@@ -3,8 +3,12 @@
 /// Gamma correction
 static uint8 gamma[257];
 #define pow __builtin_pow
-inline float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4f)-0.055; else return 12.92*c; }
-inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(255*sRGB(i/255.))); return true; }
+inline float sRGB(float c) { if(c>=0.0031308f) return 1.055f*pow(c,1/2.4f)-0.055f; else return 12.92f*c; }
+#ifdef __arm__
+inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(i)); return true; }
+#else
+//inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(255*sRGB(i/255.f))); return true; }
+#endif
 
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 
@@ -96,15 +100,8 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     return 0;
 }
 
-struct Bitmap {
-    int8* data; uint width,height;
-    Bitmap():data(0),width(0),height(0){}
-    Bitmap(uint width,uint height):data(allocate<int8>(width*height)),width(width),height(height){clear((byte*)data,height*width);}
-    int8& operator()(uint x, uint y){assert(x<width && y<height); return data[y*width+x];}
-};
-
 static int lastStepY; //dont flag first/last point twice but cancel on direction changes
-void line(Bitmap& raster, int2 p0, int2 p1) {
+void line(Bitmap<int8>& raster, int2 p0, int2 p1) {
     int x0=p0.x, y0=p0.y, x1=p1.x, y1=p1.y;
     if(y0==y1) return;
     int dx = abs(x1-x0);
@@ -122,7 +119,7 @@ void line(Bitmap& raster, int2 p0, int2 p1) {
     lastStepY=sy;
 }
 
-void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
+void curve(Bitmap<int8>& raster, int2 p0, int2 p1, int2 p2) {
     const int N=3;
     int2 a = p0;
     for(int t=1;t<=N;t++) {
@@ -137,7 +134,7 @@ int truncate(int width, uint value) { return value/width*width; }
 int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
 int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
 
-void Font::render(Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {
+void Font::render(Bitmap<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
     DataStream s=DataStream::byReference(ref<byte>(glyf +start, length), true);
@@ -150,7 +147,7 @@ void Font::render(Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yM
         yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
         int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin);
-        raster = Bitmap(width+1,height+1);
+        raster = Bitmap<int8>(width+1,height+1);
     } else s.advance(4*2); //TODO: resize as needed
 
     if(numContours>0) {
@@ -231,18 +228,18 @@ Glyph Font::glyph(uint16 index, int fx) { //fx=0;
 
     // map unicode to glyf outline
     glyph.advance = scale(swap16(hmtx[2*index]));
-    Bitmap raster; int16 xMin,xMax,yMin,yMax;
+    Bitmap<int8> raster; int16 xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
     if(!raster.data) return Glyph(glyph);
     glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
 
     int width=raster.width,height=raster.height;
 #if 0
-    glyph.image = Image<uint8>(width,height);
+    glyph.image = Image(width,height);
     for(int y=0; y<height; y++) {
         int acc=0;
         for(int x=0; x<width; x++) {
-            glyph.image(x,y) = 128+raster(x,y)*63+acc*31;
+            glyph.image(x,y) = byte4(128+raster(x,y)*63+acc*31);
             acc += raster(x,y);
         }
     }
@@ -257,28 +254,27 @@ Glyph Font::glyph(uint16 index, int fx) { //fx=0;
         }
     }
     /// Resolves supersampling (TODO: directly rasterize 16 parallel lines in target)
-    Bitmap subpixel(ceil(16,width)/16+1,height/16);
+    Bitmap<uint8> subpixel(ceil(16,width)/16+1,height/16);
     for(uint y=0; y<glyph.image.height; y++) for(uint x=0; x<glyph.image.width; x++) {
-        int r=0,g=0,b=0;
-        for(int j=0; j<16; j++) {
-#define acc(c) { int sx=x*48+i-fx%16; if(sx>0 && sx<(int)raster.width) c += raster(x*48+i-fx%16,y*16+j); }
-            for(int i=0; i<16; i++) acc(r)
-            for(int i=16; i<32; i++) acc(g)
-            for(int i=32; i<48; i++) acc(b)
-#undef acc
+        int acc=0;
+        for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
+            //int sx=x*16+i-fx%16; if(sx>0 && sx<(int)raster.width) acc += raster(x*16+i-fx%16,y*16+j);
+            acc += raster(x*16+i,y*16+j);
         }
-        subpixel(x,y) = byte4(255-gamma[b],255-gamma[g],255-gamma[r],255);
+        subpixel(x,y) = acc;
     }
-    glyph.image = Image(ceil(48,width)/48+1,height/16);
+    glyph.image = Image(subpixel.width/3,subpixel.height);
     for(uint y=0; y<glyph.image.height; y++) {
         for(uint x=0; x<glyph.image.width; x++) {
-            uint8 filter[5] = {1, 4, 6, 4, 1};
-            int r=0,g=0,b=0;
-            for(int i=0;i<5;i++) if(x+i-2>0 && x+i-2<glyph.image.width) sum+=filter[i]*line[x+i-2,y];
-            glyph.image(x,y) = byte4(sum/16);
+            //uint8 filter[5] = {1, 4, 6, 4, 1};
+            //int4 pixel;
+            //for(int c=0;c<3;c++) for(int i=0;i<5;i++) if(x*3+c+i-2>0 && x*3+c+i-2<glyph.image.width) pixel[c]+=filter[i]*subpixel(x*3+c+i-2,y);
+            //glyph.image(x,y) = byte4(pixel/16);
+            int p = subpixel(x*3,y); //(subpixel(x*3,y)+subpixel(x*3+1,y)+subpixel(x*3+2,y))/3;
+            glyph.image(x,y) = byte4(max(0,255-p),max(0,255-p),max(0,255-p),255); //min(255,p)
         }
     }
 #endif
-    unallocate(raster.data,raster.w*raster.h);
+    unallocate(raster.data,raster.width*raster.height);
     return Glyph(glyph);
 }

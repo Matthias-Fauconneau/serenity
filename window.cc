@@ -99,6 +99,7 @@ void Window::event(const pollfd& poll) {
         }
         framebuffer = share(buffer);
         currentClip=Rect(framebuffer.size());
+#ifndef __arm__
         // Oxygen like radial gradient background
         int2 center = int2(size.x/2,0); int radius=256;
         for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
@@ -107,7 +108,9 @@ void Window::event(const pollfd& poll) {
             int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
             framebuffer(x,y) = byte4(g,g,g,opacity);
         }
+#else
         fill(currentClip,white);
+#endif
         //feather edges //TODO: client side shadow
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
         if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;

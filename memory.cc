@@ -2,7 +2,7 @@
 #include "core.h"
 #include "linux.h"
 
-#ifdef STANDALONE
+#if 1
 byte* heapEnd;
 byte* systemEnd;
 void setupHeap() { systemEnd = heapEnd = (byte*)brk(0); }

@@ -40,7 +40,7 @@ template void filter<ia,2>(byte4* dst, const byte* raw, int width, int height, i
 template void filter<rgb,3>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 template void filter<rgba,4>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 
-Image<byte4> decodePNG(const ref<byte>& file) {
+Image decodePNG(const ref<byte>& file) {
     DataStream s(array<byte>(file.data,file.size), true);
     assert(s.get(8)=="\x89PNG\r\n\x1A\n"_);
     s.advance(8);
@@ -53,7 +53,7 @@ Image<byte4> decodePNG(const ref<byte>& file) {
         if(name == "IHDR"_) {
             width = s.read(), height = s.read();
             uint8 unused bitDepth = s.read();
-            if(bitDepth!=8){ warn("Unsupported PNG bitdepth"_,bitDepth); return Image<byte4>(); }
+            if(bitDepth!=8){ warn("Unsupported PNG bitdepth"_,bitDepth); return Image(); }
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
@@ -73,7 +73,7 @@ Image<byte4> decodePNG(const ref<byte>& file) {
         assert(s);
     }
     array<byte> data = inflate(buffer, true);
-    if(data.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image<byte4>(); }
+    if(data.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
     byte* src=data.data();
@@ -101,5 +101,5 @@ Image<byte4> decodePNG(const ref<byte>& file) {
         rgb3* lookup = (rgb3*)palette.data();
         for(uint i=0;i<width*height;i++) image[i]=lookup[image[i].r];
     }
-    return Image<byte4>(image,width,height,width,true,depth==2||depth==4);
+    return Image(image,width,height,width,true,depth==2||depth==4);
 }

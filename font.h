@@ -14,6 +14,13 @@ struct Glyph {
     Glyph(const Glyph& o):offset(o.offset),advance(o.advance),image(share(o.image)){}
 };
 
+template<class T> struct Bitmap {
+    T* data; uint width,height;
+    Bitmap():data(0),width(0),height(0){}
+    Bitmap(uint width,uint height):data(allocate<T>(width*height)),width(width),height(height){clear((byte*)data,height*width);}
+    T& operator()(uint x, uint y){assert(x<width && y<height); return data[y*width+x];}
+};
+
 /// Truetype font renderer stub
 struct Font {
     Map keep;
@@ -34,5 +41,5 @@ struct Font {
     /// \a x fractional part is used to return subpixel positionned images
     Glyph glyph(uint16 index, int x=0);
 private:
-    void render(struct Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
+    void render(Bitmap<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 };
