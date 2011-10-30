@@ -1,3 +1,8 @@
-build
-*.pro.user
 Makefile
+debug
+release
+test
+*.config
+*.files
+*.includes
+*.creator*
