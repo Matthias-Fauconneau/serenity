@@ -1,3 +1,4 @@
+#pragma once
 #include "string.h"
 #include <poll.h>
 
@@ -10,7 +11,6 @@ struct Application {
 
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
-	Poll(bool autoRegister=true) { if(autoRegister) registerPoll(); }
 	/// Add this to the process-wide event loop
 	void registerPoll();
 	/// Remove this from the process-wide event loop

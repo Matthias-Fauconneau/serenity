@@ -1,5 +1,6 @@
 #include "string.h"
 #include "gl.h"
+#include "process.h"
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
@@ -64,11 +65,23 @@ struct Stack : Layout {
 	void update() { for(auto& child : *this) { child.position=Widget::position; child.size=Widget::size; child.update(); } };
 };
 
-struct Window : WidgetLayout<Stack> {
-	virtual void rename(const string& name) =0;
-	virtual void resize(int2 size) =0;
-	virtual void render() =0;
-	static Window* instance();
+typedef struct _XDisplay Display;
+typedef struct __GLXcontextRec* GLXContext;
+typedef unsigned long XWindow;
+struct Window : WidgetLayout<Stack>, Poll {
+	Display* x;
+	GLXContext ctx;
+	XWindow window;
+
+	Window(int2 size);
+	~Window();
+
+	pollfd poll() override;
+	bool event(pollfd) override;
+
+	void rename(const string& name);
+	void resize(int2 size);
+	void render();
 };
 
 struct Horizontal : Layout {
@@ -111,17 +124,22 @@ typedef ValueList<Text> TextList;
 
 struct GLTexture;
 struct Image;
-struct Button : Widget {
-	GLTexture enable;
-	GLTexture disable;
+struct TriggerButton : Widget {
+	GLTexture icon;
 	int size=32;
-	bool toggle=false;
-	bool enabled=false;
 	signal() triggered;
-	signal(bool) toggled;
+	TriggerButton(const Image& icon);
+	int2 sizeHint();
+	void render(vec2 scale, vec2 offset);
+	bool event(int2, int event, int state);
+};
 
-	void setIcon(const Image& icon);
-	void setCheckable(const Image& enable,const Image& disable);
+struct ToggleButton : Widget {
+	GLTexture enableIcon, disableIcon;
+	int size=32;
+	bool enabled=false;
+	signal(bool) toggled;
+	ToggleButton(const Image& enable,const Image& disable);
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
 	bool event(int2, int event, int state);

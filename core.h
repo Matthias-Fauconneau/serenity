@@ -152,15 +152,20 @@ void log_(const char* s);
 template<class A, class... Args> void log_(const A& a, const Args&... args) { log_(a); log_(' '); log_(args...); }
 template<class... Args> void log(const Args&... args) { log_(args...); log_('\n'); }
 
+#if TRACE
 extern bool trace_enable;
 #define trace_on  trace_enable=true;
 #define trace_off trace_enable=false;
-void logBacktrace();
+#else
+#define trace_on
+#define trace_off
+#endif
+void logTrace();
 
 extern "C" void abort() throw() __attribute((noreturn));
-#define fail(args...) ({ logBacktrace(); log_("Critical Failure:\t"); log(args); abort(); })
+#define fail(args...) ({ trace_off; logTrace(); log_("Critical Failure:\t"); log(args); abort(); })
 #undef assert
-#define assert(expr, args...) ({ if(!(expr)) { logBacktrace(); log_("Assertion Failure:\t"); log(#expr, ## args); abort(); } })
+#define assert(expr, args...) ({ if(!(expr)) { trace_off; logTrace(); log_("Assertion Failure:\t"); log(#expr, ## args); abort(); } })
 
 /// virtual iteration
 
@@ -176,14 +181,14 @@ template<class T> struct abstract_iterator {
 template<class T> struct value_iterator : abstract_iterator<T> {
 	int value_size;
 	template <class D> value_iterator(D* index) : abstract_iterator<T>(index), value_size(sizeof(D)) {}
-	T& operator* () const override { return *(T*)this->index; }
-	const abstract_iterator<T>& operator++() override { this->index+=value_size; return *this; }
+	T& operator* () const { return *(T*)this->index; }
+	const abstract_iterator<T>& operator++() { this->index+=value_size; return *this; }
 };
 // abstract_iterator implementation dereferencing an array of T*
 template<class T> struct dereference_iterator : abstract_iterator<T> {
 	dereference_iterator(T** index) : abstract_iterator<T>(index) {}
-	T& operator* () const override { return **(T**)this->index; }
-	const abstract_iterator<T>& operator++() override { this->index+=sizeof(T*); return *this; }
+	T& operator* () const { return **(T**)this->index; }
+	const abstract_iterator<T>& operator++() { this->index+=sizeof(T*); return *this; }
 };
 // virtual_iterator forwards to an abstract iterator (dynamic dispatch)
 template<class T> struct virtual_iterator {

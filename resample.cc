@@ -77,109 +77,87 @@ static float sinc(double cutoff, double x, int N) {
 
 static int gcd(int a, int b) { while( b != 0 ) { int t = b; b = a % b; a = t; } return a; }
 
-struct Speex : Resampler {
-	int channelCount=1;
-	int sourceRate=0;
-	int targetRate=0;
-
-	float* kernel=0;
-	int N=0;
-
-	float* mem=0;
-	int memSize=0;
-
-	int integerAdvance=0;
-	int decimalAdvance=0;
-
-	struct {
-		int integerIndex=0;
-		int decimalIndex=0;
-	} channels[8];
-
-	void setup(int channelCount, int sourceRate, int targetRate) {
-		assert(channelCount <= 8);
-		this->channelCount = channelCount;
-		int factor = gcd(sourceRate,targetRate);
-		this->sourceRate = sourceRate/=factor;
-		this->targetRate = targetRate/=factor;
+void Resampler::setup(int channelCount, int sourceRate, int targetRate) {
+	assert(channelCount <= 8);
+	this->channelCount = channelCount;
+	int factor = gcd(sourceRate,targetRate);
+	this->sourceRate = sourceRate/=factor;
+	this->targetRate = targetRate/=factor;
 
 
-		float cutoff;
-		if (sourceRate > targetRate) { //downsampling
-			cutoff = bandwidth * targetRate / sourceRate;
-			N = filterSize * sourceRate / targetRate;
-			N &= (~0x3); // Round down to make sure we have a multiple of 4
-		} else { //upsampling
-			cutoff = bandwidth;
-			N = filterSize;
-		}
-
-		kernel = new float[N*targetRate];
-		for(int i=0;i<targetRate;i++) {
-			for (int j=0;j<N;j++) {
-				kernel[i*N+j] = sinc(cutoff, (j-N/2+1)-float(i)/targetRate, N);
-			}
-		}
-
-		integerAdvance = sourceRate/targetRate;
-		decimalAdvance = sourceRate%targetRate;
-
-		const int bufferSize=160;
-		memSize = N-1+bufferSize;
-		mem = new float[channelCount*memSize];
-		clear(mem,channelCount*memSize);
+	float cutoff;
+	if (sourceRate > targetRate) { //downsampling
+		cutoff = bandwidth * targetRate / sourceRate;
+		N = filterSize * sourceRate / targetRate;
+		N &= (~0x3); // Round down to make sure we have a multiple of 4
+	} else { //upsampling
+		cutoff = bandwidth;
+		N = filterSize;
 	}
 
-	~Speex() { delete mem; delete kernel; }
+	kernel = new float[N*targetRate];
+	for(int i=0;i<targetRate;i++) {
+		for (int j=0;j<N;j++) {
+			kernel[i*N+j] = sinc(cutoff, (j-N/2+1)-float(i)/targetRate, N);
+		}
+	}
 
-	void filter(const float* source, int *sourceSize, float* target, int *targetSize) {
-		int ilen=0, olen=0;
-		for (int channel=0;channel<channelCount;channel++) {
-			const float* in = source+channel;
-			float* out = target+channel;
-			ilen = *sourceSize;
-			olen = *targetSize;
-			while (ilen && olen) {
-				const int filterOffset = N - 1;
-				const int xlen = memSize - filterOffset;
-				int ichunk = (ilen > xlen) ? xlen : ilen;
-				int ochunk = olen;
+	integerAdvance = sourceRate/targetRate;
+	decimalAdvance = sourceRate%targetRate;
 
-				float *x = mem + channel * memSize; //TODO: avoid copy (interleaved sinc lookup)
-				for(int j=0;j<ichunk;++j) x[j+filterOffset]=in[j*channelCount];
+	const int bufferSize=160;
+	memSize = N-1+bufferSize;
+	mem = new float[channelCount*memSize];
+	clear(mem,channelCount*memSize);
+}
+Resampler::operator bool() { return kernel; }
+Resampler::~Resampler() { delete mem; delete kernel; }
 
-				int targetIndex = 0;
-				int& integerIndex = channels[channel].integerIndex;
-				int& decimalIndex = channels[channel].decimalIndex;
+void Resampler::filter(const float* source, int *sourceSize, float* target, int *targetSize) {
+	int ilen=0, olen=0;
+	for (int channel=0;channel<channelCount;channel++) {
+		const float* in = source+channel;
+		float* out = target+channel;
+		ilen = *sourceSize;
+		olen = *targetSize;
+		while (ilen && olen) {
+			const int filterOffset = N - 1;
+			const int xlen = memSize - filterOffset;
+			int ichunk = (ilen > xlen) ? xlen : ilen;
+			int ochunk = olen;
 
-				while (!(integerIndex >= (int)ichunk || targetIndex >= (int)ochunk)) {
-					const float *sinc = & kernel[decimalIndex*N];
-					const float *iptr = & x[integerIndex];
+			float *x = mem + channel * memSize; //TODO: avoid copy (interleaved sinc lookup)
+			for(int j=0;j<ichunk;++j) x[j+filterOffset]=in[j*channelCount];
 
-					out[channelCount * targetIndex++] = inner_product_single(sinc, iptr, N);
-					integerIndex += integerAdvance;
-					decimalIndex += decimalAdvance;
-					if (decimalIndex >= targetRate) {
-						decimalIndex -= targetRate;
-						integerIndex++;
-					}
+			int targetIndex = 0;
+			int& integerIndex = channels[channel].integerIndex;
+			int& decimalIndex = channels[channel].decimalIndex;
+
+			while (!(integerIndex >= (int)ichunk || targetIndex >= (int)ochunk)) {
+				const float *sinc = & kernel[decimalIndex*N];
+				const float *iptr = & x[integerIndex];
+
+				out[channelCount * targetIndex++] = inner_product_single(sinc, iptr, N);
+				integerIndex += integerAdvance;
+				decimalIndex += decimalAdvance;
+				if (decimalIndex >= targetRate) {
+					decimalIndex -= targetRate;
+					integerIndex++;
 				}
-
-				if (integerIndex < (int)ichunk) ichunk = integerIndex;
-				ochunk = targetIndex;
-				integerIndex -= ichunk;
-
-				for(int j=0;j<N-1;++j) x[j] = x[j+ichunk];
-
-				ilen -= ichunk;
-				olen -= ochunk;
-				out += ochunk * channelCount;
-				in += ichunk * channelCount;
 			}
-		}
-		*sourceSize -= ilen;
-		*targetSize -= olen;
-	}
-};
 
-Resampler* Resampler::instance() { return new Speex(); }
+			if (integerIndex < (int)ichunk) ichunk = integerIndex;
+			ochunk = targetIndex;
+			integerIndex -= ichunk;
+
+			for(int j=0;j<N-1;++j) x[j] = x[j+ichunk];
+
+			ilen -= ichunk;
+			olen -= ochunk;
+			out += ochunk * channelCount;
+			in += ichunk * channelCount;
+		}
+	}
+	*sourceSize -= ilen;
+	*targetSize -= olen;
+}

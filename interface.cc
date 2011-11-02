@@ -74,13 +74,11 @@ Text::Text(int fontSize, string&& text) : fontSize(fontSize), font(Font::instanc
 
 int2 Text::sizeHint() {
 	int widestLine = 0, width=0, height=font->height();
-	trace_off
 	for(char c: text) {
 		if(c=='\n') { widestLine=max(width,widestLine); width=0; height+=font->height(); continue; }
 		const Font::Glyph& glyph = font->glyph(c);
 		width += glyph.advance.x;
 	}
-	trace_on
 	widestLine=max(width,widestLine);
 	return int2(widestLine,height);
 }
@@ -158,30 +156,30 @@ void List::render(vec2 scale, vec2 offset) {
 	glQuad(flat,vec2(current.position-int2(margin,margin)), vec2(current.position+current.size+int2(margin,margin)));
 }
 
-/// Button //TODO: split TriggerButton | ToggleButton
+/// TriggerButton
 
-void Button::setIcon(const Image& icon) { enable=icon; }
-void Button::setCheckable(const Image& enableIcon, const Image& disableIcon) {
-	enable=enableIcon, disable=disableIcon, toggle=false;
-}
-
-int2 Button::sizeHint() { return int2(size,size); }
-
-void Button::render(vec2 scale, vec2 offset) {
+TriggerButton::TriggerButton(const Image& icon) : icon(icon) {}
+int2 TriggerButton::sizeHint() { return int2(size,size); }
+void TriggerButton::render(vec2 scale, vec2 offset) {
 	blit.bind(); blit["scale"]=scale; blit["offset"]=offset;
-	(enabled && disable?disable:enable).bind();
+	icon.bind();
 	glQuad(blit,vec2(0,0),vec2(Widget::size),true);
-	if(enabled && !disable) {
-		flat.bind();
-		flat["scale"]=scale; flat["offset"]=offset; flat["color"]=vec4(6.0/8,6.0/8,6.0/8,1);
-		glQuad(flat,vec2(-1,-1),vec2(Widget::size+int2(1,1)));
-	}
+}
+bool TriggerButton::event(int2, int event, int state) {
+	if(event==LeftButton && state==Pressed) emit(triggered);
+	return true;
 }
 
-bool Button::event(int2, int event, int state) {
-	if(event==LeftButton && state==Pressed) {
-		if(toggle) { enabled = !enabled; emit(toggled,enabled); }
-		else emit(triggered);
-	}
+///  ToggleButton
+
+ToggleButton::ToggleButton(const Image& enableIcon, const Image& disableIcon) : enableIcon(enableIcon), disableIcon(disableIcon) {}
+int2 ToggleButton::sizeHint() { return int2(size,size); }
+void ToggleButton::render(vec2 scale, vec2 offset) {
+	blit.bind(); blit["scale"]=scale; blit["offset"]=offset;
+	(enabled?disableIcon:enableIcon).bind();
+	glQuad(blit,vec2(0,0),vec2(Widget::size),true);
+}
+bool ToggleButton::event(int2, int event, int state) {
+	if(event==LeftButton && state==Pressed) { enabled = !enabled; emit(toggled,enabled); }
 	return true;
 }
