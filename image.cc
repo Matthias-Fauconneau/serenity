@@ -1,4 +1,6 @@
 #include "image.h"
+#include "vector.h"
+#include "string.h"
 #include <zlib.h>
 
 Image::Image(uint8* file, int size) {

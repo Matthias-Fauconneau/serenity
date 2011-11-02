@@ -1,7 +1,9 @@
 #include "font.h"
+#define strlen _strlen
 #include <ft2build.h>
 #include <freetype/freetype.h>
 #include <freetype/ftlcdfil.h>
+#undef strlen
 
 static FT_Library ft;
 
@@ -37,8 +39,6 @@ struct FreeType : Font {
 			data[y*width+x] = byte4(255-rgb[0],255-rgb[1],255-rgb[2],clip(0,rgb[0]+rgb[1]+rgb[2],255));
 		}
 		glyph.texture = GLTexture(Image((uint8*)data,width,height,4));
-		assert(glyph);
-		delete[] data;
 		return glyph;
 	}
 };
@@ -46,6 +46,6 @@ struct FreeType : Font {
 Font* Font::instance(int size) {
 	static map<int,Font*> fonts;
 	Font*& font = fonts[size];
-	if(!font) font = new FreeType(_("/usr/share/fonts/dejavu/DejaVuSans.ttf"),size);
+	if(!font) font = new FreeType(_("/usr/share/fonts/dejavu/DejaVuSansMono.ttf"),size);
 	return font;
 }

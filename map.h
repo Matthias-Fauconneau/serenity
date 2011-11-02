@@ -1,10 +1,11 @@
 #pragma once
 #include "core.h"
+#include "array.h"
 
 template <class K, class V> struct const_pair { const K& key; const V& value; };
 template <class K, class V> struct pair { K& key; V& value; };
 template <class K, class V> struct map {
-	DefaultConstructor(map); MoveOnly(map);
+	map(){} no_copy(map)
 	int size() const { return keys.size; }
 	bool contains(const K& key) const { return keys.contains(key); }
 	explicit operator bool() const { return keys.size; }
@@ -17,7 +18,6 @@ template <class K, class V> struct map {
 	perfect(K) V& operator [](Kf&& key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(forward<Kf>(key)); }
 	void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
-	/// iterators
 	struct const_iterator {
 		const K* k; const V* v;
 		const_iterator(const K* k, const V* v) : k(k), v(v) {}
@@ -42,3 +42,9 @@ template <class K, class V> struct map {
 	array<K> keys;
 	array<V> values;
 };
+
+template<class K, class V> void log_(const map<K,V>& m) {
+	log_('{');
+	for(int i=0;i<m.size();i++) { log_(m.keys[i]); log_(": "); log_(m.values[i]); if(i<m.size()-1) log_(", "); }
+	log_('}');
+}

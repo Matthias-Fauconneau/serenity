@@ -1,5 +1,5 @@
 #pragma once
-#include "common.h"
+#include "string.h"
 
 struct AudioFormat { int frequency, channels; };
 

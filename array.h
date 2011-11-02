@@ -1,34 +1,29 @@
 #pragma once
+#include "core.h"
 #include <initializer_list>
 
 template <class T> struct array {
-	array() = default;
+	array(){}
 	array(array& o) = delete;
 	array& operator=(const array&) = delete;
 
 	/// move constructor
 	array(array&& o) : data(o.data), size(o.size), capacity(o.capacity) { o.capacity=0; }
 	/// move constructor with conversion
-	template <class O> explicit array(array<O>&& o) :
-		data((const T*)o.data), size(o.size*sizeof(O)/sizeof(T)), capacity(o.capacity*sizeof(O)/sizeof(T)) { o.capacity=0; }
+	template <class O> explicit array(array<O>&& o)
+	: data((const T*)o.data), size(o.size*sizeof(O)/sizeof(T)), capacity(o.capacity*sizeof(O)/sizeof(T)) { o.capacity=0; }
 	/// move assigment
-	array& operator=(array&& o)
-		{ this->~array(); data=o.data; size=o.size; capacity=o.capacity; o.capacity=0; return *this; }
+	array& operator=(array&& o) { this->~array(); data=o.data; size=o.size; capacity=o.capacity; o.capacity=0; return *this; }
 	/// allocate a new uninitialized array for \a capacity elements
-	explicit array(int capacity) :
-		data((T*)malloc((size_t)capacity*sizeof(T))), capacity(capacity) { assert(capacity>0); }
+	explicit array(int capacity) : data((T*)malloc((size_t)capacity*sizeof(T))), capacity(capacity) { assert(capacity>0); }
 	/// allocate a new array with \a size elements initialized to \a value
-	explicit array(int size, const T& value) :
-		data((T*)malloc(size*sizeof(T))), capacity(size) { assert(size>0); for(int i=0;i<size;i++) append(value); }
+	explicit array(int size, const T& value) : data((T*)malloc(size*sizeof(T))), capacity(size) { for(int i=0;i<size;i++) append(value); }
 	/// reference elements from an initalizer \a list
-	explicit array(const std::initializer_list<T>& list) :
-		data((T*)list.begin()), size((int)list.size()) {}
-	/// reference \a size elements from existing buffer \a data
-	explicit array(const T* data, int size)
-			 : data(data), size(size) { assert(size>=0); assert(data); }
+	explicit array(const std::initializer_list<T>& list) : data((T*)list.begin()), size((int)list.size()) {}
+	/// reference \a size elements from existing \a data
+	explicit array(const T* data, int size) : data(data), size(size) { assert(size>=0); assert(data); }
 	/// reference elements sliced from \a begin to \a end
-	explicit array(const T* begin,const T* end)
-	: data(begin), size(int(end-begin)) { assert(size>=0); assert(data); }
+	explicit array(const T* begin,const T* end) : data(begin), size(int(end-begin)) { assert(size>=0); assert(data); }
 	/// if \a this own the data, destroy all initialized elements and free the buffer
 	~array() { if(capacity) { for(int i=0;i<size;i++) data[i].~T(); free((void*)data); } }
 
@@ -48,7 +43,7 @@ template <class T> struct array {
 		}
 	}
 	bool isSlice() { return !capacity; }
-	void detach() { if(size) reserve(size); }
+	void detach() { assert(size); if(!capacity) reserve(size); }
 	void clear() { shrink(0); }
 	void copy(T* dst) const { ::copy(dst,data,size); }
 
@@ -101,7 +96,7 @@ template <class T> struct array {
 
 	/// remove
 	void removeAt(int i) { detach(); size--; memmove((void*)(data+i),data+i+1,size_t(size-i));}
-	void removeLast() { removeAt(size-1); }
+	void removeLast() { assert(size); removeAt(size-1); }
 	void removeOne(T v) { int i=indexOf(v); assert(i>=0); removeAt(i); }
 
 	/// insert
@@ -112,24 +107,10 @@ template <class T> struct array {
 	array<T>& operator <<(array<T>&& v) { append(move(v)); return *this; }
 
 	/// iterators
-	struct const_iterator {
-		const T* t;
-		const_iterator(const T* t) : t(t) {}
-		bool operator!=(const const_iterator& o) const { return t != o.t; }
-		const T& operator* () const { return *t; }
-		const const_iterator& operator++ () { t++; return *this; }
-	};
-	const_iterator begin() const { return const_iterator(data); }
-	const_iterator end() const { return const_iterator(&data[size]); }
-	struct iterator {
-		T* t;
-		iterator(T* t) : t(t) {}
-		bool operator!=(const iterator& o) const { return t != o.t; }
-		T& operator* () const { return *t; }
-		const iterator& operator++ () { t++; return *this; }
-	};
-	iterator begin() { detach(); return iterator((T*)data); }
-	iterator end() { return iterator((T*)&data[size]); }
+	const T* begin() const { return data; }
+	const T* end() const { return &data[size]; }
+	T* begin() { if(size) detach(); return (T*)data; }
+	T* end() { return (T*)&data[size]; }
 
 	public:
 	const T* data = 0;
@@ -146,4 +127,8 @@ template <class A, class T> struct cat {
 };
 template <class A, class T> cat<A,T> operator +(const A& a,const array<T>& b) { return cat<A,T>(a,b); }
 
-inline void log_(const string& s) { write(1,s.data,(size_t)s.size); }
+template<class T> void log_(const array<T>& a) {
+	log_('[');
+	for(int i=0;i<a.size;i++) { log_(a[i]); if(i<a.size-1) log_(_(", ")); }
+	log_(']');
+}

@@ -77,8 +77,8 @@ bool GLShader::compile(const array<string>& vertex, const array<string>& fragmen
 
 void GLShader::bind() {
 	if(!id && name) {
-		compile(array<string>({_("vertex"),string(name,(int)strlen(name))}),
-				array<string>({_("fragment"),string(name,(int)strlen(name))}));
+		compile(array<string>({_("vertex"),strz(name)}),
+				array<string>({_("fragment"),strz(name)}));
 	}
 	glUseProgram(id);
 }
@@ -103,13 +103,13 @@ GLShader blit("blit");
 
 /// Texture
 
-GLTexture::GLTexture(const Image& image) : Image(image) {
+GLTexture::GLTexture(const Image& image) : Image(0,image.width,image.height,image.depth) {
     glCheck;
     if(!id) glGenTextures(1, &id);
 	assert(id);
     glBindTexture(GL_TEXTURE_2D, id);
 	uint32 format[] = { 0, GL_ALPHA, GL_LUMINANCE_ALPHA, GL_RGB, GL_BGRA };
-	glTexImage2D(GL_TEXTURE_2D,0,depth,this->width=width,this->height=height,0,format[depth],GL_UNSIGNED_BYTE,data);
+	glTexImage2D(GL_TEXTURE_2D,0,depth,this->width=width,this->height=height,0,format[depth],GL_UNSIGNED_BYTE,image.data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glCheck;

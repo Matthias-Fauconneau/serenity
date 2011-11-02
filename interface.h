@@ -1,96 +1,127 @@
-#include "common.h"
-#include <poll.h>
+#include "string.h"
+#include "gl.h"
 
-struct Poll {
-	Poll(bool autoRegister=true) { if(autoRegister) registerPoll(); }
-	void registerPoll();
-	void unregisterPoll();
-	virtual pollfd poll() =0;
-	virtual bool event(pollfd p) =0;
-};
+/// Widget is an abstract component to compose user interfaces
+struct Widget {
+	int2 position, size;
 
-struct Application {
-	Application();
-	virtual void start(array<string>&& args) =0;
-};
-
-struct Widget : array<Widget*> {
-	int count() { return array::size; }
-
-	enum Event { Motion, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp /*XK_ ...*/ };
+	enum Event { Motion, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp /*TODO: X keys*/ };
 	enum State { Released=0, Pressed=1 };
-	virtual bool event(int2 position, int event, int state) {
-		for(Widget* child : *this) {
-			if(position>child->position && position<child->position+child->size) {
-				if(child->event(position-child->position,event,state)) return true;
+	/// Preferred size (0 means expand)
+	virtual int2 sizeHint()=0;
+	/// Render this widget. use \a view to scale from widget coordinates (0-size) to viewport
+	virtual void render(vec2 scale, vec2 offset) =0;
+	/// Notify objects to process \a position,\a size or derived member changes
+	virtual void update() {};
+	/// Notify objects to process a new user event
+	virtual bool event(int2 /*position*/, int /*event*/, int /*state*/) { return false; };
+
+	//operator Widget() { return *this; } //hack to allow . syntax in Layout<Widget*>
+};
+
+/// Layout is a widget presenting other widgets
+struct Layout : Widget {
+	/// Allow to specialize child widgets storage (\sa WidgetLayout ItemLayout)
+	virtual virtual_iterator<Widget> begin() =0;
+	virtual virtual_iterator<Widget> end() =0;
+	virtual Widget& operator[](int) =0;
+
+	bool event(int2 position, int event, int state) {
+		for(auto& child : *this) {
+			if(position > child.position && position < child.position+child.size) {
+				if(child.event(position-child.position,event,state)) return true;
 			}
 		}
 		return false;
 	}
-
-	int2 position, size;
-	virtual void render(vec2 scale, vec2 offset) { for(Widget* child : *this) child->render(scale,offset+vec2(child->position)*scale); }
-	virtual int2 sizeHint() =0;
-	virtual void update() {
-		for(Widget* child : *this) { child->position=position; child->size=size; child->update(); } //default stack layout
-	};
-	virtual void debug() {
-		log_(position.x);log_(",");log_(position.y);log_(" ");log_(size.x);log_("x");log_(size.y);
-		if(array::size) { log_(" {"); for(Widget* child : *this) { child->debug();log_(" ");} log_("}"); }
+	void render(vec2 scale, vec2 offset) {
+		for(auto& child : *this) child.render(scale,offset+vec2(child.position)*scale);
 	}
 };
 
-struct Window : Widget {
-	int2 sizeHint() { return int2(0,0); }
+/// implements Layout storage using array<Widget*> (i.e by reference)
+template<class L> struct WidgetLayout : L {
+	array<Widget*> widgets;
+	virtual_iterator<Widget> begin() { return new dereference_iterator<Widget>(widgets.begin()); }
+	virtual_iterator<Widget> end() { return new dereference_iterator<Widget>(widgets.end()); }
+	int count() { return widgets.size; }
+	WidgetLayout& operator <<(Widget* w) { widgets << w; return *this; }
+	Widget& operator[](int i) { return *widgets[i]; }
+};
+
+/// implements Layout storage using array<T> (i.e by value)
+template<class L, class T> struct ItemLayout : L {
+	array<T> items;
+	virtual_iterator<Widget> begin() { return new value_iterator<Widget>(items.begin()); }
+	virtual_iterator<Widget> end() { return new value_iterator<Widget>(items.end()); }
+	int count() { return items.size; }
+	ItemLayout& operator <<(T&& t) { items << move(t); return *this; }
+	Widget& operator[](int i) { return items[i]; }
+};
+
+struct Stack : Layout {
+	int2 sizeHint() { int2 size; for(auto& child : *this) size=max(size,child.size); return size; }
+	void update() { for(auto& child : *this) { child.position=Widget::position; child.size=Widget::size; child.update(); } };
+};
+
+struct Window : WidgetLayout<Stack> {
 	virtual void rename(const string& name) =0;
 	virtual void resize(int2 size) =0;
 	virtual void render() =0;
 	static Window* instance();
 };
 
-struct Horizontal : Widget {
+struct Horizontal : Layout {
 	int margin = 4;
 	int2 sizeHint();
 	void update();
 };
+typedef WidgetLayout<Horizontal> HBox;
 
-struct Vertical : Widget {
+struct Vertical : Layout {
 	int margin = 4;
 	int2 sizeHint();
 	void update();
 };
+typedef WidgetLayout<Vertical> VBox;
 
 struct List : Vertical {
-	int current=-1;
+	int index=-1;
 	signal(int) currentChanged;
-	inline Widget* currentItem() { return at(current); }
 
 	bool event(int2 position, int event, int state);
 	void render(vec2 scale, vec2 offset);
 };
 
+template<class T> struct ValueList : ItemLayout<List, T> {
+	inline T& current() { return this->items[this->index]; }
+};
+
 struct Font;
 struct Text : Widget {
-	Font* font;
+	int fontSize=0;
+	Font* font=0;
 	string text;
-	int fontSize = 16;
-	Text(string&& text, int fontSize);
+	Text(int fontSize=10, string&& text=string());
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
 };
 
+typedef ValueList<Text> TextList;
+
 struct GLTexture;
 struct Image;
 struct Button : Widget {
-	GLTexture* enable=0;
-	GLTexture* disable=0;
+	GLTexture enable;
+	GLTexture disable;
 	int size=32;
 	bool toggle=false;
 	bool enabled=false;
-	signal(bool) triggered;
+	signal() triggered;
+	signal(bool) toggled;
 
-	Button(const Image& icon,bool toggle=false);
-	Button(const Image& enable,const Image& disable);
+	void setIcon(const Image& icon);
+	void setCheckable(const Image& enable,const Image& disable);
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
 	bool event(int2, int event, int state);

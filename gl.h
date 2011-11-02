@@ -1,5 +1,7 @@
 #pragma once
-#include "common.h"
+#include "string.h"
+#include "vector.h"
+#include "map.h"
 #include "image.h"
 
 struct GLUniform {
@@ -10,7 +12,7 @@ struct GLUniform {
 	int id;
 };
 struct GLShader {
-	MoveOnly(GLShader);
+	no_copy(GLShader)
 	GLShader(const char* name) : name(name) {}
 	bool compileShader(uint id, uint type, const array<string>& tags);
 	bool compile(const array<string>& vertex, const array<string>& fragment);
@@ -30,7 +32,7 @@ extern GLShader flat;
 extern GLShader blit;
 
 struct GLTexture : Image {
-	GLTexture()=default;
+	GLTexture(){}
 	GLTexture(const Image& image);
 	operator bool() { return id; }
     void bind();

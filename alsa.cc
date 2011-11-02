@@ -1,40 +1,25 @@
-#include <unistd.h>
+#include "process.h"
+#include "media.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-//#include <string.h>
-#include <fcntl.h>
-#include <assert.h>
-#include <endian.h>
-#include <sys/poll.h>
-#include <errno.h>
-#include <stdarg.h>
 
-#include <alsa/asoundef.h>
-#include <alsa/version.h>
 #include <alsa/global.h>
 #include <alsa/input.h>
 #include <alsa/output.h>
-#include <alsa/error.h>
 #include <alsa/conf.h>
 #include <alsa/pcm.h>
-#include <alsa/rawmidi.h>
 #include <alsa/timer.h>
-#include <alsa/hwdep.h>
 #include <alsa/control.h>
-#include <alsa/mixer.h>
 #include <alsa/seq_event.h>
 #include <alsa/seq.h>
-#include <alsa/seqmid.h>
-#include <alsa/seq_midi_event.h>
-
-#include "media.h"
-#include "interface.h"
 
 struct ALSA : AudioOutput, Poll {
     snd_pcm_t* pcm=0;
     snd_pcm_uframes_t period;
     AudioInput* input=0;
     AudioFormat format{48000,2};
+	bool running=false;
 
 	ALSA() : Poll(false) {
         snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK|SND_PCM_NO_SOFTVOL);
@@ -56,8 +41,8 @@ struct ALSA : AudioOutput, Poll {
 	}
 	void setInput(AudioInput* input) { this->input=input; input->setup(format); }
     pollfd poll() { pollfd p; snd_pcm_poll_descriptors(pcm,&p,1); return p; }
-	void start() { registerPoll(); }
-	void stop() { snd_pcm_drain(pcm); unregisterPoll(); }
+	void start() { if(running) return; registerPoll(); running=true; }
+	void stop() { if(!running) return;  snd_pcm_drain(pcm); unregisterPoll(); running=false; }
     bool event(pollfd p) {
 		assert(input);
         unsigned short revents;

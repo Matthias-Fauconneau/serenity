@@ -1,5 +1,4 @@
-/* Copyright (C) 2007-2008 Jean-Marc Valin
-   Copyright (C) 2008      Thorvald Natvig
+/* Copyright (C) 2007-2008 Jean-Marc Valin, Thorvald Natvig
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -28,12 +27,10 @@
    POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "common.h"
 #include "media.h"
-#include <stdlib.h>
 #include <math.h>
-
 #include <emmintrin.h>
+
 static inline float inner_product_single(const float *a, const float *b, int len) {
 	__m128 sum = _mm_setzero_ps();
 	for(int i=0;i<len;i+=8) {

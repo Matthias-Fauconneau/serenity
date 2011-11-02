@@ -1,3 +1,4 @@
+#include "process.h"
 #include "interface.h"
 #include "gl.h"
 
@@ -35,7 +36,7 @@ struct X : Window, Poll {
 		}
 		return true;
 	}
-	void resize(int2 size) { this->size=size;
+	void resize(int2 size) { Widget::size=size;
 		if(window) { XResizeWindow(x,window,size.x,size.y); return; }
 		window = XCreateSimpleWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,0,0);
 		XSelectInput(x,window,KeyPressMask|ButtonPressMask|PointerMotionMask);
@@ -55,7 +56,7 @@ struct X : Window, Poll {
 	void rename(const string& name) { XStoreName(x,window,strz(name).data); }
 	void render() {
 		glClear(GL_COLOR_BUFFER_BIT);
-		Widget::render(vec2(2,-2)/vec2(size),vec2(-1,1));
+		Layout::render(vec2(2,-2)/vec2(Widget::size),vec2(-1,1));
 		flat.bind(); flat["scale"]=vec2(1,1); flat["offset"]=vec2(0,0); flat["color"] = vec4(7.0/8,7.0/8,7.0/8,1);
 		glQuad(flat,vec2(-1,-1),vec2(1,1));
 		glXSwapBuffers(x, window);
