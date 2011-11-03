@@ -2,7 +2,7 @@
 #include "core.h"
 
 //TODO: SIMD
-template <class V, class T, int N> struct vector : public V {
+template <class V, class T, int N> struct vector : V {
 	static const int size = N;
 	vector(){}
 	vector(T a, T b):V(a,b){} //vector(T a, T b):V{a,b}{}
@@ -29,11 +29,8 @@ template <class V, class T, int N> struct vector : public V {
 	inline bool operator <(const vector& v) const { for(int i=0;i<N;i++) if(u(i)>=v[i]) return false; return true; }
 	inline bool operator >=(const vector& v) const { for(int i=0;i<N;i++) if(u(i)<v[i]) return false; return true; }
 	inline bool operator <=(const vector& v) const { for(int i=0;i<N;i++) if(u(i)>v[i]) return false; return true; }
-	//inline T* begin() { return &u(0); }
-	//inline T* end() { return &u(N); }
 };
 
-//template <class V, class T, int N> struct vector;
 template <class V, class T, int N> inline void log_(const vector<V,T,N>& v) {
 	log_('(');
 	for(int i=0;i<N;i++) { log_(v[i]); if(i<N-1) log_(", "); }
@@ -41,9 +38,11 @@ template <class V, class T, int N> inline void log_(const vector<V,T,N>& v) {
 }
 
 #define map(map) \
-template <class V, class T, int N> vector<V,T,N> map(const vector<V,T,N>& v) { vector<V,T,N> r; for(int i=0;i<N;i++) r[i]=map(v[i]); return r; }
+template <class V, class T, int N> vector<V,T,N> map(const vector<V,T,N>& v){ vector<V,T,N> r; for(int i=0;i<N;i++) r[i]=map(v[i]); return r; }
 map(abs) map(min) map(max)
 #undef map
+
+template <class V, class T, int N> vector<V,T,N> mix(const vector<V,T,N>& a,const vector<V,T,N>& b, float t){ return a*t + b*(1-t); }
 
 template<class T> struct xy { T x=0,y=0; xy(){} xy(T x, T y):x(x),y(y){} };
 typedef vector<xy<int>,int,2> int2;

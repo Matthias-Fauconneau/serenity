@@ -12,7 +12,6 @@ int speex_resampler_process_interleaved_float(SpeexResamplerState *st,const floa
 
 /// Decodes audio/video files using libavcodec/libavformat.
 class(FFmpeg, AudioInput) {
-    public:
     void open(const string& path) {
         av_register_all();
         av_log_set_level(AV_LOG_WARNING);
@@ -70,8 +69,7 @@ class(FFmpeg, AudioInput) {
         }
     }
 
-    private:
-    signal(int) update;
+	signal<int> update;
     AVFormatContext* file=0;
     AVStream* audioStream=0;
     AVCodecContext* audio=0;

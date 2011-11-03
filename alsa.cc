@@ -16,7 +16,7 @@
 
 AudioOutput::AudioOutput() {
 	snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK|SND_PCM_NO_SOFTVOL);
-	snd_pcm_hw_params_t *hw; snd_pcm_hw_params_alloca(&hw); snd_pcm_hw_params_any(pcm,hw);
+	snd_pcm_hw_params_t* hw=(snd_pcm_hw_params_t*)alloca(snd_pcm_hw_params_sizeof()); snd_pcm_hw_params_any(pcm,hw);
 	snd_pcm_hw_params_set_access(pcm,hw, SND_PCM_ACCESS_MMAP_INTERLEAVED);
 	snd_pcm_hw_params_set_format(pcm,hw, SND_PCM_FORMAT_S16);
 	snd_pcm_hw_params_set_rate(pcm,hw, 48000, 0);
@@ -26,7 +26,7 @@ AudioOutput::AudioOutput() {
 	snd_pcm_hw_params_set_period_size_last(pcm, hw, &period, 0);
 	snd_pcm_uframes_t bufferSize; snd_pcm_hw_params_set_buffer_size_last(pcm, hw, &bufferSize);
 	snd_pcm_hw_params(pcm, hw);
-	snd_pcm_sw_params_t *sw; snd_pcm_sw_params_alloca(&sw);
+	snd_pcm_sw_params_t *sw=(snd_pcm_sw_params_t*)alloca(snd_pcm_sw_params_sizeof());
 	snd_pcm_sw_params_current(pcm,sw);
 	snd_pcm_sw_params_set_avail_min(pcm,sw, period);
 	snd_pcm_sw_params_set_period_event(pcm,sw, 1);

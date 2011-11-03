@@ -48,7 +48,7 @@ struct AudioFile : AudioInput {
 	void seek( int time );
 	void setup(const AudioFormat& format);
 	void read(int16* output, int size);
-	signal(int,int) timeChanged;
+	signal<int,int> timeChanged;
 };
 
 typedef struct _snd_pcm snd_pcm_t;

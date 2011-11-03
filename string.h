@@ -3,7 +3,8 @@
 #include "array.h"
 
 /// string
-
+typedef array<char> string;
+#define _(s) string(s,sizeof(s)-1)
 void log_(const string& s);
 string strz(const string& s);
 string strz(const char* s);
@@ -19,29 +20,54 @@ string section(const string& str, char sep, int start=0, int end=1);
 string r; r.resize(size); T* d=(T*)r.data; for(int i=0;i<size;i++) d[i] = data[i] == before ? after : data[i]; return r;
 }*/
 
+inline bool operator <(const string& a, const string& b) {
+	for(int i=0;i<min(a.size,b.size);i++) {
+		if(a[i] > b[i]) return false;
+		if(a[i] < b[i]) return true;
+	}
+	return a.size < b.size;
+}
+
+template <class A> struct cat {
+	const A& a; const string& b;
+	struct { cat* c; operator int() const { return c->a.size+c->b.size; } } size;
+	cat(const A& a,const string& b) : a(a), b(b) { size.c=this; }
+	void copy(char* data) const { a.copy(data); ::copy(data+a.size,b.data,b.size); }
+	operator string() { string r; r.resize(size); copy((char*)r.data); return r; }
+};
+template <class A> cat<A> operator +(const A& a,const string& b) { return cat<A>(a,b); }
+
 /// stream
 
-template<bool endian=false> struct Stream {
+constexpr uint32 swap32(uint32 x) { return ((x&0xff000000)>>24)|((x&0x00ff0000)>>8)|((x&0x0000ff00)<<8)|((x&0x000000ff)<<24); }
+constexpr uint16 swap16(uint16 x) { return ((x>>8)&0xff)|((x&0xff)<<8); }
+
+struct Stream {
 	const uint8* data;
 	int size;
 	int i=0;
 	Stream(const uint8* data, int size) : data(data), size(size) {}
 	operator bool() { return i<size; }
 	template<class T=char> array<T> peek(int size) { array<T> t((T*)(data+i),size); return t; }
-	template<class T=char> array<T> read(int size) { array<T> t((T*)(data+i),size); i+=size*(int)sizeof(T); return t; }
+	template<class T=char> T readRaw() { T t = *(T*)(data+i); i+=sizeof(T); return t; }
+	template<class T> T read();
+	template<class T=char> T* readRaw(int size) { T* t = (T*)(data+i); i+=size*sizeof(T); return t; }
+	template<class T=char> array<T> read(int size) { return array<T>(readRaw<T>(size),size); }
 	template<class T> bool match(const array<T>& key) { if(peek(key.size) == key) { i+=key.size; return true; } else return false; }
-	template<class T> T read() { T t=swap(*(T*)(data+i)); i+=(int)sizeof(T); return t; }
-	struct ReadOperator { Stream * s; template <class T> operator T() { return s->read<T>(); } };
+	struct ReadOperator {
+		Stream * s;
+		operator uint32() { return swap32(s->readRaw<uint32>()); }
+		operator uint16() { return swap16(s->readRaw<uint16>()); }
+		operator uint8() { return s->readRaw<uint8>(); }
+	};
 	ReadOperator read() { return ReadOperator{this}; }
-	template<class T> Stream& operator >>(T& t) { t=read<T>(); return *this; }
 	Stream& operator ++(int) { i++; return *this; }
 	Stream& operator +=(int s) { i+=s; return *this; }
 	uint8 operator*() { return data[i]; }
 	//explicit operator array<uint8>() { return data.slice(i); }
 };
-typedef Stream<true> EndianStream;
 
-/*struct TextStream : Stream<false> {
+/*struct TextStream : Stream {
 	TextStream(const char* data, int size) : Stream((uint8*)data,size) {}
 	long readInteger(int base=10);
 	double readFloat(int base=10);

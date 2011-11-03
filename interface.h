@@ -25,6 +25,7 @@ struct Layout : Widget {
 	/// Allow to specialize child widgets storage (\sa WidgetLayout ItemLayout)
 	virtual virtual_iterator<Widget> begin() =0;
 	virtual virtual_iterator<Widget> end() =0;
+	virtual int count() =0;
 	virtual Widget& operator[](int) =0;
 
 	bool event(int2 position, int event, int state) {
@@ -72,27 +73,27 @@ struct Window : WidgetLayout<Stack>, Poll {
 	Display* x;
 	GLXContext ctx;
 	XWindow window;
+	signal<uint> keyPress;
 
 	Window(int2 size);
 	~Window();
-
 	pollfd poll() override;
 	bool event(pollfd) override;
-
+	uint addHotKey(const string& key);
 	void rename(const string& name);
 	void resize(int2 size);
 	void render();
 };
 
 struct Horizontal : Layout {
-	int margin = 4;
+	int margin = 1;
 	int2 sizeHint();
 	void update();
 };
 typedef WidgetLayout<Horizontal> HBox;
 
 struct Vertical : Layout {
-	int margin = 4;
+	int margin = 1;
 	int2 sizeHint();
 	void update();
 };
@@ -100,7 +101,7 @@ typedef WidgetLayout<Vertical> VBox;
 
 struct List : Vertical {
 	int index=-1;
-	signal(int) currentChanged;
+	signal<int> currentChanged;
 
 	bool event(int2 position, int event, int state);
 	void render(vec2 scale, vec2 offset);
@@ -112,10 +113,10 @@ template<class T> struct ValueList : ItemLayout<List, T> {
 
 struct Font;
 struct Text : Widget {
-	int fontSize=0;
-	Font* font=0;
+	int fontSize;
+	Font* font;
 	string text;
-	Text(int fontSize=10, string&& text=string());
+	Text(int fontSize, string&& text);
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
 };
@@ -127,7 +128,7 @@ struct Image;
 struct TriggerButton : Widget {
 	GLTexture icon;
 	int size=32;
-	signal() triggered;
+	signal<> triggered;
 	TriggerButton(const Image& icon);
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
@@ -138,7 +139,7 @@ struct ToggleButton : Widget {
 	GLTexture enableIcon, disableIcon;
 	int size=32;
 	bool enabled=false;
-	signal(bool) toggled;
+	signal<bool> toggled;
 	ToggleButton(const Image& enable,const Image& disable);
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
@@ -148,7 +149,7 @@ struct ToggleButton : Widget {
 struct Slider : Widget {
 	int height = 32;
 	int minimum=0,value=-1,maximum=0;
-	signal(int) valueChanged;
+	signal<int> valueChanged;
 
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);

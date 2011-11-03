@@ -1,5 +1,5 @@
  
-class Sequencer : public Poll {
+struct Sequencer : Poll {
     const int latency = 1024;
     snd_seq_t* seq;
     array<uint8> pressed{128};
@@ -11,7 +11,7 @@ class Sequencer : public Poll {
     struct Event { int16 time; uint8 key; uint8 vel; };
     array<Event> events;
     int lastTick=0;
-public:
+
     Sequencer() {
         snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0);
         snd_seq_set_client_name(seq,"Piano");

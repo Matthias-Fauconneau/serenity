@@ -38,7 +38,6 @@ template <class K, class V> struct map {
 	iterator begin() { return iterator((K*)keys.data,(V*)values.data); }
 	iterator end() { return iterator((K*)&keys.data[keys.size],(V*)&values.data[values.size]); }
 
-	public:
 	array<K> keys;
 	array<V> values;
 };

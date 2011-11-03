@@ -12,7 +12,7 @@ int2 Horizontal::sizeHint() {
 		if(size.x) width += size.x; else expanding++;
 		width += margin*2;
 	}
-	return int2(expanding?0:width,height+2*margin);
+	return int2(0,height+2*margin);
 }
 
 void Horizontal::update() {
@@ -22,8 +22,9 @@ void Horizontal::update() {
 		if(size.x) width -= size.x; else expanding++;
 		width -= margin*2;
 	}
-	if(expanding) width /= expanding;
-	int2 pen=int2(margin,margin);
+	if(expanding) width /= expanding; //divide free space between expanding widgets
+	else width /= count(); //otherwise spread out widgets
+	int2 pen=int2(margin+(expanding?0:width)/2,margin);
 	for(auto& child : *this) {
 		int2 size=child.sizeHint();
 		if(size.y==0) size.y=this->size.y-2*margin;
@@ -31,7 +32,7 @@ void Horizontal::update() {
 		child.size=size;
 		child.position= int2(pen.x, pen.y+(this->size.y-2*margin-size.y)/2);
 		child.update();
-		pen.x += size.x + 2*margin;
+		pen.x += size.x + 2*margin + (expanding?0:width);
 	}
 }
 
@@ -110,27 +111,19 @@ void Slider::render(vec2 scale, vec2 offset) {
 		flat["color"]=vec4(6.0/8,6.0/8,6.0/8,1);
 		glQuad(flat,vec2(x,0),vec2(size));
 	} else {
-		glQuad(flat,vec2(0,size.y),vec2(size));
+		glQuad(flat,vec2(0,0),vec2(size));
 	}
 }
 
 bool Slider::event(int2 position, int event, int state) {
 	if((event == Motion || event==LeftButton) && state==Pressed) {
 		value = minimum+position.x*(maximum-minimum)/size.x;
-		emit(valueChanged,value);
+		valueChanged.emit(value);
 	}
 	return true;
 }
 
 /// List
-
-/*List& operator <<(Text) {
-	array<string> files = listFiles(path);
-	for(auto& arg : files) {
-		items << Text(move(arg),16);
-	}
-	for(auto& widget: items) *this << widget;
-}*/
 
 bool List::event(int2 position, int event, int state) {
 	if(event != LeftButton || state != Pressed) return false;
@@ -139,7 +132,7 @@ bool List::event(int2 position, int event, int state) {
 		if(position>child.position-int2(margin,margin) && position<child.position+child.size+int2(margin,margin)) {
 			if(i!=index) {
 				index=i;
-				emit(currentChanged,i);
+				currentChanged.emit(i);
 			}
 			return true;
 		}
@@ -151,7 +144,7 @@ bool List::event(int2 position, int event, int state) {
 void List::render(vec2 scale, vec2 offset) {
 	Vertical::render(scale,offset);
 	if(index<0) return;
-	flat.bind(); flat["scale"]=scale; flat["offset"]=offset; flat["color"]=vec4(0,0.5,1,0.25);
+	flat.bind(); flat["scale"]=scale; flat["offset"]=offset; flat["color"]=mix(vec4(0,0.5,1,1),vec4(1,1,1,1),0.25);
 	Widget& current = operator [](index);
 	glQuad(flat,vec2(current.position-int2(margin,margin)), vec2(current.position+current.size+int2(margin,margin)));
 }
@@ -166,7 +159,7 @@ void TriggerButton::render(vec2 scale, vec2 offset) {
 	glQuad(blit,vec2(0,0),vec2(Widget::size),true);
 }
 bool TriggerButton::event(int2, int event, int state) {
-	if(event==LeftButton && state==Pressed) emit(triggered);
+	if(event==LeftButton && state==Pressed) triggered.emit();
 	return true;
 }
 
@@ -180,6 +173,6 @@ void ToggleButton::render(vec2 scale, vec2 offset) {
 	glQuad(blit,vec2(0,0),vec2(Widget::size),true);
 }
 bool ToggleButton::event(int2, int event, int state) {
-	if(event==LeftButton && state==Pressed) { enabled = !enabled; emit(toggled,enabled); }
+	if(event==LeftButton && state==Pressed) { enabled = !enabled; toggled.emit(enabled); }
 	return true;
 }

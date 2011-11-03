@@ -107,7 +107,7 @@ static Variant parse_(const char*& s) {
             s+=sizeof("stream"); if(s[0]=='\r'||s[0]=='\n') s++;
             const char* stream=s;
             while(!(s[0]=='e'&&s[1]=='n'&&s[2]=='d'&&s[3]=='s'&&s[4]=='t'&&s[5]=='r'&&s[6]=='e'&&s[7]=='a'&&s[8]=='m')) s++;
-            z_stream z; memset(&z,0,sizeof(z_stream));
+			z_stream z; clear(z);
             int size = s-stream;
             string data(size*256); //FIXME
             z.avail_in = size;

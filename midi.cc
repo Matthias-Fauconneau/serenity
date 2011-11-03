@@ -1,5 +1,5 @@
 
-class MidiFile {
+struct MidiFile {
     enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
     enum { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,
            EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
@@ -10,7 +10,7 @@ class MidiFile {
     int midiClock=0;
     Sampler* sampler=0;
     map<int, map<int, int> > sort; //[chronologic][bass to treble order] = index
-public:
+
     MidiFile(const string& path) { /// parse MIDI header
         array<uint8> file = mapFile(path);
         const uint8* s = file.data;

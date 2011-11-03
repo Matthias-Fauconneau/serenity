@@ -2,8 +2,7 @@
 
 #include "document.h"
 
-class Score : public Recognizer {
-    public:
+struct Score : Recognizer {
     array<float> staffs;
     array<vec2> positions;
     //array<int> noteIndices;
@@ -12,7 +11,7 @@ class Score : public Recognizer {
     void onPath(const array<vec2>&);
     void synchronize(array<int> MIDI);
     virtual ~Score() {}
-private:
+
     vec2 lastClef;
     array<vec2> repeats;
 

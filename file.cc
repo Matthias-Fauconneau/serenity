@@ -16,7 +16,7 @@ bool exists(const string& path) {
 struct stat statFile(const string& path) { struct stat file; stat(strz(path).data, &file); return file; }
 bool isDirectory(const string& path) { return statFile(path).st_mode&S_IFDIR; }
 
-array<string> listFiles(const string& folder, bool recursive) {
+array<string> listFiles(const string& folder, Flags flags) {
 	array<string> list;
 	DIR* dir = opendir(strz(folder).data);
 	assert(dir);
@@ -24,7 +24,13 @@ array<string> listFiles(const string& folder, bool recursive) {
 		string name = strz(dirent->d_name);
 		if(name!=_(".") && name!=_("..")) {
 			string path = folder+_("/")+name;
-			if(recursive && isDirectory(path)) list << move(listFiles(path)); else list << move(path);
+			if(flags&Recursive && isDirectory(path)) {
+				if(flags&Sort) list.insertSorted(move(listFiles(path,flags)));
+				else list << move(listFiles(path,flags));
+			} else {
+				if(flags&Sort) list.insertSorted(move(path));
+				else list << move(path);
+			}
 		}
 	}
 	closedir(dir);

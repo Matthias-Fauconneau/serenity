@@ -4,7 +4,7 @@
 #include <zlib.h>
 
 Image::Image(uint8* file, int size) {
-	EndianStream s(file,size);
+	Stream s(file,size);
 	assert(s.match(_("\x89PNG\r\n\x1A\n")));
 	z_stream z; clear(z); inflateInit(&z);
 	string idat(size*16); //FIXME

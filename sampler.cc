@@ -23,7 +23,7 @@ bool TextStream::match(const string& key) {
 long TextStream::readInteger(int base) { auto b=&data[i]; auto e=b; auto r = ::readInteger(e,base); i+=e-b; return r; }
 double TextStream::readFloat(int base) { auto b=&data[i]; auto e=b; auto r = ::readFloat(e,base); i+=e-b; return r; }
 
-class Sampler : public AudioSource {
+struct Sampler : AudioSource {
     struct Sample {
         const uint8* data=0; int size=0; //Sample Definition
         int16 trigger=0; int16 lovel=0; int16 hivel=127; int16 lokey=0; int16 hikey=127; //Input Controls
@@ -40,7 +40,7 @@ class Sampler : public AudioSource {
     Signal* signal = 0;
     string record;
     int16* pcm = 0; int time = 0;
-public:
+
     Sampler(const string& path) {
         // parse sfz and mmap samples
         Sample group;

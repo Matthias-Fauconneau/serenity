@@ -109,6 +109,10 @@ GLTexture::GLTexture(const Image& image) : Image(0,image.width,image.height,imag
 	assert(id);
     glBindTexture(GL_TEXTURE_2D, id);
 	uint32 format[] = { 0, GL_ALPHA, GL_LUMINANCE_ALPHA, GL_RGB, GL_BGRA };
+	if(image.depth==2) { //convert to darken coverage
+		byte2* ia=(byte2*)image.data;
+		for(int i=0;i<image.width*image.height;i++) ia[i].i = (ia[i].i*ia[i].a + 255*(255-ia[i].a))/255;
+	}
 	glTexImage2D(GL_TEXTURE_2D,0,depth,this->width=width,this->height=height,0,format[depth],GL_UNSIGNED_BYTE,image.data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);

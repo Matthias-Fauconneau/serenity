@@ -129,7 +129,9 @@ void logTrace() { logBacktrace(StackFrame::current()->caller_frame); }
 
 /// Signal handler
 
+#define signal _signal
 #include <signal.h>
+#undef signal
 
 enum SW { IE = 1, DE = 2, ZE = 4, OE = 8, UE = 16, PE = 32 };
 no_trace(static void handler(int sig, siginfo*, void* ctx)) {
