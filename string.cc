@@ -75,6 +75,7 @@ string strz(const char* s) { int i=0; while(s[i]) i++; return string(s,i); }
 
 /// log
 
+#include "file.h"
 void log_(bool b) { log_(b?_("true"):_("false")); }
 void log_(char c) { log_(string(&c,1)); }
 void log_(int8 n) { log_((int64)n); }
@@ -89,11 +90,9 @@ void log_(void* n) { log_(toString((long)n,16,8)); }
 void log_(float n) { log_((double)n); }
 void log_(double n) { log_(toString(n)); }
 void log_(const char* s) { log_(strz(s)); }
-
-extern "C" ssize_t write(int fd, const void* buf, size_t n); //TODO: syscall
 void log_(const string& s) { write(1,s.data,(size_t)s.size); }
 
 /// stream
 
-//long TextStream::readInteger(int base) { const char* b=&data[i], e=b; long r = ::readInteger(e,base); i+=int(e-b); return r; }
-//double TextStream::readFloat(int base) { const char* b=&data[i], e=b; double r = ::readFloat(e,base); i+=int(e-b); return r; }
+long TextStream::readInteger(int base) { auto b=(const char*)&data[i], e=b; long r = ::readInteger(e,base); i+=int(e-b); return r; }
+double TextStream::readFloat(int base) { auto b=(const char*)&data[i], e=b; double r = ::readFloat(e,base); i+=int(e-b); return r; }

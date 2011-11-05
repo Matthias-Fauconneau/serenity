@@ -5,7 +5,7 @@
 
 Image::Image(uint8* file, int size) {
 	Stream s(file,size);
-	assert(s.match(_("\x89PNG\r\n\x1A\n")));
+	if(!s.match(_("\x89PNG\r\n\x1A\n"))) fail("Unknown image format");
 	z_stream z; clear(z); inflateInit(&z);
 	string idat(size*16); //FIXME
 	z.next_out = (Bytef*)idat.data, z.avail_out = (uint)idat.capacity;
@@ -14,8 +14,9 @@ Image::Image(uint8* file, int size) {
 		string name = s.read(4);
 		if(name == _("IHDR")) {
 			width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
-			uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
-			assert(bitDepth==8); assert(compression==0); assert(filter==0); assert(interlace==0);
+			//uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
+			//assert(bitDepth==8); assert(compression==0); assert(filter==0); assert(interlace==0);
+			s++; uint8 type = s.read(); s+=3;
 			depth = "\x01\x00\x03\x00\x02\x00\x04"[type];
 		} else if(name == _("IDAT")) {
 			z.avail_in = size;

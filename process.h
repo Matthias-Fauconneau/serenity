@@ -20,14 +20,3 @@ struct Poll {
 	/// Callback on new events
 	virtual bool event(pollfd p) =0;
 };
-
-/// signals and slots
-
-template<typename... Args> struct signal : array< delegate<Args...> > {
-	void emit(Args... args) { for(auto slot: *this) slot.method(slot._this, args...);  }
-	template <class C> void connect(C* _this, void (C::*method)(Args...)) {
-		*this << delegate<Args...>(_this, method);
-	}
-};
-#define connect(signal, slot) signal.connect(this, &std::remove_reference<decltype(*this)>::type::slot);
-//#define emit(signal, args...) signal.emit(args);

@@ -50,14 +50,14 @@ template <class T> struct array {
 	/// copy all elements to \a buffer
 	void copy(T* dst) const { ::copy(dst,data,size); }
 	/// copy all elements in a new array
-	//array<T> copy() const { array<T> r(size); copy((T*)r.data); return r; }
+	array<T> copy() const { array<T> r(size); copy((T*)r.data); return r; }
 
 	/// element
-	const T& at(int i) const { assert(i>=0 && i<size,i); return data[i]; }
+	const T& at(int i) const { assert(i>=0 && i<size,"i",i,"size",size); return data[i]; }
 	const T& operator [](int i) const { return at(i); }
 	const T& first() const { return at(0); }
 	const T& last() const { return at(size-1); }
-	T& at(int i) { assert(i>=0 && i<size,i); return (T&)data[i]; }
+	T& at(int i) { assert(i>=0 && i<size,"i",i,"size",size); return (T&)data[i]; }
 	T& operator [](int i) { detach(); return at(i); }
 	T& first() { detach(); return at(0); }
 	T& last() { detach(); return at(size-1); }
@@ -94,7 +94,7 @@ template <class T> struct array {
 	explicit operator bool() const { return size; }
 
 	/// remove
-	void removeAt(int i) { detach(); size--; for(;i<size;i++) ::copy(at(i),at(i+1)); }
+	void removeAt(int i) { detach(); for(;i<size-1;i++) ::copy(at(i),at(i+1)); size--; }
 	void removeLast() { assert(size); removeAt(size-1); }
 	void removeOne(T v) { int i=indexOf(v); assert(i>=0); removeAt(i); }
 	T take(int i) { T value = move(at(i)); removeAt(i); return value; }
@@ -126,6 +126,9 @@ template <class T> struct array {
 
 	/// operations
 	void reverse() { for(int i=0; i<size/2; i++) swap(at(i), at(size-i-1)); }
+	array<T> replace(T before, T after) const {
+		array<T> r; r.resize(size); T* d=(T*)r.data; for(int i=0;i<size;i++) d[i] = data[i] == before ? after : data[i]; return r;
+	}
 
 	/// iterators
 	const T* begin() const { return data; }
@@ -137,3 +140,9 @@ template <class T> struct array {
 	int size = 0;
 	int capacity = 0; //0 = not owned
 };
+
+template<class T> void log_(const array<T>& a) {
+	log_('[');
+	for(int i=0;i<a.size;i++) { log_(a[i]); if(i<a.size-1) log_(", "); }
+	log_(']');
+}

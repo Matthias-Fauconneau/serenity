@@ -174,7 +174,7 @@ int main(int argc, const char** argv) {
 	assert(app,"No application compiled in executable");
 	app->start(move(args));
 	for(;;) {
-		assert(::poll((pollfd*)polls.values.data,polls.size(),-1)>0,"poll");
+		::poll((pollfd*)polls.values.data,polls.size(),-1);
 		for(int i=0;i<polls.size();i++) if(polls.values[i].revents) if(!polls.keys[i]->event(polls.values[i])) return 0;
 	}
 	return 0;

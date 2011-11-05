@@ -4,9 +4,12 @@
 #include "GL/glu.h"
 
 /// State
-
+#if DEBUG
 #define glCheck ({ auto e=glGetError(); \
 	if(e) { log_(__FILE__);log_(_(":"));log_(__LINE__);log_(_(": "));log_((const  char*)gluErrorString(e));log_("\n");abort(); } })
+#else
+#define glCheck
+#endif
 
 /// Shader
 
@@ -62,7 +65,6 @@ bool GLShader::compileShader(uint id, uint type, const array<string>& tags) {
 }
 
 bool GLShader::compile(const array<string>& vertex, const array<string>& fragment) {
-    glCheck;
     if(!id) id = glCreateProgram();
     compileShader(id,GL_VERTEX_SHADER,vertex);
     compileShader(id,GL_FRAGMENT_SHADER,fragment);
@@ -88,9 +90,9 @@ uint GLShader::attribLocation(const char* name ) {
 	assert(location>=0,"Unknown attribute",name,"for vertex shader:",vertex);
 	return (uint)location;
 }
-void GLUniform::operator=(float v) { glCheck; glUniform1f(id,v); glCheck; }
-void GLUniform::operator=(vec2 v) { glCheck; glUniform2f(id,v.x,v.y); glCheck; }
-void GLUniform::operator=(vec4 v) { glCheck; glUniform4f(id,v.x,v.y,v.z,v.w); glCheck; }
+void GLUniform::operator=(float v) { glUniform1f(id,v); }
+void GLUniform::operator=(vec2 v) { glUniform2f(id,v.x,v.y); }
+void GLUniform::operator=(vec4 v) { glUniform4f(id,v.x,v.y,v.z,v.w); }
 GLUniform GLShader::operator[](const char* name) {
 	int location = uniformLocations.value(name,-1);
 	if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
@@ -104,7 +106,6 @@ GLShader blit("blit");
 /// Texture
 
 GLTexture::GLTexture(const Image& image) : Image(0,image.width,image.height,image.depth) {
-    glCheck;
     if(!id) glGenTextures(1, &id);
 	assert(id);
     glBindTexture(GL_TEXTURE_2D, id);
@@ -116,10 +117,49 @@ GLTexture::GLTexture(const Image& image) : Image(0,image.width,image.height,imag
 	glTexImage2D(GL_TEXTURE_2D,0,depth,this->width=width,this->height=height,0,format[depth],GL_UNSIGNED_BYTE,image.data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glCheck;
 }
-void GLTexture::bind() { assert(id); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, id); glCheck; }
+void GLTexture::bind() const { bind(id); }
+void GLTexture::bind(int id) { assert(id); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, id); }
 void GLTexture::free() { assert(id); glDeleteTextures(1,&id); id=0; }
+
+/// Buffer
+
+void GLBuffer::upload(const array<uint32>& indices) {
+	if(!indexBuffer) glGenBuffers(1, &indexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
+	indexCount = indices.size;
+}
+void GLBuffer::upload(const array<vec2>& vertices) {
+	if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	vertexSize = sizeof(vec2);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size*vertexSize, vertices.data, GL_STATIC_DRAW);
+	vertexCount = vertices.size;
+}
+void GLBuffer::bindAttribute(GLShader* program, const char* name, int elementSize, uint64 offset) {
+	int location = program->attribLocation(name);
+	assert(location>=0,"unused attribute",name);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	glVertexAttribPointer(location, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
+	glEnableVertexAttribArray(location);
+}
+void GLBuffer::draw() {
+	glCheck;
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	int mode[] = { 0, GL_POINTS, GL_LINES, GL_TRIANGLES, GL_QUADS };
+	if (primitiveType == 1) {
+		glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+		glEnable(GL_POINT_SPRITE);
+	}
+	if (indexBuffer) {
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+		glDrawElements(mode[primitiveType], indexCount, GL_UNSIGNED_INT, 0);
+	} else {
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glDrawArrays(mode[primitiveType], 0, vertexCount);
+	}
+}
 
 void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
 	glBindBuffer(GL_ARRAY_BUFFER,0);

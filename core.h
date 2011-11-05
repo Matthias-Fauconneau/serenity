@@ -21,11 +21,6 @@ typedef unsigned long uint64;
 typedef unsigned long size_t;
 typedef long ssize_t;
 typedef uint8* raw;
-template<typename... Args> struct delegate {
-	void* _this;
-	void (*method)(void*, Args...);
-	template <class C> delegate(C* _this, void (C::*method)(Args...)) : _this((void*)_this), method((void(*)(void*, Args...))method) {}
-};
 
 /// language support
 
@@ -38,8 +33,6 @@ template<> struct predicate<true> { typedef void* type; };
 #define predicate(E) typename predicate<E>::type& condition = enabler
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
 
-/// move semantics
-
 #include <type_traits>
 template<typename T> constexpr typename std::remove_reference<T>::type&& move(T&& t){ return (typename std::remove_reference<T>::type&&)t; }
 template<typename T> constexpr T&& forward(typename std::remove_reference<T>::type& t) { return (T&&)t; }
@@ -47,12 +40,26 @@ template<typename T> constexpr T&& forward(typename std::remove_reference<T>::ty
 	static_assert(!std::is_lvalue_reference<T>::value,"forwarding an lvalue"); return (T&&)t;
 }
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
+#define move_only(o) o(o&)=delete; o& operator=(const o&)=delete; o(o&&)=default; o& operator=(o&&)=default;
 #define can_forward_(F,T) std::is_convertible<typename std::remove_reference<F>::type, typename std::remove_reference<T>::type>::value
 #define can_forward(T) can_forward_(T##f,T)
 #define perfect_(F,T) template<class F, predicate(can_forward_(F,T)) >
 #define perfect(T) perfect_(T##f,T)
 #define perfect2_(F,T,G,U) template<class F, class G, predicate(can_forward_(F,T)), predicate1(can_forward_(G,U)) >
 #define perfect2(T,U) perfect2_(T##f,T,U##f,U)
+
+template<typename... Args> struct delegate {
+	void* _this;
+	void (*method)(void*, Args...);
+	template <class C> delegate(C* _this, void (C::*method)(Args...)) : _this((void*)_this), method((void(*)(void*, Args...))method) {}
+};
+template<class T> struct array;
+template<typename... Args> struct signal : array< delegate<Args...> > {
+	void emit(Args... args) { for(auto slot: *this) slot.method(slot._this, args...);  }
+	template <class C> void connect(C* _this, void (C::*method)(Args...)) {
+		*this << delegate<Args...>(_this, method);
+	}
+};
 
 /// memory allocation
 
@@ -96,7 +103,7 @@ void log_(const char* s);
 template<class A, class... Args> void log_(const A& a, const Args&... args) { log_(a); log_(' '); log_(args...); }
 template<class... Args> void log(const Args&... args) { log_(args...); log_('\n'); }
 
-#if TRACE
+#ifdef TRACE
 extern bool trace_enable;
 #define trace_on  trace_enable=true;
 #define trace_off trace_enable=false;
@@ -104,12 +111,16 @@ extern bool trace_enable;
 #define trace_on
 #define trace_off
 #endif
-void logTrace();
 
+#ifdef DEBUG
+void logTrace();
 extern "C" void abort() throw() __attribute((noreturn));
 #define fail(args...) ({ trace_off; logTrace(); log_("Critical Failure:\t"); log(args); abort(); })
-#undef assert
 #define assert(expr, args...) ({ if(!(expr)) { trace_off; logTrace(); log_("Assertion Failure:\t"); log(#expr, ## args); abort(); } })
+#else
+#define fail(args...) ({ log_("Error:\t"); log(args); })
+#define assert(expr, args...) ({})
+#endif
 
 /// virtual iteration
 

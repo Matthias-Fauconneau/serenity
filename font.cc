@@ -7,45 +7,60 @@
 
 static FT_Library ft;
 
-struct FreeType : Font {
-	FT_FaceRec_* face;
-	Glyph glyphs[256];
-
-	FreeType(const string& path, int size) {
-		FT_Init_FreeType(&ft);
-		FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
-		FT_New_Face(ft, strz(path).data, 0, &face);
-		FT_Set_Char_Size(face, 0, size<<6, 72, 72);
-		assert(face,path);
-	}
-	int height() { return face->size->metrics.height>>6; }
-	int ascender() { return face->size->metrics.ascender>>6; }
-	Glyph& glyph(char code) {
-		Glyph& glyph = glyphs[(int)code];
-		if(glyph) return glyph;
-
-		int index = FT_Get_Char_Index(face, code); assert(index,"glyph not found '",code,"'\n");
-		FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
-		glyph.advance = int2( face->glyph->advance.x >> 6, face->glyph->advance.y >> 6 );
-		if(code == ' ') return glyph;
-		FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
-		glyph.offset = int2( face->glyph->bitmap_left, -face->glyph->bitmap_top );
-		FT_Bitmap bitmap=face->glyph->bitmap;
-		assert(bitmap.buffer);
-		int width = bitmap.width/3, height = bitmap.rows;
-		byte4* data = new byte4[height*width];
-		for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
-			uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
-			data[y*width+x] = byte4(255-rgb[0],255-rgb[1],255-rgb[2],255);
-		}
-		glyph.texture = GLTexture(Image((uint8*)data,width,height,4));
-		return glyph;
-	}
-};
-
-Font* Font::instance(int size) {
-	static map<int,Font*> fonts;
-	Font*& font = fonts[size];
-	if(!font) font = new FreeType(_("/usr/share/fonts/dejavu/DejaVuSans.ttf"),size);
-	return font;
+Font::Font(const string& path) {
+	FT_Init_FreeType(&ft);
+	FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
+	FT_New_Face(ft, strz(path).data, 0, &face);
+	assert(face,path);
 }
+
+int Font::descender() { return face->size->metrics.descender>>6; }
+int Font::ascender() { return face->size->metrics.ascender>>6; }
+int Font::height() { return face->size->metrics.height>>6; }
+
+int Font::kerning(char leftCode, char rightCode) {
+	int left = FT_Get_Char_Index(face, leftCode); assert(left,"glyph not found '",leftCode,"'\n");
+	int right = FT_Get_Char_Index(face, rightCode); assert(right,"glyph not found '",rightCode,"'\n");
+	FT_Vector kerning;
+	FT_Get_Kerning(face, left, right, FT_KERNING_DEFAULT, &kerning );
+	return kerning.x>>6;
+}
+
+Metrics Font::metrics(int size, char code) {
+	assert(face);
+	FT_Set_Char_Size(face, 0, size, 72, 72);
+	int index = FT_Get_Char_Index(face, code);
+	if(!index) index=code;
+	FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
+	Metrics metrics={
+	vec2(face->glyph->advance.x / 64.0, face->glyph->advance.y / 64.0),
+	vec2(face->glyph->metrics.width / 64.0, face->glyph->metrics.height / 64.0)
+	};
+	return metrics;
+}
+
+Glyph& Font::glyph(int size, char code) {
+	map<int, Glyph>& glyphs = cache[size];
+	if(glyphs.values.size==0) glyphs.values.reserve(256); //realloc would invalid any references
+	assert(glyphs.values.capacity==256);
+	Glyph& glyph = glyphs[(int)code];
+	if(glyph.texture || glyph.advance.x) return glyph;
+
+	glyph.advance = metrics(size,code).advance;
+	if(code == ' ') return glyph;
+	FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
+	glyph.offset = vec2( face->glyph->bitmap_left, -face->glyph->bitmap_top );
+	FT_Bitmap bitmap=face->glyph->bitmap;
+	//assert(bitmap.buffer);
+	if(!bitmap.buffer) return glyph;
+	int width = bitmap.width/3, height = bitmap.rows;
+	byte4* data = new byte4[height*width];
+	for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
+		uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
+		data[y*width+x] = byte4(255-rgb[0],255-rgb[1],255-rgb[2],255);
+	}
+	glyph.texture = GLTexture(Image((uint8*)data,width,height,4));
+	return glyph;
+}
+
+Font defaultFont(_("/usr/share/fonts/dejavu/DejaVuSans.ttf"));

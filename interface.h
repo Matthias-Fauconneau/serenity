@@ -1,6 +1,8 @@
+#pragma once
 #include "string.h"
 #include "gl.h"
 #include "process.h"
+#include "font.h"
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
@@ -9,13 +11,13 @@ struct Widget {
 	enum Event { Motion, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp /*TODO: X keys*/ };
 	enum State { Released=0, Pressed=1 };
 	/// Preferred size (0 means expand)
-	virtual int2 sizeHint()=0;
+	virtual int2 sizeHint() { return int2(0,0); }
 	/// Render this widget. use \a view to scale from widget coordinates (0-size) to viewport
 	virtual void render(vec2 scale, vec2 offset) =0;
 	/// Notify objects to process \a position,\a size or derived member changes
-	virtual void update() {};
+	virtual void update() {}
 	/// Notify objects to process a new user event
-	virtual bool event(int2 /*position*/, int /*event*/, int /*state*/) { return false; };
+	virtual bool event(int2 /*position*/, int /*event*/, int /*state*/) { return false; }
 
 	//operator Widget() { return *this; } //hack to allow . syntax in Layout<Widget*>
 };
@@ -61,21 +63,18 @@ template<class L, class T> struct ItemLayout : L {
 	Widget& operator[](int i) { return items[i]; }
 };
 
-struct Stack : Layout {
-	int2 sizeHint() { int2 size; for(auto& child : *this) size=max(size,child.size); return size; }
-	void update() { for(auto& child : *this) { child.position=Widget::position; child.size=Widget::size; child.update(); } };
-};
-
 typedef struct _XDisplay Display;
 typedef struct __GLXcontextRec* GLXContext;
 typedef unsigned long XWindow;
-struct Window : WidgetLayout<Stack>, Poll {
+struct Window : Poll {
 	Display* x;
 	GLXContext ctx;
 	XWindow window;
 	signal<uint> keyPress;
+	bool visible=true;
+	Widget& widget;
 
-	Window(int2 size);
+	Window(int2 size, Widget& widget);
 	~Window();
 	pollfd poll() override;
 	bool event(pollfd) override;
@@ -111,12 +110,13 @@ template<class T> struct ValueList : ItemLayout<List, T> {
 	inline T& current() { return this->items[this->index]; }
 };
 
-struct Font;
 struct Text : Widget {
-	int fontSize;
-	Font* font;
+	int size;
+	Font& font;
 	string text;
-	Text(int fontSize, string&& text);
+	struct Blit { vec2 min, max; uint id; };
+	array<Blit> blits;
+	Text(int size, string&& text);
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
 };

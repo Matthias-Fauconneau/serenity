@@ -5,7 +5,7 @@
 template <class K, class V> struct const_pair { const K& key; const V& value; };
 template <class K, class V> struct pair { K& key; V& value; };
 template <class K, class V> struct map {
-	map(){} no_copy(map)
+	map(){} move_only(map)
 	int size() const { return keys.size; }
 	bool contains(const K& key) const { return keys.contains(key); }
 	explicit operator bool() const { return keys.size; }

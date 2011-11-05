@@ -10,6 +10,7 @@ virtual void read(int16* output, int size) =0;
 };
 
 struct Resampler {
+	no_copy(Resampler);
 	int channelCount=0;
 	int sourceRate=0;
 	int targetRate=0;
@@ -28,8 +29,9 @@ struct Resampler {
 		int decimalIndex=0;
 	} channels[8];
 
+	Resampler(){}
+	Resampler(int channels, int sourceRate, int targetRate);
 	~Resampler();
-	void setup(int channels, int sourceRate, int targetRate);
 	void filter(const float *source, int *sourceSize, float *target, int *targetSize);
 	operator bool();
 };

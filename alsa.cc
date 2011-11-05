@@ -1,18 +1,14 @@
 #include "process.h"
 #include "media.h"
 
-#include <stdio.h>
 #include <stdlib.h>
-
 #include <alsa/global.h>
-#include <alsa/input.h>
-#include <alsa/output.h>
+struct snd_input_t;
+struct snd_output_t;
 #include <alsa/conf.h>
 #include <alsa/pcm.h>
 #include <alsa/timer.h>
 #include <alsa/control.h>
-#include <alsa/seq_event.h>
-#include <alsa/seq.h>
 
 AudioOutput::AudioOutput() {
 	snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK|SND_PCM_NO_SOFTVOL);

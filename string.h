@@ -16,9 +16,6 @@ long readInteger(const char*& s, int base=10);
 double toFloat(const string& str, int base=10 );
 double readFloat(const char*& s, int base=10 );
 string section(const string& str, char sep, int start=0, int end=1);
-/*string replace(string before, string after) const {
-string r; r.resize(size); T* d=(T*)r.data; for(int i=0;i<size;i++) d[i] = data[i] == before ? after : data[i]; return r;
-}*/
 
 inline bool operator <(const string& a, const string& b) {
 	for(int i=0;i<min(a.size,b.size);i++) {
@@ -47,6 +44,8 @@ struct Stream {
 	int size;
 	int i=0;
 	Stream(const uint8* data, int size) : data(data), size(size) {}
+	Stream(const string& data) : data((uint8*)data.data), size(data.size) {}
+	Stream(const array<uint8>& data) : data(data.data), size(data.size) {}
 	operator bool() { return i<size; }
 	template<class T=char> array<T> peek(int size) { array<T> t((T*)(data+i),size); return t; }
 	template<class T=char> T readRaw() { T t = *(T*)(data+i); i+=sizeof(T); return t; }
@@ -64,11 +63,16 @@ struct Stream {
 	Stream& operator ++(int) { i++; return *this; }
 	Stream& operator +=(int s) { i+=s; return *this; }
 	uint8 operator*() { return data[i]; }
+	uint8 operator[](int offset) { return data[i+offset]; }
 	//explicit operator array<uint8>() { return data.slice(i); }
+	array<uint8> slice(int offset, int size) { return array<uint8>(data+i+offset,size); }
 };
 
-/*struct TextStream : Stream {
-	TextStream(const char* data, int size) : Stream((uint8*)data,size) {}
+struct TextStream : Stream {
+	//TextStream(const char* data, int size) : Stream((uint8*)data,size) {}
+	TextStream(const string& data) : Stream(data) {}
 	long readInteger(int base=10);
 	double readFloat(int base=10);
-};*/
+	operator string() { return string((const char*)data+i,size-i); }
+	operator const char*() { return (const char*)data+i; }
+};

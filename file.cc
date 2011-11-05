@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <time.h>
 #include <dirent.h>
 
 bool exists(const string& path) {

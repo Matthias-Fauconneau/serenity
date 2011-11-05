@@ -1,16 +1,33 @@
+#pragma once
 #include "gl.h"
 
-struct Font {
-	struct Glyph {
-		int2 offset;
-		int2 advance;
-		GLTexture texture;
-		inline operator bool() { return texture; }
-		inline int2 size() { return { texture.width, texture.height }; }
-	};
-
-	virtual int height()=0;
-	virtual int ascender()=0;
-	virtual Glyph& glyph(char code)=0;
-	static Font* instance(int size);
+struct Metrics {
+	vec2 advance;
+	vec2 size;
 };
+
+struct Glyph {
+	vec2 offset;
+	vec2 advance;
+	GLTexture texture;
+};
+
+struct FT_FaceRec_;
+struct Font {
+	string name;
+	string data;
+	FT_FaceRec_* face=0;
+	map<int, map<int, Glyph> > cache;
+	array<float> widths;
+
+	Font(){}
+	Font(const string& path);
+	int descender();
+	int ascender();
+	int height();
+	int kerning(char leftCode, char rightCode);
+	Metrics metrics(int size, char code);
+	Glyph& glyph(int size, char code);
+};
+
+extern Font defaultFont;

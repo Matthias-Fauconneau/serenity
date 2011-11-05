@@ -77,9 +77,8 @@ static float sinc(double cutoff, double x, int N) {
 
 static int gcd(int a, int b) { while( b != 0 ) { int t = b; b = a % b; a = t; } return a; }
 
-void Resampler::setup(int channelCount, int sourceRate, int targetRate) {
+Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channelCount(channelCount) {
 	assert(channelCount <= 8);
-	this->channelCount = channelCount;
 	int factor = gcd(sourceRate,targetRate);
 	this->sourceRate = sourceRate/=factor;
 	this->targetRate = targetRate/=factor;

@@ -71,31 +71,31 @@ void Vertical::update() {
 
 /// Text
 
-Text::Text(int fontSize, string&& text) : fontSize(fontSize), font(Font::instance(fontSize)), text(move(text)) {}
+Text::Text(int size, string&& text) : size(size), font(defaultFont), text(move(text)) {}
 
 int2 Text::sizeHint() {
-	int widestLine = 0, width=0, height=font->height();
+	int widestLine = 0;
+	vec2 pen = vec2(0,font.ascender());
+	blits.clear();
+	char previous=0;
 	for(char c: text) {
-		if(c=='\n') { widestLine=max(width,widestLine); width=0; height+=font->height(); continue; }
-		const Font::Glyph& glyph = font->glyph(c);
-		width += glyph.advance.x;
+		if(c=='\n') { widestLine=max(int(pen.x),widestLine); pen.x=0; pen.y+=font.height(); continue; }
+		const Glyph& glyph = font.glyph(size,c);
+		if(previous) pen.x += font.kerning(previous,c);
+		previous = c;
+		if(glyph.texture) {
+			Blit blit = { pen+glyph.offset, pen+glyph.offset+vec2(glyph.texture.width,glyph.texture.height), glyph.texture.id };
+			blits << blit;
+		}
+		pen.x += glyph.advance.x;
 	}
-	widestLine=max(width,widestLine);
-	return int2(widestLine,height);
+	widestLine=max(int(pen.x),widestLine);
+	return int2(widestLine,pen.y-font.descender());
 }
 
 void Text::render(vec2 scale, vec2 offset) {
 	blit.bind(); blit["scale"]=scale; blit["offset"]=offset;
-	int2 pen = int2(0,font->ascender());
-	for(char c: text) {
-		if(c=='\n') { pen.x=0; pen.y+=font->height(); continue; }
-		Font::Glyph& glyph = font->glyph(c);
-		if(glyph.texture) {
-			glyph.texture.bind();
-			glQuad(blit, vec2(pen+glyph.offset), vec2(pen+glyph.offset+glyph.size()), true);
-		}
-		pen.x += glyph.advance.x;
-	}
+	for(const auto& b: blits) { GLTexture::bind(b.id); glQuad(blit, b.min, b.max, true); }
 }
 
 /// Slider

@@ -7,4 +7,5 @@ enum Flags { Recursive=1, Sort=2 }; inline Flags operator |(Flags a, Flags b) { 
 array<string> listFiles(const string& folder, Flags flags=Sort);
 int createFile(const string& path);
 string mapFile(const string& path);
+extern "C" ssize_t write(int fd, const void* buf, size_t n); //TODO: syscall
 template <class T> void write(int fd, const T& t) { write(fd,&t,sizeof(T)); }
