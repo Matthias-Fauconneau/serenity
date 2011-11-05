@@ -29,7 +29,7 @@ Window::Window(int2 size, Widget& widget) : widget(widget) {
 	glBlendFunc(GL_DST_COLOR, GL_ZERO); glClearColor(1,1,1,0); //multiply (i.e darken) blend (allow component-wise black font blending)
 	glEnable(GL_BLEND);
 }
-Window::~Window() { if(x) { XCloseDisplay(x); x=0; } }
+//Window::~Window() { if(x) { XCloseDisplay(x); x=0; } }
 pollfd Window::poll() { pollfd p; p.fd=XConnectionNumber(x); p.events=POLLIN; return p; }
 bool Window::event(pollfd) {
 	while(XEventsQueued(x, QueuedAfterFlush)) { XEvent ev; XNextEvent(x,&ev);
@@ -58,7 +58,25 @@ uint Window::addHotKey(const string& key) {
 	XGrabKey(x, XKeysymToKeycode(x, keysym), AnyModifier, DefaultRootWindow(x), True, GrabModeAsync, GrabModeAsync);
 	return keysym;
 }
-void Window::resize(int2 size) { XResizeWindow(x,window,size.x,size.y); widget.size=size; }
+void Window::resize(int2 size) {
+	if(!size.x||!size.y) {
+		XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);
+		if(!size.x) size.x=root.width; if(!size.y) size.y=root.height;
+	}
+	XResizeWindow(x,window,size.x,size.y);
+	widget.size=size;
+}
+void Window::setFullscreen(bool) {
+	XEvent xev; clear(xev);
+	xev.type = ClientMessage;
+	xev.xclient.window = window;
+	xev.xclient.message_type = XInternAtom(x, "_NET_WM_STATE", False);
+	xev.xclient.format = 32;
+	xev.xclient.data.l[0] = 1;
+	xev.xclient.data.l[1] = XInternAtom(x, "_NET_WM_STATE_FULLSCREEN", False);
+	xev.xclient.data.l[2] = 0;
+	XSendEvent(x, DefaultRootWindow(x), False, SubstructureNotifyMask, &xev);
+}
 void Window::rename(const string& name) { XStoreName(x,window,strz(name).data); XFlush(x); }
 void Window::render() {
 	glClear(GL_COLOR_BUFFER_BIT);

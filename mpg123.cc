@@ -15,7 +15,7 @@ void AudioFile::open(const string& path) {
 	timeChanged.emit(position(),duration());
 
 	if(audioInput.frequency != audioOutput.frequency) {
-		resampler.setup(audioInput.channels, audioInput.frequency, audioOutput.frequency);
+		new (&resampler) Resampler(audioInput.channels, audioInput.frequency, audioOutput.frequency);
 	}
 }
 void AudioFile::close() { mpg123_close(file); mpg123_delete(file); file=0; }

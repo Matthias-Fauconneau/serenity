@@ -3,6 +3,7 @@
 #include "file.h"
 #include "interface.h"
 #include "document.h"
+#include <sys/resource.h>
 
 struct Music : Application {
 	AudioOutput audio;
@@ -14,13 +15,14 @@ struct Music : Application {
 	map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
 	~Music() { sampler.sync(); seq.sync(); }
 
-	Window window = Window(int2(640,640), sheet);
+	Window window = Window(int2(1280,1024), sheet);
 
 	void start(array<string> &&arguments) {
 		sheet.needUpdate.connect(this,&Music::update);
 
 		for(auto&& path : arguments) {
-			if(path.endsWith(_(".sfz")) && exists(path)) {
+			if(path==_("fullscreen")) window.setFullscreen();
+			else if(path.endsWith(_(".sfz")) && exists(path)) {
 				sampler.open(path);
 				seq.noteEvent.connect(&sampler,&Sampler::event);
 				audio.setInput(&sampler);
@@ -49,10 +51,12 @@ struct Music : Application {
 			} /*else if(path.endsWith(_(".wav")) && !exists(path) && sampler) {
 				sampler->recordWAV(path);
 			}*/
+			else fail("Unhandled argument",path);
 		}
 		//if(!sampler && !sheet) fail("Usage: music [instrument.sfz] [music.mid] [sheet.pdf] [output.wav]");
 		//sheet.scroll=1600;
 		update();
+		setpriority(PRIO_PROCESS,0,-20);
 		if(audio.input) audio.start();
 	}
 	void update() {

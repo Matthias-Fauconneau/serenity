@@ -1,7 +1,13 @@
 #pragma once
 #include "gl.h"
 
-struct Metrics {
+struct FontMetrics {
+	long descender;
+	long ascender;
+	long height;
+};
+
+struct GlyphMetrics {
 	vec2 advance;
 	vec2 size;
 };
@@ -22,11 +28,9 @@ struct Font {
 
 	Font(){}
 	Font(const string& path);
-	int descender();
-	int ascender();
-	int height();
+	FontMetrics metrics(int size);
 	int kerning(char leftCode, char rightCode);
-	Metrics metrics(int size, char code);
+	GlyphMetrics metrics(int size, char code);
 	Glyph& glyph(int size, char code);
 };
 

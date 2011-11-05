@@ -17,10 +17,11 @@ AudioOutput::AudioOutput() {
 	snd_pcm_hw_params_set_format(pcm,hw, SND_PCM_FORMAT_S16);
 	snd_pcm_hw_params_set_rate(pcm,hw, 48000, 0);
 	snd_pcm_hw_params_set_channels(pcm,hw, 2);
-	//snd_pcm_hw_params_set_period_size_first(pcm, hw, &period, 0);
-	//snd_pcm_uframes_t bufferSize=period*3; snd_pcm_hw_params_set_buffer_size_near(pcm, hw, &bufferSize);
-	snd_pcm_hw_params_set_period_size_last(pcm, hw, &period, 0);
-	snd_pcm_uframes_t bufferSize; snd_pcm_hw_params_set_buffer_size_last(pcm, hw, &bufferSize);
+	snd_pcm_hw_params_set_period_size_first(pcm, hw, &period, 0);
+	//snd_pcm_uframes_t bufferSize; snd_pcm_hw_params_set_buffer_size_first(pcm, hw, &bufferSize);
+	snd_pcm_uframes_t bufferSize=period*4; snd_pcm_hw_params_set_buffer_size_near(pcm, hw, &bufferSize);
+	//snd_pcm_hw_params_set_period_size_last(pcm, hw, &period, 0);
+	//snd_pcm_uframes_t bufferSize; snd_pcm_hw_params_set_buffer_size_last(pcm, hw, &bufferSize);
 	snd_pcm_hw_params(pcm, hw);
 	snd_pcm_sw_params_t *sw=(snd_pcm_sw_params_t*)alloca(snd_pcm_sw_params_sizeof());
 	snd_pcm_sw_params_current(pcm,sw);

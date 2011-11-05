@@ -14,9 +14,11 @@ Font::Font(const string& path) {
 	assert(face,path);
 }
 
-int Font::descender() { return face->size->metrics.descender>>6; }
-int Font::ascender() { return face->size->metrics.ascender>>6; }
-int Font::height() { return face->size->metrics.height>>6; }
+FontMetrics Font::metrics(int size) {
+	FT_Set_Char_Size(face, 0, size, 72, 72);
+	FontMetrics metrics = { face->size->metrics.descender>>6, face->size->metrics.ascender>>6, face->size->metrics.height>>6 };
+	return metrics;
+}
 
 int Font::kerning(char leftCode, char rightCode) {
 	int left = FT_Get_Char_Index(face, leftCode); assert(left,"glyph not found '",leftCode,"'\n");
@@ -26,13 +28,13 @@ int Font::kerning(char leftCode, char rightCode) {
 	return kerning.x>>6;
 }
 
-Metrics Font::metrics(int size, char code) {
+GlyphMetrics Font::metrics(int size, char code) {
 	assert(face);
 	FT_Set_Char_Size(face, 0, size, 72, 72);
 	int index = FT_Get_Char_Index(face, code);
 	if(!index) index=code;
 	FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
-	Metrics metrics={
+	GlyphMetrics metrics={
 	vec2(face->glyph->advance.x / 64.0, face->glyph->advance.y / 64.0),
 	vec2(face->glyph->metrics.width / 64.0, face->glyph->metrics.height / 64.0)
 	};

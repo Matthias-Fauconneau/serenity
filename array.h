@@ -96,7 +96,7 @@ template <class T> struct array {
 	/// remove
 	void removeAt(int i) { detach(); for(;i<size-1;i++) ::copy(at(i),at(i+1)); size--; }
 	void removeLast() { assert(size); removeAt(size-1); }
-	void removeOne(T v) { int i=indexOf(v); assert(i>=0); removeAt(i); }
+	void removeOne(T v) { int i=indexOf(v); if(i>=0) removeAt(i); }
 	T take(int i) { T value = move(at(i)); removeAt(i); return value; }
 	T takeFirst() { return take(0); }
 	T takeLast() { return take(size-1); }

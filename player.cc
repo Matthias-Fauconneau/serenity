@@ -13,8 +13,8 @@ struct Player : Application {
 	array<string> folders;
 	array<string> files;
 
-	Window window = Window(int2(640,640));
 	VBox layout;
+	Window window = Window(int2(640,640),layout);
 	 HBox toolbar;
 	  ToggleButton playButton = ToggleButton(playIcon,pauseIcon);
 	  TriggerButton nextButton = TriggerButton(nextIcon);
@@ -29,16 +29,15 @@ struct Player : Application {
 		toolbar << &playButton << &nextButton << &elapsed << &slider << &remaining;
 		main << &albums << &titles;
 		layout << &toolbar << &main;
-		window << &layout;
 		albums.margin=0;
 
-		connect(window.keyPress, keyPress);
-		connect(playButton.toggled, togglePlay);
-		connect(nextButton.triggered, next);
-		connect(slider.valueChanged, seek);
-		connect(file.timeChanged, update);
-		connect(albums.currentChanged, playAlbum);
-		connect(titles.currentChanged, play);
+		window.keyPress.connect(this, &Player::keyPress);
+		playButton.toggled.connect(this, &Player::togglePlay);
+		nextButton.triggered.connect(this, &Player::next);
+		slider.valueChanged.connect(this, &Player::seek);
+		file.timeChanged.connect(this, &Player::update);
+		albums.currentChanged.connect(this, &Player::playAlbum);
+		titles.currentChanged.connect(this, &Player::play);
 		audio.setInput(&file);
 
 		folders = listFiles(_("/root/Music"));
@@ -48,7 +47,7 @@ struct Player : Application {
 			assert(exists(path),"Invalid URL",path);
 			if(isDirectory(path)) playAlbum(path); else appendFile(move(path));
 		}
-		if(files.size) next(); else { window.update(); window.render(); }
+		if(files.size) next(); else { layout.update(); window.render(); }
 	}
 	void keyPress(uint key) {
 		if(key == playHotKey) togglePlay(!playButton.enabled);
@@ -64,7 +63,7 @@ struct Player : Application {
 		assert(isDirectory(path));
 		array<string> files = listFiles(path,Recursive|Sort);
 		for(auto&& file: files) appendFile(move(file));
-		window.update();
+		layout.update();
 		window.render();
 	}
 	void playAlbum(int index) {
@@ -103,7 +102,7 @@ struct Player : Application {
 		slider.value = position; slider.maximum=duration;
 		elapsed.text = toString(position/60,10,2)+_(":")+toString(position%60,10,2);
 		remaining.text = toString((duration-position)/60,10,2)+_(":")+toString((duration-position)%60,10,2);
-		window.update();
+		layout.update();
 		window.render();
 	}
 } player;

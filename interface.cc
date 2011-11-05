@@ -75,12 +75,13 @@ Text::Text(int size, string&& text) : size(size), font(defaultFont), text(move(t
 
 int2 Text::sizeHint() {
 	int widestLine = 0;
-	vec2 pen = vec2(0,font.ascender());
+	FontMetrics metrics = font.metrics(size*64);
+	vec2 pen = vec2(0,metrics.ascender);
 	blits.clear();
 	char previous=0;
 	for(char c: text) {
-		if(c=='\n') { widestLine=max(int(pen.x),widestLine); pen.x=0; pen.y+=font.height(); continue; }
-		const Glyph& glyph = font.glyph(size,c);
+		if(c=='\n') { widestLine=max(int(pen.x),widestLine); pen.x=0; pen.y+=metrics.height; continue; }
+		const Glyph& glyph = font.glyph(size*64,c);
 		if(previous) pen.x += font.kerning(previous,c);
 		previous = c;
 		if(glyph.texture) {
@@ -90,7 +91,7 @@ int2 Text::sizeHint() {
 		pen.x += glyph.advance.x;
 	}
 	widestLine=max(int(pen.x),widestLine);
-	return int2(widestLine,pen.y-font.descender());
+	return int2(widestLine,pen.y-metrics.descender);
 }
 
 void Text::render(vec2 scale, vec2 offset) {

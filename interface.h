@@ -75,12 +75,13 @@ struct Window : Poll {
 	Widget& widget;
 
 	Window(int2 size, Widget& widget);
-	~Window();
+
 	pollfd poll() override;
 	bool event(pollfd) override;
 	uint addHotKey(const string& key);
 	void rename(const string& name);
 	void resize(int2 size);
+	void setFullscreen(bool fullscreen=true);
 	void render();
 };
 
