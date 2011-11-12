@@ -6,73 +6,92 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
-struct SpeexResamplerState;
-SpeexResamplerState *speex_resampler_init(uint nb_channels, uint in_rate, uint out_rate, int quality, int *err);
-int speex_resampler_process_interleaved_float(SpeexResamplerState *st,const float *in,uint *in_len,float *out,uint *out_len);
+#include "media.h"
+#include <mpg123.h>
 
-/// Decodes audio/video files using libavcodec/libavformat.
-class(FFmpeg, AudioInput) {
-    void open(const string& path) {
-        av_register_all();
-        av_log_set_level(AV_LOG_WARNING);
-        if(file) close();
-        audioPTS=0;
-        if(avformat_open_input(&file, strz(path).data, 0, 0)) { file=0; return; }
-        avformat_find_stream_info(file, 0);
-        if(file->duration <= 0) { close(); return; }
-        for( uint i=0; i<file->nb_streams; i++ ) {
-            if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
-                audioStream = file->streams[i];
-                audio = audioStream->codec;
-                audio->sample_fmt = AV_SAMPLE_FMT_FLT;
-                AVCodec* codec = avcodec_find_decoder(audio->codec_id);
-                if( codec && avcodec_open2(audio, codec, 0) >= 0 ) {
-                    audioInput = { audio->sample_rate, audio->channels };
-                    if( !audioInput.frequency ) { close(); return; }
-                    assert(audio->sample_fmt == AV_SAMPLE_FMT_S16,path);
-                }
-            }
-        }
-    }
-    void close() { if(file) { av_close_input_file(file); file=0; } }
-    void start(const AudioFormat &format) { audioOutput=format; }
-    int position() { return audioPTS; }
-    int duration() { return file->duration/1000; }
-    void seek( int time ) {
-        assert( av_seek_frame(file,-1,time*1000,0) >= 0 );
-        //avformat_seek_file(file,0,0,time*file->file_size/duration(),file->file_size,AVSEEK_FLAG_BYTE);
-    }
-    float* read(int size) {
-        assert(buffer,"Need destination buffer");
-        for(;;) {
-            AVPacket packet;
-            if(av_read_frame(file, &packet) < 0) { av_free_packet(&packet); emit(update,audioPTS=duration()); return 0; }
-            if( file->streams[packet.stream_index]==audioStream ) {
-                AVPacket pkt=packet;
-                //while( pkt.size > 0 ) {
-                int frameSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
-                int16* frame = malloc(frameSize);
-                int used = avcodec_decode_audio3( audio, (int16*)frame, &frameSize, &pkt );
-                if(frequency!=48000)
-                assert(bufferSize==size*2*2);
-                /*pkt.size -= used;
-                    pkt.data += used;
-                    if( bufferSize ) {*/
-                /*if(pkt.dts>=0) audioPTS = pkt.dts*av_q2d(audioStream->time_base)*1000;
-                        else audioPTS=pkt.pos*duration()/file->file_size;*/
-                av_free_packet(&packet);
-                return buffer;
-                /*}
-                }*/
-            }
-            av_free_packet(&packet);
-        }
-    }
+void AudioFile::setup(const AudioFormat &format) { audioOutput=format; }
+void AudioFile::open(const string& path) {
+	if(file) close(); else { av_register_all(); av_log_set_level(AV_LOG_ERROR); }
 
-	signal<int> update;
-    AVFormatContext* file=0;
-    AVStream* audioStream=0;
-    AVCodecContext* audio=0;
-    AudioFormat audioInput,audioOutput;
-    int audioPTS=0;
-};
+	audioPTS=0;
+	if(avformat_open_input(&file, strz(path).data, 0, 0)) { file=0; return; }
+	avformat_find_stream_info(file, 0);
+	if(file->duration <= 0) { close(); return; }
+	for(uint i=0; i<file->nb_streams; i++) {
+		if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
+			audioStream = file->streams[i];
+			audio = audioStream->codec;
+			audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_FLT;
+			AVCodec* codec = avcodec_find_decoder(audio->codec_id);
+			if(codec && avcodec_open2(audio, codec, 0) >= 0 ) {
+				audioInput = { audio->sample_rate, audio->channels };
+				break;
+			}
+		}
+	}
+	assert(audioInput.frequency && (audio->sample_fmt == AV_SAMPLE_FMT_FLT || audio->sample_fmt == AV_SAMPLE_FMT_S16) && audioInput.channels == audioOutput.channels, audioInput.frequency,(int)audio->sample_fmt,audioInput.channels);
+	timeChanged.emit(position(),duration());
+
+	if(audioInput.frequency != audioOutput.frequency) {
+		new (&resampler) Resampler(audioInput.channels, audioInput.frequency, audioOutput.frequency);
+	}
+}
+void AudioFile::close() { if(file) { av_close_input_file(file); file=0; } }
+int AudioFile::position() { return audioPTS/1000; }
+int AudioFile::duration() { return file->duration/1000/1000; }
+void AudioFile::seek( int time ) {
+	if( av_seek_frame(file,-1,time*1000*1000,0) < 0 ) fail("seek");
+	//avformat_seek_file(file,0,0,time*file->file_size/duration(),file->file_size,AVSEEK_FLAG_BYTE);
+}
+void AudioFile::read(int16* output, int outputSize) {
+	if(file) timeChanged.emit(position(),duration());
+	if(!file) { clear(output,outputSize*2); return; }
+	for(;;) {
+		if(inputSize>0) {
+			int size = min((int)inputSize,outputSize);
+			for(int i=0;i<size*audioOutput.channels;i++) output[i] = clip(-32768,int(input[i]*32768),32767); //copy/convert input buffer to output
+			inputSize -= size; input += size*audioInput.channels; //update input buffer
+			outputSize -= size; output += size*audioOutput.channels; //update output buffer
+			if(!inputSize && buffer) delete[] buffer; //free consumed buffer
+			if(!outputSize) return; //output filled
+		}
+
+		for(;;) { //fill input buffer
+			AVPacket packet;
+			if(av_read_frame(file, &packet) < 0) { av_free_packet(&packet); timeChanged.emit(duration(),duration()); clear(output,outputSize*2); return; }
+			if( file->streams[packet.stream_index]==audioStream ) {
+				if(audio->sample_fmt == AV_SAMPLE_FMT_FLT) {
+					input = new float[48000];
+					inputSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+					int used = avcodec_decode_audio3(audio, (int16*)input, &inputSize, &packet);
+					if(used != packet.size) fail("Incomplete");
+					inputSize /= audioInput.channels*4;
+				} else {
+					int16* buffer = new int16[48000*2];
+					inputSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+					int used = avcodec_decode_audio3(audio, buffer, &inputSize, &packet);
+					if(used != packet.size) fail("Incomplete");
+					inputSize /= audioInput.channels*2;
+					input = new float[inputSize*audioInput.channels];
+					for(int i=0;i<inputSize*audioInput.channels;i++) input[i] = buffer[i]/32768.0;
+					delete[] buffer;
+				}
+				av_free_packet(&packet);
+				audioPTS = packet.dts*audioStream->time_base.num*1000/audioStream->time_base.den;
+				break;
+			}
+			av_free_packet(&packet);
+		}
+		assert(inputSize);
+
+		if(resampler) {
+			int size = (inputSize*audioOutput.frequency-1)/audioInput.frequency+1;
+			buffer = new float[size*audioOutput.channels];
+			int in = inputSize, out = size;
+			resampler.filter(input,&in,buffer,&out);
+			assert(in == (int)inputSize,in,inputSize,out,size);
+			delete[] input;
+			input = buffer; inputSize = out;
+		}
+	}
+}

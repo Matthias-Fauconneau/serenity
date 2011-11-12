@@ -27,8 +27,8 @@ void Horizontal::update() {
 	int2 pen=int2(margin+(expanding?0:width)/2,margin);
 	for(auto& child : *this) {
 		int2 size=child.sizeHint();
-		if(size.y==0) size.y=this->size.y-2*margin;
-		if(size.x==0) size.x=width;
+		if(size.x==0||size.x>this->size.x-2*margin) size.x=width;
+		if(size.y==0||size.y>this->size.y-2*margin) size.y=this->size.y-2*margin;
 		child.size=size;
 		child.position= int2(pen.x, pen.y+(this->size.y-2*margin-size.y)/2);
 		child.update();
@@ -39,41 +39,59 @@ void Horizontal::update() {
 /// Vertical
 
 int2 Vertical::sizeHint() {
-	int width=0, expanding=0, height=0;
+	int height=0, expanding=0, width=0;
 	for(auto& child : *this) {
 		int2 size=child.sizeHint();
-		height = max(height,size.x);
-		if(size.y) width += size.y; else expanding++;
-		width += margin*2;
+		width = max(width,size.x);
+		if(size.y) height += size.y; else expanding++;
+		height += margin*2;
 	}
-	return int2(height+2*margin,expanding?0:width);
+	return int2(width+2*margin,expanding?0:height);
 }
 
 void Vertical::update() {
-	int width = size.y-2*margin, expanding=0;
+	// compute total size
+	int height = size.y-2*margin, expanding=0;
 	for(auto& child : *this) {
 		int2 size=child.sizeHint();
-		if(size.y) width -= size.y; else expanding++;
-		width -= margin*2;
+		if(size.y&&size.y<this->size.y) height -= size.y; else expanding++;
+		height -= margin*2;
 	}
-	if(expanding) width /= expanding;
-	int2 pen=int2(margin,margin);
-	for(auto& child : *this) {
+	if(expanding) height /= expanding;
+
+	int2 pen=int2(margin,margin-scroll);
+	first=-1; last=-1;
+	for(int i=0;i<count();i++) {
+		auto& child=at(i);
 		int2 size=child.sizeHint();
-		if(size.x==0) size.x=this->size.x-2*margin;
-		if(size.y==0) size.y=width;
-		child.size=size;
-		child.position= int2(pen.x+(this->size.x-2*margin-size.x)/2, pen.y);
+		if(size.x==0||size.x>this->size.x-2*margin) size.x=this->size.x-2*margin;
+		if(size.y==0||size.y>this->size.y-2*margin) size.y=height;
+		child.size = size;
+		child.position= int2(pen.x+((this->size.x-2*margin)-size.x)/2, pen.y);
 		child.update();
+		if(first==-1 && pen.y>=0) first=i;
+		if(pen.y+size.y<=this->size.y) last = i;
 		pen.y += size.y + 2*margin;
 	}
 }
 
+void Vertical::render(vec2 scale, vec2 offset) {
+	for(int i=first;i<=last;i++) at(i).render(scale,offset+vec2(at(i).position)*scale);
+}
+
+bool Vertical::event(int2 position, int event, int state) {
+	if(Layout::event(position,event,state)) return true;
+	if(!mayScroll || sizeHint().y<=size.y) return false;
+	if(event==WheelDown && state==Pressed) { scroll=clip(0,scroll-=at(first).size.y,sizeHint().y-size.y); update(); return true; }
+	if(event==WheelUp && state==Pressed) { scroll=clip(0,scroll+=at(last).size.y,sizeHint().y-size.y); update(); return true; }
+	return false;
+}
+
 /// Text
 
-Text::Text(int size, string&& text) : size(size), font(defaultFont), text(move(text)) {}
-
-int2 Text::sizeHint() {
+Text::Text(int size, string&& text) : size(size), font(defaultFont) { setText(move(text)); }
+void Text::setText(string&& text) {
+	if(!text.size) { this->text=move(text); return; }
 	int widestLine = 0;
 	FontMetrics metrics = font.metrics(size*64);
 	vec2 pen = vec2(0,metrics.ascender);
@@ -91,8 +109,11 @@ int2 Text::sizeHint() {
 		pen.x += glyph.advance.x;
 	}
 	widestLine=max(int(pen.x),widestLine);
-	return int2(widestLine,pen.y-metrics.descender);
+	textSize=int2(widestLine,pen.y-metrics.descender);
+	this->text=move(text);
 }
+
+int2 Text::sizeHint() { return textSize; }
 
 void Text::render(vec2 scale, vec2 offset) {
 	blit.bind(); blit["scale"]=scale; blit["offset"]=offset;
@@ -127,6 +148,7 @@ bool Slider::event(int2 position, int event, int state) {
 /// List
 
 bool List::event(int2 position, int event, int state) {
+	if(Vertical::event(position,event,state)) return true;
 	if(event != LeftButton || state != Pressed) return false;
 	int i=0;
 	for(auto& child: *this) {
@@ -144,9 +166,9 @@ bool List::event(int2 position, int event, int state) {
 
 void List::render(vec2 scale, vec2 offset) {
 	Vertical::render(scale,offset);
-	if(index<0) return;
+	if(index<first || index>last) return;
 	flat.bind(); flat["scale"]=scale; flat["offset"]=offset; flat["color"]=mix(vec4(0,0.5,1,1),vec4(1,1,1,1),0.25);
-	Widget& current = operator [](index);
+	Widget& current = at(index);
 	glQuad(flat,vec2(current.position-int2(margin,margin)), vec2(current.position+current.size+int2(margin,margin)));
 }
 

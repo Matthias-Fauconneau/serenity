@@ -34,9 +34,9 @@ pollfd Window::poll() { pollfd p; p.fd=XConnectionNumber(x); p.events=POLLIN; re
 bool Window::event(pollfd) {
 	while(XEventsQueued(x, QueuedAfterFlush)) { XEvent ev; XNextEvent(x,&ev);
 		if(ev.type==MotionNotify) {
-			widget.event(int2(ev.xmotion.x,ev.xmotion.y),0,ev.xmotion.state&Button1Mask?1:0);
+			if(widget.event(int2(ev.xmotion.x,ev.xmotion.y),0,ev.xmotion.state&Button1Mask?1:0)) render();
 		} else if(ev.type==ButtonPress) {
-			widget.event(int2(ev.xbutton.x,ev.xbutton.y),ev.xbutton.button,Widget::Pressed);
+			if(widget.event(int2(ev.xbutton.x,ev.xbutton.y),ev.xbutton.button,Widget::Pressed)) render();
 		} else if(ev.type==KeyPress) {
 			auto key = XKeycodeToKeysym(x,ev.xkey.keycode,0);
 			keyPress.emit(key);

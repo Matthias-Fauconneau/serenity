@@ -14,22 +14,23 @@ struct Player : Application {
 	array<string> files;
 
 	VBox layout;
-	Window window = Window(int2(640,640),layout);
+	Window window = Window(int2(640,995),layout);
 	 HBox toolbar;
 	  ToggleButton playButton = ToggleButton(playIcon,pauseIcon);
 	  TriggerButton nextButton = TriggerButton(nextIcon);
-	  Text elapsed = Text(16,_("--:--"));
+	  Text elapsed = Text(16);
 	  Slider slider;
-	  Text remaining = Text(16,_("--:--"));
+	  Text remaining = Text(16);
 	 HBox main;
 	  TextList albums; TextList titles; TextList durations;
 	uint playHotKey = window.addHotKey(_("XF86AudioPlay"));
 
 	void start(array<string>&& arguments) {
+		elapsed.setText(_("00:00")); remaining.setText(_("00:00"));
 		toolbar << &playButton << &nextButton << &elapsed << &slider << &remaining;
 		main << &albums << &titles;
 		layout << &toolbar << &main;
-		albums.margin=0;
+		albums.margin=0; titles.mayScroll=true;
 
 		window.keyPress.connect(this, &Player::keyPress);
 		playButton.toggled.connect(this, &Player::togglePlay);
@@ -53,7 +54,6 @@ struct Player : Application {
 		if(key == playHotKey) togglePlay(!playButton.enabled);
 	}
 	void appendFile(string&& path) {
-		if(!path.endsWith(_(".mp3"))) { log("Unsupported format",path); return; }
 		files << move(path);
 		string title = section(section(path,'/',-2,-1),'.',0,-2);
 		int i=0; while((title[i]<'A'||title[i]>'Z')&&(title[i]<'a'||title[i]>'z')) i++;
@@ -88,9 +88,9 @@ struct Player : Application {
 	void stop() {
 		audio.stop();
 		file.close();
-		elapsed.text=_("--:--");
+		elapsed.setText(_("--:--"));
 		slider.value = -1;
-		remaining.text=_("--:--");
+		remaining.setText(_("--:--"));
 		titles.index=-1;
 	}
 	void seek(int position) {
@@ -100,9 +100,8 @@ struct Player : Application {
 		if(position == duration) next();
 		if(!window.visible || slider.value == position) return;
 		slider.value = position; slider.maximum=duration;
-		elapsed.text = toString(position/60,10,2)+_(":")+toString(position%60,10,2);
-		remaining.text = toString((duration-position)/60,10,2)+_(":")+toString((duration-position)%60,10,2);
-		layout.update();
+		elapsed.setText(toString(position/60,10,2)+_(":")+toString(position%60,10,2));
+		remaining.setText(toString((duration-position)/60,10,2)+_(":")+toString((duration-position)%60,10,2));
 		window.render();
 	}
 } player;

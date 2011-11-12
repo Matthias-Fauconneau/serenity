@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Media Player
+Exec=player
+Type=Application
+Icon=applications-multimedia
+Categories=Multimedia;Player;Audio;Music;AudioVideo;

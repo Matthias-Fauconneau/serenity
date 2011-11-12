@@ -10,7 +10,7 @@ struct snd_output_t;
 #include <alsa/timer.h>
 #include <alsa/control.h>
 
-AudioOutput::AudioOutput() {
+AudioOutput::AudioOutput(bool realtime) {
 	snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK|SND_PCM_NO_SOFTVOL);
 	snd_pcm_hw_params_t* hw=(snd_pcm_hw_params_t*)alloca(snd_pcm_hw_params_sizeof()); snd_pcm_hw_params_any(pcm,hw);
 	snd_pcm_hw_params_set_access(pcm,hw, SND_PCM_ACCESS_MMAP_INTERLEAVED);
@@ -18,10 +18,9 @@ AudioOutput::AudioOutput() {
 	snd_pcm_hw_params_set_rate(pcm,hw, 48000, 0);
 	snd_pcm_hw_params_set_channels(pcm,hw, 2);
 	snd_pcm_hw_params_set_period_size_first(pcm, hw, &period, 0);
-	//snd_pcm_uframes_t bufferSize; snd_pcm_hw_params_set_buffer_size_first(pcm, hw, &bufferSize);
-	snd_pcm_uframes_t bufferSize=period*4; snd_pcm_hw_params_set_buffer_size_near(pcm, hw, &bufferSize);
-	//snd_pcm_hw_params_set_period_size_last(pcm, hw, &period, 0);
-	//snd_pcm_uframes_t bufferSize; snd_pcm_hw_params_set_buffer_size_last(pcm, hw, &bufferSize);
+	snd_pcm_uframes_t bufferSize;
+	if(realtime) snd_pcm_hw_params_set_buffer_size_first(pcm, hw, &bufferSize);
+	else snd_pcm_hw_params_set_buffer_size_last(pcm, hw, &bufferSize);
 	snd_pcm_hw_params(pcm, hw);
 	snd_pcm_sw_params_t *sw=(snd_pcm_sw_params_t*)alloca(snd_pcm_sw_params_sizeof());
 	snd_pcm_sw_params_current(pcm,sw);

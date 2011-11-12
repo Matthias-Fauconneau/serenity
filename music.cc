@@ -18,8 +18,6 @@ struct Music : Application {
 	Window window = Window(int2(1280,1024), sheet);
 
 	void start(array<string> &&arguments) {
-		sheet.needUpdate.connect(this,&Music::update);
-
 		for(auto&& path : arguments) {
 			if(path==_("fullscreen")) window.setFullscreen();
 			else if(path.endsWith(_(".sfz")) && exists(path)) {
@@ -55,11 +53,8 @@ struct Music : Application {
 		}
 		//if(!sampler && !sheet) fail("Usage: music [instrument.sfz] [music.mid] [sheet.pdf] [output.wav]");
 		//sheet.scroll=1600;
-		update();
+		window.render();
 		setpriority(PRIO_PROCESS,0,-20);
 		if(audio.input) audio.start();
-	}
-	void update() {
-		window.render();
 	}
 } music;

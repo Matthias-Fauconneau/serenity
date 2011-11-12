@@ -28,7 +28,7 @@ struct Layout : Widget {
 	virtual virtual_iterator<Widget> begin() =0;
 	virtual virtual_iterator<Widget> end() =0;
 	virtual int count() =0;
-	virtual Widget& operator[](int) =0;
+	virtual Widget& at(int) =0;
 
 	bool event(int2 position, int event, int state) {
 		for(auto& child : *this) {
@@ -40,6 +40,9 @@ struct Layout : Widget {
 	}
 	void render(vec2 scale, vec2 offset) {
 		for(auto& child : *this) child.render(scale,offset+vec2(child.position)*scale);
+		/*flat.bind(); flat["scale"]=scale; flat["offset"]=offset; flat["color"]=vec4(0,0,0,1);
+		glQuad(flat,vec2(0,0),vec2(size.x,1)); glQuad(flat,vec2(size.x,0),vec2(size.x+1,size.y));
+		glQuad(flat,vec2(0,0),vec2(1,size.y)); glQuad(flat,vec2(0,size.y),vec2(size.x,size.y+1));*/
 	}
 };
 
@@ -50,7 +53,7 @@ template<class L> struct WidgetLayout : L {
 	virtual_iterator<Widget> end() { return new dereference_iterator<Widget>(widgets.end()); }
 	int count() { return widgets.size; }
 	WidgetLayout& operator <<(Widget* w) { widgets << w; return *this; }
-	Widget& operator[](int i) { return *widgets[i]; }
+	Widget& at(int i) { return *widgets[i]; }
 };
 
 /// implements Layout storage using array<T> (i.e by value)
@@ -60,7 +63,7 @@ template<class L, class T> struct ItemLayout : L {
 	virtual_iterator<Widget> end() { return new value_iterator<Widget>(items.end()); }
 	int count() { return items.size; }
 	ItemLayout& operator <<(T&& t) { items << move(t); return *this; }
-	Widget& operator[](int i) { return items[i]; }
+	Widget& at(int i) { return items[i]; }
 };
 
 typedef struct _XDisplay Display;
@@ -93,9 +96,15 @@ struct Horizontal : Layout {
 typedef WidgetLayout<Horizontal> HBox;
 
 struct Vertical : Layout {
-	int margin = 1;
+	int margin = 0;
+	int scroll = 0;
+	bool mayScroll=false;
+	int first=0,last=0;
+	signal<> needUpdate;
 	int2 sizeHint();
 	void update();
+	bool event(int2 position, int event, int state);
+	void render(vec2 scale, vec2 offset);
 };
 typedef WidgetLayout<Vertical> VBox;
 
@@ -115,9 +124,11 @@ struct Text : Widget {
 	int size;
 	Font& font;
 	string text;
+	int2 textSize;
 	struct Blit { vec2 min, max; uint id; };
 	array<Blit> blits;
-	Text(int size, string&& text);
+	Text(int size, string&& text=string());
+	void setText(string&& text);
 	int2 sizeHint();
 	void render(vec2 scale, vec2 offset);
 };

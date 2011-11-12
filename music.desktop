@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Piano - Salamander
+Exec=music /Samples/Salamander.sfz
+Type=Application
+Icon=audio-midi
+Categories=Audio;Music

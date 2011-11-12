@@ -29,6 +29,7 @@ template <class V, class T, int N> struct vector : V {
 	inline bool operator <(const vector& v) const { for(int i=0;i<N;i++) if(u(i)>=v[i]) return false; return true; }
 	inline bool operator >=(const vector& v) const { for(int i=0;i<N;i++) if(u(i)<v[i]) return false; return true; }
 	inline bool operator <=(const vector& v) const { for(int i=0;i<N;i++) if(u(i)>v[i]) return false; return true; }
+	inline explicit operator bool() const { for(int i=0;i<N;i++) if(u(i)!=0) return true; return false; }
 };
 template <class V, class T, int N> vector<V,T,N> operator *(float s, vector<V,T,N> v){ return v*s; }
 

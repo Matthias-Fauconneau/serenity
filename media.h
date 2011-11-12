@@ -36,9 +36,7 @@ struct Resampler {
 	operator bool();
 };
 
-typedef struct mpg123_handle_struct mpg123_handle;
 struct AudioFile : AudioInput {
-	mpg123_handle* file=0;
 	AudioFormat audioInput,audioOutput;
 	Resampler resampler;
 	float* buffer=0; float* input=0; int inputSize=0;
@@ -51,6 +49,13 @@ struct AudioFile : AudioInput {
 	void setup(const AudioFormat& format);
 	void read(int16* output, int size);
 	signal<int,int> timeChanged;
+
+private:
+	//struct mpg123_handle_struct* file=0;
+	struct AVFormatContext* file=0;
+	struct AVStream* audioStream=0;
+	struct AVCodecContext* audio=0;
+	int audioPTS=0;
 };
 
 typedef struct _snd_pcm snd_pcm_t;
@@ -62,7 +67,7 @@ struct AudioOutput : Poll {
 	AudioFormat format{48000,2};
 	bool running=false;
 
-	AudioOutput();
+	AudioOutput(bool realtime=false);
 	pollfd poll();
 	bool event(pollfd);
 	virtual void setInput(AudioInput* input);
