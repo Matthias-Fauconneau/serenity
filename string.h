@@ -16,6 +16,8 @@ long readInteger(const char*& s, int base=10);
 double toFloat(const string& str, int base=10 );
 double readFloat(const char*& s, int base=10 );
 string section(const string& str, char sep, int start=0, int end=1);
+string trim(const string& str);
+array<string> split(const string& str, char sep=' ');
 
 inline bool operator <(const string& a, const string& b) {
 	for(int i=0;i<min(a.size,b.size);i++) {
@@ -25,14 +27,14 @@ inline bool operator <(const string& a, const string& b) {
 	return a.size < b.size;
 }
 
-template <class A> struct cat {
-	const A& a; const string& b;
+template <class A, class T> struct cat {
+	const A& a; const array<T>& b;
 	struct { cat* c; operator int() const { return c->a.size+c->b.size; } } size;
-	cat(const A& a,const string& b) : a(a), b(b) { size.c=this; }
-	void copy(char* data) const { a.copy(data); ::copy(data+a.size,b.data,b.size); }
-	operator string() { string r; r.resize(size); copy((char*)r.data); return r; }
+	cat(const A& a,const array<T>& b) : a(a), b(b) { size.c=this; }
+	void copy(T* data) const { a.copy(data); ::copy(data+a.size,b.data,b.size); }
+	operator array<T>() { array<T> r; r.reserve(size); copy((T*)r.data); r.size=size; return r; }
 };
-template <class A> cat<A> operator +(const A& a,const string& b) { return cat<A>(a,b); }
+template <class A, class T> cat<A,T> operator +(const A& a,const array<T>& b) { return cat<A,T>(a,b); }
 
 /// stream
 

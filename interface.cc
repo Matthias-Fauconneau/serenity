@@ -70,20 +70,20 @@ void Vertical::update() {
 		child.position= int2(pen.x+((this->size.x-2*margin)-size.x)/2, pen.y);
 		child.update();
 		if(first==-1 && pen.y>=0) first=i;
-		if(pen.y+size.y<=this->size.y) last = i;
+		if(pen.y+size.y<=this->size.y) last = i+1;
 		pen.y += size.y + 2*margin;
 	}
 }
 
 void Vertical::render(vec2 scale, vec2 offset) {
-	for(int i=first;i<=last;i++) at(i).render(scale,offset+vec2(at(i).position)*scale);
+	for(int i=first;i<last;i++) at(i).render(scale,offset+vec2(at(i).position)*scale);
 }
 
 bool Vertical::event(int2 position, int event, int state) {
 	if(Layout::event(position,event,state)) return true;
 	if(!mayScroll || sizeHint().y<=size.y) return false;
-	if(event==WheelDown && state==Pressed) { scroll=clip(0,scroll-=at(first).size.y,sizeHint().y-size.y); update(); return true; }
-	if(event==WheelUp && state==Pressed) { scroll=clip(0,scroll+=at(last).size.y,sizeHint().y-size.y); update(); return true; }
+	if(event==WheelDown && state==Pressed) { scroll=clip(0,scroll-at(first).size.y,sizeHint().y-size.y); update(); return true; }
+	if(event==WheelUp && state==Pressed) { scroll=clip(0,scroll+at(last).size.y,sizeHint().y-size.y); update(); return true; }
 	return false;
 }
 
@@ -166,7 +166,7 @@ bool List::event(int2 position, int event, int state) {
 
 void List::render(vec2 scale, vec2 offset) {
 	Vertical::render(scale,offset);
-	if(index<first || index>last) return;
+	if(index<first || index>=last) return;
 	flat.bind(); flat["scale"]=scale; flat["offset"]=offset; flat["color"]=mix(vec4(0,0.5,1,1),vec4(1,1,1,1),0.25);
 	Widget& current = at(index);
 	glQuad(flat,vec2(current.position-int2(margin,margin)), vec2(current.position+current.size+int2(margin,margin)));

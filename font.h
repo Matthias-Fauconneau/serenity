@@ -27,7 +27,8 @@ struct Font {
 	array<float> widths;
 
 	Font(){}
-	Font(const string& path);
+	Font(const char* path);
+	Font(string&& data);
 	FontMetrics metrics(int size);
 	int kerning(char leftCode, char rightCode);
 	GlyphMetrics metrics(int size, char code);

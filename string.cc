@@ -4,7 +4,7 @@
 
 string toString(long number, int base, int pad) {
 	assert(base>=2 && base<=16,"Unsupported base",base);
-	char buf[20]; clear(buf); int i=19;
+	char buf[20]; int i=19;
 	long n = abs(number);
 	if(n >= 0x10000) { base=16; pad=8; }
     do {
@@ -72,6 +72,27 @@ string section(const string& s, char sep, int start, int end) {
 }
 string strz(const string& s) { return s+_("\0"); }
 string strz(const char* s) { int i=0; while(s[i]) i++; return string(s,i); }
+
+string trim(const string& s) {
+	int b=0; for(;b<s.size && s[b]==' ';) b++;
+	int e=s.size-1; for(;e>b && s[e]==' ';) e--;
+	return s.slice(b,e+1-b);
+}
+
+array<string> split(const string& str, char sep) {
+	array<string> r;
+	int b=0,e=0;
+	for(;;) {
+		while(b<str.size && str[b]==sep) b++;
+		e=b;
+		while(e<str.size && str[e]!=sep) e++;
+		if(b==str.size) break;
+		r << str.slice(b,e-b);
+		if(e==str.size) break;
+		b=e+1;
+	}
+	return r;
+}
 
 /// log
 

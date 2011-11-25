@@ -9,9 +9,9 @@ template <class T> struct array {
 
 	/// move constructor
 	array(array&& o) : data(o.data), size(o.size), capacity(o.capacity) { o.capacity=0; }
-	/// move constructor with conversion
+	/*/// move constructor with conversion
 	template <class O> explicit array(array<O>&& o)
-	: data((const T*)o.data), size(o.size*sizeof(O)/sizeof(T)), capacity(o.capacity*sizeof(O)/sizeof(T)) { o.capacity=0; }
+	: data((const T*)o.data), size(o.size*sizeof(O)/sizeof(T)), capacity(o.capacity*sizeof(O)/sizeof(T)) { o.capacity=0; }*/
 	/// move assigment
 	array& operator=(array&& o) { this->~array(); data=o.data; size=o.size; capacity=o.capacity; o.capacity=0; return *this; }
 	/// allocate a new uninitialized array for \a capacity elements
@@ -19,7 +19,9 @@ template <class T> struct array {
 	/// allocate a new array with \a size elements initialized to \a value
 	explicit array(int size, const T& value) : data((T*)malloc(size*sizeof(T))), capacity(size) { for(int i=0;i<size;i++) append(value); }
 	/// reference elements from an initalizer \a list
-	explicit array(const std::initializer_list<T>& list) : data((T*)list.begin()), size((int)list.size()) {}
+	//array(const std::initializer_list<T>& list) : data((T*)list.begin()), size((int)list.size()) {}
+	/// reference elements from null terminated \a data
+	array(const T* data) : data(data) { assert(data); while(data[size]!=0) size++; }
 	/// reference \a size elements from existing \a data
 	explicit array(const T* data, int size) : data(data), size(size) { assert(size>=0); assert(data); }
 	/// reference elements sliced from \a begin to \a end
@@ -34,7 +36,7 @@ template <class T> struct array {
 		this->capacity=capacity;
 	}
 	/// make sure data is an owned reference (deep copy)
-	array<T>& detach() { assert(size); if(!capacity) reserve(size); return *this; }
+	void detach() { assert(size); if(!capacity) reserve(size); }
 	/// reduce size and destroy removed elements
 	void shrink(int size) { assert(size<this->size); if(capacity) for(int i=size;i<this->size;i++) data[i].~T(); this->size=size; }
 	/// reserve space and initialize added elements
@@ -50,7 +52,7 @@ template <class T> struct array {
 	/// copy all elements to \a buffer
 	void copy(T* dst) const { ::copy(dst,data,size); }
 	/// copy all elements in a new array
-	array<T> copy() const { array<T> r(size); copy((T*)r.data); return r; }
+	array<T> copy() const { array<T> r(size); copy((T*)r.data); r.size=size; return r; }
 
 	/// element
 	const T& at(int i) const { assert(i>=0 && i<size,"i",i,"size",size); return data[i]; }
@@ -65,7 +67,7 @@ template <class T> struct array {
 	/// query
 	int indexOf(const T& v) const { for(int i=0;i<size;i++) { if( data[i]==v ) return i; } return -1; }
 	bool contains(const T& v) const { return indexOf(v)>=0; }
-	bool contains(const array<T>& a) const {
+	/*bool contains(const array<T>& a) const {
 		for(int i=0;i<size-a.size;i++) {
 			for(int j=0;j<a.size;j++) {
 				if(at(i+j)!=a[j]) goto next;
@@ -74,7 +76,7 @@ template <class T> struct array {
 			next:;
 		}
 		return false;
-	}
+	}*/
 	bool startsWith(const array<T>& a) const {
 		if(size < a.size) return false;
 		for(int i=0;i<a.size;i++) if(at(i)!=a[i]) return false;
@@ -87,7 +89,7 @@ template <class T> struct array {
 	}
 	bool operator ==(const array<T>& a) const {
 		if(size != a.size) return false;
-		for(int i=0;i<size;i++) if(at(i)!=a[i]) return false;
+		for(int i=0;i<size;i++) if(!(at(i)==a[i])) return false;
 		return true;
 	}
 	bool operator !=(const array<T>& a) const { return !(*this==a); }
@@ -141,8 +143,8 @@ template <class T> struct array {
 	int capacity = 0; //0 = not owned
 };
 
-template<class T> void log_(const array<T>& a) {
-	log_('[');
-	for(int i=0;i<a.size;i++) { log_(a[i]); if(i<a.size-1) log_(", "); }
-	log_(']');
+template<class T> void log_(const array<T>& a, const char* sep=", ") {
+	//log_('[');
+	for(int i=0;i<a.size;i++) { log_(a[i]); if(i<a.size-1) log_(sep); }
+	//log_(']');
 }

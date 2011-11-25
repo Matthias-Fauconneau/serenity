@@ -100,6 +100,8 @@ void log_(float);
 void log_(double);
 void log_(const char* s);
 
+template<class A> void log_(A* a) { if(a) log_(*a); else log_("null"); }
+template<class A> void log_(const A* a) { if(a) log_(*a); else log_("null"); }
 template<class A, class... Args> void log_(const A& a, const Args&... args) { log_(a); log_(' '); log_(args...); }
 template<class... Args> void log(const Args&... args) { log_(args...); log_('\n'); }
 

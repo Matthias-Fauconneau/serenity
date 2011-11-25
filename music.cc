@@ -6,7 +6,7 @@
 #include <sys/resource.h>
 
 struct Music : Application {
-	AudioOutput audio;
+	AudioOutput audio{true};
 	Sampler sampler;
 	Sequencer seq;
 	MidiFile midi;

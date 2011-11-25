@@ -29,7 +29,7 @@ void Sampler::open(const string& path) {
 				string path = folder+value.replace('\\','/')+string("\0",1);
 				auto file = mapFile(path).slice(44);
 				sample->data = (uint8*)file.data; sample->size=file.size;
-				mlock(sample->data, min(256*1024,sample->size)); //TODO: monolithic file for sequential load
+				mlock(sample->data, min(64*1024,sample->size)); //TODO: monolithic file for sequential load
 			}
 			else if(key==_("trigger")) sample->trigger = value==_("release");
 			else if(key==_("lovel")) sample->lovel=toInteger(value);

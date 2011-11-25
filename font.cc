@@ -6,13 +6,18 @@
 #undef strlen
 
 static FT_Library ft;
+struct InitFreeType {
+	InitFreeType() {
+		FT_Init_FreeType(&ft);
+		FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
+	}
+} static_this;
 
-Font::Font(const string& path) {
-	FT_Init_FreeType(&ft);
-	FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
-	FT_New_Face(ft, strz(path).data, 0, &face);
+Font::Font(const char* path) {
+	FT_New_Face(ft, path, 0, &face);
 	assert(face,path);
 }
+Font::Font(string&& data) : data(move(data)) { log(data.size); FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face); }
 
 FontMetrics Font::metrics(int size) {
 	FT_Set_Char_Size(face, 0, size, 72, 72);
@@ -32,7 +37,7 @@ GlyphMetrics Font::metrics(int size, char code) {
 	assert(face);
 	FT_Set_Char_Size(face, 0, size, 72, 72);
 	int index = FT_Get_Char_Index(face, code);
-	if(!index) index=code;
+	assert(index); //if(!index) index=code;
 	FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
 	GlyphMetrics metrics={
 	vec2(face->glyph->advance.x / 64.0, face->glyph->advance.y / 64.0),

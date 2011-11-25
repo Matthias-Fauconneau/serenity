@@ -5,12 +5,9 @@
 #include <float.h>
 #include <math.h>
 #include <zlib.h>
-
-#include <ft2build.h>
-#include <freetype/freetype.h>
-#include <freetype/ftlcdfil.h>
-
-static FT_Library ft;
+#include <stdlib.h>
+//#include <ft2build.h>
+//#include <freetype/freetype.h>
 
 struct Variant { //TODO: union
 	move_only(Variant);
@@ -134,8 +131,6 @@ static map<string,Variant> toDict(const array<const char*>& xref, Variant&& obje
 //#define toDict(object) ({ object.dict ? : parse(xref[object.number]).dict })
 
 void PDF::open(const string& path) {
-	if(!ft) FT_Init_FreeType( &ft ); FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
-
 	string pdf = mapFile(path);
 	array<const char*> xref; map<string,Variant> catalog;
 	{
@@ -177,12 +172,10 @@ void PDF::open(const string& path) {
 			if(descendant) fontDict = parse(xref[descendant->list[0].number]).dict;
 			Font& font = fonts.insert(move(e.key));
 			font.name = move(fontDict.at(_("BaseFont")).data);
+			log(font.name);
 			auto descriptor = parse(xref[fontDict.at(_("FontDescriptor")).number]).dict;
 			auto fontFile = descriptor.find(_("FontFile"))?:descriptor.find(_("FontFile2"))?:descriptor.find(_("FontFile3"));
-			if(fontFile) {
-				font.data = parse(xref[fontFile->number]).data;
-				FT_New_Memory_Face(ft,(const FT_Byte*)font.data.data,font.data.size,0,&font.face);
-			}
+			if(fontFile) font = Font( parse(xref[fontFile->number]).data );
 			auto firstChar = fontDict.find(_("FirstChar"));
 			if(firstChar) font.widths.resize(firstChar->number);
 			auto widths = fontDict.find(_("Widths"));
@@ -401,7 +394,7 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
 		mat32 Trm = Tm*Cm;
 		vec2 position = vec2(Trm.dx,Trm.dy);
 		float size = fontSize*Trm.m11*64;
-		Metrics metrics = font->metrics(round(size), code);
+		GlyphMetrics metrics = font->metrics(round(size), code);
 		extend(position); extend(position+metrics.size);
 		Character c = { position, font, size, code }; characters << c;
 		float advance = spacing+(code==' '?wordSpacing:0);
