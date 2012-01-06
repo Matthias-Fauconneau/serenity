@@ -172,7 +172,7 @@ void PDF::open(const string& path) {
 			if(descendant) fontDict = parse(xref[descendant->list[0].number]).dict;
 			Font& font = fonts.insert(move(e.key));
 			font.name = move(fontDict.at(_("BaseFont")).data);
-			log(font.name);
+			log("FontName",font.name);
 			auto descriptor = parse(xref[fontDict.at(_("FontDescriptor")).number]).dict;
 			auto fontFile = descriptor.find(_("FontFile"))?:descriptor.find(_("FontFile2"))?:descriptor.find(_("FontFile3"));
 			if(fontFile) font = Font( parse(xref[fontFile->number]).data );
@@ -422,9 +422,9 @@ void PDF::render(vec2 scale, vec2 offset) {
 
 	flat.bind(); flat["scale"] = scale; flat["offset"] = offset; flat["color"] = vec4(0,0,0,1);
 	//glSmooth();
-	stroke.bindAttribute(&flat,"position",2,0);
+    stroke.bindAttribute(flat,"position",2);
 	stroke.draw();
-	fill.bindAttribute(&flat,"position",2,0);
+    fill.bindAttribute(flat,"position",2);
 	fill.draw();
 
 	//flat["scale"] = vec2(1,1); flat["offset"] = vec2(0,0); flat["color"] = vec4(1,1,1,1);

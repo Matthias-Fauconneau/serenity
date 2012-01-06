@@ -19,7 +19,7 @@ template <class T> struct array {
 	/// allocate a new array with \a size elements initialized to \a value
 	explicit array(int size, const T& value) : data((T*)malloc(size*sizeof(T))), capacity(size) { for(int i=0;i<size;i++) append(value); }
 	/// reference elements from an initalizer \a list
-	//array(const std::initializer_list<T>& list) : data((T*)list.begin()), size((int)list.size()) {}
+	array(const std::initializer_list<T>& list) : data((T*)list.begin()), size((int)list.size()) {}
 	/// reference elements from null terminated \a data
 	array(const T* data) : data(data) { assert(data); while(data[size]!=0) size++; }
 	/// reference \a size elements from existing \a data

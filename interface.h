@@ -5,32 +5,73 @@
 #include "font.h"
 
 /// Widget is an abstract component to compose user interfaces
-struct Widget {
-	int2 position, size;
 
-	enum Event { Motion, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp /*TODO: X keys*/ };
-	enum State { Released=0, Pressed=1 };
+struct Widget {
+/// Layout
+	int2 position, size;
 	/// Preferred size (0 means expand)
 	virtual int2 sizeHint() { return int2(0,0); }
-	/// Render this widget. use \a view to scale from widget coordinates (0-size) to viewport
-	virtual void render(vec2 scale, vec2 offset) =0;
-	/// Notify objects to process \a position,\a size or derived member changes
-	virtual void update() {}
-	/// Notify objects to process a new user event
-	virtual bool event(int2 /*position*/, int /*event*/, int /*state*/) { return false; }
+    /// Notify objects to process \a position,\a size or derived member changes
+    virtual void update() {}
 
-	//operator Widget() { return *this; } //hack to allow . syntax in Layout<Widget*>
+/// Paint
+    /// Render this widget. use \a scale and \a offset in implementation to scale from widget coordinates (0-size) to viewport
+    virtual void render(vec2 scale, vec2 offset) =0;
+
+/// Event
+    /// Event type, mouse button or key
+    enum Event { Motion, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp /*TODO: X keys*/ };
+    /// State of \a event (or LeftButton for Motion events)
+    enum State { Released=0, Pressed=1 };
+    /// Notify objects to process a new user event
+    virtual bool event(int2 /*position*/, Event /*event*/, State /*state*/) { return false; }
 };
 
-/// Layout is a widget presenting other widgets
+/// Window display \a widget in an X11 window, initialize its GL context and forward events.
+//forward declarations from Xlib.h
+typedef struct _XDisplay Display;
+typedef struct __GLXcontextRec* GLXContext;
+typedef unsigned long XWindow;
+struct Window : Poll {
+    /// Create a \a size big window to host \a widget
+    Window(int2 size, Widget& widget);
+    /// Repaint window contents. Also called when an event was accepted by a widget.
+    void render();
+
+    /// Show/Hide window
+    void setVisible(bool visible=true);
+    /// Resize window to \a size
+    void resize(int2 size);
+    /// Toggle windowed/fullscreen mode
+    void setFullscreen(bool fullscreen=true);
+    /// Rename window to \a name
+    void rename(const string& name);
+
+    /// Register global shortcut named \a key (X11 KeySym)
+    uint addHotKey(const string& key);
+    /// User triggerred a registered hot key
+    signal<uint /*KeySym*/> hotKeyTriggered;
+protected:
+    pollfd poll() override;
+    bool event(pollfd) override;
+
+    Display* x;
+    GLXContext ctx;
+    XWindow window;
+    bool visible=true;
+    Widget& widget;
+};
+
+/// Layout is a pure Widget containing children.
 struct Layout : Widget {
-	/// Allow to specialize child widgets storage (\sa WidgetLayout ItemLayout)
+    /// \a begin, \a end, \a count and \a at allow to specialize child widgets storage (\sa WidgetLayout ItemLayout)
 	virtual virtual_iterator<Widget> begin() =0;
 	virtual virtual_iterator<Widget> end() =0;
 	virtual int count() =0;
 	virtual Widget& at(int) =0;
 
-	bool event(int2 position, int event, int state) {
+    /// Forward event to intersecting child widgets until accepted
+    bool event(int2 position, Event event, State state) {
 		for(auto& child : *this) {
 			if(position > child.position && position < child.position+child.size) {
 				if(child.event(position-child.position,event,state)) return true;
@@ -38,15 +79,14 @@ struct Layout : Widget {
 		}
 		return false;
 	}
+    /// Render every child widget
 	void render(vec2 scale, vec2 offset) {
 		for(auto& child : *this) child.render(scale,offset+vec2(child.position)*scale);
-		/*flat.bind(); flat["scale"]=scale; flat["offset"]=offset; flat["color"]=vec4(0,0,0,1);
-		glQuad(flat,vec2(0,0),vec2(size.x,1)); glQuad(flat,vec2(size.x,0),vec2(size.x+1,size.y));
-		glQuad(flat,vec2(0,0),vec2(1,size.y)); glQuad(flat,vec2(0,size.y),vec2(size.x,size.y+1));*/
 	}
 };
 
-/// implements Layout storage using array<Widget*> (i.e by reference)
+/// WidgetLayout implements Layout storage using array<Widget*> (i.e by reference)
+/// \note It allows a layout to contain heterogenous Widget objects.
 template<class L> struct WidgetLayout : L {
 	array<Widget*> widgets;
 	virtual_iterator<Widget> begin() { return new dereference_iterator<Widget>(widgets.begin()); }
@@ -56,7 +96,8 @@ template<class L> struct WidgetLayout : L {
 	Widget& at(int i) { return *widgets[i]; }
 };
 
-/// implements Layout storage using array<T> (i.e by value)
+/// ItemLayout implements Layout storage using array<T> (i.e by value)
+/// \note It allows a layout to directly contain homogenous items without managing an indirection.
 template<class L, class T> struct ItemLayout : L {
 	array<T> items;
 	virtual_iterator<Widget> begin() { return new value_iterator<Widget>(items.begin()); }
@@ -66,110 +107,130 @@ template<class L, class T> struct ItemLayout : L {
 	Widget& at(int i) { return items[i]; }
 };
 
-typedef struct _XDisplay Display;
-typedef struct __GLXcontextRec* GLXContext;
-typedef unsigned long XWindow;
-struct Window : Poll {
-	Display* x;
-	GLXContext ctx;
-	XWindow window;
-	signal<uint> keyPress;
-	bool visible=true;
-	Widget& widget;
-
-	Window(int2 size, Widget& widget);
-
-	pollfd poll() override;
-	bool event(pollfd) override;
-	uint addHotKey(const string& key);
-	void rename(const string& name);
-	void resize(int2 size);
-	void setFullscreen(bool fullscreen=true);
-	void render();
-};
-
+/// Horizontal divide horizontal space between contained widgets
+//TODO: factorize scrolling from Vertical
 struct Horizontal : Layout {
-	int margin = 1;
-	int2 sizeHint();
-	void update();
+protected:
+    int2 sizeHint() override;
+    void update() override;
+
+    static const int margin = 1;
 };
+/// HBox layouts heterogenous widgets (i.e references) horizontally
 typedef WidgetLayout<Horizontal> HBox;
 
+/// Vertical divide vertical space between contained widgets, with scrolling if necessary
 struct Vertical : Layout {
-	int margin = 0;
-	int scroll = 0;
-	bool mayScroll=false;
-	int first=0,last=0;
-	signal<> needUpdate;
-	int2 sizeHint();
-	void update();
-	bool event(int2 position, int event, int state);
-	void render(vec2 scale, vec2 offset);
+protected:
+    int2 sizeHint() override;
+    void update() override;
+    bool event(int2 position, Event event, State state) override;
+    void render(vec2 scale, vec2 offset) override;
+
+    int margin = 0;
+    int scroll = 0;
+    bool mayScroll = false;
+    int first = 0, last = 0;
 };
+/// VBox layouts heterogenous widgets (i.e references) vertically
 typedef WidgetLayout<Vertical> VBox;
 
+/// List is a \a Vertical layout with selection
+//TODO: multi selection
 struct List : Vertical {
-	int index=-1;
-	signal<int> currentChanged;
+    /// User changed active index.
+    signal<int /*active index*/> activeChanged;
 
-	bool event(int2 position, int event, int state);
-	void render(vec2 scale, vec2 offset);
+protected:
+    bool event(int2 position, Event event, State state) override;
+    void render(vec2 scale, vec2 offset) override;
+
+    int index = -1;
 };
 
+/// ValueList is a \a List of homogenous items (i.e values)
 template<class T> struct ValueList : ItemLayout<List, T> {
-	inline T& current() { return this->items[this->index]; }
+    /// Return active item (last selection)
+    inline T& active() { return this->items[this->index]; }
 };
 
+/// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
-	int size;
-	Font& font;
-	string text;
-	int2 textSize;
-	struct Blit { vec2 min, max; uint id; };
-	array<Blit> blits;
-	Text(int size, string&& text=string());
-	void setText(string&& text);
-	int2 sizeHint();
-	void render(vec2 scale, vec2 offset);
-};
+    /// Create a caption that display \a text using a \a size pt (points) font
+    Text(int size, string&& text=string());
+    /// Set the text to display
+    void setText(string&& text);
 
+protected:
+    int2 sizeHint() override;
+    void render(vec2 scale, vec2 offset) override;
+
+    int size;
+    Font& font;
+    string text;
+    int2 textSize;
+    struct Blit { vec2 min, max; uint id; };
+    array<Blit> blits;
+};
+/// TextList is a \a ValueList of \a Text items
 typedef ValueList<Text> TextList;
 
-struct GLTexture;
-struct Image;
+/// TriggerButton is a clickable image Widget
 struct TriggerButton : Widget {
-	GLTexture icon;
-	int size=32;
-	signal<> triggered;
-	TriggerButton(const Image& icon);
-	int2 sizeHint();
-	void render(vec2 scale, vec2 offset);
-	bool event(int2, int event, int state);
+    /// Create a trigger button showing \a icon
+    TriggerButton(const Image& icon);
+
+    /// User clicked on the button
+    signal<> triggered;
+
+protected:
+    int2 sizeHint() override;
+    void render(vec2 scale, vec2 offset) override;
+    bool event(int2, Event event, State state) override;
+
+    GLTexture icon;
+    const int size = 32;
 };
 
+/// TriggerButton is a togglable image Widget
 struct ToggleButton : Widget {
-	GLTexture enableIcon, disableIcon;
-	int size=32;
-	bool enabled=false;
-	signal<bool> toggled;
+    /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
 	ToggleButton(const Image& enable,const Image& disable);
-	int2 sizeHint();
-	void render(vec2 scale, vec2 offset);
-	bool event(int2, int event, int state);
+
+    /// User toggled the button
+    signal<bool /*nextState*/> toggled;
+
+protected:
+    int2 sizeHint() override;
+    void render(vec2 scale, vec2 offset) override;
+    bool event(int2, Event event, State state) override;
+
+    GLTexture enableIcon, disableIcon;
+    bool enabled = false;
+    static const int size = 32;
 };
 
+/// Slider is a Widget to show or control a bounded value
 struct Slider : Widget {
-	int height = 32;
-	int minimum=0,value=-1,maximum=0;
+    /// \a minimum and \a maximum displayable/settable value
+    int minimum = 0, maximum = 0;
+    /// current \a value shown by the slider
+    int value = -1;
+    /// User edited the \a value
 	signal<int> valueChanged;
 
-	int2 sizeHint();
-	void render(vec2 scale, vec2 offset);
-	bool event(int2 position, int event, int state);
+protected:
+    int2 sizeHint() override;
+    void render(vec2 scale, vec2 offset) override;
+    bool event(int2 position, Event event, State state) override;
+
+    static const int height = 32;
 };
 
-
+/// Declare a small .png icon embedded in the binary, decoded on startup and accessible at runtime as an Image
+/// \note an icon with the same name must be linked by the build system
+///       'ld -r -b binary -o name.o name.png' can be used to embed a file in the binary
 #define ICON(name) \
 	extern uint8 _binary_## name ##_png_start[]; \
 	extern uint8 _binary_## name ##_png_end[]; \
-	static Image name ## Icon (_binary_## name ##_png_start,_binary_## name ##_png_end-_binary_## name ##_png_start);
+    static Image name ## Icon (_binary_## name ##_png_start,_binary_## name ##_png_end-_binary_## name ##_png_start)

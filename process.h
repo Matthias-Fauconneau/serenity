@@ -7,6 +7,8 @@ struct Application {
 	Application();
 	/// Initialize using the given command line \a args
 	virtual void start(array<string>&& args) =0;
+    /// Flag to exit event loop and return from main()
+    bool running=true;
 };
 
 /// Poll is an interface for objects needing to participate in event handling

@@ -79,7 +79,7 @@ void Vertical::render(vec2 scale, vec2 offset) {
 	for(int i=first;i<last;i++) at(i).render(scale,offset+vec2(at(i).position)*scale);
 }
 
-bool Vertical::event(int2 position, int event, int state) {
+bool Vertical::event(int2 position, Event event, State state) {
 	if(Layout::event(position,event,state)) return true;
 	if(!mayScroll || sizeHint().y<=size.y) return false;
 	if(event==WheelDown && state==Pressed) { scroll=clip(0,scroll-at(first).size.y,sizeHint().y-size.y); update(); return true; }
@@ -137,7 +137,7 @@ void Slider::render(vec2 scale, vec2 offset) {
 	}
 }
 
-bool Slider::event(int2 position, int event, int state) {
+bool Slider::event(int2 position, Event event, State state) {
 	if((event == Motion || event==LeftButton) && state==Pressed) {
 		value = minimum+position.x*(maximum-minimum)/size.x;
 		valueChanged.emit(value);
@@ -146,8 +146,7 @@ bool Slider::event(int2 position, int event, int state) {
 }
 
 /// List
-
-bool List::event(int2 position, int event, int state) {
+bool List::event(int2 position, Event event, State state) {
 	if(Vertical::event(position,event,state)) return true;
 	if(event != LeftButton || state != Pressed) return false;
 	int i=0;
@@ -155,7 +154,7 @@ bool List::event(int2 position, int event, int state) {
 		if(position>child.position-int2(margin,margin) && position<child.position+child.size+int2(margin,margin)) {
 			if(i!=index) {
 				index=i;
-				currentChanged.emit(i);
+                activeChanged.emit(i);
 			}
 			return true;
 		}
@@ -181,7 +180,7 @@ void TriggerButton::render(vec2 scale, vec2 offset) {
 	icon.bind();
 	glQuad(blit,vec2(0,0),vec2(Widget::size),true);
 }
-bool TriggerButton::event(int2, int event, int state) {
+bool TriggerButton::event(int2, Event event, State state) {
 	if(event==LeftButton && state==Pressed) triggered.emit();
 	return true;
 }
@@ -195,7 +194,7 @@ void ToggleButton::render(vec2 scale, vec2 offset) {
 	(enabled?disableIcon:enableIcon).bind();
 	glQuad(blit,vec2(0,0),vec2(Widget::size),true);
 }
-bool ToggleButton::event(int2, int event, int state) {
+bool ToggleButton::event(int2, Event event, State state) {
 	if(event==LeftButton && state==Pressed) { enabled = !enabled; toggled.emit(enabled); }
 	return true;
 }

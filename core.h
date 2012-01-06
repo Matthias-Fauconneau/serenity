@@ -78,6 +78,7 @@ template <class T> void copy(T& dst,const T& src) { copy(&dst,&src,1); }
 template <class T> T copy(const T& t) { return t; }
 template <class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 
+template <class T> T sqr(T x) { return x*x; }
 template <class T> T abs(T x) { return x>=0 ? x : -x; }
 template <class T> T min(T a, T b) { return a<b ? a : b; }
 template <class T> T max(T a, T b) { return a>b ? a : b; }

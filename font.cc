@@ -17,7 +17,7 @@ Font::Font(const char* path) {
 	FT_New_Face(ft, path, 0, &face);
 	assert(face,path);
 }
-Font::Font(string&& data) : data(move(data)) { log(data.size); FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face); }
+Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face); }
 
 FontMetrics Font::metrics(int size) {
 	FT_Set_Char_Size(face, 0, size, 72, 72);
@@ -70,4 +70,4 @@ Glyph& Font::glyph(int size, char code) {
 	return glyph;
 }
 
-Font defaultFont(_("/usr/share/fonts/dejavu/DejaVuSans.ttf"));
+Font defaultFont("/usr/share/fonts/dejavu/DejaVuSans.ttf");

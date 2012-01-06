@@ -32,7 +32,7 @@ struct Player : Application {
 		layout << &toolbar << &main;
 		albums.margin=0; titles.mayScroll=true;
 
-		window.keyPress.connect(this, &Player::keyPress);
+        window.hotKeyTriggered.connect(this, &Player::hotKey);
 		playButton.toggled.connect(this, &Player::togglePlay);
 		nextButton.triggered.connect(this, &Player::next);
 		slider.valueChanged.connect(this, &Player::seek);
@@ -50,7 +50,7 @@ struct Player : Application {
 		}
 		if(files.size) next(); else { layout.update(); window.render(); }
 	}
-	void keyPress(uint key) {
+    void hotKey(uint key) {
 		if(key == playHotKey) togglePlay(!playButton.enabled);
 	}
 	void appendFile(string&& path) {
@@ -74,7 +74,7 @@ struct Player : Application {
 	void play(int index) {
 		playButton.enabled=true;
 		file.open(files[index]);
-		window.rename(titles.current().text);
+        window.rename(titles.active().text);
 		audio.start();
 	}
 	void next() {

@@ -159,10 +159,10 @@ declare(static void catch_sigsegv(), constructor) {
 
 /// Poll
 
-/*#include "map.h"
+#include "map.h"
 static map<Poll*,pollfd> polls __attribute((init_priority(103)));
 void Poll::registerPoll() { polls.insert(this,this->poll()); }
-void Poll::unregisterPoll() { polls.remove(this); }*/
+void Poll::unregisterPoll() { polls.remove(this); }
 
 /// Application
 
@@ -173,9 +173,9 @@ int main(int argc, const char** argv) {
 	for(int i=1;i<argc;i++) args << strz(argv[i]);
 	assert(app,"No application compiled in executable");
 	app->start(move(args));
-	/*while(polls.size()) {
+    while(polls.size() && app->running) {
 		::poll((pollfd*)polls.values.data,polls.size(),-1);
 		for(int i=0;i<polls.size();i++) if(polls.values[i].revents) if(!polls.keys[i]->event(polls.values[i])) return 0;
-	}*/
+	}
 	return 0;
 }

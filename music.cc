@@ -16,8 +16,11 @@ struct Music : Application {
 	~Music() { sampler.sync(); seq.sync(); }
 
 	Window window = Window(int2(1280,1024), sheet);
+    uint escapeHotKey = window.addHotKey(_("q"));
 
 	void start(array<string> &&arguments) {
+        window.hotKeyTriggered.connect(this,&Music::hotKey);
+        //window.setVisible();
 		for(auto&& path : arguments) {
 			if(path==_("fullscreen")) window.setFullscreen();
 			else if(path.endsWith(_(".sfz")) && exists(path)) {
@@ -37,6 +40,8 @@ struct Music : Application {
 				//sheet.onPath.connect(&score,&Score::onPath);
 				sheet.open(path);
 				window.rename(section(section(path,'/',-2,-1),'.',0,-2));
+                window.render();
+                window.setVisible();
 				//score->synchronize(midi->notes);
 				/*map<int, map<int, int> > sort; //[chronologic][bass to treble order] = index
 				for(int i=0;i<events.count();i++) {
@@ -51,10 +56,10 @@ struct Music : Application {
 			}*/
 			else fail("Unhandled argument",path);
 		}
-		//if(!sampler && !sheet) fail("Usage: music [instrument.sfz] [music.mid] [sheet.pdf] [output.wav]");
+        if(!sampler && !sheet) fail("Usage: music [instrument.sfz] [music.mid] [sheet.pdf] [output.wav]");
 		//sheet.scroll=1600;
-		window.render();
 		setpriority(PRIO_PROCESS,0,-20);
 		if(audio.input) audio.start();
 	}
+    void hotKey(uint key) { if(key==escapeHotKey) running=false; }
 } music;

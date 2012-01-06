@@ -17,7 +17,7 @@ string toString(long number, int base, int pad) {
 	string s(buf+i,19-i); s.detach(); return s;
 }
 string toString(double number) {
-    return _(".")+toString(long(100*number));
+	return toString(long(number))+_(".")+toString(long((100*abs(number)))%100,10,2);
 }
 long readInteger(const char*& s, int base) {
 	assert(base>=2 && base<=16,"Unsupported base",base);

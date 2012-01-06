@@ -50,7 +50,7 @@ struct AudioFile : AudioInput {
 	void read(int16* output, int size);
 	signal<int,int> timeChanged;
 
-private:
+protected:
 	//struct mpg123_handle_struct* file=0;
 	struct AVFormatContext* file=0;
 	struct AVStream* audioStream=0;

@@ -26,6 +26,7 @@ void log_(const Rule& r) { log_(r.symbol,"→ ");log_(r.tokens," "); }
 struct Item {
 	const Rule& rule;
 	int dot;
+	word lookahead;
 	//word operator []( int i ) { return rule.tokens[i]; }
 	word expected() const { return rule[dot]; }
 	bool operator ==(const Item& o) const { return rule==o.rule && dot == o.dot; }
@@ -57,6 +58,26 @@ struct Parser : Application {
 			}
 		}
 	}
+
+	array<word> first(array<word> Y) { //First(Y1Y2..Yk) is either
+			array<word> firstY = first( Y[0] );
+			if(firstY.contains("ε")) firstY = first(Y[0]).removeAll("ε") << first(Y.slice(1)); //OR everything in First(Y1) <except for ε > ~ First(Y2..Yk)
+			//If First(Y1) First(Y2)..First(Yk) all contain ε then add ε to First(Y1Y2..Yk) as well.
+			bool allE=true; foreach( y; Y ) if( !first(y).contains("ε") ) { allE=false; break; }
+			if( allE ) firstY ~= "ε";
+			return firstY;
+		}
+		string[] first( string X ) {
+			if( terminal.contains(X) ) { return [X]; } //If X is a terminal then First(X) is just X!
+			if( !(X in firstSet) ) { //If there is a Production X->
+				firstSet[X] = reduce( grammar[X], (Rule rule, ref string[] firstX){
+					if( rule.tokens==["ε"] ) firstX ~= "ε"; //If there is a Production X → ε then add ε to first(X)
+					else firstX ~=first( rule.tokens ); //If there is a Production X → Y1Y2..Yk then add first(Y1Y2..Yk) to first(X)
+				} );
+			}
+			return firstSet[X];
+		}
+
 	void computeTransitions(int current) {
 		map<word, State> next;
 		for(const Item& item: states[current].items) if( item.dot < item.rule.tokens.size ) next[ item.expected() ].items << item;
