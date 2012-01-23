@@ -6,7 +6,7 @@
 struct Application {
 	Application();
 	/// Initialize using the given command line \a args
-	virtual void start(array<string>&& args) =0;
+    virtual void start(array<string>&& /*args*/) {}
     /// Flag to exit event loop and return from main()
     bool running=true;
 };
@@ -20,5 +20,5 @@ struct Poll {
 	/// Linux poll file descriptor
 	virtual pollfd poll() =0;
 	/// Callback on new events
-	virtual bool event(pollfd p) =0;
+    virtual void event(pollfd p) =0;
 };

@@ -32,21 +32,21 @@ void AudioOutput::setInput(AudioInput* input) { this->input=input; input->setup(
 pollfd AudioOutput::poll() { pollfd p; snd_pcm_poll_descriptors(pcm,&p,1); return p; }
 void AudioOutput::start() { if(running) return; registerPoll(); running=true; }
 void AudioOutput::stop() { if(!running) return;  snd_pcm_drain(pcm); unregisterPoll(); running=false; }
-bool AudioOutput::event(pollfd p) {
+void AudioOutput::event(pollfd p) {
 	assert(input);
 	unsigned short revents;
 	snd_pcm_poll_descriptors_revents(pcm, &p, 1, &revents);
-	if(!(revents & POLLOUT)) return true;
+    if(!(revents & POLLOUT)) return;
 	if( snd_pcm_state(pcm) == SND_PCM_STATE_XRUN ) { snd_pcm_prepare(pcm); }
 	snd_pcm_uframes_t frames = (snd_pcm_uframes_t)snd_pcm_avail_update(pcm); //snd_pcm_avail(pcm);
-	assert(frames >= period,"snd_pcm_avail");
+    assert(frames >= period);
 	const snd_pcm_channel_area_t* areas; snd_pcm_uframes_t offset;
 	frames=period;
 	snd_pcm_mmap_begin(pcm, &areas, &offset, &frames);
-	assert(frames == period,"snd_pcm_mmap_begin");
+    assert(frames == period);
 	int16* output = (int16*)areas[0].addr+offset*2;
 	input->read(output,(int)period);
 	snd_pcm_mmap_commit(pcm, offset, frames);
-	if(snd_pcm_state(pcm) == SND_PCM_STATE_PREPARED && snd_pcm_avail_update(pcm)==0) snd_pcm_start(pcm);
-	return true;
+    if(snd_pcm_state(pcm) == SND_PCM_STATE_PREPARED && snd_pcm_avail_update(pcm)==0) snd_pcm_start(pcm);
+    return;
 }

@@ -2,7 +2,7 @@ vertex {
 	attribute vec2 position;
 	uniform vec2 scale;
 	uniform vec2 offset;
-	gl_Position = vec4( scale * position + offset, 0, 1 );
+	gl_Position = vec4(scale * (position + offset) + vec2(-1,1), 0, 1);
 	blit {
 		attribute vec2 texCoord;
 		varying vec2 UV;

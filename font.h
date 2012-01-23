@@ -30,9 +30,9 @@ struct Font {
 	Font(const char* path);
 	Font(string&& data);
 	FontMetrics metrics(int size);
-	int kerning(char leftCode, char rightCode);
-	GlyphMetrics metrics(int size, char code);
-	Glyph& glyph(int size, char code);
+    int kerning(int leftCode, int rightCode);
+    GlyphMetrics metrics(int size, int code);
+    Glyph& glyph(int size, int code);
 };
 
 extern Font defaultFont;

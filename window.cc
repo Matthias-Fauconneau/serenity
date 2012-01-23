@@ -10,68 +10,54 @@
 #undef Window
 #undef Font
 
-Window::Window(int2 size, Widget& widget) : widget(widget) {
-	x = XOpenDisplay(0);
-#if 1
-	int attrib[] = {GLX_RGBA, GLX_RED_SIZE,8, GLX_GREEN_SIZE,8, GLX_BLUE_SIZE,8, GLX_ALPHA_SIZE,8, GLX_DEPTH_SIZE,24, GLX_STENCIL_SIZE,8, GLX_DOUBLEBUFFER, GLX_SAMPLE_BUFFERS,1, GLX_SAMPLES,8, 0};
-	XVisualInfo* vis = glXChooseVisual(x,DefaultScreen(x),attrib);
-	window = XCreateSimpleWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,0,0);
-	ctx = glXCreateContext(x,vis,0,1);
-#else
-	int attrib[] = { GLX_X_RENDERABLE,True, GLX_DRAWABLE_TYPE,GLX_WINDOW_BIT, GLX_RENDER_TYPE,GLX_RGBA_BIT, GLX_X_VISUAL_TYPE,GLX_TRUE_COLOR,
-					 GLX_RED_SIZE,8, GLX_GREEN_SIZE,8, GLX_BLUE_SIZE,8, GLX_ALPHA_SIZE,8, GLX_DEPTH_SIZE,24, GLX_STENCIL_SIZE,8, GLX_DOUBLEBUFFER,True,
-					 GLX_SAMPLE_BUFFERS,1, GLX_SAMPLES,8, 0 };
-	int fbCount;
-	GLXFBConfig* fbConfigs = glXChooseFBConfig(x,DefaultScreen(x),attrib,&fbCount);
-	assert(fbCount==1);
-	GLXFBConfig fbc = fbConfigs[0];
-	XFree(fbConfigs);
-	XVisualInfo* vis = glXGetVisualFromFBConfig(x, fbc);
-	XSetWindowAttributes swa;
-	swa.colormap = XCreateColormap(x,DefaultRootWindow(x),vis->visual,AllocNone);
-	swa.background_pixmap=None; swa.border_pixel=0; swa.event_mask=StructureNotifyMask;
-	window = XCreateWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,vis->depth,InputOutput, vis->visual,CWBorderPixel|CWColormap|CWEventMask,&swa);
+int xErrorHandler(Display*, XErrorEvent*) { return 0; }
+//int xErrorHandler(Display* x, XErrorEvent* e) { char buffer[64]; XGetErrorText(x,e->error_code,buffer,64); log(strz(buffer)); return 0; }
 
-	int context_attribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB,3, GLX_CONTEXT_MINOR_VERSION_ARB,1, 0 };
-	ctx = glXCreateContextAttribsARB(x,fbc,0,True,context_attribs);
-	XSync(x,0);
-	assert(glXIsDirect(x,ctx));
-#endif
+#define Atom(name) XInternAtom(x, #name, 1)
 
-	widget.size=size;
-	XSelectInput(x,window,KeyPressMask|ButtonPressMask|PointerMotionMask|ExposureMask|StructureNotifyMask);
-	auto atom = XInternAtom(x,"WM_DELETE_WINDOW",True); XSetWMProtocols(x,window,&atom,1);
-	registerPoll();
-    //XMapWindow(x, window);
-	//glHint(GL_LINE_SMOOTH_HINT,GL_NICEST);
-	//glHint(GL_POLYGON_SMOOTH_HINT,GL_NICEST);
-	//glEnable(GL_LINE_SMOOTH); glEnable(GL_POLYGON_SMOOTH);
-	//glBlendFunc(GL_SRC_ALPHA_SATURATE, GL_ONE); glClearColor(0,0,0,0); //correct front-to-back coverage blend
-	//glBlendFunc(GL_DST_COLOR, GL_ZERO); glClearColor(1,1,1,0); //multiply (i.e darken) blend (allow component-wise black font blending)
-	//glEnable(GL_BLEND);
-    //glEnable(GL_DEPTH_TEST);
+template<class T> void Window::setProperty(const char* type,const char* name, const array<T>& value) {
+    XChangeProperty(x, id, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)&value, value.size);
+    XFlush(x);
 }
-//Window::~Window() { if(x) { XCloseDisplay(x); x=0; } }
 
+Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
+    x = XOpenDisplay(0);
+    XSetErrorHandler(xErrorHandler);
+    registerPoll();
+
+    if(!size.x||!size.y) {
+        XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);
+        if(!size.x) size.x=root.width; if(!size.y) size.y=root.height;
+    }
+    id = XCreateSimpleWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,0,0);
+    setProperty<char>("STRING", "WM_CLASS", name+"\0"_+name);
+    XSelectInput(x, id, KeyPressMask|ButtonPressMask|PointerMotionMask|ExposureMask|StructureNotifyMask);
+    setProperty<uint>("ATOM", "WM_PROTOCOLS", {(uint)Atom(WM_DELETE_WINDOW),0});
+
+    XVisualInfo* vis = glXChooseVisual(x,DefaultScreen(x),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,0});
+    ctx = glXCreateContext(x,vis,0,1);
+    glXMakeCurrent(x, id, ctx);
+    glViewport(widget.size=size);
+    glClearColor(7./8,7./8,7./8,0);
+    glBlendFunc(GL_DST_COLOR, GL_ZERO); //multiply (i.e darken) blend (allow blending with subpixel fonts)
+    glEnable(GL_BLEND); //glEnable(GL_DEPTH_TEST);
+    //glHint(GL_LINE_SMOOTH_HINT,GL_NICEST); glHint(GL_POLYGON_SMOOTH_HINT,GL_NICEST);
+    //glEnable(GL_LINE_SMOOTH); glEnable(GL_POLYGON_SMOOTH);
+    //glBlendFunc(GL_SRC_ALPHA_SATURATE, GL_ONE); glClearColor(0,0,0,0); //correct front-to-back coverage blend
+}
 
 void Window::render() {
     assert(visible);
     glClear(GL_COLOR_BUFFER_BIT |GL_DEPTH_BUFFER_BIT);
-    widget.render(vec2(2,-2)/vec2(widget.size),vec2(-1,1));
+    widget.render(int2(0,0));
     //flat.bind(); flat["scale"]=vec2(1,1); flat["offset"]=vec2(0,0); flat["color"] = vec4(/*7.0/8,7.0/8,7.0/8*/1,1,1,1);
     //glQuad(flat,vec2(-1,-1),vec2(1,1));
-    glXSwapBuffers(x, window);
+    glXSwapBuffers(x, id);
 }
 
 void Window::setVisible(bool visible) {
-    this->visible=visible;
-    if(visible) {
-        XMapWindow(x, window);
-        glXMakeCurrent(x,window,ctx);
-        glViewport(0,0,widget.size.x,widget.size.y);
-    } else {
-        XUnmapWindow(x,window);
-    }
+    this->visible=visible; if(visible) XMapWindow(x, id); else XUnmapWindow(x, id);
+    XSync(x,0); event(pollfd());
 }
 
 void Window::resize(int2 size) {
@@ -79,58 +65,73 @@ void Window::resize(int2 size) {
 		XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);
 		if(!size.x) size.x=root.width; if(!size.y) size.y=root.height;
 	}
-	XResizeWindow(x,window,size.x,size.y);
-	widget.size=size;
+    XResizeWindow(x, id, size.x, size.y);
 }
 
 void Window::setFullscreen(bool) {
 	XEvent xev; clear(xev);
 	xev.type = ClientMessage;
-	xev.xclient.window = window;
-	xev.xclient.message_type = XInternAtom(x, "_NET_WM_STATE", False);
+    xev.xclient.window = id;
+    xev.xclient.message_type = Atom(_NET_WM_STATE);
 	xev.xclient.format = 32;
-	xev.xclient.data.l[0] = 1;
-	xev.xclient.data.l[1] = XInternAtom(x, "_NET_WM_STATE_FULLSCREEN", False);
-	xev.xclient.data.l[2] = 0;
-	XSendEvent(x, DefaultRootWindow(x), False, SubstructureNotifyMask, &xev);
+    xev.xclient.data.l[0] = 1;
+    xev.xclient.data.l[1] = Atom(_NET_WM_STATE_FULLSCREEN);
+    xev.xclient.data.l[2] = 0;
+    XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
 }
 
-void Window::rename(const string& name) {
-    XStoreName(x,window,strz(name).data);
+void Window::rename(const string& name) { setProperty("UTF8_STRING", "_NET_WM_NAME", name); }
+
+void Window::setIcon(const Image& icon) {
+    int size = 2+icon.width*icon.height;
+    array<int> buffer(2*size); //CARDINAL is long
+    buffer.size=2*size; buffer[0]=icon.width, buffer[1]=icon.height;
+    copy((byte4*)(&buffer+2),icon.data,icon.width*icon.height);
+    if(sizeof(long)==8) for(int i=size-1;i>=0;i--) { buffer[2*i]=buffer[i]; buffer[2*i+1]=0; } //0-extend int to long CARDINAL
+    buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
+    setProperty("CARDINAL", "_NET_WM_ICON", buffer);
     XFlush(x);
 }
 
 uint Window::addHotKey(const string& key) {
-    KeySym keysym = XStringToKeysym(strz(key).data);
+    KeySym keysym = XStringToKeysym(&strz(key));
     assert(keysym != NoSymbol);
     XGrabKey(x, XKeysymToKeycode(x, keysym), AnyModifier, DefaultRootWindow(x), True, GrabModeAsync, GrabModeAsync);
     XFlush(x);
     return keysym;
 }
 
-pollfd Window::poll() { pollfd p; p.fd=XConnectionNumber(x); p.events=POLLIN; return p; }
-bool Window::event(pollfd) {
+pollfd Window::poll() { return {XConnectionNumber(x), POLLIN}; }
+void Window::event(pollfd) {
     bool needRender=false;
-    while(XEventsQueued(x, QueuedAfterFlush)) { XEvent ev; XNextEvent(x,&ev);
-        if(ev.type==MotionNotify) {
-            needRender |= widget.event(int2(ev.xmotion.x,ev.xmotion.y), Widget::Motion,
-                                       ev.xmotion.state&Button1Mask ? Widget::Pressed : Widget::Released);
-        } else if(ev.type==ButtonPress) {
-            needRender |= widget.event(int2(ev.xbutton.x,ev.xbutton.y), (Widget::Event)ev.xbutton.button, Widget::Pressed);
-        } else if(ev.type==KeyPress) {
-            auto key = XKeycodeToKeysym(x,ev.xkey.keycode,0);
-            hotKeyTriggered.emit(key);
-            if(key == XK_Escape) return false; //DEBUG
-        } else if(ev.type==Expose && !ev.xexpose.count) {
-            needRender=true;
-        } else if(ev.type==MapNotify) {
+    while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
+        if(e.type==MotionNotify) {
+            needRender |= widget.event(int2(e.xmotion.x,e.xmotion.y), Motion,
+                                       e.xmotion.state&Button1Mask ? Pressed : Released);
+        } else if(e.type==ButtonPress) {
+            needRender |= widget.event(int2(e.xbutton.x,e.xbutton.y), (Event)e.xbutton.button, Pressed);
+        } else if(e.type==KeyPress) {
+            auto key = XKeycodeToKeysym(x,e.xkey.keycode,0);
+            if(key==XK_Escape) key=Quit; //DEBUG
+            keyPress.emit((Event)key);
+            widget.event(int2(),key==XK_Escape?Quit:(Event)key,Pressed);
+        } else if(e.type==Expose && !e.xexpose.count) {
+            needRender = true;
+        } else if(e.type==ConfigureNotify) {
+            XConfigureEvent ev = e.xconfigure;
+            if(widget.size != int2(ev.width,ev.height)) {
+                glViewport(widget.size = int2(ev.width,ev.height));
+                widget.update();
+                needRender = true;
+            }
+        } else if(e.type==MapNotify) {
             visible=true;
-        } else if(ev.type==UnmapNotify) {
+        } else if(e.type==UnmapNotify) {
             visible=false;
-        } else if(ev.type==ClientMessage) {
-            x=0; return false;
+        } else if(e.type==ClientMessage) {
+            keyPress.emit(Quit);
+            widget.event(int2(),Quit,Pressed);
         }
     }
-    if(needRender) render();
-    return true;
+    if(needRender && visible) render();
 }

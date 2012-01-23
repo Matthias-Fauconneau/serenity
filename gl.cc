@@ -5,17 +5,22 @@
 /// State
 #if DEBUG
 #include "GL/glu.h"
-#define glCheck ({ auto e=glGetError(); \
-	if(e) { log_(__FILE__);log_(_(":"));log_(__LINE__);log_(_(": "));log_((const  char*)gluErrorString(e));log_("\n");abort(); } })
+#define glCheck ({ auto e=glGetError(); if(e) { log(strz((const  char*)gluErrorString(e)));abort(); } })
 #else
 #define glCheck
 #endif
+
+static vec2 glViewportScale;
+void glViewport(int2 size) {
+    glViewportScale = vec2(2,-2)/vec2(size);
+    glViewport(0,0,size.x,size.y);
+}
 
 /// Shader
 
 bool GLShader::compileShader(uint id, uint type, const array<string>& tags) {
 	string global, main;
-    const char* s = source.data, *e=source.data+source.size;
+    const char* s = &source, *e=&source+source.size;
 	array<int> scope;
 	for(int nest=0;s<e;) { //for each line
 		const char* l=s;
@@ -27,7 +32,7 @@ bool GLShader::compileShader(uint id, uint type, const array<string>& tags) {
 				for(const auto& e : tags) if(tag==e) { skip=false; break; }
 				s=t;
 				if(skip) {
-					for(int nest=1;nest;s++) { assert(*s,"Unmatched {"); if(*s=='{') nest++; if(*s=='}') nest--; }
+                    for(int nest=1;nest;s++) { assert(*s,"Unmatched {"_); if(*s=='{') nest++; if(*s=='}') nest--; }
 					assert(*s=='\n'); s++;
 				} else { scope<<nest; nest++; } //remember to remove scope end bracket
 				continue;
@@ -38,17 +43,17 @@ bool GLShader::compileShader(uint id, uint type, const array<string>& tags) {
 			const char* t=s; while(*t==' '||*t=='\t') t++; const char* b=t; while(*t>='a'&&*t<='z') t++;
 			const string qualifier(b,t);
 			if(t>b && *t++==' ') {
-				for(const auto& e : {_("uniform"),_("attribute"),_("varying"),_("in"),_("out")}) if(qualifier==e) { declaration=true; break; }
+                for(const auto& e : {"uniform"_,"attribute"_,"varying"_,"in"_,"out"_}) if(qualifier==e) { declaration=true; break; }
 			}
 		}
 		for(;s<e && *s!='\n';s++) { if(*s=='{') nest++; if(*s=='}') nest--; } s++;
 		if(scope.size && nest==scope.last()) { scope.removeLast(); continue; }
 		(declaration ? global : main) << string(l,s);
 	}
-	string source = _("#version 120\n")+global+_("\nvoid main() {\n")+main+_("\n}\n");
+    string source = "#version 120\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
 
 	uint shader = glCreateShader(type);
-	glShaderSource(shader,1,&source.data,&source.size);
+    glShaderSource(shader,1,(const char**)& &source,&source.size);
 	(type==GL_VERTEX_SHADER ? vertex : fragment) = move(source);
 	glCheck;
 	glCompileShader(shader);
@@ -56,8 +61,8 @@ bool GLShader::compileShader(uint id, uint type, const array<string>& tags) {
 	int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
 	if(status) return true;
 	int l=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&l);
-	string msg(l); glGetProgramInfoLog(id,l,&msg.size,(char*)msg.data);
-	fail("Error compiling shader\n",msg.size,msg.data,(type==GL_VERTEX_SHADER ? vertex : fragment));
+    string msg(l); glGetProgramInfoLog(id,l,&msg.size,(char*)&msg);
+    error("Error compiling shader\n"_,msg,(type==GL_VERTEX_SHADER ? vertex : fragment));
 	return false;
 }
 
@@ -69,19 +74,21 @@ bool GLShader::compile(const array<string>& vertex, const array<string>& fragmen
 	int status; glGetProgramiv(id,GL_LINK_STATUS,&status);
 	if(status) return true;
 	int l=0; glGetProgramiv(id,GL_INFO_LOG_LENGTH,&l);
-	string msg(l); glGetProgramInfoLog(id,l,&msg.size,(char*)msg.data);
-	fail("Error linking shader\n",msg);
+    string msg(l); glGetProgramInfoLog(id,l,&msg.size,(char*)&msg);
+    error("Error linking shader\n"_,msg);
 	return false;
 }
 
+
 void GLShader::bind() {
-    if(!id && name) compile(array<string>({_("vertex"),strz(name)}), array<string>({_("fragment"),strz(name)}));
+    if(!id && name) compile({"vertex"_,strz(name)},{"fragment"_,strz(name)});
     glUseProgram(id);
+    operator[]("scale")=glViewportScale;
 }
-uint GLShader::attribLocation(const char* name ) {
+uint GLShader::attribLocation(const char* name) {
 	int location = attribLocations.value(name,-1);
 	if(location<0) attribLocations.insert(name,location=glGetAttribLocation(id,name));
-	assert(location>=0,"Unknown attribute",name,"for vertex shader:",vertex);
+    assert(location>=0,"Unknown attribute"_,strz(name),"for vertex shader\n"_,vertex);
 	return (uint)location;
 }
 void GLUniform::operator=(float v) { glUniform1f(id,v); }
@@ -91,7 +98,7 @@ void GLUniform::operator=(mat4 m) { glUniformMatrix4fv(id,1,0,m.data); }
 GLUniform GLShader::operator[](const char* name) {
 	int location = uniformLocations.value(name,-1);
 	if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
-	assert(location>=0,"Unknown uniform",name,"\nVertex:\n",vertex,"\nFragment:\n",fragment);
+    assert(location>=0,"Unknown uniform"_,strz(name),"\n[Vertex]\n"_,vertex,"\n[Fragment]\n"_,fragment);
 	return GLUniform(location);
 }
 
@@ -101,18 +108,18 @@ GLShader blit(blitShader,"blit");
 
 /// Texture
 
-GLTexture::GLTexture(const Image& image) : Image(0,image.width,image.height,image.depth) {
+GLTexture::GLTexture(const Image& image) : Image(image.copy()) {
 	if(!id) glGenTextures(1, &id);
 	assert(id);
-	glBindTexture(GL_TEXTURE_2D, id);
-	uint32 format[] = { 0, GL_ALPHA, GL_LUMINANCE_ALPHA, GL_RGB, GL_BGRA };
-	if(image.depth==2) { //convert to darken coverage
-		byte2* ia=(byte2*)image.data;
-		for(int i=0;i<image.width*image.height;i++) ia[i].i = (ia[i].i*ia[i].a + 255*(255-ia[i].a))/255;
-	}
-	glTexImage2D(GL_TEXTURE_2D,0,depth,this->width=width,this->height=height,0,format[depth],GL_UNSIGNED_BYTE,image.data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, id);
+    for(int i=0;i<width*height;i++) { //convert to darken coverage
+        data[i].r = (data[i].r*data[i].a + 255*(255-data[i].a))/255;
+        data[i].g = (data[i].g*data[i].a + 255*(255-data[i].a))/255;
+        data[i].b = (data[i].b*data[i].a + 255*(255-data[i].a))/255;
+    }
+    glTexImage2D(GL_TEXTURE_2D,0,4,width,height,0,GL_BGRA,GL_UNSIGNED_BYTE,data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 void GLTexture::bind() const { bind(id); }
 void GLTexture::bind(int id) { assert(id); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, id); }
@@ -120,6 +127,8 @@ void GLTexture::free() { assert(id); glDeleteTextures(1,&id); id=0; }
 
 /// Buffer
 
+GLBuffer::GLBuffer(PrimitiveType primitiveType) : primitiveType(primitiveType) {}
+GLBuffer::~GLBuffer() { if(vertexBuffer) glDeleteBuffers(1,&vertexBuffer); if(indexBuffer) glDeleteBuffers(1,&indexBuffer); }
 void GLBuffer::allocate(int indexCount, int vertexCount, int vertexSize) {
 	this->vertexCount = vertexCount;
 	this->vertexSize = vertexSize;
@@ -147,44 +156,45 @@ void GLBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffe
 void GLBuffer::upload(const array<uint32>& indices) {
 	if(!indexBuffer) glGenBuffers(1, &indexBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), &indices, GL_STATIC_DRAW);
 	indexCount = indices.size;
 }
 void GLBuffer::upload(const array<vec2>& vertices) {
 	if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
 	vertexSize = sizeof(vec2);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size*vertexSize, vertices.data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size*vertexSize, &vertices, GL_STATIC_DRAW);
 	vertexCount = vertices.size;
 }
 void GLBuffer::bindAttribute(GLShader& program, const char* name, int elementSize, uint64 offset) {
+    assert(vertexBuffer);
 	int location = program.attribLocation(name);
-	assert(location>=0,"unused attribute",name);
+    assert(location>=0,"unused attribute"_,strz(name));
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
 	glVertexAttribPointer(location, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
 	glEnableVertexAttribArray(location);
 }
 void GLBuffer::draw() {
 	glCheck;
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	int mode[] = { 0, GL_POINTS, GL_LINES, GL_TRIANGLES, GL_QUADS, GL_TRIANGLE_STRIP };
-	if (primitiveType == 1) {
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    /*if (primitiveType == Point) {
 		glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 		glEnable(GL_POINT_SPRITE);
-	}
+    }*/
 	if (indexBuffer) {
 		if(primitiveRestart) {
 			glEnable(GL_PRIMITIVE_RESTART);
 			glPrimitiveRestartIndex(0xFFFFFFFF);
 		}
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-		glDrawElements(mode[primitiveType], indexCount, GL_UNSIGNED_INT, 0);
+        glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);
 		if(primitiveRestart) {
 			glDisable(GL_PRIMITIVE_RESTART);
 		}
 	} else {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-		glDrawArrays(mode[primitiveType], 0, vertexCount);
+        glCheck;
+        glDrawArrays(primitiveType, 0, vertexCount);
 	}
 	glCheck;
 }

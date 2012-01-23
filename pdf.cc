@@ -23,7 +23,7 @@ void log_(const Variant& o) {
 	else if(o.type==Variant::Data) log_(o.data);
 	else if(o.type==Variant::List) log_(o.list);
 	else if(o.type==Variant::Dict) log_(o.dict);
-	else fail("Invalid Variant",int(o.type));
+    else error("Invalid Variant",int(o.type));
 }
 
 
@@ -89,7 +89,7 @@ static Variant parse_(const char*& s) {
 			data.size=z.total_out;
 			inflateEnd(&z);
 			auto decodeParms = dict.find(_("DecodeParms"));
-			if(decodeParms) { fail("unsupported stream compression");
+            if(decodeParms) { error("unsupported stream compression");
 				/*assert(decodeParms->dict.size() == 2);
 				int predictor = decodeParms->dict.value("Predictor",Variant(1)).number;
 				if(predictor != 12) abort();
@@ -121,7 +121,7 @@ static Variant parse_(const char*& s) {
 		} s++;
 		return move(data);
 	}
-	fail("unknown type",string(s-64,64),string(s,64));
+    error("unknown type",string(s-64,64),string(s,64));
 	return Variant(0);
 }
 static Variant parse(const char* s) { return parse_(s); }
@@ -149,7 +149,7 @@ void PDF::open(const string& path) {
 				assert(s[0]=='t'&&s[1]=='r'&&s[2]=='a'&&s[3]=='i'&&s[4]=='l'&&s[5] =='e'&&s[6]=='r',"invalid xref");
 				s+=sizeof("trailer"); if(s[0]=='\r'||s[0]=='\n') s++;
 				dict = parse( s ).dict;
-			} else fail("xref stream");
+            } else error("xref stream");
 			if(!root) root=dict.at(_("Root")).number;
 			const Variant* offset = dict.find(_("Prev"));
 			if(!offset) break;

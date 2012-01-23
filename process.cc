@@ -21,24 +21,21 @@ declare(static void read_debug_symbols(), constructor(101)) {
 		assert(symcount >= 0);
 	}
 }
-struct Symbol { string file,function; int line=0; };
+struct Symbol { string file,function; int line; };
 Symbol findNearestLine(void* address) {
 	for(bfd_section* s=abfd->sections;s;s=s->next) {
 		if((bfd_vma)address < s->vma || (bfd_vma)address >= s->vma + s->size) continue;
-		const char* path=0; const char* function=0; uint line=0;
-		if(bfd_find_nearest_line(abfd, s, (bfd_symbol**)syms, (bfd_vma)address - s->vma, &path, &function, &line)) {
-			if(!path || !function || !line) continue;
-			Symbol symbol;
-			symbol.file=section(strz(path),'/',-2,-1);
-			if(symbol.file.startsWith(_("functional"))) break;
-			char* demangle = abi::__cxa_demangle(function,0,0,0);
-			if(demangle) { symbol.function=strz(demangle); symbol.function.detach(); free(demangle); }
-			else symbol.function = strz(function);
-			symbol.line=line;
-			return symbol;
+        const char* path=0; const char* func=0; uint line=0;
+        if(bfd_find_nearest_line(abfd, s, (bfd_symbol**)syms, (bfd_vma)address - s->vma, &path, &func, &line)) {
+            if(!path || !func || !line) continue;
+            string file = section(strz(path),'/',-2,-1);
+            char* demangle = abi::__cxa_demangle(func,0,0,0);
+            string function = strz(demangle?:func).copy();
+            free(demangle);
+            return {move(file),move(function),line};
 		}
 	}
-	Symbol missing; return missing;
+    return {};
 }
 
 /// Stack
@@ -51,17 +48,26 @@ int backtrace(void** frames, int capacity, StackFrame* ebp) {
 	int i=0;
 	for(;i<capacity;i++) {
 		frames[i]=ebp->return_address;
-		if(!(ebp=ebp->caller_frame)) break;
+        if(int64(ebp=ebp->caller_frame)<0x10) break;
 	}
 	return i;
 }
 void logBacktrace(StackFrame* frame) {
-	void* frames[8];
-	int size = backtrace(frames,8,frame);
+    void* frames[8];
+    int size = backtrace(frames,8,frame);
 	for(int i=size-1; i>=0; i--) {
-		Symbol s = findNearestLine(frames[i]);
-		if(s.function) { log_(s.file);log_(':');log_(s.line);log_(_("   \t"));log(s.function); }
+        Symbol s = findNearestLine(frames[i]);
+        if(s.function) { log<string>(s.file+":"_+toString(s.line)+"   \t"_+s.function); }
 	}
+}
+//TODO: log local symbols?
+void logFrame() {
+    void* frames[8];
+    int size = backtrace(frames,8,StackFrame::current()->caller_frame);
+    for(int i=0; i<size; i++) {
+        Symbol s = findNearestLine(frames[i]);
+        if(s.function) { log<string>(s.file+":"_+toString(s.line)+"   "_+s.function); break; }
+    }
 }
 
 #ifdef TRACE
@@ -137,15 +143,16 @@ enum SW { IE = 1, DE = 2, ZE = 4, OE = 8, UE = 16, PE = 32 };
 no_trace(static void handler(int sig, siginfo*, void* ctx)) {
 	trace_off;
 	ucontext* context = (ucontext*)ctx;
-	if(sig == SIGSEGV) { log(_("Segmentation Fault: "));
+    if(sig == SIGSEGV) log("Segmentation Violation"_);
+    else if(sig == SIGPIPE) log("Broken pipe"_);
+    else error("Unhandled signal"_);
 #ifdef TRACE
-		trace.log();
+    trace.log();
 #endif
-		logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
-		Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
-		log_(s.file);log_(':');log_(s.line);log_(_("   \t"));log(s.function);
-	} else fail("Unhandled signal");
-	log(_("Aborted")); abort();
+    logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
+    Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
+    log_(s.file);log_(':');log_(s.line);log_("   \t"_);log(s.function);
+    log("Aborted"_); abort();
 }
 
 declare(static void catch_sigsegv(), constructor) {
@@ -153,9 +160,19 @@ declare(static void catch_sigsegv(), constructor) {
 	sa.sa_sigaction = &handler;
 	sa.sa_flags = SA_SIGINFO;
 	sigaction(SIGSEGV, &sa, 0);
+    sigaction(SIGPIPE, &sa, 0);
 }
 
 #endif
+
+/// limit process ressources to avoid hanging the system when debugging
+#include <sys/resource.h>
+declare(static void limit_resource(), constructor) {
+    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<8;/*64K*/ setrlimit(RLIMIT_STACK,&limit); }
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24;/*16M*/ setrlimit(RLIMIT_DATA,&limit); }
+    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<28;/*256M*/ setrlimit(RLIMIT_AS,&limit); }
+    setpriority(PRIO_PROCESS,0,19);
+}
 
 /// Poll
 
@@ -167,15 +184,15 @@ void Poll::unregisterPoll() { polls.remove(this); }
 /// Application
 
 Application* app=0;
-Application::Application() { assert(!app,"Multiple application compiled in executable"); app=this; }
+Application::Application() { assert(!app,"Multiple application compiled in executable"_); app=this; }
 int main(int argc, const char** argv) {
 	array<string> args;
 	for(int i=1;i<argc;i++) args << strz(argv[i]);
-	assert(app,"No application compiled in executable");
+    assert(app,"No application compiled in executable"_);
 	app->start(move(args));
     while(polls.size() && app->running) {
-		::poll((pollfd*)polls.values.data,polls.size(),-1);
-		for(int i=0;i<polls.size();i++) if(polls.values[i].revents) if(!polls.keys[i]->event(polls.values[i])) return 0;
+        ::poll((pollfd*)&polls.values,polls.size(),-1);
+        for(int i=0;i<polls.size();i++) if(polls.values[i].revents) polls.keys[i]->event(polls.values[i]);
 	}
 	return 0;
 }

@@ -4,193 +4,260 @@
 #include "process.h"
 #include "font.h"
 
-/// Widget is an abstract component to compose user interfaces
+/// Event type, mouse button or key
+enum Event { Motion, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp, Quit /*TODO: X keys*/ };
+/// State of \a event (or LeftButton for Motion events)
+enum State { Released=0, Pressed=1 };
 
+/// Widget is an abstract component to compose user interfaces
 struct Widget {
 /// Layout
-	int2 position, size;
-	/// Preferred size (0 means expand)
-	virtual int2 sizeHint() { return int2(0,0); }
+    int2 position; /// position of the widget within its parent widget
+    int2 size; /// size of the widget
+    /// Preferred size (positive means fixed size, negative means minimum size (i.e benefit from extra space to expand))
+    virtual int2 sizeHint() = 0;
     /// Notify objects to process \a position,\a size or derived member changes
     virtual void update() {}
 
 /// Paint
-    /// Render this widget. use \a scale and \a offset in implementation to scale from widget coordinates (0-size) to viewport
-    virtual void render(vec2 scale, vec2 offset) =0;
+    /// Render this widget.
+    /// use \a scale to transform window coordinates to OpenGL device coordinates (TODO: handle in GLShader?)
+    /// \a offset is the absolute position of the parent widget
+    virtual void render(int2 parent) =0;
 
 /// Event
-    /// Event type, mouse button or key
-    enum Event { Motion, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp /*TODO: X keys*/ };
-    /// State of \a event (or LeftButton for Motion events)
-    enum State { Released=0, Pressed=1 };
     /// Notify objects to process a new user event
     virtual bool event(int2 /*position*/, Event /*event*/, State /*state*/) { return false; }
 };
 
+//->window.h
 /// Window display \a widget in an X11 window, initialize its GL context and forward events.
 //forward declarations from Xlib.h
 typedef struct _XDisplay Display;
 typedef struct __GLXcontextRec* GLXContext;
 typedef unsigned long XWindow;
 struct Window : Poll {
-    /// Create a \a size big window to host \a widget
-    Window(int2 size, Widget& widget);
+    /// Display \a widget in a window
+    /// \a name is the application class name (WM_CLASS)
+    /// \note a Window must be created before OpenGL can be used (e.g most Widget constructors need a GL context)
+    /// \note Make sure the referenced widget is initialized before running this constructor
+    Window(Widget& widget, int2 size, const string& name);
     /// Repaint window contents. Also called when an event was accepted by a widget.
     void render();
 
     /// Show/Hide window
     void setVisible(bool visible=true);
+    /// Current visibility
+    bool visible = false;
+
     /// Resize window to \a size
     void resize(int2 size);
     /// Toggle windowed/fullscreen mode
     void setFullscreen(bool fullscreen=true);
     /// Rename window to \a name
     void rename(const string& name);
+    /// Set window icon to \a icon
+    void setIcon(const Image& icon);
+
+    template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
 
     /// Register global shortcut named \a key (X11 KeySym)
     uint addHotKey(const string& key);
-    /// User triggerred a registered hot key
-    signal<uint /*KeySym*/> hotKeyTriggered;
+    /// User pressed a key (including global hot keys)
+    signal<Event> keyPress;
+    /// X11 window ID
+    XWindow id;
 protected:
-    pollfd poll() override;
-    bool event(pollfd) override;
+    pollfd poll();
+    void event(pollfd);
 
     Display* x;
     GLXContext ctx;
-    XWindow window;
-    bool visible=true;
     Widget& widget;
 };
 
-/// Layout is a pure Widget containing children.
+/// Space is a proxy Widget to add space as needed
+struct Space : Widget {
+    /// desired empty space size (negative for expanding)
+    int2 space;
+    Space(int x, int y):space(x,y){}
+    int2 sizeHint() { return space; }
+    void render(int2) {}
+};
+
+/// Scroll is a proxy Widget containing a single widget in a scrollable area.
+//TODO: scroll indicator (+flick) or scrollbar
+struct ScrollArea : Widget {
+    /// override \a widget to return the proxied widget
+    virtual Widget& widget() =0;
+
+    int2 sizeHint() { return widget().sizeHint(); }
+    void update() override {
+        if(size>=widget().sizeHint()) {
+            widget().position=int2(0,0);
+            widget().size = size;
+        } else {
+            widget().position = max(size-widget().sizeHint(),min(int2(0,0),widget().position));
+            widget().size=max(widget().sizeHint(),size);
+        }
+        widget().update();
+    }
+    bool event(int2 position, Event event, State state) override;
+    void render(int2 parent) { return widget().render(parent+position); }
+};
+
+/// Scroll<T> implement a scrollable \a T by proxying it through \a ScrollArea
+/// It allow an object to act both as the content (T) and the container (ScrollArea)
+/// \note \a ScrollArea and \a T will be instancied as separate Widget (non-virtual multiple inheritance)
+template<class T> struct Scroll : ScrollArea, T {
+    Widget& widget() { return (T&)*this; }
+    Widget& parent() { return (ScrollArea&)*this; }
+    /// Return a reference to \a ScrollArea::Widget. e.g used when adding this widget to a layout
+    Widget* operator &() const { return (ScrollArea*)this; }
+};
+
+/// index_iterator is used to iterate indexable containers
+template<class C, class T> struct index_iterator {
+    C* container;
+    int index;
+    index_iterator(C* container, int index):container(container),index(index){}
+    bool operator!=(const index_iterator& o) const { assert(container==o.container); return o.index != index; }
+    T& operator* () const { assert(container); return container->at(index); }
+    const index_iterator& operator++ () { index++; return *this; }
+};
+
+/// Layout is a proxy Widget containing multiple widgets.
 struct Layout : Widget {
-    /// \a begin, \a end, \a count and \a at allow to specialize child widgets storage (\sa WidgetLayout ItemLayout)
-	virtual virtual_iterator<Widget> begin() =0;
-	virtual virtual_iterator<Widget> end() =0;
-	virtual int count() =0;
-	virtual Widget& at(int) =0;
+    /// override \a count and \a at to implement widgets storage (\sa WidgetLayout ItemLayout Tab)
+    virtual int count() =0;
+    virtual Widget& at(int) =0;
+
+    typedef index_iterator<Layout,Widget> iterator;
+    iterator begin() { return iterator(this,0); }
+    iterator end() { return iterator(this,count()); }
 
     /// Forward event to intersecting child widgets until accepted
-    bool event(int2 position, Event event, State state) {
-		for(auto& child : *this) {
-			if(position > child.position && position < child.position+child.size) {
-				if(child.event(position-child.position,event,state)) return true;
-			}
-		}
-		return false;
-	}
+    bool event(int2 position, Event event, State state) override;
     /// Render every child widget
-	void render(vec2 scale, vec2 offset) {
-		for(auto& child : *this) child.render(scale,offset+vec2(child.position)*scale);
-	}
+    void render(int2 parent);
 };
 
 /// WidgetLayout implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
-template<class L> struct WidgetLayout : L {
-	array<Widget*> widgets;
-	virtual_iterator<Widget> begin() { return new dereference_iterator<Widget>(widgets.begin()); }
-	virtual_iterator<Widget> end() { return new dereference_iterator<Widget>(widgets.end()); }
-	int count() { return widgets.size; }
-	WidgetLayout& operator <<(Widget* w) { widgets << w; return *this; }
-	Widget& at(int i) { return *widgets[i]; }
+struct WidgetLayout : virtual Layout, array<Widget*> {
+    int count() { return array<Widget*>::size; }
+    Widget& at(int i) { return *array<Widget*>::at(i); }
+    WidgetLayout& operator <<(Widget& w) { append(&w); return *this; }
 };
 
 /// ItemLayout implements Layout storage using array<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing an indirection.
-template<class L, class T> struct ItemLayout : L {
-	array<T> items;
-	virtual_iterator<Widget> begin() { return new value_iterator<Widget>(items.begin()); }
-	virtual_iterator<Widget> end() { return new value_iterator<Widget>(items.end()); }
-	int count() { return items.size; }
-	ItemLayout& operator <<(T&& t) { items << move(t); return *this; }
-	Widget& at(int i) { return items[i]; }
+template<class T> struct ItemLayout : virtual Layout, array<T> {
+    int count() { return array<T>::size; }
+    Widget& at(int i) { return array<T>::at(i); }
+    ItemLayout& operator <<(T&& t) { array<T>::append(move(t)); return *this; }
+};
+
+/// Linear divide space between contained widgets
+/// \note this is an abstract class, use \a Horizontal or \a Vertical
+struct Linear : virtual Layout {
+    /// Try to fill parent space to spread out contained items
+    bool expanding = false;
+    int2 sizeHint();
+    void update() override;
+    virtual int2 xy(int2 xy) =0; //overriden to reuse the same code for horizontal/vertical
 };
 
 /// Horizontal divide horizontal space between contained widgets
-//TODO: factorize scrolling from Vertical
-struct Horizontal : Layout {
-protected:
-    int2 sizeHint() override;
-    void update() override;
-
-    static const int margin = 1;
+struct Horizontal : virtual Linear {
+    int2 xy(int2 xy) override { return xy; }
 };
-/// HBox layouts heterogenous widgets (i.e references) horizontally
-typedef WidgetLayout<Horizontal> HBox;
+/// HBox is a \a Horizontal layout of heterogenous widgets (\sa WidgetLayout)
+struct HBox : Horizontal, WidgetLayout {};
 
-/// Vertical divide vertical space between contained widgets, with scrolling if necessary
-struct Vertical : Layout {
-protected:
-    int2 sizeHint() override;
-    void update() override;
-    bool event(int2 position, Event event, State state) override;
-    void render(vec2 scale, vec2 offset) override;
-
-    int margin = 0;
-    int scroll = 0;
-    bool mayScroll = false;
-    int first = 0, last = 0;
+/// Vertical divide vertical space between contained widgets
+struct Vertical : virtual Linear {
+    int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };
-/// VBox layouts heterogenous widgets (i.e references) vertically
-typedef WidgetLayout<Vertical> VBox;
+/// VBox is a \a Vertical layout of heterogenous widgets (\sa WidgetLayout)
+struct VBox : Vertical, WidgetLayout {};
 
-/// List is a \a Vertical layout with selection
+/// Selection implements selection of active widget/item for a \a Layout
 //TODO: multi selection
-struct List : Vertical {
+struct Selection : virtual Layout {
     /// User changed active index.
     signal<int /*active index*/> activeChanged;
 
-protected:
-    bool event(int2 position, Event event, State state) override;
-    void render(vec2 scale, vec2 offset) override;
-
+    /// Active index
     int index = -1;
+
+    bool event(int2 position, Event event, State state) override;
+    void render(int2 parent) override;
 };
 
-/// ValueList is a \a List of homogenous items (i.e values)
-template<class T> struct ValueList : ItemLayout<List, T> {
+/// ItemSelection is an \a ItemLayout with \a Selection
+template<class T> struct ItemSelection : ItemLayout<T>, Selection {
     /// Return active item (last selection)
-    inline T& active() { return this->items[this->index]; }
+    inline T& active() { return array<T>::at(this->index); }
 };
+
+/// List is a \a Vertical layout of selectable items (\sa ItemSelection)
+template<class T> struct List : Scroll<Vertical>, ItemSelection<T> {};
+//template<class T> struct List : Vertical, ItemSelection<T> {};
+/// Bar is a \a Horizontal layout of selectable items (\sa ItemSelection)
+template<class T> struct Bar : Horizontal, ItemSelection<T> {};
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(int size, string&& text=string());
+    Text(int size=16, string&& text=""_);
     /// Set the text to display
     void setText(string&& text);
 
-protected:
-    int2 sizeHint() override;
-    void render(vec2 scale, vec2 offset) override;
+    /// Displayed text
+    string text;
 
+    int2 sizeHint();
+    void render(int2 parent);
+
+protected:
     int size;
     Font& font;
-    string text;
     int2 textSize;
     struct Blit { vec2 min, max; uint id; };
     array<Blit> blits;
 };
-/// TextList is a \a ValueList of \a Text items
-typedef ValueList<Text> TextList;
+
+/// TextList is a \a List of \a Text items
+typedef List<Text> TextList;
 
 /// TriggerButton is a clickable image Widget
 struct TriggerButton : Widget {
+    TriggerButton() {}
     /// Create a trigger button showing \a icon
     TriggerButton(const Image& icon);
 
     /// User clicked on the button
     signal<> triggered;
 
-protected:
-    int2 sizeHint() override;
-    void render(vec2 scale, vec2 offset) override;
-    bool event(int2, Event event, State state) override;
+    int2 sizeHint();
+    void render(int2 parent);
+    bool event(int2 position, Event event, State state) override;
 
+protected:
     GLTexture icon;
-    const int size = 32;
 };
+typedef TriggerButton Icon;
+
+/// Tab is an icon with text
+struct Tab : Horizontal {
+    Icon icon; Space margin{4,0}; Text text;
+    int count() { return 3; }
+    Widget& at(int i) { return i==0?(Widget&)icon:i==1?(Widget&)margin:(Widget&)text; }//TODO:named tuple
+};
+
+/// TabBar is a \a Bar of \a Tab items
+typedef Bar<Tab> TabBar;
 
 /// TriggerButton is a togglable image Widget
 struct ToggleButton : Widget {
@@ -200,13 +267,15 @@ struct ToggleButton : Widget {
     /// User toggled the button
     signal<bool /*nextState*/> toggled;
 
-protected:
-    int2 sizeHint() override;
-    void render(vec2 scale, vec2 offset) override;
-    bool event(int2, Event event, State state) override;
-
-    GLTexture enableIcon, disableIcon;
+    /// Current button state
     bool enabled = false;
+
+    int2 sizeHint();
+    void render(int2 parent);
+    bool event(int2 position, Event event, State state) override;
+
+protected:
+    GLTexture enableIcon, disableIcon;
     static const int size = 32;
 };
 
@@ -219,11 +288,11 @@ struct Slider : Widget {
     /// User edited the \a value
 	signal<int> valueChanged;
 
-protected:
-    int2 sizeHint() override;
-    void render(vec2 scale, vec2 offset) override;
+    int2 sizeHint();
+    void render(int2 parent);
     bool event(int2 position, Event event, State state) override;
 
+protected:
     static const int height = 32;
 };
 
@@ -231,6 +300,6 @@ protected:
 /// \note an icon with the same name must be linked by the build system
 ///       'ld -r -b binary -o name.o name.png' can be used to embed a file in the binary
 #define ICON(name) \
-	extern uint8 _binary_## name ##_png_start[]; \
-	extern uint8 _binary_## name ##_png_end[]; \
-    static Image name ## Icon (_binary_## name ##_png_start,_binary_## name ##_png_end-_binary_## name ##_png_start)
+    extern byte _binary_## name ##_png_start[]; \
+    extern byte _binary_## name ##_png_end[]; \
+    static Image name ## Icon (array<byte>(_binary_## name ##_png_start,_binary_## name ##_png_end-_binary_## name ##_png_start))

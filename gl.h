@@ -4,10 +4,12 @@
 #include "map.h"
 #include "image.h"
 
+void glViewport(int2 size);
+
 #define SHADER(name) \
 extern char _binary_## name ##_glsl_start[]; \
 extern char _binary_## name ##_glsl_end[]; \
-static string name ## Shader = string(_binary_## name ##_glsl_start,_binary_## name ##_glsl_end);
+static string name ## Shader = string(_binary_## name ##_glsl_start,_binary_## name ##_glsl_end)
 
 struct GLUniform {
 	GLUniform(int id) : id(id) {}
@@ -50,7 +52,10 @@ struct GLTexture : Image {
 	static void bind(int id);
 };
 
+enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
 struct GLBuffer {
+    no_copy(GLBuffer)
+    GLBuffer(PrimitiveType primitiveType=Point);
 	void allocate(int indexCount, int vertexCount, int vertexSize);
 	uint* mapIndexBuffer();
 	void unmapIndexBuffer();
@@ -61,6 +66,7 @@ struct GLBuffer {
 	void bind();
 	void bindAttribute(GLShader& program, const char* name, int elementSize, uint64 offset = 0);
 	void draw();
+    ~GLBuffer();
 
 	operator bool() { return vertexBuffer; }
 
@@ -69,7 +75,7 @@ struct GLBuffer {
 	uint32 vertexSize=0;
 	uint32 indexBuffer=0;
 	uint32 indexCount=0;
-	uint32 primitiveType=3;
+    PrimitiveType primitiveType = Point;
 	bool primitiveRestart=false;
 };
 

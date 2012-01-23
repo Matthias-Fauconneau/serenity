@@ -3,24 +3,50 @@
 #include "string.h"
 #include <zlib.h>
 
-Image::Image(uint8* file, int size) {
-	Stream s(file,size);
-	if(!s.match(_("\x89PNG\r\n\x1A\n"))) fail("Unknown image format");
+template<class T> void filter(byte4* dst, const byte* raw, int width, int height) {
+    byte4 zero[width]; clear(zero,width); byte4* prior=zero;
+    for(int y=0;y<height;y++,raw+=width*sizeof(T),dst+=width) {
+        int filter = *raw++; assert(filter>=0 && filter<=4);
+        T* src = (T*)raw;
+        byte4 a;
+        if(filter==0) for(int i=0;i<width;i++) dst[i]= src[i];
+        if(filter==1) for(int i=0;i<width;i++) dst[i]= a= a+src[i];
+        if(filter==2) for(int i=0;i<width;i++) dst[i]= prior[i]+src[i];
+        if(filter==3) for(int i=0;i<width;i++) dst[i]= a= byte4((int4(prior[i])+int4(a))/2)+src[i];
+        if(filter==4) {
+            byte4 a; int4 b;
+            for(int i=0;i<width;i++) {
+                int4 c = b;
+                b = int4(prior[i]);
+                int4 d = int4(a) + b - c;
+                int4 pa = abs(d-int4(a)), pb = abs(d-b), pc = abs(d-c);
+                byte4 p; for(int i=0;i<4;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
+                dst[i]= a= p+src[i];
+            }
+        }
+        prior = dst;
+    }
+}
+
+Image::Image(array<byte>&& file) {
+    Stream<BigEndian> s(move(file));
+    if(!s.match("\x89PNG\r\n\x1A\n"_)) error("Unknown image format"_);
 	z_stream z; clear(z); inflateInit(&z);
-	string idat(size*16); //FIXME
-	z.next_out = (Bytef*)idat.data, z.avail_out = (uint)idat.capacity;
+    array<byte> idat(file.size*16); //FIXME
+    z.next_out = (Bytef*)&idat, z.avail_out = (uint)idat.capacity;
+    int depth=0;
 	while(s) {
 		uint32 size = s.read();
 		string name = s.read(4);
-		if(name == _("IHDR")) {
+        if(name == "IHDR"_) {
 			width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
 			//uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
 			//assert(bitDepth==8); assert(compression==0); assert(filter==0); assert(interlace==0);
 			s++; uint8 type = s.read(); s+=3;
 			depth = "\x01\x00\x03\x00\x02\x00\x04"[type];
-		} else if(name == _("IDAT")) {
+        } else if(name == "IDAT"_) {
 			z.avail_in = size;
-			z.next_in = (Bytef*)s.read((int)size).data;
+            z.next_in = (Bytef*)&s.read((int)size);
 			inflate(&z, Z_NO_FLUSH);
 		} else s += (int)size;
 		s+=4; //CRC
@@ -28,32 +54,34 @@ Image::Image(uint8* file, int size) {
 	inflate(&z, Z_FINISH);
 	inflateEnd(&z);
 	idat.size = (int)z.total_out;
-	int stride = width*depth;
-	assert(idat.size == height*(1+stride), idat.size, width, height);
-	assert(depth==2);
-	data = new uint8[height*stride];
-	uint8* raw = (uint8*)idat.data;
-	byte2* dst = (byte2*)data;
-	byte2 zero[width]; clear(zero,width); byte2* prior=zero;
-	for(int y=0;y<height;y++,raw+=stride,dst+=width) {
-		int filter = *raw++; assert(filter>=0 && filter<=4);
-		byte2* src = (byte2*)raw;
-		byte2 a;
-		if(filter==0) copy(dst,src,width);
-		if(filter==1) for(int i=0;i<width;i++) dst[i]= a= a+src[i];
-		if(filter==2) for(int i=0;i<width;i++) dst[i]= prior[i]+src[i];
-		if(filter==3) for(int i=0;i<width;i++) dst[i]= a= byte2((int2(prior[i])+int2(a))/2)+src[i];
-		if(filter==4) {
-			byte2 a; int2 b;
-			for(int i=0;i<width;i++) {
-				int2 c = b;
-				b = int2(prior[i]);
-				int2 d = int2(a) + b - c;
-				int2 pa = abs(d-int2(a)), pb = abs(d-b), pc = abs(d-c);
-				byte2 p; for(int i=0;i<2;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
-				dst[i]= a= p+src[i];
-			}
-		}
-		prior = dst;
-	}
+    assert(idat.size == height*(1+width*depth), idat.size, width, height);
+    data = new byte4[width*height];
+    /**/ if(depth==2) filter<byte2>((byte4*)data,&idat,width,height);
+    else if(depth==4) filter<rgba4>((byte4*)data,&idat,width,height);
+    else error("depth"_,depth);
+}
+
+Image& Image::resize(int w, int h) {
+    if(w==width && h==height) return *this;
+    const byte4* src = data;
+    byte4* buffer = new byte4[w*h];
+    byte4* dst = buffer;
+    assert(width/w==height/h && !(width%w) && !(height%h)); //integer uniform downscale
+    int scale = width/w;
+    for(int y=0;y<h;y++) {
+        for(int x=0;x<w;x++) {
+            int4 s;
+            for(int i=0;i<scale;i++){
+                for(int j=0;j<scale;j++) {
+                    s+= int4(src[i*width+j]);
+                }
+            }
+            *dst = byte4(s/(scale*scale));
+            src+=scale, dst++;
+        }
+        src += (scale-1)*width;
+    }
+    width=w, height=h;
+    if(own) delete[] data; data=buffer; own=true;
+    return *this;
 }

@@ -3,6 +3,14 @@
 #include "map.h"
 #include "string.h"
 
+string trim(const string& s) {
+    int b=0; for(;b<s.size && s[b]==' ';) b++;
+    int e=s.size-1; for(;e>b && s[e]==' ';) e--;
+    return s.slice(b,e+1-b);
+}
+
+string trim(const string& str);
+
 struct word {
 	static array<string> unique;
 	int id;
@@ -120,7 +128,7 @@ struct Parser : Application {
 				if(m==0) continue;
 				if(item.dot == item.rule.tokens.size) { //fill state with reduce
 					for(word t: terminal) {
-						if(set.transitions.contains(t)) fail("Conflict",set.transitions[t],item.rule);
+                        if(set.transitions.contains(t)) error("Conflict",set.transitions[t],item.rule);
 						set.transitions[t] = -m;
 					}
 				}

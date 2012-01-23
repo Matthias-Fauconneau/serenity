@@ -54,9 +54,9 @@ struct Music : Application {
 			} /*else if(path.endsWith(_(".wav")) && !exists(path) && sampler) {
 				sampler->recordWAV(path);
 			}*/
-			else fail("Unhandled argument",path);
+            else error("Unhandled argument",path);
 		}
-        if(!sampler && !sheet) fail("Usage: music [instrument.sfz] [music.mid] [sheet.pdf] [output.wav]");
+        if(!sampler && !sheet) error("Usage: music [instrument.sfz] [music.mid] [sheet.pdf] [output.wav]");
 		//sheet.scroll=1600;
 		setpriority(PRIO_PROCESS,0,-20);
 		if(audio.input) audio.start();

@@ -41,7 +41,7 @@ void Sampler::open(const string& path) {
 			else if(key==_("amp_veltrack")) sample->amp_veltrack=toInteger(value);
 			else if(key==_("rt_decay")) sample->rt_decay=toInteger(value);
 			else if(key==_("volume")) sample->volume=exp10(toInteger(value)/20.0);
-			else fail("unknown opcode",key);
+            else error("unknown opcode",key);
 		}
 	}
 

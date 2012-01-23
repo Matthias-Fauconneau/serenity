@@ -10,7 +10,13 @@ virtual void read(int16* output, int size) =0;
 };
 
 struct Resampler {
-	no_copy(Resampler);
+    no_copy(Resampler)
+    Resampler(){}
+    Resampler(int channels, int sourceRate, int targetRate);
+    ~Resampler();
+    void filter(const float *source, int *sourceSize, float *target, int *targetSize);
+    operator bool();
+private:
 	int channelCount=0;
 	int sourceRate=0;
 	int targetRate=0;
@@ -28,12 +34,6 @@ struct Resampler {
 		int integerIndex=0;
 		int decimalIndex=0;
 	} channels[8];
-
-	Resampler(){}
-	Resampler(int channels, int sourceRate, int targetRate);
-	~Resampler();
-	void filter(const float *source, int *sourceSize, float *target, int *targetSize);
-	operator bool();
 };
 
 struct AudioFile : AudioInput {
@@ -51,7 +51,6 @@ struct AudioFile : AudioInput {
 	signal<int,int> timeChanged;
 
 protected:
-	//struct mpg123_handle_struct* file=0;
 	struct AVFormatContext* file=0;
 	struct AVStream* audioStream=0;
 	struct AVCodecContext* audio=0;
@@ -69,7 +68,7 @@ struct AudioOutput : Poll {
 
 	AudioOutput(bool realtime=false);
 	pollfd poll();
-	bool event(pollfd);
+    void event(pollfd);
 	virtual void setInput(AudioInput* input);
 	virtual void start();
 	virtual void stop();
