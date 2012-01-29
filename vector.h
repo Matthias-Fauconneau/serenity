@@ -7,10 +7,10 @@
 template <template <typename> class V, class T, int N> struct vector : V<T> {
     static const int size = N;
     vector():V<T>{}{}
-    template<class... Args> vector(Args... args):V<T>{args...}{static_assert(sizeof...(args) == N, "Invalid number of arguments");}
+    template<class... Args> explicit vector(Args... args):V<T>{args...}{static_assert(sizeof...(args) == N, "Invalid number of arguments");}
+    template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }
     const T& u(int i) const { return ((T*)this)[i]; }
     T& u(int i) { return ((T*)this)[i]; }
-    template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }
     const T& operator[](int i) const { assert(i>=0 && i<N); return u(i); }
     T& operator[](int i) { assert(i>=0 && i<N); return u(i); }
     vector operator +=(const vector& v) { for(int i=0;i<N;i++) u(i)+=v[i]; return *this; }
@@ -56,24 +56,31 @@ template <template <typename> class V, class T, int N> inline void log_(const ve
 }
 
 template<class T> struct xy { T x,y; };
-template<class T> struct xyz { T x,y,z; };
-template<class T> struct xyzw { T x,y,z,w; /*vec2 xy(){return vec2(x,y);}*/ };
-template<class T> struct bgra { T b,g,r,a; };
-template<class T> struct rgba { T r,g,b,a; operator vector<bgra,T,4>()const{return {b,g,r,a};} };
-template<class T> struct ia { T i,a; operator vector<bgra,T,4>()const{return {i,i,i,a};}};
-
 typedef vector<xy,int,2> int2;
 typedef vector<xy,float,2> vec2;
-typedef vector<ia,uint8,2> byte2;
-typedef vector<xyz,float,3> vec3;
-typedef vector<rgba,uint8,4> rgba4;
+
+//template<class T> struct xyz { T x,y,z; };
+//typedef vector<xyz,float,3> vec3;
+
+template<class T> struct xyzw { T x,y,z,w; };
+typedef vector<xyzw,float,4> vec4;
+
+template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 typedef vector<bgra,int,4> int4;
-typedef vector<xyzw,float,4> vec4;
+
+template<class T> struct rgba { T r,g,b,a; operator byte4()const{return byte4{b,g,r,a};} };
+typedef vector<rgba,uint8,4> rgba4;
+template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a};}};
+typedef vector<ia,uint8,2> byte2;
+
+
+
+
 
 inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
 
-inline float dot( vec3 a, vec3 b ) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+/*inline float dot( vec3 a, vec3 b ) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
 inline vec3 planeNormal(vec3 a, vec3 b, vec3 c) { return cross(c-a,c-b); }
 
@@ -171,3 +178,4 @@ struct mat4 {
     mat4 transpose() const { mat4 t(0); for(int i=0;i<4;i++) for(int j=0;j<4;j++) t(i,j)=m(j,i); return t; }
 };
 inline bool operator !=( mat4 a, mat4 b ) { for(int i=0;i<16;i++) if(a.data[i]!=b.data[i]) return true; return false; }
+*/

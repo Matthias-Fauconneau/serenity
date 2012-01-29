@@ -2,5 +2,5 @@
 Name=Media Player
 Exec=player
 Type=Application
-Icon=media-playback-start
+Icon=player
 Categories=Multimedia;Player;Audio;Music;AudioVideo;

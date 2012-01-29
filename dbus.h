@@ -1,3 +1,4 @@
+#pragma once
 #include "file.h"
 
 #include <stdlib.h>
@@ -14,7 +15,7 @@ inline void dump(const array<byte>& s) {
 /// D-Bus
 
 //static Message Header
-enum Message : byte { Call=1, Return, Error, Signal };
+enum Message : byte { Call=1, ReplyMessage, Error, Signal };
 template <Message type> struct MessageHeader {
     byte endianness='l';
     Message message = type;
@@ -48,12 +49,19 @@ template<class T> void read(Stream<>& s, Variant<T>& output) {
     read(s,(T&)output);
 }
 template<class T> void read(Stream<>& s, array<T>& output) {
-    s.align(4); int32 length = s.read();
-    int begin=s.pos; //FIXME: wrong if T has align(8) (structs)
+    s.align<4>(); int32 length = s.read();
+    uint begin=s.pos; //FIXME: wrong if T has align(8) (structs)
     while(s.pos<begin+length) { T e; read(s,e); output << move(e); }
 }
-void read(Stream<>& s, string& output) { s.align(4); output = s.readArray().copy(); s++;/*0*/ }
+void read(Stream<>& s, string& output) { s.align<4>(); output = s.readArray().copy(); s++;/*0*/ }
 void read(Stream<>&) {}
+
+struct DBusIcon {
+    int width;
+    int height;
+    array<byte> data;
+};
+void read(Stream<>& s, DBusIcon& output) { s.align<8>(); output.width=s.read(); output.height=s.read(); output.data=s.readArray().copy(); }
 
 // Template metaprogramming for static dispatch of D-Bus signature serializer
 
@@ -63,26 +71,26 @@ template<> void sign<int>(array<byte>& s) { s<<"i"_; }
 
 template<class... Inputs> void writeSignature(array<byte>& s) {
     string signature; sign<Inputs...>(signature);
-    s.align(8); s << raw(FieldHeader<SignatureField>()); s << signature.size; s << move(signature); s << 0;
+    s.align<8>(); s << raw(FieldHeader<SignatureField>()); s << signature.size; s << move(signature); s << 0;
 }
 template<> void writeSignature(array<byte>&) {}
 
 // Template metaprogramming for static dispatch of D-Bus inputs serializer
 
 void write(array<byte>& s, const string& input) {
-    s.align(4);
+    s.align<4>();
     s << raw(input.size);
     s << input;
     s << 0;
 }
-void write(array<byte>& s, int integer) { s.align(4); s << raw(integer); }
+void write(array<byte>& s, int integer) { s.align<4>(); s << raw(integer); }
 void write(array<byte>&) {}
 template<class Input, class... Inputs> void write(array<byte>& s, const Input& input, const Inputs&... inputs) {
     write(s,input); write(s,inputs...);
 }
 
 template <Field type> void writeField(array<byte>& s, const string& field) {
-    s.align(8);
+    s.align<8>();
     s << raw(FieldHeader<type>());
     write(s,field);
 }
@@ -93,12 +101,12 @@ struct DBus {
     uint32 serial = 0; // Serial number to match messages and their replies
 
     /// Read messages and parse \a outputs from first reply (without type checking)
-    template<class... Outputs> void read(uint32 serial, Outputs&... outputs) {
+    template<class... Outputs> void read(uint32, Outputs&... outputs) {
         for(;;) {
-            array<byte> buffer(sizeof(MessageHeader<Return>)+4);
+            array<byte> buffer(sizeof(MessageHeader<ReplyMessage>)+4);
             ::read(fd,buffer); assert(buffer.size==buffer.capacity,buffer.size,"Connection closed"_);
-            auto header = *(MessageHeader<Return>*)&buffer;
-            uint32 fieldsSize = align(*(uint32*)&buffer.at(sizeof(MessageHeader<Return>)), 8);
+            auto header = *(MessageHeader<ReplyMessage>*)&buffer;
+            uint32 fieldsSize = align<8>(*(uint32*)&buffer.at(sizeof(MessageHeader<ReplyMessage>)));
             array<byte> fields(fieldsSize); ::read(fd,fields);
             string signal;
             for(Stream<> s(fields);s;) {
@@ -106,20 +114,20 @@ struct DBus {
                 uint8 size = s.read();
                 s += size+1;
                 if(field==Target||field==Path||field==Interface||field==Member||field==Sender) {
-                    s.align(4);
+                    s.align<4>();
                     string name = s.readArray(); s+=1;
                     if(field==Member) signal=move(name);
-                } else if(field==ReplySerial) { s.align(4); uint32 replySerial=s.read(); assert(replySerial==serial); }
+                } else if(field==ReplySerial) { s.align<4>(); s.read<uint32>(); /*uint32 replySerial=s.read(); assert(replySerial==serial);*/ }
                 else if(field==SignatureField) { uint8 size = s.read(); s+=size; }
-                s.align(4);
+                s.align<4>();
             }
             if(header.length) {
                 array<byte> data(header.length); ::read(fd,data); Stream<> s(data);
                 //dump(data);
-                if(header.message == Return) ::read(s,outputs...);
+                if(header.message == ReplyMessage) ::read(s,outputs...);
                 //else if(header.message == Signal) log("signal"_,signal);
             }
-            if(header.message == Return) return;
+            if(header.message == ReplyMessage) return;
         }
     }
 
@@ -129,14 +137,14 @@ struct DBus {
         array<byte> body; ::write(body,inputs...);
         array<byte> s;
         s << raw(MessageHeader<type>(body.size,++serial));
-        int length = s.size; s.skip(4); s.align(4); int begin=s.size;
+        int length = s.size; s.skip(4); s.align<4>(); int begin=s.size;
         ::writeField<Path>(s,object);
         if(interface) ::writeField<Interface>(s,interface);
         ::writeField<Member>(s,member);
         ::writeField<Target>(s,target);
         ::writeSignature<Inputs...>(s);
         *(uint32*)(&s.at(length)) = s.size-begin;
-        s.align(8);
+        s.align<8>();
         s << move(body);
         //dump(s); log(R"()"_);
         ::write(fd,s);
@@ -178,12 +186,12 @@ struct DBus {
     }
 
     DBus() {
-        fd = socket(PF_UNIX, SOCK_STREAM, 0);
+        fd = socket(PF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
         sockaddr_un addr; clear(addr);
         addr.sun_family = AF_UNIX;
         string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
         addr.sun_path[0]=0; path.copy(addr.sun_path+1);
-        assert(!connect(fd,(sockaddr*)&addr,3+path.size));
+        if(connect(fd,(sockaddr*)&addr,3+path.size)) fail();
         ::write(fd,"\0AUTH EXTERNAL 30\r\n"_);
         char buf[256]; ::read(fd,buf,sizeof(buf)); //OK
         ::write(fd,"BEGIN \r\n"_);

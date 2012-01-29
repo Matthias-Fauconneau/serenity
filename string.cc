@@ -72,7 +72,7 @@ string section(const string& s, char sep, int start, int end) {
 	return s.slice(b,e-b);
 }
 string strz(const string& s) { return s+"\0"_; }
-string strz(const char* s) { int i=0; while(s[i]) i++; return string(s,i); }
+string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string(s,i); }
 
 array<string> split(const string& str, char sep) {
 	array<string> r;

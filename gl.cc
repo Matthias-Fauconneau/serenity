@@ -2,6 +2,9 @@
 #define GL_GLEXT_PROTOTYPES
 #include "GL/gl.h"
 
+SHADER(flat);
+SHADER(blit);
+
 /// State
 #if DEBUG
 #include "GL/glu.h"
@@ -15,96 +18,40 @@ void glViewport(int2 size) {
     glViewportScale = vec2(2,-2)/vec2(size);
     glViewport(0,0,size.x,size.y);
 }
-
+#include "process.h"
 /// Shader
 
-bool GLShader::compileShader(uint id, uint type, const array<string>& tags) {
-	string global, main;
-    const char* s = &source, *e=&source+source.size;
-	array<int> scope;
-	for(int nest=0;s<e;) { //for each line
-		const char* l=s;
-		{ //[a-z]+ {
-			const char* t=s; while(*t==' '||*t=='\t') t++; const char* b=t; while(*t>='a'&&*t<='z') t++;
-			const string tag(b,t);
-			if(t>b && *t++==' ' && *t++=='{' && *t++=='\n') { //scope
-				bool skip=true;
-				for(const auto& e : tags) if(tag==e) { skip=false; break; }
-				s=t;
-				if(skip) {
-                    for(int nest=1;nest;s++) { assert(*s,"Unmatched {"_); if(*s=='{') nest++; if(*s=='}') nest--; }
-					assert(*s=='\n'); s++;
-				} else { scope<<nest; nest++; } //remember to remove scope end bracket
-				continue;
-			}
-		}
-		bool declaration=false;
-		{ //(uniform|attribute|varying|in|out )|(float|vec[1234]|mat[234]) [a-zA-Z0-9]+\(
-			const char* t=s; while(*t==' '||*t=='\t') t++; const char* b=t; while(*t>='a'&&*t<='z') t++;
-			const string qualifier(b,t);
-			if(t>b && *t++==' ') {
-                for(const auto& e : {"uniform"_,"attribute"_,"varying"_,"in"_,"out"_}) if(qualifier==e) { declaration=true; break; }
-			}
-		}
-		for(;s<e && *s!='\n';s++) { if(*s=='{') nest++; if(*s=='}') nest--; } s++;
-		if(scope.size && nest==scope.last()) { scope.removeLast(); continue; }
-		(declaration ? global : main) << string(l,s);
-	}
-    string source = "#version 120\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
-
-	uint shader = glCreateShader(type);
-    glShaderSource(shader,1,(const char**)& &source,&source.size);
-	(type==GL_VERTEX_SHADER ? vertex : fragment) = move(source);
-	glCheck;
-	glCompileShader(shader);
-	glAttachShader(id,shader);
-	int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
-	if(status) return true;
-	int l=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&l);
-    string msg(l); glGetProgramInfoLog(id,l,&msg.size,(char*)&msg);
-    error("Error compiling shader\n"_,msg,(type==GL_VERTEX_SHADER ? vertex : fragment));
-	return false;
-}
-
-bool GLShader::compile(const array<string>& vertex, const array<string>& fragment) {
-	if(!id) id = glCreateProgram();
-	compileShader(id,GL_VERTEX_SHADER,vertex);
-	compileShader(id,GL_FRAGMENT_SHADER,fragment);
-	glLinkProgram(id);
-	int status; glGetProgramiv(id,GL_LINK_STATUS,&status);
-	if(status) return true;
-	int l=0; glGetProgramiv(id,GL_INFO_LOG_LENGTH,&l);
-    string msg(l); glGetProgramInfoLog(id,l,&msg.size,(char*)&msg);
-    error("Error linking shader\n"_,msg);
-	return false;
-}
-
-
 void GLShader::bind() {
-    if(!id && name) compile({"vertex"_,strz(name)},{"fragment"_,strz(name)});
+    if(!id) {
+        id = glCreateProgram();
+        GLint formats = 0;
+        glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formats);
+        GLint binaryFormats[formats];
+        glGetIntegerv(GL_PROGRAM_BINARY_FORMATS, binaryFormats);
+        glProgramBinary(id, binaryFormats[0], &binary, binary.size);
+        //binary.clear();
+        int success=0; glGetProgramiv(id, GL_LINK_STATUS, &success);
+        assert(success);
+    }
     glUseProgram(id);
     operator[]("scale")=glViewportScale;
 }
 uint GLShader::attribLocation(const char* name) {
 	int location = attribLocations.value(name,-1);
 	if(location<0) attribLocations.insert(name,location=glGetAttribLocation(id,name));
-    assert(location>=0,"Unknown attribute"_,strz(name),"for vertex shader\n"_,vertex);
+    assert(location>=0,"Unknown attribute"_,strz(name));
 	return (uint)location;
 }
 void GLUniform::operator=(float v) { glUniform1f(id,v); }
 void GLUniform::operator=(vec2 v) { glUniform2f(id,v.x,v.y); }
 void GLUniform::operator=(vec4 v) { glUniform4f(id,v.x,v.y,v.z,v.w); }
-void GLUniform::operator=(mat4 m) { glUniformMatrix4fv(id,1,0,m.data); }
+//void GLUniform::operator=(mat4 m) { glUniformMatrix4fv(id,1,0,m.data); }
 GLUniform GLShader::operator[](const char* name) {
 	int location = uniformLocations.value(name,-1);
 	if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
-    assert(location>=0,"Unknown uniform"_,strz(name),"\n[Vertex]\n"_,vertex,"\n[Fragment]\n"_,fragment);
+    assert(location>=0,"Unknown uniform"_,strz(name));
 	return GLUniform(location);
 }
-
-SHADER(blit);
-GLShader flat(blitShader,"flat");
-GLShader blit(blitShader,"blit");
 
 /// Texture
 
@@ -112,7 +59,7 @@ GLTexture::GLTexture(const Image& image) : Image(image.copy()) {
 	if(!id) glGenTextures(1, &id);
 	assert(id);
     glBindTexture(GL_TEXTURE_2D, id);
-    for(int i=0;i<width*height;i++) { //convert to darken coverage
+    for(int i=0;i<width*height;i++) { //convert alpha to multiply blend
         data[i].r = (data[i].r*data[i].a + 255*(255-data[i].a))/255;
         data[i].g = (data[i].g*data[i].a + 255*(255-data[i].a))/255;
         data[i].b = (data[i].b*data[i].a + 255*(255-data[i].a))/255;

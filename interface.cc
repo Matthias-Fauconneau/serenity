@@ -1,16 +1,24 @@
 #include "interface.h"
+#include "window.h"
 #include "font.h"
 #include "gl.h"
 
 /// ScrollArea
 
-bool ScrollArea::event(int2 position, Event event, State state) {
-    if(widget().event(position-widget().position,event,state)) return true;
-    if((event==WheelDown || event==WheelUp) && state==Pressed) {
+void ScrollArea::update() {
+    int2 hint = widget().sizeHint();
+    widget().position = min(int2(0,0), max(size-hint, widget().position));
+    widget().size = max(hint, size);
+    widget().update();
+}
+
+bool ScrollArea::mouseEvent(int2 position, Event event, Button button) {
+    if(widget().mouseEvent(position-widget().position,event,button)) return true;
+    if(event==Press && (button==WheelDown || button==WheelUp)) {
         if(size>=widget().sizeHint()) return false;
         int2& position = widget().position;
         int2 previous = position;
-        position.y += event==WheelUp?-32:32;
+        position.y += button==WheelUp?-32:32;
         position = max(size-widget().sizeHint(),min(int2(0,0),position));
         if(position != previous) update();
         return true;
@@ -18,12 +26,16 @@ bool ScrollArea::event(int2 position, Event event, State state) {
     return false;
 }
 
+void ScrollArea::ensureVisible(Widget& target) {
+    widget().position = max(-target.position, min(size-(target.position+target.size), widget().position));
+}
+
 /// Layout
 
-bool Layout::event(int2 position, Event event, State state) {
+bool Layout::mouseEvent(int2 position, Event event, Button button) {
     for(auto& child : *this) {
-        if(position > child.position && position < child.position+child.size) {
-            if(child.event(position-child.position,event,state)) return true;
+        if(position >= child.position && position < child.position+child.size) {
+            if(child.mouseEvent(position-child.position,event,button)) return true;
         }
     }
     return false;
@@ -31,13 +43,12 @@ bool Layout::event(int2 position, Event event, State state) {
 
 void Layout::render(int2 parent) {
     for(auto& child : *this) {
-        if(position+child.position>=int2(0,0) && child.position+child.size<=size)
+        if(position+child.position>=int2(-4,-4) && child.position+child.size<=size+int2(4,4))
             child.render(parent+position);
     }
 }
 
 /// Linear
-//in sizeHint() and update(), xy() transform coordinates so that x/y always mean along/across the line
 
 int2 Linear::sizeHint() {
 	int width=0, expanding=0, height=0;
@@ -54,38 +65,53 @@ int2 Linear::sizeHint() {
 void Linear::update() {
     if(!count()) return;
     int2 size = xy(this->size);
-    array<int> sizes(count(),-1);
-    int width = size.x /*remaining space*/, expanding=0 /*expanding count*/, expandingWidth=0;
-    for(int p=0;p<2;p++) { //try hard to allocate space (i.e also allocate expanding widgets if bigger than (free space / expanding count))
-        for(int i=0;i<count();i++) {
-            if(sizes[i]>=0) continue;
-            int hint = xy(at(i).sizeHint()).x;
-            if(hint>=0 && hint >= width-expandingWidth) hint=-hint; //convert to expanding if not enough space
-            if(hint>=0 && hint <= width-expandingWidth) { width -= sizes[i]=hint; assert(width>=0); continue; }
-            if(p==0) { expanding++; expandingWidth+=-hint; } //count expanding widgets
-            if(expanding <= 1) continue;
-            if(-hint>width/expanding && -hint < width) { width -= sizes[i]=-hint; expanding--; expandingWidth-=-hint; }
-            assert(width>=0);
+    int width = size.x /*remaining space*/, sharing=0 /*expanding count*/, expandingWidth=0;
+    array<int> hints(count(),-1); array<int> sizes(count(),-1);
+    //allocate fixed space and convert to expanding if not enough space
+    for(int i=0;i<count();i++) {
+        int hint = xy(at(i).sizeHint()).x;
+        if(hint >= width) hint = -hint; //convert to expanding if not enough space
+        if(hint >= 0) width -= (sizes[i]=hints[i]=hint); //allocate fixed size
+        else {
+            hints[i] = -hint;
+            sharing++; //count expanding widgets
+            expandingWidth += -hint; //compute minimum total expanding size
         }
     }
-    int margin = expanding ? width-width/expanding*expanding //integer rounding leave some unused margin
-                           : width/(count()+1); //spread out all fixed size items
-    int2 pen = int2(margin/2,0);
+    assert(width>=0);
+    width -= expandingWidth;
+    bool expanding=sharing;
+    if(!expanding) sharing=count(); //if no expanding: all widgets will share the extra space
+    if(width > 0 || sharing==1) { //share extra space evenly between expanding/all widgets
+        int extra = width/(sharing+!expanding); //if no expanding: keep space for margins
+        for(int i=0;i<count();i++) {
+            sizes[i] = hints[i] + ((!expanding || sizes[i]<0)?extra:0);
+        }
+        width -= extra*sharing; //remaining margin due to integer rounding
+    } else { //reduce biggest widgets first until all fit
+        for(int i=0;i<count();i++) if(sizes[i]<0) sizes[i]=hints[i]; //allocate all widgets
+        while(width<-sharing) {
+            int& first = max(sizes);
+            int second=first; for(int e: sizes) if(e>second && e<first) second=e;
+            int delta = first-second;
+            if(delta==0 || delta>-width/sharing) delta=-width/sharing; //if no change or bigger than necessary
+            assert(delta>0,width);
+            first -= delta; width += delta;
+        }
+    }
+    int2 pen = int2(width/2,0); //external margin
     for(int i=0;i<count();i++) {
-        if(sizes[i]<0) sizes[i] = width/expanding;
         at(i).size = xy(int2(sizes[i],size.y));
         at(i).position = xy(pen);
         at(i).update();
-        pen.x += sizes[i] + (expanding?0:margin);
+        pen.x += sizes[i];
     }
 }
 
 /// Text
 
-Text::Text(int size, string&& text) : size(size), font(defaultFont) { setText(move(text)); }
-void Text::setText(string&& t) {
-    text=move(t);
-    if(!text) return;
+Text::Text(string&& text, int size) : text(move(text)), size(size), font(defaultFont) { update(); }
+void Text::update() {
 	int widestLine = 0;
     FontMetrics metrics = font.metrics(size);
 	vec2 pen = vec2(0,metrics.ascender);
@@ -104,14 +130,51 @@ void Text::setText(string&& t) {
 	}
 	widestLine=max(int(pen.x),widestLine);
 	textSize=int2(widestLine,pen.y-metrics.descender);
-    assert(textSize);
-    if(Widget::size) update();
 }
-int2 Text::sizeHint() { assert(textSize); return textSize; }
+int2 Text::sizeHint() { if(!textSize) update(); assert(textSize); return textSize; }
 
 void Text::render(int2 parent) {
-    blit.bind(); blit["offset"]=vec2(parent+position+(Widget::size-textSize)/2);
-    for(const auto& b: blits) { GLTexture::bind(b.id); glQuad(blit, b.min, b.max, true); }
+    blit.bind(); blit["offset"]=vec2(parent+position+max(int2(0,0),(Widget::size-textSize)/2));
+    for(const auto& b: blits) {
+        if(b.min>=vec2(-4,0) && b.max<=vec2(Widget::size+int2(2,2))) {
+            GLTexture::bind(b.id); glQuad(blit, b.min, b.max, true);
+        }
+    }
+}
+
+/// TextInput
+
+void TextInput::update() {
+    Text::update();
+    cursor=clip(0,cursor,text.size);
+}
+
+bool TextInput::mouseEvent(int2 position, Event event, Button button) {
+    if(event!=Press || button!=LeftButton) return false;
+    Window::focus=this;
+    int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
+    for(cursor=0;cursor<blits.size && x>(blits[cursor].min.x+blits[cursor].max.x)/2;cursor++) {}
+    return true;
+}
+
+bool TextInput::keyPress(Key key) {
+    cursor=clip(0,cursor,text.size);
+    /**/ if(key==Left && cursor>0) cursor--;
+    else if(key==Right && cursor<text.size) cursor++;
+    else if(key==Delete && cursor<text.size) { text.removeAt(cursor); update(); }
+    else if(key==BackSpace && cursor>0) { text.removeAt(--cursor); update(); }
+    else if(!(key&0xff00)) { text.insertAt(cursor++,(char)key); update(); }
+    else return false;
+    return true;
+}
+
+void TextInput::render(int2 parent) {
+    Text::render(parent);
+    if(Window::focus==this) {
+        flat.bind(); flat["offset"]=vec2(parent+position+(Widget::size-textSize)/2); flat["color"]=vec4(0,0,0,1);
+        int x = cursor < blits.size? blits[cursor].min.x : cursor>0 ? blits.last().max.x : 0;
+        glQuad(flat,vec2(x,0),vec2(x+1,Widget::size.y));
+    }
 }
 
 /// Slider
@@ -130,8 +193,8 @@ void Slider::render(int2 parent) {
 	}
 }
 
-bool Slider::event(int2 position, Event event, State state) {
-	if((event == Motion || event==LeftButton) && state==Pressed) {
+bool Slider::mouseEvent(int2 position, Event event, Button button) {
+    if((event == Motion || event==Press) && button==LeftButton) {
 		value = minimum+position.x*(maximum-minimum)/size.x;
 		valueChanged.emit(value);
         return true;
@@ -141,9 +204,9 @@ bool Slider::event(int2 position, Event event, State state) {
 
 /// Selection
 
-bool Selection::event(int2 position, Event event, State state) {
-    if(Layout::event(position,event,state)) return true;
-	if(event != LeftButton || state != Pressed) return false;
+bool Selection::mouseEvent(int2 position, Event event, Button button) {
+    if(Layout::mouseEvent(position,event,button)) return true;
+    if(event != Press || button != LeftButton) return false;
     int i=0;
     for(auto& child: *this) {
         if(position>child.position && position<child.position+child.size) {
@@ -159,26 +222,29 @@ void Selection::render(int2 parent) {
     Layout::render(parent);
     if(index<0 || index>=count()) return;
     Widget& current = at(index);
-    if(position+current.position>=int2(0,0) && current.position+current.size<=size) {
-        flat.bind(); flat["offset"]=vec2(parent+position); flat["color"]=mix(vec4(0, 1./2, 1, 1),vec4(1,1,1,1),1./4);
+    if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
+        flat.bind(); flat["offset"]=vec2(parent+position); flat["color"]=vec4(3./4, 7./8, 1, 1); //multiply blend
         glQuad(flat,vec2(current.position), vec2(current.position+current.size));
     }
 }
 
-/// TriggerButton
+/// Icon
 
-TriggerButton::TriggerButton(const Image& icon) : icon(icon) {}
-int2 TriggerButton::sizeHint() { return int2(icon.width,icon.height); }
-void TriggerButton::render(int2 parent) {
-    if(!icon) return;
+Icon::Icon(const Image& image) : image(image) {}
+int2 Icon::sizeHint() { return int2(image.width,image.height); }
+void Icon::render(int2 parent) {
+    if(!image) return;
     int size = min(Widget::size.x,Widget::size.y);
     int2 offset = (Widget::size-int2(size,size))/2;
     blit.bind(); blit["offset"]=vec2(parent+position+offset);
-	icon.bind();
+    image.bind();
     glQuad(blit,vec2(0,0),vec2(size,size),true);
 }
-bool TriggerButton::event(int2, Event event, State state) {
-    if(event==LeftButton && state==Pressed) { triggered.emit(); return true; }
+
+/// TriggerButton
+
+bool TriggerButton::mouseEvent(int2, Event event, Button button) {
+    if(event==Press && button==LeftButton) { triggered.emit(); return true; }
     return false;
 }
 
@@ -194,7 +260,7 @@ void ToggleButton::render(int2 parent) {
 	(enabled?disableIcon:enableIcon).bind();
     glQuad(blit,vec2(0,0),vec2(size,size),true);
 }
-bool ToggleButton::event(int2, Event event, State state) {
-    if(event==LeftButton && state==Pressed) { enabled = !enabled; toggled.emit(enabled); return true; }
+bool ToggleButton::mouseEvent(int2, Event event, Button button) {
+    if(event==Press && button==LeftButton) { enabled = !enabled; toggled.emit(enabled); return true; }
     return false;
 }

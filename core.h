@@ -6,29 +6,20 @@
 #define constexpr
 #define override
 #define _
-#endif
 
-/// primitive types
+#define no_copy(o)
+#define move_only(o)
+#define no_move(o)
+#define perfect
+#define perfectV
+#define perfectK
+#define perfectKV
+#define predicate(E)
 
-typedef signed char int8;
-typedef char byte;
-typedef unsigned char uint8;
-typedef unsigned char ubyte;
-typedef short int16;
-typedef unsigned short uint16;
-typedef int int32;
-typedef unsigned int uint32;
-typedef unsigned int uint;
-typedef long int64;
-typedef unsigned long uint64;
-typedef unsigned long size_t;
-typedef long ssize_t;
+#else
 
 /// language support
 
-#define declare(function, attributes...) function __attribute((attributes)); function
-#define no_trace(function) function __attribute((no_instrument_function)); function
-no_trace(inline void* operator new(uint64, void* p)) { return p; }
 extern void* enabler;
 template<bool> struct predicate {};
 template<> struct predicate<true> { typedef void* type; };
@@ -48,13 +39,19 @@ template<typename T> constexpr T&& forward(typename std::remove_reference<T>::ty
 #define is_same(F,T) std::is_same<F,T>::value
 #define can_forward_(F,T) is_convertible(typename std::remove_reference<F>::type, typename std::remove_reference<T>::type)
 #define can_forward(T) can_forward_(T##f,T)
-#define perfect_(F,T) template<class F, predicate(can_forward_(F,T)) >
-#define perfect(T) perfect_(T##f,T)
+#define perfect__(F,T) template<class F, predicate(can_forward_(F,T)) >
+#define perfect_(T) perfect__(T##f,T)
+#define perfect perfect_(T)
+#define perfectV perfect_(V)
+#define perfectK perfect_(K)
 #define perfect2_(F,T,G,U) template<class F, class G, predicate(can_forward_(F,T)), predicate1(can_forward_(G,U)) >
 #define perfect2(T,U) perfect2_(T##f,T,U##f,U)
+#define perfectKV perfect2(K,V)
 
 /*struct unroll { template<typename ...T> unroll(T...) {} };
 #define unroll(call) ({ unroll{(call, 1)...}; })*/
+
+#endif
 
 template<typename... Args> struct delegate {
 	void* _this;
@@ -69,6 +66,23 @@ template<typename... Args> struct signal : array< delegate<Args...> > {
 	}
 };
 
+/// primitive types
+
+typedef signed char int8;
+typedef char byte;
+typedef unsigned char uint8;
+typedef unsigned char ubyte;
+typedef short int16;
+typedef unsigned short uint16;
+typedef int int32;
+typedef unsigned int uint32;
+typedef unsigned int uint;
+typedef long int64;
+typedef unsigned long uint64;
+
+typedef unsigned long size_t;
+typedef long ssize_t;
+
 /// memory allocation
 
 extern "C" {
@@ -76,6 +90,7 @@ void* malloc(size_t size) throw();
 void* realloc(void* ptr, size_t size) throw();
 void free(void *ptr) throw();
 }
+inline void* operator new(uint64, void* p) { return p; }
 
 /// algorithms
 
@@ -96,8 +111,16 @@ template <class T> T min(T a, T b) { return a<b ? a : b; }
 template <class T> T max(T a, T b) { return a>b ? a : b; }
 template <class T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 
-inline int padding(int offset, int align) { return (-offset) & (align - 1); }
-inline int align(int offset, int align) { return (offset + align - 1) & ~(align - 1); }
+/// Returns the necessary padding to align \a offset to \a width
+template<int width> int padding(int offset) {
+    static_assert(width && !(width & (width - 1)),"width must be a power of two");
+    return (-offset) & (width - 1);
+}
+/// Returns the next \a offset aligned to \a width
+template<int width> int align(int offset) {
+    static_assert(width && !(width & (width - 1)),"width must be a power of two");
+    return (offset + width - 1) & ~(width - 1);
+}
 
 /// debugging support
 
@@ -124,28 +147,23 @@ template<> void log_(const double&);
 //template<class A> void log_(const A* a) { if(a) log_(*a); else log_("null"_); }
 template<> void log_(char* const&);
 
-#ifdef TRACE
-extern bool trace_enable;
-#define trace_on  trace_enable=true;
-#define trace_off trace_enable=false;
-#else
-#define trace_on
-#define trace_off
-#endif
-
 #ifdef DEBUG
-void logFrame();
+#ifdef NO_BFD
+inline void logTrace() {}
+#else
 void logTrace();
+#endif
 extern "C" void abort() throw() __attribute((noreturn));
-#define fail() ({ trace_off; logTrace(); abort(); })
-#define error(args...) ({ trace_off; logTrace(); log("Error:\t"_,##args); abort(); })
-#define assert(expr, args...) ({ if(!(expr)) { trace_off; logTrace(); log("Assert:\t"_,#expr##_, ##args); abort(); } })
+#define fail() ({ logTrace(); abort(); })
+#define error(args...) ({ logTrace(); log("Error:\t"_,##args); abort(); })
+#define assert(expr, args...) ({ if(!(expr)) { logTrace(); log("Assert:\t"_,#expr##_, ##args); abort(); } })
 #else
 #define fail() ({})
 #define error(args...) ({})
 #define assert(expr, args...) ({})
 #endif
 
-/// import runtime support classes
+/// Imports runtime support classes
+/// \note runtime support types are lowercase
 #include "array.h"
 #include "string.h"

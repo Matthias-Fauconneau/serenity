@@ -43,7 +43,8 @@ Image::Image(array<byte>&& file) {
 			//uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
 			//assert(bitDepth==8); assert(compression==0); assert(filter==0); assert(interlace==0);
 			s++; uint8 type = s.read(); s+=3;
-			depth = "\x01\x00\x03\x00\x02\x00\x04"[type];
+            depth = (int[]){0,0,3,0,2,0,4}[type];
+            if(!depth) return;
         } else if(name == "IDAT"_) {
 			z.avail_in = size;
             z.next_in = (Bytef*)&s.read((int)size);
@@ -83,5 +84,13 @@ Image& Image::resize(int w, int h) {
     }
     width=w, height=h;
     if(own) delete[] data; data=buffer; own=true;
+    return *this;
+}
+
+Image& Image::swap() {
+    uint32* p = (uint32*)data;
+    for(int i=0;i<width*height;i++) {
+        p[i] = swap32(p[i]);
+    }
     return *this;
 }

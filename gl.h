@@ -7,35 +7,29 @@
 void glViewport(int2 size);
 
 #define SHADER(name) \
-extern char _binary_## name ##_glsl_start[]; \
-extern char _binary_## name ##_glsl_end[]; \
-static string name ## Shader = string(_binary_## name ##_glsl_start,_binary_## name ##_glsl_end)
+extern char _binary_## name ##_gpu_start[]; \
+extern char _binary_## name ##_gpu_end[]; \
+GLShader name = array<byte>(_binary_## name ##_gpu_start,_binary_## name ##_gpu_end)
 
 struct GLUniform {
 	GLUniform(int id) : id(id) {}
     void operator=(float);
     void operator=(vec2);
     void operator=(vec4);
-	void operator=(mat4);
+    //void operator=(mat4);
 	int id;
 };
 struct GLShader {
-	no_copy(GLShader)
-    GLShader(string& source, const char* name) : source(source), name(name) {}
-	bool compileShader(uint id, uint type, const array<string>& tags);
-	bool compile(const array<string>& vertex, const array<string>& fragment);
+    GLShader(array<byte>&& binary):binary(move(binary)){}
     void bind();
 	uint attribLocation(const char*);
     GLUniform operator[](const char*);
 
-    string& source;
-	const char* name=0;
+    array<byte> binary;
 	uint id=0;
     //using pointer comparison (only works with string literals)
 	map<const char*,int> attribLocations;
 	map<const char*,int> uniformLocations;
-	//debug:
-	string vertex,fragment;
 };
 extern GLShader flat;
 extern GLShader blit;

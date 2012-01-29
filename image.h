@@ -4,7 +4,7 @@
 #include "vector.h"
 
 struct Image {
-	no_copy(Image)
+    no_copy(Image)
 
     byte4* data=0; bool own=false;
     int width=0, height=0;
@@ -22,6 +22,9 @@ struct Image {
 
     ~Image(){ if(data && own) delete data; }
 	operator bool() { return data; }
-    Image copy() const { Image r(width,height); ::copy(r.data,data,width*height); return r; }
+    Image copy() const { Image r(width,height); if(data) ::copy(r.data,data,width*height); return r; }
+    /// Resize this image to \a width x \a height
     Image& resize(int width, int height);
+    /// Swap ARGB <-> BGRA
+    Image& swap();
 };
