@@ -8,7 +8,7 @@ enum Event { Motion, Press, Release, Enter, Leave };
 enum Button { None, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp };
 /// Key code
 #include "X11/keysym.h"
-enum Key { Escape=XK_Escape, Return=XK_Return, Left=XK_Left, Right=XK_Right, Delete=XK_Delete, BackSpace=XK_BackSpace /*TODO: X keys*/ };
+enum Key { Escape=XK_Escape, Return=XK_Return, Left=XK_Left, Right=XK_Right, Delete=XK_Delete, BackSpace=XK_BackSpace };
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
@@ -23,7 +23,6 @@ struct Widget {
 
 /// Paint
     /// Renders this widget.
-    /// use \a scale to transform window coordinates to OpenGL device coordinates (TODO: handle in GLShader?)
     /// \a offset is the absolute position of the parent widget
     virtual void render(int2 parent) =0;
 

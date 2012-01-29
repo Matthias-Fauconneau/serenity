@@ -55,7 +55,7 @@ struct Status : TriggerButton {
     DBus::Object app;
     Status(DBus::Object&& app, const Image& icon) : TriggerButton(icon), app(move(app)) {}
     bool mouseEvent(int2 position, Event event, Button button) override {
-        if(Icon::mouseEvent(position,event,button)) { app("org.kde.StatusNotifierItem.Activate"_,0,0); return true; }
+        if(TriggerButton::mouseEvent(position,event,button)) { app("org.kde.StatusNotifierItem.Activate"_,0,0); return true; }
         return false;
     }
 };
@@ -103,14 +103,8 @@ struct TaskBar : Poll, Application {
         if(buffer.size>2) task.icon = Image((array<byte4>)buffer.slice(2).copy(),buffer[0],buffer[1]).resize(16,16);
     }
 
-    TaskBar() {
-        x = XOpenDisplay(0);
-        registerPoll();
-        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
-
-        for(auto w: getProperty<XWindow>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) addTask(w);
-
-        //TODO: receive new item signal
+    void updateStatusNotifierItems() {
+        status.clear();
         DBus::Object StatusNotifierWatcher = dbus("org.kde.StatusNotifierWatcher/StatusNotifierWatcher"_);
         StatusNotifierWatcher("org.kde.StatusNotifierWatcher.RegisterStatusNotifierHost"_, dbus.name);
         Variant<array<string>> items = StatusNotifierWatcher["RegisteredStatusNotifierItems"_];
@@ -124,6 +118,21 @@ struct TaskBar : Poll, Application {
             }
             status << Status(dbus(item), icon.resize(16,16));
         }
+    }
+
+    TaskBar() {
+        x = XOpenDisplay(0);
+        registerPoll();
+        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
+        for(auto w: getProperty<XWindow>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) addTask(w);
+
+        DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
+        DBus("org.freedesktop.DBus.AddMatch"_, "type='signal',sender='org.kde.StatusNotifierWatcher',interface='org.kde.StatusNotifierWatcher',"
+             "path='/StatusNotifierWatcher',member='StatusNotifierItemRegistered'"_);
+        dbus.signals["StatusNotifierItemRegistered"_].connect(this,&TaskBar::updateStatusNotifierItems);
+        DBus("org.freedesktop.DBus.AddMatch"_, "type='signal',sender='org.kde.StatusNotifierWatcher',interface='org.kde.StatusNotifierWatcher',"
+             "path='/StatusNotifierWatcher',member='StatusNotifierItemUnregistered'"_);
+        dbus.signals["StatusNotifierItemUnregistered"_].connect(this,&TaskBar::updateStatusNotifierItems);
 
         panel << start << tasks << status << clock;
          start.image = buttonIcon.resize(16,16);
@@ -152,20 +161,23 @@ struct TaskBar : Poll, Application {
     }
     pollfd poll() { return {XConnectionNumber(x), POLLIN}; }
     void event(pollfd) {
+        bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
+            //TODO: try to optimize by receiving only useful events
             XWindow id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
             Task* task = tasks.find([id](const Task& t){return t.id==id;});
-            //don't create window on PropertyNotify or ReparentNotify
-            if(!task && (e.type==PropertyNotify || e.type == ReparentNotify || !(task=addTask(id)))) continue;
-            /**/ if(e.type == CreateNotify || e.type == MapNotify || e.type == ReparentNotify) {}
-            else if(e.type == PropertyNotify || e.type == ConfigureNotify || e.type == ClientMessage) {
-                if(e.type==PropertyNotify && e.xproperty.atom != Atom(_NET_WM_NAME) && e.xproperty.atom != Atom(_NET_WM_ICON)) continue;
+            if(!task && (e.type == CreateNotify || e.type == MapNotify || e.type==ReparentNotify)) task=addTask(id);
+            if(!task) continue;
+            /**/ if(e.type == CreateNotify || e.type == MapNotify || e.type == ReparentNotify) {
+            } else if(e.type == ConfigureNotify || e.type == ClientMessage ||
+                      (e.type==PropertyNotify && e.xproperty.atom != Atom(_NET_WM_NAME) && e.xproperty.atom != Atom(_NET_WM_ICON))) {
                 updateTask(*task);
-            }
-            else if(e.type == DestroyNotify || e.type == UnmapNotify) tasks.removeRef(task);
-            else continue;
-            panel.update(); window.render();
+            } else if(e.type == DestroyNotify || e.type == UnmapNotify) {
+                tasks.removeRef(task);
+            } else continue;
+            needUpdate = true;
         }
+        if(needUpdate) { panel.update(); window.render(); }
     }
     void keyPress(Key key) { if(key==Escape) quit(); }
 } taskbar;

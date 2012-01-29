@@ -41,7 +41,7 @@ struct Player : Application {
         titles.activeChanged.connect(this, &Player::play);
         audio.setInput(&media);
 
-        folders = listFiles("/Music"_,Sort|Folders); //TODO: async IO
+        folders = listFiles("/Music"_,Sort|Folders);
         for(auto& folder : folders) albums << Text(section(folder,'/',-2,-1), 10);
 
 		for(auto&& path: arguments) {

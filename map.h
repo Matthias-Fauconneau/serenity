@@ -13,7 +13,7 @@ template <class K, class V> struct map {
 	const V& at(const K& key) const { int i = keys.indexOf(key); assert(i>=0,"No matching key"); return values[i];}
 	V& at(const K& key) { int i = keys.indexOf(key); assert(i>=0,"No matching key"); return values[i];}
     perfectV Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
-	V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
+    V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? addressof(values[i]) : 0; }
     perfectKV V& insert(Kf&& key, Vf&& value) { keys << forward<Kf>(key); values << forward<Vf>(value); return values.last(); }
     perfectK V& insert(Kf&& key) { insert(forward<Kf>(key),V()); return values.last(); }
     perfectK V& operator [](Kf&& key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(forward<Kf>(key)); }

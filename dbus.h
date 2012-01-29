@@ -1,5 +1,7 @@
 #pragma once
 #include "file.h"
+#include "process.h"
+#include "map.h"
 
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -95,10 +97,11 @@ template <Field type> void writeField(array<byte>& s, const string& field) {
     write(s,field);
 }
 
-struct DBus {
+struct DBus : Poll {
     int fd = 0; // Session bus socket
     string name; // Instance name given by DBus
     uint32 serial = 0; // Serial number to match messages and their replies
+    map<string, signal<> > signals;
 
     /// Read messages and parse \a outputs from first reply (without type checking)
     template<class... Outputs> void read(uint32, Outputs&... outputs) {
@@ -108,7 +111,7 @@ struct DBus {
             auto header = *(MessageHeader<ReplyMessage>*)&buffer;
             uint32 fieldsSize = align<8>(*(uint32*)&buffer.at(sizeof(MessageHeader<ReplyMessage>)));
             array<byte> fields(fieldsSize); ::read(fd,fields);
-            string signal;
+            string signalName;
             for(Stream<> s(fields);s;) {
                 Field field = s.read();
                 uint8 size = s.read();
@@ -116,7 +119,7 @@ struct DBus {
                 if(field==Target||field==Path||field==Interface||field==Member||field==Sender) {
                     s.align<4>();
                     string name = s.readArray(); s+=1;
-                    if(field==Member) signal=move(name);
+                    if(field==Member) signalName=move(name);
                 } else if(field==ReplySerial) { s.align<4>(); s.read<uint32>(); /*uint32 replySerial=s.read(); assert(replySerial==serial);*/ }
                 else if(field==SignatureField) { uint8 size = s.read(); s+=size; }
                 s.align<4>();
@@ -125,7 +128,11 @@ struct DBus {
                 array<byte> data(header.length); ::read(fd,data); Stream<> s(data);
                 //dump(data);
                 if(header.message == ReplyMessage) ::read(s,outputs...);
-                //else if(header.message == Signal) log("signal"_,signal);
+                else if(header.message == Signal) {
+                    auto signal = signals.find(signalName);
+                    if(signal) signal->emit();
+                    return;
+                }
             }
             if(header.message == ReplyMessage) return;
         }
@@ -196,5 +203,8 @@ struct DBus {
         char buf[256]; ::read(fd,buf,sizeof(buf)); //OK
         ::write(fd,"BEGIN \r\n"_);
         name = (*this)("org.freedesktop.DBus/org/freedesktop/DBus"_)("org.freedesktop.DBus.Hello"_);
+        registerPoll();
     }
+    pollfd poll() { return {fd, POLLIN}; }
+    void event(pollfd) { read(0); }
 };

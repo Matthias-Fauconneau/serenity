@@ -1,8 +1,6 @@
-/*TODO:
-Menu: /Applications/Categories/application, /Files/(Favorites|Devices|Recent Files|URLs)/file, rounded window
-Search: {Applications, Files, Web, Command}, completion in popup (+recent queries)
-Desktop: Applications, Favorites/Places/Devices/Recent Files/URLs, Folder, Feeds/Messages/Contacts, Events, Search, PowerOff
-*/
+//TODO: Menu: /Applications/Categories/application, /Files/(Favorites|Devices|Recent Files|URLs)/file, rounded window
+//TODO: Search: {Applications, Files, Web, Command}, completion in popup (+recent queries)
+//TODO: Desktop: Applications, Favorites/Places/Devices/Recent Files/URLs, Folder, Feeds/Messages/Contacts, Events, Search, PowerOff
 #include "launcher.h"
 #include "process.h"
 #include "window.h"
@@ -43,7 +41,7 @@ map<string,string> readConfig(const string& file) {
     return entries;
 }
 
-Launcher::Launcher() { //TODO: cache
+Launcher::Launcher() {
     map<string,string> config = readConfig(strz(getenv("HOME"))+"/.config/launcher"_);
     browser = move(config["Browser"_]);
     assert(exists(browser));

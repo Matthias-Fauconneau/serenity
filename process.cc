@@ -157,7 +157,7 @@ no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enabl
 
 void logProfile() {
     trace_off;
-    for(auto e: trace.profile) { //TODO: sort >
+    for(auto e: trace.profile) {
         if(e.value>40) log<string>(toString(e.value)+"\t"_+findNearestLine(e.key).function);
     }
     trace_on;
