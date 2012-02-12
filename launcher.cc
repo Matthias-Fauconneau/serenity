@@ -76,5 +76,5 @@ Launcher::Launcher() {
     window.setOverrideRedirect(true);
 }
 
-void Launcher::show() { window.show(); window.move(int2(0,0)); window.sync(); window.setFocus(&search); window.sync(); }
+void Launcher::show() { window.show(); window.move(int2(0,0)); window.setFocus(&search); }
 void Launcher::keyPress(Key key) { if(key==Escape) window.hide(); }

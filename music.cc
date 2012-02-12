@@ -41,7 +41,7 @@ struct Music : Application {
 				sheet.open(path);
 				window.rename(section(section(path,'/',-2,-1),'.',0,-2));
                 window.render();
-                window.setVisible();
+                window.show();
 				//score->synchronize(midi->notes);
 				/*map<int, map<int, int> > sort; //[chronologic][bass to treble order] = index
 				for(int i=0;i<events.count();i++) {

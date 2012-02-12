@@ -20,7 +20,7 @@ struct Menu : VBox {
 
 struct Launcher {
     Menu menu;
-    Window window = Window(menu,int2(128,16+256),"Menu"_);
+    Window window{menu,int2(128,16+256),"Menu"_};
     Search search;
     List<Shortcut> shortcuts;
 

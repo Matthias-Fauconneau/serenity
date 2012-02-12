@@ -333,8 +333,9 @@ arg:
 	}
 }
 
-float pow2(float x) { return x*x; }
-float pow3(float x) { return x*x*x; }
+inline float pow2(float x) { return x*x; }
+inline float pow3(float x) { return x*x*x; }
+inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return pow3(1-t) * A + 3*pow2(1-t)*t * B + 3*(1-t)*pow2(t) * C + pow3(t) * D; }
 
 void PDF::drawPath(array<array<vec2> >& paths, int flags) {

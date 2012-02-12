@@ -67,12 +67,12 @@ void read(Stream<>& s, DBusIcon& output) { s.align<8>(); output.width=s.read(); 
 
 // Template metaprogramming for static dispatch of D-Bus signature serializer
 
-template<class Input, class... Inputs> void sign(array<byte>& s) { sign<Input>(s); sign<Inputs...>(s); }
-template<> void sign<string>(array<byte>& s) { s<<"s"_; }
-template<> void sign<int>(array<byte>& s) { s<<"i"_; }
+template<class Input, class... Inputs> string sign() { return sign<Input>()+sign<Inputs...>(); }
+template<> string sign<string>() { return "s"_; }
+template<> string sign<int>() { return "i"_; }
 
 template<class... Inputs> void writeSignature(array<byte>& s) {
-    string signature; sign<Inputs...>(signature);
+    string signature=sign<Inputs...>();
     s.align<8>(); s << raw(FieldHeader<SignatureField>()); s << signature.size; s << move(signature); s << 0;
 }
 template<> void writeSignature(array<byte>&) {}

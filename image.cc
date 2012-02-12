@@ -31,30 +31,30 @@ template<class T> void filter(byte4* dst, const byte* raw, int width, int height
 Image::Image(array<byte>&& file) {
     Stream<BigEndian> s(move(file));
     if(!s.match("\x89PNG\r\n\x1A\n"_)) error("Unknown image format"_);
-	z_stream z; clear(z); inflateInit(&z);
+    z_stream z; clear(z); inflateInit(&z);
     array<byte> idat(file.size*16); //FIXME
     z.next_out = (Bytef*)&idat, z.avail_out = (uint)idat.capacity;
     int depth=0;
-	while(s) {
-		uint32 size = s.read();
-		string name = s.read(4);
+    while(s) {
+        uint32 size = s.read();
+        string name = s.read(4);
         if(name == "IHDR"_) {
-			width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
-			//uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
-			//assert(bitDepth==8); assert(compression==0); assert(filter==0); assert(interlace==0);
-			s++; uint8 type = s.read(); s+=3;
+            width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
+            //uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
+            //assert(bitDepth==8); assert(compression==0); assert(filter==0); assert(interlace==0);
+            s++; uint8 type = s.read(); s+=3;
             depth = (int[]){0,0,3,0,2,0,4}[type];
             if(!depth) return;
         } else if(name == "IDAT"_) {
-			z.avail_in = size;
+            z.avail_in = size;
             z.next_in = (Bytef*)&s.read((int)size);
-			inflate(&z, Z_NO_FLUSH);
-		} else s += (int)size;
-		s+=4; //CRC
-	}
-	inflate(&z, Z_FINISH);
-	inflateEnd(&z);
-	idat.size = (int)z.total_out;
+            inflate(&z, Z_NO_FLUSH);
+        } else s += (int)size;
+        s+=4; //CRC
+    }
+    inflate(&z, Z_FINISH);
+    inflateEnd(&z);
+    idat.size = (int)z.total_out;
     assert(idat.size == height*(1+width*depth), idat.size, width, height);
     data = new byte4[width*height];
     /**/ if(depth==2) filter<byte2>((byte4*)data,&idat,width,height);

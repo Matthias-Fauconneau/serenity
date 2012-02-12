@@ -55,7 +55,7 @@ struct string : array<char> {
     string replace(const string& before, const string& after) const {
         string r(size);
         for(int i=0;i<size;) { //->utf8_iterator
-            if(i<=size-before.size && slice(i,before.size)==before) { r<<after.copy(); i+=before.size; }
+            if(i<=size-before.size && slice(i,before.size)==before) { r<<::copy(after); i+=before.size; }
             else { r<<data[i]; i++; }
         }
         return r;
@@ -68,11 +68,9 @@ string strz(const string& s);
 string strz(const char* s);
 
 /// Converts a machine integer to its human-readable representation
-string toString(long n, int base=10, int pad=0);
-//inline string toString(int n, int base=10, int pad=0) { return toString((long)n,base,pad); }
+string toString(int n, int base=10, int pad=0);
 /// Converts a floating point number to its human-readable representation
-//TODO: variable decimal precision
-//string toString(double number);
+string toString(float number, int precision=2, int base=10);
 
 /// Parses an integer value
 long toInteger(const string& str, int base=10 );
@@ -91,18 +89,18 @@ array<string> split(const string& str, char sep=' ');
 
 /// Lexically compare strings
 inline bool operator <(const string& a, const string& b) {
-	for(int i=0;i<min(a.size,b.size);i++) {
-		if(a[i] > b[i]) return false;
-		if(a[i] < b[i]) return true;
-	}
-	return a.size < b.size;
+    for(int i=0;i<min(a.size,b.size);i++) {
+        if(a[i] > b[i]) return false;
+        if(a[i] < b[i]) return true;
+    }
+    return a.size < b.size;
 }
 
 /// operator + can be used to concatenate arrays
 template <class A, class T> struct cat {
-	const A& a; const array<T>& b;
-	struct { cat* c; operator int() const { return c->a.size+c->b.size; } } size;
-	cat(const A& a,const array<T>& b) : a(a), b(b) { size.c=this; }
+    const A& a; const array<T>& b;
+    struct { cat* c; operator int() const { return c->a.size+c->b.size; } } size;
+    cat(const A& a,const array<T>& b) : a(a), b(b) { size.c=this; }
     void copy(T* data) const { a.copy(data); ::copy(data+a.size,&b,b.size); }
     operator array<T>() { array<T> r; r.reserve(size); copy((T*)&r); r.size=size; return r; }
     operator string() { return operator array<T>(); } //C++ resolve a single implicit conversion
@@ -157,7 +155,7 @@ template<Endianness endianness=LittleEndian> struct Stream {
         operator uint16() { return endianness==BigEndian?swap16(s->read<uint16>()):s->read<uint16>(); }
         /// Reads a \a T element (deduced from the destination (return type overload))
         template<class T> operator T() { return s->read<T>(); }
-	};
+    };
     /// Returns an operator to deduce the type to read from the destination (return type overload)
     ReadOperator read() { return ReadOperator{this}; }
 
@@ -174,10 +172,10 @@ template<Endianness endianness=LittleEndian> struct Stream {
 };
 
 /*struct TextStream : Stream<> {
-	//TextStream(const char* data, int size) : Stream((uint8*)data,size) {}
-	TextStream(const string& data) : Stream(data) {}
-	long readInteger(int base=10);
-	double readFloat(int base=10);
+    //TextStream(const char* data, int size) : Stream((uint8*)data,size) {}
+    TextStream(const string& data) : Stream(data) {}
+    long readInteger(int base=10);
+    double readFloat(int base=10);
     //operator string() { return string((const char*)data+pos,size-pos); }
     //operator const char*() { return (const char*)data+pos; }
 };*/

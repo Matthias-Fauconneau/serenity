@@ -2,6 +2,7 @@
 #include "window.h"
 #include "gl.h"
 
+#include <poll.h>
 #define None None
 #define Font XWindow
 #define Window XWindow
@@ -49,15 +50,13 @@ Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
     }
 }
 
-void Window::sync() { XSync(x,0); update(); }
-
 void Window::update() {
     bool needRender=false;
     while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
         if(e.type==MotionNotify) {
             needRender |= widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, e.xmotion.state&Button1Mask ? LeftButton : None);
         } else if(e.type==ButtonPress) {
-            //tXSetInputFocus(x, id, RevertToNone, CurrentTime);
+            //XSetInputFocus(x, id, RevertToNone, CurrentTime);
             needRender |= widget.mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
         } else if(e.type==KeyPress) {
             auto key = XKeycodeToKeysym(x,e.xkey.keycode,0);
@@ -67,7 +66,7 @@ void Window::update() {
             needRender |= widget.mouseEvent(int2(e.xcrossing.x,e.xcrossing.y), e.type==EnterNotify?Enter:Leave, None);
         } else if(e.type==Expose && !e.xexpose.count) {
             needRender = true;
-        } else if(e.type == MapNotify || e.type==ConfigureNotify || e.type==ReparentNotify) {
+        } else if(e.type==ConfigureNotify || e.type==ReparentNotify) {
             XWindowAttributes window; XGetWindowAttributes(x,id,&window); int2 size{window.width, window.height};
             if(widget.size != size) {
                 widget.size=size;
@@ -80,6 +79,7 @@ void Window::update() {
             visible=false;
         } else if(e.type==ClientMessage) {
             keyPress.emit(Escape);
+            widget.keyPress(Escape);
             return;
         }
     }
@@ -94,25 +94,25 @@ void Window::render() {
     glXSwapBuffers(x,id);
 }
 
-void Window::show() { visible=true; XMapWindow(x, id); }
-void Window::hide() { visible=false; XUnmapWindow(x, id); sync(); }
+void Window::show() { visible=true; XMapWindow(x, id); XFlush(x); }
+void Window::hide() { visible=false; XUnmapWindow(x, id); XFlush(x); }
 
-void Window::move(int2 position) { XMoveWindow(x, id, position.x, position.y); }
+void Window::move(int2 position) { XMoveWindow(x, id, position.x, position.y); XFlush(x); }
 
 void Window::resize(int2 size) {
-	if(!size.x||!size.y) {
-		XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);
-		if(!size.x) size.x=root.width; if(!size.y) size.y=root.height;
-	}
+    if(!size.x||!size.y) {
+        XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);
+        if(!size.x) size.x=root.width; if(!size.y) size.y=root.height;
+    }
     XResizeWindow(x, id, size.x, size.y);
 }
 
 void Window::setFullscreen(bool) {
-	XEvent xev; clear(xev);
-	xev.type = ClientMessage;
+    XEvent xev; clear(xev);
+    xev.type = ClientMessage;
     xev.xclient.window = id;
     xev.xclient.message_type = Atom(_NET_WM_STATE);
-	xev.xclient.format = 32;
+    xev.xclient.format = 32;
     xev.xclient.data.l[0] = 1;
     xev.xclient.data.l[1] = Atom(_NET_WM_STATE_FULLSCREEN);
     xev.xclient.data.l[2] = 0;
@@ -155,5 +155,6 @@ void Window::event(pollfd) { update(); }
 void Window::setFocus(Widget* focus) {
     this->focus=focus;
     XSetInputFocus(x, id, RevertToNone, CurrentTime);
+    XFlush(x);
 }
 Widget* Window::focus=0;

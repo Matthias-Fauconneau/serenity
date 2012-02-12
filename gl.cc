@@ -1,9 +1,7 @@
 #include "gl.h"
+//TODO: reduced header
 #define GL_GLEXT_PROTOTYPES
 #include "GL/gl.h"
-
-SHADER(flat);
-SHADER(blit);
 
 /// State
 #if DEBUG
@@ -13,12 +11,12 @@ SHADER(blit);
 #define glCheck
 #endif
 
-static vec2 glViewportScale;
+vec2 viewport;
 void glViewport(int2 size) {
-    glViewportScale = vec2(2,-2)/vec2(size);
+    viewport = vec2(2,-2)/vec2(size);
     glViewport(0,0,size.x,size.y);
 }
-#include "process.h"
+
 /// Shader
 
 void GLShader::bind() {
@@ -34,30 +32,29 @@ void GLShader::bind() {
         assert(success);
     }
     glUseProgram(id);
-    operator[]("scale")=glViewportScale;
 }
 uint GLShader::attribLocation(const char* name) {
-	int location = attribLocations.value(name,-1);
-	if(location<0) attribLocations.insert(name,location=glGetAttribLocation(id,name));
+    int location = attribLocations.value(name,-1);
+    if(location<0) attribLocations.insert(name,location=glGetAttribLocation(id,name));
     assert(location>=0,"Unknown attribute"_,strz(name));
-	return (uint)location;
+    return (uint)location;
 }
 void GLUniform::operator=(float v) { glUniform1f(id,v); }
 void GLUniform::operator=(vec2 v) { glUniform2f(id,v.x,v.y); }
 void GLUniform::operator=(vec4 v) { glUniform4f(id,v.x,v.y,v.z,v.w); }
-//void GLUniform::operator=(mat4 m) { glUniformMatrix4fv(id,1,0,m.data); }
+void GLUniform::operator=(mat4 m) { glUniformMatrix4fv(id,1,0,m.data); }
 GLUniform GLShader::operator[](const char* name) {
-	int location = uniformLocations.value(name,-1);
-	if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
+    int location = uniformLocations.value(name,-1);
+    if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
     assert(location>=0,"Unknown uniform"_,strz(name));
-	return GLUniform(location);
+    return GLUniform(location);
 }
 
 /// Texture
 
 GLTexture::GLTexture(const Image& image) : Image(image.copy()) {
-	if(!id) glGenTextures(1, &id);
-	assert(id);
+    if(!id) glGenTextures(1, &id);
+    assert(id);
     glBindTexture(GL_TEXTURE_2D, id);
     for(int i=0;i<width*height;i++) { //convert alpha to multiply blend
         data[i].r = (data[i].r*data[i].a + 255*(255-data[i].a))/255;
@@ -77,90 +74,94 @@ void GLTexture::free() { assert(id); glDeleteTextures(1,&id); id=0; }
 GLBuffer::GLBuffer(PrimitiveType primitiveType) : primitiveType(primitiveType) {}
 GLBuffer::~GLBuffer() { if(vertexBuffer) glDeleteBuffers(1,&vertexBuffer); if(indexBuffer) glDeleteBuffers(1,&indexBuffer); }
 void GLBuffer::allocate(int indexCount, int vertexCount, int vertexSize) {
-	this->vertexCount = vertexCount;
-	this->vertexSize = vertexSize;
-	if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, vertexCount*vertexSize, 0, GL_STATIC_DRAW );
-	this->indexCount = indexCount;
-	if(indexCount) {
-		if(!indexBuffer) glGenBuffers(1, &indexBuffer);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount*sizeof(uint), 0, GL_STATIC_DRAW );
-	}
+    this->vertexCount = vertexCount;
+    this->vertexSize = vertexSize;
+    if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, vertexCount*vertexSize, 0, GL_STATIC_DRAW );
+    this->indexCount = indexCount;
+    if(indexCount) {
+        if(!indexBuffer) glGenBuffers(1, &indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount*sizeof(uint), 0, GL_STATIC_DRAW );
+    }
 }
 uint* GLBuffer::mapIndexBuffer() {
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-	return (uint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    return (uint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
 }
 void GLBuffer::unmapIndexBuffer() { glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
 void* GLBuffer::mapVertexBuffer() {
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
 }
 void GLBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ARRAY_BUFFER, 0); }
 
-void GLBuffer::upload(const array<uint32>& indices) {
-	if(!indexBuffer) glGenBuffers(1, &indexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+void GLBuffer::upload(const array<int>& indices) {
+    if(!indexBuffer) glGenBuffers(1, &indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), &indices, GL_STATIC_DRAW);
-	indexCount = indices.size;
+    indexCount = indices.size;
 }
-void GLBuffer::upload(const array<vec2>& vertices) {
-	if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	vertexSize = sizeof(vec2);
+void GLBuffer::upload(const array<vec3> &vertices) {
+    if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    vertexSize = sizeof(vec3);
     glBufferData(GL_ARRAY_BUFFER, vertices.size*vertexSize, &vertices, GL_STATIC_DRAW);
-	vertexCount = vertices.size;
+    vertexCount = vertices.size;
 }
 void GLBuffer::bindAttribute(GLShader& program, const char* name, int elementSize, uint64 offset) {
     assert(vertexBuffer);
-	int location = program.attribLocation(name);
+    int location = program.attribLocation(name);
     assert(location>=0,"unused attribute"_,strz(name));
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glVertexAttribPointer(location, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
-	glEnableVertexAttribArray(location);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glVertexAttribPointer(location, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
+    glEnableVertexAttribArray(location);
 }
 void GLBuffer::draw() {
-	glCheck;
+    glCheck;
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     /*if (primitiveType == Point) {
-		glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-		glEnable(GL_POINT_SPRITE);
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        glEnable(GL_POINT_SPRITE);
     }*/
-	if (indexBuffer) {
-		if(primitiveRestart) {
-			glEnable(GL_PRIMITIVE_RESTART);
-			glPrimitiveRestartIndex(0xFFFFFFFF);
-		}
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    if (indexBuffer) {
+        if(primitiveRestart) {
+            glEnable(GL_PRIMITIVE_RESTART);
+            glPrimitiveRestartIndex(0xFFFFFFFF);
+        }
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
         glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);
-		if(primitiveRestart) {
-			glDisable(GL_PRIMITIVE_RESTART);
-		}
-	} else {
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        if(primitiveRestart) {
+            glDisable(GL_PRIMITIVE_RESTART);
+        }
+    } else {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         glCheck;
         glDrawArrays(primitiveType, 0, vertexCount);
-	}
-	glCheck;
+    }
+    glCheck;
 }
 
 void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
-	glCheck;
-	glBindBuffer(GL_ARRAY_BUFFER,0);
-	uint positionIndex = shader.attribLocation("position");
-	vec2 positions[] = { vec2(min.x,min.y), vec2(max.x,min.y), vec2(max.x,max.y), vec2(min.x,max.y) };
-	glVertexAttribPointer(positionIndex,2,GL_FLOAT,0,0,positions);
-	glEnableVertexAttribArray(positionIndex);
-	uint texCoordIndex;
-	if(texCoord) {
-		texCoordIndex = shader.attribLocation("texCoord");
-		vec2 texCoords[] = { vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1) };
-		glVertexAttribPointer(texCoordIndex,2,GL_FLOAT,0,0,texCoords);
-		glEnableVertexAttribArray(texCoordIndex);
-	}
-	glDrawArrays(GL_QUADS,0,4);
-	glDisableVertexAttribArray(positionIndex);
-	if(texCoord) glDisableVertexAttribArray(texCoordIndex);
+    glCheck;
+    glBindBuffer(GL_ARRAY_BUFFER,0);
+    uint positionIndex = shader.attribLocation("position");
+    vec2 positions[] = { vec2(min.x,min.y), vec2(max.x,min.y), vec2(max.x,max.y), vec2(min.x,max.y) };
+    glVertexAttribPointer(positionIndex,2,GL_FLOAT,0,0,positions);
+    glEnableVertexAttribArray(positionIndex);
+    uint texCoordIndex;
+    if(texCoord) {
+        texCoordIndex = shader.attribLocation("texCoord");
+        vec2 texCoords[] = { vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1) };
+        glVertexAttribPointer(texCoordIndex,2,GL_FLOAT,0,0,texCoords);
+        glEnableVertexAttribArray(texCoordIndex);
+    }
+    glDrawArrays(GL_QUADS,0,4);
+    glDisableVertexAttribArray(positionIndex);
+    if(texCoord) glDisableVertexAttribArray(texCoordIndex);
+}
+
+void glWireframe(bool wireframe) {
+    glPolygonMode(GL_FRONT_AND_BACK,wireframe?GL_LINE:GL_FILL);
 }

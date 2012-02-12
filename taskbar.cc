@@ -80,21 +80,21 @@ struct TaskBar : Poll, Application {
     }
 
     HBox panel;
-    Window window = Window(panel,int2(0,16),"TaskBar"_);
+    Window window{panel,int2(0,16),"TaskBar"_};
     TriggerButton start;
     Launcher launcher;
     Bar<Task> tasks;
     Bar<Status> status;
     Clock clock;
 
-    Task* addTask(XWindow w) {
+    int addTask(XWindow w) {
         if(getProperty<Atom>(w,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}) return 0;
         XSelectInput(x,w,PropertyChangeMask);
         Task task(w);
         updateTask(task);
         if(!task.text.text || !task.icon.image) return 0;
         tasks << move(task);
-        return &tasks.last();
+        return tasks.size-1;
     }
     void updateTask(Task& task) {
         task.text.text = getProperty<char>(task.id,"_NET_WM_NAME");
@@ -144,7 +144,7 @@ struct TaskBar : Poll, Application {
 
         window.keyPress.connect(this, &TaskBar::keyPress);
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
-        window.render(); window.show(); window.move(int2(0,0)); window.sync();
+        window.show(); window.move(int2(0,0));
     }
     void raise(int) {
         XSetInputFocus(x, tasks.active().id, RevertToNone, CurrentTime);
@@ -165,15 +165,15 @@ struct TaskBar : Poll, Application {
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
             //TODO: try to optimize by receiving only useful events
             XWindow id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
-            Task* task = tasks.find([id](const Task& t){return t.id==id;});
-            if(!task && (e.type == CreateNotify || e.type == MapNotify || e.type==ReparentNotify)) task=addTask(id);
-            if(!task) continue;
+            int i = tasks.find([id](const Task& t){return t.id==id;});
+            if(i<0 && (e.type == CreateNotify || e.type == MapNotify || e.type==ReparentNotify)) i=addTask(id);
+            if(i<0) continue;
             /**/ if(e.type == CreateNotify || e.type == MapNotify || e.type == ReparentNotify) {
             } else if(e.type == ConfigureNotify || e.type == ClientMessage ||
                       (e.type==PropertyNotify && e.xproperty.atom != Atom(_NET_WM_NAME) && e.xproperty.atom != Atom(_NET_WM_ICON))) {
-                updateTask(*task);
+                updateTask(tasks[i]);
             } else if(e.type == DestroyNotify || e.type == UnmapNotify) {
-                tasks.removeRef(task);
+                tasks.remove(i);
             } else continue;
             needUpdate = true;
         }

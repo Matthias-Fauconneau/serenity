@@ -9,14 +9,13 @@ typedef struct _XDisplay Display;
 typedef struct __GLXcontextRec* GLXContext;
 typedef unsigned long XWindow;
 struct Window : Poll {
+    no_copy(Window)
     /// Display \a widget in a window
     /// \a name is the application class name (WM_CLASS)
     /// \note a Window must be created before OpenGL can be used (e.g most Widget constructors need a GL context)
     /// \note Make sure the referenced widget is initialized before running this constructor
     /// \note Currently only one window per process can be created (or GL context issues will occur)
     Window(Widget& widget, int2 size, const string& name);
-    /// Synchronize with the X server
-    void sync();
     /// Update the window by handling any incoming events
     void update();
     /// Repaint window contents. Called by update after an event is accepted by a widget.
