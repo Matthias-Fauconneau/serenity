@@ -2,7 +2,7 @@
 #include "window.h"
 #include "file.h"
 #include "gl.h"
-#include "algebra.h"
+#include "sparse.h"
 
 SHADER(shader);
 
@@ -16,7 +16,7 @@ template<class T> struct Grid {
     Grid(int m, int n) : data(new T[m*n]), m(m), n(n) {}
     ~Grid() { if(data) delete data; }
     /// Initializes the grid
-    void clear(T v=0) { ::set(data,m*n,v); }
+    void clear(T v=0) { clear(data,m*n,v); }
 
     /// Indexing operators
     const T& at(int i, int j) const { assert(data && i>=0 && i<m && j>=0 && j<n); return data[j*m+i]; }
@@ -28,6 +28,8 @@ template<class T> struct Grid {
     T* data=0; /// elements stored in column-major order
     int m=-1,n=-1; /// row and column count
 };
+
+template <class T> T sign(T x) { return x>=0 ? 1 : -1; }
 
 template<class Lambda> void line(int2 p0, int2 p1, Lambda set) {
     int2 d = abs(p1-p0);

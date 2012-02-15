@@ -75,6 +75,9 @@ static float sinc(double cutoff, double x, int N) {
     return cutoff*sin(M_PI*xx)/(M_PI*xx) * window(fabs(2*x/N));
 }
 
+/// Returns the largest positive integer that divides the numbers without a remainder
+inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
+
 Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channelCount(channelCount) {
     assert(channelCount <= 8);
     int factor = gcd(sourceRate,targetRate);

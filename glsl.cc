@@ -60,7 +60,7 @@ int main(int argc, const char** argv) {
         int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
         if(!status) {
             log(glsl);
-            log<string>(args[1]+":1:1: error: Failed to compile"_);
+            log(args[1]+":1:1: error: Failed to compile"_);
             int l=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&l);
             if(l) { string msg(l); glGetProgramInfoLog(program,l,&msg.size,(char*)&msg); log(msg); }
             return 1;

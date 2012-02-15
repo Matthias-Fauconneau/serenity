@@ -1,76 +1,47 @@
 #pragma once
 
-/// workaround missing IDE support
+/// Missing C++11 IDE support workarounds
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
 #define for()
 #define constexpr
 #define override
 #define _
 #define DEBUG
-
-#define no_copy(o)
-#define move_only(o)
-#define no_move(o)
-#define perfect
-#define perfectV
-#define perfectK
-#define perfectKV
-#define predicate(E)
-
+#define i( ignore )
 #else
+#define i( ignore... ) ignore
+#endif
 
-/// language support
+/// Language support
 
-#define declare(function, attributes...) function __attribute((attributes)); function
-#define no_trace(function) declare(function,no_instrument_function)
+// Traits
+#include <type_traits>
+#define is_convertible(F,T) std::is_convertible<F,T>::value
+#define is_same(F,T) std::is_same<F,T>::value
+#define remove_reference(T) typename std::remove_reference<T>::type
 
+// Predicates
 extern void* enabler;
 template<bool> struct predicate {};
 template<> struct predicate<true> { typedef void* type; };
 #define predicate(E) typename predicate<E>::type& condition = enabler
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
+// perfect forwarding predicates
+#define can_forward(T) is_convertible(remove_reference(T##f), remove_reference(T))
+#define perfect(T) class T##f, predicate(can_forward(T))
+#define perfect2(T,U) class T##f, class U##f, predicate(can_forward(T)), predicate1(can_forward(U))
 
-#include <type_traits>
-no_trace(template<typename T> constexpr typename std::remove_reference<T>::type&& move(T&& t)){ return (typename std::remove_reference<T>::type&&)t; }
-template<typename T> constexpr T&& forward(typename std::remove_reference<T>::type& t) { return (T&&)t; }
-template<typename T> constexpr T&& forward(typename std::remove_reference<T>::type&& t) {
-    static_assert(!std::is_lvalue_reference<T>::value,"forwarding an lvalue"); return (T&&)t;
-}
+// Move semantics
+template<class T> inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)t; }
+template<class T> inline constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
+template<class T> inline constexpr T&& forward(remove_reference(T)&& t){static_assert(!std::is_lvalue_reference<T>::value,""); return (T&&)t; }
+// non-copyable type with no default move constructor
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
-#define move_only(o) no_copy(o) o(o&&)=default; o& operator=(o&&)=default;
-#define no_move(o) no_copy(o) o(o&&)=delete; o& operator=(o&&)=delete;
-#define is_convertible(F,T) std::is_convertible<F,T>::value
-#define is_same(F,T) std::is_same<F,T>::value
-#define can_forward_(F,T) is_convertible(typename std::remove_reference<F>::type, typename std::remove_reference<T>::type)
-#define can_forward(T) can_forward_(T##f,T)
-#define perfect__(F,T) template<class F, predicate(can_forward_(F,T)) >
-#define perfect_(T) perfect__(T##f,T)
-#define perfect perfect_(T)
-#define perfectV perfect_(V)
-#define perfectK perfect_(K)
-#define perfect2_(F,T,G,U) template<class F, class G, predicate(can_forward_(F,T)), predicate1(can_forward_(G,U)) >
-#define perfect2(T,U) perfect2_(T##f,T,U##f,U)
-#define perfectKV perfect2(K,V)
+// non-copyable type with default move constructor
+#define move_only(o)
+//no_copy(o) o(o&&)=default; o& operator=(o&&)=default;
 
-#define concept(C,T) predicate(is_convertible(T,C))
-#define concept1(C,T) predicate1(is_convertible(T,C))
-
-#endif
-
-template<typename... Args> struct delegate {
-    void* _this;
-    void (*method)(void*, Args...);
-    template <class C> delegate(C* _this, void (C::*method)(Args...)) : _this((void*)_this), method((void(*)(void*, Args...))method) {}
-};
-template<class T> struct array;
-template<typename... Args> struct signal : array< delegate<Args...> > {
-    void emit(Args... args) { for(auto slot: *this) slot.method(slot._this, args...);  }
-    template <class C> void connect(C* _this, void (C::*method)(Args...)) {
-        *this << delegate<Args...>(_this, method);
-    }
-};
-
-/// primitive types
+/// Primitive types
 
 typedef signed char int8;
 typedef char byte;
@@ -89,69 +60,62 @@ typedef long ssize_t;
 
 const float NaN = __builtin_nansf("");
 
-/// memory allocation
+/// Basic operations
 
-extern "C" {
-void* malloc(size_t size) throw();
-void* realloc(void* ptr, size_t size) throw();
-void free(void *ptr) throw();
-}
-inline void* operator new(uint64, void* p) { return p; }
-
-/// algorithms
-
-template<class T> T* addressof( T & v ) { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char &>(v))); }
-
-//TODO: SSE raw copy (for basic types)
-template <class T> void rawCopy(T* dst,const T* src, int count) { auto d=(byte*)dst,s=(byte*)src; for(uint i=0;i<count*sizeof(T);i++) d[i]=s[i]; }
-template <class T> void rawCopy(T& dst,const T& src)  { rawCopy(addressof(dst),addressof(src),1); }
-
-template <class T> void set(T* data, int count, T value) { for(int i=0;i<count;i++) data[i]=T(value); }
-template <class T> void clear(T& data) { data=T(); }
-template <class T> void clear(T* data, int count) {  for(int i=0;i<count;i++) clear(data[i]); }
-template <class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
 template <class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
-
-template <class T> T abs( T x) { return x>=0 ? x : -x; }
-template <class T> T sign(T x) { return x>=0 ? 1 : -1; }
 template <class T> T min(T a, T b) { return a<b ? a : b; }
 template <class T> T max(T a, T b) { return a>b ? a : b; }
 template <class T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
+template <class T> T abs(T x) { return x>=0 ? x : -x; }
 
-/// Returns the largest positive integer that divides the numbers without a remainder
-inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
+/// Memory
 
-/// Returns the necessary padding to align \a offset to \a width
-template<int width> int padding(int offset) {
-    static_assert(width && !(width & (width - 1)),"width must be a power of two");
-    return (-offset) & (width - 1);
-}
-/// Returns the next \a offset aligned to \a width
-template<int width> int align(int offset) {
-    static_assert(width && !(width & (width - 1)),"width must be a power of two");
-    return (offset + width - 1) & ~(width - 1);
-}
+extern "C" void* malloc(size_t size) throw();
+extern "C" void* realloc(void* ptr, size_t size) throw();
+extern "C" void free(void *ptr) throw();
+inline void* operator new(uint64, void* p) { return p; } //placement new
 
-/// debugging support
+// Gets a pointer to \a value even if T override operator& (e.g array overrides & to return a pointer to its data buffer)
+template<class T> T* addressof(T& value) { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char &>(value))); }
 
-struct string;
-string operator "" _(const char* data, size_t size);
+// clear
 
-template<class A> void log_(const A&) { static_assert(sizeof(A) && 0,"Unknown format"); }
-template<class A, class... Args> void log_(const A& a, const Args&... args) { log_(a); log_(' '); log_(args...); }
-template<class... Args> void log(const Args&... args) { log_(args...); log_('\n'); }
+//raw buffer zero initialization //TODO: SSE
+inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }
+//unsafe  (ignoring constructors) raw value zero initialization
+template <class T> void clear(T& dst) { clear((byte*)addressof(dst),sizeof(T)); }
+//safe buffer default initialization
+template <class T> void clear(T* data, int count, const T& value=T()) { for(int i=0;i<count;i++) data[i]=value; }
 
-template<> void log_(const string&);
-template<> void log_(const bool&);
-template<> void log_(const char&);
-template<> void log_(const int&);
-template<> void log_(const float&);
+// copy
+//raw buffer copy //TODO: SSE
+inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
+//unsafe (ignoring constructors) raw value copy
+template <class T> void copy(T& dst,const T& src) { copy(addressof(dst),addressof(src),sizeof(T)); }
+
+// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
+template <class T> T copy(const T& t) { return t; }
+// explicit buffer copy
+template <class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
+
+/// Debugger
+
+extern"C" ssize_t write(int fd, const void* buf, size_t size);
+inline void log(const char* msg) { int i=0; while(msg[i]) i++; write(1,msg,(size_t)i); }
 
 #ifdef DEBUG
+/// compile \a statements in executable only if \a DEBUG flag is set
+#define debug( statements... ) statements
+#else
+#define debug( statements... )
+#endif
+
 #ifdef NO_BFD
 inline void logTrace() {}
 #else
 void logTrace();
+#endif
+
 #ifdef TRACE
 extern bool trace_enable;
 #define trace_on trace_enable=true
@@ -160,20 +124,16 @@ extern bool trace_enable;
 #define trace_on
 #define trace_off
 #endif
-#endif
-extern "C" void abort() throw() __attribute((noreturn));
-#define fail() ({ trace_off; logTrace(); abort(); })
-#define error(args...) ({ trace_off; logTrace(); log("Error:\t"_,##args); abort(); })
-#define assert(expr, args...) ({ if(!(expr)) { trace_off; logTrace(); log("Assert:\t"_,#expr##_, ##args); abort(); } })
-#define debug(statement) statement
-#else
-#define fail() ({})
-#define error(args...) ({})
-#define assert(expr, args...) ({})
-#define debug(statement) ;
-#endif
 
-/// Imports runtime support classes
-/// \note runtime support types are lowercase
-#include "array.h"
-#include "string.h"
+extern "C" void abort() throw() __attribute((noreturn));
+
+/// Aborts the process without any message, stack trace is logged
+#define fail() (debug({ trace_off; logTrace(); abort(); }))
+
+/// Aborts unconditionally
+// can be used without string
+#define error_(message) (debug({ if(!(expr)) { trace_off; logTrace(); log("Error:\t"); log(#message); log("\n"); abort(); } }))
+
+/// Aborts if \a expr evaluates to false
+// can be used without string
+#define assert_(expr) (debug({ if(!(expr)) { trace_off; logTrace(); log("Assert:\t"); log(#expr); log("\n"); abort(); } }))

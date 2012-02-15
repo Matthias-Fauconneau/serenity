@@ -9,7 +9,7 @@
 
 #ifdef DEBUG
 inline void dump(const array<byte>& s) {
-    string str; for(int i=0;i<s.size;i++) { char c = s[i]; if(c>=' '&&c<='~') str<<c; else str<<'\\'<<toString((ubyte)c,8); }
+    string str; for(int i=0;i<s.size;i++) { char c = s[i]; if(c>=' '&&c<='~') str<<c; else str<<'\\'<<str((ubyte)c,8); }
     log(str);
 }
 #endif

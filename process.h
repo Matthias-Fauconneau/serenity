@@ -1,6 +1,5 @@
 #pragma once
 #include "string.h"
-//#include <poll.h>
 struct pollfd;
 
 /// Application should be inherited to compile an application into an executable
@@ -39,6 +38,6 @@ void logProfile();
 struct Profile {
     string name;
     int time=0;
-    Profile(string&& name=""_):name(move(name)){ log<string>(name+">"_+toString(time=getCPUTime())); }
-    ~Profile() { log<string>(name+"<"_+toString(getCPUTime()-time)); }
+    Profile(string&& name=""_):name(move(name)){ log(name,">"_,time=getCPUTime()); }
+    ~Profile() { log(name,"<"_,getCPUTime()-time); }
 };

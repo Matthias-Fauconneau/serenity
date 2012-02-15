@@ -7,6 +7,8 @@
 #include <sys/resource.h>
 extern "C" __pid_t waitpid(__pid_t __pid, int *__stat_loc, int __options);
 
+#define declare(function, attributes...) function __attribute((attributes)); function
+
 /// Process
 
 /// limit process ressources to avoid hanging the system when debugging
@@ -91,10 +93,10 @@ Symbol findNearestLine(void* address) {
             char* demangle = abi::__cxa_demangle(func,0,0,0);
             string function = copy(strz(demangle?:func));
             free(demangle);
-            return {move(file),move(function),line};
+            return i({move(file),move(function),(int)line});
         }
     }
-    return {};
+    return i({string(),string(),0});
 }
 
 /// Stack
@@ -116,7 +118,7 @@ void logBacktrace(StackFrame* frame) {
     int size = backtrace(frames,8,frame);
     for(int i=size-1; i>=0; i--) {
         Symbol s = findNearestLine(frames[i]);
-        if(s.function) { log<string>(s.file+":"_+toString(s.line)+"   \t"_+s.function); }
+        if(s.function) { log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
     }
 }
 
@@ -175,6 +177,7 @@ struct Trace {
     }
 } trace __attribute((init_priority(102)));
 
+#define no_trace(function) declare(function,no_instrument_function)
 no_trace(extern "C" void __cyg_profile_func_enter(void* function, void*)) { if(trace_enable) { trace_off; trace.trace(function); trace_on; }}
 no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enable) { trace_off; trace.trace(0); trace_on; } }
 
@@ -204,17 +207,14 @@ struct Trace {
     }
 } trace __attribute((init_priority(102)));
 
-extern bool trace_enable;
-#define trace_on  trace_enable=true;
-#define trace_off trace_enable=false;
-#define no_trace(function) function __attribute((no_instrument_function)); function
+#define no_trace(function) declare(function,no_instrument_function)
 no_trace(extern "C" void __cyg_profile_func_enter(void* function, void*)) { if(trace_enable) { trace_off; trace.trace(function); trace_on; }}
 no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enable) { trace_off; trace.trace(0); trace_on; } }
 
 void logProfile() {
     trace_off;
     for(auto e: trace.profile) {
-        if(e.value>40) log<string>(toString(e.value)+"\t"_+findNearestLine(e.key).function);
+        if(e.value>40) log(toString(e.value)+"\t"_+findNearestLine(e.key).function);
     }
     trace_on;
 }
@@ -235,14 +235,16 @@ static void handler(int sig, siginfo*, void* ctx) {
     if(sig == SIGSEGV) log("Segmentation violation"_);
     else if(sig == SIGPIPE) log("Broken Pipe"_);
     else if(sig == SIGFPE) {
-        log_("Arithmetic exception "_);
+        log("Arithmetic exception ");
         const string flags[] = {"Invalid Operand"_,"Denormal Operand"_,"Zero Divide"_,"Overflow"_,"Underflow"_};
-        for(int i=1;i<=4;i++) if(context->uc_mcontext.fpregs->mxcsr & (1<<i)) log_(flags[i],""_);
+        string s;
+        for(int i=1;i<=4;i++) if(context->uc_mcontext.fpregs->mxcsr & (1<<i)) s<<flags[i]+" "_;
+        log(s);
     }
     else error("Unhandled signal"_);
     logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
-    log_(s.file);log_(':');log_(s.line);log_("   \t"_);log(s.function);
+    log(s.file+":"_+str(s.line)+"   \t"_+s.function);
     log("Aborted"_); abort();
 }
 

@@ -1,114 +1,87 @@
 #pragma once
-#include "core.h"
+/// Symbolic linear algebra (matrix operations, linear solver)
+#include "expression.h"
 
-/// Matrix for (TODO:sparse) linear algebra
+/// Matrix for symbolic linear algebra
 struct Matrix {
     no_copy(Matrix)
     Matrix(Matrix&& o) : data(o.data), m(o.m), n(o.n) { o.data=0; }
     Matrix& operator=(Matrix&& o) {assert(&o!=this); this->~Matrix(); data=o.data; m=o.m; n=o.n; o.data=0; return *this; }
-    /// Allocate a m-row, n-column matrix
-    Matrix(int m, int n):data(new T[m*n]),m(m),n(n){debug(set((int*)data,m*n,*(int*)&NaN);)}
-    ~Matrix() { if(data) delete data; }
+    /// Allocate a m-row, n-column matrix initialized to invalid expressions
+    Matrix(int m, int n):data(new Expression[m*n]),m(m),n(n) {}
+    Matrix(const std::initializer_list< std::initializer_list<Expression> >& list) : Matrix(list.begin()[0].size(),list.size()) {
+        int i=0; for(auto& row: list) { int j=0; for(auto& e: row) { at(i,j)=Expression(::copy(e)); j++; } assert(j==n); i++; }
+    }
+    ~Matrix() { if(data) delete[] data; }
 
-    float operator()(int i, int j) const { assert(data && i>=0 && i<m && j>=0 && j<n); return data[j*m+i]; }
-    float& operator()(int i, int j) { assert(data && i>=0 && i<m && j>=0 && j<n); return data[j*m+i]; }
+    const Expression& at(int i, int j) const { assert(data && i>=0 && i<m && j>=0 && j<n); return data[j*m+i]; }
+    Expression& at(int i, int j) { assert(data && i>=0 && i<m && j>=0 && j<n); return data[j*m+i]; }
+    const Expression& operator()(int i, int j) const { return at(i,j); }
+    Expression& operator()(int i, int j) { return at(i,j); }
 
-    float* data; /// elements stored in column-major order
+    void zero() { for(int i=0;i<m;i++) for(int j=0;j<n;j++) at(i,j)=0; }
+
+    Expression* data; /// elements stored in column-major order
     int m=-1,n=-1; /// row and column count
 };
+template<> inline Matrix copy(const Matrix& a) { Matrix o(a.m,a.n); copy(o.data,a.data,a.m*a.n); return o; }
 
-/// Vector for linear algebra (i.e n-row, single column matrix)
+/// Returns true if both matrices are identical
+bool operator==(const Matrix& a,const Matrix& b);
+inline bool operator!=(const Matrix& a,const Matrix& b) { return !(a==b); }
+
+/// Matrix multiplication (composition of linear transformations)
+Matrix operator*(const Matrix& a,const Matrix& b);
+
+/// Logs to standard text output
+template<> string str(const Matrix& a);
+
+/// Permutation matrix
+struct Permutation {
+    move_only(Permutation)
+    int even=1; //1 if even count of swaps, -1 if odd count of swaps (used for determinant)
+    array<int> order;
+    Permutation(int n):order(n) { order.size=n; for(int i=0;i<n;i++) order[i] = i; } // identity ordering
+    void swap(int i, int j) { ::swap(order[i],order[j]); even=-even; }
+    int determinant() const { return even; }
+    int operator[](int i) const { return order[i]; } //b[P[i]] = (P*b)[i]
+};
+
+Matrix operator *(const Permutation& P, Matrix&& A);
+
+// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
+void pivot(Matrix &A, Permutation& P, int j);
+
+/// Factorizes any matrix as the product of a lower triangular matrix and an upper triangular matrix
+/// \return permutations (P) and packed LU (U's diagonal is 1).
+struct PLU { Permutation P; Matrix LU; };
+PLU factorize(Matrix&& A);
+
+/// Returns L and U from a packed LU matrix.
+struct LU { Matrix L,U; };
+LU unpack(Matrix&& LU);
+
+/// Compute determinant of a packed PLU matrix (product along diagonal)
+Expression determinant(const Permutation& P, const Matrix& LU);
+
+/// Vector for symbolic linear algebra (i.e n-row, single column matrix)
 struct Vector : Matrix {
     Vector(Matrix&& o):Matrix(move(o)){ assert(n==1); }
     Vector(int n):Matrix(n,1){}
-    float operator[](int i) const { assert(data && i>=0 && i<m); return data[i]; }
-    float& operator[](int i) { assert(data && i>=0 && i<m); return data[i]; }
+    Vector(const std::initializer_list<Expression>& list) : Vector(list.size()) {
+        int i=0; for(auto& e: list) { at(i,0)=Expression(::copy(e)); i++; }
+    }
+    const Expression& operator[](int i) const { assert(data && i>=0 && i<m); return data[i]; }
+    Expression& operator[](int i) { assert(data && i>=0 && i<m); return data[i]; }
 };
+template<> inline Vector copy(const Vector& a) { return copy<Matrix>(a); }
+template<> inline string str(const Vector& a) { return str<Matrix>(a); }
 
-/// Logs to standard text output
-template<> void log_(const Matrix& a) {
-    string s="["_;
-    for(int i=0;i<a.m;i++) {
-        if(a.n==1) s = s+"\t"_+toString(a(i,0));
-        else {
-            for(int j=0;j<a.n;j++) {
-                s = s+"\t"_+toString(a(i,j));
-            }
-            if(i<a.m-1) s=s+"\n"_;
-        }
-    }
-    s=s+" ]"_;
-    log_(s);
-}
-template<> void log_(const Vector& a) { log_<Matrix>(a); }
+/// Solves PLUx=b
+Vector solve(const Permutation& P, const Matrix &LU, Vector&& b);
 
-/// Returns true if both matrices are identical
-bool operator==(const Matrix& a,const Matrix& b) {
-    assert(a.m==b.m && a.n==b.n);
-    for(int i=0;i<a.m;i++) for(int j=0;j<a.n;j++) if(a(i,j)!=b(i,j)) return false;
-    return true;
-}
+/// Solves Ax[j]=e[j] using LU factorization
+Matrix inverse(const Matrix &A);
 
-/// Transposition (reflect over main diagonal)
-//TODO: implicit transposition
-Matrix transpose(const Matrix& a) {
-    Matrix r(a.n,a.m);
-    for(int i=0;i<r.m;i++) for(int j=0;j<r.n;j++) r(i,j)=a(j,i);
-    return r;
-}
-
-/// Matrix multiplication (composition of linear transformations)
-Matrix operator*(const Matrix& a,const Matrix& b) {
-    assert(a.n==b.m);
-    Matrix r(a.m,b.n);
-    for(int i=0;i<r.m;i++) for(int j=0;j<r.n;j++) { r(i,j)=0; for(int k=0;k<a.n;k++) r(i,j) += a(i,k)*b(k,j); }
-    return r;
-}
-
-/// Factorizes a symmetric, positive-definite matrix as the product of a lower triangular matrix and its transpose
-void cholesky(Matrix& a) {
-    assert(transpose(a)==a);
-    for(int j=0;j<a.n;j++) {
-        debug(for(int i=0;i<j;i++) a(i,j)=0;)
-        a(j,j)=sqrt(a(j,j));
-        for(int i=j+1;i<a.m;i++) a(i,j) /= a(j,j);
-        for(int k=j+1;k<a.m;k++)
-            for(int i=k;i<a.m;i++) a(i,k) -= a(i,j)*a(k,j);
-    }
-}
-
-/// Solves Lx=b using forward substitution
-Vector forward(const Matrix& l, const Vector& b) {
-    assert(l.m==l.n && l.n==b.m && b.n==1);
-    Vector x(l.n);
-    for(int i=0;i<l.n;i++) {
-        x[i] = b[i];
-        for(int j=0;j<i;j++) x[i] -= l(i,j) * x[j];
-        x[i] /= l(i, i);
-    }
-    return x;
-}
-
-/// Solves Ux=b using backward substitution
-Vector backward(const Matrix& u, const Vector& b) {
-    assert(u.m==u.n && u.n==b.m && b.n==1);
-    Vector x(u.n);
-    for(int i=u.n-1;i>=0;i--) {
-        x[i] = b[i];
-        for(int j=i+1;j<u.n;j++) x[i] -= u(i,j) * x[j];
-        x[i] /= u(i, i);
-    }
-    return x;
-}
-
-/// Solves the linear least squares minimization |Ax-b|²
-//TODO: sparse cholesky
-Vector solve(const Matrix& A, const Vector& b) {
-    //solve the normal equations (At·A)x=(At)b
-    Matrix AtA = transpose(A)*A;
-    Vector Atb = transpose(A)*b;
-    // Solves AtAx=Atb using Cholesky decomposition (A=LL*), forward substitution (Lx = b) and backward substitution (Ux = y)
-    // \note AtA is a symmetric, positive-definite matrix
-    cholesky(AtA);
-    return backward(transpose(AtA),forward(AtA,Atb));
-}
+/// Solves Ax=b using LU factorization
+Vector solve(const Matrix& A, const Vector& b);

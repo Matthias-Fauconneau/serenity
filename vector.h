@@ -1,5 +1,5 @@
 #pragma once
-#include "core.h"
+#include "string.h"
 #include "math.h"
 #define PI M_PI
 
@@ -43,10 +43,10 @@ generic vector<V,T,N> max(const vector<V,T,N>& a, const vector<V,T,N>& b){ vecto
 generic vector<V,T,N> mix(const vector<V,T,N>& a,const vector<V,T,N>& b, float t) { return a*t + b*(1-t); }
 generic float length(const vector<V,T,N>& a) { float l=0; for(int i=0;i<N;i++) l+=a[i]*a[i]; return sqrt(l); }
 generic vector<V,T,N> normalize(const vector<V,T,N>& a){ return a/length(a); }
-generic void log_(const vector<V,T,N>& v) {
-    log_('(');
-    for(int i=0;i<N;i++) { log_(v[i]); if(i<N-1) log_(", "_); }
-    log_(')');
+generic string str(const vector<V,T,N>& v) {
+    string s="("_;
+    for(int i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; }
+    return s<<")"_;
 }
 #undef generic
 

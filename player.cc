@@ -70,7 +70,7 @@ struct Player : Application {
         int i=title.indexOf('-'); i++; //skip album name
         while(title[i]>='0'&&title[i]<='9') i++; //skip track number
         while(title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_') i++; //skip whitespace
-        titles << Text(title.slice(i).replace('_',' '), 16);
+        titles << Text(replace(title.slice(i),'_',' '), 16);
         files << move(path);
     }
     void playAlbum(const string& path) {
