@@ -10,8 +10,6 @@ vertex {
 }
 
 fragment {
-	lambert {
-		uniform vec4 color;
-		gl_FragColor = color; //dot(vertexNormal,vec3(0,0,1)) * color;
-	}
+	uniform vec4 color;
+	gl_FragColor = color; //dot(vertexNormal,vec3(0,0,1)) * color;
 }
