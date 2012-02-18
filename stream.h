@@ -23,18 +23,18 @@ template<Endianness endianness=LittleEndian> struct Stream {
     template<class T> bool match(const array<T>& key) { if(peek(key.size) == key) { pos+=key.size; return true; } else return false; }
 
     /// Reads one raw \a T element from stream
-    template<class T=char> T read() {
+    template<class T> T read() {
         assert(pos+sizeof(T)<=size); T t = *(T*)(data+pos); pos+=sizeof(T); return t;
     }
     /// Reads \a size raw \a T elements from stream
-    template<class T=char> array<T> read(int size) {
+    template<class T=byte> array<T> read(int size) {
         assert((pos+size*sizeof(T))<=this->size); T* t = (T*)(data+pos); pos+=size*sizeof(T); return array<T>(t,size);
     }
     /// Read an array of raw \a T elements from stream with the array size encoded as an uint32
-    template<class T=char> array<T> readArray() { uint32 size=read(); return read<T>(size); }
+    template<class T> array<T> readArray() { uint32 size=read(); return read<T>(size); }
 
     /// Read an array of raw \a T elements from stream until \a end is read
-    template<class T=char, class E> array<T> readUntil(E end) {
+    template<class T, class E> array<T> readUntil(E end) {
         uint length=0; for(;length<size-pos;length++) if(*(E*)(data+pos+length*sizeof(T))==end) break;
         return read(length);
     }
@@ -60,4 +60,15 @@ template<Endianness endianness=LittleEndian> struct Stream {
 
     array<byte> slice(int offset, int size) const { return array<byte>(data+pos+offset,size); }
     operator array<byte>() { return slice(0,size-pos); }
+};
+
+struct TextStream : Stream<> {
+    //TextStream(const char* data, int size) : Stream((uint8*)data,size) {}
+    TextStream(const string& data) : Stream(data) {}
+    long readInteger(int base=10);
+    double readFloat(int base=10);
+    string word() { int start=pos; while(data[pos]!=' '&&data[pos]!='\n'&&data[pos]!='\r') pos++; return string((const char*)data+start,pos-start); }
+    char operator*() { return data[pos]; }
+    operator string() { return string((const char*)data+pos,size-pos); }
+    //operator const char*() { return (const char*)data+pos; }
 };

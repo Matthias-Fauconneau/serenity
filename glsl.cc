@@ -20,7 +20,7 @@ int main(int argc, const char** argv) {
     uint program = glCreateProgram();
     for(int type: {GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {
         array<string> tags_ = { (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_) };
-        tags_ << tags.copy();
+        tags_ << tags;
         string global, main;
         const char* s = &source, *e=&source+source.size; //TODO: TextStream
         array<int> scope;

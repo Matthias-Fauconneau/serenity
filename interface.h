@@ -1,4 +1,5 @@
 #pragma once
+#include "signal.h"
 #include "gl.h"
 class Font;
 
@@ -234,7 +235,7 @@ typedef Bar<Tab> TabBar;
 //TODO: inherit Icon
 struct ToggleButton : Widget {
     /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-	ToggleButton(const Image& enable,const Image& disable);
+    ToggleButton(const Image& enable,const Image& disable);
 
     /// User toggled the button
     signal<bool /*nextState*/> toggled;
@@ -258,7 +259,7 @@ struct Slider : Widget {
     /// current \a value shown by the slider
     int value = -1;
     /// User edited the \a value
-	signal<int> valueChanged;
+    signal<int> valueChanged;
 
     int2 sizeHint();
     void render(int2 parent);

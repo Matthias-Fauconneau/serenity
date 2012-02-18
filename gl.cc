@@ -103,10 +103,9 @@ void GLBuffer::upload(const array<int>& indices) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), &indices, GL_STATIC_DRAW);
     indexCount = indices.size;
 }
-void GLBuffer::upload(const array<vec3> &vertices) {
+void GLBuffer::upload(const array<byte> &vertices) {
     if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    vertexSize = sizeof(vec3);
     glBufferData(GL_ARRAY_BUFFER, vertices.size*vertexSize, &vertices, GL_STATIC_DRAW);
     vertexCount = vertices.size;
 }

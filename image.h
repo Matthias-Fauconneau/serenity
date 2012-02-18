@@ -12,7 +12,7 @@ struct Image {
     Image(Image&& o) : data(o.data), own(o.own), width(o.width), height(o.height) { o.data=0; }
     Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; o.data=0; return *this; }
     //Image(const byte4* data, int width, int height):data((byte4*)data),width(width),height(height){}
-    Image(int width, int height):data(new byte4[width*height]),own(true),width(width),height(height){}
+    Image(int width, int height):data(allocate<byte4>(width*height)),own(true),width(width),height(height){}
     Image(array<byte4>&& data, int width, int height):data((byte4*)&data),own(true),width(width),height(height) {
         assert(data.size >= width*height, data.size, width, height);
         data.capacity = 0; //taking ownership

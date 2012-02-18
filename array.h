@@ -33,13 +33,13 @@ template <class T> struct array {
 
     /// Allocates a new uninitialized array for \a capacity elements
     /// \note use placement new to safely initialize objects with assignment operator
-    explicit array(int capacity) : data((T*)malloc(capacity*sizeof(T))), capacity(capacity) { assert_(capacity>0); }
+    explicit array(int capacity) : data(allocate<T>(capacity)), capacity(capacity) { assert_(capacity>0); }
     /// Allocates a new array with \a size elements initialized to \a value
-    //explicit array(int size, const T& value) : data((T*)malloc(size*sizeof(T))), capacity(size) { for(int i=0;i<size;i++) append(value); }
+    array(int size, const T& value) : data((T*)malloc(size*sizeof(T))), capacity(size) { for(int i=0;i<size;i++) append(value); }
+    /// Copy elements from an initializer \a list
+    array(const std::initializer_list<T>& list) { append(array((T*)list.begin(),list.size())); }
 
 //referencing constructors
-    /// References elements from an initializer \a list
-    array(const std::initializer_list<T>& list) : data((T*)list.begin()), size((int)list.size()) {}
     /// References \a size elements from \a data pointer
     array(const T* data, int size) : data(data), size(size) { assert_(size>=0); assert_(data); }
     /// References elements sliced from \a begin to \a end
@@ -52,7 +52,7 @@ template <class T> struct array {
     void reserve(int capacity) {
         if(this->capacity>=capacity) return;
         if(this->capacity) data=(T*)realloc((void*)data,(size_t)capacity*sizeof(T));
-        else if(capacity) { T* detach=(T*)malloc((size_t)capacity*sizeof(T)); copy((byte*)detach,(byte*)data,size*sizeof(T)); data=detach; }
+        else if(capacity) { T* detach=allocate<T>(capacity); copy((byte*)detach,(byte*)data,size*sizeof(T)); data=detach; }
         this->capacity=capacity;
     }
     /// Sets the array size to \a size and destroys removed elements
@@ -91,19 +91,11 @@ template <class T> struct array {
     /// Searches for an element using a comparator delegate
     template<class Comparator> int find(Comparator lambda) { for(int i=0;i<size;i++) { if(lambda(at(i))) return i; } return -1; }
 
-    /// comparison
-    bool operator ==(const array& a) const {
-        if(size != a.size) return false;
-        for(int i=0;i<size;i++) if(!(at(i)==a[i])) return false;
-        return true;
-    }
-    bool operator !=(const array& a) const { return !(*this==a); }
-
     /// remove
-    void removeAt(int i) { assert_(i>=0 && i<size); for(;i<size-1;i++) copy(at(i),at(i+1)); size--; }
+    void removeAt(int i) { assert_(i>=0 && i<size); for(;i<size-1;i++) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); size--; }
     void removeRef(T* p) { assert_(p>=data && p<data+size); removeAt(p-data); }
     void removeLast() { assert_(size); removeAt(size-1); }
-    //void removeOne(T v) { int i=indexOf(v); if(i>=0) removeAt(i); }
+    void removeOne(T v) { int i=indexOf(v); if(i>=0) removeAt(i); }
     T take(int i) { T value = move(at(i)); removeAt(i); return value; }
     T takeFirst() { return take(0); }
     T takeLast() { return take(size-1); }
@@ -131,7 +123,7 @@ template <class T> struct array {
     /// insert
     template<perfect(T)> void insertAt(int index, Tf&& v) {
         reserve(size+1); size++;
-        for(int i=size-2;i>=index;i--) rawCopy(at(i+1),at(i));
+        for(int i=size-2;i>=index;i--) copy((byte*)&at(i+1),(byte*)&at(i),sizeof(T));
         new (addressof(at(index))) T(forward<Tf>(v));
     }
     template<perfect(T)> void insertSorted(Tf&& v) {
@@ -151,6 +143,14 @@ template <class T> struct array {
     T* end() { return (T*)data+size; }
 };
 
+/// comparison
+template<class T> bool operator ==(const array<T>& a, const array<T>& b) {
+    if(a.size != b.size) return false;
+    for(int i=0;i<a.size;i++) if(!(a[i]==b[i])) return false;
+    return true;
+}
+template<class T> bool operator !=(const array<T>& a, const array<T>& b) { return !(a==b); }
+
 /// Copies all elements in a new array
 template<class T> array<T> copy(const array<T>& a) { array<T> r; r<<a; return  r; }
 
@@ -163,9 +163,9 @@ template<class T> array<T> reverse(const array<T>& a) { array<T> r(a.size); r.si
 template<class T> array<T>  replace(array<T>&& array, const T& before, const T& after) { for(auto& e : array) if(e==before) e=copy(after); return array; }
 /// Constructs a copy of \a array with every occurence of \a before replaced with \a after
 template<class T> array<T>  replace(const array<T>& a, const T& before, const T& after) {
-    array<T> r(a.size); r.size=a.size; for(int i=0;i<a.size;i++) new (&r+i) T(copy(a[i]==before? after : a[i])); return r;
+    array<T> r(a.size); r.size=a.size; for(int i=0;i<a.size;i++) new ((T*)&r+i) T(copy(a[i]==before? after : a[i])); return r;
 }
 
-template<class T> T& min(const array<T>& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
-template<class T> T& max(const array<T>& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
+template<class T> const T& min(const array<T>& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
+template<class T> T& max(array<T>& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
 template<class T> T sum(const array<T>& a) { T sum=0; for(const T& e: a) sum+=e; return sum; }

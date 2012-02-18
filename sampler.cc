@@ -9,39 +9,39 @@ void Sampler::open(const string& path) {
     // parse sfz and mmap samples
     Sample group;
     int start=::time();
-    string folder = section(path,'/',0,-2); folder.size++;
+    string folder = section(path,'/',0,-2)+"/"_;
     TextStream s = mapFile(path);
     Sample* sample=0;
     for(;;) {
         while(*s==' '||*s=='\n'||*s=='\r') s++;
         if(*s == 0) break;
-        if(s.match(_("<group>"))) { group=Sample(); sample = &group; }
-        else if(s.match(_("<region>"))) { samples<<group; sample = &samples.last();  }
-        else if(s.match(_("//"))) {
+        if(s.match("<group>"_)) { group=Sample(); sample = &group; }
+        else if(s.match("<region>"_)) { samples<<group; sample = &samples.last();  }
+        else if(s.match("//"_)) {
             while(*s && *s!='\n' && *s!='\r') s++;
             while(*s=='\n' || *s=='\r') s++;
         }
         else {
             string key = section(s,'='); s+=key.size; s++;/*=*/
-            const char* v=s; while(*s!=' '&&*s!='\n'&&*s!='\r') s++; string value(v,s-v);
-            if(key==_("sample")) {
-                if(::time()-start > 1000) { start=::time(); log("Loading...",samples.size); }
-                string path = folder+replace(value,'\\','/')+string("\0",1);
-                auto file = mapFile(path).slice(44);
-                sample->data = (uint8*)file.data; sample->size=file.size;
-                mlock(sample->data, min(64*1024,sample->size)); //TODO: monolithic file for sequential load
+            string value = s.word();
+            if(key=="sample"_) {
+                if(::time()-start > 1000) { start=::time(); log("Loading..."_,samples.size); }
+                string path = folder+replace(value,'\\','/');
+                auto file = mapFile(path);
+                sample->data = (uint8*)file.data+44; sample->size=file.size-44;
+                //mlock(sample->data, min(/*64*/1024,sample->size)); //TODO: monolithic file for sequential load + compression
             }
-            else if(key==_("trigger")) sample->trigger = value==_("release");
-            else if(key==_("lovel")) sample->lovel=toInteger(value);
-            else if(key==_("hivel")) sample->hivel=toInteger(value);
-            else if(key==_("lokey")) sample->lokey=toInteger(value);
-            else if(key==_("hikey")) sample->hikey=toInteger(value);
-            else if(key==_("pitch_keycenter")) sample->pitch_keycenter=toInteger(value);
-            else if(key==_("ampeg_release")) sample->releaseTime=(48000*toInteger(value))/1024*1024;
-            else if(key==_("amp_veltrack")) sample->amp_veltrack=toInteger(value);
-            else if(key==_("rt_decay")) sample->rt_decay=toInteger(value);
-            else if(key==_("volume")) sample->volume=exp10(toInteger(value)/20.0);
-            else error("unknown opcode",key);
+            else if(key=="trigger"_) sample->trigger = value=="release"_;
+            else if(key=="lovel"_) sample->lovel=toInteger(value);
+            else if(key=="hivel"_) sample->hivel=toInteger(value);
+            else if(key=="lokey"_) sample->lokey=toInteger(value);
+            else if(key=="hikey"_) sample->hikey=toInteger(value);
+            else if(key=="pitch_keycenter"_) sample->pitch_keycenter=toInteger(value);
+            else if(key=="ampeg_release"_) sample->releaseTime=(48000*toInteger(value))/1024*1024;
+            else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
+            else if(key=="rt_decay"_) sample->rt_decay=toInteger(value);
+            else if(key=="volume"_) sample->volume=exp10(toInteger(value)/20.0);
+            else error("unknown opcode"_,key);
         }
     }
 
@@ -68,7 +68,7 @@ void Sampler::event(int key, int vel) {
     for(const Sample& s : samples) {
         if(trigger == s.trigger && key >= s.lokey && key <= s.hikey && vel >= s.lovel && vel <= s.hivel) {
             int shift = 1+key-s.pitch_keycenter;
-            assert(shift>=0 && shift<3,"TODO: pitch shift > 1");
+            assert(shift>=0 && shift<3,"TODO: pitch shift > 1"_);
             float level = float(vel*vel)/(127*127);
             level = 1-(s.amp_veltrack/100.0*(1-level));
             level *= s.volume;
@@ -87,7 +87,7 @@ void Sampler::event(int key, int vel) {
 void Sampler::setup(const AudioFormat&) {}
 
 void Sampler::read(int16 *output, int period) {
-    assert(period==layers[1].size,"period != 1024");
+    assert(period==layers[1].size,"period != 1024"_);
     timeChanged.emit(time);
     for(Layer& layer : layers) clear(layer.buffer,layer.size*2);
     for(int i=0;i<active.size;i++) { Note& n = active[i];
@@ -130,10 +130,10 @@ void Sampler::recordWAV(const string& path) {
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
         int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=48000; int32 bps=48000*4;
         int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } __attribute__ ((packed)) header;
-    write(record,header);
+    write(record,raw(header));
 }
 
 void Sampler::sync() {
     if(!record) return;
-    lseek(record,4,SEEK_SET); write<int32>(record,36+time); lseek(record,0,SEEK_END);
+    lseek(record,4,SEEK_SET); write(record,raw<int32>(36+time)); lseek(record,0,SEEK_END);
 }

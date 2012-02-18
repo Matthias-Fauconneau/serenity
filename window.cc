@@ -149,7 +149,7 @@ uint Window::addHotKey(const string& key) {
     return keysym;
 }
 
-pollfd Window::poll() { return {XConnectionNumber(x), POLLIN}; }
+pollfd Window::poll() { return {XConnectionNumber(x), POLLIN, 0}; }
 void Window::event(pollfd) { update(); }
 
 void Window::setFocus(Widget* focus) {

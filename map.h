@@ -9,8 +9,8 @@ template <class K, class V> struct map {
     bool contains(const K& key) const { return keys.contains(key); }
     explicit operator bool() const { return keys.size; }
 
-    const V& at(const K& key) const { int i = keys.indexOf(key); assert(i>=0,"No matching key"); return values[i];}
-    V& at(const K& key) { int i = keys.indexOf(key); assert(i>=0,"No matching key"); return values[i];}
+    const V& at(const K& key) const { int i = keys.indexOf(key); assert(i>=0,"No matching key"_); return values[i];}
+    V& at(const K& key) { int i = keys.indexOf(key); assert(i>=0,"No matching key"_); return values[i];}
     template<perfect(V)> Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? addressof(values[i]) : 0; }
     template<perfect2(K,V)> V& insert(Kf&& key, Vf&& value) { keys << forward<Kf>(key); values << forward<Vf>(value); return values.last(); }
@@ -45,5 +45,5 @@ template <class K, class V> struct map {
 template<class K, class V> string str(const map<K,V>& m) {
     string s="{"_;
     for(int i=0;i<m.size();i++) { s<<str(m.keys[i],": "_,m.values[i]); if(i<m.size()-1) s<<", "_; }
-    return s<<"}"_;
+    return s+"}"_;
 }

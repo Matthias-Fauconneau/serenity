@@ -58,7 +58,8 @@ struct GLBuffer {
     void* mapVertexBuffer();
     void unmapVertexBuffer();
     void upload(const array<int>& indices);
-    void upload(const array<vec3>& vertices);
+    void upload(const array<byte>& vertices);
+    template<class T> void upload(const array<T>& vertices) { vertexSize=sizeof(T); upload(array<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
     void bind();
     void bindAttribute(GLShader& program, const char* name, int elementSize, uint64 offset = 0);
     void draw();

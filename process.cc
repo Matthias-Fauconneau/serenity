@@ -255,7 +255,7 @@ declare(static void catch_sigsegv(), constructor) {
     sigaction(SIGSEGV, &sa, 0);
     sigaction(SIGPIPE, &sa, 0);
     sigaction(SIGFPE, &sa, 0);
-    feenableexcept(FE_DIVBYZERO|FE_INVALID|FE_OVERFLOW|FE_UNDERFLOW);
+    feenableexcept(FE_DIVBYZERO|FE_INVALID|FE_OVERFLOW);
 }
 
 #endif

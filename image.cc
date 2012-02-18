@@ -1,14 +1,15 @@
 #include "image.h"
+#include "stream.h"
 #include "vector.h"
 #include "string.h"
 #include <zlib.h>
 
 template<class T> void filter(byte4* dst, const byte* raw, int width, int height) {
-    byte4 zero[width]; clear(zero,width); byte4* prior=zero;
+    byte4* zero = allocate<byte4>(width); clear((byte*)zero,width*4); byte4* prior=zero;
     for(int y=0;y<height;y++,raw+=width*sizeof(T),dst+=width) {
         int filter = *raw++; assert(filter>=0 && filter<=4);
         T* src = (T*)raw;
-        byte4 a;
+        byte4 a(0,0,0,0);
         if(filter==0) for(int i=0;i<width;i++) dst[i]= src[i];
         if(filter==1) for(int i=0;i<width;i++) dst[i]= a= a+src[i];
         if(filter==2) for(int i=0;i<width;i++) dst[i]= prior[i]+src[i];
@@ -26,6 +27,7 @@ template<class T> void filter(byte4* dst, const byte* raw, int width, int height
         }
         prior = dst;
     }
+    free(zero);
 }
 
 Image::Image(array<byte>&& file) {
@@ -56,7 +58,7 @@ Image::Image(array<byte>&& file) {
     inflateEnd(&z);
     idat.size = (int)z.total_out;
     assert(idat.size == height*(1+width*depth), idat.size, width, height);
-    data = new byte4[width*height];
+    data = allocate<byte4>(width*height);
     /**/ if(depth==2) filter<byte2>((byte4*)data,&idat,width,height);
     else if(depth==4) filter<rgba4>((byte4*)data,&idat,width,height);
     else error("depth"_,depth);
@@ -65,13 +67,13 @@ Image::Image(array<byte>&& file) {
 Image& Image::resize(int w, int h) {
     if(w==width && h==height) return *this;
     const byte4* src = data;
-    byte4* buffer = new byte4[w*h];
+    byte4* buffer = allocate<byte4>(w*h);
     byte4* dst = buffer;
     assert(width/w==height/h && !(width%w) && !(height%h)); //integer uniform downscale
     int scale = width/w;
     for(int y=0;y<h;y++) {
         for(int x=0;x<w;x++) {
-            int4 s;
+            int4 s{0,0,0,0};
             for(int i=0;i<scale;i++){
                 for(int j=0;j<scale;j++) {
                     s+= int4(src[i*width+j]);

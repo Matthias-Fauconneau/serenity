@@ -3,10 +3,9 @@
 
 extern "C" ssize_t read(int fd, void* buf, size_t size);
 extern "C" ssize_t write(int fd, const void* buf, size_t size);
-extern "C"int close(int fd);
+extern "C" int close(int fd);
 
 inline void read(int fd, array<byte>& s) { s.size=read(fd,(byte*)&s,(size_t)s.capacity); }
-inline void write(int fd, const array<byte>& s) { write(fd,&s,(size_t)s.size); }
 
 int createFile(const string& path);
 string mapFile(const string& path);

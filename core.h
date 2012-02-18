@@ -75,6 +75,9 @@ extern "C" void* realloc(void* ptr, size_t size) throw();
 extern "C" void free(void *ptr) throw();
 inline void* operator new(uint64, void* p) { return p; } //placement new
 
+// Allocates an uninitialized memory buffer for \a size Ts
+template<class T> T* allocate(int size) { return (T*)malloc(size*sizeof(T)); }
+
 // Gets a pointer to \a value even if T override operator& (e.g array overrides & to return a pointer to its data buffer)
 template<class T> T* addressof(T& value) { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char &>(value))); }
 
