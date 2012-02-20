@@ -4,6 +4,7 @@
 #include "map.h"
 #include "vector.h"
 #include "stream.h"
+#include "lac.h"
 
 int time();
 
@@ -49,17 +50,17 @@ struct MidiFile {
 
 struct Sampler : AudioInput {
     struct Sample {
-        const uint8* data=0; int size=0; //Sample Definition
+        const byte* data=0; int size=0; //Sample Definition
         int16 trigger=0; int16 lovel=0; int16 hivel=127; int16 lokey=0; int16 hikey=127; //Input Controls
         int16 pitch_keycenter=60; int32 releaseTime=0; int16 amp_veltrack=100; int16 rt_decay=0; float volume=1; //Performance Parameters
     };
-    struct Note { const Sample* sample; const uint8* begin; const uint8* end; int key; int vel; int shift; float level; };
+    struct Note { const Sample* sample; Codec decode; int position,end; int key; int vel; int shift; float level; };
 
     static const int period = 1024; //-> latency
 
     array<Sample> samples{1024};
     array<Note> active{64};
-    struct Layer { int size=0; float* buffer=0; Resampler resampler; } layers[3];
+    struct Layer { int size=0; float* buffer=0; bool active=false; Resampler resampler; } layers[3];
     float* buffer = 0;
     int record;
     int16* pcm = 0; int time = 0;

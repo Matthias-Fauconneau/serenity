@@ -61,7 +61,7 @@ string Expression::str() const {
     string B = b->type<Operator || b->type>=type ? b->str() : "("_+b->str()+")"_;
     if(type==Add) return replace(A+"+"_+B,"+-"_,"-"_);
     if(type==Mul)  {
-        if(a->type==Pow && a->b->type==Integer && a->b->integer==-1) return B+A.slice(1);
+        if(a->type==Pow && a->b->type==Integer && a->b->integer==-1) return B+slice(A,1);
         if(b->type==Integer && a->type!=Integer) return B+A;
         return A+"*"_+B;
     }

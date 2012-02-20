@@ -70,7 +70,7 @@ string section(const string& s, char sep, int start, int end) {
         e=s.size;
         if(end!=-1) for(int i=0;e-->0;) { if(s[e]==sep) { i++; if(i>=-end-1) break; } }
     }
-    return copy(s.slice(b,e-b));
+    return slice(s,b,e-b);
 }
 
 array<string> split(const string& str, char sep) {
@@ -81,7 +81,7 @@ array<string> split(const string& str, char sep) {
         e=b;
         while(e<str.size && str[e]!=sep) e++;
         if(b==str.size) break;
-        r << str.slice(b,e-b);
+        r << slice(str,b,e-b);
         if(e==str.size) break;
         b=e+1;
     }
@@ -91,7 +91,7 @@ array<string> split(const string& str, char sep) {
 string replace(const string& s, const string& before, const string& after) {
     string r(s.size);
     for(int i=0;i<s.size;) { //->utf8_iterator
-        if(i<=s.size-before.size && s.slice(i,before.size)==before) { r<<copy(after); i+=before.size; }
+        if(i<=s.size-before.size && slice(s, i, before.size)==before) { r<<copy(after); i+=before.size; }
         else { r<<s.data[i]; i++; }
     }
     return r;
@@ -99,25 +99,22 @@ string replace(const string& s, const string& before, const string& after) {
 
 /// Human-readable value representation
 
-string str(int number, int base, int pad) {
+string str(uint64 n, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
-    char buf[32]; int i=32;
-    uint n = abs(number);
-    //if(n >= 0x100000) { base=16; pad=8; }
+    char buf[64]; int i=64;
     do {
         buf[--i] = "0123456789ABCDEF"[n%base];
         n /= base;
     } while( n!=0 );
-    while(32-i<pad) buf[--i] = '0';
-    if(number<0) buf[--i] = '-';
-    return copy(string(buf+i,32-i));
+    while(64-i<pad) buf[--i] = '0';
+    return copy(string(buf+i,64-i));
 }
 
 string str(float n, int precision, int base) {
     if(isnan(n)) return "NaN"_;
     if(isinf(n)) return n>0?"∞"_:"-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;
-    return (n>=0?""_:"-"_)+str(int(abs(n)),base)+"."_+str(int(m*abs(n))%m,base,precision);
+    return (n>=0?""_:"-"_)+str(uint64(abs(n)),base)+"."_+str(uint64(m*abs(n))%m,base,precision);
 }
 
 long readInteger(const char*& s, int base) {

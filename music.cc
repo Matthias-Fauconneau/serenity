@@ -23,11 +23,11 @@ struct Music : Application {
         //window.setVisible();
         for(auto&& path : arguments) {
             if(path=="fullscreen"_) window.setFullscreen();
-            else if(path.endsWith(".sfz"_) && exists(path)) {
+            else if(section(path,'.',-2,-1)=="sfz"_ && exists(path)) {
                 sampler.open(path);
                 seq.noteEvent.connect(&sampler,&Sampler::event);
                 audio.setInput(&sampler);
-            } else if(path.endsWith(".mid"_)) {
+            } else if(section(path,'.',-2,-1)=="mid"_) {
                 if(exists(path)) {
                     midi.open(path);
                     sampler.timeChanged.connect(&midi,&MidiFile::update);
@@ -35,7 +35,7 @@ struct Music : Application {
                 } else {
                     seq.recordMID(path);
                 }
-            } else if(path.endsWith(".pdf"_) && exists(path)) {
+            } else if(section(path,'.',-2,-1)=="pdf"_ && exists(path)) {
                 //sheet.onGlyph.connect(&score,&Score::onGlyph);
                 //sheet.onPath.connect(&score,&Score::onPath);
                 sheet.open(path);

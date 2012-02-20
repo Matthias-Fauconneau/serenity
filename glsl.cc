@@ -15,7 +15,7 @@ int main(int argc, const char** argv) {
     if(args.size<2) { log("Usage: glsl binary.gpu shader.glsl tags"_); return 1; }
     assert(exists(args[1]));
     string source = mapFile(args[1]);
-    array<string> tags = args.slice(2);
+    array<string> tags = slice(args,2);
 
     uint program = glCreateProgram();
     for(int type: {GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {

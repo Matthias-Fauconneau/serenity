@@ -64,11 +64,6 @@ template <class T> struct array {
     /// Sets the array size to 0, destroying any contained elements
     void clear() { if(size) shrink(0); }
 
-    /// Slices an array copying elements from \a pos to \a pos + \a size
-    array slice(int pos,int size) const { assert_(pos>=0 && pos+size<=this->size); return copy(array(data+pos,size)); }
-    /// Slices an array copying elements from \a pos to the end of the array
-    array slice(int pos) const { return slice(pos,size-pos); }
-
     /// Returns a raw pointer to \a data buffer
     T const * const & operator &() const { return data; }
     /// Returns true if not empty
@@ -153,6 +148,24 @@ template<class T> bool operator !=(const array<T>& a, const array<T>& b) { retur
 
 /// Copies all elements in a new array
 template<class T> array<T> copy(const array<T>& a) { array<T> r; r<<a; return  r; }
+
+/// Slices an array referencing elements from \a pos to \a pos + \a size
+/// \note Using move semantics, this operation is safe without refcounting the data buffer
+template<class T> array<T> slice(array<T>&& a, int pos,int size) {
+    assert_(pos>=0 && pos+size<=a.size);
+    assert_(a.capacity == 0); //only allow slicing of referencing arrays. TODO: custom allocator allowing arbitrary resize
+    return array<T>(a.data+pos,size);
+}
+/// Slices an array referencing elements from \a pos to the end of the array
+template<class T> array<T> slice(array<T>&& a, int pos) { return slice(move(a),pos,a.size-pos); }
+
+/// Slices an array copying elements from \a pos to \a pos + \a size
+template<class T> array<T> slice(const array<T>& a, int pos,int size) {
+    assert_(pos>=0 && pos+size<=a.size);
+    return copy(array<T>(a.data+pos,size));
+}
+/// Slices an array copying elements from \a pos to the end of the array
+template<class T> array<T> slice(const array<T>& a, int pos) { return slice(a,pos,a.size-pos); }
 
 /// Reverses elements in-place
 template<class T> array<T> reverse(array<T>&& a) { for(int i=0; i<a.size/2; i++) swap(a[i], a[a.size-i-1]); return move(a); }

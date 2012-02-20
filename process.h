@@ -38,6 +38,6 @@ void logProfile();
 struct Profile {
     string name;
     int time=0;
-    Profile(string&& name=""_):name(move(name)){ log(name,">"_,time=getCPUTime()); }
-    ~Profile() { log(name,"<"_,getCPUTime()-time); }
+    Profile(string&& name=""_):name(move(name)){ time=getCPUTime(); }
+    ~Profile() { log(name,getCPUTime()-time); }
 };

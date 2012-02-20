@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include "math.h"
+#include "lac.h"
 
 void Sampler::open(const string& path) {
     // parse sfz and mmap samples
@@ -28,8 +29,8 @@ void Sampler::open(const string& path) {
                 if(::time()-start > 1000) { start=::time(); log("Loading..."_,samples.size); }
                 string path = folder+replace(value,'\\','/');
                 auto file = mapFile(path);
-                sample->data = (uint8*)file.data+44; sample->size=file.size-44;
-                //mlock(sample->data, min(/*64*/1024,sample->size)); //TODO: monolithic file for sequential load + compression
+                sample->data = file.data+4; sample->size=*(int*)file.data;
+                mlock(sample->data, min(48000*6,file.size)); //TODO: compute real _compressed_ size for first second
             }
             else if(key=="trigger"_) sample->trigger = value=="release"_;
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -60,7 +61,7 @@ void Sampler::event(int key, int vel) {
     if(vel==0) {
         for(Note& note : active) {
             if(note.key==key) {
-                note.end = note.begin + 6*note.sample->releaseTime;
+                note.end = note.position + note.sample->releaseTime;
                 trigger=1; released=&note; vel = note.vel; //for release sample
             }
         }
@@ -73,12 +74,11 @@ void Sampler::event(int key, int vel) {
             level = 1-(s.amp_veltrack/100.0*(1-level));
             level *= s.volume;
             if(released) {
-                float noteLength = float(released->end - released->sample->data)/6/48000;
+                float noteLength = float(released->end)/48000;
                 float attenuation = exp10(-s.rt_decay * noteLength / 20);
                 level *= attenuation;
             }
-            Note note = { &s, s.data, s.data + s.size + 6*s.releaseTime, key, vel, shift, level };
-            active << note;
+            active << Note{ &s, Codec(array<byte>(s.data,s.size)), 0, s.size/6 + s.releaseTime, key, vel, shift, level };
             break; //assume only one match
         }
     }
@@ -89,33 +89,33 @@ void Sampler::setup(const AudioFormat&) {}
 void Sampler::read(int16 *output, int period) {
     assert(period==layers[1].size,"period != 1024"_);
     timeChanged.emit(time);
-    for(Layer& layer : layers) clear(layer.buffer,layer.size*2);
+    for(Layer& layer : layers)  { clear(layer.buffer,layer.size*2); layer.active=false; }
     for(int i=0;i<active.size;i++) { Note& n = active[i];
+         layers[n.shift].active = true;
         const int frame = layers[n.shift].size;
         float* d = layers[n.shift].buffer;
-        const uint8* &s = n.begin;
-#define L float(*(int*)(s-1)>>8) //TODO: fast 24bit to float
-#define R float(*(int*)(s+2)>>8)
         float level = n.level;
-        int release = (n.end-s)/6;
+        int release = n.end-n.position;
         int sustain = release - n.sample->releaseTime;
-        int length = ((n.sample->data+n.sample->size)-s)/6;
+        int length = n.sample->size/6 - n.position;
         if( sustain >= frame && length >= frame ) {
             sustain = min(sustain,length);
-            for(const float* end=d+frame*2;d<end;d+=2,s+=6) {
-                d[0] += level*L;
-                d[1] += level*R;
+            for(const float* end=d+frame*2;d<end;d+=2) {
+                d[0] += level*n.decode(0);
+                d[1] += level*n.decode(1);
             }
+            n.position += frame;
         } else if( release >= frame && length >= frame ) {
             float reciprocal = level/n.sample->releaseTime;
             const float* end=d+frame*2;
-            for(int i=release;d<end;d+=2,s+=6,i--) {
-                d[0] += (reciprocal * i) * L;
-                d[1] += (reciprocal * i) * R;
+            for(int i=release;d<end;d+=2,i--) {
+                d[0] += (reciprocal * i) * n.decode(0);
+                d[1] += (reciprocal * i) * n.decode(1);
             }
+            n.position += frame;
         } else { active.removeAt(i); i--; }
     }
-    for(Layer& layer : layers) { if(!layer.resampler) continue;
+    for(Layer& layer : layers) { if(!layer.resampler || !layer.active) continue;
         int in = layer.size, out = period;
         layer.resampler.filter(layer.buffer,&in,buffer,&out);
         for(int i=0;i<period*2;i++) layers[1].buffer[i] += buffer[i];

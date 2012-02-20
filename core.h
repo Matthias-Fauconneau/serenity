@@ -131,12 +131,12 @@ extern bool trace_enable;
 extern "C" void abort() throw() __attribute((noreturn));
 
 /// Aborts the process without any message, stack trace is logged
-#define fail() (debug({ trace_off; logTrace(); abort(); }))
+#define fail() ({debug( trace_off; logTrace(); ) abort(); })
 
 /// Aborts unconditionally
 // can be used without string
-#define error_(message) (debug({ if(!(expr)) { trace_off; logTrace(); log("Error:\t"); log(#message); log("\n"); abort(); } }))
+#define error_(message) ({debug( trace_off; logTrace(); ) log("Error:\t"); log(#message); log("\n"); abort(); })
 
 /// Aborts if \a expr evaluates to false
 // can be used without string
-#define assert_(expr) (debug({ if(!(expr)) { trace_off; logTrace(); log("Assert:\t"); log(#expr); log("\n"); abort(); } }))
+#define assert_(expr) ({debug( if(!(expr)) { trace_off; logTrace(); log("Assert:\t"); log(#expr); log("\n"); abort(); } )})

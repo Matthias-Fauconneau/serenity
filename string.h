@@ -23,8 +23,8 @@ struct string : array<char> {
     const utf8_iterator begin() const { return data; }
     const utf8_iterator end() const { return data+size; }
 
-    bool startsWith(const string& a) const { return slice(0,a.size)==a; }
-    bool endsWith(const string& a) const { return slice(size-a.size)==a; }
+    //bool startsWith(const string& a) const { return slice(0,a.size)==a; }
+    //bool endsWith(const string& a) const { return slice(size-a.size)==a; }
 };
 template<> inline string copy(const string& s) { return copy<char>(s); }
 
@@ -53,7 +53,7 @@ string replace(const string& s, const string& before, const string& after);
 /// Human-readable value representation
 
 /// Base template for conversion to human-readable value representation
-template<class A> string str(const A&) { static_assert(sizeof(A) && 0,"No string representation defined for type"); fail(); }
+template<class A> string str(const A&) { static_assert(sizeof(A) && 0,"No string representation defined for type"); return ""; }
 
 /// string representation of a string
 inline string str(const string& s) { return copy(s); }
@@ -75,8 +75,9 @@ template<> inline string str(const bool& b) { return b?"true"_:"false"_; }
 template<> inline string str(const char& c) { return string(&c,1); }
 
 /// Converts a machine integer to its human-readable representation
-string str(int number, int base, int pad=0);
-template<> inline string str(const int& number) { return str(number,10); }
+string str(uint64 number, int base, int pad=0);
+template<> inline string str(const uint& n) { return str(uint64(n),10); }
+template<> inline string str(const int& n) { return n>=0?str(uint64(n),10):"-"_+str(uint64(-n),10); }
 /// Converts a floating point number to its human-readable representation
 string str(float number, int precision, int base=10);
 template<> inline string str(const float& number) { return str(number,2); }
@@ -84,10 +85,12 @@ template<> inline string str(const float& number) { return str(number,2); }
 /// Enhanced debugging using str(...)
 inline void write(int fd, const array<byte>& s) { write(fd,&s,(size_t)s.size); }
 template<class... Args> void log(const Args&... args) { write(1,str(args...,"\n"_)); }
+/// Display variable name and its value
+#define var(v) ({debug( log(#v##_, v); )})
 /// Aborts unconditionally and display \a message
-#define error(message...) (debug({ trace_off; logTrace(); log("Error:\t"_,##message); abort(); }))
+#define error(message...) ({debug( trace_off; logTrace(); ) log("Error:\t"_,##message); abort(); })
 /// Aborts if \a expr evaluates to false and display \a message (except stack trace)
-#define assert(expr, message...) (debug({ if(!(expr)) { trace_off; logTrace(); log("Assert:\t"_,#expr##_, ##message); abort(); } }))
+#define assert(expr, message...) ({debug( if(!(expr)) { trace_off; logTrace(); log("Assert:\t"_,#expr##_, ##message); abort(); } )})
 
 
 /// Number parsing
