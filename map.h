@@ -3,8 +3,11 @@
 
 template <class K, class V> struct const_pair { const K& key; const V& value; };
 template <class K, class V> struct pair { K& key; V& value; };
+/// \a map associates keys with values
 template <class K, class V> struct map {
-    map(){} move_only(map)
+    array<K> keys;
+    array<V> values;
+
     int size() const { return keys.size; }
     bool contains(const K& key) const { return keys.contains(key); }
     explicit operator bool() const { return keys.size; }
@@ -37,9 +40,6 @@ template <class K, class V> struct map {
     };
     iterator begin() { return iterator((K*)keys.data,(V*)values.data); }
     iterator end() { return iterator((K*)&keys.data[keys.size],(V*)&values.data[values.size]); }
-
-    array<K> keys;
-    array<V> values;
 };
 
 template<class K, class V> string str(const map<K,V>& m) {
@@ -47,3 +47,9 @@ template<class K, class V> string str(const map<K,V>& m) {
     for(int i=0;i<m.size();i++) { s<<str(m.keys[i],": "_,m.values[i]); if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }
+
+template <class K, class V, int N> struct static_map : map<K,V> {
+        K key_buffer[N];
+        V value_buffer[N];
+        static_map() : map<K,V>{{key_buffer,0,N},{value_buffer,0,N}} {}
+};

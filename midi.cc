@@ -2,15 +2,15 @@
 #include "file.h"
 
 void MidiFile::open(const string& path) { /// parse MIDI header
-    Stream<> s = mapFile(path);
+    Stream s = mapFile(path);
     s+=10;
     uint16 nofChunks = s.read();
     midiClock = 48*60000/120/(uint16)s.read(); //48Khz clock
     for(int i=0; s && i<nofChunks;i++) {
-        string tag = s.read(4); uint32 length = s.read();
+        string tag = s.read<char>(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
-            int i=0; while(s.read<byte>()&0x80) i++; //ignore first time to revert decode order
-            tracks << Track(s.slice(i,length));
+            while(s.read<byte>()&0x80) {} //ignore first time
+            tracks << Track(s.read<byte>(length));
         }
         s += length;
     }

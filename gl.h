@@ -37,7 +37,6 @@ extern GLShader flat;
 extern GLShader blit;
 
 struct GLTexture : Image {
-    move_only(GLTexture)
     GLTexture(){}
     GLTexture(const Image& image);
     operator bool() const { return id; }

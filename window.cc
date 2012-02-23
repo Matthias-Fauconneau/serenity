@@ -35,7 +35,7 @@ Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
     }
     id = XCreateSimpleWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,0,0xFFE0E0E0);
     XSelectInput(x, id, StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask);
-    setProperty<char>("STRING", "WM_CLASS", name+"\0"_+name);
+    setProperty<char>("STRING", "WM_CLASS", static_string<32>(name+"\0"_+name));
     setProperty<char>("UTF8_STRING", "_NET_WM_NAME", name);
     setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
     setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});

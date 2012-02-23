@@ -31,7 +31,7 @@ template<class T> void filter(byte4* dst, const byte* raw, int width, int height
 }
 
 Image::Image(array<byte>&& file) {
-    Stream<BigEndian> s(move(file));
+    NetworkStream s(move(file));
     if(!s.match("\x89PNG\r\n\x1A\n"_)) error("Unknown image format"_);
     z_stream z; clear(z); inflateInit(&z);
     array<byte> idat(file.size*16); //FIXME
@@ -39,7 +39,7 @@ Image::Image(array<byte>&& file) {
     int depth=0;
     while(s) {
         uint32 size = s.read();
-        string name = s.read(4);
+        string name = s.read<byte>(4);
         if(name == "IHDR"_) {
             width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
             //uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
@@ -49,7 +49,7 @@ Image::Image(array<byte>&& file) {
             if(!depth) return;
         } else if(name == "IDAT"_) {
             z.avail_in = size;
-            z.next_in = (Bytef*)&s.read((int)size);
+            z.next_in = (Bytef*)&s.read<byte>((int)size);
             inflate(&z, Z_NO_FLUSH);
         } else s += (int)size;
         s+=4; //CRC

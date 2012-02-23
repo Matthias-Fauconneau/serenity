@@ -1,6 +1,6 @@
+#include "lac.h"
 #include "process.h"
 #include "file.h"
-#include "stream.h"
 #include "sys/mman.h"
 
 /// Codec for unary/binary encoding
@@ -56,48 +56,65 @@ int encode(const array<byte>& in, BitWriter& out) { //550
     return out.flush();
 }
 
-void decode(BitReader& in, array<byte>& out) {
+void decode(Codec& in, array<byte>& out) {
     for(byte* raw=(byte*)&out, *end=raw+out.size;raw<end;) {
         for(int c=0;c<2;c++) {
-            *(int*)(raw) = s; raw+=3;
+            *(int*)(raw) = in(c); raw+=3;
         }
     }
 }
 
-#if 0
-struct Test : Application {
+struct : Application {
     void start(array<string>&& args) override {
-        bool convert = args[0]=="convert"_, verify = args[0]=="verify"_;
-        for(auto& path: slice(args,1)) {
-            string target = section(path,'.',0,-2)+".lac"_;
-            if(!verify && exists(target)) continue;
+        bool /*convert = args[0]=="convert"_, verify = args[0]=="verify"_,*/ stats = args[0]=="stats"_;
+        for(auto& path: array<string>(&args+1,args.size-1)) {
+            if(path.endsWith(".lac"_)) {
+                if(stats) {
+                    Codec lac = mapFile(path);
+                    int size = lac.binary(32)/6;
+                    int begin=0,end=0;
+                    for(int i=0;i<size;i++) {
+                        for(int c=0;c<2;c++) {
+                            int s = lac(c);
+                            if(abs(s)>0) {
+                                end=i;
+                                if(!begin) begin=i;
+                            }
+                        }
+                    }
+                    munmap((void*)lac.data,lac.size);
+                    log(section(section(path,'/',-2,-1),'.',0,-2), "\tHead"_,begin,"\tTail"_,size-end);
+                }
+            }/* else {
+                string target = section(path,'.',0,-2)+".lac"_;
+                if(!verify && exists(target)) continue;
 
-            array<byte> wav = slice(mapFile(path),44);
-            if(convert) {
-                int time=getCPUTime();
-                BitWriter lac(wav.size/2);
-                lac.binary(32, wav.size);
-                lac.size = encode(wav, lac);
-                int fd = createFile(target);
-                write(fd,lac);
-                close(fd);
-                time=getCPUTime()-time;
-                log("\tEncode Speed:"_,(lac.size/time)/1024,"MB/s\t"_,str((lac.size/48)/time)+"x"_);
-            }
-            if(verify) {
-                BitReader lac = mapFile(target);
-                array<byte> raw(lac.binary(32));
-                int time=getCPUTime();
-                decode(lac, raw);
-                time=getCPUTime()-time;
-                munmap((void*)lac.data,lac.size);
-                if(raw!=wav) log("File Corrupted");
-                log(section(section(path,'/',-2,-1),'.',0,-2), "\tRatio:"_,str(100.f*lac.size/wav.size)+"%"_,"\tFLAC:"_, str((194500.0f*lac.size/wav.size)/738)+"%"_,
-                    "\tSalamander (MB):"_, 1945.0f*lac.size/wav.size,
-                    "\tDecode Speed:"_,(lac.size/time)/1024,"MB/s\t"_,str((lac.size/48)/time)+"x"_);
-            }
-            munmap((void*)(wav.data-44),wav.size);
+                array<byte> wav = slice(mapFile(path),44);
+                if(convert) {
+                    int time=getCPUTime();
+                    BitWriter lac(wav.size/2);
+                    lac.binary(32, wav.size);
+                    lac.size = encode(wav, lac);
+                    int fd = createFile(target);
+                    write(fd,lac);
+                    close(fd);
+                    time=getCPUTime()-time;
+                    log("\tEncode Speed:"_,(lac.size/time)/1024,"MB/s\t"_,str((lac.size/48)/time)+"x"_);
+                }
+                if(verify) {
+                    BitReader lac = mapFile(target);
+                    array<byte> raw(lac.binary(32));
+                    int time=getCPUTime();
+                    decode(lac, raw);
+                    time=getCPUTime()-time;
+                    munmap((void*)lac.data,lac.size);
+                    if(raw!=wav) log("File Corrupted");
+                    log(section(section(path,'/',-2,-1),'.',0,-2), "\tRatio:"_,str(100.f*lac.size/wav.size)+"%"_,"\tFLAC:"_, str((194500.0f*lac.size/wav.size)/738)+"%"_,
+                        "\tSalamander (MB):"_, 1945.0f*lac.size/wav.size,
+                        "\tDecode Speed:"_,(lac.size/time)/1024,"MB/s\t"_,str((lac.size/48)/time)+"x"_);
+                }
+                munmap((void*)(wav.data-44),wav.size); //TODO: file.h
+            }*/
         }
     }
-} test;
-#endif
+} stats;

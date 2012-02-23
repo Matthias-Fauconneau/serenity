@@ -33,14 +33,6 @@ const utf8_iterator& utf8_iterator::operator++() {
 
 /// string operations
 
-string operator +(const string& a, const string& b) {
-    string r; int size=a.size+b.size;
-    if(size==0) return r;
-    r.reserve(size); r.size=size;
-    copy((char*)&r,&a,a.size); copy((char*)&r+a.size,&b,b.size);
-    return r;
-}
-
 bool operator <(const string& a, const string& b) {
     for(int i=0;i<min(a.size,b.size);i++) {
         if(a[i] > b[i]) return false;
@@ -49,11 +41,11 @@ bool operator <(const string& a, const string& b) {
     return a.size < b.size;
 }
 
-string strz(const string& s) { return s+"\0"_; }
+short_string strz(const string& s) { return s+"\0"_; }
 
 string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string(s,i); }
 
-string section(const string& s, char sep, int start, int end) {
+void section_(const string& s, char sep, int& start, int& end, bool includeSep) {
     int b,e;
     if(start>=0) {
         b=0;
@@ -65,12 +57,20 @@ string section(const string& s, char sep, int start, int end) {
     }
     if(end>=0) {
         e=0;
-        for(int i=0;e<s.size;e++) if(s[e]==sep) { i++; if(i>=end) break; }
+        for(int i=0;e<s.size;e++) if(s[e]==sep) { i++; if(i>=end) { if(includeSep) e++; break; } }
     } else {
         e=s.size;
-        if(end!=-1) for(int i=0;e-->0;) { if(s[e]==sep) { i++; if(i>=-end-1) break; } }
+        if(end!=-1) for(int i=0;e-->0;) { if(s[e]==sep) { i++; if(i>=-end-1) { if(includeSep) e++; break; } } }
     }
-    return slice(s,b,e-b);
+    start=b; end=e;
+}
+short_string section(const string& s, char sep, int start, int end, bool includeSep) {
+    section_(s,sep,start,end,includeSep);
+    return string(s.data+start,end-start);
+}
+string section(string&& s, char sep, int start, int end, bool includeSep) {
+    section_(s,sep,start,end,includeSep);
+    return slice(move(s),start,end-start);
 }
 
 array<string> split(const string& str, char sep) {
@@ -88,10 +88,10 @@ array<string> split(const string& str, char sep) {
     return r;
 }
 
-string replace(const string& s, const string& before, const string& after) {
-    string r(s.size);
+short_string replace(const string& s, const string& before, const string& after) {
+    short_string r(s.size);
     for(int i=0;i<s.size;) { //->utf8_iterator
-        if(i<=s.size-before.size && slice(s, i, before.size)==before) { r<<copy(after); i+=before.size; }
+        if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r<<after; i+=before.size; }
         else { r<<s.data[i]; i++; }
     }
     return r;
@@ -99,7 +99,7 @@ string replace(const string& s, const string& before, const string& after) {
 
 /// Human-readable value representation
 
-string str(uint64 n, int base, int pad) {
+static_string<16> str(uint64 n, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     char buf[64]; int i=64;
     do {
@@ -107,7 +107,7 @@ string str(uint64 n, int base, int pad) {
         n /= base;
     } while( n!=0 );
     while(64-i<pad) buf[--i] = '0';
-    return copy(string(buf+i,64-i));
+    return string(buf+i,64-i);
 }
 
 string str(float n, int precision, int base) {

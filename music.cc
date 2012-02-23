@@ -7,27 +7,29 @@
 #include <sys/resource.h>
 
 struct Music : Application {
-    AudioOutput audio{true};
-    Sampler sampler;
     Sequencer seq;
+    Sampler sampler;
+    AudioOutput audio{true};
     MidiFile midi;
+
+#ifdef UI
     PDF sheet;
     //Score score;
     map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
-    ~Music() { sampler.sync(); seq.sync(); }
-
     Window window{sheet,int2(1280,1024),"Music"_};
+#define ui(s) s
+#else
+#define ui(s)
+#endif
 
-    void start(array<string> &&arguments) {
-        window.keyPress.connect(this,&Music::keyPress);
-        //window.setVisible();
+    void start(array<string>&& arguments) {
+        ui( window.keyPress.connect(this,&Music::keyPress); )
         for(auto&& path : arguments) {
-            if(path=="fullscreen"_) window.setFullscreen();
-            else if(section(path,'.',-2,-1)=="sfz"_ && exists(path)) {
+            if(path.endsWith(".sfz"_) && exists(path)) {
                 sampler.open(path);
                 seq.noteEvent.connect(&sampler,&Sampler::event);
                 audio.setInput(&sampler);
-            } else if(section(path,'.',-2,-1)=="mid"_) {
+            } else if(path.endsWith(".mid"_)) {
                 if(exists(path)) {
                     midi.open(path);
                     sampler.timeChanged.connect(&midi,&MidiFile::update);
@@ -35,7 +37,9 @@ struct Music : Application {
                 } else {
                     seq.recordMID(path);
                 }
-            } else if(section(path,'.',-2,-1)=="pdf"_ && exists(path)) {
+            }
+#ifdef UI
+            else if(path.endsWith(".pdf"_) && exists(path)) {
                 //sheet.onGlyph.connect(&score,&Score::onGlyph);
                 //sheet.onPath.connect(&score,&Score::onPath);
                 sheet.open(path);
@@ -54,11 +58,12 @@ struct Music : Application {
             } /*else if(path.endsWith(".wav"_)) && !exists(path) && sampler) {
                 sampler->recordWAV(path);
             }*/
+#endif
             else error("Unhandled argument"_,path);
         }
-        if(!sampler && !sheet) error("Usage: music [instrument.sfz] [music.mid] [sheet.pdf] [output.wav]"_);
+        if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
         //sheet.scroll=1600;
-        setpriority(PRIO_PROCESS,0,-20);
+        setPriority(-20);
         if(audio.input) audio.start();
     }
     void keyPress(Key key) { if(key==Escape) running=false; }

@@ -10,7 +10,6 @@
 //#include <freetype/freetype.h>
 
 struct Variant { //TODO: union
-    move_only(Variant);
     enum { Number, Data, List, Dict } type;
     float number=0; string data; array<Variant> list; map<string,Variant> dict;
     Variant(double number) : type(Number), number(number) {}

@@ -2,5 +2,5 @@
 Name=Piano - Salamander
 Exec=music /Samples/Salamander.sfz
 Type=Application
-Icon=audio-midi
+Icon=music
 Categories=Audio;Music

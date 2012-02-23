@@ -14,6 +14,7 @@ template <class T> struct array {
     const T* data = 0;
     int size = 0;
     int capacity = 0; //0 = not owned
+    bool heap = true; //allocated on heap
 
     /// Prevents creation of independent handle, as they might become dangling when this handle free the buffer.
     /// \note Handle to unacquired ressources still might become dangling if the referenced buffer is freed before this handle.
@@ -24,34 +25,39 @@ template <class T> struct array {
 
 //acquiring constructors
     /// Move constructor
-    array(array&& o) : data(o.data), size(o.size), capacity(o.capacity) { o.capacity=0; }
+    array(array&& o) : data(o.data), size(o.size), capacity(o.capacity) { o.capacity=0; assert_(o.heap); }
     /// Move constructor with conversion
     template <class O> explicit array(array<O>&& o)
-        : data((const T*)&o), size(o.size*sizeof(O)/sizeof(T)), capacity(o.capacity*sizeof(O)/sizeof(T)) { o.capacity=0; }
+        : data((const T*)&o), size(o.size*sizeof(O)/sizeof(T)), capacity(o.capacity*sizeof(O)/sizeof(T)) { o.capacity=0; assert_(o.heap); }
     /// Move assigment
-    array& operator=(array&& o) { this->~array(); data=o.data; size=o.size; capacity=o.capacity; o.capacity=0; return *this; }
+    array& operator=(array&& o) {
+        assert_(o.heap);
+        this->~array(); data=o.data; size=o.size; capacity=o.capacity; o.capacity=0;
+        return *this;
+    }
 
     /// Allocates a new uninitialized array for \a capacity elements
-    /// \note use placement new to safely initialize objects with assignment operator
     explicit array(int capacity) : data(allocate<T>(capacity)), capacity(capacity) { assert_(capacity>0); }
     /// Allocates a new array with \a size elements initialized to \a value
-    array(int size, const T& value) : data((T*)malloc(size*sizeof(T))), capacity(size) { for(int i=0;i<size;i++) append(value); }
+    array(int size, const T& value) : data(allocate<T>(size)), capacity(size) { for(int i=0;i<size;i++) append(value); }
     /// Copy elements from an initializer \a list
     array(const std::initializer_list<T>& list) { append(array((T*)list.begin(),list.size())); }
 
 //referencing constructors
-    /// References \a size elements from \a data pointer
+    /// References \a size elements from read-only \a data pointer
     array(const T* data, int size) : data(data), size(size) { assert_(size>=0); assert_(data); }
     /// References elements sliced from \a begin to \a end
     array(const T* begin,const T* end) : data(begin), size(int(end-begin)) { assert_(size>=0); assert_(data); }
+    /// References \a size elements from mutable \a buffer with total \a capacity
+    array(T* buffer, int size, int capacity) : data(buffer), size(size), capacity(capacity), heap(false) { assert_(size<=capacity); assert_(data); }
 
     /// if \a this own the data, destroys all initialized elements and frees the buffer
-    ~array() { if(capacity) { for(int i=0;i<size;i++) data[i].~T(); free((void*)data); } }
+    ~array() { if(capacity) { for(int i=0;i<size;i++) data[i].~T(); if(heap) unallocate(data); } }
 
     /// Allocates enough memory for \a capacity elements
     void reserve(int capacity) {
         if(this->capacity>=capacity) return;
-        if(this->capacity) data=(T*)realloc((void*)data,(size_t)capacity*sizeof(T));
+        if(this->capacity && heap) data=reallocate<T>(data,this->capacity,capacity);
         else if(capacity) { T* detach=allocate<T>(capacity); copy((byte*)detach,(byte*)data,size*sizeof(T)); data=detach; }
         this->capacity=capacity;
     }
@@ -101,7 +107,7 @@ template <class T> struct array {
     void append(const T& v) { int s=size+1; reserve(s); new (end()) T(copy(v)); size=s; }
     array& operator <<(T&& v) { append(move(v)); return *this; }
     array& operator <<(const T&  v) { append(v); return *this; }
-    //template<perfect(T)> void appendOnce(Tf&& v) { if(!contains(v)) append(forward<Tf>(v)); }
+    template<perfect(T)> void appendOnce(Tf&& v) { if(!contains(v)) append(forward<Tf>(v)); }
 
     /// append array
     void append(array&& a) { int s=size+a.size; reserve(s); copy((byte*)end(),(byte*)a.data,a.size*sizeof(T)); size=s; }
@@ -153,7 +159,7 @@ template<class T> array<T> copy(const array<T>& a) { array<T> r; r<<a; return  r
 /// \note Using move semantics, this operation is safe without refcounting the data buffer
 template<class T> array<T> slice(array<T>&& a, int pos,int size) {
     assert_(pos>=0 && pos+size<=a.size);
-    assert_(a.capacity == 0); //only allow slicing of referencing arrays. TODO: custom allocator allowing arbitrary resize
+    assert_(a.capacity == 0); //only allow slicing of referencing arrays. TODO: custom realloc with slicing
     return array<T>(a.data+pos,size);
 }
 /// Slices an array referencing elements from \a pos to the end of the array
@@ -182,3 +188,10 @@ template<class T> array<T>  replace(const array<T>& a, const T& before, const T&
 template<class T> const T& min(const array<T>& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
 template<class T> T& max(array<T>& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
 template<class T> T sum(const array<T>& a) { T sum=0; for(const T& e: a) sum+=e; return sum; }
+
+/// \a static_array is an array with an initial static allocated buffer
+/// \note This feature is not directly implemented by array to avoid template bloat (reuse array<T> for all N)
+template <class T, int N> struct static_array : array<T> {
+    T buffer[N];
+    static_array() : array<T>(buffer,0,N){}
+};

@@ -29,18 +29,24 @@
 
 #include "media.h"
 #include <math.h>
-#include <emmintrin.h>
+
+typedef float __m128 __attribute__ ((__vector_size__ (16), __may_alias__));
+#define _mm_add_ps __builtin_ia32_addps
+#define _mm_mul_ps __builtin_ia32_mulps
+#define _mm_loadu_ps __builtin_ia32_loadups
+#define _mm_movehl_ps __builtin_ia32_movhlps
+#define _mm_add_ss __builtin_ia32_addss
+#define _mm_shuffle_ps __builtin_ia32_shufps
 
 static inline float inner_product_single(const float *a, const float *b, int len) {
-    __m128 sum = _mm_setzero_ps();
+    __m128 sum = {0,0,0,0};
     for(int i=0;i<len;i+=8) {
         sum = _mm_add_ps(sum, _mm_mul_ps(_mm_loadu_ps(a+i), _mm_loadu_ps(b+i)));
         sum = _mm_add_ps(sum, _mm_mul_ps(_mm_loadu_ps(a+i+4), _mm_loadu_ps(b+i+4)));
     }
     sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
     sum = _mm_add_ss(sum, _mm_shuffle_ps(sum, sum, 0x55));
-    float ret; _mm_store_ss(&ret, sum);
-    return ret;
+    return __builtin_ia32_vec_ext_v4sf(sum, 0);
 }
 
 const int filterSize = 256;

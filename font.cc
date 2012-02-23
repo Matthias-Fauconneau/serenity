@@ -47,7 +47,7 @@ GlyphMetrics Font::metrics(int size, int code) {
 
 Glyph& Font::glyph(int size, int code) {
     map<int, Glyph>& glyphs = cache[size];
-    if(glyphs.values.size==0) glyphs.values.reserve(256); //realloc would invalid any references
+    if(glyphs.values.size==0) glyphs.values.reserve(256); //FIXME: dynamic array would invalid any references
     assert(glyphs.values.capacity==256);
     Glyph& glyph = glyphs[code]; //TODO: lookup for code in [0x20..0x80]
     if(glyph.texture || glyph.advance.x) return glyph;

@@ -12,8 +12,8 @@ typedef struct _snd_seq snd_seq_t;
 struct Sequencer : Poll {
     static const int latency = 1024;
     snd_seq_t* seq;
-    array<uint8> pressed{128};
-    array<uint8> sustained{128};
+    static_array<uint8,16> pressed;
+    static_array<uint8,32> sustained;
     bool sustain=false;
     signal<int,int> noteEvent;
     int maxVelocity=96;
@@ -27,7 +27,7 @@ struct Sequencer : Poll {
     void setRecord(bool record);
     void event(pollfd);
     void recordMID(const string& path);
-    void sync();
+    ~Sequencer();
 };
 
 struct MidiFile {
@@ -35,7 +35,7 @@ struct MidiFile {
     enum { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,
            EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
     enum State { Seek=0, Play=1, Sort=2 };
-    struct Track : Stream<> { Track(array<byte> data):Stream(data){} int time=0; int type=0; };
+    struct Track : Stream { Track(array<byte>&& data):Stream(move(data)){} int time=0; int type=0; };
     array<Track> tracks;
     int trackCount=0;
     int midiClock=0;
@@ -54,12 +54,12 @@ struct Sampler : AudioInput {
         int16 trigger=0; int16 lovel=0; int16 hivel=127; int16 lokey=0; int16 hikey=127; //Input Controls
         int16 pitch_keycenter=60; int32 releaseTime=0; int16 amp_veltrack=100; int16 rt_decay=0; float volume=1; //Performance Parameters
     };
-    struct Note { const Sample* sample; Codec decode; int position,end; int key; int vel; int shift; float level; };
+    struct Note { const Sample* sample; Codec decode; int remaining; int key; int vel; int shift; float level; };
 
     static const int period = 1024; //-> latency
 
-    array<Sample> samples{1024};
-    array<Note> active{64};
+    static_array<Sample,1024> samples;
+    static_array<Note,16> active;
     struct Layer { int size=0; float* buffer=0; bool active=false; Resampler resampler; } layers[3];
     float* buffer = 0;
     int record;
@@ -72,7 +72,7 @@ struct Sampler : AudioInput {
     void setup(const AudioFormat& format) override;
     void read(int16* output, int size) override;
     void recordWAV(const string& path);
-    void sync();
+    ~Sampler();
 };
 
 struct Score {

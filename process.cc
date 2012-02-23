@@ -11,15 +11,7 @@ extern "C" __pid_t waitpid(__pid_t __pid, int *__stat_loc, int __options);
 
 /// Process
 
-/// limit process ressources to avoid hanging the system when debugging
-
 void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
-declare(static void limit_resource(), constructor) {
-    /*{ rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<20; setrlimit(RLIMIT_STACK,&limit); } //1M
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24; setrlimit(RLIMIT_DATA,&limit); } //16M
-    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_AS,&limit); } //256M*/
-    setPriority(19);
-}
 
 int getCPUTime() {
     rusage usage; getrusage(RUSAGE_SELF,&usage);
@@ -41,7 +33,7 @@ void execute(const string& path, const array<string>& args) {
 
 /// Poll
 
-static map<Poll*,pollfd> polls __attribute((init_priority(103)));
+static static_map<Poll*,pollfd,4> polls __attribute((init_priority(103)));
 void Poll::registerPoll() { polls.insert(this,this->poll()); }
 void Poll::unregisterPoll() { polls.remove(this); }
 
@@ -50,7 +42,7 @@ void Poll::unregisterPoll() { polls.remove(this); }
 Application* app=0;
 Application::Application() { assert(!app,"Multiple application compiled in executable"_); app=this; }
 int main(int argc, const char** argv) {
-    array<string> args;
+    static_array<string,1024> args;
     for(int i=1;i<argc;i++) args << strz(argv[i]);
     assert(app,"No application compiled in executable"_);
     app->start(move(args));
@@ -82,18 +74,16 @@ declare(static void read_debug_symbols(), constructor(101)) {
         assert(symcount >= 0);
     }
 }
-struct Symbol { string file,function; int line; };
+struct Symbol { static_string<128> file,function; uint line; };
 Symbol findNearestLine(void* address) {
     for(bfd_section* s=abfd->sections;s;s=s->next) {
         if((bfd_vma)address < s->vma || (bfd_vma)address >= s->vma + s->size) continue;
         const char* path=0; const char* func=0; uint line=0;
         if(bfd_find_nearest_line(abfd, s, (bfd_symbol**)syms, (bfd_vma)address - s->vma, &path, &func, &line)) {
             if(!path || !func || !line) continue;
-            string file = section(strz(path),'/',-2,-1);
-            char* demangle = abi::__cxa_demangle(func,0,0,0);
-            string function = copy(strz(demangle?:func));
-            free(demangle);
-            return i({move(file),move(function),(int)line});
+            static size_t length=128; static char* buffer=(char*)malloc(length); int status;
+            buffer=abi::__cxa_demangle(func,buffer,&length,&status);
+            return i({ section(strz(path),'/',-2,-1), strz(!status?buffer:func), (int)line });
         }
     }
     return i({string(),string(),0});
@@ -118,7 +108,7 @@ void logBacktrace(StackFrame* frame) {
     int size = backtrace(frames,8,frame);
     for(int i=size-1; i>=0; i--) {
         Symbol s = findNearestLine(frames[i]);
-        if(s.function) { log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
+        if(s.function && s.function[0]!='_') { log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
     }
 }
 
@@ -184,6 +174,11 @@ no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enabl
 void logTrace() { trace.log(); logBacktrace(StackFrame::current()->caller_frame); }
 #else
 void logTrace() { logBacktrace(StackFrame::current()->caller_frame); }
+void logTrace(int skip) {
+    StackFrame* frame = StackFrame::current();
+    while(skip--) frame=frame->caller_frame;
+    logBacktrace(frame);
+}
 #ifdef PROFILE
 /// Profiler
 

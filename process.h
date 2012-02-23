@@ -26,14 +26,15 @@ struct Poll {
     virtual void event(pollfd p) =0;
 };
 
+/// Set process CPU scheduling priority (-20 high priority, 19 low priority)
 void setPriority(int priority);
+/// Execute binary at \a path with command line arguments \a args
 void execute(const string& path, const array<string>& args=array<string>());
 /// Returns CPU time in milliseconds consumed since start of process
 int getCPUTime();
 
-#ifdef TRACE
-void logProfile();
-#endif
+/// Log stack trace skipping top \a skip frames
+void logTrace(int skip);
 
 struct Profile {
     string name;

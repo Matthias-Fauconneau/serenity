@@ -1,6 +1,7 @@
 #include "music.h"
+#include "file.h"
 
-#include <stdlib.h>
+#include <sys/types.h>
 #include <alsa/global.h>
 struct snd_input_t;
 struct snd_output_t;
@@ -26,51 +27,49 @@ Sequencer::Sequencer() {
 
 pollfd Sequencer::poll() { pollfd p; snd_seq_poll_descriptors(seq,&p,1,POLLIN); return p; }
 void Sequencer::event(pollfd) {
-    snd_seq_event_t* ev; snd_seq_event_input(seq, &ev);
-    if(ev->type == SND_SEQ_EVENT_NOTEON) {
-        int key = ev->data.note.note;
-        int vel = ev->data.note.velocity;
-        if( vel == 0 ) {
-            pressed.removeOne(key);
-            if(sustain) sustained << key;
-            else {
-                noteEvent.emit(key,0);
+    int remaining;
+    do {
+        snd_seq_event_t* ev;
+        remaining = snd_seq_event_input(seq, &ev);
+        if(ev->type == SND_SEQ_EVENT_NOTEON) {
+            int key = ev->data.note.note;
+            int vel = ev->data.note.velocity;
+            if( vel == 0 ) {
+                pressed.removeOne(key);
+                if(sustain) sustained.appendOnce( key );
+                else {
+                    noteEvent.emit(key,0);
+                    if(record) {
+                        int tick = time();
+                        events << Event((int16)(tick-lastTick), (uint8)key, (uint8)0);
+                        lastTick = tick;
+                    }
+                }
+            } else {
+                pressed << key;
+                if(vel>maxVelocity) maxVelocity=vel;
+                noteEvent.emit(key, vel*127/maxVelocity);
                 if(record) {
                     int tick = time();
-                    events << Event((int16)(tick-lastTick), (uint8)key, (uint8)0);
+                    events << Event((int16)(tick-lastTick), (uint8)key, (uint8)vel);
                     lastTick = tick;
                 }
             }
-        } else {
-            sustained.removeOne(key);
-            pressed << key;
-            if(vel>maxVelocity) maxVelocity=vel;
-            noteEvent.emit(key, vel*127/maxVelocity);
-            if(record) {
-                int tick = time();
-                events << Event((int16)(tick-lastTick), (uint8)key, (uint8)vel);
-                lastTick = tick;
-            }
-            //expected.removeAll(note); followScore();
-        }
-    } else if( ev->type == SND_SEQ_EVENT_CONTROLLER ) {
-        if(ev->data.control.param==64) {
-            sustain = (ev->data.control.value != 0);
-            if(!sustain) {
-                for(int key : sustained) noteEvent.emit(key,0);
-                sustained.clear();
+        } else if( ev->type == SND_SEQ_EVENT_CONTROLLER ) {
+            if(ev->data.control.param==64) {
+                sustain = (ev->data.control.value != 0);
+                if(!sustain) {
+                    for(int key : sustained) noteEvent.emit(key,0);
+                    sustained.clear();
+                }
             }
         }
-    }
-    snd_seq_free_event(ev);
+        snd_seq_free_event(ev);
+    } while(remaining>1);
 }
 
-#include "file.h"
-#include <fcntl.h>
-#include <unistd.h>
-
 void Sequencer::recordMID(const string& path) { record=copy(path); }
-void Sequencer::sync() {
+Sequencer::~Sequencer() {
     array<byte> track;
     for(Event e : events) {
         int v=e.time;
@@ -82,7 +81,7 @@ void Sequencer::sync() {
     }
     track << 0x00 << 0xFF << 0x2F << 0x00; //EndOfTrack
 
-    int fd = open(strz(record).data,O_CREAT|O_WRONLY|O_TRUNC,0666);
+    int fd = createFile(record);
     struct { char name[4]={'M','T','h','d'}; int32 size=swap32(6); int16 format=swap16(0);
         int16 trackCount=swap16(1); int16 timeDivision=swap16(500); } __attribute__ ((packed)) MThd;
     write(fd,raw(MThd));
