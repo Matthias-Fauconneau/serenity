@@ -1,6 +1,6 @@
-//TODO: Menu: /Applications/Categories/application, /Files/(Favorites|Devices|Recent Files|URLs)/file, rounded window
+//TODO: Menu: /Applications/Categories/application, /Files/(Favorites|Devices|Recent Files|URLs)/file, rounded menu
 //TODO: Search: {Applications, Files, Web, Command}, completion in popup (+recent queries)
-//TODO: Desktop: Applications, Favorites/Places/Devices/Recent Files/URLs, Folder, Feeds/Messages/Contacts, Events, Search, PowerOff
+//TODO: Desktop: Applications, Favorites/Places/Devices/Recent Files/URLs, Folder, Feeds/Messages/Contacts, Events, Search
 #include "launcher.h"
 #include "stream.h"
 #include "process.h"
@@ -28,9 +28,7 @@ bool Shortcut::mouseEvent(int2, Event event, Button) {
 
 bool Menu::mouseEvent(int2 position, Event event, Button button) {
     if(Vertical::mouseEvent(position,event,button)) return true;
-    if(event==Leave) {
-        closeMenu.emit();
-    }
+    if(event==Leave) closeMenu.emit();
     return false;
 }
 
@@ -77,6 +75,7 @@ Launcher::Launcher() {
     shortcuts.expanding = true;
     menu.update();
 
+    window.resize(int2(128,16+32*shortcuts.count()));
     window.keyPress.connect(this,&Launcher::keyPress);
     closeMenu.connect(&window,&Window::hide);
     window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);

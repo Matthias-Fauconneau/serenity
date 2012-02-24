@@ -11,6 +11,7 @@ process.cc
 file.h
 file.cc
 signal.h
+memory.cc
 
 image.h
 image.cc
@@ -41,4 +42,3 @@ sampler.cc
 midi.cc
 
 music.cc
-memory.cc
