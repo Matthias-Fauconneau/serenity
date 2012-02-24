@@ -34,8 +34,8 @@ int main(int argc, const char** argv) {
                     for(const auto& e : tags_) if(tag==e) { skip=false; break; }
                     s=t;
                     if(skip) {
-                        for(int nest=1;nest;s++) { assert(*s,"Unmatched {"_); if(*s=='{') nest++; if(*s=='}') nest--; }
-                        assert(*s=='\n'); s++;
+                        for(int nest=1;nest;s++) { if(!*s) error("Unmatched {"_); if(*s=='{') nest++; if(*s=='}') nest--; }
+                        if(*s!='\n') fail(); s++;
                     } else { scope<<nest; nest++; } //remember to remove scope end bracket
                     continue;
                 }

@@ -64,14 +64,18 @@ void section_(const string& s, char sep, int& start, int& end, bool includeSep) 
     }
     start=b; end=e;
 }
+/*string sectionRef(const string& s, char sep, int start, int end, bool includeSep) {
+    section_(s,sep,start,end,includeSep);
+    return string(s.data+start,end-start);
+}*/
 short_string section(const string& s, char sep, int start, int end, bool includeSep) {
     section_(s,sep,start,end,includeSep);
     return string(s.data+start,end-start);
 }
-string section(string&& s, char sep, int start, int end, bool includeSep) {
+/*string section(string&& s, char sep, int start, int end, bool includeSep) {
     section_(s,sep,start,end,includeSep);
     return slice(move(s),start,end-start);
-}
+}*/
 
 array<string> split(const string& str, char sep) {
     array<string> r;

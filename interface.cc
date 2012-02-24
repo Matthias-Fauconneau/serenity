@@ -4,6 +4,7 @@
 #include "gl.h"
 
 SHADER(flat);
+SHADER(radial);
 SHADER(blit);
 
 /// ScrollArea
@@ -62,7 +63,7 @@ int2 Linear::sizeHint() {
         if(size.x<0) expanding++;
         width += abs(size.x);
     }
-    return xy(int2((this->expanding||expanding)?-width:width,height));
+    return xy(int2((this->expanding||expanding)?-min(1,width):width,height));
 }
 
 void Linear::update() {
@@ -137,7 +138,7 @@ void Text::update() {
 int2 Text::sizeHint() { if(!textSize) update(); assert(textSize); return textSize; }
 
 void Text::render(int2 parent) {
-    blit.bind(); blit["scale"]=viewport; blit["offset"]=vec2(parent+position+max(int2(0,0),(Widget::size-textSize)/2));
+    blit.bind(); blit["offset"]=vec2(parent+position+max(int2(0,0),(Widget::size-textSize)/2));
     for(const auto& b: blits) {
         if(b.min>=vec2(-4,0) && b.max<=vec2(Widget::size+int2(2,2))) {
             GLTexture::bind(b.id); glQuad(blit, b.min, b.max, true);
@@ -174,7 +175,7 @@ bool TextInput::keyPress(Key key) {
 void TextInput::render(int2 parent) {
     Text::render(parent);
     if(Window::focus==this) {
-        flat.bind(); flat["scale"]=viewport; flat["offset"]=vec2(parent+position+(Widget::size-textSize)/2); flat["color"]=vec4(0,0,0,1);
+        flat.bind(); flat["offset"]=vec2(parent+position+(Widget::size-textSize)/2); flat["color"]=vec4(0,0,0,1);
         int x = cursor < blits.size? blits[cursor].min.x : cursor>0 ? blits.last().max.x : 0;
         glQuad(flat,vec2(x,0),vec2(x+1,Widget::size.y));
     }
@@ -185,7 +186,7 @@ void TextInput::render(int2 parent) {
 int2 Slider::sizeHint() { return int2(-height,height); }
 
 void Slider::render(int2 parent) {
-    flat.bind(); flat["scale"]=viewport; flat["offset"]=vec2(parent+position); flat["color"]=vec4(1./2, 1./2, 1./2, 1);
+    flat.bind(); flat["offset"]=vec2(parent+position); flat["color"]=vec4(1./2, 1./2, 1./2, 1);
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = size.x*(value-minimum)/(maximum-minimum);
         glQuad(flat,vec2(0,0),vec2(x,size.y));
@@ -212,7 +213,7 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(event != Press || button != LeftButton) return false;
     int i=0;
     for(auto& child: *this) {
-        if(position>child.position && position<child.position+child.size) {
+        if(position>=child.position && position<child.position+child.size) {
             index=i; activeChanged.emit(i);
             return true;
         }
@@ -221,14 +222,33 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     return false;
 }
 
-void Selection::render(int2 parent) {
+void HighlightSelection::render(int2 parent) {
     Layout::render(parent);
     if(index<0 || index>=count()) return;
     Widget& current = at(index);
     if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
-        flat.bind(); flat["scale"]=viewport; flat["offset"]=vec2(parent+position); flat["color"]=vec4(3./4, 7./8, 1, 1); //multiply blend
+        flat.bind(); flat["offset"]=vec2(parent+position); flat["color"]=vec4(3./4, 7./8, 1, 1); //multiply blend
         glQuad(flat,vec2(current.position), vec2(current.position+current.size));
     }
+}
+
+void TabSelection::render(int2 parent) {
+    Layout::render(parent);
+    if(index<0 || index>=count()) return;
+    Widget& current = at(index);
+
+    flat.bind(); flat["offset"]=vec2(parent+position);
+
+    glBlend(false);
+    flat["color"]=vec4(15./16,15./16,15./16,1); //white underline
+    glQuad(flat,vec2(0, size.y-1), vec2(current.position.x, size.y));
+    glQuad(flat,vec2(current.position.x+current.size.x, size.y-1), vec2(size));
+
+    glBlend(true);
+    flat["color"]=vec4(7./8,7./8,7./8,1); // darken
+    glQuad(flat,vec2(0, 0), vec2(current.position.x, size.y));
+    if(current.position.x+current.size.x<size.x-1-count()) //dont darken only margin
+        glQuad(flat,vec2(current.position.x+current.size.x, 0), vec2(size));
 }
 
 /// Icon
@@ -239,7 +259,7 @@ void Icon::render(int2 parent) {
     if(!image) return;
     int size = min(Widget::size.x,Widget::size.y);
     int2 offset = (Widget::size-int2(size,size))/2;
-    blit.bind(); blit["scale"]=viewport; blit["offset"]=vec2(parent+position+offset);
+    blit.bind(); blit["offset"]=vec2(parent+position+offset);
     image.bind();
     glQuad(blit,vec2(0,0),vec2(size,size),true);
 }
@@ -259,7 +279,7 @@ void ToggleButton::render(int2 parent) {
     if(!(enabled?disableIcon:enableIcon)) return;
     int size = min(Widget::size.x,Widget::size.y);
     int2 offset = (Widget::size-int2(size,size))/2;
-    blit.bind(); blit["scale"]=viewport; blit["offset"]=vec2(parent+position+offset);
+    blit.bind(); blit["offset"]=vec2(parent+position+offset);
     (enabled?disableIcon:enableIcon).bind();
     glQuad(blit,vec2(0,0),vec2(size,size),true);
 }

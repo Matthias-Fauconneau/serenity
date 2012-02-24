@@ -4,7 +4,7 @@
 #include "GL/gl.h"
 
 /// State
-#if DEBUG
+#if GLU
 #include "GL/glu.h"
 #define glCheck ({ auto e=glGetError(); if(e) { log(strz((const  char*)gluErrorString(e)));abort(); } })
 #else
@@ -39,15 +39,16 @@ uint GLShader::attribLocation(const char* name) {
     assert(location>=0,"Unknown attribute"_,strz(name));
     return (uint)location;
 }
-void GLUniform::operator=(float v) { glUniform1f(id,v); }
-void GLUniform::operator=(vec2 v) { glUniform2f(id,v.x,v.y); }
-void GLUniform::operator=(vec4 v) { glUniform4f(id,v.x,v.y,v.z,v.w); }
-void GLUniform::operator=(mat4 m) { glUniformMatrix4fv(id,1,0,m.data); }
+void GLUniform::operator=(float v) { glProgramUniform1f(program,location,v); }
+void GLUniform::operator=(vec2 v) { glProgramUniform2f(program,location,v.x,v.y); }
+void GLUniform::operator=(vec4 v) { glProgramUniform4f(program,location,v.x,v.y,v.z,v.w); }
+void GLUniform::operator=(mat4 m) { glProgramUniformMatrix4fv(program,location,1,0,m.data); }
 GLUniform GLShader::operator[](const char* name) {
     int location = uniformLocations.value(name,-1);
+    if(!id) bind();
     if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
-    assert(location>=0,"Unknown uniform"_,strz(name));
-    return GLUniform(location);
+    if(location<0) error("Unknown uniform"_,strz(name));
+    return GLUniform(id,location);
 }
 
 /// Texture
@@ -161,6 +162,5 @@ void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     if(texCoord) glDisableVertexAttribArray(texCoordIndex);
 }
 
-void glWireframe(bool wireframe) {
-    glPolygonMode(GL_FRONT_AND_BACK,wireframe?GL_LINE:GL_FILL);
-}
+void glWireframe(bool wireframe) { glPolygonMode(GL_FRONT_AND_BACK,wireframe?GL_LINE:GL_FILL); }
+void glBlend(bool blend) { if(blend) glEnable(GL_BLEND); else glDisable(GL_BLEND); }

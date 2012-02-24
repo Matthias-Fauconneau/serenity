@@ -17,7 +17,7 @@ template <class K, class V> struct map {
     template<perfect(V)> Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? addressof(values[i]) : 0; }
     template<perfect2(K,V)> V& insert(Kf&& key, Vf&& value) { keys << forward<Kf>(key); values << forward<Vf>(value); return values.last(); }
-    template<perfect(K)> V& insert(Kf&& key) { insert(forward<Kf>(key),V()); return values.last(); }
+    template<perfect(K)> V& insert(Kf&& key) { keys << forward<Kf>(key); values.resize(keys.size); return values.last(); }
     template<perfect(K)> V& operator [](Kf&& key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(forward<Kf>(key)); }
     void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
@@ -44,7 +44,7 @@ template <class K, class V> struct map {
 
 template<class K, class V> string str(const map<K,V>& m) {
     string s="{"_;
-    for(int i=0;i<m.size();i++) { s<<str(m.keys[i],": "_,m.values[i]); if(i<m.size()-1) s<<", "_; }
+    for(int i=0;i<m.size();i++) { s<<m.keys[i]+": "_+m.values[i]; if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }
 

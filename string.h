@@ -30,6 +30,7 @@ struct string : array<char> {
     bool endsWith(const string& a) const { return a.size<=size && array(data+size-a.size,a.size)==a; }
 };
 template<> inline string copy(const string& s) { return copy<char>(s); }
+//typedef array<char> string;
 
 /// Expression template to hold recursive concatenation operations
 template<class A> struct cat {
@@ -56,9 +57,18 @@ template<int N> struct static_string : string {
     static_string() : string(buffer,0,N){}
     static_string(const array<char>& o):static_string(){ append(o); }
     static_string(int capacity):static_string(){reserve(capacity);}
+    static_string(static_string&& o):static_string(){
+        if(o.heap) { data=o.data, size=o.size, capacity=o.capacity, heap=true; o.capacity=0; }
+        else append(o); //copy if static
+    }
+    /*template<int O> static_string(static_string<O>&& o):static_string(){
+        if(o.heap) { data=o.data, size=o.size, capacity=o.capacity, heap=true; o.capacity=0; }
+        else append(o); //copy if static
+    }*/
+
     /// specialization to concatenate strings without allocation using static_string<N>(a+b+...)
     template<class A> static_string(const cat<A>& a):static_string(){
-         size=a.size(); reserve(size); //allocate if needed
+         int size=a.size(); reserve(size); this->size=size; //allocate if needed
          char* data=(char*)this->data; a.copy(data);
     }
 };
@@ -67,19 +77,27 @@ typedef static_string<64> short_string;
 
 /// Constructs string literals
 inline string operator "" _(const char* data, size_t size) { return string(data,size); }
+
 /// Lexically compare strings
 bool operator <(const string& a, const string& b);
+
 /// Returns a null-terminated string
 short_string strz(const string& s);
 /// Returns a bounded reference to the null-terminated string pointer
 string strz(const char* s);
+
 /// Returns a copy of the string between the "start"th and "end"th occurence separator \a sep
 /// \note you can use negative \a start, \a end to count from the right
 /// \note this is a shortcut to join(split(str,sep).slice(start,end),sep)
 short_string section(const string& str, char sep, int start=0, int end=1, bool includeSep=false);
 //string section(string&& s, char sep, int start=0, int end=1, bool includeSep=false);
+/*/// Returns a reference to the string between the "start"th and "end"th occurence separator \a sep
+/// \note \a str should stay allocated as long as the returned string is used
+string sectionRef(const string& str, char sep, int start, int end, bool includeSep);-*/
+
 /// Splits \a str wherever \a sep occurs
 array<string> split(const string& str, char sep=' ');
+
 /// Replaces every occurrence of the string \a before with the string \a after
 short_string replace(const string& s, const string& before, const string& after);
 
@@ -121,6 +139,12 @@ template<class T> string str(const array<T>& a) {
     for(int i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<", "_; }
     return s+"]"_;
 }
+template<> inline string str(const array<string>& a) {
+    string s="["_;
+    for(int i=0;i<a.size;i++) { s<<a[i]; if(i<a.size-1) s<<", "_; }
+    return s+"]"_;
+}
+
 
 /// Enhanced debugging using str(...)
 //inline void write(int fd, const string& s) { write(fd,&s,(size_t)s.size); }

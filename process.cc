@@ -5,6 +5,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <sys/resource.h>
+#include <sched.h>
 extern "C" __pid_t waitpid(__pid_t __pid, int *__stat_loc, int __options);
 
 #define declare(function, attributes...) function __attribute((attributes)); function
@@ -21,13 +22,16 @@ int getCPUTime() {
 
 void execute(const string& path, const array<string>& args) {
     array<string> args0(1+args.size);
-    args0 << strz(path);
-    for(int i=0;i<args.size;i++) args0 << strz(args[i]);
+    args0 << copy(strz(path));
+    for(int i=0;i<args.size;i++) args0 << copy(strz(args[i]));
     const char* argv[args0.size+1];
     for(int i=0;i<args0.size;i++) argv[i]=&args0[i];
     argv[1+args.size]=0;
     pid_t pid = fork();
-    if(pid==0 && execv(&strz(path),(char* const*)argv)) _exit(-1);
+    if(pid==0) {
+        unshare(CLONE_FILES);
+        if(!execv(&strz(path),(char* const*)argv)) _exit(-1);
+    }
     //int status; waitpid(pid,&status,0);
 }
 

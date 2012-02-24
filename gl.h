@@ -14,12 +14,12 @@ extern char _binary_## name ##_gpu_end[]; \
 GLShader name = array<byte>(_binary_## name ##_gpu_start,_binary_## name ##_gpu_end)
 
 struct GLUniform {
-    GLUniform(int id) : id(id) {}
+    GLUniform(int program, int location) : program(program), location(location) {}
     void operator=(float);
     void operator=(vec2);
     void operator=(vec4);
     void operator=(mat4);
-    int id;
+    int program, location;
 };
 struct GLShader {
     GLShader(array<byte>&& binary):binary(move(binary)){}
@@ -33,8 +33,6 @@ struct GLShader {
     map<const char*,int> attribLocations;
     map<const char*,int> uniformLocations;
 };
-extern GLShader flat;
-extern GLShader blit;
 
 struct GLTexture : Image {
     GLTexture(){}
@@ -77,3 +75,4 @@ struct GLBuffer {
 
 void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord=false);
 void glWireframe(bool wireframe=true);
+void glBlend(bool blend=true);

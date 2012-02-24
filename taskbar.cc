@@ -1,4 +1,4 @@
-//TODO: Calendar, Notifications, Jump Lists
+//TODO: Calendar, Events, Notifications, Jump Lists
 #include "process.h"
 #include "dbus.h"
 #include "interface.h"
@@ -8,17 +8,17 @@
 //-> time.h
 #include "time.h"
 time_t unixTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
-string date(const string& format) {
+string date(Stream format) {
     time_t time=unixTime(); tm date; localtime_r(&time,&date);
     string r(format.size);
-    for(Stream<> s(format);s;) {
-        /**/ if(s.match("ss"_))  r << toString(date.tm_sec,10,2);
-        else if(s.match("mm"_))  r << toString(date.tm_min,10,2);
-        else if(s.match("hh"_))  r << toString(date.tm_hour,10,2);
-        else if(s.match("d"_))   r << toString(date.tm_mday);
-        else if(s.match("MM"_))  r << toString(date.tm_mon,10,2);
-        else if(s.match("yyyy"_))r << toString(date.tm_year);
-        else r << s.read();
+    while(format) {
+        /**/ if(format.match("ss"_))  r << str((uint64)date.tm_sec,10,2);
+        else if(format.match("mm"_))  r << str((uint64)date.tm_min,10,2);
+        else if(format.match("hh"_))  r << str((uint64)date.tm_hour,10,2);
+        else if(format.match("d"_))   r << str((uint64)date.tm_mday);
+        else if(format.match("MM"_))  r << str((uint64)date.tm_mon,10,2);
+        else if(format.match("yyyy"_))r << str((uint64)date.tm_year);
+        else r << format.read<byte>();
     }
     return r;
 }
@@ -35,6 +35,7 @@ struct Timer : Poll {
 };
 
 ICON(button);
+ICON(shutdown);
 
 #define Font XWindow
 #define Window XWindow
@@ -50,6 +51,7 @@ struct Task : Tab {
     XWindow id;
     Task(XWindow id):id(id){}
 };
+bool operator==(const Task& a,const Task& b){return a.id==b.id;}
 
 struct Status : TriggerButton {
     DBus::Object app;
@@ -65,6 +67,14 @@ struct Clock : Text, Timer {
     void expired() { text=date("hh:mm"_); update(); setAbsolute(unixTime()+60); }
 };
 
+struct Desktop {
+    Shortcut shutdown{shutdownIcon,"Shutdown"_,"poweroff"_};
+    Window window{shutdown,int2(0,0),"Desktop"_};
+
+    Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
+    void show() { window.show(); }
+};
+
 struct TaskBar : Poll, Application {
     Display* x;
     DBus dbus;
@@ -74,7 +84,7 @@ struct TaskBar : Poll, Application {
         Atom type; int format; ulong size, bytesAfter; uint8* data =0;
         XGetWindowProperty(x,window,atom,0,~0,0,0,&type,&format,&size,&bytesAfter,&data);
         if(!data || !size) return array<T>();
-        array<T> list = array<T>((T*)data,size).copy();
+        array<T> list = copy(array<T>((T*)data,size));
         XFree(data);
         return list;
     }
@@ -83,6 +93,7 @@ struct TaskBar : Poll, Application {
     Window window{panel,int2(0,16),"TaskBar"_};
     TriggerButton start;
     Launcher launcher;
+    Desktop desktop;
     Bar<Task> tasks;
     Bar<Status> status;
     Clock clock;
@@ -94,13 +105,13 @@ struct TaskBar : Poll, Application {
         updateTask(task);
         if(!task.text.text || !task.icon.image) return 0;
         tasks << move(task);
-        return tasks.size-1;
+        return tasks.array::size-1;
     }
     void updateTask(Task& task) {
         task.text.text = getProperty<char>(task.id,"_NET_WM_NAME");
         array<int> buffer = (array<int>)getProperty<ulong>(task.id,"_NET_WM_ICON");
         if(sizeof(long)==8) for(int i=0;i<buffer.size/2;i++) buffer[i]=buffer[2*i]; //discard CARDINAL high words
-        if(buffer.size>2) task.icon = Image((array<byte4>)buffer.slice(2).copy(),buffer[0],buffer[1]).resize(16,16);
+        if(buffer.size>2) task.icon = Image((array<byte4>)slice(buffer,2),buffer[0],buffer[1]).resize(16,16);
     }
 
     void updateStatusNotifierItems() {
@@ -142,7 +153,6 @@ struct TaskBar : Poll, Application {
          clock.trigger.connect(&window, &Window::render);
         panel.update();
 
-        window.keyPress.connect(this, &TaskBar::keyPress);
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
         window.show(); window.move(int2(0,0));
     }
@@ -162,22 +172,27 @@ struct TaskBar : Poll, Application {
     pollfd poll() { return {XConnectionNumber(x), POLLIN}; }
     void event(pollfd) {
         bool needUpdate = false;
-        while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
+        while(XEventsQueued(x, QueuedAfterFlush)) {
+            XEvent e; XNextEvent(x,&e);
             //TODO: try to optimize by receiving only useful events
             XWindow id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
-            int i = tasks.find([id](const Task& t){return t.id==id;});
-            if(i<0 && (e.type == CreateNotify || e.type == MapNotify || e.type==ReparentNotify)) i=addTask(id);
-            if(i<0) continue;
-            /**/ if(e.type == CreateNotify || e.type == MapNotify || e.type == ReparentNotify) {
-            } else if(e.type == ConfigureNotify || e.type == ClientMessage ||
-                      (e.type==PropertyNotify && e.xproperty.atom != Atom(_NET_WM_NAME) && e.xproperty.atom != Atom(_NET_WM_ICON))) {
-                updateTask(tasks[i]);
-            } else if(e.type == DestroyNotify || e.type == UnmapNotify) {
-                tasks.remove(i);
-            } else continue;
-            needUpdate = true;
+            if(e.type==PropertyNotify && id==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
+                XWindow id = getProperty<XWindow>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
+                tasks.index = tasks.indexOf(id);
+                needUpdate = true;
+            } else {
+                int i = tasks.indexOf(id);
+                if(i<0 && (e.type == CreateNotify || e.type==ReparentNotify)) i=addTask(id);
+                if(i<0) continue;
+                if(e.type == DestroyNotify || e.type == UnmapNotify) tasks.removeAt(i);
+                else updateTask(tasks[i]);
+                if(!tasks[i].text.text || !tasks[i].icon.image) tasks.removeAt(i);
+                needUpdate = true;
+            }
+            if(needUpdate) {
+                panel.update(); window.render();
+                if(!tasks) desktop.show();
+            }
         }
-        if(needUpdate) { panel.update(); window.render(); }
-    }
-    void keyPress(Key key) { if(key==Escape) quit(); }
+   }
 } taskbar;

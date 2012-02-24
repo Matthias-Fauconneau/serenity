@@ -7,6 +7,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+const int lock = 1024*1024; //keep ~4s always in RAM
+
 void Sampler::open(const string& path) {
     // parse sfz and mmap samples
     Sample group;
@@ -32,8 +34,7 @@ void Sampler::open(const string& path) {
                 auto file = mapFile(path);
                 sample->data = file.data+4; sample->size=*(int*)file.data;
                 madvise((void*)file.data,file.size,MADV_SEQUENTIAL);
-                madvise((void*)file.data,min(1024*1024,file.size),MADV_WILLNEED);
-                mlock(sample->data, min(512*1024,file.size));
+                mlock(sample->data, min(lock, file.size));
             }
             else if(key=="trigger"_) sample->trigger = value=="release"_;
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -62,17 +63,18 @@ void Sampler::event(int key, int vel) {
     int noteLength=0;
     int trigger=0;
     if(vel==0) {
-        for(Note& note : active) {
-            if(note.key==key) {
-                trigger=1; noteLength=note.sample->size/6-note.remaining; vel = note.vel; //schedule release sample
-                note.remaining = min(note.remaining, note.sample->releaseTime); //fade out active sample
-                break;
-            }
+        for(Note& note : active) if(note.mayRelease && note.key==key) {
+            if(note.sample->size > lock) munlock(note.sample->data+lock, note.sample->size-lock); //unlock active sample
+            trigger=1; noteLength=note.sample->size/6-note.remaining; vel = note.vel; //schedule release sample
+            note.remaining = min(note.remaining, note.sample->releaseTime); //fade out active sample
+            note.mayRelease = false; //don't stop release samples or the same note twice
         }
         if(!trigger) return; //double release
     }
     for(const Sample& s : samples) {
         if(trigger == s.trigger && key >= s.lokey && key <= s.hikey && vel >= s.lovel && vel <= s.hivel) {
+            mlock(s.data, s.size); //lock sample
+
             int shift = 1+key-s.pitch_keycenter;
             assert(shift>=0 && shift<3,"TODO: pitch shift > 1"_);
             float level = float(vel*vel)/(127*127);
@@ -87,11 +89,12 @@ void Sampler::event(int key, int vel) {
                 for(int i=1;i<active.size;i++) if(active[i].remaining<m) m=active[i].remaining, best=i;
                 active.removeAt(best);
             }
-            active << Note{ &s, Codec(array<byte>(s.data,s.size)), s.size/6, key, vel, shift, level };
+            //log(trigger,key,vel,level);
+            active << Note{ &s, Codec(array<byte>(s.data,s.size)), s.size/6, trigger==0, key, vel, shift, level };
             return; //assume only one match
         }
     }
-    error("Missing sample"_,key,vel);
+    if(trigger==0) error("Missing sample"_,key,vel);
 }
 
 void Sampler::setup(const AudioFormat&) {}

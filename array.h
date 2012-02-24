@@ -3,10 +3,12 @@
 #include <initializer_list>
 
 /// Returns the next \a offset aligned to \a width
-template<int width> inline int align(int offset) {
+template<int width> inline uint64 align(uint64 offset) {
     static_assert(width && !(width & (width - 1)),"width must be a power of two");
     return (offset + width - 1) & ~(width - 1);
 }
+
+template <class T, int N> struct static_array;
 
 /// \a array is a typed and bound-checked handle to memory using move semantics to avoid reference counting
 template <class T> struct array {
@@ -19,6 +21,8 @@ template <class T> struct array {
     /// Prevents creation of independent handle, as they might become dangling when this handle free the buffer.
     /// \note Handle to unacquired ressources still might become dangling if the referenced buffer is freed before this handle.
     no_copy(array)
+
+    template<int N> array(static_array<T,N>&&)=delete;
 
     /// Default constructs an empty array
     array(){}
@@ -40,9 +44,8 @@ template <class T> struct array {
     explicit array(int capacity) : data(allocate<T>(capacity)), capacity(capacity) { assert_(capacity>0); }
     /// Allocates a new array with \a size elements initialized to \a value
     array(int size, const T& value) : data(allocate<T>(size)), capacity(size) { for(int i=0;i<size;i++) append(value); }
-    /// Copy elements from an initializer \a list
-    array(const std::initializer_list<T>& list) { append(array((T*)list.begin(),list.size())); }
-
+    //// Reference elements from an initializer \a list
+    //array(const std::initializer_list<T>& list) { append(array((T*)list.begin(),list.size())); }
 //referencing constructors
     /// References \a size elements from read-only \a data pointer
     array(const T* data, int size) : data(data), size(size) { assert_(size>=0); assert_(data); }
@@ -50,6 +53,8 @@ template <class T> struct array {
     array(const T* begin,const T* end) : data(begin), size(int(end-begin)) { assert_(size>=0); assert_(data); }
     /// References \a size elements from mutable \a buffer with total \a capacity
     array(T* buffer, int size, int capacity) : data(buffer), size(size), capacity(capacity), heap(false) { assert_(size<=capacity); assert_(data); }
+    /// Reference elements from an initializer \a list
+    array(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()), heap(false) {}
 
     /// if \a this own the data, destroys all initialized elements and frees the buffer
     ~array() { if(capacity) { for(int i=0;i<size;i++) data[i].~T(); if(heap) unallocate(data); } }
@@ -58,7 +63,7 @@ template <class T> struct array {
     void reserve(int capacity) {
         if(this->capacity>=capacity) return;
         if(this->capacity && heap) data=reallocate<T>(data,this->capacity,capacity);
-        else if(capacity) { T* detach=allocate<T>(capacity); copy((byte*)detach,(byte*)data,size*sizeof(T)); data=detach; }
+        else if(capacity) { T* detach=allocate<T>(capacity); copy((byte*)detach,(byte*)data,size*sizeof(T)); data=detach; heap=true; }
         this->capacity=capacity;
     }
     /// Sets the array size to \a size and destroys removed elements
@@ -90,7 +95,7 @@ template <class T> struct array {
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& value) const { return indexOf(value)>=0; }
     /// Searches for an element using a comparator delegate
-    template<class Comparator> int find(Comparator lambda) { for(int i=0;i<size;i++) { if(lambda(at(i))) return i; } return -1; }
+    //template<class Comparator> int find(Comparator lambda) { for(int i=0;i<size;i++) { if(lambda(at(i))) return i; } return -1; }
 
     /// remove
     void removeAt(int i) { assert_(i>=0 && i<size); for(;i<size-1;i++) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); size--; }
@@ -105,8 +110,7 @@ template <class T> struct array {
     /// append element
     void append(T&& v) { int s=size+1; reserve(s); new (end()) T(move(v)); size=s; }
     void append(const T& v) { int s=size+1; reserve(s); new (end()) T(copy(v)); size=s; }
-    array& operator <<(T&& v) { append(move(v)); return *this; }
-    array& operator <<(const T&  v) { append(v); return *this; }
+    template<perfect(T)> array& operator <<(Tf&& v) { append(forward<Tf>(v)); return *this; }
     template<perfect(T)> void appendOnce(Tf&& v) { if(!contains(v)) append(forward<Tf>(v)); }
 
     /// append array
@@ -191,6 +195,7 @@ template<class T> T sum(const array<T>& a) { T sum=0; for(const T& e: a) sum+=e;
 
 /// \a static_array is an array with an initial static allocated buffer
 /// \note This feature is not directly implemented by array to avoid template bloat (reuse array<T> for all N)
+/// \note The data pointer is not updated if the static_array moves (i.e array<static_array> is unsafe)
 template <class T, int N> struct static_array : array<T> {
     T buffer[N];
     static_array() : array<T>(buffer,0,N){}

@@ -50,7 +50,7 @@ template<Endianness endianness> struct EndianStream : array<byte> {
     /// Skips \a count byte from the stream
     EndianStream& operator +=(int count) { pos+=count; return *this; }
     /// Align the stream position to the next \a width
-    template <int width> void align() { pos=::align<width>(pos); }
+    template <int width> void align() { pos=(const byte*)::align<width>((uint64)pos); }
 
     /// If stream match any of \a key, advances \a pos
     template<class T> bool matchAny(const array<T>& any) { for(const T& e: any) if(peek<T>() == e) { pos+=sizeof(T); return true; } return false; }

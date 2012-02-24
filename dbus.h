@@ -2,17 +2,20 @@
 #include "file.h"
 #include "process.h"
 #include "map.h"
+#include "stream.h"
+#include "signal.h"
 
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <poll.h>
 
-#ifdef DEBUG
+/*#ifdef DEBUG
 inline void dump(const array<byte>& s) {
     string str; for(int i=0;i<s.size;i++) { char c = s[i]; if(c>=' '&&c<='~') str<<c; else str<<'\\'<<str((ubyte)c,8); }
     log(str);
 }
-#endif
+#endif*/
 
 /// D-Bus
 
@@ -46,24 +49,24 @@ template <Field type> struct FieldHeader {
 template <class T> struct Variant : T {
     operator T&() const { return *this; }
 };
-template<class T> void read(Stream<>& s, Variant<T>& output) {
+template<class T> void read(Stream& s, Variant<T>& output) {
     uint8 size = s.read(); s += size+1; //TODO: type checking
     read(s,(T&)output);
 }
-template<class T> void read(Stream<>& s, array<T>& output) {
+template<class T> void read(Stream& s, array<T>& output) {
     s.align<4>(); int32 length = s.read();
-    uint begin=s.pos; //FIXME: wrong if T has align(8) (structs)
+    const byte* begin=s.pos; //FIXME: wrong if T has align(8) (structs)
     while(s.pos<begin+length) { T e; read(s,e); output << move(e); }
 }
-void read(Stream<>& s, string& output) { s.align<4>(); output = s.readArray().copy(); s++;/*0*/ }
-void read(Stream<>&) {}
+void read(Stream& s, string& output) { s.align<4>(); output = copy(s.readArray<byte>()); s++;/*0*/ }
+void read(Stream&) {}
 
 struct DBusIcon {
     int width;
     int height;
     array<byte> data;
 };
-void read(Stream<>& s, DBusIcon& output) { s.align<8>(); output.width=s.read(); output.height=s.read(); output.data=s.readArray().copy(); }
+void read(Stream& s, DBusIcon& output) { s.align<8>(); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray<byte>()); }
 
 // Template metaprogramming for static dispatch of D-Bus signature serializer
 
@@ -106,26 +109,25 @@ struct DBus : Poll {
     /// Read messages and parse \a outputs from first reply (without type checking)
     template<class... Outputs> void read(uint32, Outputs&... outputs) {
         for(;;) {
-            array<byte> buffer(sizeof(MessageHeader<ReplyMessage>)+4);
-            ::read(fd,buffer); assert(buffer.size==buffer.capacity,buffer.size,"Connection closed"_);
+            array<byte> buffer = ::read(fd,sizeof(MessageHeader<ReplyMessage>)+4);
+            assert(buffer.size==buffer.capacity,buffer.size,"Connection closed"_);
             auto header = *(MessageHeader<ReplyMessage>*)&buffer;
             uint32 fieldsSize = align<8>(*(uint32*)&buffer.at(sizeof(MessageHeader<ReplyMessage>)));
-            array<byte> fields(fieldsSize); ::read(fd,fields);
             string signalName;
-            for(Stream<> s(fields);s;) {
+            for(Stream s = ::read(fd, fieldsSize);s;){
                 Field field = s.read();
                 uint8 size = s.read();
                 s += size+1;
                 if(field==Target||field==Path||field==Interface||field==Member||field==Sender) {
                     s.align<4>();
-                    string name = s.readArray(); s+=1;
+                    string name = s.readArray<byte>(); s++;
                     if(field==Member) signalName=move(name);
                 } else if(field==ReplySerial) { s.align<4>(); s.read<uint32>(); /*uint32 replySerial=s.read(); assert(replySerial==serial);*/ }
                 else if(field==SignatureField) { uint8 size = s.read(); s+=size; }
                 s.align<4>();
             }
             if(header.length) {
-                array<byte> data(header.length); ::read(fd,data); Stream<> s(data);
+                Stream s = ::read(fd,header.length);
                 //dump(data);
                 if(header.message == ReplyMessage) ::read(s,outputs...);
                 else if(header.message == Signal) {
@@ -173,31 +175,30 @@ struct DBus : Poll {
 
     struct Object {
         DBus* d;
-        string target;
-        string object;
+        short_string target;
+        short_string object;
         /// Call \a method with \a inputs. Return a handle to read the reply.
         /// \note \a Reply must be read before interleaving any call
         template<class... Inputs> Reply operator ()(const string& method, const Inputs&... inputs) {
-            string interface = /*method.contains('.')?*/section(method,'.',0,-2)/*:""_*/, member=section(method,'.',-2,-1);
+            short_string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
             return Reply(d,d->write<Call>(target,object,interface,member,inputs...));
         }
         Reply operator [](const string& property) {
             return (*this)("org.freedesktop.DBus.Properties.Get"_,""_,property);
         }
-        Object(DBus* d,string&& target, string&& object):d(d),target(move(target)),object(move(object)){}
     };
 
     /// Get a handle to a D-Bus object
     template<class... Inputs> Object operator ()(const string& object, const Inputs&... inputs) {
-        return Object(this,section(object,'/').copy(),"/"_+section(object,'/',-2,-1).copy());
+        return {this,section(object,'/'),"/"_+section(object,'/',-2,-1)};
     }
 
     DBus() {
         fd = socket(PF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
         sockaddr_un addr; clear(addr);
         addr.sun_family = AF_UNIX;
-        string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
-        addr.sun_path[0]=0; path.copy(addr.sun_path+1);
+        short_string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
+        addr.sun_path[0]=0; copy(addr.sun_path+1,&path,path.size);
         if(connect(fd,(sockaddr*)&addr,3+path.size)) fail();
         ::write(fd,"\0AUTH EXTERNAL 30\r\n"_);
         char buf[256]; ::read(fd,buf,sizeof(buf)); //OK

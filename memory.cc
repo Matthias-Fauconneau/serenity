@@ -1,8 +1,7 @@
 #include "string.h"
-#include "process.h"
 #include <stdlib.h>
 
-#ifdef DEBUG
+#ifdef TRACE_MALLOC
 #include <cxxabi.h>
 string demangle(const char* mangled) {
     char* demangle = abi::__cxa_demangle(mangled,0,0,0);

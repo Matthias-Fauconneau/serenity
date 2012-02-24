@@ -2,6 +2,7 @@
 //TODO: Search: {Applications, Files, Web, Command}, completion in popup (+recent queries)
 //TODO: Desktop: Applications, Favorites/Places/Devices/Recent Files/URLs, Folder, Feeds/Messages/Contacts, Events, Search, PowerOff
 #include "launcher.h"
+#include "stream.h"
 #include "process.h"
 #include "window.h"
 #include "interface.h"
@@ -33,20 +34,26 @@ bool Menu::mouseEvent(int2 position, Event event, Button button) {
     return false;
 }
 
-map<string,string> readConfig(const string& file) {
+map<string,string> readConfig(const string& path) {
+    Stream s(mapFile(path));
     map<string,string> entries;
-    for(const string& line: split(mapFile(file),'\n')) {
-        if(line.contains('=')) entries[section(line,'=')]=section(line,'=',1,-1);
+    while(s) {
+        if(s.match("["_)) s.until('\n');
+        else {
+            string key = s.until('='), value=s.until('\n');
+            entries[move(key)] = move(value);
+        }
+        s.whileAny("\n"_);
     }
     return entries;
 }
 
 Launcher::Launcher() {
-    map<string,string> config = readConfig(strz(getenv("HOME"))+"/.config/launcher"_);
+    auto config = readConfig(strz(getenv("HOME"))+"/.config/launcher"_);
     browser = move(config["Browser"_]);
-    assert(exists(browser));
+    assert(exists(browser), config);
     for(const string& desktop: split(config["Favorites"_],',')) {
-        map<string,string> entries = readConfig(desktop);
+        auto entries = readConfig(desktop);
         auto iconPaths = {"/usr/share/icons/oxygen/32x32/apps/"_,
                           "/usr/share/icons/hicolor/32x32/apps/"_,
                           "/usr/local/share/icons/hicolor/32x32/apps/"_,

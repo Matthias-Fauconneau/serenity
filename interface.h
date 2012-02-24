@@ -3,6 +3,10 @@
 #include "gl.h"
 class Font;
 
+extern GLShader flat;
+extern GLShader radial;
+extern GLShader blit;
+
 /// Event type
 enum Event { Motion, Press, Release, Enter, Leave };
 /// Mouse button
@@ -142,24 +146,32 @@ struct VBox : Vertical, WidgetLayout {};
 struct Selection : virtual Layout {
     /// User changed active index.
     signal<int /*active index*/> activeChanged;
-
     /// Active index
     int index = -1;
 
     bool mouseEvent(int2 position, Event event, Button button) override;
+};
+
+/// Displays a selection using a blue highlight
+struct HighlightSelection : virtual Selection {
     void render(int2 parent) override;
 };
 
-/// ListSelection is an \a ListLayout with \a Selection
-template<class T> struct ListSelection : ListLayout<T>, Selection {
+/// Displays a selection using horizontal tabs
+struct TabSelection : virtual Selection {
+    void render(int2 parent) override;
+};
+
+/// ListSelection is an \a ListLayout with \a HighlightSelection
+template<class T> struct ListSelection : ListLayout<T>, virtual Selection {
     /// Return active item (last selection)
     inline T& active() { return array<T>::at(this->index); }
 };
 
 /// List is a \a Vertical layout of selectable items (\sa ListSelection)
-template<class T> struct List : Scroll<Vertical>, ListSelection<T> {};
+template<class T> struct List : Scroll<Vertical>, ListSelection<T>, HighlightSelection {};
 /// Bar is a \a Horizontal layout of selectable items (\sa ListSelection)
-template<class T> struct Bar : Horizontal, ListSelection<T> {};
+template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {};
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {

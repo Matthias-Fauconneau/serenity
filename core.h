@@ -27,7 +27,7 @@ template<> struct predicate<true> { typedef void* type; };
 #define predicate(E) typename predicate<E>::type& condition = enabler
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
 // perfect forwarding predicates
-#define can_forward(T) is_convertible(remove_reference(T##f), remove_reference(T))
+#define can_forward(T) is_convertible(remove_reference(T), remove_reference(T##f))
 #define perfect(T) class T##f, predicate(can_forward(T))
 #define perfect2(T,U) class T##f, class U##f, predicate(can_forward(T)), predicate1(can_forward(U))
 
@@ -69,6 +69,7 @@ template <class T> T abs(T x) { return x>=0 ? x : -x; }
 
 extern"C" ssize_t write(int fd, const void* buf, size_t size);
 inline void log(const char* msg) { int i=0; while(msg[i]) i++; write(1,msg,(size_t)i); }
+inline void log(char* msg) { log((const char*)msg); }
 
 #ifdef DEBUG
 /// compile \a statements in executable only if \a DEBUG flag is set
@@ -112,7 +113,7 @@ extern "C" void* malloc(size_t size) throw();
 extern "C" void* realloc(void* buffer, size_t size) throw();
 extern "C" void free(void* buffer) throw();
 
-#ifdef DEBUG
+#if TRACE_MALLOC
 void* allocate_(int size, const char* type=0);
 void* reallocate_(void* buffer, int oldsize, int size);
 void unallocate_(void* buffer);

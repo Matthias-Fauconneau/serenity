@@ -412,7 +412,7 @@ void PDF::render(int2 parent) {
     //vec2 offset = vec2(-1-x1*scale.x,-1+(round((size.y/2)*scroll*scale.y)+0.5)/(size.y/2));
     parent.y += scroll/size.y;
 
-    blit.bind(); blit["scale"]=viewport; blit["offset"]=vec2(parent); //blit["color"] = vec4(0,0,0,1);
+    blit.bind(); blit["offset"]=vec2(parent); //blit["color"] = vec4(0,0,0,1);
     //glHard();
     for(const auto& b : blits) {
         //if(character.color != 0) blit["color"] = vec4(0,0,1,1);
@@ -420,7 +420,7 @@ void PDF::render(int2 parent) {
         //if(character.color != 0) blit["color"] = vec4(0,0,0,1);
     }
 
-    flat.bind(); flat["scale"]=viewport; flat["offset"]=vec2(parent); flat["color"] = vec4(0,0,0,1);
+    flat.bind(); flat["offset"]=vec2(parent); flat["color"] = vec4(0,0,0,1);
     //glSmooth();
     stroke.bindAttribute(flat,"position",2);
     stroke.draw();

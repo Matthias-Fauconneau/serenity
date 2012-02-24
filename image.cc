@@ -42,9 +42,9 @@ Image::Image(array<byte>&& file) {
         string name = s.read<byte>(4);
         if(name == "IHDR"_) {
             width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
-            //uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
-            //assert(bitDepth==8); assert(compression==0); assert(filter==0); assert(interlace==0);
-            s++; uint8 type = s.read(); s+=3;
+            uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
+            assert(bitDepth==8,(int)bitDepth); assert(compression==0); assert(filter==0); assert(interlace==0);
+            //s++; uint8 type = s.read(); s+=3;
             depth = (int[]){0,0,3,0,2,0,4}[type];
             if(!depth) return;
         } else if(name == "IDAT"_) {
@@ -57,7 +57,7 @@ Image::Image(array<byte>&& file) {
     inflate(&z, Z_FINISH);
     inflateEnd(&z);
     idat.size = (int)z.total_out;
-    assert(idat.size == height*(1+width*depth), idat.size, width, height);
+    assert(idat.size == height*(1+width*depth), idat.size, width, height, depth);
     data = allocate<byte4>(width*height);
     /**/ if(depth==2) filter<byte2>((byte4*)data,&idat,width,height);
     else if(depth==4) filter<rgba4>((byte4*)data,&idat,width,height);

@@ -54,12 +54,12 @@ struct Sampler : AudioInput {
         int16 trigger=0; int16 lovel=0; int16 hivel=127; int16 lokey=0; int16 hikey=127; //Input Controls
         int16 pitch_keycenter=60; int32 releaseTime=0; int16 amp_veltrack=100; int16 rt_decay=0; float volume=1; //Performance Parameters
     };
-    struct Note { const Sample* sample; Codec decode; int remaining; int key; int vel; int shift; float level; };
+    struct Note { const Sample* sample; Codec decode; int remaining; bool mayRelease; int key; int vel; int shift; float level; };
 
     static const int period = 1024; //-> latency
 
     static_array<Sample,1024> samples;
-    static_array<Note,16> active;
+    static_array<Note,64> active;
     struct Layer { int size=0; float* buffer=0; bool active=false; Resampler resampler; } layers[3];
     float* buffer = 0;
     int record;

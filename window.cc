@@ -33,6 +33,7 @@ Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
         XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);
         if(!size.x) size.x=root.width; if(!size.y) size.y=root.height;
     }
+    widget.size=size;
     id = XCreateSimpleWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,0,0xFFE0E0E0);
     XSelectInput(x, id, StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask);
     setProperty<char>("STRING", "WM_CLASS", static_string<32>(name+"\0"_+name));
@@ -46,7 +47,6 @@ Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
         glXMakeCurrent(x, id, ctx);
         glClearColor(7./8,7./8,7./8,0);
         glBlendFunc(GL_DST_COLOR, GL_ZERO);
-        glEnable(GL_BLEND); //multiply (i.e darken) blend (allow blending with subpixel fonts)
     }
 }
 
@@ -75,6 +75,7 @@ void Window::update() {
             }
         } else if(e.type==MapNotify) {
             visible=true;
+            render();
         } else if(e.type==UnmapNotify) {
             visible=false;
         } else if(e.type==ClientMessage) {
@@ -87,15 +88,24 @@ void Window::update() {
 }
 
 void Window::render() {
+    if(!visible || !widget.size) return;
     glXMakeCurrent(x, id, ctx);
     glViewport(widget.size);
-    glClear(GL_COLOR_BUFFER_BIT);
+    blit["scale"]=viewport; flat["scale"]=viewport; radial["scale"]=viewport;
+
+    glDisable(GL_BLEND);
+    radial.bind(); radial["offset"]=vec2(0,0);
+    radial["center"]=vec2(widget.size.x/2,0); radial["startColor"]=vec4(15./16,15./16,15./16,1);
+    radial["radius"]=256.f; radial["endColor"]=vec4(7./8,7./8,7./8,1);
+    glQuad(radial,vec2(0,0),vec2(widget.size));
+    glEnable(GL_BLEND); //multiply (i.e darken) blend (allow blending with subpixel fonts)
+
     widget.render(int2(0,0));
     glXSwapBuffers(x,id);
 }
 
-void Window::show() { visible=true; XMapWindow(x, id); XFlush(x); }
-void Window::hide() { visible=false; XUnmapWindow(x, id); XFlush(x); }
+void Window::show() { XMapWindow(x, id); XFlush(x); }
+void Window::hide() { XUnmapWindow(x, id); XFlush(x); }
 
 void Window::move(int2 position) { XMoveWindow(x, id, position.x, position.y); XFlush(x); }
 
