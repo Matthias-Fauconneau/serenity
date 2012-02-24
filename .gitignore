@@ -1,9 +1,5 @@
-Makefile
 debug
 release
-*.config
-*.files
-*.includes
+serenity.files
 *.creator*
-*.sh
 *stash
