@@ -8,16 +8,16 @@ template <class K, class V> struct map {
     array<K> keys;
     array<V> values;
 
-    int size() const { return keys.size; }
+    int size() const { return keys.size(); }
     bool contains(const K& key) const { return keys.contains(key); }
-    explicit operator bool() const { return keys.size; }
+    explicit operator bool() const { return keys.size(); }
 
     const V& at(const K& key) const { int i = keys.indexOf(key); assert(i>=0,"No matching key"_); return values[i];}
     V& at(const K& key) { int i = keys.indexOf(key); assert(i>=0,"No matching key"_); return values[i];}
     template<perfect(V)> Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? addressof(values[i]) : 0; }
     template<perfect2(K,V)> V& insert(Kf&& key, Vf&& value) { keys << forward<Kf>(key); values << forward<Vf>(value); return values.last(); }
-    template<perfect(K)> V& insert(Kf&& key) { keys << forward<Kf>(key); values.resize(keys.size); return values.last(); }
+    template<perfect(K)> V& insert(Kf&& key) { keys << forward<Kf>(key); values.resize(keys.size()); return values.last(); }
     template<perfect(K)> V& operator [](Kf&& key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(forward<Kf>(key)); }
     void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
@@ -28,8 +28,8 @@ template <class K, class V> struct map {
         const_pair<K,V> operator* () const { return i({*k,*v}); }
         const const_iterator& operator++ () { k++; v++; return *this; }
     };
-    const_iterator begin() const { return const_iterator(keys.data,values.data); }
-    const_iterator end() const { return const_iterator(&keys.data[keys.size],&values.data[values.size]); }
+    const_iterator begin() const { return const_iterator(keys.begin(),values.begin()); }
+    const_iterator end() const { return const_iterator(keys.end(),values.end()); }
 
     struct iterator {
         K* k; V* v;
@@ -38,8 +38,8 @@ template <class K, class V> struct map {
         pair<K,V> operator* () const { return i({*k,*v}); }
         const iterator& operator++ () { k++; v++; return *this; }
     };
-    iterator begin() { return iterator((K*)keys.data,(V*)values.data); }
-    iterator end() { return iterator((K*)&keys.data[keys.size],(V*)&values.data[values.size]); }
+    iterator begin() { return iterator((K*)keys.begin(),(V*)values.begin()); }
+    iterator end() { return iterator((K*)&keys.end(),(V*)&values.end()); }
 };
 
 template<class K, class V> string str(const map<K,V>& m) {
@@ -47,9 +47,3 @@ template<class K, class V> string str(const map<K,V>& m) {
     for(int i=0;i<m.size();i++) { s<<m.keys[i]+": "_+m.values[i]; if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }
-
-template <class K, class V, int N> struct static_map : map<K,V> {
-        K key_buffer[N];
-        V value_buffer[N];
-        static_map() : map<K,V>{{key_buffer,0,N},{value_buffer,0,N}} {}
-};

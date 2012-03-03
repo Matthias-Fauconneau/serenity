@@ -4,23 +4,24 @@
 /// Fixed-size transformation matrices (using GLSL conventions)
 
 struct mat2 {
-    float data[2*2];
-    float& m(int i, int j) { return data[j*2+i]; }
-    float& operator()(int i, int j) { return m(i,j); }
-    vec2 operator*(vec2 v) { vec2 r(0,0); for(int i=0;i<2;i++) r[i] = v.x*m(i,0)+v.y*m(i,1); return r; }
+    float m11, m12, m21, m22;
+    mat2(float m11, float m12, float m21, float m22):m11(m11),m12(m12),m21(m21),m22(m22){}
+    mat2() : mat2(1,0,0,1) {}
+    vec2 operator*(vec2 v) { return vec2( m11*v.x + m21*v.y, m12*v.x + m22*v.y ); }
+    mat2 operator*(mat2 m) const { return mat2( m11*m.m11 + m12*m.m21, m11*m.m12 + m12*m.m22,
+                                                m21*m.m11 + m22*m.m21, m21*m.m12 + m22*m.m22); }
 };
 
 struct mat32 {
-    void set(float m11_, float m12_, float m21_, float m22_, float dx_, float dy_) { m11=m11_;m12=m12_;m21=m21_;m22=m22_;dx=dx_;dy=dy_; }
-    mat32(float m11, float m12, float m21, float m22, float dx, float dy) { set(m11,m12,m21,m22,dx,dy); }
-    mat32(float dx, float dy) { set(1,0,0,1,dx,dy); }
-    mat32(vec2 t) { set(1,0,0,1,t.x,t.y); }
-    mat32() { set(1,0,0,1,0,0); }
+    float m11, m12, m21, m22, dx, dy;
+    mat32(float m11, float m12, float m21, float m22, float dx, float dy):m11(m11),m12(m12),m21(m21),m22(m22),dx(dx),dy(dy){}
+    mat32(float dx, float dy) : mat32(1,0,0,1,dx,dy) {}
+    mat32(vec2 t) : mat32(1,0,0,1,t.x,t.y) {}
+    mat32() : mat32(1,0,0,1,0,0) {}
     mat32 operator*(mat32 m) const { return mat32( m11*m.m11 + m12*m.m21, m11*m.m12 + m12*m.m22,
                                                           m21*m.m11 + m22*m.m21, m21*m.m12 + m22*m.m22,
                                                           dx*m.m11  + dy*m.m21 + m.dx, dx*m.m12  + dy*m.m22 + m.dy ); }
     vec2 operator*(vec2 v) const { return vec2( m11*v.x + m21*v.y + dx, m12*v.x + m22*v.y + dy ); }
-    float m11, m12, m21, m22, dx, dy;
 };
 
 struct mat3 {

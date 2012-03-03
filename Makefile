@@ -1,8 +1,8 @@
-CC = g++-4.7.0-alpha20120114
+CC = g++-4.7.0-alpha20120225
 PREFIX = /usr/local
 
 ifeq (,$(TARGET))
- TARGET = player
+ TARGET = bspline
 endif
 
 	ifeq ($(BUILD),debug)
@@ -36,9 +36,34 @@ else ifeq ($(TARGET),editor)
  GLSL = editor
  GPUS = shader
 else ifeq ($(TARGET),symbolic)
-  SRCS += symbolic algebra expression
+ SRCS += symbolic algebra expression
 else ifeq ($(TARGET),lac)
-  SRCS += file lac
+ SRCS += file lac
+else ifeq ($(TARGET),bspline)
+ SRCS += window bspline file image
+endif
+
+ifneq (,$(findstring image,$(SRCS)))
+  LIBS += -lz
+endif
+
+ifneq (,$(findstring font,$(SRCS)))
+  LIBS += -lfreetype
+endif
+
+ifneq (,$(findstring window,$(SRCS)))
+  LIBS += -lX11
+endif
+
+ifneq (,$(findstring gl,$(SRCS)))
+ FLAGS += -DGL
+ LIBS += -lGL
+ ifeq ($(BUILD),debug)
+  FLAGS += -DGLU
+  LIBS += -lGLU
+ endif
+else
+ LIBS += -lXext
 endif
 
 ifneq (,$(findstring interface,$(SRCS)))
@@ -46,11 +71,6 @@ ifneq (,$(findstring interface,$(SRCS)))
  INCLUDES = -I/usr/include/freetype2
  GLSL = interface
  GPUS = flat radial blit
- LIBS += -lz -lfreetype -lX11 -lGL
- ifeq ($(BUILD),debug)
-  FLAGS += -DGLU
-  LIBS += -lGLU
- endif
 endif
 
 SRCS += $(ICONS:%=icons/%)

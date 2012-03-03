@@ -11,7 +11,7 @@ constexpr uint16 swap16(uint16 x) { return ((x>>8)&0xff)|((x&0xff)<<8); }
 enum Endianness { LittleEndian,BigEndian };
 template<Endianness endianness> struct EndianStream : array<byte> {
     const byte* pos,*end;
-    EndianStream(array<byte>&& buffer) : array(move(buffer)), pos(data), end(data+size) {}
+    EndianStream(array<byte>&& buffer) : array(move(buffer)), pos(data()), end(data()+size()) {}
 
     /// Returns true if there is data to read
     explicit operator bool() const { return pos<end; }
@@ -56,7 +56,7 @@ template<Endianness endianness> struct EndianStream : array<byte> {
     template<class T> bool matchAny(const array<T>& any) { for(const T& e: any) if(peek<T>() == e) { pos+=sizeof(T); return true; } return false; }
 
     /// If stream match \a key, advances \a pos by \a key size
-    template<class T> bool match(const array<T>& key) { if(peek<T>(key.size) == key) { pos+=key.size*sizeof(T); return true; } else return false; }
+    template<class T> bool match(const array<T>& key) { if(peek<T>(key.size()) == key) { pos+=key.size()*sizeof(T); return true; } else return false; }
 
     /// advances \a pos until stream match \a key
     /// \returns no match count

@@ -30,7 +30,7 @@ void Sampler::open(const string& path) {
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
                 if(::time()-start > 1000) { start=::time(); log("Loading..."_,samples.size); }
-                short_string path = folder+replace(value,"\\"_,"/"_);
+                string path = folder+replace(value,"\\"_,"/"_);
                 auto file = mapFile(path);
                 sample->data = file.data+4; sample->size=*(int*)file.data;
                 madvise((void*)file.data,file.size,MADV_SEQUENTIAL);

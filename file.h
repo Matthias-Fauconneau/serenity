@@ -8,7 +8,7 @@ extern "C" int close(int fd);
 //inline void read(int fd, array<byte>& s) { s.size=read(fd,(byte*)&s,(size_t)s.capacity); }
 inline array<byte> read(int fd, int capacity) {
     array<byte> buffer(capacity);
-    buffer.size=read(fd,(byte*)&buffer,(size_t)buffer.capacity);
+    buffer.setSize(read(fd,(byte*)&buffer,(size_t)buffer.capacity()));
     return buffer;
 }
 

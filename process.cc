@@ -21,12 +21,12 @@ int getCPUTime() {
 }
 
 void execute(const string& path, const array<string>& args) {
-    array<string> args0(1+args.size);
+    array<string> args0(1+args.size());
     args0 << copy(strz(path));
-    for(int i=0;i<args.size;i++) args0 << copy(strz(args[i]));
-    const char* argv[args0.size+1];
-    for(int i=0;i<args0.size;i++) argv[i]=&args0[i];
-    argv[1+args.size]=0;
+    for(int i=0;i<args.size();i++) args0 << copy(strz(args[i]));
+    const char* argv[args0.size()+1];
+    for(int i=0;i<args0.size();i++) argv[i]=&args0[i];
+    argv[1+args.size()]=0;
     pid_t pid = fork();
     if(pid==0) {
         unshare(CLONE_FILES);
@@ -37,7 +37,7 @@ void execute(const string& path, const array<string>& args) {
 
 /// Poll
 
-static static_map<Poll*,pollfd,4> polls __attribute((init_priority(103)));
+static map<Poll*,pollfd> polls __attribute((init_priority(103)));
 void Poll::registerPoll() { polls.insert(this,this->poll()); }
 void Poll::unregisterPoll() { polls.remove(this); }
 
@@ -46,7 +46,7 @@ void Poll::unregisterPoll() { polls.remove(this); }
 Application* app=0;
 Application::Application() { assert(!app,"Multiple application compiled in executable"_); app=this; }
 int main(int argc, const char** argv) {
-    static_array<string,1024> args;
+    array<string> args;
     for(int i=1;i<argc;i++) args << strz(argv[i]);
     assert(app,"No application compiled in executable"_);
     app->start(move(args));
@@ -78,7 +78,7 @@ declare(static void read_debug_symbols(), constructor(101)) {
         assert(symcount >= 0);
     }
 }
-struct Symbol { static_string<128> file,function; uint line; };
+struct Symbol { string file,function; uint line; };
 Symbol findNearestLine(void* address) {
     for(bfd_section* s=abfd->sections;s;s=s->next) {
         if((bfd_vma)address < s->vma || (bfd_vma)address >= s->vma + s->size) continue;
@@ -235,14 +235,21 @@ static void handler(int sig, siginfo*, void* ctx) {
     else if(sig == SIGPIPE) log("Broken Pipe"_);
     else if(sig == SIGFPE) {
         log("Arithmetic exception ");
-        const string flags[] = {"Invalid Operand"_,"Denormal Operand"_,"Zero Divide"_,"Overflow"_,"Underflow"_};
+#if __WORDSIZE == 64
+		const string flags[] = {"Invalid Operand"_,"Denormal Operand"_,"Zero Divide"_,"Overflow"_,"Underflow"_};
         string s;
         for(int i=1;i<=4;i++) if(context->uc_mcontext.fpregs->mxcsr & (1<<i)) s<<flags[i]+" "_;
         log(s);
+#endif
     }
     else error("Unhandled signal"_);
+#if __WORDSIZE == 64
     logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
+#else
+	logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_EBP]));
+    Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_EIP]);
+#endif
     log(s.file+":"_+str(s.line)+"   \t"_+s.function);
     log("Aborted"_); abort();
 }

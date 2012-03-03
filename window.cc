@@ -1,32 +1,26 @@
 #include "process.h"
 #include "window.h"
-#include "gl.h"
 
 #include <poll.h>
-#define None None
-#define Font XWindow
-#define Window XWindow
-#include <X11/Xlib.h>
-//#define GLX_GLXEXT_PROTOTYPES
-#include <GL/glx.h>
-#undef Window
-#undef Font
 
-int xErrorHandler(Display*, XErrorEvent*) { return 0; }
-//int xErrorHandler(Display* x, XErrorEvent* e) { char buffer[64]; XGetErrorText(x,e->error_code,buffer,64); log(strz(buffer)); return 0; }
+#if GL
+#include "gl.h"
+GLXContext Window::ctx;
+#else
+#include <X11/extensions/XShm.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
+Image framebuffer;
+#endif
 
 #define Atom(name) XInternAtom(x, #name, 1)
-
 template<class T> void Window::setProperty(const char* type,const char* name, const array<T>& value) {
-    XChangeProperty(x, id, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)&value, value.size);
+    XChangeProperty(x, id, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)&value, value.size());
     XFlush(x);
 }
 
-GLXContext Window::ctx;
-
 Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
     x = XOpenDisplay(0);
-    XSetErrorHandler(xErrorHandler);
     registerPoll();
 
     if(!size.x||!size.y) {
@@ -36,11 +30,12 @@ Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
     widget.size=size;
     id = XCreateSimpleWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,0,0xFFE0E0E0);
     XSelectInput(x, id, StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask);
-    setProperty<char>("STRING", "WM_CLASS", static_string<32>(name+"\0"_+name));
+    setProperty<char>("STRING", "WM_CLASS", name+"\0"_+name);
     setProperty<char>("UTF8_STRING", "_NET_WM_NAME", name);
     setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
     setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
-
+    if(!focus) this->focus=&widget;
+#if GL
     if(!ctx) {
         XVisualInfo* vis = glXChooseVisual(x,DefaultScreen(x),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,1,0});
         ctx = glXCreateContext(x,vis,0,1);
@@ -48,6 +43,7 @@ Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
         glClearColor(7./8,7./8,7./8,0);
         glBlendFunc(GL_DST_COLOR, GL_ZERO);
     }
+#endif
 }
 
 void Window::update() {
@@ -89,6 +85,7 @@ void Window::update() {
 
 void Window::render() {
     if(!visible || !widget.size) return;
+#if GL
     glXMakeCurrent(x, id, ctx);
     glViewport(widget.size);
     blit["scale"]=viewport; flat["scale"]=viewport; radial["scale"]=viewport;
@@ -99,9 +96,34 @@ void Window::render() {
     radial["radius"]=256.f; radial["endColor"]=vec4(7./8,7./8,7./8,1);
     glQuad(radial,vec2(0,0),vec2(widget.size));
     glEnable(GL_BLEND); //multiply (i.e darken) blend (allow blending with subpixel fonts)
-
     widget.render(int2(0,0));
     glXSwapBuffers(x,id);
+#else
+	if(!image || image->width != widget.size.x || image->height != widget.size.y) {
+		if(image) {
+			XShmDetach(x, &shminfo);
+  			image->f.destroy_image(image);
+  			shmdt(shminfo.shmaddr);
+		}
+		image = XShmCreateImage(x,DefaultVisual(x,0),DefaultDepth(x,0),ZPixmap,0,&shminfo,widget.size.x, widget.size.y);
+		shminfo.shmid = shmget(IPC_PRIVATE, image->bytes_per_line*image->height, IPC_CREAT | 0777);
+		shminfo.shmaddr = image->data = (char *)shmat(shminfo.shmid, 0, 0);
+  		shminfo.readOnly = True;
+  		XShmAttach(x, &shminfo);
+	}
+	framebuffer = Image((byte4*)image->data, image->width, image->height);
+	{
+		 int2 center = int2(widget.size.x/2,0); int radius=256;
+         for_Image(framebuffer) {
+			int2 pos = int2(x,y);
+            int g = mix(224,240,min(1.f,length(pos-center)/radius));
+			framebuffer(x,y) = byte4(g,g,g,255);
+		 }
+	}
+	widget.render(int2(0,0));
+	XShmPutImage(x,id,DefaultGC(x,0),image,0,0,0,0,image->width,image->height,0);
+    XFlush(x);
+#endif
 }
 
 void Window::show() { XMapWindow(x, id); XFlush(x); }
@@ -134,10 +156,10 @@ void Window::rename(const string& name) { setProperty("UTF8_STRING", "_NET_WM_NA
 void Window::setIcon(const Image& icon) {
     int size = 2+icon.width*icon.height;
     array<int> buffer(2*size); //CARDINAL is long
-    buffer.size=2*size; buffer[0]=icon.width, buffer[1]=icon.height;
+    buffer.buffer.size=2*size; buffer[0]=icon.width, buffer[1]=icon.height;
     copy((byte4*)(&buffer+2),icon.data,icon.width*icon.height);
     if(sizeof(long)==8) for(int i=size-1;i>=0;i--) { buffer[2*i]=buffer[i]; buffer[2*i+1]=0; } //0-extend int to long CARDINAL
-    buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
+    buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
     setProperty("CARDINAL", "_NET_WM_ICON", buffer);
     XFlush(x);
 }

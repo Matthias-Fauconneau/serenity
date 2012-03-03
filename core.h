@@ -52,8 +52,13 @@ typedef unsigned int uint;
 typedef long int64;
 typedef unsigned long uint64;
 
+#if __WORDSIZE == 64
 typedef unsigned long size_t;
 typedef long ssize_t;
+#else
+typedef unsigned int size_t;
+typedef int ssize_t;
+#endif
 
 const float NaN = __builtin_nansf("");
 
@@ -74,8 +79,11 @@ inline void log(char* msg) { log((const char*)msg); }
 #ifdef DEBUG
 /// compile \a statements in executable only if \a DEBUG flag is set
 #define debug( statements... ) statements
+/// compile \a statements in executable only if \a DEBUG flag is not set
+#define release( statements... )
 #else
 #define debug( statements... )
+#define release( statements... ) statements
 #endif
 
 #ifdef NO_BFD
@@ -108,7 +116,7 @@ extern "C" void abort() throw() __attribute((noreturn));
 #define assert_(expr) ({debug( if(!(expr)) { trace_off; logTrace(); log("Assert:\t"); log(#expr); log("\n"); abort(); } )})
 
 /// Memory
-inline void* operator new(uint64, void* p) { return p; } //placement new
+inline void* operator new(size_t, void* p) { return p; } //placement new
 extern "C" void* malloc(size_t size) throw();
 extern "C" void* realloc(void* buffer, size_t size) throw();
 extern "C" void free(void* buffer) throw();

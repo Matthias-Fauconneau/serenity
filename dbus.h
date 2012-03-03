@@ -175,12 +175,12 @@ struct DBus : Poll {
 
     struct Object {
         DBus* d;
-        short_string target;
-        short_string object;
+        string target;
+        string object;
         /// Call \a method with \a inputs. Return a handle to read the reply.
         /// \note \a Reply must be read before interleaving any call
         template<class... Inputs> Reply operator ()(const string& method, const Inputs&... inputs) {
-            short_string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
+            string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
             return Reply(d,d->write<Call>(target,object,interface,member,inputs...));
         }
         Reply operator [](const string& property) {
@@ -197,7 +197,7 @@ struct DBus : Poll {
         fd = socket(PF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
         sockaddr_un addr; clear(addr);
         addr.sun_family = AF_UNIX;
-        short_string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
+        string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
         addr.sun_path[0]=0; copy(addr.sun_path+1,&path,path.size);
         if(connect(fd,(sockaddr*)&addr,3+path.size)) fail();
         ::write(fd,"\0AUTH EXTERNAL 30\r\n"_);

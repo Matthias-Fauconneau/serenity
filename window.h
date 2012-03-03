@@ -2,12 +2,21 @@
 #include "interface.h"
 #include "process.h"
 
+#define None None
+#define Font XWindow
+#define Window XWindow
+#include <X11/Xlib.h>
+#undef Window
+#undef Font
+
+#if GL
+#include <GL/glx.h>
+#else
+#include <X11/extensions/XShm.h>
+#endif
+
 /// Window embeds \a widget in an X11 window, displaying it and forwarding user input.
 //TODO: wayland
-//forward declarations from Xlib.h
-typedef struct _XDisplay Display;
-typedef struct __GLXcontextRec* GLXContext;
-typedef unsigned long XWindow;
 struct Window : Poll {
     no_copy(Window)
     /// Display \a widget in a window
@@ -62,6 +71,11 @@ protected:
 
     XWindow id;
     Display* x;
-    static GLXContext ctx;
     Widget& widget;
+#if GL
+    static GLXContext ctx;
+#else
+	XImage* image;
+	XShmSegmentInfo shminfo;
+#endif
 };

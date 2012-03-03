@@ -1,11 +1,7 @@
 #pragma once
 #include "signal.h"
-#include "gl.h"
-class Font;
-
-extern GLShader flat;
-extern GLShader radial;
-extern GLShader blit;
+#include "vector.h"
+#include "image.h"
 
 /// Event type
 enum Event { Motion, Press, Release, Enter, Leave };
@@ -104,7 +100,7 @@ struct Layout : Widget {
 /// WidgetLayout implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
 struct WidgetLayout : virtual Layout, array<Widget*> {
-    int count() { return array<Widget*>::size; }
+    int count() { return array<Widget*>::size(); }
     Widget& at(int i) { return *array<Widget*>::at(i); }
     WidgetLayout& operator <<(Widget& w) { append(&w); return *this; }
 };
@@ -186,7 +182,6 @@ struct Text : Widget {
     void render(int2 parent);
 protected:
     int size;
-    Font& font;
     int2 textSize;
     struct Blit { vec2 min, max; uint id; };
     array<Blit> blits;
@@ -209,11 +204,10 @@ protected:
 
 /// Icon is a widget displaying a static image
 struct Icon : Widget {
-    Icon(){}
     /// Create a trigger button displaying \a image
     Icon(const Image& image);
     /// Displayed image
-    GLTexture image;
+    const Image& image;
 
     int2 sizeHint();
     void render(int2 parent);
@@ -222,7 +216,6 @@ struct Icon : Widget {
 /// TriggerButton is a clickable Icon
 struct TriggerButton : Icon {
     //using Icon::Icon;
-    TriggerButton(){}
     TriggerButton(const Image& image):Icon(image){}
     /// User clicked on the button
     signal<> triggered;
@@ -233,7 +226,6 @@ struct TriggerButton : Icon {
 //TODO: generic TupleLayout<> to store named tuples -> Item : Horizontal, TupleLayout<Icon icon,Text text>
 struct Item : Horizontal {
     Icon icon; Text text; Space rightRag;
-    Item() {}
     Item(Icon&& icon, Text&& text):icon(move(icon)),text(move(text)){}
     int count() { return 3; }
     Widget& at(int i) { return i==0?(Widget&)icon:i==1?(Widget&)text:rightRag; }
@@ -260,7 +252,8 @@ struct ToggleButton : Widget {
     bool mouseEvent(int2 position, Event event, Button button) override;
 
 protected:
-    GLTexture enableIcon, disableIcon;
+    const Image& enableIcon;
+	const Image& disableIcon;
     static const int size = 32;
 };
 

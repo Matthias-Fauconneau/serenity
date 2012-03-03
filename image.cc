@@ -4,47 +4,51 @@
 #include "string.h"
 #include <zlib.h>
 
-template<class T> void filter(byte4* dst, const byte* raw, int width, int height) {
-    byte4* zero = allocate<byte4>(width); clear((byte*)zero,width*4); byte4* prior=zero;
-    for(int y=0;y<height;y++,raw+=width*sizeof(T),dst+=width) {
+template<template <typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height) {
+    typedef vector<T,uint8,N> S;
+    typedef vector<T,int,N> V;
+    S prior[width]; clear(prior,width,S(zero));
+    for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=width) {
         int filter = *raw++; assert(filter>=0 && filter<=4);
-        T* src = (T*)raw;
-        byte4 a(0,0,0,0);
-        if(filter==0) for(int i=0;i<width;i++) dst[i]= src[i];
-        if(filter==1) for(int i=0;i<width;i++) dst[i]= a= a+src[i];
-        if(filter==2) for(int i=0;i<width;i++) dst[i]= prior[i]+src[i];
-        if(filter==3) for(int i=0;i<width;i++) dst[i]= a= byte4((int4(prior[i])+int4(a))/2)+src[i];
+        S* src = (S*)raw;
+        S a=zero;
+        if(filter==0) for(int i=0;i<width;i++) dst[i]= prior[i]=      src[i];
+        if(filter==1) for(int i=0;i<width;i++) dst[i]= prior[i]= a= a+src[i];
+        if(filter==2) for(int i=0;i<width;i++) dst[i]= prior[i]=      prior[i]+src[i];
+        if(filter==3) for(int i=0;i<width;i++) dst[i]= prior[i]= a= S((V(prior[i])+V(a))/2)+src[i];
         if(filter==4) {
-            byte4 a; int4 b;
+            V b=zero;
             for(int i=0;i<width;i++) {
-                int4 c = b;
-                b = int4(prior[i]);
-                int4 d = int4(a) + b - c;
-                int4 pa = abs(d-int4(a)), pb = abs(d-b), pc = abs(d-c);
-                byte4 p; for(int i=0;i<4;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
-                dst[i]= a= p+src[i];
+                V c = b;
+                b = V(prior[i]);
+                V d = V(a) + b - c;
+                V pa = abs(d-V(a)), pb = abs(d-b), pc = abs(d-c);
+                S p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
+                dst[i]= prior[i]=a= p+src[i];
             }
         }
-        prior = dst;
     }
-    free(zero);
 }
 
 Image::Image(array<byte>&& file) {
     NetworkStream s(move(file));
     if(!s.match("\x89PNG\r\n\x1A\n"_)) error("Unknown image format"_);
     z_stream z; clear(z); inflateInit(&z);
-    array<byte> idat(file.size*16); //FIXME
-    z.next_out = (Bytef*)&idat, z.avail_out = (uint)idat.capacity;
+    array<byte> idat(file.size()*16); //FIXME
+    z.next_out = (Bytef*)&idat, z.avail_out = (uint)idat.capacity();
     int depth=0;
     while(s) {
         uint32 size = s.read();
         string name = s.read<byte>(4);
         if(name == "IHDR"_) {
             width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
-            uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
-            assert(bitDepth==8,(int)bitDepth); assert(compression==0); assert(filter==0); assert(interlace==0);
-            //s++; uint8 type = s.read(); s+=3;
+            debug(
+                uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
+                assert(bitDepth==8,(int)bitDepth); assert(compression==0); assert(filter==0); assert(interlace==0);
+            )
+            release(
+                s++; uint8 type = s.read(); s+=3;
+            )
             depth = (int[]){0,0,3,0,2,0,4}[type];
             if(!depth) return;
         } else if(name == "IDAT"_) {
@@ -56,11 +60,12 @@ Image::Image(array<byte>&& file) {
     }
     inflate(&z, Z_FINISH);
     inflateEnd(&z);
-    idat.size = (int)z.total_out;
-    assert(idat.size == height*(1+width*depth), idat.size, width, height, depth);
+    idat.setSize( (int)z.total_out );
+    assert(idat.size() == height*(1+width*depth), idat.size(), width, height, depth);
     data = allocate<byte4>(width*height);
-    /**/ if(depth==2) filter<byte2>((byte4*)data,&idat,width,height);
-    else if(depth==4) filter<rgba4>((byte4*)data,&idat,width,height);
+    /**/ if(depth==2) filter<ia,2>((byte4*)data,&idat,width,height);
+    else if(depth==3) filter<rgb,3>((byte4*)data,&idat,width,height);
+    else if(depth==4) filter<rgba,4>((byte4*)data,&idat,width,height);
     else error("depth"_,depth);
 }
 
