@@ -1,4 +1,4 @@
-#include "media.h"
+#include "ffmpeg.h"
 extern "C" {
 #define __STDC_CONSTANT_MACROS
 #include <stdint.h>
@@ -6,9 +6,6 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
-#include "media.h"
-
-void AudioFile::setup(const AudioFormat &format) { audioOutput=format; }
 void AudioFile::open(const string& path) {
 	if(file) close(); else { av_register_all(); av_log_set_level(AV_LOG_ERROR); }
 
@@ -28,7 +25,10 @@ void AudioFile::open(const string& path) {
 			}
 		}
 	}
-	assert(audioInput.frequency && (audio->sample_fmt == AV_SAMPLE_FMT_FLT || audio->sample_fmt == AV_SAMPLE_FMT_S16) && audioInput.channels == audioOutput.channels, audioInput.frequency,(int)audio->sample_fmt,audioInput.channels);
+    assert(audio, path);
+    assert(audio->sample_fmt == AV_SAMPLE_FMT_FLT || audio->sample_fmt == AV_SAMPLE_FMT_S16);
+    assert(audioInput.frequency && audioOutput.frequency);
+    assert(audioInput.channels == audioOutput.channels);
 	timeChanged.emit(position(),duration());
 
 	if(audioInput.frequency != audioOutput.frequency) {

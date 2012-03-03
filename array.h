@@ -17,36 +17,38 @@ template <class T> struct Buffer {
 };
 
 /// \a array is a typed and bound-checked handle to a memory buffer using move semantics to avoid reference counting
-/// It also transparently store small arrays inline when possible
+/// It also transparently store small arrays inline when possible (FIXME: not working)
 template <class T> struct array {
 //read:
-    int8 tag=-1; //allow inline array (without heap allocation), -1 = heap allocated
+    //int8 tag=-1; //allow inline array (without heap allocation), -1 = heap allocated
     Buffer<T> buffer;
+    /*T* data() { assert_(tag>=0 || buffer.capacity); return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
     const T* data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
-    T* data() { /*assert_(tag>=0 || buffer.capacity);*/ return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
-    int size() const { return tag>=0 ? tag : buffer.size; }
-    void setSize(int size) { if(tag>=0) tag=size; else buffer.size=size; }
-    int capacity() const { return tag>=0 ? (sizeof(array)-1)/sizeof(T) : buffer.capacity; }
+    int size() const { assert_((tag>=0 ? tag : buffer.size)>=0 && (tag>=0 ? tag : buffer.size)<4096); return tag>=0 ? tag : buffer.size; }
+    void setSize(int size) { if(tag>=0) tag=size; else buffer.size=size; assert_(array::size()>=0 && array::size()<4096); }
+    const int inline_capacity = (sizeof(array)-1)/sizeof(T);
+    int capacity() const { return tag>=0 ? inline_capacity : buffer.capacity; }*/
+    T* data() { /*assert_(tag>=0 || buffer.capacity);*/ return (T*)buffer.data; }
+    const T* data() const { return buffer.data; }
+    int size() const { return buffer.size; }
+    void setSize(int size) { buffer.size=size; }
+    int capacity() const { return buffer.capacity; }
 
     /// Prevents creation of independent handle, as they might become dangling when this handle free the buffer.
     /// \note Handle to unacquired ressources still might become dangling if the referenced buffer is freed before this handle.
     no_copy(array)
 
     /// Default constructs an empty array
-    array():tag(0){}
+    array()/*:tag(0)*/{}
 
 //acquiring constructors
     /// Move constructor
-    array(array&& o) { if(o.tag==-1) buffer=o.buffer, o.buffer.capacity=0; else copy((byte*)this,(byte*)addressof(o),sizeof(array)); }
+    array(array&& o) { /*if(o.tag==-1)*/ buffer=o.buffer; /*else copy(*this,o); o.tag=0;*/o.buffer.capacity=0; }
     /// Move constructor with conversion
     template <class O> explicit array(array<O>&& o)
-        : buffer((const T*)&o, o.size*sizeof(O)/sizeof(T), o.capacity*sizeof(O)/sizeof(T)) { o.buffer.capacity=0; assert_(o.tag==-1); }
+        : buffer((const T*)&o, o.size*sizeof(O)/sizeof(T), o.capacity*sizeof(O)/sizeof(T)) { /*assert_(o.tag==-1); o.tag=0;*/o.buffer.capacity=0; }
     /// Move assigment
-    array& operator=(array&& o) {
-        assert_(o.tag==-1);
-        this->~array(); buffer=o.buffer; o.buffer.capacity=0;
-        return *this;
-    }
+    array& operator=(array&& o) { /*assert_(o.tag==-1);*/ this->~array(); buffer=o.buffer; /*o.tag=0;*/o.buffer.capacity=0; return *this; }
 
     /// Allocates a new uninitialized array for \a capacity elements
     explicit array(int capacity) : buffer(allocate<T>(capacity), 0, capacity) { assert_(capacity>0); }
@@ -66,19 +68,28 @@ template <class T> struct array {
     array(const std::initializer_list<T>& list) : buffer(list.begin(), list.size(), 0) {}
 
     /// if the array own the data, destroys all initialized elements and frees the buffer
-    ~array() { if(capacity()) { for(int i=0;i<size();i++) data()[i].~T(); if(tag==-1) unallocate(buffer.data); } }
+    ~array() { if(capacity()) { for(int i=0;i<size();i++) at(i).~T(); /*if(tag==-1)*/ unallocate(buffer.data); } }
 
     /// Allocates enough memory for \a capacity elements
     void reserve(int capacity) {
         if(array::capacity()>=capacity) return;
-        if(tag==-1 && buffer.capacity) buffer.data=reallocate<T>(buffer.data,buffer.capacity,capacity);
-        else if(capacity) { T* detach=allocate<T>(capacity); copy((byte*)detach,(byte*)data(),size()*sizeof(T)); buffer.data=detach; tag=-1; }
-        buffer.capacity=capacity;
+        if(/*tag==-1 &&*/ buffer.capacity) {
+            buffer.data=reallocate<T>(buffer.data,buffer.capacity,capacity);
+            buffer.capacity=capacity;
+        } /*else if(capacity <= inline_capacity) {
+            assert_(tag>=0); //TODO: free heap
+        }*/ else {
+            T* heap=allocate<T>(capacity);
+            copy((byte*)heap,(byte*)data(),size()*sizeof(T));
+            buffer.data=heap;
+            //if(tag>=0) { buffer.size=tag; tag=-1; }
+            buffer.capacity=capacity;
+        }
     }
     /// Sets the array size to \a size and destroys removed elements
-    void shrink(int size) { assert_(size<array::size()); if(capacity()) for(int i=size;i<array::size();i++) data[i].~T(); array::size()=size; }
+    void shrink(int size) { assert_(size<array::size()); if(capacity()) for(int i=size;i<array::size();i++) at(i).~T(); setSize(size); }
     /// Allocates memory for \a size elements and initializes added elements with their default constructor
-    void grow(int size) { assert_(size>array::size()); reserve(size); for(int i=array::size();i<size;i++) new ((void*)(data()+i)) T(); array::size()=size; }
+    void grow(int size) { assert_(size>array::size()); reserve(size); for(int i=array::size();i<size;i++) new ((void*)(data()+i)) T(); setSize(size); }
     /// Sets the array size to \a size, destroying or initializing elements as needed
     void resize(int size) { if(size<array::size()) shrink(size); else if(size>array::size()) grow(size); }
     /// Sets the array size to 0, destroying any contained elements
@@ -135,7 +146,7 @@ template <class T> struct array {
     /// insert
     template<perfect(T)> void insertAt(int index, Tf&& v) {
         reserve(size()+1); setSize(size()+1);
-        for(int i=size()-2;i>=index;i--) copy((byte*)&at(i+1),(byte*)&at(i),sizeof(T));
+        for(int i=size()-2;i>=index;i--) copy(at(i+1),at(i));
         new (addressof(at(index))) T(forward<Tf>(v));
     }
     template<perfect(T)> void insertSorted(Tf&& v) {
@@ -182,7 +193,7 @@ template<class T> array<T> slice(const array<T>& a, int pos,int size) {
     return copy(array<T>(a.data()+pos,size));
 }
 /// Slices an array copying elements from \a pos to the end of the array
-template<class T> array<T> slice(const array<T>& a, int pos) { return slice(a,pos,a.size-pos); }
+template<class T> array<T> slice(const array<T>& a, int pos) { return slice(a,pos,a.size()-pos); }
 
 /// Reverses elements in-place
 template<class T> array<T> reverse(array<T>&& a) { for(int i=0; i<a.size()/2; i++) swap(a[i], a[a.size()-i-1]); return move(a); }
@@ -190,7 +201,7 @@ template<class T> array<T> reverse(array<T>&& a) { for(int i=0; i<a.size()/2; i+
 //template<class T> array<T> reverse(const array<T>& a) { array<T> r(a.size); r.size=a.size; for(int i=0;i<a.size;i++) new((T*)&r+a.size-1-i) T(copy(a[i])); return r; }
 
 /// Replaces in \a array every occurence of \a before with \a after
-template<class T> array<T>  replace(array<T>&& array, const T& before, const T& after) { for(auto& e : array) if(e==before) e=copy(after); return array; }
+template<class T> array<T>  replace(array<T>&& array, const T& before, const T& after) { for(auto& e : array) if(e==before) e=copy(after); return move(array); }
 /*/// Copy \a array with every occurence of \a before replaced with \a after
 template<class T> array<T>  replace(const array<T>& a, const T& before, const T& after) {
     array<T> r(a.size); r.size=a.size; for(int i=0;i<a.size;i++) new ((T*)&r+i) T(copy(a[i]==before? after : a[i])); return r;

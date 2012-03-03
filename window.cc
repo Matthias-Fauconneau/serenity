@@ -3,15 +3,10 @@
 
 #include <poll.h>
 
-#if GL
-#include "gl.h"
-GLXContext Window::ctx;
-#else
 #include <X11/extensions/XShm.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
 Image framebuffer;
-#endif
 
 #define Atom(name) XInternAtom(x, #name, 1)
 template<class T> void Window::setProperty(const char* type,const char* name, const array<T>& value) {
@@ -35,18 +30,9 @@ Window::Window(Widget& widget, int2 size, const string& name) : widget(widget) {
     setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
     setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
     if(!focus) this->focus=&widget;
-#if GL
-    if(!ctx) {
-        XVisualInfo* vis = glXChooseVisual(x,DefaultScreen(x),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,1,0});
-        ctx = glXCreateContext(x,vis,0,1);
-        glXMakeCurrent(x, id, ctx);
-        glClearColor(7./8,7./8,7./8,0);
-        glBlendFunc(GL_DST_COLOR, GL_ZERO);
-    }
-#endif
 }
 
-void Window::update() {
+void Window::event(pollfd) {
     bool needRender=false;
     while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
         if(e.type==MotionNotify) {
@@ -71,6 +57,7 @@ void Window::update() {
             }
         } else if(e.type==MapNotify) {
             visible=true;
+            widget.update();
             render();
         } else if(e.type==UnmapNotify) {
             visible=false;
@@ -85,20 +72,6 @@ void Window::update() {
 
 void Window::render() {
     if(!visible || !widget.size) return;
-#if GL
-    glXMakeCurrent(x, id, ctx);
-    glViewport(widget.size);
-    blit["scale"]=viewport; flat["scale"]=viewport; radial["scale"]=viewport;
-
-    glDisable(GL_BLEND);
-    radial.bind(); radial["offset"]=vec2(0,0);
-    radial["center"]=vec2(widget.size.x/2,0); radial["startColor"]=vec4(15./16,15./16,15./16,1);
-    radial["radius"]=256.f; radial["endColor"]=vec4(7./8,7./8,7./8,1);
-    glQuad(radial,vec2(0,0),vec2(widget.size));
-    glEnable(GL_BLEND); //multiply (i.e darken) blend (allow blending with subpixel fonts)
-    widget.render(int2(0,0));
-    glXSwapBuffers(x,id);
-#else
 	if(!image || image->width != widget.size.x || image->height != widget.size.y) {
 		if(image) {
 			XShmDetach(x, &shminfo);
@@ -123,7 +96,6 @@ void Window::render() {
 	widget.render(int2(0,0));
 	XShmPutImage(x,id,DefaultGC(x,0),image,0,0,0,0,image->width,image->height,0);
     XFlush(x);
-#endif
 }
 
 void Window::show() { XMapWindow(x, id); XFlush(x); }
@@ -182,7 +154,6 @@ uint Window::addHotKey(const string& key) {
 }
 
 pollfd Window::poll() { return {XConnectionNumber(x), POLLIN, 0}; }
-void Window::event(pollfd) { update(); }
 
 void Window::setFocus(Widget* focus) {
     this->focus=focus;

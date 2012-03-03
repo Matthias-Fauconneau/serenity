@@ -26,8 +26,7 @@
    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
    POSSIBILITY OF SUCH DAMAGE.
 */
-
-#include "media.h"
+#include "resample.h"
 #include <math.h>
 
 typedef float __m128 __attribute__ ((__vector_size__ (16), __may_alias__));
@@ -85,7 +84,6 @@ static float sinc(double cutoff, double x, int N) {
 inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 
 Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channelCount(channelCount) {
-    assert(channelCount <= 8);
     int factor = gcd(sourceRate,targetRate);
     this->sourceRate = sourceRate/=factor;
     this->targetRate = targetRate/=factor;

@@ -16,18 +16,18 @@ endif
 SRCS = string process memory
 
 	 ifeq ($(TARGET),player)
- SRCS += file image gl window font interface alsa ffmpeg resample player
+ SRCS += file image window font interface alsa ffmpeg resample player
  ICONS = play pause next
  LIBS += -lasound -lavformat -lavcodec
 else ifeq ($(TARGET),sampler)
  SRCS += file alsa resample sequencer sampler midi music
  LIBS += -lasound
 else ifeq ($(TARGET),music)
- SRCS += file image gl window font interface alsa resample sequencer sampler midi pdf music
+ SRCS += file image window font interface alsa resample sequencer sampler midi pdf music
  LIBS += -lasound
  INSTALL = icons/music.png music.desktop
 else ifeq ($(TARGET),taskbar)
- SRCS += file image gl window font interface launcher taskbar
+ SRCS += file image window font interface launcher taskbar
  ICONS = button shutdown
  #ICONS = system network utility graphics office
  LIBS += -lrt
@@ -48,6 +48,7 @@ ifneq (,$(findstring image,$(SRCS)))
 endif
 
 ifneq (,$(findstring font,$(SRCS)))
+  INCLUDES = -I/usr/include/freetype2
   LIBS += -lfreetype
 endif
 
@@ -64,13 +65,6 @@ ifneq (,$(findstring gl,$(SRCS)))
  endif
 else
  LIBS += -lXext
-endif
-
-ifneq (,$(findstring interface,$(SRCS)))
- FLAGS += -Wno-pmf-conversions -DUI
- INCLUDES = -I/usr/include/freetype2
- GLSL = interface
- GPUS = flat radial blit
 endif
 
 SRCS += $(ICONS:%=icons/%)

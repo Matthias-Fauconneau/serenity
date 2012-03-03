@@ -9,9 +9,11 @@ constexpr uint16 swap16(uint16 x) { return ((x>>8)&0xff)|((x&0xff)<<8); }
 
 /// \a Stream provides a convenient interface for reading binary data or text
 enum Endianness { LittleEndian,BigEndian };
-template<Endianness endianness> struct EndianStream : array<byte> {
-    const byte* pos,*end;
-    EndianStream(array<byte>&& buffer) : array(move(buffer)), pos(data()), end(data()+size()) {}
+template<Endianness endianness> struct EndianStream {
+    const array<byte> buffer;
+    const byte* pos;
+    const byte* end;
+    EndianStream(array<byte>&& buffer) : buffer(move(buffer)), pos(this->buffer.begin()), end(this->buffer.end()) {}
 
     /// Returns true if there is data to read
     explicit operator bool() const { return pos<end; }
@@ -64,7 +66,7 @@ template<Endianness endianness> struct EndianStream : array<byte> {
         const byte* start=pos;
         while(pos<end && peek<T>()!=key) pos+=sizeof(T);
         pos+=sizeof(T);
-        return array(start,pos-sizeof(T));
+        return array<T>(start,pos-sizeof(T));
     }
 
     /// advances \a pos while stream match any of \a key
@@ -72,7 +74,7 @@ template<Endianness endianness> struct EndianStream : array<byte> {
     template<class T> array<T> whileAny(const array<T>& any) {
         const byte* start=pos;
         while(pos<end && matchAny(any)) {}
-        return array(start,pos);
+        return array<T>(start,pos);
     }
 
     /// advances \a pos until stream match any of \a key
@@ -80,7 +82,7 @@ template<Endianness endianness> struct EndianStream : array<byte> {
     template<class T> array<T> untilAny(const array<T>& any) {
         const byte* start=pos;
         while(pos<end && !matchAny(any)) pos+=sizeof(T);
-        return array(start,pos-sizeof(T));
+        return array<T>(start,pos-sizeof(T));
     }
 
 

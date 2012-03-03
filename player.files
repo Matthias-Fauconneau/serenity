@@ -1,7 +1,7 @@
 Makefile
 core.h
 array.h
-vector.h
+signal.h
 map.h
 string.h
 string.cc
@@ -10,20 +10,21 @@ process.cc
 file.h
 file.cc
 
+vector.h
 image.h
 image.cc
 font.h
 font.cc
-gl.h
-gl.cc
-shader.glsl
-
+window.h
+window.cc
 interface.h
 interface.cc
-window.cc
 
-media.h
+ffmpeg.cc
+ffmpeg.h
 alsa.cc
-mpg123.cc
+alsa.h
 resample.cc
+resample.h
 player.cc
+gl.cc

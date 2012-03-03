@@ -15,7 +15,7 @@ Font::Font(const char* path) {
     FT_New_Face(ft, path, 0, &face);
     assert(face,strz(path));
 }
-Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)&data,data.size,0,&face); }
+Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)&data,data.size(),0,&face); }
 
 FontMetrics Font::metrics(int size) {
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,size<<6,0,0};
@@ -47,10 +47,10 @@ GlyphMetrics Font::metrics(int size, int code) {
 
 Glyph& Font::glyph(int size, int code) {
     map<int, Glyph>& glyphs = cache[size];
-    if(glyphs.values.size==0) glyphs.values.reserve(256); //FIXME: dynamic array would invalid any references
-    assert(glyphs.values.capacity==256);
+    if(!glyphs.values) glyphs.values.reserve(256); //FIXME: dynamic array would invalid any references
+    assert(glyphs.values.capacity()==256);
     Glyph& glyph = glyphs[code]; //TODO: lookup for code in [0x20..0x80]
-    if(glyph.texture || glyph.advance.x) return glyph;
+    if(glyph.image || glyph.advance.x) return glyph;
 
     glyph.advance = metrics(size,code).advance;
     if(code == ' ') return glyph;
@@ -60,13 +60,12 @@ Glyph& Font::glyph(int size, int code) {
     //assert(bitmap.buffer);
     if(!bitmap.buffer) return glyph;
     int width = bitmap.width/3, height = bitmap.rows;
-    Image image(width,height);
+    glyph.image = Image(width,height);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
         uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
-        image.data[y*width+x] = byte4(255-rgb[0],255-rgb[1],255-rgb[2],255);
+        glyph.image.data[y*width+x] = byte4(255-rgb[0],255-rgb[1],255-rgb[2],255);
     }
-    glyph.texture = image;
     return glyph;
 }
 
-Font defaultFont("/usr/share/fonts/dejavu/DejaVuSans.ttf");
+Font font("/usr/share/fonts/dejavu/DejaVuSans.ttf");

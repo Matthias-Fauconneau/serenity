@@ -16,7 +16,7 @@ bool isDirectory(const string& path) { return statFile(path).st_mode&S_IFDIR; }
 array<string> listFiles(const string& folder, Flags flags) {
     array<string> list;
     DIR* dir = opendir(folder?&strz(folder):".");
-    assert(dir);
+    assert(dir, "Folder not found"_, folder);
     for(dirent* dirent; (dirent=readdir(dir));) {
         string path = strz(dirent->d_name);
         if(path!="."_ && path!=".."_) {

@@ -71,7 +71,7 @@ template<class T> struct Scroll : ScrollArea, T {
     Widget& parent() { return (ScrollArea&)*this; }
 };
 
-/// index_iterator is used to iterate indexable containers
+/*/// index_iterator is used to iterate indexable containers
 template<class C, class T> struct index_iterator {
     C* container;
     int index;
@@ -79,17 +79,17 @@ template<class C, class T> struct index_iterator {
     bool operator!=(const index_iterator& o) const { assert(container==o.container); return o.index != index; }
     T& operator* () const { assert(container); return container->at(index); }
     const index_iterator& operator++ () { index++; return *this; }
-};
+};*/
 
 /// Layout is a proxy Widget containing multiple widgets.
 struct Layout : Widget {
     /// Override \a count and \a at to implement widgets storage (\sa WidgetLayout ListLayout TupleLayout)
-    virtual int count() =0;
+    virtual int count() const =0;
     virtual Widget& at(int) =0;
 
-    typedef index_iterator<Layout,Widget> iterator;
+    /*typedef index_iterator<Layout,Widget> iterator;
     iterator begin() { return iterator(this,0); }
-    iterator end() { return iterator(this,count()); }
+    iterator end() { return iterator(this,count()); }*/
 
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 position, Event event, Button button) override;
@@ -99,18 +99,21 @@ struct Layout : Widget {
 
 /// WidgetLayout implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
-struct WidgetLayout : virtual Layout, array<Widget*> {
-    int count() { return array<Widget*>::size(); }
-    Widget& at(int i) { return *array<Widget*>::at(i); }
-    WidgetLayout& operator <<(Widget& w) { append(&w); return *this; }
+struct WidgetLayout : virtual Layout {
+    array<Widget*> widgets;
+    int count() const { return widgets.size(); }
+    Widget& at(int i) { return *widgets.at(i); }
+    WidgetLayout& operator <<(Widget& w) { widgets << &w; return *this; }
 };
 
 /// ListLayout implements Layout storage using array<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing an indirection.
-template<class T> struct ListLayout : virtual Layout, array<T> {
-    int count() { return array<T>::size; }
-    Widget& at(int i) { return array<T>::at(i); }
-    ListLayout& operator <<(T&& t) { array<T>::append(move(t)); return *this; }
+template<class T> struct ListLayout : virtual Layout {
+    array<T> items;
+    int count() const { return items.size(); }
+    Widget& at(int i) { return items.at(i); }
+    ListLayout& operator <<(T&& t) { items << move(t); return *this; }
+    void clear() { items.clear(); }
 };
 
 /// Linear divide space between contained widgets
@@ -161,7 +164,7 @@ struct TabSelection : virtual Selection {
 /// ListSelection is an \a ListLayout with \a HighlightSelection
 template<class T> struct ListSelection : ListLayout<T>, virtual Selection {
     /// Return active item (last selection)
-    inline T& active() { return array<T>::at(this->index); }
+    inline T& active() { return ListLayout<T>::items.at(this->index); }
 };
 
 /// List is a \a Vertical layout of selectable items (\sa ListSelection)
@@ -183,8 +186,8 @@ struct Text : Widget {
 protected:
     int size;
     int2 textSize;
-    struct Blit { vec2 min, max; uint id; };
-    array<Blit> blits;
+    struct Blit { int2 pos; const Image& image; };
+    array<Blit> layout;
 };
 
 /// TextList is a \a List of \a Text items
@@ -230,10 +233,9 @@ struct Item : Horizontal {
     int count() { return 3; }
     Widget& at(int i) { return i==0?(Widget&)icon:i==1?(Widget&)text:rightRag; }
 };
-typedef Item Tab; //TODO: tab aspect
 
-/// TabBar is a \a Bar of \a Tab items
-typedef Bar<Tab> TabBar;
+/// TabBar is a \a Bar containing \a Item elements
+typedef Bar<Item> TabBar;
 
 /// TriggerButton is a togglable Icon
 //TODO: inherit Icon

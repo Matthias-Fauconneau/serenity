@@ -154,7 +154,7 @@ template <class T> void clear(T* data, int count, const T& value=T()) { for(int 
 //raw buffer copy //TODO: SSE
 inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
 //unsafe (ignoring constructors) raw value copy
-template <class T> void copy(T& dst,const T& src) { copy(addressof(dst),addressof(src),sizeof(T)); }
+template <class T> void copy(T& dst,const T& src) { copy((byte*)addressof(dst),(byte*)addressof(src),sizeof(T)); }
 
 // base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
 template <class T> T copy(const T& t) { return t; }

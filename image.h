@@ -21,10 +21,11 @@ struct Image {
     Image(array<byte>&& file);
 
     ~Image(){ if(data && own) delete data; }
-    operator bool() { return data; }
+    explicit operator bool() const { return data; }
 
     byte4 operator()(int x, int y) const { return data[y*width+x]; }
     byte4& operator()(int x, int y) { return data[y*width+x]; }
+    int2 size() const { return int2(width,height); }
 
     Image copy() const { Image r(width,height); if(data) ::copy(r.data,data,width*height); return r; }
     /// Resize this image to \a width x \a height

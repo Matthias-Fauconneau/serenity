@@ -25,8 +25,6 @@ struct Window : Poll {
     /// \note Make sure the referenced widget is initialized before running this constructor
     /// \note Currently only one window per process can be created (or GL context issues will occur)
     Window(Widget& widget, int2 size, const string& name);
-    /// Update the window by handling any incoming events
-    void update();
     /// Repaint window contents. Called by update after an event is accepted by a widget.
     void render();
 
@@ -67,6 +65,7 @@ protected:
     template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
 
     pollfd poll();
+    /// Update the window by handling any incoming events
     void event(pollfd);
 
     XWindow id;

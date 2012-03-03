@@ -1,6 +1,7 @@
 #include "process.h"
 #include "file.h"
-#include "media.h"
+#include "ffmpeg.h"
+#include "alsa.h"
 #include "interface.h"
 #include "window.h"
 ICON(play);
@@ -39,7 +40,8 @@ struct Player : Application {
         media.timeChanged.connect(this, &Player::update);
         albums.activeChanged.connect(this, &Player::playAlbum);
         titles.activeChanged.connect(this, &Player::play);
-        audio.setInput(&media);
+        media.audioOutput={audio.frequency,audio.channels};
+        audio.read = {&media,&AudioFile::read};
 
         folders = listFiles("/Music"_,Sort|Folders);
         for(auto& folder : folders) albums << Text(section(folder,'/',-2,-1), 10);
@@ -53,14 +55,14 @@ struct Player : Application {
             string folder = section(last,'/',0,3);
             albums.index = folders.indexOf(folder);
             array<string> files = listFiles(folder,Recursive|Sort|Files);
-            int i=0; for(;i<files.size;i++) if(files[i]==last) break;
-            for(;i<files.size;i++) appendFile(move(files[i]));
+            int i=0; for(;i<files.size();i++) if(files[i]==last) break;
+            for(;i<files.size();i++) appendFile(move(files[i]));
         }
         if(files) next();
         window.show();
         setPriority(-20);
     }
-    ~Player() { if(titles.index<0) return; string& file = files[titles.index]; write(createFile("/Music/.last"_),&file,file.size); }
+    ~Player() { if(titles.index<0) return; string& file = files[titles.index]; write(createFile("/Music/.last"_),&file,file.size()); }
     void keyPress(Key key) {
         /**/ if(key == Escape) quit();
         else if(key == playHotKey) togglePlay(!playButton.enabled);
@@ -68,9 +70,9 @@ struct Player : Application {
     void appendFile(string&& path) {
         string title = section(section(path,'/',-2,-1),'.',0,-2);
         int i=title.indexOf('-'); i++; //skip album name
-        while(title[i]>='0'&&title[i]<='9') i++; //skip track number
-        while(title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_') i++; //skip whitespace
-        titles << Text(replace(title.slice(i),'_',' '), 16);
+        while(i<title.size() && title[i]>='0'&&title[i]<='9') i++; //skip track number
+        while(i<title.size() && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
+        titles << Text(replace(slice(title,i),'_',' '), 16);
         files << move(path);
     }
     void playAlbum(const string& path) {
@@ -114,8 +116,8 @@ struct Player : Application {
         if(position == duration) next();
         if(!window.visible || slider.value == position) return;
         slider.value = position; slider.maximum=duration;
-        elapsed.text=toString(position/60,10,2)+":"_+toString(position%60,10,2);
-        remaining.text=toString((duration-position)/60,10,2)+":"_+toString((duration-position)%60,10,2);
+        elapsed.text=str(uint64(position/60),10,2)+":"_+str(uint64(position%60),10,2);
+        remaining.text=str(uint64((duration-position)/60),10,2)+":"_+str(uint64((duration-position)%60),10,2);
         toolbar.update(); window.render();
     }
 } player;

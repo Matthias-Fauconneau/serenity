@@ -34,7 +34,7 @@ Image::Image(array<byte>&& file) {
     NetworkStream s(move(file));
     if(!s.match("\x89PNG\r\n\x1A\n"_)) error("Unknown image format"_);
     z_stream z; clear(z); inflateInit(&z);
-    array<byte> idat(file.size()*16); //FIXME
+    array<byte> idat(s.buffer.size()*16); //FIXME
     z.next_out = (Bytef*)&idat, z.avail_out = (uint)idat.capacity();
     int depth=0;
     while(s) {

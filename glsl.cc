@@ -12,7 +12,7 @@ int main(int argc, const char** argv) {
     glXMakeCurrent(x, id, ctx);
 
     array<string> args; for(int i=1;i<argc;i++) args << strz(argv[i]);
-    if(args.size<2) { log("Usage: glsl binary.gpu shader.glsl tags"_); return 1; }
+    if(args.size()<2) { log("Usage: glsl binary.gpu shader.glsl tags"_); return 1; }
     assert(exists(args[1]));
     string source = mapFile(args[1]);
     array<string> tags = slice(args,2);

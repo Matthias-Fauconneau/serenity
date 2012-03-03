@@ -1,7 +1,5 @@
-#include "process.h"
-#include "media.h"
+#include "alsa.h"
 
-//#include <stdlib.h>
 #include <sys/types.h>
 #include <alsa/global.h>
 struct snd_input_t;
@@ -32,12 +30,11 @@ AudioOutput::AudioOutput(bool realtime) {
     snd_pcm_sw_params_set_period_event(pcm,sw, 1);
     snd_pcm_sw_params(pcm,sw);
 }
-void AudioOutput::setInput(AudioInput* input) { this->input=input; input->setup(format); }
 pollfd AudioOutput::poll() { pollfd p; snd_pcm_poll_descriptors(pcm,&p,1); return p; }
 void AudioOutput::start() { if(running) return; registerPoll(); running=true; }
 void AudioOutput::stop() { if(!running) return;  snd_pcm_drain(pcm); unregisterPoll(); running=false; }
 void AudioOutput::event(pollfd p) {
-    assert(input);
+    assert(read.method);
     unsigned short revents;
     snd_pcm_poll_descriptors_revents(pcm, &p, 1, &revents);
     if(!(revents & POLLOUT)) return;
@@ -49,7 +46,7 @@ void AudioOutput::event(pollfd p) {
     snd_pcm_mmap_begin(pcm, &areas, &offset, &frames);
     assert(frames == period);
     int16* output = (int16*)areas[0].addr+offset*2;
-    input->read(output,(int)period);
+    read(output,(int)period);
     snd_pcm_mmap_commit(pcm, offset, frames);
     if(snd_pcm_state(pcm) == SND_PCM_STATE_PREPARED && snd_pcm_avail_update(pcm)==0) snd_pcm_start(pcm);
     return;

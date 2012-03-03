@@ -43,7 +43,7 @@ bool operator <(const string& a, const string& b) {
 
 string strz(const string& s) { return s+"\0"_; }
 
-string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string(s,i); }
+string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return copy(string(s,i)); }
 
 void section_(const string& s, char sep, int& start, int& end, bool includeSep) {
     int b,e;
@@ -70,7 +70,7 @@ void section_(const string& s, char sep, int& start, int& end, bool includeSep) 
 }*/
 string section(const string& s, char sep, int start, int end, bool includeSep) {
     section_(s,sep,start,end,includeSep);
-    return string(s.data()+start,end-start);
+    return copy(string(s.data()+start,end-start));
 }
 /*string section(string&& s, char sep, int start, int end, bool includeSep) {
     section_(s,sep,start,end,includeSep);

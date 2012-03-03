@@ -15,7 +15,7 @@ struct GlyphMetrics {
 struct Glyph {
 	vec2 offset;
 	vec2 advance;
-	GLTexture texture;
+	Image image;
 };
 
 struct FT_FaceRec_;
@@ -35,4 +35,4 @@ struct Font {
     Glyph& glyph(int size, int code);
 };
 
-extern Font defaultFont;
+extern Font font;

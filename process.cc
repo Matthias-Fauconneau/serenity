@@ -14,6 +14,14 @@ extern "C" __pid_t waitpid(__pid_t __pid, int *__stat_loc, int __options);
 
 void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
 
+/// limit process ressources to avoid hanging the system when debugging
+declare(static void limit_resource(), constructor) {
+    /*{ rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21; setrlimit(RLIMIT_STACK,&limit); } //2M
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24; setrlimit(RLIMIT_DATA,&limit); } //16M
+    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_AS,&limit); } //256M*/
+    setPriority(19);
+}
+
 int getCPUTime() {
     rusage usage; getrusage(RUSAGE_SELF,&usage);
     return  usage.ru_stime.tv_sec*1000+usage.ru_stime.tv_usec/1000 + //user time in ms
@@ -46,10 +54,12 @@ void Poll::unregisterPoll() { polls.remove(this); }
 Application* app=0;
 Application::Application() { assert(!app,"Multiple application compiled in executable"_); app=this; }
 int main(int argc, const char** argv) {
-    array<string> args;
-    for(int i=1;i<argc;i++) args << strz(argv[i]);
-    assert(app,"No application compiled in executable"_);
-    app->start(move(args));
+    {
+        array<string> args;
+        for(int i=1;i<argc;i++) args << strz(argv[i]);
+        assert(app,"No application compiled in executable"_);
+        app->start(move(args));
+    }
     while(polls.size() && app->running) {
         ::poll((pollfd*)&polls.values,polls.size(),-1);
         for(int i=0;i<polls.size();i++) if(polls.values[i].revents) polls.keys[i]->event(polls.values[i]);
