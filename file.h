@@ -5,10 +5,11 @@ extern "C" ssize_t read(int fd, void* buf, size_t size);
 extern "C" ssize_t write(int fd, const void* buf, size_t size);
 extern "C" int close(int fd);
 
-//inline void read(int fd, array<byte>& s) { s.size=read(fd,(byte*)&s,(size_t)s.capacity); }
-inline array<byte> read(int fd, int capacity) {
+inline array<byte> read(int fd, uint capacity) {
     array<byte> buffer(capacity);
-    buffer.setSize(read(fd,(byte*)&buffer,(size_t)buffer.capacity()));
+    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
+    buffer.setSize(size);
+    assert(buffer.size()==capacity);
     return buffer;
 }
 

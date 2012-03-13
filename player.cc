@@ -8,6 +8,8 @@ ICON(play);
 ICON(pause);
 ICON(next);
 
+#include "array.cc"
+
 struct Player : Application {
     array<string> folders;
     array<string> files;
@@ -15,24 +17,21 @@ struct Player : Application {
     AudioFile media;
     AudioOutput audio;
 
-    VBox layout;
-    Window window{layout,int2(640,640),"Player"_};
-     HBox toolbar;
-      ToggleButton playButton = ToggleButton(playIcon,pauseIcon);
-      TriggerButton nextButton = TriggerButton(nextIcon);
-      Text elapsed = Text("00:00"_);
-      Slider slider;
-      Text remaining = Text("00:00"_);
-     HBox main;
-      TextList albums; TextList titles;
+       ToggleButton playButton = ToggleButton(move(playIcon),move(pauseIcon));
+       TriggerButton nextButton = TriggerButton(move(nextIcon));
+       Text elapsed = Text("00:00"_);
+       Slider slider;
+       Text remaining = Text("00:00"_);
+      HBox toolbar {&playButton, &nextButton, &elapsed, &slider, &remaining};
+       Scroll<TextList> albums;
+       Scroll<TextList> titles;
+      HBox main { &albums.parent(), &titles.parent() };
+     VBox layout { &toolbar, &main };
+     Window window{&layout, int2(0,0), "Player"_, pauseIcon};
+
     uint playHotKey = window.addHotKey("XF86AudioPlay"_);
 
     void start(array<string>&& arguments) {
-        window.setIcon(pauseIcon);
-        toolbar << playButton << nextButton << elapsed << slider << remaining;
-        main << albums.parent() << titles.parent();
-        layout << toolbar << main;
-
         window.keyPress.connect(this, &Player::keyPress);
         playButton.toggled.connect(this, &Player::togglePlay);
         nextButton.triggered.connect(this, &Player::next);
@@ -53,9 +52,9 @@ struct Player : Application {
         if(!files && exists("/Music/.last"_)) {
             string last = mapFile("/Music/.last"_);
             string folder = section(last,'/',0,3);
-            albums.index = folders.indexOf(folder);
+            albums.index = indexOf(folders, folder);
             array<string> files = listFiles(folder,Recursive|Sort|Files);
-            int i=0; for(;i<files.size();i++) if(files[i]==last) break;
+            uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
             for(;i<files.size();i++) appendFile(move(files[i]));
         }
         if(files) next();
@@ -69,7 +68,7 @@ struct Player : Application {
     }
     void appendFile(string&& path) {
         string title = section(section(path,'/',-2,-1),'.',0,-2);
-        int i=title.indexOf('-'); i++; //skip album name
+        uint i=indexOf(title, '-'); i++; //skip album name
         while(i<title.size() && title[i]>='0'&&title[i]<='9') i++; //skip track number
         while(i<title.size() && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
         titles << Text(replace(slice(title,i),'_',' '), 16);
@@ -83,11 +82,11 @@ struct Player : Application {
     }
     void playAlbum(int index) {
         stop(); files.clear(); titles.clear();
-        window.rename(albums.active().text);
+        window.setName(albums.active().text);
         playAlbum(folders[index]);
     }
     void play(int index) {
-        window.rename(titles.active().text);
+        window.setName(titles.active().text);
         media.open(files[index]);
         audio.start();
         togglePlay(true);
@@ -95,7 +94,7 @@ struct Player : Application {
     void next() {
         if(!playButton.enabled) togglePlay(true);
         if(titles.index+1<titles.count()) play(++titles.index);
-        else window.rename(albums.active().text);
+        else window.setName(albums.active().text);
         titles.ensureVisible(titles.active());
     }
     void togglePlay(bool play) {

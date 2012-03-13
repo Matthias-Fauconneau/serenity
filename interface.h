@@ -40,10 +40,7 @@ struct Widget {
 
 /// Space is a proxy Widget to add space as needed
 struct Space : Widget {
-    /// desired empty space size (negative for expanding)
-    int2 space;
-    Space(int x=-1, int y=-1):space(x,y){}
-    int2 sizeHint() { return space; }
+    int2 sizeHint() { return int2(-1,-1); }
     void render(int2) {}
 };
 
@@ -87,10 +84,6 @@ struct Layout : Widget {
     virtual int count() const =0;
     virtual Widget& at(int) =0;
 
-    /*typedef index_iterator<Layout,Widget> iterator;
-    iterator begin() { return iterator(this,0); }
-    iterator end() { return iterator(this,count()); }*/
-
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 position, Event event, Button button) override;
     /// Renders every child widget
@@ -99,21 +92,19 @@ struct Layout : Widget {
 
 /// WidgetLayout implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
-struct WidgetLayout : virtual Layout {
-    array<Widget*> widgets;
-    int count() const { return widgets.size(); }
-    Widget& at(int i) { return *widgets.at(i); }
-    WidgetLayout& operator <<(Widget& w) { widgets << &w; return *this; }
+struct WidgetLayout : virtual Layout, array<Widget*> {
+    WidgetLayout(std::initializer_list<Widget*>&& widgets):array(move(widgets)){}
+    int count() const;
+    Widget& at(int i);
 };
 
 /// ListLayout implements Layout storage using array<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing an indirection.
-template<class T> struct ListLayout : virtual Layout {
-    array<T> items;
-    int count() const { return items.size(); }
-    Widget& at(int i) { return items.at(i); }
-    ListLayout& operator <<(T&& t) { items << move(t); return *this; }
-    void clear() { items.clear(); }
+template<class T> struct ListLayout : virtual Layout, array<T> {
+    ListLayout(){}
+    ListLayout(std::initializer_list<T>&& items) : array<T>(move(items)){}
+    int count() const { return array<T>::size(); }
+    Widget& at(int i) { return array<T>::at(i); }
 };
 
 /// Linear divide space between contained widgets
@@ -130,15 +121,19 @@ struct Linear : virtual Layout {
 struct Horizontal : virtual Linear {
     int2 xy(int2 xy) override { return xy; }
 };
-/// HBox is a \a Horizontal layout of heterogenous widgets (\sa WidgetLayout)
-struct HBox : Horizontal, WidgetLayout {};
-
 /// Vertical divide vertical space between contained widgets
 struct Vertical : virtual Linear {
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };
+
+/// HBox is a \a Horizontal layout of heterogenous widgets (\sa WidgetLayout)
+struct HBox : Horizontal, WidgetLayout {
+    HBox(std::initializer_list<Widget*>&& widgets):WidgetLayout(move(widgets)){}
+};
 /// VBox is a \a Vertical layout of heterogenous widgets (\sa WidgetLayout)
-struct VBox : Vertical, WidgetLayout {};
+struct VBox : Vertical, WidgetLayout {
+    VBox(std::initializer_list<Widget*>&& widgets):WidgetLayout(move(widgets)){}
+};
 
 /// Selection implements selection of active widget/item for a \a Layout
 //TODO: multi selection
@@ -161,14 +156,19 @@ struct TabSelection : virtual Selection {
     void render(int2 parent) override;
 };
 
-/// ListSelection is an \a ListLayout with \a HighlightSelection
+/// ListSelection is an \a ListLayout with \a Selection
 template<class T> struct ListSelection : ListLayout<T>, virtual Selection {
+    ListSelection(){}
+    ListSelection(std::initializer_list<T>&& items) : ListLayout<T>(move(items)){}
     /// Return active item (last selection)
-    inline T& active() { return ListLayout<T>::items.at(this->index); }
+    inline T& active() { return array<T>::at(this->index); }
 };
 
 /// List is a \a Vertical layout of selectable items (\sa ListSelection)
-template<class T> struct List : Scroll<Vertical>, ListSelection<T>, HighlightSelection {};
+template<class T> struct List : Vertical, ListSelection<T>, HighlightSelection {
+    List(){}
+    List(std::initializer_list<T>&& items) : ListSelection<T>(move(items)){}
+};
 /// Bar is a \a Horizontal layout of selectable items (\sa ListSelection)
 template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {};
 
@@ -197,9 +197,8 @@ typedef List<Text> TextList;
 //TODO: multiline
 struct TextInput : Text {
 protected:
-    int cursor=0;
+    uint cursor=0;
 
-    void update() override;
     bool mouseEvent(int2 position, Event event, Button button) override;
     bool keyPress(Key key) override;
     void render(int2 parent);
@@ -207,10 +206,11 @@ protected:
 
 /// Icon is a widget displaying a static image
 struct Icon : Widget {
+    Icon(){}
     /// Create a trigger button displaying \a image
-    Icon(const Image& image);
+    Icon(Image&& image):image(move(image)){}
     /// Displayed image
-    const Image& image;
+    Image image;
 
     int2 sizeHint();
     void render(int2 parent);
@@ -219,19 +219,20 @@ struct Icon : Widget {
 /// TriggerButton is a clickable Icon
 struct TriggerButton : Icon {
     //using Icon::Icon;
-    TriggerButton(const Image& image):Icon(image){}
+    TriggerButton(){}
+    TriggerButton(Image&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
     bool mouseEvent(int2 position, Event event, Button button) override;
 };
 
 /// Item is an icon with text
-//TODO: generic TupleLayout<> to store named tuples -> Item : Horizontal, TupleLayout<Icon icon,Text text>
 struct Item : Horizontal {
-    Icon icon; Text text; Space rightRag;
+    Icon icon; Text text; Space space;
+    Item(){}
     Item(Icon&& icon, Text&& text):icon(move(icon)),text(move(text)){}
-    int count() { return 3; }
-    Widget& at(int i) { return i==0?(Widget&)icon:i==1?(Widget&)text:rightRag; }
+    int count() const { return 3; }
+    Widget& at(int i) { Widget* list[] = {&icon,&text,&space}; return *list[i]; }
 };
 
 /// TabBar is a \a Bar containing \a Item elements
@@ -255,7 +256,7 @@ struct ToggleButton : Widget {
 
 protected:
     const Image& enableIcon;
-	const Image& disableIcon;
+    const Image& disableIcon;
     static const int size = 32;
 };
 

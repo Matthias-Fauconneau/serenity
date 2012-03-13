@@ -1,10 +1,20 @@
-#include "music.h"
 #include "process.h"
 #include "file.h"
+
+#include "sequencer.h"
+#include "sampler.h"
+#include "alsa.h"
+#include "midi.h"
+
+#ifdef UI
+#include "pdf.h"
 #include "interface.h"
 #include "window.h"
-#include "pdf.h"
+#endif
+
 #include <sys/resource.h>
+
+#include "array.cc"
 
 struct Music : Application {
     Sequencer seq;
@@ -17,19 +27,17 @@ struct Music : Application {
     //Score score;
     map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
     Window window{sheet,int2(1280,1024),"Music"_};
-#define ui(s) s
-#else
-#define ui(s)
 #endif
-
     void start(array<string>&& arguments) {
-        ui( window.keyPress.connect(this,&Music::keyPress); )
+#ifdef UI
+        window.keyPress.connect(this,&Music::keyPress);
+#endif
         for(auto&& path : arguments) {
-            if(path.endsWith(".sfz"_) && exists(path)) {
+            if(endsWith(path, ".sfz"_) && exists(path)) {
                 sampler.open(path);
                 seq.noteEvent.connect(&sampler,&Sampler::event);
-                audio.setInput(&sampler);
-            } else if(path.endsWith(".mid"_)) {
+                audio.read = {&sampler, &Sampler::read};
+            } else if(endsWith(path, ".mid"_)) {
                 if(exists(path)) {
                     midi.open(path);
                     sampler.timeChanged.connect(&midi,&MidiFile::update);
@@ -39,7 +47,7 @@ struct Music : Application {
                 }
             }
 #ifdef UI
-            else if(path.endsWith(".pdf"_) && exists(path)) {
+            else if(endsWith(path, ".pdf"_) && exists(path)) {
                 //sheet.onGlyph.connect(&score,&Score::onGlyph);
                 //sheet.onPath.connect(&score,&Score::onPath);
                 sheet.open(path);
@@ -64,7 +72,9 @@ struct Music : Application {
         if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
         //sheet.scroll=1600;
         setPriority(-20);
-        if(audio.input) audio.start();
+        audio.start();
     }
+#ifdef UI
     void keyPress(Key key) { if(key==Escape) running=false; }
+#endif
 } music;

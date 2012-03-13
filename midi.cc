@@ -1,8 +1,11 @@
-#include "music.h"
+#include "midi.h"
 #include "file.h"
 
+#include "array.cc"
+template class array<Track>;
+
 void MidiFile::open(const string& path) { /// parse MIDI header
-    Stream s = mapFile(path);
+    Stream s( mapFile(path) );
     s+=10;
     uint16 nofChunks = s.read();
     midiClock = 48*60000/120/(uint16)s.read(); //48Khz clock
@@ -10,23 +13,24 @@ void MidiFile::open(const string& path) { /// parse MIDI header
         string tag = s.read<char>(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
             while(s.read<byte>()&0x80) {} //ignore first time
-            tracks << Track(s.read<byte>(length));
+            tracks.append( Track(s.read<byte>(length)) );
         }
         s += length;
     }
 }
 
 void MidiFile::read(Track& track, int time, State state) {
-    if(!track) return;
+    auto& s = track.stream;
+    if(!s) return;
     while(track.time < time) {
-        uint8 type=track.type, vel=0,key=track.read();
-        if(key & 0x80) { type=key>>4; key=track.read(); }
-        if( type == NoteOn) vel=track.read();
-        else if( type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend ) track++;
+        uint8 type=track.type, vel=0,key=s.read();
+        if(key & 0x80) { type=key>>4; key=s.read(); }
+        if( type == NoteOn) vel=s.read();
+        else if( type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend ) s++;
         else if( type == ProgramChange || type == ChannelAftertouch ) {}
         else if( type == Meta ) {
-            uint8 c=track.read(); int len=c&0x7f; if(c&0x80){ c=track.read(); len=(len<<7)|(c&0x7f); }
-            track+=len;
+            uint8 c=s.read(); int len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
+            s+=len;
         }
         track.type = type;
 
@@ -37,20 +41,20 @@ void MidiFile::read(Track& track, int time, State state) {
             sort[e.tick][e.note] =
         }*/
 
-        if(!track) return;
-        uint8 c=track.read(); int t=c&0x7f;
-        if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|c;}}}
+        if(!s) return;
+        uint8 c=s.read(); int t=c&0x7f;
+        if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
         track.time += t*midiClock;
     }
 }
 
 void MidiFile::seek(int time) {
-    for(int i=0;i<tracks.size;i++) { Track& track=tracks[i];
-        if(time < track.time) { track.time=0; track.pos=0; }
+    for(Track& track: tracks) {
+        if(time < track.time) { track.time=0; track.stream.index=0; }
         read(track,time,Seek);
         track.time -= time;
     }
 }
 void MidiFile::update(int time) {
-    for(int i=0;i<tracks.size;i++) read(tracks[i],time,Play);
+    for(Track& track: tracks) read(track,time,Play);
 }

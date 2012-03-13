@@ -8,38 +8,34 @@
 #define _
 #define DEBUG
 #define i( ignore )
+#define unused
 #else
 #define i( ignore... ) ignore
+#define unused __attribute__ (unused)
 #endif
 
 /// Language support
-
+#define declare(function, attributes...) function __attribute((attributes)); function
 // Traits
 #include <type_traits>
 #define is_convertible(F,T) std::is_convertible<F,T>::value
-#define is_same(F,T) std::is_same<F,T>::value
 #define remove_reference(T) typename std::remove_reference<T>::type
-
 // Predicates
 extern void* enabler;
 template<bool> struct predicate {};
 template<> struct predicate<true> { typedef void* type; };
 #define predicate(E) typename predicate<E>::type& condition = enabler
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
-// perfect forwarding predicates
 #define can_forward(T) is_convertible(remove_reference(T), remove_reference(T##f))
 #define perfect(T) class T##f, predicate(can_forward(T))
 #define perfect2(T,U) class T##f, class U##f, predicate(can_forward(T)), predicate1(can_forward(U))
-
 // Move semantics
 template<class T> inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)t; }
 template<class T> inline constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
 template<class T> inline constexpr T&& forward(remove_reference(T)&& t){static_assert(!std::is_lvalue_reference<T>::value,""); return (T&&)t; }
-// delete copy constructors
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
 
 /// Primitive types
-
 typedef signed char int8;
 typedef char byte;
 typedef unsigned char uint8;
@@ -51,46 +47,39 @@ typedef unsigned int uint32;
 typedef unsigned int uint;
 typedef long int64;
 typedef unsigned long uint64;
-
 #if __WORDSIZE == 64
-typedef unsigned long size_t;
-typedef long ssize_t;
+typedef unsigned long size_t; typedef long ssize_t; typedef unsigned long ptr;
 #else
-typedef unsigned int size_t;
-typedef int ssize_t;
+typedef unsigned int size_t; typedef int ssize_t; typedef unsigned int ptr;
 #endif
 
-const float NaN = __builtin_nansf("");
-
 /// Basic operations
-
 template <class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 template <class T> T min(T a, T b) { return a<b ? a : b; }
 template <class T> T max(T a, T b) { return a>b ? a : b; }
 template <class T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 template <class T> T abs(T x) { return x>=0 ? x : -x; }
 
-/// Debugger
+/// SIMD
+typedef float float4 __attribute__ ((vector_size(16)));
+typedef double double2 __attribute__ ((vector_size(16)));
+#define xor_ps __builtin_ia32_xorps
+#define xor_pd __builtin_ia32_xorpd
+#define loadu_ps __builtin_ia32_loadups
+#define loadu_pd __builtin_ia32_loadupd
+#define loada_ps __builtin_ia32_loadaps
+#define movehl_ps __builtin_ia32_movhlps
+#define shuffle_ps __builtin_ia32_shufps
+#define extract_s __builtin_ia32_vec_ext_v4sf
+#define extract_d __builtin_ia32_vec_ext_v2df
 
-extern"C" ssize_t write(int fd, const void* buf, size_t size);
-inline void log(const char* msg) { int i=0; while(msg[i]) i++; write(1,msg,(size_t)i); }
-inline void log(char* msg) { log((const char*)msg); }
-
+/// Debug
 #ifdef DEBUG
 /// compile \a statements in executable only if \a DEBUG flag is set
 #define debug( statements... ) statements
 /// compile \a statements in executable only if \a DEBUG flag is not set
-#define release( statements... )
 #else
 #define debug( statements... )
-#define release( statements... ) statements
-#endif
-
-#ifdef NO_BFD
-inline void logTrace() {}
-#else
-/// Log backtrace
-void logTrace();
 #endif
 
 #ifdef TRACE
@@ -102,18 +91,9 @@ extern bool trace_enable;
 #define trace_off
 #endif
 
-extern "C" void abort() throw() __attribute((noreturn));
-
+void logTrace();
 /// Aborts the process without any message, stack trace is logged
-#define fail() ({debug( trace_off; logTrace(); ) abort(); })
-
-/// Aborts unconditionally
-// can be used without string
-#define error_(message) ({debug( trace_off; logTrace(); ) log("Error:\t"); log(#message); log("\n"); abort(); })
-
-/// Aborts if \a expr evaluates to false
-// can be used without string
-#define assert_(expr) ({debug( if(!(expr)) { trace_off; logTrace(); log("Assert:\t"); log(#expr); log("\n"); abort(); } )})
+#define fail() ({debug( trace_off; logTrace(); )  __builtin_abort(); })
 
 /// Memory
 inline void* operator new(size_t, void* p) { return p; } //placement new
@@ -138,24 +118,19 @@ template<class T> T* reallocate(const T* buffer, int, int size) { return (T*)rea
 template<class T> void unallocate(T* buffer) { free((void*)buffer); }
 #endif
 
-// Gets a pointer to \a value even if T override operator& (e.g array overrides & to return a pointer to its data buffer)
-template<class T> T* addressof(T& value) { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char &>(value))); }
-
-// clear
-
+/// Clear
 //raw buffer zero initialization //TODO: SSE
 inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }
 //unsafe  (ignoring constructors) raw value zero initialization
-template <class T> void clear(T& dst) { clear((byte*)addressof(dst),sizeof(T)); }
+template <class T> void clear(T& dst) { clear((byte*)&dst,sizeof(T)); }
 //safe buffer default initialization
 template <class T> void clear(T* data, int count, const T& value=T()) { for(int i=0;i<count;i++) data[i]=value; }
 
-// copy
+/// Copy
 //raw buffer copy //TODO: SSE
 inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
 //unsafe (ignoring constructors) raw value copy
-template <class T> void copy(T& dst,const T& src) { copy((byte*)addressof(dst),(byte*)addressof(src),sizeof(T)); }
-
+template <class T> void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src,sizeof(T)); }
 // base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
 template <class T> T copy(const T& t) { return t; }
 // explicit buffer copy

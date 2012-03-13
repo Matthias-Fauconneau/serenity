@@ -1,6 +1,13 @@
 #include "string.h"
 #include "math.h" //isnan/isinf
 
+#include "array.cc"
+template class array<string>;
+template int indexOf(const array<string>&, const string&);
+
+// minimal debug support for array.h
+void log(const char* expr) { return log(strz(expr)); }
+
 /// utf8_iterator
 int utf8_iterator::operator* () const {
     int code = pointer[0];
@@ -33,8 +40,11 @@ const utf8_iterator& utf8_iterator::operator++() {
 
 /// string operations
 
+bool startsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data(),s.size())==a; }
+bool endsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a; }
+
 bool operator <(const string& a, const string& b) {
-    for(int i=0;i<min(a.size(),b.size());i++) {
+    for(uint i=0;i<min(a.size(),b.size());i++) {
         if(a[i] > b[i]) return false;
         if(a[i] < b[i]) return true;
     }
@@ -42,25 +52,24 @@ bool operator <(const string& a, const string& b) {
 }
 
 string strz(const string& s) { return s+"\0"_; }
-
 string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return copy(string(s,i)); }
 
 void section_(const string& s, char sep, int& start, int& end, bool includeSep) {
-    int b,e;
+    uint b,e;
     if(start>=0) {
         b=0;
-        for(int i=0;i<start && b<s.size();b++) if(s[b]==sep) i++;
+        for(uint i=0;i<(uint)start && b<s.size();b++) if(s[b]==sep) i++;
     } else {
         b=s.size();
-        if(start!=-1) for(int i=0;b-->0;) { if(s[b]==sep) { i++; if(i>=-start-1) break; } }
+        if(start!=-1) for(uint i=0;b-- > 0;) { if(s[b]==sep) { i++; if(i>=uint(-start-1)) break; } }
         b++; //skip separator
     }
     if(end>=0) {
         e=0;
-        for(int i=0;e<s.size();e++) if(s[e]==sep) { i++; if(i>=end) { if(includeSep) e++; break; } }
+        for(uint i=0;e<s.size();e++) if(s[e]==sep) { i++; if(i>=(uint)end) { if(includeSep) e++; break; } }
     } else {
         e=s.size();
-        if(end!=-1) for(int i=0;e-->0;) { if(s[e]==sep) { i++; if(i>=-end-1) { if(includeSep) e++; break; } } }
+        if(end!=-1) for(uint i=0;e-- > 0;) { if(s[e]==sep) { i++; if(i>=uint(-end-1)) { if(includeSep) e++; break; } } }
     }
     start=b; end=e;
 }
@@ -79,7 +88,7 @@ string section(const string& s, char sep, int start, int end, bool includeSep) {
 
 array<string> split(const string& str, char sep) {
     array<string> r;
-    int b=0,e=0;
+    uint b=0,e=0;
     for(;;) {
         while(b<str.size() && str[b]==sep) b++;
         e=b;
@@ -94,23 +103,26 @@ array<string> split(const string& str, char sep) {
 
 string replace(const string& s, const string& before, const string& after) {
     string r(s.size());
-    for(int i=0;i<s.size();) { //->utf8_iterator
+    for(uint i=0;i<s.size();) { //->utf8_iterator
         if(i<=s.size()-before.size() && string(s.data()+i, before.size())==before) { r<<after; i+=before.size(); }
-        else { r<<s[i]; i++; }
+        else { r << s[i]; i++; }
     }
     return r;
 }
 
 /// Human-readable value representation
 
-string str(uint64 n, int base, int pad) {
+string str(int64 number, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     char buf[64]; int i=64;
+    uint64 n=abs(number);
     do {
         buf[--i] = "0123456789ABCDEF"[n%base];
         n /= base;
     } while( n!=0 );
     while(64-i<pad) buf[--i] = '0';
+    if(number<0) buf[--i]='-',
+    assert(i>=0);
     return copy(string(buf+i,64-i));
 }
 
@@ -118,26 +130,24 @@ string str(float n, int precision, int base) {
     if(isnan(n)) return "NaN"_;
     if(isinf(n)) return n>0?"∞"_:"-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;
-    return (n>=0?""_:"-"_)+str(uint64(abs(n)),base)+"."_+str(uint64(m*abs(n))%m,base,precision);
+    return (n>=0?""_:"-"_)+str(int64(abs(n)),base)+"."_+str(int64(m*abs(n))%m,base,precision);
 }
 
-long readInteger(const char*& s, int base) {
+long toInteger(const string& number, int base) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
-    int neg=0;
-    if(*s == '-' ) s++, neg=1; else if(*s == '+') s++;
-    long number=0;
-    for(;*s;s++) {
-        int n = string("0123456789ABCDEF",base).indexOf(*s);
-        if(n < 0) break; //assert(n>=0,"Invalid integer",str);
-        number *= base;
-        number += n;
+    int sign=1;
+    uint i=0; if(number[i] == '-' ) i++, sign=-1; else if(number[i] == '+') i++;
+    long value=0;
+    for(;i<number.size();i++) {
+        int n = indexOf(string("0123456789ABCDEF",base), number[i]);
+        assert(n>=0,"Invalid integer",number);
+        value *= base;
+        value += n;
     }
-    return neg ? -number : number;
+    return sign*value;
 }
 
-long toInteger(const string& str, int base) { const char* s=&str; return readInteger(s,base); }
-
-double readFloat(const char*& s, int base ) {
+/*double readFloat(const char*& s, int base ) {
     assert(base>2 && base<16,"Unsupported base"_,base);
     int neg=0;
     if(*s == '-') s++, neg=1; else if(*s == '+') s++;
@@ -145,7 +155,7 @@ double readFloat(const char*& s, int base ) {
     int significand = 0;
     for(bool gotDot=false;*s;s++) {
         if(*s == '.') { gotDot=true; continue; }
-        int n = string("0123456789ABCDEF",base).indexOf(*s);
+        int n = indexOf(string("0123456789ABCDEF",base), *s);
         if(n < 0) break; //assert(n>=0,"Invalid float",str);
         significand *= base;
         significand += n;
@@ -153,12 +163,4 @@ double readFloat(const char*& s, int base ) {
     }
     return neg ? -float(significand)/float(exponent) : float(significand)/float(exponent);
 }
-
-double readFloat(const string& str, int base ) { const char* s=&str; return readFloat(s,base); }
-
-
-
-/// Stream (TODO -> stream.cc)
-
-//long TextStream::readInteger(int base) { auto b=(const char*)&data[pos], e=b; long r = ::readInteger(e,base); pos+=int(e-b); return r; }
-//double TextStream::readFloat(int base) { auto b=(const char*)&data[pos], e=b; double r = ::readFloat(e,base); pos+=int(e-b); return r; }
+double readFloat(const string& str, int base ) { const char* s=str.data(); return readFloat(s,base); }*/

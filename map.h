@@ -1,5 +1,6 @@
 #pragma once
 #include "array.h"
+#include "string.h"
 
 template <class K, class V> struct const_pair { const K& key; const V& value; };
 template <class K, class V> struct pair { K& key; V& value; };
@@ -9,17 +10,19 @@ template <class K, class V> struct map {
     array<V> values;
 
     int size() const { return keys.size(); }
-    bool contains(const K& key) const { return keys.contains(key); }
+    bool contains(const K& key) const { return ::contains(keys, key); }
     explicit operator bool() const { return keys.size(); }
+    void clear() { keys.clear(); values.clear(); }
 
-    const V& at(const K& key) const { int i = keys.indexOf(key); assert(i>=0,"No matching key"_); return values[i];}
-    V& at(const K& key) { int i = keys.indexOf(key); assert(i>=0,"No matching key"_); return values[i];}
+    const V& at(const K& key) const { int i = keys.indexOf(key); assert(i>=0); return values[i];}
+    V& at(const K& key) { int i = indexOf(keys, key); assert(i>=0); return values[i];}
     template<perfect(V)> Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
-    V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? addressof(values[i]) : 0; }
-    template<perfect2(K,V)> V& insert(Kf&& key, Vf&& value) { keys << forward<Kf>(key); values << forward<Vf>(value); return values.last(); }
-    template<perfect(K)> V& insert(Kf&& key) { keys << forward<Kf>(key); values.resize(keys.size()); return values.last(); }
-    template<perfect(K)> V& operator [](Kf&& key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(forward<Kf>(key)); }
-    void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
+    V* find(const K& key) { int i = indexOf(keys, key); return i>=0 ? &values[i] : 0; }
+    template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) { assert(!contains(key)); keys << forward<Kf>(key); values << forward<Vf>(value); }
+    template<perfect(K)> V& insert(Kf&& key) { assert(!contains(key)); keys << forward<Kf>(key); grow(values, keys.size()); return values.last(); }
+    //template<perfect(K)> V& operator [](Kf&& key) { int i = indexOf(keys, key); if(i>=0) return values[i]; return insert(forward<Kf>(key)); }
+    V& operator [](K key) { int i = indexOf(keys, key); if(i>=0) return values[i]; return insert(key); }
+    void remove(const K& key) { int i=indexOf(keys, key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
         const K* k; const V* v;
@@ -44,6 +47,6 @@ template <class K, class V> struct map {
 
 template<class K, class V> string str(const map<K,V>& m) {
     string s="{"_;
-    for(int i=0;i<m.size();i++) { s<<m.keys[i]+": "_+m.values[i]; if(i<m.size()-1) s<<", "_; }
+    for(int i=0;i<m.size();i++) { s<<str(m.keys[i])+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }

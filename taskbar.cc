@@ -1,119 +1,100 @@
 //TODO: Calendar, Events, Notifications, Jump Lists
 #include "process.h"
-#include "dbus.h"
+#include "time.h"
 #include "interface.h"
 #include "window.h"
 #include "launcher.h"
+#include "poll.h"
+#include "array.cc"
 
-//-> time.h
-#include "time.h"
-time_t unixTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
-string date(Stream format) {
-    time_t time=unixTime(); tm date; localtime_r(&time,&date);
-    string r(format.size);
-    while(format) {
-        /**/ if(format.match("ss"_))  r << str((uint64)date.tm_sec,10,2);
-        else if(format.match("mm"_))  r << str((uint64)date.tm_min,10,2);
-        else if(format.match("hh"_))  r << str((uint64)date.tm_hour,10,2);
-        else if(format.match("d"_))   r << str((uint64)date.tm_mday);
-        else if(format.match("MM"_))  r << str((uint64)date.tm_mon,10,2);
-        else if(format.match("yyyy"_))r << str((uint64)date.tm_year);
-        else r << format.read<byte>();
-    }
-    return r;
-}
-
-#include <sys/timerfd.h>
-struct Timer : Poll {
-    int fd = timerfd_create(CLOCK_REALTIME,0);
-    signal<> trigger;
-    Timer(){ registerPoll(); }
-    void setAbsolute(int date) { itimerspec timer{timespec{0,0},timespec{date,0}}; timerfd_settime(fd,TFD_TIMER_ABSTIME,&timer,0); };
-    pollfd poll() { return {fd, POLLIN}; }
-    virtual void expired() =0;
-    void event(pollfd) { expired(); trigger.emit(); }
-};
-
-ICON(button);
-ICON(shutdown);
-
-#define Font XWindow
-#define Window XWindow
-#define Status XStatus
-#include <X11/Xlib.h>
-#undef Window
-#undef Font
-#undef Status
-
-#define Atom(name) XInternAtom(x, #name, 1)
-
-struct Task : Tab {
-    XWindow id;
-    Task(XWindow id):id(id){}
-};
-bool operator==(const Task& a,const Task& b){return a.id==b.id;}
-
+#define DBUS 1
+#if DBUS
+#include "dbus.h"
 struct Status : TriggerButton {
     DBus::Object app;
-    Status(DBus::Object&& app, const Image& icon) : TriggerButton(icon), app(move(app)) {}
+    Status(DBus::Object&& app, Image&& icon) : TriggerButton(move(icon)), app(move(app)) {}
     bool mouseEvent(int2 position, Event event, Button button) override {
         if(TriggerButton::mouseEvent(position,event,button)) { app("org.kde.StatusNotifierItem.Activate"_,0,0); return true; }
         return false;
     }
 };
+#endif
+
+struct Task : Item {
+    XID id;
+    Task(XID id):id(id){} //for indexOf
+    Task(XID id, Icon&& icon, Text&& text):Item(move(icon),move(text)),id(id){}
+};
+bool operator==(const Task& a,const Task& b){return a.id==b.id;}
 
 struct Clock : Text, Timer {
-    Clock():Text(date("hh:mm"_)){ setAbsolute(unixTime()/60*60+60); }
-    void expired() { text=date("hh:mm"_); update(); setAbsolute(unixTime()+60); }
+    signal<> trigger;
+    Clock():Text(date("hh:mm"_)){ setAbsolute(getUnixTime()/60*60+60); }
+    void expired() { text=date("hh:mm"_); update(); setAbsolute(getUnixTime()+60); trigger.emit(); }
 };
+
+ICON(shutdown);
 
 struct Desktop {
-    Shortcut shutdown{shutdownIcon,"Shutdown"_,"poweroff"_};
-    Window window{shutdown,int2(0,0),"Desktop"_};
-
+     Space space;
+     List<Command> shortcuts { readShortcuts() };
+     List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_) };
+    HBox applets { &space, &shortcuts, &system };
+    Window window{&applets,int2(-1,-1)};
     Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
-    void show() { window.show(); }
 };
 
-struct TaskBar : Poll, Application {
-    Display* x;
-    DBus dbus;
+#define Atom(name) XInternAtom(x, #name, 1)
 
-    template<class T> array<T> getProperty(XWindow window, const char* property) {
+ICON(button);
+
+struct TaskBar : Poll {
+    Display* x;
+    signal<int> tasksChanged;
+
+     TriggerButton start;
+     Launcher launcher;
+     Bar<Task> tasks;
+#if DBUS
+     DBus dbus;
+     Bar<Status> status;
+     Clock clock;
+    HBox panel {&start, &tasks, &status, &clock };
+#else
+     Clock clock;
+    HBox panel {&start, &tasks, &clock };
+#endif
+    Window window{&panel,int2(-1,0),"TaskBar"_};
+
+    template<class T> array<T> getProperty(XID window, const char* property) {
         Atom atom = XInternAtom(x,property,1);
         Atom type; int format; ulong size, bytesAfter; uint8* data =0;
         XGetWindowProperty(x,window,atom,0,~0,0,0,&type,&format,&size,&bytesAfter,&data);
         if(!data || !size) return array<T>();
         array<T> list = copy(array<T>((T*)data,size));
+        assert(list.data()!=(T*)data);
         XFree(data);
         return list;
     }
 
-    HBox panel;
-    Window window{panel,int2(0,16),"TaskBar"_};
-    TriggerButton start;
-    Launcher launcher;
-    Desktop desktop;
-    Bar<Task> tasks;
-    Bar<Status> status;
-    Clock clock;
-
-    int addTask(XWindow w) {
-        if(getProperty<Atom>(w,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}) return 0;
-        XSelectInput(x,w,PropertyChangeMask);
-        Task task(w);
-        updateTask(task);
-        if(!task.text.text || !task.icon.image) return 0;
-        tasks << move(task);
-        return tasks.array::size-1;
+    string getTitle(XID id) { return getProperty<char>(id,"_NET_WM_NAME"); }
+    Image getIcon(XID id) {
+        array<ulong> buffer = getProperty<ulong>(id,"_NET_WM_ICON");
+        if(buffer.size()<=2) return Image();
+        array<byte4> image(buffer.size());
+        for(uint i=0;i<buffer.size()-2;i++) image << *(byte4*)&buffer[i+2];
+        return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
     }
-    void updateTask(Task& task) {
-        task.text.text = getProperty<char>(task.id,"_NET_WM_NAME");
-        array<int> buffer = (array<int>)getProperty<ulong>(task.id,"_NET_WM_ICON");
-        if(sizeof(long)==8) for(int i=0;i<buffer.size/2;i++) buffer[i]=buffer[2*i]; //discard CARDINAL high words
-        if(buffer.size>2) task.icon = Image((array<byte4>)slice(buffer,2),buffer[0],buffer[1]).resize(16,16);
+    int addTask(XID id) {
+        if(getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}) return -1;
+        string title = getTitle(id);
+        Image icon = getIcon(id);
+        if(!title) return -1;
+        tasks << Task(id,move(icon),move(title));
+        return tasks.array::size()-1;
     }
 
+#if DBUS
     void updateStatusNotifierItems() {
         status.clear();
         DBus::Object StatusNotifierWatcher = dbus("org.kde.StatusNotifierWatcher/StatusNotifierWatcher"_);
@@ -125,18 +106,25 @@ struct TaskBar : Poll, Application {
             if(exists(path)) icon=Image(mapFile(path));
             else {
                 DBusIcon dbusIcon = move(((Variant<array<DBusIcon>>)dbus(item)["IconPixmap"_]).first());
-                icon=move(Image((array<byte4>)move(dbusIcon.data),dbusIcon.width,dbusIcon.height).swap());
+                icon=swap(Image(cast<byte4>(move(dbusIcon.data)),dbusIcon.width,dbusIcon.height));
             }
-            status << Status(dbus(item), icon.resize(16,16));
+            status << Status(dbus(item), resize(icon, 16,16));
         }
     }
+#endif
 
+    static int xErrorHandler(Display*, XErrorEvent*) { return 0; }
     TaskBar() {
+        XSetErrorHandler(xErrorHandler);
         x = XOpenDisplay(0);
-        registerPoll();
         XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
-        for(auto w: getProperty<XWindow>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) addTask(w);
+        registerPoll({XConnectionNumber(x), POLLIN});
+        for(auto id: getProperty<XID>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) {
+         addTask(id);
+         XSelectInput(x, id, PropertyChangeMask);
+        }
 
+#if DBUS
         DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
         DBus("org.freedesktop.DBus.AddMatch"_, "type='signal',sender='org.kde.StatusNotifierWatcher',interface='org.kde.StatusNotifierWatcher',"
              "path='/StatusNotifierWatcher',member='StatusNotifierItemRegistered'"_);
@@ -144,9 +132,9 @@ struct TaskBar : Poll, Application {
         DBus("org.freedesktop.DBus.AddMatch"_, "type='signal',sender='org.kde.StatusNotifierWatcher',interface='org.kde.StatusNotifierWatcher',"
              "path='/StatusNotifierWatcher',member='StatusNotifierItemUnregistered'"_);
         dbus.signals["StatusNotifierItemUnregistered"_].connect(this,&TaskBar::updateStatusNotifierItems);
+#endif
 
-        panel << start << tasks << status << clock;
-         start.image = buttonIcon.resize(16,16);
+         start.image = resize(buttonIcon, 16,16);
          start.triggered.connect(&launcher,&Launcher::show);
          tasks.expanding=true;
          tasks.activeChanged.connect(this,&TaskBar::raise);
@@ -154,7 +142,9 @@ struct TaskBar : Poll, Application {
         panel.update();
 
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
-        window.show(); window.move(int2(0,0));
+        window.show();
+        window.setPosition(int2(0,0));
+        window.update();
     }
     void raise(int) {
         XSetInputFocus(x, tasks.active().id, RevertToNone, CurrentTime);
@@ -169,30 +159,50 @@ struct TaskBar : Poll, Application {
         XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
         XFlush(x);
     }
-    pollfd poll() { return {XConnectionNumber(x), POLLIN}; }
     void event(pollfd) {
         bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) {
             XEvent e; XNextEvent(x,&e);
-            //TODO: try to optimize by receiving only useful events
-            XWindow id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
+            //TODO: receive only useful events
+            XID id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
             if(e.type==PropertyNotify && id==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
-                XWindow id = getProperty<XWindow>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
-                tasks.index = tasks.indexOf(id);
-                needUpdate = true;
+                XID id = getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
+                int i = indexOf(tasks, Task(id));
+                if(i<0) i=addTask(id);
+                if(i>=0) {
+                    if((!tasks[i].text.text || !tasks[i].icon.image)) tasks.removeAt(i);
+                    else tasks.index=i;
+                    needUpdate = true;
+                }
             } else {
-                int i = tasks.indexOf(id);
-                if(i<0 && (e.type == CreateNotify || e.type==ReparentNotify)) i=addTask(id);
-                if(i<0) continue;
-                if(e.type == DestroyNotify || e.type == UnmapNotify) tasks.removeAt(i);
-                else updateTask(tasks[i]);
-                if(!tasks[i].text.text || !tasks[i].icon.image) tasks.removeAt(i);
-                needUpdate = true;
-            }
-            if(needUpdate) {
-                panel.update(); window.render();
-                if(!tasks) desktop.show();
+                int i = indexOf(tasks, Task(id));
+                if(e.type == CreateNotify || e.type==ReparentNotify) XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+                if(e.type == PropertyNotify) {
+                    if(e.xproperty.atom==Atom(_NET_WM_NAME)) {
+                        if(i<0) i=addTask(id);
+                        else tasks[i].text.text = getTitle(id);
+                        needUpdate = true;
+                    }
+                    if(i>=0 && e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].icon = getIcon(id), needUpdate = true;
+                }
+                if(i>=0 && (e.type == DestroyNotify || e.type == UnmapNotify || e.type==ReparentNotify || (!tasks[i].text.text || !tasks[i].icon.image))) {
+                    tasks.removeAt(i), needUpdate = true;
+                }
             }
         }
+        if(needUpdate) {
+            panel.update(); window.render();
+            tasksChanged.emit(tasks.array::size());
+        }
    }
-} taskbar;
+};
+
+struct Shell : Application {
+    TaskBar taskbar;
+    Desktop desktop;
+    Shell() {
+        taskbar.tasksChanged.connect(this,&Shell::tasksChanged);
+        tasksChanged(taskbar.tasks.array::size());
+    }
+    void tasksChanged(int count) { taskbar.window.setVisible(count); desktop.window.setVisible(!count); }
+} shell;

@@ -9,10 +9,9 @@ struct AudioOutput : Poll {
     int frequency=48000, channels=2;
     bool running=false;
 
-    delegate<int16* /*output*/, int /*size*/> read;
+    delegate<int16* /*output*/, uint /*size*/> read;
 
     AudioOutput(bool realtime=false);
-    pollfd poll();
     void event(pollfd);
     virtual void start();
     virtual void stop();

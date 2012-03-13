@@ -1,5 +1,5 @@
 debug
+reldbg
 release
-serenity.files
 *.creator*
-*stash
+serenity.files

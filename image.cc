@@ -4,6 +4,9 @@
 #include "string.h"
 #include <zlib.h>
 
+#include "array.cc"
+//template class array<byte4>;
+
 template<template <typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height) {
     typedef vector<T,uint8,N> S;
     typedef vector<T,int,N> V;
@@ -31,29 +34,26 @@ template<template <typename> class T, int N> void filter(byte4* dst, const byte*
 }
 
 Image::Image(array<byte>&& file) {
-    NetworkStream s(move(file));
+    Stream s(move(file)); s.bigEndian=true;
     if(!s.match("\x89PNG\r\n\x1A\n"_)) error("Unknown image format"_);
     z_stream z; clear(z); inflateInit(&z);
     array<byte> idat(s.buffer.size()*16); //FIXME
-    z.next_out = (Bytef*)&idat, z.avail_out = (uint)idat.capacity();
+    z.next_out = (Bytef*)idat.data(), z.avail_out = (uint)idat.capacity();
     int depth=0;
     while(s) {
         uint32 size = s.read();
         string name = s.read<byte>(4);
         if(name == "IHDR"_) {
             width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
-            debug(
-                uint8 bitDepth = s.read(), type = s.read(), compression = s.read(), filter = s.read(), interlace = s.read();
-                assert(bitDepth==8,(int)bitDepth); assert(compression==0); assert(filter==0); assert(interlace==0);
-            )
-            release(
-                s++; uint8 type = s.read(); s+=3;
-            )
-            depth = (int[]){0,0,3,0,2,0,4}[type];
-            if(!depth) return;
+            uint8 unused bitDepth = s.read(); assert(bitDepth==8,(int)bitDepth);
+            uint8 type = s.read(); depth = (int[]){0,0,3,0,2,0,4}[type]; assert(depth,type);
+            uint8 unused compression = s.read(); assert(compression==0);
+            uint8 unused filter = s.read(); assert(filter==0);
+            uint8 unused interlace = s.read(); assert(interlace==0);
         } else if(name == "IDAT"_) {
             z.avail_in = size;
-            z.next_in = (Bytef*)&s.read<byte>((int)size);
+            auto buffer = s.read<byte>(size);
+            z.next_in = (Bytef*)buffer.data();
             inflate(&z, Z_NO_FLUSH);
         } else s += (int)size;
         s+=4; //CRC
@@ -61,43 +61,40 @@ Image::Image(array<byte>&& file) {
     inflate(&z, Z_FINISH);
     inflateEnd(&z);
     idat.setSize( (int)z.total_out );
-    assert(idat.size() == height*(1+width*depth), idat.size(), width, height, depth);
+    assert(idat.size() == height*(1+width*depth), idat.size(), width, height, depth, z.avail_in);
     data = allocate<byte4>(width*height);
-    /**/ if(depth==2) filter<ia,2>((byte4*)data,&idat,width,height);
-    else if(depth==3) filter<rgb,3>((byte4*)data,&idat,width,height);
-    else if(depth==4) filter<rgba,4>((byte4*)data,&idat,width,height);
+    /**/ if(depth==2) filter<ia,2>(data,idat.data(),width,height);
+    else if(depth==3) filter<rgb,3>(data,idat.data(),width,height);
+    else if(depth==4) filter<rgba,4>(data,idat.data(),width,height);
     else error("depth"_,depth);
 }
 
-Image& Image::resize(int w, int h) {
-    if(w==width && h==height) return *this;
-    const byte4* src = data;
-    byte4* buffer = allocate<byte4>(w*h);
-    byte4* dst = buffer;
-    assert(width/w==height/h && !(width%w) && !(height%h)); //integer uniform downscale
-    int scale = width/w;
-    for(int y=0;y<h;y++) {
-        for(int x=0;x<w;x++) {
-            int4 s{0,0,0,0};
+Image resize(const Image& image, uint width, uint height) {
+    if(width==image.width && height==image.height) return copy(image);
+    assert(image.width/width==image.height/height && !(image.width%width) && !(image.height%height)); //integer uniform downscale
+    Image target(width,height);
+    const byte4* src = image.data;
+    byte4* dst = target.data;
+    int scale = image.width/width;
+    for(uint y=0; y<height; y++) {
+        for(uint x=0; x<width; x++) {
+            int4 s=zero;
             for(int i=0;i<scale;i++){
                 for(int j=0;j<scale;j++) {
-                    s+= int4(src[i*width+j]);
+                    s+= int4(src[i*image.width+j]);
                 }
             }
             *dst = byte4(s/(scale*scale));
             src+=scale, dst++;
         }
-        src += (scale-1)*width;
+        src += (scale-1)*image.width;
     }
-    width=w, height=h;
-    if(own) delete[] data; data=buffer; own=true;
-    return *this;
+    return target;
 }
 
-Image& Image::swap() {
-    uint32* p = (uint32*)data;
-    for(int i=0;i<width*height;i++) {
-        p[i] = swap32(p[i]);
-    }
-    return *this;
+#define swap32 __builtin_bswap32
+Image swap(Image&& image) {
+    uint32* p = (uint32*)image.data;
+    for(uint i=0;i<image.width*image.height;i++) p[i] = swap32(p[i]);
+    return move(image);
 }

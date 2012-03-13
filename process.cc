@@ -1,53 +1,42 @@
 #include "process.h"
 #include "map.h"
-//#include "file.h"
 
 #include <poll.h>
 #include <unistd.h>
 #include <sys/resource.h>
 #include <sched.h>
-extern "C" __pid_t waitpid(__pid_t __pid, int *__stat_loc, int __options);
 
-#define declare(function, attributes...) function __attribute((attributes)); function
+#include "array.cc"
 
 /// Process
 
 void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
-
-/// limit process ressources to avoid hanging the system when debugging
-declare(static void limit_resource(), constructor) {
-    /*{ rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21; setrlimit(RLIMIT_STACK,&limit); } //2M
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24; setrlimit(RLIMIT_DATA,&limit); } //16M
-    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_AS,&limit); } //256M*/
-    setPriority(19);
-}
 
 int getCPUTime() {
     rusage usage; getrusage(RUSAGE_SELF,&usage);
     return  usage.ru_stime.tv_sec*1000+usage.ru_stime.tv_usec/1000 + //user time in ms
             usage.ru_utime.tv_sec*1000+usage.ru_utime.tv_usec/1000; //kernel time in ms
 }
+map<const char*, int> profile;
 
 void execute(const string& path, const array<string>& args) {
     array<string> args0(1+args.size());
-    args0 << copy(strz(path));
-    for(int i=0;i<args.size();i++) args0 << copy(strz(args[i]));
+    args0 << strz(path);
+    for(uint i=0;i<args.size();i++) args0 << strz(args[i]);
     const char* argv[args0.size()+1];
-    for(int i=0;i<args0.size();i++) argv[i]=&args0[i];
-    argv[1+args.size()]=0;
+    for(uint i=0;i<args0.size();i++) argv[i]=args0[i].data();
+    argv[args0.size()]=0;
     pid_t pid = fork();
     if(pid==0) {
         unshare(CLONE_FILES);
-        if(!execv(&strz(path),(char* const*)argv)) _exit(-1);
+        if(!execv(strz(path).data(),(char* const*)argv)) __builtin_abort();
     }
-    //int status; waitpid(pid,&status,0);
 }
 
 /// Poll
 
 static map<Poll*,pollfd> polls __attribute((init_priority(103)));
-void Poll::registerPoll() { polls.insert(this,this->poll()); }
-void Poll::unregisterPoll() { polls.remove(this); }
+void Poll::registerPoll(pollfd poll) { polls.insert(this,poll); }
 
 /// Application
 
@@ -61,7 +50,7 @@ int main(int argc, const char** argv) {
         app->start(move(args));
     }
     while(polls.size() && app->running) {
-        ::poll((pollfd*)&polls.values,polls.size(),-1);
+        ::poll((pollfd*)polls.values.data(),polls.size(),-1);
         for(int i=0;i<polls.size();i++) if(polls.values[i].revents) polls.keys[i]->event(polls.values[i]);
     }
     return 0;
@@ -107,13 +96,13 @@ Symbol findNearestLine(void* address) {
 
 struct StackFrame {
     StackFrame* caller_frame; void* return_address;
-    static inline StackFrame* current() { register StackFrame* ebp asm("ebp"); return ebp; }
+    static inline StackFrame* current() { register StackFrame* ebp __asm__("ebp"); return ebp; }
 };
 int backtrace(void** frames, int capacity, StackFrame* ebp) {
     int i=0;
     for(;i<capacity;i++) {
-        frames[i]=ebp->return_address;
         if(int64(ebp=ebp->caller_frame)<0x10) break;
+        frames[i]=ebp->return_address;
     }
     return i;
 }
@@ -244,24 +233,22 @@ static void handler(int sig, siginfo*, void* ctx) {
     if(sig == SIGSEGV) log("Segmentation violation"_);
     else if(sig == SIGPIPE) log("Broken Pipe"_);
     else if(sig == SIGFPE) {
-        log("Arithmetic exception ");
-#if __WORDSIZE == 64
-		const string flags[] = {"Invalid Operand"_,"Denormal Operand"_,"Zero Divide"_,"Overflow"_,"Underflow"_};
+        log("Arithmetic exception "_);
+        const string flags[] = {"Invalid Operand"_,"Denormal Operand"_,"Zero Divide"_,"Overflow"_,"Underflow"_};
         string s;
-        for(int i=1;i<=4;i++) if(context->uc_mcontext.fpregs->mxcsr & (1<<i)) s<<flags[i]+" "_;
+        for(int i=0;i<=4;i++) if(context->uc_mcontext.fpregs->mxcsr & (1<<i)) s<<flags[i]+" "_;
         log(s);
-#endif
     }
     else error("Unhandled signal"_);
 #if __WORDSIZE == 64
     logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
 #else
-	logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_EBP]));
+    logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_EBP]));
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_EIP]);
 #endif
     log(s.file+":"_+str(s.line)+"   \t"_+s.function);
-    log("Aborted"_); abort();
+    __builtin_abort();
 }
 
 declare(static void catch_sigsegv(), constructor) {
@@ -271,7 +258,7 @@ declare(static void catch_sigsegv(), constructor) {
     sigaction(SIGSEGV, &sa, 0);
     sigaction(SIGPIPE, &sa, 0);
     sigaction(SIGFPE, &sa, 0);
-    feenableexcept(FE_DIVBYZERO|FE_INVALID|FE_OVERFLOW);
+    feenableexcept(FE_DIVBYZERO|FE_INVALID); //|FE_OVERFLOW
 }
 
 #endif

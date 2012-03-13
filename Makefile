@@ -1,11 +1,12 @@
-CC = g++-4.7.0-alpha20120225
-PREFIX = /usr/local
+CC = g++-4.8.0-alpha20120304
+PREFIX = /usr
 
 ifeq (,$(TARGET))
- TARGET = bspline
+ TARGET = taskbar
 endif
 
 	ifeq ($(BUILD),debug)
+else ifeq ($(BUILD),reldbg)
 else ifeq ($(BUILD),release)
 else ifeq ($(BUILD),trace)
 else
@@ -13,21 +14,21 @@ else
 endif
 
 #TODO: use dependency files (.P) to link object files .o
-SRCS = string process memory
+SRCS = core array string process vector
 
 	 ifeq ($(TARGET),player)
- SRCS += file image window font interface alsa ffmpeg resample player
+ SRCS += signal stream file image window font interface alsa ffmpeg resample player
  ICONS = play pause next
  LIBS += -lasound -lavformat -lavcodec
 else ifeq ($(TARGET),sampler)
- SRCS += file alsa resample sequencer sampler midi music
+ SRCS += stream time signal file alsa resample sequencer flac sampler midi music
  LIBS += -lasound
 else ifeq ($(TARGET),music)
  SRCS += file image window font interface alsa resample sequencer sampler midi pdf music
  LIBS += -lasound
  INSTALL = icons/music.png music.desktop
 else ifeq ($(TARGET),taskbar)
- SRCS += file image window font interface launcher taskbar
+ SRCS += signal stream time file image window font interface launcher taskbar
  ICONS = button shutdown
  #ICONS = system network utility graphics office
  LIBS += -lrt
@@ -37,8 +38,8 @@ else ifeq ($(TARGET),editor)
  GPUS = shader
 else ifeq ($(TARGET),symbolic)
  SRCS += symbolic algebra expression
-else ifeq ($(TARGET),lac)
- SRCS += file lac
+else ifeq ($(TARGET),flac)
+ SRCS += file flac codec disasm
 else ifeq ($(TARGET),bspline)
  SRCS += window bspline file image
 endif
@@ -53,7 +54,7 @@ ifneq (,$(findstring font,$(SRCS)))
 endif
 
 ifneq (,$(findstring window,$(SRCS)))
-  LIBS += -lX11
+  LIBS += -lX11 -lXext
 endif
 
 ifneq (,$(findstring gl,$(SRCS)))
@@ -63,23 +64,24 @@ ifneq (,$(findstring gl,$(SRCS)))
   FLAGS += -DGLU
   LIBS += -lGLU
  endif
-else
- LIBS += -lXext
 endif
 
 SRCS += $(ICONS:%=icons/%)
 SRCS += $(GPUS:%=%.gpu)
 
-FLAGS += -std=c++11 -pipe -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -fno-rtti -march=native
+#-fno-implicit-templates
+FLAGS += -pipe -std=c++11 -fno-operator-names -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -fno-rtti -march=native
 
 ifeq ($(BUILD),debug)
-	FLAGS += -g -DDEBUG
+	FLAGS += -ggdb -DDEBUG -O2 -fno-omit-frame-pointer
 	LIBS += -lbfd
+else ifeq ($(BUILD),reldbg)
+	FLAGS += -ggdb -Ofast
 else ifeq ($(BUILD),release)
 	FLAGS += -Ofast
 else ifeq ($(BUILD),trace)
 	FLAGS += -g -DDEBUG
-	LIBS += -lbfd -lGLU
+	LIBS += -lbfd
 	FLAGS += -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector -DTRACE
 endif
 
@@ -111,7 +113,7 @@ prepare:
 	@ln -sf $(TARGET).files serenity.files
 
 clean:
-	rm $(SRCS:%=$(BUILD)/%.o) $(BUILD)/glsl
+	rm $(BUILD)/*.o
 
 install_icons/%.png: icons/%.png
 	@cp $< $(PREFIX)/share/icons/hicolor/32x32/apps

@@ -2,7 +2,6 @@
 #include "string.h"
 #include "vector.h"
 #include "map.h"
-#include "gl.h"
 #include "font.h"
 #include "interface.h"
 
@@ -38,5 +37,5 @@ struct PDF : Widget {
     void render(int2 parent);
     bool mouseEvent(int2, Event, Button) override;
 
-    operator bool() { return characters.size; }
+    operator bool() { return characters.size(); }
 };

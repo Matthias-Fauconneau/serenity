@@ -91,7 +91,7 @@ static Variant parse_(const char*& s) {
             if(decodeParms) { error("unsupported stream compression"_);
                 /*assert(decodeParms->dict.size() == 2);
                 int predictor = decodeParms->dict.value("Predictor",Variant(1)).number;
-                if(predictor != 12) abort();
+                if(predictor != 12) fail();
                 int size = data.size;
                 int w = decodeParms->dict.value("Columns",Variant(1)).number;
                 int h = size/(w+1);
@@ -100,7 +100,7 @@ static Variant parse_(const char*& s) {
                 uchar* dst = (uchar*)data.data();
                 for(int y=0;y<h;y++) {
                     int filter = *src++;
-                    if(filter != 2) abort();
+                    if(filter != 2) fail();
                     for(int x=0;x<w;x++) {
                         *dst = (y>0 ? *(dst-w) : 0) + *src;
                         dst++; src++;
@@ -332,10 +332,10 @@ arg:
     }
 }
 
-inline float pow2(float x) { return x*x; }
-inline float pow3(float x) { return x*x*x; }
-inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
-vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return pow3(1-t) * A + 3*pow2(1-t)*t * B + 3*(1-t)*pow2(t) * C + pow3(t) * D; }
+vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return cb(1-t) * A + 3*sq(1-t)*t * B + 3*(1-t)*sq(t) * C + cb(t) * D; }
+
+//// Reverses elements in-place
+//template<class T> array<T> reverse(array<T>&& a) { for(int i=0; i<a.size()/2; i++) swap(a[i], a[a.size()-i-1]); return move(a); }
 
 void PDF::drawPath(array<array<vec2> >& paths, int flags) {
     for(const auto& path : paths) {

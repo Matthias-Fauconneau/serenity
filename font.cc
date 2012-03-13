@@ -1,7 +1,12 @@
 #include "font.h"
+
+#undef abort
+#undef exit
 #include <ft2build.h>
 #include <freetype/freetype.h>
 #include <freetype/ftlcdfil.h>
+
+#include "array.cc"
 
 static FT_Library ft;
 struct InitFreeType {
@@ -15,7 +20,7 @@ Font::Font(const char* path) {
     FT_New_Face(ft, path, 0, &face);
     assert(face,strz(path));
 }
-Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)&data,data.size(),0,&face); }
+Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)data.data(),data.size(),0,&face); }
 
 FontMetrics Font::metrics(int size) {
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,size<<6,0,0};
@@ -36,7 +41,7 @@ GlyphMetrics Font::metrics(int size, int code) {
     assert(face);
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,size<<6,0,0}; FT_Request_Size(face,&req);
     int index = FT_Get_Char_Index(face, code);
-    assert(index); //if(!index) index=code;
+    assert(index, code); //if(!index) index=code;
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
     GlyphMetrics metrics={
     vec2(face->glyph->advance.x / 64.0, face->glyph->advance.y / 64.0),

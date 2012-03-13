@@ -1,46 +1,46 @@
-#include "music.h"
+#include "sequencer.h"
+#include "stream.h"
 #include "file.h"
+#include "time.h"
 
 #include <sys/types.h>
 #include <alsa/global.h>
 struct snd_input_t;
 struct snd_output_t;
 #include <alsa/conf.h>
-//#include <alsa/pcm.h>
 #include <alsa/timer.h>
 #include <alsa/control.h>
+#undef unused
 #include <alsa/seq_event.h>
 #include <alsa/seq.h>
 #include <alsa/seqmid.h>
 #include <poll.h>
 
-//#include <time.h>
-int time() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
+#include "array.cc"
 
 Sequencer::Sequencer() {
     snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0);
     snd_seq_set_client_name(seq,"Piano");
     snd_seq_create_simple_port(seq,"Input",SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,SND_SEQ_PORT_TYPE_APPLICATION);
-    if(snd_seq_connect_from(seq,0,20,0)) log("MIDI controller not connected");
-    registerPoll();
+    if(snd_seq_connect_from(seq,0,20,0)) log("MIDI controller not connected"_);
+    pollfd p; snd_seq_poll_descriptors(seq,&p,1,POLLIN); registerPoll(p);
 }
 
-pollfd Sequencer::poll() { pollfd p; snd_seq_poll_descriptors(seq,&p,1,POLLIN); return p; }
 void Sequencer::event(pollfd) {
     int remaining;
     do {
         snd_seq_event_t* ev;
         remaining = snd_seq_event_input(seq, &ev);
         if(ev->type == SND_SEQ_EVENT_NOTEON) {
-            int key = ev->data.note.note;
+            uint8 key = ev->data.note.note;
             int vel = ev->data.note.velocity;
             if( vel == 0 ) {
-                pressed.removeOne(key);
-                if(sustain) sustained.appendOnce( key );
+                removeOne(pressed, key);
+                if(sustain) appendOnce(sustained, key);
                 else {
                     noteEvent.emit(key,0);
                     if(record) {
-                        int tick = time();
+                        int tick = getRealTime();
                         events << Event((int16)(tick-lastTick), (uint8)key, (uint8)0);
                         lastTick = tick;
                     }
@@ -50,7 +50,7 @@ void Sequencer::event(pollfd) {
                 if(vel>maxVelocity) maxVelocity=vel;
                 noteEvent.emit(key, vel*127/maxVelocity);
                 if(record) {
-                    int tick = time();
+                    int tick = getRealTime();
                     events << Event((int16)(tick-lastTick), (uint8)key, (uint8)vel);
                     lastTick = tick;
                 }
@@ -85,7 +85,7 @@ Sequencer::~Sequencer() {
     struct { char name[4]={'M','T','h','d'}; int32 size=swap32(6); int16 format=swap16(0);
         int16 trackCount=swap16(1); int16 timeDivision=swap16(500); } __attribute__ ((packed)) MThd;
     write(fd,raw(MThd));
-    struct { char name[4]={'M','T','r','k'}; int32 size=0; } __attribute__ ((packed)) MTrk; MTrk.size=swap32(track.size);
+    struct { char name[4]={'M','T','r','k'}; int32 size=0; } __attribute__ ((packed)) MTrk; MTrk.size=swap32(track.size());
     write(fd,raw(MTrk));
     write(fd,track);
     close(fd);

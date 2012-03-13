@@ -2,14 +2,21 @@
 #include "window.h"
 #include "font.h"
 
-/// Primitives (TODO ->graphics.h)
+#include "array.cc"
+template class array<Widget*>;
+template class array<Text::Blit>;
+
+/// Sets the array size to \a size, filling with \a value
+template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }
+
+/// Primitives (TODO: move to new module: graphics.h)
 extern Image framebuffer;
 
 enum Blend { Opaque, Alpha, Multiply };
 /// Fill framebuffer area between [target+min, target+max] with \a color
 void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) { //TODO: clip
-    for(int y= ::max(target.y+min.y,0);y< ::min(framebuffer.height,target.y+max.y);y++)
-        for(int x= ::max(target.x+min.x,0);x< ::min(framebuffer.width,target.x+max.x);x++) {
+    for(int y= ::max(target.y+min.y,0);y< ::min<int>(framebuffer.height,target.y+max.y);y++)
+        for(int x= ::max(target.x+min.x,0);x< ::min<int>(framebuffer.width,target.x+max.x);x++) {
             byte4 s = color;
             byte4& d = framebuffer(x,y);
             if(blend == Opaque) d=s;
@@ -20,8 +27,8 @@ void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) { //
 
 /// Blit \a source to framebuffer at \a target
 void blit(int2 target, const Image& source, Blend blend=Opaque) { //TODO: clip
-    for(int y=max(target.y,0);y<min(framebuffer.height,target.y+source.height);y++)
-        for(int x=max(target.x,0);x<min(framebuffer.width,target.x+source.width);x++) {
+    for(int y=max(target.y,0);y<min<int>(framebuffer.height,target.y+source.height);y++)
+        for(int x=max(target.x,0);x<min<int>(framebuffer.width,target.x+source.width);x++) {
             byte4 s = source(x-target.x,y-target.y);
             byte4& d = framebuffer(x,y);
             if(blend == Opaque) d=s;
@@ -42,9 +49,7 @@ void ScrollArea::update() {
 }
 
 bool ScrollArea::mouseEvent(int2 position, Event event, Button button) {
-    if(widget().mouseEvent(position-widget().position,event,button)) return true;
-    if(event==Press && (button==WheelDown || button==WheelUp)) {
-        if(size>=widget().sizeHint()) return false;
+    if(event==Press && (button==WheelDown || button==WheelUp) && size<widget().sizeHint()) {
         int2& position = widget().position;
         int2 previous = position;
         position.y += button==WheelUp?-32:32;
@@ -52,6 +57,7 @@ bool ScrollArea::mouseEvent(int2 position, Event event, Button button) {
         if(position != previous) update();
         return true;
     }
+    if(widget().mouseEvent(position-widget().position,event,button)) return true;
     return false;
 }
 
@@ -77,28 +83,35 @@ void Layout::render(int2 parent) {
     }
 }
 
+/// WidgetLayout
+
+int WidgetLayout::count() const { return array::size(); }
+Widget& WidgetLayout::at(int i) { return *array::at(i); }
+
 /// Linear
 
 int2 Linear::sizeHint() {
-    int width=0, expanding=0, height=0;
+    int width=0, expandingWidth=0;
+    int height=0, expandingHeight=0;
     for(int i=0;i<count();i++) { Widget& child=at(i);
         int2 size=xy(child.sizeHint());
-        if(size.y<0) height = min(height,size.y);
-        if(height>=0) height = max(height,size.y);
-        if(size.x<0) expanding++;
+        if(size.y<0) expandingHeight=true;
+        height = max(height,abs(size.y));
+        if(size.x<0) expandingWidth=true;
         width += abs(size.x);
     }
-    return xy(int2((this->expanding||expanding)?-min(1,width):width,height));
+    return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
 }
 
 void Linear::update() {
     if(!count()) return;
     int2 size = xy(this->size);
-    int width = size.x /*remaining space*/, sharing=0 /*expanding count*/, expandingWidth=0;
-    array<int> hints(count(),-1); array<int> sizes(count(),-1);
+    int width = size.x /*remaining space*/, sharing=0 /*expanding count*/, expandingWidth=0, height=0;
+    array<int> hints; fill(hints,-1,count()); array<int> sizes; fill(sizes,-1,count());
     //allocate fixed space and convert to expanding if not enough space
     for(int i=0;i<count();i++) {
-        int hint = xy(at(i).sizeHint()).x;
+        int2 sizeHint = xy(at(i).sizeHint());
+        int hint = sizeHint.x; height=sizeHint.y<0?size.y:max(height,sizeHint.y);
         if(hint >= width) hint = -hint; //convert to expanding if not enough space
         if(hint >= 0) width -= (sizes[i]=hints[i]=hint); //allocate fixed size
         else {
@@ -128,9 +141,9 @@ void Linear::update() {
             first -= delta; width += delta;
         }
     }
-    int2 pen = int2(width/2,0); //external margin
+    int2 pen = int2(width/2,(size.y-min(height,size.y))/2); //external margin
     for(int i=0;i<count();i++) {
-        at(i).size = xy(int2(sizes[i],size.y));
+        at(i).size = xy(int2(sizes[i],min(height,size.y)));
         at(i).position = xy(pen);
         at(i).update();
         pen.x += sizes[i];
@@ -170,21 +183,16 @@ void Text::render(int2 parent) {
 
 /// TextInput
 
-void TextInput::update() {
-    Text::update();
-    cursor=clip(0,cursor,text.size());
-}
-
 bool TextInput::mouseEvent(int2 position, Event event, Button button) {
     if(event!=Press || button!=LeftButton) return false;
     Window::focus=this;
     int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
-    for(cursor=0;cursor<layout.size() && x>layout[cursor].pos.x+layout[cursor].image.width/2;cursor++) {}
+    for(cursor=0;cursor<layout.size() && x>layout[cursor].pos.x+(int)layout[cursor].image.width/2;cursor++) {}
     return true;
 }
 
 bool TextInput::keyPress(Key key) {
-    cursor=clip(0,cursor,text.size());
+    if(cursor>text.size()) cursor=text.size();
     /**/ if(key==Left && cursor>0) cursor--;
     else if(key==Right && cursor<text.size()) cursor++;
     else if(key==Delete && cursor<text.size()) { text.removeAt(cursor); update(); }
@@ -197,8 +205,9 @@ bool TextInput::keyPress(Key key) {
 void TextInput::render(int2 parent) {
     Text::render(parent);
     if(Window::focus==this) {
+        if(cursor>text.size()) cursor=text.size();
         int x = cursor < layout.size()? layout[cursor].pos.x : cursor>0 ? layout.last().pos.x+layout.last().image.width : 0;
-        fill(parent+position, int2(x,0), int2(x+1,Widget::size.y),gray(0));
+        fill(parent+position+max(int2(0,0),(Widget::size-textSize)/2), int2(x,0), int2(x+1,Widget::size.y),gray(0));
     }
 }
 
@@ -227,6 +236,8 @@ bool Slider::mouseEvent(int2 position, Event event, Button button) {
 
 /// Selection
 
+//TODO: mousewheel
+
 bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(Layout::mouseEvent(position,event,button)) return true;
     if(event != Press || button != LeftButton) return false;
@@ -239,6 +250,8 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     return false;
 }
 
+/// HighlightSelection
+
 void HighlightSelection::render(int2 parent) {
     if(index>=0 && index<count()) {
         Widget& current = at(index);
@@ -249,14 +262,20 @@ void HighlightSelection::render(int2 parent) {
     Layout::render(parent);
 }
 
+/// TabSelection
+
 void TabSelection::render(int2 parent) {
     Layout::render(parent);
-    if(index<0 || index>=count()) return;
+    if(index<0 || index>=count()) {
+        //darken whole tabbar
+        fill(parent+position, int2(0,0), size, gray(224), Multiply);
+        return;
+    }
     Widget& current = at(index);
 
-    //white underline
+    /*//white underline
     fill(parent+position, int2(0, size.y-1), int2(current.position.x, size.y), gray(240));
-    fill(parent+position, int2(current.position.x+current.size.x, size.y-1), size, gray(240));
+    fill(parent+position, int2(current.position.x+current.size.x, size.y-1), size, gray(240));*/
 
     //darken inactive tabs
     fill(parent+position, int2(0,0), int2(current.position.x, size.y), gray(224), Multiply);
@@ -265,14 +284,10 @@ void TabSelection::render(int2 parent) {
 }
 
 /// Icon
-
-Icon::Icon(const Image& image) : image(image) {}
 int2 Icon::sizeHint() { return int2(image.width,image.height); }
 void Icon::render(int2 parent) {
-    if(!image.data) return;
-    int size = min(Widget::size.x,Widget::size.y);
-    int2 offset = (Widget::size-int2(size,size))/2;
-    blit(parent+position+offset, image, Alpha);
+    if(!image) return;
+    blit(parent+position+(Widget::size-image.size())/2, image, Alpha);
 }
 
 /// TriggerButton

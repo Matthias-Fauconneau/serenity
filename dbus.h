@@ -5,17 +5,14 @@
 #include "stream.h"
 #include "signal.h"
 
-#include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <poll.h>
 
-/*#ifdef DEBUG
-inline void dump(const array<byte>& s) {
-    string str; for(int i=0;i<s.size;i++) { char c = s[i]; if(c>=' '&&c<='~') str<<c; else str<<'\\'<<str((ubyte)c,8); }
-    log(str);
-}
-#endif*/
+/// Align array size appending default elements
+void align(array<byte>& a, int width) { int s=a.size(), n=align(width, s); if(n>s) grow(a, n); }
+/// Align the stream position to the next \a width
+void align(Stream& s, int width) { s.index=align(width, s.index); }
 
 /// D-Bus
 
@@ -38,9 +35,9 @@ template <char... str> struct Signature {
 };
 
 //static Field Header
-enum Field : byte { Path=1, Interface, Member, ErrorName, ReplySerial, Target, Sender, SignatureField };
+enum Field { Path=1, Interface, Member, ErrorName, ReplySerial, Target, Sender, SignatureField };
 template <Field type> struct FieldHeader {
-    Field field = type;
+    byte field = type;
     Signature<type==SignatureField?'g':type==Path?'o':'s'> s;
 };
 
@@ -54,11 +51,11 @@ template<class T> void read(Stream& s, Variant<T>& output) {
     read(s,(T&)output);
 }
 template<class T> void read(Stream& s, array<T>& output) {
-    s.align<4>(); int32 length = s.read();
-    const byte* begin=s.pos; //FIXME: wrong if T has align(8) (structs)
-    while(s.pos<begin+length) { T e; read(s,e); output << move(e); }
+    align(s, 4); int32 length = s.read();
+    //FIXME: wrong if T has align(8) (structs)
+    for(int i=0;i<length;i++) { T e; read(s,e); output << move(e); }
 }
-void read(Stream& s, string& output) { s.align<4>(); output = copy(s.readArray<byte>()); s++;/*0*/ }
+void read(Stream& s, string& output) { align(s, 4); output = copy(s.readArray<byte>()); s++;/*0*/ }
 void read(Stream&) {}
 
 struct DBusIcon {
@@ -66,7 +63,7 @@ struct DBusIcon {
     int height;
     array<byte> data;
 };
-void read(Stream& s, DBusIcon& output) { s.align<8>(); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray<byte>()); }
+void read(Stream& s, DBusIcon& output) { align(s, 8); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray<byte>()); }
 
 // Template metaprogramming for static dispatch of D-Bus signature serializer
 
@@ -76,26 +73,24 @@ template<> string sign<int>() { return "i"_; }
 
 template<class... Inputs> void writeSignature(array<byte>& s) {
     string signature=sign<Inputs...>();
-    s.align<8>(); s << raw(FieldHeader<SignatureField>()); s << signature.size; s << move(signature); s << 0;
+    align(s, 8); s << raw(FieldHeader<SignatureField>()); s << signature.size(); s << move(signature); s << 0;
 }
 template<> void writeSignature(array<byte>&) {}
 
 // Template metaprogramming for static dispatch of D-Bus inputs serializer
 
 void write(array<byte>& s, const string& input) {
-    s.align<4>();
-    s << raw(input.size);
-    s << input;
-    s << 0;
+    align(s, 4);
+    s << raw(input.size()) << input << 0;
 }
-void write(array<byte>& s, int integer) { s.align<4>(); s << raw(integer); }
+void write(array<byte>& s, int integer) { align(s, 4); s << raw(integer); }
 void write(array<byte>&) {}
 template<class Input, class... Inputs> void write(array<byte>& s, const Input& input, const Inputs&... inputs) {
     write(s,input); write(s,inputs...);
 }
 
 template <Field type> void writeField(array<byte>& s, const string& field) {
-    s.align<8>();
+    align(s, 8);
     s << raw(FieldHeader<type>());
     write(s,field);
 }
@@ -110,25 +105,24 @@ struct DBus : Poll {
     template<class... Outputs> void read(uint32, Outputs&... outputs) {
         for(;;) {
             array<byte> buffer = ::read(fd,sizeof(MessageHeader<ReplyMessage>)+4);
-            assert(buffer.size==buffer.capacity,buffer.size,"Connection closed"_);
-            auto header = *(MessageHeader<ReplyMessage>*)&buffer;
-            uint32 fieldsSize = align<8>(*(uint32*)&buffer.at(sizeof(MessageHeader<ReplyMessage>)));
+            auto header = *(MessageHeader<ReplyMessage>*)buffer.data();
+            uint32 fieldsSize = align(8, *(uint32*)&buffer.at(sizeof(MessageHeader<ReplyMessage>)));
             string signalName;
-            for(Stream s = ::read(fd, fieldsSize);s;){
-                Field field = s.read();
+            Stream s( ::read(fd, fieldsSize) );
+            for(;s;){
+                byte field = s.read();
                 uint8 size = s.read();
                 s += size+1;
                 if(field==Target||field==Path||field==Interface||field==Member||field==Sender) {
-                    s.align<4>();
+                    align(s, 4);
                     string name = s.readArray<byte>(); s++;
                     if(field==Member) signalName=move(name);
-                } else if(field==ReplySerial) { s.align<4>(); s.read<uint32>(); /*uint32 replySerial=s.read(); assert(replySerial==serial);*/ }
+                } else if(field==ReplySerial) { align(s, 4); s.read<uint32>(); /*uint32 replySerial=s.read(); assert(replySerial==serial);*/ }
                 else if(field==SignatureField) { uint8 size = s.read(); s+=size; }
-                s.align<4>();
+                align(s, 4);
             }
             if(header.length) {
-                Stream s = ::read(fd,header.length);
-                //dump(data);
+                Stream s( ::read(fd,header.length) );
                 if(header.message == ReplyMessage) ::read(s,outputs...);
                 else if(header.message == Signal) {
                     auto signal = signals.find(signalName);
@@ -145,15 +139,15 @@ struct DBus : Poll {
     uint32 write(const string& target, const string& object, const string& interface, const string& member, const Inputs&... inputs) {
         array<byte> body; ::write(body,inputs...);
         array<byte> s;
-        s << raw(MessageHeader<type>(body.size,++serial));
-        int length = s.size; s.skip(4); s.align<4>(); int begin=s.size;
+        s << raw(MessageHeader<type>(body.size(),++serial));
+        int length = s.size(); s<<0; align(s, 4); int begin=s.size();
         ::writeField<Path>(s,object);
         if(interface) ::writeField<Interface>(s,interface);
         ::writeField<Member>(s,member);
         ::writeField<Target>(s,target);
         ::writeSignature<Inputs...>(s);
-        *(uint32*)(&s.at(length)) = s.size-begin;
-        s.align<8>();
+        *(uint32*)(&s.at(length)) = s.size()-begin;
+        align(s, 8);
         s << move(body);
         //dump(s); log(R"()"_);
         ::write(fd,s);
@@ -198,14 +192,11 @@ struct DBus : Poll {
         sockaddr_un addr; clear(addr);
         addr.sun_family = AF_UNIX;
         string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
-        addr.sun_path[0]=0; copy(addr.sun_path+1,&path,path.size);
-        if(connect(fd,(sockaddr*)&addr,3+path.size)) fail();
-        ::write(fd,"\0AUTH EXTERNAL 30\r\n"_);
-        char buf[256]; ::read(fd,buf,sizeof(buf)); //OK
-        ::write(fd,"BEGIN \r\n"_);
-        name = (*this)("org.freedesktop.DBus/org/freedesktop/DBus"_)("org.freedesktop.DBus.Hello"_);
-        registerPoll();
+        addr.sun_path[0]=0; copy(addr.sun_path+1,path.data(),path.size());
+        if(connect(fd,(sockaddr*)&addr,3+path.size())) fail();
+        ::write(fd,"\0AUTH EXTERNAL 30\r\n"_); ::read(fd,37);/*OK*/ ::write(fd,"BEGIN \r\n"_);
+        name = operator ()("org.freedesktop.DBus/org/freedesktop/DBus"_)("org.freedesktop.DBus.Hello"_);
+        registerPoll({fd, POLLIN});
     }
-    pollfd poll() { return {fd, POLLIN}; }
     void event(pollfd) { read(0); }
 };

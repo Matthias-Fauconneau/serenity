@@ -27,31 +27,22 @@
    POSSIBILITY OF SUCH DAMAGE.
 */
 #include "resample.h"
+#include "string.h"
 #include <math.h>
 
-typedef float __m128 __attribute__ ((__vector_size__ (16), __may_alias__));
-#define _mm_add_ps __builtin_ia32_addps
-#define _mm_mul_ps __builtin_ia32_mulps
-#define _mm_loadu_ps __builtin_ia32_loadups
-#define _mm_movehl_ps __builtin_ia32_movhlps
-#define _mm_add_ss __builtin_ia32_addss
-#define _mm_shuffle_ps __builtin_ia32_shufps
-
+//TODO: store FIR of order 48 in registers
 static inline float inner_product_single(const float *a, const float *b, int len) {
-    __m128 sum = {0,0,0,0};
-    for(int i=0;i<len;i+=8) {
-        sum = _mm_add_ps(sum, _mm_mul_ps(_mm_loadu_ps(a+i), _mm_loadu_ps(b+i)));
-        sum = _mm_add_ps(sum, _mm_mul_ps(_mm_loadu_ps(a+i+4), _mm_loadu_ps(b+i+4)));
-    }
-    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
-    sum = _mm_add_ss(sum, _mm_shuffle_ps(sum, sum, 0x55));
-    return __builtin_ia32_vec_ext_v4sf(sum, 0);
+    float4 sum = {0,0,0,0};
+    for(int i=0;i<len-4;i+=4) sum += loadu_ps(a+i) * loadu_ps(b+i); //TODO: align
+    sum += movehl_ps(sum, sum);
+    sum += shuffle_ps(sum, sum, 0x55);
+    return extract_s(sum, 0);
 }
 
 const int filterSize = 256;
 const float bandwidth = 0.975;
 const int windowOversample = 64;
-static double kaiser12[68] = { //TODO: generate
+static double kaiser12[68] = {
     0.99859849, 1.00000000, 0.99859849, 0.99440475, 0.98745105, 0.97779076, 0.96549770, 0.95066529,
     0.93340547, 0.91384741, 0.89213598, 0.86843014, 0.84290116, 0.81573067, 0.78710866, 0.75723148,
     0.72629970, 0.69451601, 0.66208321, 0.62920216, 0.59606986, 0.56287762, 0.52980938, 0.49704014,
@@ -112,12 +103,12 @@ Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channel
     const int bufferSize=160;
     memSize = N-1+bufferSize;
     mem = new float[channelCount*memSize];
-    clear(mem,channelCount*memSize);
+    clear(mem,channelCount*memSize,0.f);
 }
-Resampler::operator bool() { return kernel; }
+Resampler::operator bool() const { return kernel; }
 Resampler::~Resampler() { delete[] mem; mem=0; delete[] kernel; kernel=0; }
 
-void Resampler::filter(const float* source, int *sourceSize, float* target, int *targetSize) {
+void Resampler::filter(const float* source, int *sourceSize, float* target, int *targetSize, bool mix) {
     int ilen=0, olen=0;
     for (int channel=0;channel<channelCount;channel++) {
         const float* in = source+channel;
@@ -141,7 +132,8 @@ void Resampler::filter(const float* source, int *sourceSize, float* target, int 
                 const float *sinc = & kernel[decimalIndex*N];
                 const float *iptr = & x[integerIndex];
 
-                out[channelCount * targetIndex++] = inner_product_single(sinc, iptr, N);
+                if(mix) out[channelCount * targetIndex++] += inner_product_single(sinc, iptr, N);
+                else out[channelCount * targetIndex++] = inner_product_single(sinc, iptr, N);
                 integerIndex += integerAdvance;
                 decimalIndex += decimalAdvance;
                 if (decimalIndex >= targetRate) {

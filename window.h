@@ -3,9 +3,10 @@
 #include "process.h"
 
 #define None None
-#define Font XWindow
-#define Window XWindow
+#define Font XID
+#define Window XID
 #include <X11/Xlib.h>
+#undef Status
 #undef Window
 #undef Font
 
@@ -20,11 +21,11 @@
 struct Window : Poll {
     no_copy(Window)
     /// Display \a widget in a window
-    /// \a name is the application class name (WM_CLASS)
-    /// \note a Window must be created before OpenGL can be used (e.g most Widget constructors need a GL context)
     /// \note Make sure the referenced widget is initialized before running this constructor
-    /// \note Currently only one window per process can be created (or GL context issues will occur)
-    Window(Widget& widget, int2 size, const string& name);
+    /// \note size admits special values (0: widget.sizeHint, -1: screen.size)
+    Window(Widget* widget, int2 size=int2(0,0), const string& name=string(), const Image& icon=Image());
+    /// Update the window by handling any incoming events
+    void update();
     /// Repaint window contents. Called by update after an event is accepted by a widget.
     void render();
 
@@ -32,17 +33,19 @@ struct Window : Poll {
     void show();
     /// Hide window
     void hide();
+    /// Set visibility
+    void setVisible(bool visible);
     /// Current visibility
     bool visible = false;
 
     /// Move window to \a position
-    void move(int2 position);
+    void setPosition(int2 position);
     /// Resize window to \a size
-    void resize(int2 size);
+    void setSize(int2 size);
     /// Toggle windowed/fullscreen mode
     void setFullscreen(bool fullscreen=true);
     /// Rename window to \a name
-    void rename(const string& name);
+    void setName(const string& name);
     /// Set window icon to \a icon
     void setIcon(const Image& icon);
     /// Set window type (using Extended Window Manager Hints)
@@ -64,17 +67,15 @@ protected:
     /// \note The template is instantiated for strings (STRING,UTF8_STRING) and uints (ATOM)
     template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
 
-    pollfd poll();
-    /// Update the window by handling any incoming events
     void event(pollfd);
 
-    XWindow id;
+    XID id;
     Display* x;
     Widget& widget;
 #if GL
     static GLXContext ctx;
 #else
-	XImage* image;
-	XShmSegmentInfo shminfo;
+    XImage* image;
+    XShmSegmentInfo shminfo;
 #endif
 };
