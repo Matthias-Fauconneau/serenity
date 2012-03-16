@@ -14,7 +14,7 @@ extern Image framebuffer;
 
 enum Blend { Opaque, Alpha, Multiply, MultiplyAlpha };
 /// Fill framebuffer area between [target+min, target+max] with \a color
-void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) { //TODO: clip
+void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) {
     for(int y= ::max(target.y+min.y,0);y< ::min<int>(framebuffer.height,target.y+max.y);y++)
         for(int x= ::max(target.x+min.x,0);x< ::min<int>(framebuffer.width,target.x+max.x);x++) {
             byte4 s = color;
@@ -26,7 +26,7 @@ void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) { //
 }
 
 /// Blit \a source to framebuffer at \a target
-void blit(int2 target, const Image& source, Blend blend=Opaque, int alpha=255) { //TODO: clip
+void blit(int2 target, const Image& source, Blend blend=Opaque, int alpha=255) {
     for(int y=max(target.y,0);y<min<int>(framebuffer.height,target.y+source.height);y++)
         for(int x=max(target.x,0);x<min<int>(framebuffer.width,target.x+source.width);x++) {
             byte4 s = source(x-target.x,y-target.y);
@@ -256,14 +256,15 @@ bool Slider::mouseEvent(int2 position, Event event, Button button) {
 
 /// Selection
 
-//TODO: mousewheel
-
 bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(Layout::mouseEvent(position,event,button)) return true;
-    if(event != Press || button != LeftButton) return false;
+    if(event != Press) return false;
+    if(button == WheelDown && index>0) { index--; activeChanged.emit(index); return true; }
+    if(button == WheelUp && index<count()-1) { index++; activeChanged.emit(index); return true; }
+    if(button != LeftButton) return false;
     for(int i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<child.position+child.size) {
-            index=i; activeChanged.emit(i);
+            index=i; activeChanged.emit(index);
             return true;
         }
     }

@@ -82,6 +82,7 @@ template<> inline string str(const bool& b) { return b?"true"_:"false"_; }
 template<> inline string str(const char& c) { return string(&c,1); }
 /// String representation of a C string literal
 inline string str(const char* s) { int l=0;for(;s[l];l++); return string(s,l); }
+inline string str(char* s) { int l=0;for(;s[l];l++); return string(s,l); }
 
 /// Converts a machine integer to its human-readable representation
 string itoa(int64 number, int base=10, int pad=0);

@@ -114,12 +114,15 @@ struct TaskBar : Poll {
         for(uint i=0;i<buffer.size()-2;i++) image << *(byte4*)&buffer[i+2];
         return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
     }
+    bool skipTaskbar(XID id) {
+        return getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}
+        || contains(getProperty<Atom>(id,"_NET_WM_STATE"),Atom(_NET_WM_SKIP_TASKBAR));
+    }
     int addTask(XID id) {
-        if(getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}) return -1;
-        if(contains(getProperty<Atom>(id,"_NET_WM_STATE"),Atom(_NET_WM_SKIP_TASKBAR))) return -1;
+        if(skipTaskbar(id)) return -1;
         string title = getTitle(id);
-        Image icon = getIcon(id);
         if(!title) return -1;
+        Image icon = getIcon(id);
         tasks << Task(id,move(icon),move(title));
         return tasks.array::size()-1;
     }
@@ -192,34 +195,32 @@ struct TaskBar : Poll {
         bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) {
             XEvent e; XNextEvent(x,&e);
-            //TODO: receive only useful events
             XID id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
             if(e.type==PropertyNotify && id==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
                 XID id = getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
                 int i = indexOf(tasks, Task(id));
                 if(i<0) i=addTask(id);
-                if(i>=0) {
-                    if((!tasks[i].text.text || !tasks[i].icon.image)) tasks.removeAt(i);
-                    else tasks.index=i;
-                    needUpdate = true;
-                }
+                if(i<0) continue;
+                tasks.index=i;
             } else {
                 int i = indexOf(tasks, Task(id));
-                if(e.type == CreateNotify || e.type==ReparentNotify) XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
-                if(e.type == PropertyNotify) {
-                    if(e.xproperty.atom==Atom(_NET_WM_NAME)) {
-                        if(i<0) i=addTask(id);
-                        else tasks[i].text.text = getTitle(id);
-                        needUpdate = true;
+                if(i<0) {
+                    if(e.type == CreateNotify || e.type==ReparentNotify) XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+                    else if(e.type == MapNotify) i=addTask(id);
+                    else continue;
+                } else {
+                    if(e.type == PropertyNotify) {
+                        if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].text.text = getTitle(id);
+                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].icon = getIcon(id), needUpdate = true;
+                        else if(e.xproperty.atom==Atom(_NET_WM_WINDOW_TYPE) || e.xproperty.atom==Atom(_NET_WM_STATE)) {
+                            if(skipTaskbar(id)) tasks.removeAt(i);
+                        } else continue;
                     }
-                    if(i>=0 && e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].icon = getIcon(id), needUpdate = true;
-                    if(i>=0 && e.xproperty.atom==Atom(_NET_WM_WINDOW_TYPE) &&
-                            getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)})  tasks.removeAt(i);
-                }
-                if(i>=0 && (e.type == DestroyNotify || e.type == UnmapNotify || e.type==ReparentNotify || (!tasks[i].text.text || !tasks[i].icon.image))) {
-                    tasks.removeAt(i), needUpdate = true;
+                    else if(e.type == DestroyNotify || e.type == UnmapNotify || e.type==ReparentNotify) tasks.removeAt(i);
+                    else continue;
                 }
             }
+            needUpdate = true;
         }
         if(needUpdate) {
             panel.update(); window.render();
