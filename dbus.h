@@ -99,7 +99,7 @@ struct DBus : Poll {
         for(;;) {
             auto header = ::read<Header>(fd);
             if(header.message == MethodCall) assert(header.flag==0);
-            uint32 replySerial;
+            uint32 replySerial=0;
             string name;
             Stream s( ::read(fd, align(4,header.fieldsSize)+header.length) );
             for(;s.index<header.fieldsSize;){
@@ -215,8 +215,7 @@ struct DBus : Poll {
     Object operator ()(const string& object) { return Object(this,section(object,'/'),"/"_+section(object,'/',-2,-1)); }
 
     /// MethodCall method delegate and return empty reply
-    void methodWrapper(uint32 serial, string name, array<byte> data) {
-        assert(!data);
+    void methodWrapper(uint32 serial, string name, array<byte>) {
         delegates.at(name)();
         write(MethodReturn,serial,""_,""_,""_,""_);
     }

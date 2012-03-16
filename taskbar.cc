@@ -7,8 +7,6 @@
 #include "poll.h"
 #include "array.cc"
 
-#define DBUS 1
-#if DBUS
 #include "dbus.h"
 struct Status : TriggerButton {
     DBus::Object item;
@@ -18,7 +16,6 @@ struct Status : TriggerButton {
         return false;
     }
 };
-#endif
 
 struct Task : Item {
     XID id;
@@ -49,26 +46,35 @@ struct Desktop {
     Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
 };
 
-struct Calendar : Widget {
-    Window window{this,int2(256,256)};
-    array<Text> texts;
+struct Month : Grid<Text> {
+    Month() : Grid(7,6) {
+        Date date = currentDate();
+        static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
+        const int nofDays[12] = { 31, !(date.year%4)&&(date.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+        for(int i=0;i<7;i++) append(copy(days[i]));
+        int first = date.weekDay+1 - date.day%7;
+        for(int i=0;i<first;i++) append(Text(dec(nofDays[(date.month+11)%12]-first+i+1,2),16,128)); //previous month
+        for(int i=0;i<nofDays[date.month];i++) append(dec(i+1,2)); //current month
+        for(int i=1;count()<7*6;i++) append(Text(dec(i,2),16,128)); //next month
+        //string str; for(int y=0,i=0;y<6;y++) { for(int x=0;x<7;x++,i++) str<<array::at(i).text<<' '; str<<'\n'; } log(str);
+    }
+};
+
+struct Calendar {
+      Text date { ::date("dddd, dd MMMM yyyy"_) };
+      Month month;
+     Menu menu { &date, &month };
+    Window window{&menu,int2(0,0)};
     Calendar() {
         window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
         window.setOverrideRedirect(true);
-    }
-    void update() { //TODO: layout
-        texts.clear();
-        texts << Text(date("dddd, dd MMMM yyyy"_));
-        texts.first().Widget::size=size;
-    }
-    void render(int2 parent) {
-        texts.first().render(parent);
+        menu.close.connect(&window,&Window::hide);
     }
     bool mouseEvent(int2, Event event, Button) {
         if(event==Leave) { window.hide(); return true; }
         return false;
     }
-    void show() { window.show(); window.setPosition(int2(-size.x,0)); }
+    void show() { window.show(); window.setPosition(int2(-menu.Widget::size.x,0)); }
 };
 
 #define Atom(name) XInternAtom(x, #name, 1)
@@ -118,7 +124,6 @@ struct TaskBar : Poll {
         return tasks.array::size()-1;
     }
 
-#if DBUS
     void registerStatusNotifierItem(string service) {
         for(const auto& s: status) if(s.item.target == service) return;
         DBus::Object item(&dbus,move(service),"/StatusNotifierItem"_);
@@ -136,7 +141,6 @@ struct TaskBar : Poll {
         if(interface=="org.kde.StatusNotifierWatcher"_ && property=="ProtocolVersion"_) return 1;
         else error(interface, property);
     }
-#endif
 
     static int xErrorHandler(Display*, XErrorEvent*) { return 0; }
     TaskBar() {
@@ -151,14 +155,12 @@ struct TaskBar : Poll {
            XSelectInput(x, id, PropertyChangeMask);
         }
 
-#if DBUS
         dbus.bind("Get"_,this,&TaskBar::Get);
         dbus.bind("RegisterStatusNotifierItem"_,this,&TaskBar::registerStatusNotifierItem);
         DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
         array<string> names = DBus("org.freedesktop.DBus.ListNames"_);
         for(string& name: names) if(startsWith(name,"org.kde.StatusNotifierItem"_)) registerStatusNotifierItem(move(name));
         DBus("org.freedesktop.DBus.RequestName"_, "org.kde.StatusNotifierWatcher"_, (uint)0);
-#endif
 
          start.image = resize(buttonIcon, 16,16);
          start.triggered.connect(&launcher,&Launcher::show);

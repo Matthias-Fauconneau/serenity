@@ -80,7 +80,7 @@ template<class C, class T> struct index_iterator {
 
 /// Layout is a proxy Widget containing multiple widgets.
 struct Layout : Widget {
-    /// Override \a count and \a at to implement widgets storage (\sa WidgetLayout ListLayout TupleLayout)
+    /// Override \a count and \a at to implement widgets storage (\sa Widgets Array Tuple)
     virtual int count() const =0;
     virtual Widget& at(int) =0;
 
@@ -90,36 +90,36 @@ struct Layout : Widget {
     void render(int2 parent);
 };
 
-/// WidgetLayout implements Layout storage using array<Widget*> (i.e by reference)
+/// Widgets implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
-struct WidgetLayout : virtual Layout, array<Widget*> {
-    WidgetLayout(std::initializer_list<Widget*>&& widgets):array(move(widgets)){}
+struct Widgets : virtual Layout, array<Widget*> {
+    Widgets(std::initializer_list<Widget*>&& widgets):array(move(widgets)){}
     int count() const;
     Widget& at(int i);
 };
 
-/// ListLayout implements Layout storage using array<T> (i.e by value)
+/// Array implements Layout storage using array<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
-template<class T> struct ListLayout : virtual Layout, array<T> {
-    ListLayout(){}
-    ListLayout(std::initializer_list<T>&& items) : array<T>(move(items)){}
+template<class T> struct Array : virtual Layout, array<T> {
+    Array(){}
+    Array(std::initializer_list<T>&& items) : array<T>(move(items)){}
     int count() const { return array<T>::size(); }
     Widget& at(int i) { return array<T>::at(i); }
 };
 
-/// TupleLayout implements Layout storage using static inheritance
+/// Tuple implements Layout storage using static inheritance
 /// \note It allows a layout to directly contain heterogenous Widgets without managing heap pointers.
 template<class T> struct item : T { item(uint list[]) { while(*list) list++; *list=this-list; } };
-template<class... T> struct TupleLayout : virtual Layout, item<T>... {
+template<class... T> struct Tuple : virtual Layout, item<T>... {
     uint widgets[sizeof...(T)];
-    TupleLayout() : T(widgets)... {}
+    Tuple() : T(widgets)... {}
     int count() const { return sizeof...(T); }
     Widget& at(int i) { return *(Widget*)((byte*)widgets+widgets[i]); }
 };
 
 /// Linear divide space between contained widgets
 /// \note this is an abstract class, use \a Horizontal or \a Vertical
-struct Linear : virtual Layout {
+struct Linear: virtual Layout {
     /// If true, try to fill parent space to spread out contained items
     bool expanding = false;
     int2 sizeHint();
@@ -132,17 +132,25 @@ struct Horizontal : virtual Linear {
     int2 xy(int2 xy) override { return xy; }
 };
 /// Vertical divide vertical space between contained widgets
-struct Vertical : virtual Linear {
+struct Vertical : virtual Linear{
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };
 
-/// HBox is a \a Horizontal layout of heterogenous widgets (\sa WidgetLayout)
-struct HBox : Horizontal, WidgetLayout {
-    HBox(std::initializer_list<Widget*>&& widgets):WidgetLayout(move(widgets)){}
+/// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
+struct HBox : Horizontal, Widgets {
+    HBox(std::initializer_list<Widget*>&& widgets):Widgets(move(widgets)){}
 };
-/// VBox is a \a Vertical layout of heterogenous widgets (\sa WidgetLayout)
-struct VBox : Vertical, WidgetLayout {
-    VBox(std::initializer_list<Widget*>&& widgets):WidgetLayout(move(widgets)){}
+/// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
+struct VBox : Vertical, Widgets {
+    VBox(std::initializer_list<Widget*>&& widgets):Widgets(move(widgets)){}
+};
+
+/// Layout items on an uniform \a width x \a height grid
+struct UniformGrid : virtual Layout {
+    int width,height;
+    UniformGrid(int width, int height):width(width),height(height){}
+    int2 sizeHint();
+    void update();
 };
 
 /// Selection implements selection of active widget/item for a \a Layout
@@ -166,10 +174,10 @@ struct TabSelection : virtual Selection {
     void render(int2 parent) override;
 };
 
-/// ListSelection is an \a ListLayout with \a Selection
-template<class T> struct ListSelection : ListLayout<T>, virtual Selection {
+/// ListSelection is an \a Array with \a Selection
+template<class T> struct ListSelection : Array<T>, virtual Selection {
     ListSelection(){}
-    ListSelection(std::initializer_list<T>&& items) : ListLayout<T>(move(items)){}
+    ListSelection(std::initializer_list<T>&& items) : Array<T>(move(items)){}
     /// Return active item (last selection)
     inline T& active() { return array<T>::at(this->index); }
 };
@@ -180,21 +188,31 @@ template<class T> struct List : Vertical, ListSelection<T>, HighlightSelection {
     List(std::initializer_list<T>&& items) : ListSelection<T>(move(items)){}
 };
 /// Bar is a \a Horizontal layout of selectable items (\sa ListSelection)
-template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {};
+template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {
+    Bar(){}
+    Bar(std::initializer_list<T>&& items) : ListSelection<T>(move(items)){}
+};
+/// Grid is an \a UniformGrid layout of selectable items (\sa ListSelection)
+template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelection {
+    Grid(int width, int height):UniformGrid(width,height){}
+};
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(string&& text=""_, int size=16);
+    Text(string&& text=""_, int size=16, ubyte opacity=255);
 
     /// Displayed text
     string text;
+    /// Font size
+    int size;
+    /// Opacity
+    ubyte opacity;
 
     int2 sizeHint();
     void update() override;
     void render(int2 parent);
 protected:
-    int size;
     int2 textSize;
     struct Blit { int2 pos; const Image& image; };
     array<Blit> layout;

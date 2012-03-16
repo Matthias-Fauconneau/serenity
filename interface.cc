@@ -12,7 +12,7 @@ template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(s
 /// Primitives (TODO: move to new module: graphics.h)
 extern Image framebuffer;
 
-enum Blend { Opaque, Alpha, Multiply };
+enum Blend { Opaque, Alpha, Multiply, MultiplyAlpha };
 /// Fill framebuffer area between [target+min, target+max] with \a color
 void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) { //TODO: clip
     for(int y= ::max(target.y+min.y,0);y< ::min<int>(framebuffer.height,target.y+max.y);y++)
@@ -26,7 +26,7 @@ void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) { //
 }
 
 /// Blit \a source to framebuffer at \a target
-void blit(int2 target, const Image& source, Blend blend=Opaque) { //TODO: clip
+void blit(int2 target, const Image& source, Blend blend=Opaque, int alpha=255) { //TODO: clip
     for(int y=max(target.y,0);y<min<int>(framebuffer.height,target.y+source.height);y++)
         for(int x=max(target.x,0);x<min<int>(framebuffer.width,target.x+source.width);x++) {
             byte4 s = source(x-target.x,y-target.y);
@@ -34,6 +34,7 @@ void blit(int2 target, const Image& source, Blend blend=Opaque) { //TODO: clip
             if(blend == Opaque) d=s;
             else if(blend==Multiply) d = byte4((int4(s)*int4(d))/255);
             else if(blend==Alpha) d = byte4((s.a*int4(s) + (255-s.a)*int4(d))/255);
+            else if(blend==MultiplyAlpha) d = byte4((alpha*(int4(s)*int4(d))/255 + (255-alpha)*int4(d))/255);
     }
 }
 
@@ -83,10 +84,10 @@ void Layout::render(int2 parent) {
     }
 }
 
-/// WidgetLayout
+/// Widgets
 
-int WidgetLayout::count() const { return array::size(); }
-Widget& WidgetLayout::at(int i) { return *array::at(i); }
+int Widgets::count() const { return array::size(); }
+Widget& Widgets::at(int i) { return *array::at(i); }
 
 /// Linear
 
@@ -150,9 +151,28 @@ void Linear::update() {
     }
 }
 
+/// UniformGrid
+
+int2 UniformGrid::sizeHint() {
+    int2 max;
+    for(int i=0;i<count();i++) {
+        int2 size=at(i).sizeHint();
+        max = ::max(max,size);
+    }
+    return int2(width,height)*max;
+}
+
+void UniformGrid::update() {
+    int2 size(Widget::size.x/width,  Widget::size.y/height);
+    int2 margin = (Widget::size - int2(width,height)*size) / 2;
+    int i=0; for(int y=0;y<height;y++) for(int x=0;x<width;x++,i++) { if(i>=count()) return; Widget& child=at(i);
+        child.position = margin + int2(x,y)*size; child.size=size;
+    }
+}
+
 /// Text
 
-Text::Text(string&& text, int size) : text(move(text)), size(size) { update(); }
+Text::Text(string&& text, int size, ubyte opacity) : text(move(text)), size(size), opacity(opacity) { update(); }
 void Text::update() {
     int widestLine = 0;
     FontMetrics metrics = font.metrics(size);
@@ -176,7 +196,7 @@ void Text::render(int2 parent) {
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: layout) {
         if(b.pos>=int2(-4,0) && b.pos+b.image.size()<=Widget::size+int2(2,2)) {
-            blit(offset+b.pos, b.image, Multiply);
+            blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
         }
     }
 }

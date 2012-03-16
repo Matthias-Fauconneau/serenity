@@ -14,7 +14,7 @@ inline array<byte> read(int fd, uint capacity) {
 }
 template<class T> T read(int fd) {
     T t;
-    int size = read(fd,(byte*)&t,sizeof(T));
+    int unused size = read(fd,(byte*)&t,sizeof(T));
     assert(size==sizeof(T),size,sizeof(T));
     return t;
 }
