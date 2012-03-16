@@ -84,15 +84,20 @@ template<> inline string str(const char& c) { return string(&c,1); }
 inline string str(const char* s) { int l=0;for(;s[l];l++); return string(s,l); }
 
 /// Converts a machine integer to its human-readable representation
-string str(int64 number, int base=10, int pad=0);
-inline string hex(int64 n, int pad=0) { return str(int64(n),16,pad); }
-inline string bin(uint64 n, int pad=0) { return str(int64(n),2,pad); }
+string itoa(int64 number, int base=10, int pad=0);
+inline string hex(int64 n, int pad=0) { return itoa(n,16,pad); }
+inline string dec(int64 n, int pad=0) { return itoa(n,10,pad); }
+inline string oct(int64 n, int pad=0) { return itoa(n,8,pad); }
+inline string bin(uint64 n, int pad=0) { return itoa(n,2,pad); }
 
-template<> inline string str(const uint32& n) { return str(uint64(n),10); }
-template<> inline string str(const uint16& n) { return str(uint64(n),10); }
-template<> inline string str(const uint8& n) { return str(uint64(n),10); }
-template<> inline string str(void* const& n) { return hex(uint64(n)); }
-template<> inline string str(const int& n) { return str(int64(n),10); }
+template<> inline string str(void* const& n) { return hex(int64(n)); }
+template<> inline string str(const uint64& n) { return dec(n); }
+template<> inline string str(const uint32& n) { return dec(n); }
+template<> inline string str(const int32& n) { return dec(n); }
+template<> inline string str(const uint16& n) { return dec(n); }
+template<> inline string str(const int16& n) { return dec(n); }
+template<> inline string str(const uint8& n) { return dec(n); }
+template<> inline string str(const int8& n) { return dec(n); }
 
 /// Converts a floating point number to its human-readable representation
 string str(float number, int precision, int base=10);
@@ -127,6 +132,7 @@ inline void write(int fd, const array<char>& s) { write(fd,s.data(),(size_t)s.si
 template<class... Args> void log(const Args&... args) { write(1,str(args...)+"\n"_); }
 template<class A> void log(const cat<A>& a) { write(1,a+"\n"_); }
 template<> inline void log(const string& args) { write(1,args+"\n"_); }
+//inline void log(const char* s) { write(1,strz(s)+"\n"_); }
 /// Display variable name and its value
 #define var(v) ({ auto t=v; debug( log(#v##_, t); )  t; })
 /// Aborts unconditionally and display \a message

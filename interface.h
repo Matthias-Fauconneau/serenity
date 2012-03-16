@@ -99,12 +99,22 @@ struct WidgetLayout : virtual Layout, array<Widget*> {
 };
 
 /// ListLayout implements Layout storage using array<T> (i.e by value)
-/// \note It allows a layout to directly contain homogenous items without managing an indirection.
+/// \note It allows a layout to directly contain homogenous items without managing pointers.
 template<class T> struct ListLayout : virtual Layout, array<T> {
     ListLayout(){}
     ListLayout(std::initializer_list<T>&& items) : array<T>(move(items)){}
     int count() const { return array<T>::size(); }
     Widget& at(int i) { return array<T>::at(i); }
+};
+
+/// TupleLayout implements Layout storage using static inheritance
+/// \note It allows a layout to directly contain heterogenous Widgets without managing heap pointers.
+template<class T> struct item : T { item(uint list[]) { while(*list) list++; *list=this-list; } };
+template<class... T> struct TupleLayout : virtual Layout, item<T>... {
+    uint widgets[sizeof...(T)];
+    TupleLayout() : T(widgets)... {}
+    int count() const { return sizeof...(T); }
+    Widget& at(int i) { return *(Widget*)((byte*)widgets+widgets[i]); }
 };
 
 /// Linear divide space between contained widgets

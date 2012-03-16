@@ -36,7 +36,7 @@ void Sampler::open(const string& path) {
                 auto file = mapFile(path);
                 sample->data = file.data(); sample->size=file.size();
                 madvise((void*)sample->data, file.size(), MADV_SEQUENTIAL);
-                mlock((void*)sample->data, min(file.size(),1024*1024u));
+                mlock((void*)sample->data, min(file.size(),1024*512u));
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -92,8 +92,10 @@ void Sampler::read(int16 *output, uint period) {
     assert(period==layers[1].size,"period != 1024"_);
     timeChanged.emit(time);
     for(Layer& layer : layers) layer.active=false;
+#if DEBUG
     static int cpu=getCPUTime(), real=getRealTime();
     if(getRealTime()-real>1000) { log("active",active.size(),"total",getCPUTime()-cpu,profile); real=getRealTime(); cpu=getCPUTime(); profile.clear(); }
+#endif
     for(uint i=0;i<active.size();i++) { Note& n = active[i];
         auto& layer = layers[n.layer];
         int frame = layer.size;

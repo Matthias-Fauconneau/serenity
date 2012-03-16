@@ -111,7 +111,13 @@ void Window::render() {
 void Window::show() { setVisible(true); }
 void Window::hide() { setVisible(false); }
 void Window::setVisible(bool visible) { if(visible) XMapWindow(x, id);  else XUnmapWindow(x, id); XFlush(x); }
-void Window::setPosition(int2 position) { XMoveWindow(x, id, position.x, position.y); XFlush(x); }
+void Window::setPosition(int2 position) {
+    if(position.x<0||position.y<0) {
+        XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);
+        if(position.x<0) position.x=root.width+position.x; if(position.y<0) position.y=root.height+position.y;
+    }
+    XMoveWindow(x, id, position.x, position.y); XFlush(x);
+}
 void Window::setSize(int2 size) {
     if(!size.x||!size.y) {
         XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root);

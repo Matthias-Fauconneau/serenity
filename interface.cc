@@ -273,10 +273,6 @@ void TabSelection::render(int2 parent) {
     }
     Widget& current = at(index);
 
-    /*//white underline
-    fill(parent+position, int2(0, size.y-1), int2(current.position.x, size.y), gray(240));
-    fill(parent+position, int2(current.position.x+current.size.x, size.y-1), size, gray(240));*/
-
     //darken inactive tabs
     fill(parent+position, int2(0,0), int2(current.position.x, size.y), gray(224), Multiply);
     if(current.position.x+current.size.x<size.x-1-count()) //dont darken only margin

@@ -19,19 +19,15 @@ SRCS = core array string process vector
 	 ifeq ($(TARGET),player)
  SRCS += signal stream file image window font interface alsa ffmpeg resample player
  ICONS = play pause next
- LIBS += -lasound -lavformat -lavcodec
 else ifeq ($(TARGET),sampler)
  SRCS += stream time signal file alsa resample sequencer flac sampler midi music
- LIBS += -lasound
 else ifeq ($(TARGET),music)
  SRCS += file image window font interface alsa resample sequencer sampler midi pdf music
- LIBS += -lasound
  INSTALL = icons/music.png music.desktop
 else ifeq ($(TARGET),taskbar)
  SRCS += signal stream time file image window font interface launcher taskbar
  ICONS = button shutdown
  #ICONS = system network utility graphics office
- LIBS += -lrt
 else ifeq ($(TARGET),editor)
  SRCS += file image gl window font editor
  GLSL = editor
@@ -44,8 +40,20 @@ else ifeq ($(TARGET),bspline)
  SRCS += window bspline file image
 endif
 
+ifneq (,$(findstring time,$(SRCS)))
+  LIBS += -lrt
+endif
+
+ifneq (,$(findstring alsa,$(SRCS)))
+ LIBS += -lasound
+endif
+
 ifneq (,$(findstring image,$(SRCS)))
   LIBS += -lz
+endif
+
+ifneq (,$(findstring ffmpeg,$(SRCS)))
+ LIBS += -lavformat -lavcodec
 endif
 
 ifneq (,$(findstring font,$(SRCS)))
@@ -73,7 +81,7 @@ SRCS += $(GPUS:%=%.gpu)
 FLAGS += -pipe -std=c++11 -fno-operator-names -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -fno-rtti -march=native
 
 ifeq ($(BUILD),debug)
-	FLAGS += -ggdb -DDEBUG -O2 -fno-omit-frame-pointer
+	FLAGS += -ggdb -DDEBUG -fno-omit-frame-pointer
 	LIBS += -lbfd
 else ifeq ($(BUILD),reldbg)
 	FLAGS += -ggdb -Ofast

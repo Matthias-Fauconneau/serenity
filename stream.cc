@@ -15,7 +15,8 @@ template<class T> array<T> Stream::read(int size) {
     index+=size*sizeof(T);
     return copy(t);
 }
-template<class T> array<T> Stream::readArray() { uint32 size=read(); return read<T>(size); }
+template<class T> array<T> Stream::readArray() { uint32 size=read(); assert(size<4096); return read<T>(size); }
+template<class T> array<T> Stream::readAll() { uint32 size=(buffer.size()-index)/sizeof(T); return read<T>(size); }
 
 Stream::ReadOperator::operator uint32() { return s->bigEndian?swap32(s->read<uint32>()):s->read<uint32>(); }
 Stream::ReadOperator::operator int32() { return operator uint32(); }
@@ -54,6 +55,7 @@ template char Stream::read();
 template uint Stream::read();
 template array<char> Stream::read(int);
 template array<char> Stream::readArray();
+template array<char> Stream::readAll();
 template bool Stream::match(const array<char>&);
 template array<char> Stream::until(const char&);
 template array<char> Stream::whileAny(const array<char>&);

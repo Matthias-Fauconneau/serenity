@@ -8,9 +8,15 @@ extern "C" int close(int fd);
 inline array<byte> read(int fd, uint capacity) {
     array<byte> buffer(capacity);
     int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
+    assert((uint)size==capacity,size);
     buffer.setSize(size);
-    assert(buffer.size()==capacity);
     return buffer;
+}
+template<class T> T read(int fd) {
+    T t;
+    int size = read(fd,(byte*)&t,sizeof(T));
+    assert(size==sizeof(T),size,sizeof(T));
+    return t;
 }
 
 int createFile(const string& path);

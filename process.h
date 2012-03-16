@@ -35,8 +35,12 @@ int getCPUTime();
 
 /// Times \a statements and add to the process CPU usage profile
 /// \note use getCPUTime to profile kernel time and avoid other interference from other processes (adapted to longer tasks)
+#if DEBUG
 extern map<const char*, int> profile;
 #define profile(name, statements ) { int start=getCPUTime(); statements; profile[#name]+=getCPUTime()-start; }
+#else
+#define profile(name, statements ) { statements; }
+#endif
 
 /// Log the corresponding assembly the first time \a statements is executed
 void disasm(array<ubyte> code);

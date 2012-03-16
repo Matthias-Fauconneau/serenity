@@ -5,9 +5,6 @@
 template class array<string>;
 template int indexOf(const array<string>&, const string&);
 
-// minimal debug support for array.h
-void log(const char* expr) { return log(strz(expr)); }
-
 /// utf8_iterator
 int utf8_iterator::operator* () const {
     int code = pointer[0];
@@ -40,7 +37,7 @@ const utf8_iterator& utf8_iterator::operator++() {
 
 /// string operations
 
-bool startsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data(),s.size())==a; }
+bool startsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data(),a.size())==a; }
 bool endsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a; }
 
 bool operator <(const string& a, const string& b) {
@@ -73,10 +70,6 @@ void section_(const string& s, char sep, int& start, int& end, bool includeSep) 
     }
     start=b; end=e;
 }
-/*string sectionRef(const string& s, char sep, int start, int end, bool includeSep) {
-    section_(s,sep,start,end,includeSep);
-    return string(s.data+start,end-start);
-}*/
 string section(const string& s, char sep, int start, int end, bool includeSep) {
     section_(s,sep,start,end,includeSep);
     return copy(string(s.data()+start,end-start));
@@ -112,7 +105,7 @@ string replace(const string& s, const string& before, const string& after) {
 
 /// Human-readable value representation
 
-string str(int64 number, int base, int pad) {
+string itoa(int64 number, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     char buf[64]; int i=64;
     uint64 n=abs(number);
@@ -130,7 +123,7 @@ string str(float n, int precision, int base) {
     if(isnan(n)) return "NaN"_;
     if(isinf(n)) return n>0?"∞"_:"-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;
-    return (n>=0?""_:"-"_)+str(int64(abs(n)),base)+"."_+str(int64(m*abs(n))%m,base,precision);
+    return (n>=0?""_:"-"_)+itoa(abs(n),base)+"."_+itoa(int(m*abs(n))%m,base,precision);
 }
 
 long toInteger(const string& number, int base) {

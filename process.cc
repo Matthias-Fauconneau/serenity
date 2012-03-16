@@ -51,7 +51,13 @@ int main(int argc, const char** argv) {
     }
     while(polls.size() && app->running) {
         ::poll((pollfd*)polls.values.data(),polls.size(),-1);
-        for(int i=0;i<polls.size();i++) if(polls.values[i].revents) polls.keys[i]->event(polls.values[i]);
+        for(int i=0;i<polls.size();i++) {
+            int events = polls.values[i].revents;
+            if(events) {
+                assert(events==POLLIN,events);
+                polls.keys[i]->event(polls.values[i]);
+            }
+        }
     }
     return 0;
 }

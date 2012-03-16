@@ -1,11 +1,14 @@
 #pragma once
 #include "array.h"
+#include "string.h"
 
-constexpr uint16 swap16(uint16 x) { return ((x>>8)&0xff)|((x&0xff)<<8); }
 #define swap32 __builtin_bswap32
+constexpr uint16 swap16(uint16 x) { return swap32(x)>>16; }
 
-/// create an array<byte> reference of a types's raw memory representation
+/// create an array<byte> reference of \a t raw memory representation
 template<class T> array<byte> raw(const T& t) { return array<byte>((byte*)&t,sizeof(T)); }
+/// cast raw memory to a \a T
+template<class T> T raw(const array<byte>& a) { assert(a.size()==sizeof(T)); return *(T*)a.data(); }
 
 /// \a Stream provides a convenient interface for reading binary data or text
 struct Stream {
@@ -23,13 +26,14 @@ struct Stream {
     /// Peeks at the next \a size raw \a T elements in stream without moving \a pos
     template<class T> array<T> peek(int size) const;
 
-
     /// Reads one raw \a T element from stream
     template<class T> T read();
     /// Reads \a size raw \a T elements from stream
     template<class T> array<T> read(int size);
     /// Read an array of raw \a T elements from stream with the array size encoded as an uint32
     template<class T> array<T> readArray();
+    /// Reads the rest of the stream as raw \a T elements
+    template<class T> array<T> readAll();
 
     struct ReadOperator {
         Stream * s;
