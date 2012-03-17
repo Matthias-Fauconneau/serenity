@@ -4,10 +4,12 @@
 
 struct Search : TextInput {
     string browser;
+    signal<> triggered;
     bool keyPress(Key key) override;
 };
 
 struct Command : Item {
+    signal<> triggered;
     string exec;
     Command(Icon&& icon, Text&& text, string&& exec):Item(move(icon),move(text)),exec(move(exec)){}
     bool mouseEvent(int2, Event event, Button) override;

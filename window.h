@@ -8,12 +8,9 @@
 #include <X11/Xlib.h>
 #undef Window
 #undef Font
-
-#if GL
-#include <GL/glx.h>
-#else
 #include <X11/extensions/XShm.h>
-#endif
+
+#define Atom(name) XInternAtom(x, #name, 1)
 
 /// Window embeds \a widget in an X11 window, displaying it and forwarding user input.
 struct Window : Poll {
@@ -52,28 +49,37 @@ struct Window : Poll {
     void setOverrideRedirect(bool override_redirect);
 
     /// Register global shortcut named \a key (X11 KeySym)
-    uint addHotKey(const string& key);
+    static uint addHotKey(const string& key);
     /// User pressed a key (including global hot keys)
-    signal<Key> keyPress;
+    static signal<Key> keyPress;
 
     /// Set keyboard input focus
     void setFocus(Widget* focus);
     /// Current widget that has the keyboard input focus
     static Widget* focus;
+
+    /// Get current text selection
+    static string getSelection();
+
+    /// Get X11 property \a name on \a window
+    template<class T> static array<T> getProperty(XID window, const char* property);
 protected:
     /// Set X11 property \a name to \a value
-    /// \note The template is instantiated for strings (STRING,UTF8_STRING) and uints (ATOM)
     template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
 
     void event(pollfd);
+    void event(const XEvent& e);
 
-    Display* x;
+    static Display* x;
+    static int2 screen;
+    static int depth;
+    static Visual* visual;
+    static map<XID, Window*> windows;
+
     XID id;
-    int depth;
-    Visual* visual;
     GC gc;
     XImage* image;
     XShmSegmentInfo shminfo;
     Widget& widget;
-    int2 position, size, screen;
+    int2 position, size;
 };

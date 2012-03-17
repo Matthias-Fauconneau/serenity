@@ -6,7 +6,7 @@
 /// Event type
 enum Event { Motion, Press, Release, Enter, Leave };
 /// Mouse button
-enum Button { None, LeftButton, RightButton, MiddleButton, WheelDown, WheelUp };
+enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
 /// Key code
 #include "X11/keysym.h"
 enum Key { Escape=XK_Escape, Return=XK_Return, Left=XK_Left, Right=XK_Right, Delete=XK_Delete, BackSpace=XK_BackSpace };

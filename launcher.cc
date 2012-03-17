@@ -12,26 +12,25 @@ template class array<Command>;
 bool Search::keyPress(Key key) {
     if(key == Return) {
         execute("/usr/lib64/chromium-browser/chromium-launcher.sh"_,{"google.com/search?q="_+text});
-        text.clear(); update(); return true;
+        text.clear(); update(); triggered.emit(); return true;
     }
     else return TextInput::keyPress(key);
 }
 
-bool Command::mouseEvent(int2, Event event, Button) {
-    if(event == Press) { execute(exec); return true; }
+bool Command::mouseEvent(int2, Event event, Button button) {
+    if(event == Press && button == LeftButton) { execute(exec); triggered.emit(); return true; }
     return false;
 }
 
 bool Menu::mouseEvent(int2 position, Event event, Button button) {
-    if(Vertical::mouseEvent(position,event,button)) { close.emit(); return true; }
+    if(Vertical::mouseEvent(position,event,button)) return true;
     if(event==Leave) close.emit();
     return false;
 }
 
 bool Menu::keyPress(Key key) {
-    if(Vertical::keyPress(key)) {
-        if(key==Return) { close.emit(); return true; }
-    } else if(key==Escape) { close.emit(); return true; }
+    if(Vertical::keyPress(key)) return true;
+    if(key==Escape) { close.emit(); return true; }
     return false;
 }
 
@@ -75,9 +74,10 @@ List<Command> readShortcuts() {
     return shortcuts;
 }
 
-Launcher::Launcher() : shortcuts(readShortcuts()), menu({ &search, &shortcuts }), window(&menu,int2(-3,-3)) {
-    window.keyPress.connect(this,&Launcher::keyPress);
+Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts })), window(&menu,int2(-3,-3)) {
     menu.close.connect(&window,&Window::hide);
+    search.triggered.connect(&window,&Window::hide);
+    for(auto& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
     window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
     window.setOverrideRedirect(true);
 }

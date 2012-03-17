@@ -76,8 +76,6 @@ struct Calendar {
     void show() { window.show(); window.setPosition(int2(-menu.Widget::size.x,0)); }
 };
 
-#define Atom(name) XInternAtom(x, #name, 1)
-
 ICON(button);
 
 struct TaskBar : Poll {
@@ -94,28 +92,17 @@ struct TaskBar : Poll {
      HBox panel {&start, &tasks, &status, &clock };
     Window window{&panel,int2(0,-1),"TaskBar"_};
 
-    template<class T> array<T> getProperty(XID window, const char* property) {
-        Atom atom = XInternAtom(x,property,1);
-        Atom type; int format; ulong size, bytesAfter; uint8* data =0;
-        XGetWindowProperty(x,window,atom,0,~0,0,0,&type,&format,&size,&bytesAfter,&data);
-        if(!data || !size) return array<T>();
-        array<T> list = copy(array<T>((T*)data,size));
-        assert(list.data()!=(T*)data);
-        XFree(data);
-        return list;
-    }
-
-    string getTitle(XID id) { return getProperty<char>(id,"_NET_WM_NAME"); }
+    string getTitle(XID id) { return Window::getProperty<char>(id,"_NET_WM_NAME"); }
     Image getIcon(XID id) {
-        array<ulong> buffer = getProperty<ulong>(id,"_NET_WM_ICON");
+        array<ulong> buffer = Window::getProperty<ulong>(id,"_NET_WM_ICON");
         if(buffer.size()<=2) return Image();
         array<byte4> image(buffer.size());
         for(uint i=0;i<buffer.size()-2;i++) image << *(byte4*)&buffer[i+2];
         return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
     }
     bool skipTaskbar(XID id) {
-        return getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}
-        || contains(getProperty<Atom>(id,"_NET_WM_STATE"),Atom(_NET_WM_SKIP_TASKBAR));
+        return Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}
+        || contains(Window::getProperty<Atom>(id,"_NET_WM_STATE"),Atom(_NET_WM_SKIP_TASKBAR));
     }
     int addTask(XID id) {
         if(skipTaskbar(id)) return -1;
@@ -152,7 +139,7 @@ struct TaskBar : Poll {
         XChangeWindowAttributes(x,DefaultRootWindow(x),CWCursor,&attributes);
         XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
         registerPoll({XConnectionNumber(x), POLLIN});
-        for(auto id: getProperty<XID>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) {
+        for(auto id: Window::getProperty<XID>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) {
            addTask(id);
            XSelectInput(x, id, PropertyChangeMask);
         }
@@ -175,7 +162,6 @@ struct TaskBar : Poll {
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
         window.show();
         window.setPosition(int2(0,0));
-        window.update();
     }
     void raise(int) {
         XSetInputFocus(x, tasks.active().id, RevertToNone, CurrentTime);
@@ -196,7 +182,7 @@ struct TaskBar : Poll {
             XEvent e; XNextEvent(x,&e);
             XID id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
             if(e.type==PropertyNotify && id==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
-                XID id = getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
+                XID id = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
                 int i = indexOf(tasks, Task(id));
                 if(i<0) i=addTask(id);
                 if(i<0) continue;

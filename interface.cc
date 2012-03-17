@@ -208,10 +208,11 @@ void Text::render(int2 parent) {
 /// TextInput
 
 bool TextInput::mouseEvent(int2 position, Event event, Button button) {
-    if(event!=Press || button!=LeftButton) return false;
+    if(event!=Press) return false;
     Window::focus=this;
     int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
     for(cursor=0;cursor<layout.size() && x>layout[cursor].pos.x+(int)layout[cursor].image.width/2;cursor++) {}
+    if(button==MiddleButton) { string selection=Window::getSelection(); cursor+=selection.size(); text<<move(selection); update(); }
     return true;
 }
 
