@@ -7,7 +7,6 @@ int getRealTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); retu
 
 int getUnixTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
 
-//TODO: implement without libc
 Date currentDate() { tm t; time_t ts=getUnixTime(); localtime_r(&ts,&t); return { t.tm_sec, t.tm_min, t.tm_hour, t.tm_mday, t.tm_mon, 1900+t.tm_year, (t.tm_wday+6)%7/*0=Monday*/ }; }
 
 string date(string&& format) {

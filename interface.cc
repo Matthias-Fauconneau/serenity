@@ -27,14 +27,18 @@ void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) {
 
 /// Blit \a source to framebuffer at \a target
 void blit(int2 target, const Image& source, Blend blend=Opaque, int alpha=255) {
-    for(int y=max(target.y,0);y<min<int>(framebuffer.height,target.y+source.height);y++)
+    for(int y=max(target.y,0);y<min<int>(framebuffer.height,target.y+source.height);y++) {
         for(int x=max(target.x,0);x<min<int>(framebuffer.width,target.x+source.width);x++) {
             byte4 s = source(x-target.x,y-target.y);
             byte4& d = framebuffer(x,y);
             if(blend == Opaque) d=s;
             else if(blend==Multiply) d = byte4((int4(s)*int4(d))/255);
             else if(blend==Alpha) d = byte4((s.a*int4(s) + (255-s.a)*int4(d))/255);
-            else if(blend==MultiplyAlpha) d = byte4((alpha*(int4(s)*int4(d))/255 + (255-alpha)*int4(d))/255);
+            else if(blend==MultiplyAlpha) {
+                int a = max(int(d.a),s.a*alpha/255);
+                if(d.a) d = byte4((int4(s)*int4(d)*255/d.a)*a/255/255), d.a=a;
+            }
+        }
     }
 }
 
@@ -154,7 +158,7 @@ void Linear::update() {
 /// UniformGrid
 
 int2 UniformGrid::sizeHint() {
-    int2 max;
+    int2 max(0,0);
     for(int i=0;i<count();i++) {
         int2 size=at(i).sizeHint();
         max = ::max(max,size);

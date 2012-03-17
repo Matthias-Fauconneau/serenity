@@ -8,6 +8,7 @@ generic vector vector::operator +=(vector v) { for(int i=0;i<N;i++) u(i)+=v[i]; 
 generic vector vector::operator -=(vector v) { for(int i=0;i<N;i++) u(i)-=v[i]; return *this; }
 generic vector vector::operator *=(vector v) { for(int i=0;i<N;i++) u(i)*=v[i]; return *this; }
 generic vector vector::operator *=(float s) { for(int i=0;i<N;i++) u(i)*=s; return *this; }
+generic vector vector::operator /=(float s) { for(int i=0;i<N;i++) u(i)/=s; return *this; }
 generic vector vector::operator -() const { vector r; for(int i=0;i<N;i++) r[i]=-u(i); return r; }
 generic vector vector::operator +(vector v) const { vector r; for(int i=0;i<N;i++) r[i]=u(i)+v[i]; return r; }
 generic vector vector::operator -(vector v) const { vector r; for(int i=0;i<N;i++) r[i]=u(i)-v[i]; return r; }

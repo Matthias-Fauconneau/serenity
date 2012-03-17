@@ -23,6 +23,7 @@ struct Image {
     ~Image(){ if(data && own) delete data; }
     explicit operator bool() const { return data; }
 
+    byte4 get(uint x, uint y) const { if(x>=width||y>=height) return byte4(0,0,0,0); return data[y*width+x]; }
     byte4 operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*width+x]; }
     byte4& operator()(uint x, uint y) {assert(x<width && y<height); return data[y*width+x]; }
     int2 size() const { return int2(width,height); }

@@ -11,7 +11,6 @@ struct utf8_iterator {
 };
 
 /// \a string is an \a array of characters with specialized methods for UTF-8 string handling
-//TODO: proper multibyte encoding support
 struct string : array<char> {
     //using array<char>::array<char>;
     string() {}

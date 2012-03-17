@@ -267,7 +267,6 @@ struct Item : Horizontal {
 typedef Bar<Item> TabBar;
 
 /// TriggerButton is a togglable Icon
-//TODO: inherit Icon
 struct ToggleButton : Widget {
     /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
     ToggleButton(const Image& enable,const Image& disable);

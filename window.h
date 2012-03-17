@@ -6,7 +6,6 @@
 #define Font XID
 #define Window XID
 #include <X11/Xlib.h>
-#undef Status
 #undef Window
 #undef Font
 
@@ -17,12 +16,11 @@
 #endif
 
 /// Window embeds \a widget in an X11 window, displaying it and forwarding user input.
-//TODO: wayland
 struct Window : Poll {
     no_copy(Window)
     /// Display \a widget in a window
     /// \note Make sure the referenced widget is initialized before running this constructor
-    /// \note size admits special values (0: widget.sizeHint, -1: screen.size)
+    /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1)
     Window(Widget* widget, int2 size=int2(0,0), const string& name=string(), const Image& icon=Image());
     /// Update the window by handling any incoming events
     void update();
@@ -69,13 +67,13 @@ protected:
 
     void event(pollfd);
 
-    XID id;
     Display* x;
-    Widget& widget;
-#if GL
-    static GLXContext ctx;
-#else
+    XID id;
+    int depth;
+    Visual* visual;
+    GC gc;
     XImage* image;
     XShmSegmentInfo shminfo;
-#endif
+    Widget& widget;
+    int2 position, size, screen;
 };

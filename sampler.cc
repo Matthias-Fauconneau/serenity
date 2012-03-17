@@ -139,7 +139,7 @@ void Sampler::read(int16 *output, uint period) {
     }
     if(anyActive) {
         float* in = layers[1].buffer;
-        profile(mix, for(uint i=0;i<period*2;i++) output[i] = clip(-32768,int(in[i])>>8,32767);/*TODO: fast ->float conversion*/ )
+        profile(mix, for(uint i=0;i<period*2;i++) output[i] = clip(-32768,int(in[i])>>8,32767);)
     } else clear(output,period*2); //no active note -> play silence (TODO: pause alsa)
     if(record) write(record,output,period*2*sizeof(int16));
     time+=period;

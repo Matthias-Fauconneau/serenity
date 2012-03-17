@@ -1,6 +1,3 @@
-//TODO: Menu: /Applications/Categories/application, /Files/(Favorites|Devices|Recent Files|URLs)/file, rounded menu
-//TODO: Search: {Applications, Files, Web, Command}, completion in popup (+recent queries)
-//TODO: Desktop: Applications, Favorites/Places/Devices/Recent Files/URLs, Folder, Feeds/Messages/Contacts, Events, Search
 #include "launcher.h"
 #include "map.h"
 #include "stream.h"
@@ -51,7 +48,6 @@ map<string,string> readConfig(const string& path) {
     return entries;
 }
 
-//TODO: parse /usr/share/applications/*.desktop to categories (Network Graphics AudioVideo Office Utility System)
 List<Command> readShortcuts() {
     List<Command> shortcuts;
     auto config = readConfig(strz(getenv("HOME"))+"/.config/launcher"_);
@@ -79,7 +75,7 @@ List<Command> readShortcuts() {
     return shortcuts;
 }
 
-Launcher::Launcher() : shortcuts(readShortcuts()), menu({ &search, &shortcuts }), window(&menu,int2(0,0)) {
+Launcher::Launcher() : shortcuts(readShortcuts()), menu({ &search, &shortcuts }), window(&menu,int2(-3,-3)) {
     window.keyPress.connect(this,&Launcher::keyPress);
     menu.close.connect(&window,&Window::hide);
     window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);

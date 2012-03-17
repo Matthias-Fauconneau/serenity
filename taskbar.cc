@@ -1,4 +1,3 @@
-//TODO: Calendar, Events, Notifications, Jump Lists
 #include "process.h"
 #include "time.h"
 #include "interface.h"
@@ -8,9 +7,9 @@
 #include "array.cc"
 
 #include "dbus.h"
-struct Status : TriggerButton {
+struct StatusNotifierItem : TriggerButton {
     DBus::Object item;
-    Status(DBus::Object&& item, Image&& icon) : TriggerButton(move(icon)), item(move(item)) {}
+    StatusNotifierItem(DBus::Object&& item, Image&& icon) : TriggerButton(move(icon)), item(move(item)) {}
     bool mouseEvent(int2 position, Event event, Button button) override {
         if(TriggerButton::mouseEvent(position,event,button)) { item.noreply("org.kde.StatusNotifierItem.Activate"_,0,0); return true; }
         return false;
@@ -42,7 +41,7 @@ struct Desktop {
     List<Command> shortcuts { readShortcuts() };
     List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_) };
     HBox applets { &space, &shortcuts, &system };
-    Window window{&applets,int2(-1,-1)};
+    Window window{&applets,int2(0,0)};
     Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
 };
 
@@ -64,7 +63,7 @@ struct Calendar {
       Text date { ::date("dddd, dd MMMM yyyy"_) };
       Month month;
      Menu menu { &date, &month };
-    Window window{&menu,int2(0,0)};
+    Window window{&menu,int2(-2,-2)};
     Calendar() {
         window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
         window.setOverrideRedirect(true);
@@ -89,11 +88,11 @@ struct TaskBar : Poll {
       TriggerButton start;
        Launcher launcher;
       Bar<Task> tasks;
-      Bar<Status> status;
+      Bar<StatusNotifierItem> status;
       Clock clock;
        Calendar calendar;
      HBox panel {&start, &tasks, &status, &clock };
-    Window window{&panel,int2(-1,0),"TaskBar"_};
+    Window window{&panel,int2(0,-1),"TaskBar"_};
 
     template<class T> array<T> getProperty(XID window, const char* property) {
         Atom atom = XInternAtom(x,property,1);
@@ -137,10 +136,10 @@ struct TaskBar : Poll {
             DBusIcon dbusIcon = move(item.get< array<DBusIcon> >("IconPixmap"_).first());
             icon=swap(Image(cast<byte4>(move(dbusIcon.data)),dbusIcon.width,dbusIcon.height));
         }
-        status << Status(move(item), resize(icon, 16,16));
+        status << StatusNotifierItem(move(item), resize(icon, 16,16));
         panel.update(); window.render();
     }
-    variant<int> Get(string interface, string property) { //TODO: DBus properties
+    variant<int> Get(string interface, string property) {
         if(interface=="org.kde.StatusNotifierWatcher"_ && property=="ProtocolVersion"_) return 1;
         else error(interface, property);
     }

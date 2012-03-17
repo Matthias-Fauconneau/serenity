@@ -20,11 +20,11 @@ template <template <typename> class V, class T, int N> struct vector : V<T> {
     vector operator -=(vector v);
     vector operator *=(vector v);
     vector operator *=(float s);
+    vector operator /=(float s);
     vector operator -() const;
     vector operator +(vector v) const;
     vector operator -(vector v) const;
     vector operator *(vector v) const;
-    //vector operator /(vector v) const { vector r; for(int i=0;i<N;i++) r[i]=u(i)/v[i]; return r; }
     vector operator *(float s) const;
     vector operator /(float s) const;
     bool operator ==(vector v) const;

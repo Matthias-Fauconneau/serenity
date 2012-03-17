@@ -62,13 +62,21 @@ Glyph& Font::glyph(int size, int code) {
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
     glyph.offset = vec2( face->glyph->bitmap_left, -face->glyph->bitmap_top );
     FT_Bitmap bitmap=face->glyph->bitmap;
-    //assert(bitmap.buffer);
     if(!bitmap.buffer) return glyph;
     int width = bitmap.width/3, height = bitmap.rows;
-    glyph.image = Image(width,height);
+    Image image(width,height);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
         uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
-        glyph.image.data[y*width+x] = byte4(255-rgb[0],255-rgb[1],255-rgb[2],255);
+        image(x,y) = byte4(255-rgb[0],255-rgb[1],255-rgb[2],rgb[0]|rgb[1]|rgb[2]?255:0);
+    }
+    glyph.image = Image(width,height);
+    for(int y=0;y<height;y++) for(int x=0;x<width;x++) { //feather alpha
+        byte4& d = glyph.image(x,y);
+        d = image(x,y);
+        if(d.a==0) d.a=(
+                    image.get(x-1,y-1).a+image.get(x ,y - 1).a+image.get(x+1,y -1).a+
+                    image.get(x-1,y+0).a+image.get(x,y     ).a+image.get(x+1,y   ).a+
+                    image.get(x-1,y+1).a+image.get(x,y+1).a+image.get(x+1,y+1).a ) / 8;
     }
     return glyph;
 }
