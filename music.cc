@@ -71,7 +71,9 @@ struct Music : Application {
         }
         if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
         //sheet.scroll=1600;
+#ifndef DEBUG
         setPriority(-20);
+#endif
         audio.start();
     }
 #ifdef UI

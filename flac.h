@@ -7,10 +7,11 @@
 
 /// Stream reader for encoded packed bits
 struct BitReader : array<byte> {
-    ubyte* data;
-    uint bsize;
-    uint index;
-    BitReader(array<byte>&& buffer);
+    ubyte* data=0;
+    uint bsize=0;
+    uint index=0;
+    BitReader(){}
+    BitReader(array<byte>&& buffer){setData(move(buffer));}
     /// Skip \a count bytes in stream
     void skip(int count);
     /// Reads one bit in MSB msb encoding
@@ -23,17 +24,21 @@ struct BitReader : array<byte> {
     uint unary();
     /// Reads an UCS-2 encoded value
     uint utf8();
+protected:
+    void setData(array<byte>&& buffer);
 };
 
 struct FLAC : BitReader {
+    FLAC(){}
     const int sampleRate = 48000;
     const int channels = 2;
     const int bitsPerSample = 24;
-    uint time;
-    int2* buffer=0;
+    uint time=0;
+    int2 buffer[8192]; //64K
     int blockSize=0;
     int position=0;
-    FLAC(array<byte>&& buffer);
+    /// Read header and prepare to read frames
+    void open(array<byte>&& data);
     /// Decode next FLAC frame
     void readFrame();
 };

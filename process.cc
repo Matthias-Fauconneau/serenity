@@ -12,6 +12,15 @@
 
 void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
 
+/// limit process ressources to avoid hanging the system when debugging
+declare(static void limit_resource(), constructor) {
+    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21; setrlimit(RLIMIT_STACK,&limit); } //2 MB
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24; setrlimit(RLIMIT_DATA,&limit); } //16 MB
+    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30; setrlimit(RLIMIT_AS,&limit); } //1 GB
+    setPriority(19);
+}
+
+
 int getCPUTime() {
     rusage usage; getrusage(RUSAGE_SELF,&usage);
     return  usage.ru_stime.tv_sec*1000+usage.ru_stime.tv_usec/1000 + //user time in ms
@@ -104,11 +113,12 @@ struct StackFrame {
     StackFrame* caller_frame; void* return_address;
     static inline StackFrame* current() { register StackFrame* ebp __asm__("ebp"); return ebp; }
 };
-int backtrace(void** frames, int capacity, StackFrame* ebp) {
+int backtrace(void** frames, int capacity, StackFrame* frame) {
     int i=0;
     for(;i<capacity;i++) {
-        if(int64(ebp=ebp->caller_frame)<0x10) break;
-        frames[i]=ebp->return_address;
+        frame=frame->caller_frame;
+        if(uint64(frame)<0x10 || uint64(frame)>0x10000000000000) break;
+        frames[i]=frame->return_address;
     }
     return i;
 }
@@ -182,12 +192,12 @@ no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enabl
 
 void logTrace() { trace.log(); logBacktrace(StackFrame::current()->caller_frame); }
 #else
-void logTrace() { logBacktrace(StackFrame::current()->caller_frame); }
 void logTrace(int skip) {
     StackFrame* frame = StackFrame::current();
-    while(skip--) frame=frame->caller_frame;
+    while(skip-- && uint64(frame->caller_frame)<0x10 && uint64(frame->caller_frame)>0x10000000000000) frame=frame->caller_frame;
     logBacktrace(frame);
 }
+
 #ifdef PROFILE
 /// Profiler
 

@@ -6,6 +6,7 @@ ifeq (,$(TARGET))
 endif
 
 	ifeq ($(BUILD),debug)
+else ifeq ($(BUILD),memdbg)
 else ifeq ($(BUILD),reldbg)
 else ifeq ($(BUILD),release)
 else ifeq ($(BUILD),trace)
@@ -78,15 +79,19 @@ SRCS += $(ICONS:%=icons/%)
 SRCS += $(GPUS:%=%.gpu)
 
 #-fno-implicit-templates
-FLAGS += -pipe -std=c++11 -fno-operator-names -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -fno-rtti -march=native
+FLAGS += -pipe -std=c++11 -fno-operator-names -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -march=native
 
 ifeq ($(BUILD),debug)
 	FLAGS += -ggdb -DDEBUG -fno-omit-frame-pointer
 	LIBS += -lbfd
+else ifeq ($(BUILD),memdbg)
+	FLAGS += -ggdb -DDEBUG -DTRACE_MALLOC -Ofast -fno-omit-frame-pointer
+	SRCS += memory
+	LIBS += -lbfd
 else ifeq ($(BUILD),reldbg)
-	FLAGS += -ggdb -Ofast
+	FLAGS += -ggdb -Ofast -fno-rtti
 else ifeq ($(BUILD),release)
-	FLAGS += -Ofast
+	FLAGS += -Ofast -fno-rtti
 else ifeq ($(BUILD),trace)
 	FLAGS += -g -DDEBUG
 	LIBS += -lbfd

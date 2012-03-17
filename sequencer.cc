@@ -27,10 +27,10 @@ Sequencer::Sequencer() {
 }
 
 void Sequencer::event(pollfd) {
-    int remaining;
-    do {
+    while(snd_seq_event_input_pending(seq,1)) {
         snd_seq_event_t* ev;
-        remaining = snd_seq_event_input(seq, &ev);
+        int remaining = snd_seq_event_input(seq, &ev);
+        if(remaining<=0) log(remaining);
         if(ev->type == SND_SEQ_EVENT_NOTEON) {
             uint8 key = ev->data.note.note;
             int vel = ev->data.note.velocity;
@@ -65,7 +65,7 @@ void Sequencer::event(pollfd) {
             }
         }
         snd_seq_free_event(ev);
-    } while(remaining>1);
+    };
 }
 
 void Sequencer::recordMID(const string& path) { record=copy(path); }

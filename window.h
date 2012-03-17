@@ -18,7 +18,7 @@ struct Window : Poll {
     /// Display \a widget in a window
     /// \note Make sure the referenced widget is initialized before running this constructor
     /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1)
-    Window(Widget* widget, int2 size=int2(0,0), const string& name=string(), const Image& icon=Image());
+    Window(Widget* widget, int2 size=int2(0,0), const string& name=string(), const Image& icon=Image(), ubyte opacity=192);
     /// Update the window by handling any incoming events
     void update();
     /// Repaint window contents. Called by update after an event is accepted by a widget.
@@ -80,6 +80,7 @@ protected:
     GC gc;
     XImage* image;
     XShmSegmentInfo shminfo;
-    Widget& widget;
     int2 position, size;
+    Widget& widget;
+    ubyte opacity;
 };

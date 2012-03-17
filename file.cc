@@ -37,6 +37,12 @@ array<string> listFiles(const string& folder, Flags flags) {
     return list;
 }
 
+int openFile(const string& path) {
+    int fd = open(strz(path).data(), O_RDONLY);
+    if(fd < 0) error("File not found"_,"'"_+path+"'"_);
+    return fd;
+}
+
 int createFile(const string& path) {
     return open(strz(path).data(),O_CREAT|O_WRONLY|O_TRUNC,0666);
 }

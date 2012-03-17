@@ -91,7 +91,7 @@ extern bool trace_enable;
 #define trace_off
 #endif
 
-void logTrace();
+void logTrace(int skip=1);
 /// Aborts the process without any message, stack trace is logged
 #define fail() ({debug( trace_off; logTrace(); )  __builtin_abort(); })
 
@@ -101,7 +101,7 @@ extern "C" void* malloc(size_t size) throw();
 extern "C" void* realloc(void* buffer, size_t size) throw();
 extern "C" void free(void* buffer) throw();
 
-#if TRACE_MALLOC
+#ifdef TRACE_MALLOC
 void* allocate_(int size, const char* type=0);
 void* reallocate_(void* buffer, int oldsize, int size);
 void unallocate_(void* buffer);

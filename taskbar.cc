@@ -41,7 +41,7 @@ struct Desktop {
     List<Command> shortcuts { readShortcuts() };
     List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_) };
     HBox applets { &space, &shortcuts, &system };
-    Window window{&applets,int2(0,0)};
+    Window window{&applets,int2(0,0),""_,Image(),255};
     Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
 };
 
@@ -90,7 +90,7 @@ struct TaskBar : Poll {
       Clock clock;
        Calendar calendar;
      HBox panel {&start, &tasks, &status, &clock };
-    Window window{&panel,int2(0,-1),"TaskBar"_};
+    Window window{&panel,int2(0,-1),"TaskBar"_,Image(),255};
 
     string getTitle(XID id) { return Window::getProperty<char>(id,"_NET_WM_NAME"); }
     Image getIcon(XID id) {
@@ -131,17 +131,19 @@ struct TaskBar : Poll {
         else error(interface, property);
     }
 
-    static int xErrorHandler(Display*, XErrorEvent*) { return 0; }
+    static int xErrorHandler(Display* x, XErrorEvent* error) {
+        char buffer[64]; XGetErrorText(x,error->error_code,buffer,sizeof(buffer)); log(buffer);
+        return 0;
+    }
     TaskBar() {
         XSetErrorHandler(xErrorHandler);
         x = XOpenDisplay(0);
         XSetWindowAttributes attributes; attributes.cursor=XCreateFontCursor(x,68);
         XChangeWindowAttributes(x,DefaultRootWindow(x),CWCursor,&attributes);
-        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
         registerPoll({XConnectionNumber(x), POLLIN});
         for(auto id: Window::getProperty<XID>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) {
-           addTask(id);
-           XSelectInput(x, id, PropertyChangeMask);
+            addTask(id);
+            XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
         }
 
         dbus.bind("Get"_,this,&TaskBar::Get);
@@ -162,6 +164,8 @@ struct TaskBar : Poll {
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
         window.show();
         window.setPosition(int2(0,0));
+        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
+        XFlush(x);
     }
     void raise(int) {
         XSetInputFocus(x, tasks.active().id, RevertToNone, CurrentTime);
@@ -176,18 +180,22 @@ struct TaskBar : Poll {
         XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
         XFlush(x);
     }
-    void event(pollfd) {
+    void event(pollfd) override {
         bool needUpdate = false;
-        while(XEventsQueued(x, QueuedAfterFlush)) {
-            XEvent e; XNextEvent(x,&e);
-            XID id = (e.type==PropertyNotify||e.type==ClientMessage) ? e.xproperty.window : e.xconfigure.window;
-            if(e.type==PropertyNotify && id==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
+        while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
+            if(e.type==PropertyNotify && e.xproperty.window==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
                 XID id = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
                 int i = indexOf(tasks, Task(id));
                 if(i<0) i=addTask(id);
                 if(i<0) continue;
                 tasks.index=i;
-            } else {
+            } else if(e.type>=CreateNotify && e.type<=PropertyNotify) {
+                //offset for window field
+#define o(name) offsetof(X##name##Event,window)
+                const int window[13] = {o(CreateWindow),o(DestroyWindow),o(Unmap),o(Map),o(MapRequest),o(Reparent),o(Configure),
+                                        o(ConfigureRequest), o(Gravity),o(ResizeRequest),o(Circulate),o(CirculateRequest),o(Property)};
+#undef o
+                XID id = *(XID*)((byte*)&e+window[e.type-CreateNotify]);
                 int i = indexOf(tasks, Task(id));
                 if(i<0) {
                     if(e.type == CreateNotify || e.type==ReparentNotify) XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
@@ -221,5 +229,5 @@ struct Shell : Application {
         taskbar.tasksChanged.connect(this,&Shell::tasksChanged);
         tasksChanged(taskbar.tasks.array::size());
     }
-    void tasksChanged(int count) { taskbar.window.setVisible(count); desktop.window.setVisible(!count); }
+    void tasksChanged(int count) { desktop.window.setVisible(!count); }
 } shell;

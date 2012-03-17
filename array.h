@@ -10,18 +10,16 @@ template <class T> struct Buffer {
     uint size = 0;
     uint capacity = 0; //0 = not owned
     Buffer(const T* data=0, int size=0, int capacity=0):data(data),size(size),capacity(capacity){}
-    const T& operator[](uint i) const { debug(if(i>=size)fail();) return data[i]; }
-    T& operator[](uint i) { debug(if(i>=size)fail();) return (T&)data[i]; }
-};
+} __attribute((packed));
 
 /// \a array is a typed and bound-checked handle to a memory buffer using move semantics to avoid reference counting
 /// \note array transparently store small arrays inline when possible
 /// \note #include "array.cc" to compile arrays or method definitions for custom types
 template<class T> struct array {
-    int8 tag=-1; /*-1 = heap allocated*/ int8 pad[7]; //8 bytes
+    int8 tag=-1; /*>=0: inline, -1 = heap, -2 = static*/ int8 pad[7]; //1+7 bytes
     Buffer<T> buffer; //+16
-    uint64 cache[5]; //+40 to make sizeof(array) = 64 bytes (allow long[7]/int[15]/short[31]/char[63] to be inlined in same cache line)
-
+    ubyte cache[sizeof(T)>63?0:sizeof(T)==1?7:40]; //+7/40 to make sizeof(array) = 31/64 bytes (inline char[30], inline string[2])
+    static constexpr uint32 inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
     T* data();
     const T* data() const;
     uint size() const;
@@ -95,7 +93,7 @@ template<class T> struct array {
     const T* end() const { return data()+size(); }
     T* begin() { return (T*)data(); }
     T* end() { return (T*)data()+size(); }
-};
+}__attribute((packed));
 
 /// Reinterpret cast \a array to array<T>
 template<class T, class O> array<T> cast(array<O>&& array);

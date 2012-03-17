@@ -3,7 +3,7 @@
 
 #define swap64 __builtin_bswap64
 
-BitReader::BitReader(array<byte>&& buffer) : array(move(buffer)), data((ubyte*)array::data()), bsize(8*array::size()), index(0) {}
+void BitReader::setData(array<byte>&& buffer) { array<byte>::operator=(move(buffer)); data=(ubyte*)array::data(); bsize=8*array::size(); index=0; }
 
 void BitReader::skip(int count) { index+=count; }
 
@@ -56,7 +56,8 @@ uint BitReader::utf8() {
     return code;
 }
 
-FLAC::FLAC(array<byte>&& file) : BitReader(move(file)) {
+void FLAC::open(array<byte>&& data) {
+    BitReader::setData(move(data));
     skip(32); //fLaC
     for(;;) { //METADATA_BLOCK*
         bool last=bit();
@@ -122,7 +123,7 @@ template<int unroll> inline void unroll_predictor(uint order, double* predictor,
 
 uint64 rice=0, predict=0, order=0;
 void FLAC::readFrame() {
-    if(buffer) unallocate(buffer); position=0;
+    position=0;
     //Frame
     int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync));
     bool unused variable = bit();
@@ -137,8 +138,7 @@ void FLAC::readFrame() {
     int unused zero = bit(); assert(zero==0);
     int unused frameNumber = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;
-    assert(blockSize>0,blockSize);
-    buffer = allocate<int2>(blockSize);
+    assert(blockSize>0&&uint(blockSize)<=sizeof(buffer)/sizeof(int2),blockSize);
     skip(8);
 
     int block[2][blockSize];

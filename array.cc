@@ -3,21 +3,20 @@
 
 #define generic template<class T>
 
-#define inline_capacity int((sizeof(array)-1)/sizeof(T))
 generic T* array<T>::data() { return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
 generic const T* array<T>::data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
 generic uint array<T>::size() const { return tag>=0?tag:buffer.size; }
 generic void array<T>::setSize(uint size) { assert(size<=capacity()); if(tag>=0) tag=size; else buffer.size=size;}
-generic uint array<T>::capacity() const { return tag>=0 ? inline_capacity : buffer.capacity; }
+generic uint array<T>::capacity() const { return tag>=0 ? inline_capacity() : buffer.capacity; }
 
 generic array<T>::array(array<T>&& o) {
-    if(o.tag==-1) buffer=o.buffer; else copy(*this,o);
+    if(o.tag<0) buffer=o.buffer; else copy(*this,o);
     o.tag=0;
 }
 
 generic array<T>& array<T>::operator=(array<T>&& o) {
     array::~array();
-    if(o.tag==-1) tag=-1, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(*this));
+    if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(*this));
     o.tag=0;
     return *this;
 }
@@ -30,12 +29,12 @@ generic array<T>::array(std::initializer_list<T>&& list) {
 generic array<T>::~array() { if(capacity()) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-1) unallocate(buffer.data); } }
 
 generic void array<T>::reserve(uint capacity) {
-    if(array::capacity()>=capacity) return;
+    if(capacity <= array::capacity()) return;
     if(tag==-1 && buffer.capacity) {
         buffer.data=reallocate<T>(buffer.data,buffer.capacity,capacity);
         buffer.capacity=capacity;
-    } else if(capacity <= inline_capacity) {
-        if(tag==-1) {
+    } else if(capacity <= inline_capacity()) {
+        if(tag<0) {
              tag=buffer.size;
              copy((byte*)(&tag+1),(byte*)buffer.data,buffer.size*sizeof(T));
         }
@@ -43,14 +42,16 @@ generic void array<T>::reserve(uint capacity) {
         T* heap=allocate<T>(capacity);
         copy((byte*)heap,(byte*)data(),size()*sizeof(T));
         buffer.data=heap;
-        if(tag>=0) { buffer.size=tag; tag=-1; }
+        if(tag>=0) buffer.size=tag;
+        tag=-1;
         buffer.capacity=capacity;
     }
 }
 
 template<class T, class O> array<T> cast(array<O>&& o) {
     array<T> r;
-    if(o.tag==-1) {
+    if(o.tag<0) {
+        r.tag=o.tag;
         r.buffer.data=(const T*)o.buffer.data;
         r.buffer.size = o.buffer.size*sizeof(O)/sizeof(T);
         r.buffer.capacity = o.buffer.capacity*sizeof(O)/sizeof(T);

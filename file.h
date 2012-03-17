@@ -19,6 +19,7 @@ template<class T> T read(int fd) {
     return t;
 }
 
+int openFile(const string& path);
 int createFile(const string& path);
 string mapFile(const string& path);
 

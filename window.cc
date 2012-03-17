@@ -36,7 +36,7 @@ template<class T> void Window::setProperty(const char* type,const char* name, co
     XFlush(x);
 }
 
-Window::Window(Widget* widget, int2 size, const string& name, const Image& icon) : widget(*widget) {
+Window::Window(Widget* widget, int2 size, const string& name, const Image& icon, ubyte opacity) : widget(*widget), opacity(opacity) {
     if(!x) {
         x = XOpenDisplay(0);
         pollfd p={XConnectionNumber(x), POLLIN, 0}; registerPoll(p);
@@ -128,8 +128,8 @@ void Window::render() {
          int2 center = int2(size.x/2,0); int radius=256;
          for_Image(framebuffer) {
             int2 pos = int2(x,y);
-            int g = mix(224,240,min(1.f,length(pos-center)/radius))*192/255;
-            framebuffer(x,y) = byte4(g,g,g,192);
+            int g = mix(224,240,min(1.f,length(pos-center)/radius))*opacity/255;
+            framebuffer(x,y) = byte4(g,g,g,opacity);
          }
     }
     //feather edges //TODO: shadow

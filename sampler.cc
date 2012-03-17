@@ -36,7 +36,7 @@ void Sampler::open(const string& path) {
                 auto file = mapFile(path);
                 sample->data = file.data(); sample->size=file.size();
                 madvise((void*)sample->data, file.size(), MADV_SEQUENTIAL);
-                mlock((void*)sample->data, min(file.size(),1024*512u));
+                mlock((void*)sample->data, min(file.size(),1024*1024u));
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -60,7 +60,6 @@ void Sampler::open(const string& path) {
 }
 
 void Sampler::event(int key, int velocity) {
-    //log(key,velocity);
     int release=0;
     if(velocity==0) {
         for(Note& note : active) if(note.release && note.key==key) {
@@ -71,17 +70,17 @@ void Sampler::event(int key, int velocity) {
     }
     for(const Sample& s : samples) {
         if(!!release == s.trigger && key >= s.lokey && key <= s.hikey && velocity >= s.lovel && velocity <= s.hivel) {
-            Note note(array<byte>(s.data,s.size));
+            active << Note();
+            Note& note = active.last();
+            note.open(array<byte>(s.data,s.size));
             note.remaining=note.time;
-            note.release=s.release;
+            note.release=max(240000,s.release);
             note.key=key;
             int shift = key-s.pitch_keycenter; assert(shift>=-1 && shift<=1,"unsupported pitch shift"_,shift);
             note.layer=1+shift;
             note.velocity=velocity;
             note.level = (1-(s.amp_veltrack/100.0*(1-float(velocity*velocity)/(127*127)))) * s.volume;
             if(release) note.level *= exp10(-s.rt_decay * release/48000.0 / 20); //attenuation
-            //else log(key,velocity,note.level);
-            active << move(note);
             return; //assume only one match
         }
     }
@@ -92,10 +91,6 @@ void Sampler::read(int16 *output, uint period) {
     assert(period==layers[1].size,"period != 1024"_);
     timeChanged.emit(time);
     for(Layer& layer : layers) layer.active=false;
-#if DEBUG
-    static int cpu=getCPUTime(), real=getRealTime();
-    if(getRealTime()-real>1000) { log("active",active.size(),"total",getCPUTime()-cpu,profile); real=getRealTime(); cpu=getCPUTime(); profile.clear(); }
-#endif
     for(uint i=0;i<active.size();i++) { Note& n = active[i];
         auto& layer = layers[n.layer];
         int frame = layer.size;
@@ -107,12 +102,12 @@ void Sampler::read(int16 *output, uint period) {
             while(frame > n.blockSize) {
                 frame -= n.blockSize;
                 int* in = (int*)(n.buffer+n.position);
-                profile(mix, for(int i=0; i<2*n.blockSize; i++) out[i] += n.level * float(in[i]); )
+                for(int i=0; i<2*n.blockSize; i++) out[i] += n.level * float(in[i]);
                 out += 2*n.blockSize;
-                profile(decode, n.readFrame(); )
+                n.readFrame();
             }
             int* in = (int*)(n.buffer+n.position);
-            profile(mix, for(int i=0; i<2*frame; i++)  out[i] += n.level * float(in[i]); )
+            for(int i=0; i<2*frame; i++)  out[i] += n.level * float(in[i]);
             n.position += frame;
             n.blockSize -= frame;
         } else { //release
@@ -121,12 +116,12 @@ void Sampler::read(int16 *output, uint period) {
             while(frame > n.blockSize) {
                 frame -= n.blockSize;
                 int* in = (int*)(n.buffer+n.position);
-                profile(mix, for(int i=0; i<2*n.blockSize; i++,n.remaining--) out[i] += n.remaining*reciprocal * float(in[i]); )
+                for(int i=0; i<2*n.blockSize; i++,n.remaining--) out[i] += n.remaining*reciprocal * float(in[i]);
                 out += 2*n.blockSize;
-                profile(decode, n.readFrame(); )
+                n.readFrame();
             }
             int* in = (int*)(n.buffer+n.position);
-            profile(mix, for(int i=0; i<2*frame; i++,n.remaining--) out[i] += n.remaining*reciprocal * float(in[i]); )
+            for(int i=0; i<2*frame; i++,n.remaining--) out[i] += n.remaining*reciprocal * float(in[i]);
             n.position += frame;
             n.blockSize -= frame;
         }
@@ -134,12 +129,12 @@ void Sampler::read(int16 *output, uint period) {
     bool anyActive = layers[1].active;
     for(int i=0;i<=2;i+=2) { if(!layers[i].active) continue;
         int in = layers[i].size, out = period;
-        profile(resample, layers[i].resampler.filter(layers[i].buffer,&in, layers[1].buffer, &out, anyActive); )
+        layers[i].resampler.filter(layers[i].buffer,&in, layers[1].buffer, &out, anyActive);
         anyActive=true; //directly mix if unresampled layer or any previous layer is active
     }
     if(anyActive) {
         float* in = layers[1].buffer;
-        profile(mix, for(uint i=0;i<period*2;i++) output[i] = clip(-32768,int(in[i])>>8,32767);)
+        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>9; if(o<=-32768 || o>=32768) log("clip"); output[i] = clip(-32767,o,32767);}
     } else clear(output,period*2); //no active note -> play silence (TODO: pause alsa)
     if(record) write(record,output,period*2*sizeof(int16));
     time+=period;
