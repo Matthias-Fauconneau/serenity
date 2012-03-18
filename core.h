@@ -96,6 +96,7 @@ void logTrace(int skip=1);
 #define fail() ({debug( trace_off; logTrace(); )  __builtin_abort(); })
 
 /// Memory
+#define _NEW
 inline void* operator new(size_t, void* p) { return p; } //placement new
 extern "C" void* malloc(size_t size) throw();
 extern "C" void* realloc(void* buffer, size_t size) throw();

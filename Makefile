@@ -15,18 +15,21 @@ else
 endif
 
 #TODO: use dependency files (.P) to link object files .o
-SRCS = core array string process vector
+SRCS = core array string process
 
 	 ifeq ($(TARGET),player)
- SRCS += signal stream file image window font interface alsa ffmpeg resample player
+ SRCS += vector signal stream file image window font interface alsa ffmpeg resample player
  ICONS = play pause next
+else ifeq ($(TARGET),browser)
+ SRCS += stream file browser
+ LIBS += -lssl
 else ifeq ($(TARGET),sampler)
- SRCS += stream time signal file alsa resample sequencer flac sampler midi music
+ SRCS += vector stream time signal file alsa resample sequencer flac sampler midi music
 else ifeq ($(TARGET),music)
  SRCS += file image window font interface alsa resample sequencer sampler midi pdf music
  INSTALL = icons/music.png music.desktop
 else ifeq ($(TARGET),taskbar)
- SRCS += signal stream time file image window font interface launcher taskbar
+ SRCS += vector signal stream time file image window font interface launcher taskbar
  ICONS = button shutdown
  #ICONS = system network utility graphics office
 else ifeq ($(TARGET),editor)
@@ -36,7 +39,7 @@ else ifeq ($(TARGET),editor)
 else ifeq ($(TARGET),symbolic)
  SRCS += symbolic algebra expression
 else ifeq ($(TARGET),flac)
- SRCS += file flac codec disasm
+ SRCS += file vector flac codec disasm
 else ifeq ($(TARGET),bspline)
  SRCS += window bspline file image
 endif

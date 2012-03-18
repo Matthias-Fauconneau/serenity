@@ -1,65 +1,78 @@
 #include "stream.h"
 #include "string.h"
 
-Stream::Stream(array<byte>&& buffer) : buffer(move(buffer)), data(this->buffer.data()), index(0), bigEndian(false) {}
-
 /// Returns true if there is data to read
-Stream::operator bool() const { return index<buffer.size(); }
+DataStream::operator bool() { return available(1); }
 
-template<class T> const T& Stream::peek() const { return *(T*)(data+index); }
-template<class T> array<T> Stream::peek(int size) const { return array<T>((T*)(data+index),size); }
-template<class T> T Stream::read() { assert(index+sizeof(T)<=buffer.size()); T t = *(T*)(data+index); index+=sizeof(T); return t; }
-template<class T> array<T> Stream::read(int size) {
-    assert(index*sizeof(T)<=buffer.size());
-    array<T> t(data+index,size);
-    index+=size*sizeof(T);
-    return copy(t);
+template<class T> const T& DataStream::peek() {
+    assert(available(sizeof(T))>=sizeof(T));
+    return *(T*)(peekData((uint)sizeof(T)).data());
 }
-template<class T> array<T> Stream::readArray() { uint32 size=read(); assert(size<4096); return read<T>(size); }
-template<class T> array<T> Stream::readAll() { uint32 size=(buffer.size()-index)/sizeof(T); return read<T>(size); }
+template<class T> array<T> DataStream::peek(int size) {
+    assert(available(size*sizeof(T))>=size*sizeof(T));
+    return array<T>(peekData((uint)size*sizeof(T)));
+}
+template<class T> T DataStream::read() { T t = peek<T>(); advance(sizeof(T)); return t; }
+template<class T> array<T> DataStream::read(int size) { array<T> t = peek<T>(size); advance(size*sizeof(T)); return t; }
+template<class T> array<T> DataStream::readArray() { uint size=read<uint32>(); return read<T>(size); }
+template<class T> array<T> DataStream::readAll() { uint size=available(-1); assert(!(size%sizeof(T))); return read<T>(size/sizeof(T)); }
 
-Stream::ReadOperator::operator uint32() { return s->bigEndian?swap32(s->read<uint32>()):s->read<uint32>(); }
-Stream::ReadOperator::operator int32() { return operator uint32(); }
-Stream::ReadOperator::operator uint16() { return s->bigEndian?swap16(s->read<uint16>()):s->read<uint16>(); }
-Stream::ReadOperator::operator int16() { return operator uint16(); }
-template<class T> Stream::ReadOperator::operator T() { return s->read<T>(); }
-Stream::ReadOperator Stream::read() { return {this}; }
+DataStream::ReadOperator::operator uint32() { return s->bigEndian?swap32(s->read<uint32>()):s->read<uint32>(); }
+DataStream::ReadOperator::operator int32() { return operator uint32(); }
+DataStream::ReadOperator::operator uint16() { return s->bigEndian?swap16(s->read<uint16>()):s->read<uint16>(); }
+DataStream::ReadOperator::operator int16() { return operator uint16(); }
+template<class T> DataStream::ReadOperator::operator T() { return s->read<T>(); }
+DataStream::ReadOperator DataStream::read() { return {this}; }
 
-Stream& Stream::operator ++(int) { index++; return *this; }
-Stream& Stream::operator +=(int count) { index+=count; return *this; }
+//DataStream& DataStream::operator ++(int) { index++; return *this; }
+//DataStream& DataStream::operator +=(int count) { index+=count; return *this; }
 
-template<class T> bool Stream::matchAny(const array<T>& any) {
-    for(const T& e: any) if(peek<T>() == e) { index+=sizeof(T); return true; } return false;
+template<class T> bool DataStream::matchAny(const array<T>& any) {
+    for(const T& e: any) if(available(sizeof(T))>=sizeof(T) && peek<T>() == e) { advance(sizeof(T)); return true; } return false;
 }
-template<class T> bool Stream::match(const array<T>& key) {
-    if(peek<T>(key.size()) == key) { index+=key.size()*sizeof(T); return true; } else return false;
+template<class T> bool DataStream::match(const array<T>& key) {
+    if(available(key.size()*sizeof(T))>=key.size()*sizeof(T) && peek<T>(key.size()) == key) { advance(key.size()*sizeof(T)); return true; } else return false;
 }
-template<class T> array<T> Stream::until(const T& key) {
-    int start=index;
-    while(index<buffer.size() && peek<T>()!=key) index+=sizeof(T);
-    index+=sizeof(T);
-    return copy(array<T>(data+start,index-start-sizeof(T)));
+template<class T> array<T> DataStream::until(const T& key) {
+    array<T> a;
+    for(;;) { T t = read<T>(); if(t==key) break; else a<<t; }
+    return a;
 }
-template<class T> array<T> Stream::whileAny(const array<T>& any) {
-    int start=index;
-    while(index<buffer.size() && matchAny(any));
-    return copy(array<T>(data+start,index-start));
+template<class T> array<T> DataStream::until(const array<T>& key) {
+    array<T> a;
+    for(;available(key.size())>=key.size() && peek<T>(key.size()) != key;) a << read<T>();
+    advance(key.size()*sizeof(T));
+    return a;
 }
-template<class T> array<T> Stream::untilAny(const array<T>& any) {
-    int start=index;
-    while(index<buffer.size() && !matchAny(any)) index+=sizeof(T);
-    return copy(array<T>(data+start,index-sizeof(T)-start));
+template<class T> void DataStream::whileAny(const array<T>& any) { while(matchAny(any)); }
+template<class T> array<T> DataStream::untilAny(const array<T>& any) {
+    array<T> a;
+    while(!matchAny(any)) a<<read<T>();
+    return a;
 }
 
-template char Stream::read();
-template uint Stream::read();
-template array<char> Stream::read(int);
-template array<char> Stream::readArray();
-template array<char> Stream::readAll();
-template bool Stream::match(const array<char>&);
-template array<char> Stream::until(const char&);
-template array<char> Stream::whileAny(const array<char>&);
-template array<char> Stream::untilAny(const array<char>&);
+template char DataStream::read();
+template uint DataStream::read();
+template array<char> DataStream::read(int);
+template array<char> DataStream::readArray();
+template array<char> DataStream::readAll();
+template bool DataStream::match(const array<char>&);
+template array<char> DataStream::until(const char&);
+template array<char> DataStream::until(const array<char>&);
+template void DataStream::whileAny(const array<char>&);
+template array<char> DataStream::untilAny(const array<char>&);
+template DataStream::ReadOperator::operator char();
+template DataStream::ReadOperator::operator uint8();
 
-template Stream::ReadOperator::operator char();
-template Stream::ReadOperator::operator uint8();
+Buffer::Buffer(array<byte>&& buffer) : buffer(move(buffer)) {}
+uint Buffer::available(uint) { return buffer.size()-index; }
+void Buffer::advance(int count) { index+=count;  assert(index<=buffer.size()); }
+array<byte> Buffer::peekData(uint size) { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); }
+
+void TextStream::skip() { whileAny(" \t\n\r"_); }
+string TextStream::until(const string& key) { return DataStream::until((array<char>&)key); }
+string TextStream::word() {
+    string word;
+    for(;available(1);) { char c=peek<char>(); if(!(c>='a'&&c<='z')) break; word<<c; advance(1); }
+    return word;
+}

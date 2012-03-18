@@ -1,4 +1,5 @@
 debug
+memdbg
 reldbg
 release
 *.creator*

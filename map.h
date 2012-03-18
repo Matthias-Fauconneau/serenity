@@ -14,7 +14,7 @@ template <class K, class V> struct map {
     explicit operator bool() const { return keys.size(); }
     void clear() { keys.clear(); values.clear(); }
 
-    const V& at(const K& key) const { int i = keys.indexOf(key); assert(i>=0,"Invalid key"_,key,keys); return values[i];}
+    const V& at(const K& key) const { int i = indexOf(keys,key); assert(i>=0,"Invalid key"_,key,keys); return values[i];}
     V& at(const K& key) { int i = indexOf(keys, key); assert(i>=0,"Invalid key"_,key,keys); return values[i];}
     template<perfect(V)> Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
     V* find(const K& key) { int i = indexOf(keys, key); return i>=0 ? &values[i] : 0; }

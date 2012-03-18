@@ -58,14 +58,16 @@ string strz(const string& s);
 /// Returns a bounded reference to the null-terminated string pointer
 string strz(const char* s);
 
-/// Returns a copy of the string between the "start"th and "end"th occurence separator \a sep
-/// \note you can use negative \a start, \a end to count from the right
-/// \note this is a shortcut to join(split(str,sep).slice(start,end),sep)
-string section(const string& str, char sep, int start=0, int end=1, bool includeSep=false);
-//string section(string&& s, char sep, int start=0, int end=1, bool includeSep=false);
+/// Returns a copy of the string between the \a{start}th and \a{end}th occurence of \a separator
+/// \note You can use a negative \a start or \a end to count from the right
+/// \note This is a shortcut to join(split(str,sep).slice(start,end),sep)
+string section(const string& str, char separator, int start=0, int end=1, bool includeSeparator=false);
 
-/// Splits \a str wherever \a sep occurs
-array<string> split(const string& str, char sep=' ');
+/// Splits \a str wherever \a separator occurs
+array<string> split(const string& str, char separator=' ');
+
+/// Joins \a list into a single string with each element separated by \a separator
+string join(const array<string>& list, const string& separator);
 
 /// Replaces every occurrence of the string \a before with the string \a after
 string replace(const string& s, const string& before, const string& after);
@@ -111,19 +113,14 @@ template<class A, predicate(!is_convertible(A,string))> string str(const A& a, c
 inline string str(const string& a, const string& b) { return a+" "_+b; }
 
 /// String representation of a cat (force conversion to string)
-template<class A> inline string str(const cat<A>& s) { return s; }
+template<class A> string str(const cat<A>& s) { return s; }
+
+/// String representation of a pointer
+template<class A> string str(A* const& s) { return str(*s); }
 
 /// String representation of an array
-template<class T> string str(const array<T>& a) {
-    string s="["_;
-    for(uint i=0;i<a.size();i++) { s<<str(a[i]); if(i<a.size()-1) s<<", "_; }
-    return s+"]"_;
-}
-template<> inline string str(const array<string>& a) {
-    string s="["_;
-    for(uint i=0;i<a.size();i++) { s<<a[i]; if(i<a.size()-1) s<<", "_; }
-    return s+"]"_;
-}
+template<class T> string str(const array<T>& list) { return str(apply<string>(list,[](const T& t){return str(t);})); }
+template<> inline string str(const array<string>& list) { return "["_+join(list,", "_)+"]"_; }
 
 /// Enhanced debugging using str(...)
 extern "C" ssize_t write(int fd, const void* buf, size_t size);
@@ -132,7 +129,6 @@ inline void write(int fd, const array<char>& s) { write(fd,s.data(),(size_t)s.si
 template<class... Args> void log(const Args&... args) { write(1,str(args...)+"\n"_); }
 template<class A> void log(const cat<A>& a) { write(1,a+"\n"_); }
 template<> inline void log(const string& args) { write(1,args+"\n"_); }
-//inline void log(const char* s) { write(1,strz(s)+"\n"_); }
 /// Display variable name and its value
 #define var(v) ({ auto t=v; debug( log(#v##_, t); )  t; })
 /// Aborts unconditionally and display \a message

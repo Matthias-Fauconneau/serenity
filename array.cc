@@ -133,7 +133,6 @@ generic array replace(array&& a, const T& before, const T& after) {
 // Orderable?
 generic const T& min(const array& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
 generic T& max(array& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
-//generic T sum(const array& a) { T sum=0; for(const T& e: a) sum+=e; return sum; }
 
 #undef generic
 #undef array

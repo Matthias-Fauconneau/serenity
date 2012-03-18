@@ -10,21 +10,25 @@ template<class T> array<byte> raw(const T& t) { return array<byte>((byte*)&t,siz
 /// cast raw memory to a \a T
 template<class T> T raw(const array<byte>& a) { assert(a.size()==sizeof(T)); return *(T*)a.data(); }
 
-/// \a Stream provides a convenient interface for reading binary data or text
+/// \a Stream is an abstract interface used by \a DataStream, TextStream and implemented by Buffer,File,Socket
 struct Stream {
-    array<byte> buffer;
-    const byte* data;
-    uint index;
-    bool bigEndian;
-    Stream(array<byte>&& buffer);
+    /// Returns number of bytes available, reading \a need bytes from underlying device if possible
+    virtual uint available(uint need) = 0;
+    virtual array<byte> peekData(uint size) = 0;
+    virtual void advance(int count) = 0;
+};
+
+/// \a Stream provides a convenient interface for reading binary data
+struct DataStream : virtual Stream {
+    bool bigEndian = false;
 
     /// Returns true if there is data to read
-    explicit operator bool() const;
+    explicit operator bool();
 
     /// Peeks at the next raw \a T element in stream without moving \a pos
-    template<class T> const T& peek() const;
+    template<class T> const T& peek();
     /// Peeks at the next \a size raw \a T elements in stream without moving \a pos
-    template<class T> array<T> peek(int size) const;
+    template<class T> array<T> peek(int size);
 
     /// Reads one raw \a T element from stream
     template<class T> T read();
@@ -36,7 +40,7 @@ struct Stream {
     template<class T> array<T> readAll();
 
     struct ReadOperator {
-        Stream * s;
+        DataStream * s;
         /// Reads an int32 and if necessary, swaps from stream to host byte order
         operator int32();
         operator uint32();
@@ -49,11 +53,6 @@ struct Stream {
     /// Returns an operator to deduce the type to read from the destination (return type overload)
     ReadOperator read();
 
-    /// Skips a byte from the stream
-    Stream& operator ++(int);
-    /// Skips \a count byte from the stream
-    Stream& operator +=(int count);
-
     /// If stream match any of \a key, advances \a pos
     template<class T> bool matchAny(const array<T>& any);
     /// If stream match \a key, advances \a pos by \a key size
@@ -63,11 +62,39 @@ struct Stream {
     /// \returns no match count
     template<class T> array<T> until(const T& key);
 
+    /// advances \a pos until stream match \a key
+    /// \returns no match count
+    template<class T> array<T> until(const array<T>& key);
+
     /// advances \a pos while stream match any of \a key
-    /// \returns reference to matched data
-    template<class T> array<T> whileAny(const array<T>& any);
+    template<class T> void whileAny(const array<T>& any);
 
     /// advances \a pos until stream match any of \a key
     /// \returns no match count
     template<class T> array<T> untilAny(const array<T>& any);
+};
+
+/// Buffer is an in-memory \a Stream
+struct Buffer : virtual Stream {
+    array<byte> buffer;
+    uint index=0;
+    Buffer(){}
+    Buffer(array<byte>&& buffer);
+    uint available(uint) override;
+    array<byte> peekData(uint size) override;
+    void advance(int count) override;
+};
+
+/// \a TextStream is a \a DataStream with convenience methods for text
+//TODO: regexp
+struct TextStream : DataStream {
+    /// Skips whitespaces
+    void skip();
+    string readAll() { return DataStream::readAll<char>(); }
+    string until(const string& key);
+    string word();
+};
+
+struct TextBuffer : TextStream, Buffer {
+    TextBuffer(array<byte>&& buffer):Buffer(move(buffer)){}
 };

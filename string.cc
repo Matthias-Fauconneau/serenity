@@ -70,28 +70,30 @@ void section_(const string& s, char sep, int& start, int& end, bool includeSep) 
     }
     start=b; end=e;
 }
-string section(const string& s, char sep, int start, int end, bool includeSep) {
-    section_(s,sep,start,end,includeSep);
+string section(const string& s, char separator, int start, int end, bool includeSeparator) {
+    section_(s,separator,start,end,includeSeparator);
     return copy(string(s.data()+start,end-start));
 }
-/*string section(string&& s, char sep, int start, int end, bool includeSep) {
-    section_(s,sep,start,end,includeSep);
-    return slice(move(s),start,end-start);
-}*/
 
 array<string> split(const string& str, char sep) {
-    array<string> r;
+    array<string> list;
     uint b=0,e=0;
     for(;;) {
         while(b<str.size() && str[b]==sep) b++;
         e=b;
         while(e<str.size() && str[e]!=sep) e++;
         if(b==str.size()) break;
-        r << slice(str,b,e-b);
+        list << slice(str,b,e-b);
         if(e==str.size()) break;
         b=e+1;
     }
-    return r;
+    return list;
+}
+
+string join(const array<string>& list, const string& separator) {
+    string str;
+    for(uint i=0;i<list.size();i++) { str<<list[i]; if(i<list.size()-1) str<<separator; }
+    return str;
 }
 
 string replace(const string& s, const string& before, const string& after) {
@@ -110,7 +112,7 @@ string itoa(int64 number, int base, int pad) {
     char buf[64]; int i=64;
     uint64 n=abs(number);
     do {
-        buf[--i] = "0123456789ABCDEF"[n%base];
+        buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
     while(64-i<pad) buf[--i] = '0';
@@ -132,7 +134,7 @@ long toInteger(const string& number, int base) {
     uint i=0; if(number[i] == '-' ) i++, sign=-1; else if(number[i] == '+') i++;
     long value=0;
     for(;i<number.size();i++) {
-        int n = indexOf(string("0123456789ABCDEF",base), number[i]);
+        int n = indexOf(string("0123456789abcdef",base), number[i]);
         assert(n>=0,"Invalid integer",number);
         value *= base;
         value += n;
