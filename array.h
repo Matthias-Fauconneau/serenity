@@ -89,10 +89,10 @@ template<class T> struct array {
     void insertAt(int index, T&& v);
 
     /// Iterators
-    const T* begin() const { return data(); }
-    const T* end() const { return data()+size(); }
-    T* begin() { return (T*)data(); }
-    T* end() { return (T*)data()+size(); }
+    const T* begin() const;
+    const T* end() const;
+    T* begin();
+    T* end();
 }__attribute((packed));
 
 /// Reinterpret cast \a array to array<T>
@@ -139,7 +139,6 @@ generic array replace(array&& a, const T& before, const T& after);
 // Orderable?
 generic const T& min(const array& a);
 generic T& max(array& a);
-generic T sum(const array& a);
 
 #undef generic
 #undef array

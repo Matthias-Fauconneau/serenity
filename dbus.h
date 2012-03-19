@@ -12,7 +12,7 @@
 /// Align array size appending default elements
 void align(array<byte>& a, int width) { int s=a.size(), n=align(width, s); if(n>s) grow(a, n); }
 /// Align the stream position to the next \a width
-void align(Stream& s, int width) { s.index=align(width, s.index); }
+void align(Buffer& s, int width) { s.index=align(width, s.index); }
 
 /// D-Bus
 
@@ -71,18 +71,18 @@ template<class... Args> void write(array<byte>& s, signature<Args...>) {
 template<> void write(array<byte>& s, signature<>) { s << 0 << 0; }
 
 // D-Bus argument parsers
-template<class T> void read(Stream& s, variant<T>& output) {
-    uint8 size = s.read(); s += size+1; //TODO: type checking
+template<class T> void read(DataBuffer& s, variant<T>& output) {
+    uint8 size = s.read(); s.advance(size+1); //TODO: type checking
     read(s,(T&)output);
 }
-template<class T> void read(Stream& s, array<T>& output) {
+template<class T> void read(DataBuffer& s, array<T>& output) {
     align(s, 4); uint length = s.read();
     for(uint start=s.index;s.index<start+length;) { T e; read(s,e); output << move(e); }
 }
-void read(Stream& s, string& output) { align(s, 4); output = copy(s.readArray<byte>()); s++;/*0*/ }
-void read(Stream&) {}
-void read(Stream& s, DBusIcon& output) { align(s, 8); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray<byte>()); }
-template<class Arg, class... Args> void read(Stream& s, Arg& arg, Args&... args) { read(s,arg); read(s, args i(...)); }
+void read(DataBuffer& s, string& output) { align(s, 4); output = copy(s.readArray<byte>()); s.advance(1);/*0*/ }
+void read(DataBuffer&) {}
+void read(DataBuffer& s, DBusIcon& output) { align(s, 8); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray<byte>()); }
+template<class Arg, class... Args> void read(DataBuffer& s, Arg& arg, Args&... args) { read(s,arg); read(s, args i(...)); }
 
 struct DBus : Poll {
     int fd = 0; // Session bus socket
@@ -101,19 +101,19 @@ struct DBus : Poll {
             if(header.message == MethodCall) assert(header.flag==0);
             uint32 replySerial=0;
             string name;
-            Stream s( ::read(fd, align(4,header.fieldsSize)+header.length) );
+            DataBuffer s( ::read(fd, align(8,header.fieldsSize)+header.length) );
             for(;s.index<header.fieldsSize;){
-                byte field = s.read();
-                uint8 size = s.read(); s+=size+1;
-                if(field==Destination||field==Path||field==Interface||field==Member||field==Sender||field==ErrorName) {
+                ubyte field = s.read();
+                uint8 size = s.read(); s.advance(size+1);
+                if(field==Path||field==Interface||field==Member||field==ErrorName||field==Destination||field==Sender) {
                     string value; ::read(s, value);
                     if(field==Member) name=move(value);
                     else if(field==ErrorName) log(value);
                 } else if(field==ReplySerial) {
                     replySerial=s.read();
                 } else if(field==Signature) {
-                    uint8 size = s.read(); s+=size;
-                } else error("Unknown field"_,field);
+                    uint8 size = s.read(); s.advance(size);
+                } else warn("Unknown field"_,field);
                 align(s, 8);
             }
             if(header.length) {
@@ -214,34 +214,28 @@ struct DBus : Poll {
     /// Get a handle to a D-Bus object
     Object operator ()(const string& object) { return Object(this,section(object,'/'),"/"_+section(object,'/',-2,-1)); }
 
-    /// MethodCall method delegate and return empty reply
+    /// call method delegate and return empty reply
     void methodWrapper(uint32 serial, string name, array<byte>) {
         delegates.at(name)();
         write(MethodReturn,serial,""_,""_,""_,""_);
     }
-    /*/// MethodCall method delegate and return reply
-    template<class R> void methodWrapper(uint32 serial, string name, array<byte> data) {
-        Stream in(move(data));
-        R r = (*(delegate<R>*)&delegates.at(name))();
-        write(MethodReturn,serial,""_,""_,""_,""_,r);
-    }*/
     /// Unpack one argument, call method delegate and return empty reply
     template<class A> void methodWrapper(uint32 serial, string name, array<byte> data) {
-        Stream in(move(data));
+        DataBuffer in(move(data));
         A a; ::read(in,a);
         (*(delegate<void,A>*)&delegates.at(name))(move(a));
         write(MethodReturn,serial,""_,""_,""_,""_);
     }
     /// Unpack one argument and call method delegate and return reply
     template<class R, class A> void methodWrapper(uint32 serial, string name, array<byte> data) {
-        Stream in(move(data));
+        DataBuffer in(move(data));
         A a; ::read(in,a);
         R r = (*(delegate<R,A>*)&delegates.at(name))(move(a));
         write(MethodReturn,serial,""_,""_,""_,""_,r);
     }
     /// Unpack two arguments and call the method delegate and return reply
     template<class R, class A, class B> void methodWrapper(uint32 serial, string name, array<byte> data) {
-        Stream in(move(data));
+        DataBuffer in(move(data));
         A a; B b; ::read(in,a,b);
         R r = (*(delegate<R,A,B>*)&delegates.at(name))(move(a),move(b));
         write(MethodReturn,serial,""_,""_,""_,""_,r);
@@ -257,18 +251,27 @@ struct DBus : Poll {
         delegates.insert(copy(name), delegate<void>(object, (void (C::*)())method));
     }
 
-    /// Unpack arguments and call the delegate
-    template<class... Args> void signalMethodCall(string name, Stream& in, Args... args) {
-        assert(!in);
-        (*(delegate<void,Args...>*)&delegates.at(name))(move(args) i(...));
+    /// call signal delegate
+    void signalWrapper(string name, array<byte>) {
+        delegates.at(name)();
     }
-    template<class U, class... Unpack, class... Args> void signalMethodCall(string name, Stream& in, Args... args) {
-        U u; ::read(in,u);
-        signalMethodCall<Unpack...>(move(name), in, move(u), args i(...));
+    /// Unpack one argument and call signal delegate
+    template<class A> void signalWrapper(string name, array<byte> data) {
+        DataBuffer in(move(data));
+        A a; ::read(in,a);
+        (*(delegate<void,A>*)&delegates.at(name))(move(a));
     }
-    template<class... Unpack> void signalWrapper(string name, array<byte> data) {
-        Stream in(move(data));
-        signalMethodCall<Unpack...>(move(name), in);
+    /// Unpack two arguments and call signal delegate
+    template<class A, class B> void signalWrapper(string name, array<byte> data) {
+        DataBuffer in(move(data));
+        A a; B b; ::read(in,a,b);
+        (*(delegate<void,A,B>*)&delegates.at(name))(move(a),move(b));
+    }
+    /// Unpack three arguments and call signal delegate
+    template<class A, class B, class C> void signalWrapper(string name, array<byte> data) {
+        DataBuffer in(move(data));
+        A a; B b; C c; ::read(in,a,b,c);
+        (*(delegate<void,A,B,C>*)&delegates.at(name))(move(a),move(b),move(c));
     }
 
     /// Generates an IPC wrapper for \a signal and connect it to \a name

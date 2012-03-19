@@ -39,7 +39,7 @@ void AudioFile::close() { if(file) avformat_close_input(&file); resampler.~Resam
 int AudioFile::position() { return audioPTS/1000; }
 int AudioFile::duration() { return file->duration/1000/1000; }
 void AudioFile::seek( int time ) {
-    if(file && av_seek_frame(file,-1,time*1000*1000,0) < 0) { log("Seek Error"_); }
+    if(file && av_seek_frame(file,-1,time*1000*1000,0) < 0) { warn("Seek Error"_); }
     //avformat_seek_file(file,0,0,time*file->file_size/duration(),file->file_size,AVSEEK_FLAG_BYTE);
 }
 void AudioFile::read(int16* output, int outputSize) {
@@ -63,7 +63,7 @@ void AudioFile::read(int16* output, int outputSize) {
                 AVFrame frame; avcodec_get_frame_defaults(&frame); int gotFrame=0;
                 int used = avcodec_decode_audio4(audio, &frame, &gotFrame, &packet);
                 //av_free_packet(&packet);
-                if(used < 0 || !gotFrame) continue; //{ log("AudioFile: decoder error"_,used,gotFrame); goto EndOfFile; }
+                if(used < 0 || !gotFrame) continue;
                 inputSize = frame.nb_samples;
                 if(audio->sample_fmt == AV_SAMPLE_FMT_FLT) {
                     input = (float*)frame.data[0];

@@ -75,7 +75,6 @@ void Window::event(const XEvent& e) {
     if(e.type==MotionNotify) {
         needRender |= widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, e.xmotion.state&Button1Mask ? LeftButton : None);
     } else if(e.type==ButtonPress) {
-        //XSetInputFocus(x, id, RevertToNone, CurrentTime);
         needRender |= widget.mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
     } else if(e.type==KeyPress) {
         auto key = XKeycodeToKeysym(x,e.xkey.keycode,0);
@@ -199,7 +198,7 @@ void Window::setOverrideRedirect(bool override_redirect) {
 
 void Window::setFocus(Widget* focus) {
     this->focus=focus;
-    XSetInputFocus(x, id, RevertToNone, CurrentTime);
+    XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
     XFlush(x);
 }
 

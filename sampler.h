@@ -1,6 +1,7 @@
 #pragma once
 #include "signal.h"
 #include "string.h"
+#include "file.h"
 #include "resample.h"
 #include "flac.h"
 
@@ -14,7 +15,7 @@ template<class T, int N> struct static_array : array<T> {
 };
 
 struct Sample {
-    const byte* data=0; int size=0; //Sample Definition
+    Map data; //Sample Definition
     int16 trigger=0; int16 lovel=0; int16 hivel=127; int16 lokey=0; int16 hikey=127; //Input Controls
     int16 pitch_keycenter=60; int32 release=48000; int16 amp_veltrack=100; int16 rt_decay=0; float volume=1; //Performance Parameters
 };

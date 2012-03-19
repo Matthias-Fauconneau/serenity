@@ -129,6 +129,8 @@ inline void write(int fd, const array<char>& s) { write(fd,s.data(),(size_t)s.si
 template<class... Args> void log(const Args&... args) { write(1,str(args...)+"\n"_); }
 template<class A> void log(const cat<A>& a) { write(1,a+"\n"_); }
 template<> inline void log(const string& args) { write(1,args+"\n"_); }
+#define warn log
+
 /// Display variable name and its value
 #define var(v) ({ auto t=v; debug( log(#v##_, t); )  t; })
 /// Aborts unconditionally and display \a message

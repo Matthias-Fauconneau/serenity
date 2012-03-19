@@ -2,6 +2,8 @@
 #include "window.h"
 #include "interface.h"
 
+extern const string iconPaths[4];
+
 struct Search : TextInput {
     string browser;
     signal<> triggered;

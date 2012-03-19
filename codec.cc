@@ -11,10 +11,10 @@ struct : Application {
         setPriority(-20);
         for(auto& path: args) {
             string base = section(path,'.',0,-2);
-            FLAC flac = mapFile(base+".flac"_); mlock(flac.data,flac.size());
+            FLAC flac = readFile(base+".flac"_);
 #define VERIFY 0
 #if VERIFY
-            string raw = slice(mapFile(section(base,'/',0,-3)+"/wav/"_+section(base,'/',-2,-1)+".wav"_),44);
+            string raw = slice(readFile(section(base,'/',0,-3)+"/wav/"_+section(base,'/',-2,-1)+".wav"_),44);
             mlock(raw.data(),raw.size());
             byte* out = raw.data()-1;
 #endif

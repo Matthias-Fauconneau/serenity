@@ -21,7 +21,7 @@ SRCS = core array string process
  SRCS += vector signal stream file image window font interface alsa ffmpeg resample player
  ICONS = play pause next
 else ifeq ($(TARGET),browser)
- SRCS += stream file browser
+ SRCS += stream file http xml browser
  LIBS += -lssl
 else ifeq ($(TARGET),sampler)
  SRCS += vector stream time signal file alsa resample sequencer flac sampler midi music

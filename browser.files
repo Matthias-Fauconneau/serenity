@@ -10,5 +10,8 @@ file.h
 file.cc
 stream.h
 stream.cc
-browser.cc
 xml.h
+xml.cc
+http.h
+http.cc
+browser.cc

@@ -130,7 +130,7 @@ static map<string,Variant> toDict(const array<const char*>& xref, Variant&& obje
 //#define toDict(object) ({ object.dict ? : parse(xref[object.number]).dict })
 
 void PDF::open(const string& path) {
-    string pdf = mapFile(path);
+    string pdf = readFile(path);
     array<const char*> xref; map<string,Variant> catalog;
     {
         const char* s=pdf.data+pdf.size-sizeof("\r\n%%EOF");

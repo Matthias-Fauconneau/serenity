@@ -9,6 +9,10 @@ template <class K, class V> struct map {
     array<K> keys;
     array<V> values;
 
+    map()=default;
+    map(map&&)=default;
+    map& operator =(map&&)=default;
+
     int size() const { return keys.size(); }
     bool contains(const K& key) const { return ::contains(keys, key); }
     explicit operator bool() const { return keys.size(); }
@@ -44,6 +48,8 @@ template <class K, class V> struct map {
     iterator begin() { return iterator((K*)keys.begin(),(V*)values.begin()); }
     iterator end() { return iterator((K*)&keys.end(),(V*)&values.end()); }
 };
+
+template<class K, class V> map<K,V> copy(const map<K,V>& o) { map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t; }
 
 template<class K, class V> string str(const map<K,V>& m) {
     string s="{"_;

@@ -10,7 +10,7 @@ int getUnixTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); retu
 Date currentDate() { tm t; time_t ts=getUnixTime(); localtime_r(&ts,&t); return { t.tm_sec, t.tm_min, t.tm_hour, t.tm_mday, t.tm_mon, 1900+t.tm_year, (t.tm_wday+6)%7/*0=Monday*/ }; }
 
 string date(string&& format) {
-    Stream s(move(format));
+    TextBuffer s(move(format));
     Date date = currentDate();
     string r;
     static const string days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};

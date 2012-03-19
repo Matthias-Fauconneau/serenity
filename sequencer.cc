@@ -22,7 +22,7 @@ Sequencer::Sequencer() {
     snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0);
     snd_seq_set_client_name(seq,"Piano");
     snd_seq_create_simple_port(seq,"Input",SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,SND_SEQ_PORT_TYPE_APPLICATION);
-    if(snd_seq_connect_from(seq,0,20,0)) log("MIDI controller not connected"_);
+    if(snd_seq_connect_from(seq,0,20,0)) warn("MIDI controller not connected"_);
     pollfd p; snd_seq_poll_descriptors(seq,&p,1,POLLIN); registerPoll(p);
 }
 

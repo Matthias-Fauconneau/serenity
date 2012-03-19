@@ -5,7 +5,7 @@
 template class array<Track>;
 
 void MidiFile::open(const string& path) { /// parse MIDI header
-    Stream s( mapFile(path) );
+    Stream s( readFile(path) );
     s+=10;
     uint16 nofChunks = s.read();
     midiClock = 48*60000/120/(uint16)s.read(); //48Khz clock

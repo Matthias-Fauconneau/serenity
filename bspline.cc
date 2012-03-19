@@ -40,7 +40,7 @@ struct BSplineDemo : Application, Widget {
     void start(array<string>&& args) override {
         assert(args,"Usage: bspline image.png"_);
         window.rename(args[0]);
-        image = Image(mapFile(args[0]));
+        image = Image(readFile(args[0]));
         int w=image.width, h=image.height;
         float4 buffer[w*h]; // use full precision buffer between filtering pass
         prefilter(image.data,buffer,w,h); //filter X and upsample to float

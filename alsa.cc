@@ -37,7 +37,7 @@ void AudioOutput::event(pollfd p) {
     unsigned short revents;
     snd_pcm_poll_descriptors_revents(pcm, &p, 1, &revents);
     if(!(revents & POLLOUT)) return;
-    if( snd_pcm_state(pcm) == SND_PCM_STATE_XRUN ) { log("xrun"_); snd_pcm_prepare(pcm); }
+    if( snd_pcm_state(pcm) == SND_PCM_STATE_XRUN ) { warn("xrun"_); snd_pcm_prepare(pcm); }
     snd_pcm_uframes_t frames = (snd_pcm_uframes_t)snd_pcm_avail_update(pcm); //snd_pcm_avail(pcm);
     assert(frames >= period);
     const snd_pcm_channel_area_t* areas; snd_pcm_uframes_t offset;

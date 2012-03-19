@@ -15,7 +15,7 @@ void Sampler::open(const string& path) {
     // parse sfz and mmap samples
     Sample group;
     int start=getRealTime();
-    Stream s(mapFile(path));
+    Stream s(readFile(path));
     auto folder = section(path,'/',0,-2,true);
     Sample* sample=0;
     for(;;) {
@@ -33,8 +33,7 @@ void Sampler::open(const string& path) {
             if(key=="sample"_) {
                 if(getRealTime()-start > 1000) { start=getRealTime(); log("Loading..."_,samples.size()); }
                 string path = folder+replace(value,"\\"_,"/"_);
-                auto file = mapFile(path);
-                sample->data = file.data(); sample->size=file.size();
+                sample->map = mapFile(path);
                 madvise((void*)sample->data, file.size(), MADV_SEQUENTIAL);
                 mlock((void*)sample->data, min(file.size(),1024*1024u));
             }
@@ -66,13 +65,13 @@ void Sampler::event(int key, int velocity) {
             release=note.time-note.remaining; velocity = note.velocity; //schedule release sample
             note.remaining = min(note.remaining,note.release); //schedule active sample fade out
         }
-        if(!release) { log("double release"_); return; }
+        if(!release) { warn("double release"_); return; }
     }
     for(const Sample& s : samples) {
         if(!!release == s.trigger && key >= s.lokey && key <= s.hikey && velocity >= s.lovel && velocity <= s.hivel) {
             active << Note();
             Note& note = active.last();
-            note.open(array<byte>(s.data,s.size));
+            note.open(array<byte>(s.map.data,s.map.size));
             note.remaining=note.time;
             note.release=max(240000,s.release);
             note.key=key;
@@ -134,7 +133,7 @@ void Sampler::read(int16 *output, uint period) {
     }
     if(anyActive) {
         float* in = layers[1].buffer;
-        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>9; if(o<=-32768 || o>=32768) log("clip"); output[i] = clip(-32767,o,32767);}
+        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>9; if(o<=-32768 || o>=32768) warn("clip"); output[i] = clip(-32767,o,32767);}
     } else clear(output,period*2); //no active note -> play silence (TODO: pause alsa)
     if(record) write(record,output,period*2*sizeof(int16));
     time+=period;

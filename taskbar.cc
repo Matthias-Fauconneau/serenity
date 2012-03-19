@@ -11,7 +11,10 @@ struct StatusNotifierItem : TriggerButton {
     DBus::Object item;
     StatusNotifierItem(DBus::Object&& item, Image&& icon) : TriggerButton(move(icon)), item(move(item)) {}
     bool mouseEvent(int2 position, Event event, Button button) override {
-        if(TriggerButton::mouseEvent(position,event,button)) { item.noreply("org.kde.StatusNotifierItem.Activate"_,0,0); return true; }
+        if(TriggerButton::mouseEvent(position,event,button)) {
+            item.noreply("org.kde.StatusNotifierItem.Activate"_,0,0);
+            return true;
+        }
         return false;
     }
 };
@@ -55,7 +58,6 @@ struct Month : Grid<Text> {
         for(int i=0;i<first;i++) append(Text(dec(nofDays[(date.month+11)%12]-first+i+1,2),16,128)); //previous month
         for(int i=0;i<nofDays[date.month];i++) append(dec(i+1,2)); //current month
         for(int i=1;count()<7*6;i++) append(Text(dec(i,2),16,128)); //next month
-        //string str; for(int y=0,i=0;y<6;y++) { for(int x=0;x<7;x++,i++) str<<array::at(i).text<<' '; str<<'\n'; } log(str);
     }
 };
 
@@ -81,6 +83,7 @@ ICON(button);
 struct TaskBar : Poll {
     Display* x;
     DBus dbus;
+    bool ownWM=false; //when no WM is detected, basic window management will be provided
     signal<int> tasksChanged;
 
       TriggerButton start;
@@ -115,20 +118,32 @@ struct TaskBar : Poll {
 
     void registerStatusNotifierItem(string service) {
         for(const auto& s: status) if(s.item.target == service) return;
+
+        DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
+        DBus("org.freedesktop.DBus.AddMatch"_,string("member='NameOwnerChanged',arg0='"_+service+"'"_));
+
         DBus::Object item(&dbus,move(service),"/StatusNotifierItem"_);
         Image icon;
-        string path = "/usr/share/icons/oxygen/16x16/apps/"_+item.get<string>("IconName"_)+".png"_;
-        if(exists(path)) icon=Image(mapFile(path));
-        else {
-            DBusIcon dbusIcon = move(item.get< array<DBusIcon> >("IconPixmap"_).first());
-            icon=swap(Image(cast<byte4>(move(dbusIcon.data)),dbusIcon.width,dbusIcon.height));
+        string name = item.get<string>("IconName"_);
+        for(const string& folder: iconPaths) {
+            string path = replace(folder,"$size"_,"16x16"_)+name+".png"_;
+            if(exists(path)) { icon=resize(Image(readFile(path)), 16,16); break; }
         }
-        status << StatusNotifierItem(move(item), resize(icon, 16,16));
+        if(!icon) {
+            auto icons = item.get< array<DBusIcon> >("IconPixmap"_);
+            assert(icons,name,"not found");
+            DBusIcon dbusIcon = move(icons.first());
+            icon=swap(resize(Image(cast<byte4>(move(dbusIcon.data)),dbusIcon.width,dbusIcon.height),16,16));
+        }
+        status << StatusNotifierItem(move(item), move(icon));
         panel.update(); window.render();
     }
     variant<int> Get(string interface, string property) {
         if(interface=="org.kde.StatusNotifierWatcher"_ && property=="ProtocolVersion"_) return 1;
         else error(interface, property);
+    }
+    void removeStatusNotifierItem(string name, string, string) {
+        for(uint i=0;i<status.array<StatusNotifierItem>::size();i++) if(status[i].item.target == name) status.removeAt(i);
     }
 
     static int xErrorHandler(Display* x, XErrorEvent* error) {
@@ -141,13 +156,20 @@ struct TaskBar : Poll {
         XSetWindowAttributes attributes; attributes.cursor=XCreateFontCursor(x,68);
         XChangeWindowAttributes(x,DefaultRootWindow(x),CWCursor,&attributes);
         registerPoll({XConnectionNumber(x), POLLIN});
-        for(auto id: Window::getProperty<XID>(DefaultRootWindow(x),"_NET_CLIENT_LIST")) {
+        array<XID> list = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_CLIENT_LIST");
+        if(!list && !Window::getProperty<XID>(DefaultRootWindow(x),"_NET_SUPPORTING_WM_CHECK")) {
+            XID root,parent; XID* children; uint count=0; XQueryTree(x,DefaultRootWindow(x),&root,&parent,&children,&count);
+            list = array<XID>(children,count);
+            ownWM = true;
+        }
+        for(XID id: list) {
             addTask(id);
             XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
         }
 
         dbus.bind("Get"_,this,&TaskBar::Get);
         dbus.bind("RegisterStatusNotifierItem"_,this,&TaskBar::registerStatusNotifierItem);
+        dbus.connect("NameOwnerChanged"_,this,&TaskBar::removeStatusNotifierItem);
         DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
         array<string> names = DBus("org.freedesktop.DBus.ListNames"_);
         for(string& name: names) if(startsWith(name,"org.kde.StatusNotifierItem"_)) registerStatusNotifierItem(move(name));
@@ -168,16 +190,21 @@ struct TaskBar : Poll {
         XFlush(x);
     }
     void raise(int) {
-        XSetInputFocus(x, tasks.active().id, RevertToNone, CurrentTime);
-        XEvent xev; clear(xev);
-        xev.type = ClientMessage;
-        xev.xclient.window = tasks.active().id;
-        xev.xclient.message_type = Atom(_NET_ACTIVE_WINDOW);
-        xev.xclient.format = 32;
-        xev.xclient.data.l[0] = 2;
-        xev.xclient.data.l[1] = 0;
-        xev.xclient.data.l[2] = 0;
-        XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
+        if(ownWM)  {
+            XMapWindow(x, tasks.active().id);
+            XRaiseWindow(x, tasks.active().id);
+        } else {
+            XSetInputFocus(x, tasks.active().id, RevertToPointerRoot, CurrentTime);
+            XEvent xev; clear(xev);
+            xev.type = ClientMessage;
+            xev.xclient.window = tasks.active().id;
+            xev.xclient.message_type = Atom(_NET_ACTIVE_WINDOW);
+            xev.xclient.format = 32;
+            xev.xclient.data.l[0] = 2;
+            xev.xclient.data.l[1] = 0;
+            xev.xclient.data.l[2] = 0;
+            XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
+        }
         XFlush(x);
     }
     void event(pollfd) override {

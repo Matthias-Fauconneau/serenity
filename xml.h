@@ -1,68 +1,51 @@
 #pragma once
+#include "string.h"
+#include "map.h"
 #include "stream.h"
-#include "array.cc"
-//TODO: xml.cc
+
+/// unique pointer to a pool-allocated value with move semantics (useful for recursive types)
+template<class T> struct pointer {
+    no_copy(pointer)
+    static const int poolSize=1<<8;
+    static T pool[poolSize];
+    static int count;
+    explicit pointer(T&& value):value(new (pool+count++) T(move(value))){assert(count<poolSize);}
+    pointer(pointer&& o) : value(o.value) { o.value=0; }
+    pointer& operator=(pointer&& o) { this->~pointer(); value=o.value; o.value=0; return *this; }
+    ~pointer() { if(value) { value->~T(); value=0; } }
+    T* value=0;
+    const T& operator *() const { return *value; }
+    T& operator *() { return *value; }
+    const T* operator ->() const { return value; }
+    T* operator ->() { return value; }
+    explicit operator bool() const { return value; }
+    bool operator !() const { return !value; }
+    operator const T*() const { return value; }
+    operator T*() { return value; }
+};
+template <class T> T pointer<T>::pool[pointer<T>::poolSize];
+template <class T> int pointer<T>::count=0;
+template<class T> pointer<T> copy(const pointer<T>& p) { assert(p.value); return pointer<T>(copy(*p.value)); }
 
 /// XML element
 struct Element {
-    string name,content,declaration;
+    string name,content;
     map< string, string > attributes;
-    array<Element*> children;
+    array< pointer<Element> > children;
     Element(){}
-    Element(array<byte>&& document) {
-        TextBuffer s(move(document));
-        if(s.match("<?xml "_)) s.until("?>"_); s.skip(); //XML declaration
-        if(!s.match("<"_)) error(s.until("\n"_));
-        parseContent(s);
-    }
-    ~Element(){ for(auto& e: children) delete e; }
-    void parseContent(TextBuffer& s) {
-        name=s.word(); s.skip();
-        while(!s.match(">"_)) {
-            if(s.match("/>"_)) { s.skip(); return; }
-            string key=s.until("="_);
-            if(!s.match("\""_)) error(s.until("\n"_));
-            string value=s.until("\""_); //FIXME: escape
-            attributes[move(key)]=move(value);
-            s.skip();
-        }
-        s.skip();
-        while(!s.match("</"_)) {
-            if(s.match("<"_)) { children<<new Element(); children.last()->parseContent(s); }
-            else { s.skip(); error(s.until("\n"_)); }
-        }
-        if(!s.match(name)) error(s.until("\n"_),name);
-        if(!s.match(">"_)) error(s.until("\n"_));
-        s.skip();
-    }
-    string operator[](string&& attribute) const { return copy(attributes.at(move(attribute))); }
-    const Element& operator[]( int i ) const { return *children[i]; }
-    array<const Element*> operator()(const string& path) const {
-        if(!path) return array<const Element*>{this};
-        //if(s.match("//")) return fold( collect, ( ref XML[] match, XML n ){ match ~= n.XPath( peekAll ); } );
-        if(startsWith(path,"/"_)) { array<const Element*> match; for(const Element* e: children) match << (*e)(slice(path,1)); return match; }
-        else {
-            TextBuffer s(copy(path));
-            do {
-               string name = s.word();
-               if(name == this->name) return operator()(s.readAll());
-            } while(s.match("|"_));
-            return array<const Element*>{};
-        }
-    }
-    string str(const string& prefix=""_) const {
-        string r;
-        if(content) r << content; //content element
-        else {
-            r << prefix+"<"_+name;
-            for(const_pair<string,string> attr: attributes) r << " "_+attr.key+"=\""_+attr.value+"\""_;
-            if(children) {
-                r << ">\n"_;
-                for(const Element* e: children) r << e->str(prefix+" "_);
-                r << prefix+"</"_+name+">\n"_;
-            } else r << "/>\n"_;
-        }
-        return r;
-    }
+    Element(Element&&)=default;
+    Element(TextBuffer& s);
+    /// Returns value for \a attribute
+    string operator[](const string& attribute) const;
+    /// Collects elements with matching \a path
+    array<Element> operator()(const string& path) const;
+    /// Collects elements with matching \a path
+    array<Element> xpath(const string& path) const;
+    /// Returns element as parseable string
+    string str(const string& prefix=""_) const;
 };
-template<> string str(const Element& e) { return e.str(); }
+template<> Element copy(const Element& e);
+template<> string str(const Element& e);
+
+/// Parse an XML document as a tree of \a Element
+Element parseXML(array<byte>&& document);

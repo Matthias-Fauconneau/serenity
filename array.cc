@@ -87,6 +87,11 @@ generic void array<T>::insertAt(int index, T&& v) {
     new (&at(index)) T(move(v));
 }
 
+generic const T* array<T>::begin() const { return data(); }
+generic const T* array<T>::end() const { return data()+size(); }
+generic T* array<T>::begin() { return (T*)data(); }
+generic T* array<T>::end() { return (T*)data()+size(); }
+
 #define array array<T>
 
 generic array slice(array&& a, uint pos, uint size) {

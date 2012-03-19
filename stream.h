@@ -19,7 +19,7 @@ struct Stream {
 };
 
 /// \a Stream provides a convenient interface for reading binary data
-struct DataStream : virtual Stream {
+struct DataStream : virtual protected Stream {
     bool bigEndian = false;
 
     /// Returns true if there is data to read
@@ -93,6 +93,10 @@ struct TextStream : DataStream {
     string readAll() { return DataStream::readAll<char>(); }
     string until(const string& key);
     string word();
+};
+
+struct DataBuffer : DataStream, Buffer {
+    DataBuffer(array<byte>&& buffer):Buffer(move(buffer)){}
 };
 
 struct TextBuffer : TextStream, Buffer {

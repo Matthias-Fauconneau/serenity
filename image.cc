@@ -34,7 +34,7 @@ template<template <typename> class T, int N> void filter(byte4* dst, const byte*
 }
 
 Image::Image(array<byte>&& file) {
-    Stream s(move(file)); s.bigEndian=true;
+    DataBuffer s(move(file)); s.bigEndian=true;
     if(!s.match("\x89PNG\r\n\x1A\n"_)) error("Unknown image format"_);
     z_stream z; clear(z); inflateInit(&z);
     array<byte> idat(s.buffer.size()*16); //FIXME
@@ -55,8 +55,8 @@ Image::Image(array<byte>&& file) {
             auto buffer = s.read<byte>(size);
             z.next_in = (Bytef*)buffer.data();
             inflate(&z, Z_NO_FLUSH);
-        } else s += (int)size;
-        s+=4; //CRC
+        } else s.advance(size);
+        s.advance(4); //CRC
     }
     inflate(&z, Z_FINISH);
     inflateEnd(&z);

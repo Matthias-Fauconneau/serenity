@@ -9,6 +9,13 @@
 #include "array.cc"
 template class array<Command>;
 
+const string iconPaths[4] = {
+    "/usr/share/pixmaps/"_,
+    "/usr/share/icons/oxygen/$size/apps/"_,
+    "/usr/share/icons/hicolor/$size/apps/"_,
+    "/usr/local/share/icons/hicolor/$size/apps/"_
+};
+
 bool Search::keyPress(Key key) {
     if(key == Return) {
         execute("/usr/lib64/chromium-browser/chromium-launcher.sh"_,{"google.com/search?q="_+text});
@@ -36,10 +43,10 @@ bool Menu::keyPress(Key key) {
 
 map<string,string> readConfig(const string& path) {
     map<string,string> entries;
-    for(Stream s(mapFile(path));s;) {
-        if(s.match("["_)) s.until('\n');
+    for(TextBuffer s(readFile(path));s;) {
+        if(s.match("["_)) s.until("\n"_);
         else {
-            string key = s.until('='), value=s.until('\n');
+            string key = s.until("="_), value=s.until("\n"_);
             entries.insert(move(key),move(value));
         }
         s.whileAny("\n"_);
@@ -53,14 +60,10 @@ List<Command> readShortcuts() {
     for(const string& desktop: split(config["Favorites"_],',')) {
         if(!exists(desktop)) continue;
         auto entries = readConfig(desktop);
-        auto iconPaths = {"/usr/share/pixmaps/"_,
-                          "/usr/share/icons/oxygen/32x32/apps/"_,
-                          "/usr/share/icons/hicolor/32x32/apps/"_,
-                          "/usr/local/share/icons/hicolor/32x32/apps/"_};
         Image icon;
         for(const string& folder: iconPaths) {
-            string path = folder+entries["Icon"_]+".png"_;
-            if(exists(path)) { icon=resize(Image(mapFile(path)), 32,32); break; }
+            string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
+            if(exists(path)) { icon=resize(Image(readFile(path)), 32,32); break; }
         }
         auto execPaths = {"/usr/bin/"_,"/usr/local/bin/"_};
         string exec;

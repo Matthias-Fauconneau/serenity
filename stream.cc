@@ -4,12 +4,13 @@
 /// Returns true if there is data to read
 DataStream::operator bool() { return available(1); }
 
+#define need(size) ({ uint unused has=available(size); assert(has>=size, has, size); })
 template<class T> const T& DataStream::peek() {
-    assert(available(sizeof(T))>=sizeof(T));
+    need(sizeof(T));
     return *(T*)(peekData((uint)sizeof(T)).data());
 }
 template<class T> array<T> DataStream::peek(int size) {
-    assert(available(size*sizeof(T))>=size*sizeof(T));
+    need(size*sizeof(T));
     return array<T>(peekData((uint)size*sizeof(T)));
 }
 template<class T> T DataStream::read() { T t = peek<T>(); advance(sizeof(T)); return t; }

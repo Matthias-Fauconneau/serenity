@@ -68,6 +68,7 @@ void section_(const string& s, char sep, int& start, int& end, bool includeSep) 
         e=s.size();
         if(end!=-1) for(uint i=0;e-- > 0;) { if(s[e]==sep) { i++; if(i>=uint(-end-1)) { if(includeSep) e++; break; } } }
     }
+    assert(e>=b);
     start=b; end=e;
 }
 string section(const string& s, char separator, int start, int end, bool includeSeparator) {

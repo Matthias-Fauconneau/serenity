@@ -50,7 +50,7 @@ struct Player : Application {
             if(isDirectory(path)) playAlbum(path); else appendFile(move(path));
         }
         if(!files && exists("/Music/.last"_)) {
-            string last = mapFile("/Music/.last"_);
+            string last = readFile("/Music/.last"_);
             string folder = section(last,'/',0,3);
             albums.index = indexOf(folders, folder);
             array<string> files = listFiles(folder,Recursive|Sort|Files);
