@@ -14,9 +14,9 @@ void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
 
 /// limit process ressources to avoid hanging the system when debugging
 declare(static void limit_resource(), constructor) {
-    //{ rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21; setrlimit(RLIMIT_STACK,&limit); } //2 MB
-    //{ rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24; setrlimit(RLIMIT_DATA,&limit); } //16 MB
-    //{ rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30; setrlimit(RLIMIT_AS,&limit); } //1 GB
+    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21; setrlimit(RLIMIT_STACK,&limit); } //2 MB
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24; setrlimit(RLIMIT_DATA,&limit); } //16 MB
+    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30; setrlimit(RLIMIT_AS,&limit); } //1 GB
     setPriority(19);
 }
 

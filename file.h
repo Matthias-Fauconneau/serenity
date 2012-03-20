@@ -25,7 +25,15 @@ const int CWD = -100;
 int openFile(const string& path, int at=CWD);
 int createFile(const string& path, int at=CWD);
 array<byte> readFile(const string& path, int at=CWD);
-struct Map { const byte* data; int size; ~Map(); };
+struct Map {
+    no_copy(Map)
+    const byte* data=0; uint size=0;
+    Map(){}
+    Map(const byte* data, uint size):data(data),size(size){}
+    Map(Map&& o):data(o.data),size(o.size){o.data=0,o.size=0;}
+    Map& operator=(Map&& o){data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
+    ~Map();
+};
 Map mapFile(const string& path, int at=CWD);
 void writeFile(const string& path, const array<byte>& content, int at=CWD);
 

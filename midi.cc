@@ -5,8 +5,8 @@
 template class array<Track>;
 
 void MidiFile::open(const string& path) { /// parse MIDI header
-    Stream s( readFile(path) );
-    s+=10;
+    DataBuffer s( readFile(path) );
+    s.advance(10);
     uint16 nofChunks = s.read();
     midiClock = 48*60000/120/(uint16)s.read(); //48Khz clock
     for(int i=0; s && i<nofChunks;i++) {
@@ -15,7 +15,7 @@ void MidiFile::open(const string& path) { /// parse MIDI header
             while(s.read<byte>()&0x80) {} //ignore first time
             tracks.append( Track(s.read<byte>(length)) );
         }
-        s += length;
+        s.advance(length);
     }
 }
 
@@ -26,11 +26,11 @@ void MidiFile::read(Track& track, int time, State state) {
         uint8 type=track.type, vel=0,key=s.read();
         if(key & 0x80) { type=key>>4; key=s.read(); }
         if( type == NoteOn) vel=s.read();
-        else if( type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend ) s++;
+        else if( type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend ) s.advance(1);
         else if( type == ProgramChange || type == ChannelAftertouch ) {}
         else if( type == Meta ) {
             uint8 c=s.read(); int len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
-            s+=len;
+            s.advance(len);
         }
         track.type = type;
 

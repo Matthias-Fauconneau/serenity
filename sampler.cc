@@ -15,27 +15,27 @@ void Sampler::open(const string& path) {
     // parse sfz and mmap samples
     Sample group;
     int start=getRealTime();
-    Stream s(readFile(path));
+    TextBuffer s(readFile(path));
     auto folder = section(path,'/',0,-2,true);
     Sample* sample=0;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
         if(s.match("<group>"_)) { group=Sample(); sample = &group; }
-        else if(s.match("<region>"_)) { samples<<group; sample = &samples.last();  }
+        else if(s.match("<region>"_)) { assert(!group.data.data); samples<<move(group); sample = &samples.last();  }
         else if(s.match("//"_)) {
             s.untilAny("\n\r"_);
             s.whileAny("\n\r"_);
         }
         else {
-            string key = s.until('=');
+            string key = s.until("="_);
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
                 if(getRealTime()-start > 1000) { start=getRealTime(); log("Loading..."_,samples.size()); }
                 string path = folder+replace(value,"\\"_,"/"_);
-                sample->map = mapFile(path);
-                madvise((void*)sample->data, file.size(), MADV_SEQUENTIAL);
-                mlock((void*)sample->data, min(file.size(),1024*1024u));
+                sample->data = mapFile(path);
+                madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
+                mlock((void*)sample->data.data, min(sample->data.size,1024*1024u));
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -71,7 +71,7 @@ void Sampler::event(int key, int velocity) {
         if(!!release == s.trigger && key >= s.lokey && key <= s.hikey && velocity >= s.lovel && velocity <= s.hivel) {
             active << Note();
             Note& note = active.last();
-            note.open(array<byte>(s.map.data,s.map.size));
+            note.open(array<byte>(s.data.data,s.data.size));
             note.remaining=note.time;
             note.release=max(240000,s.release);
             note.key=key;

@@ -32,7 +32,7 @@ Map mapFile(const string& path, int at) {
     struct stat sb; fstat(fd, &sb);
     const byte* data = (byte*)mmap(0,(size_t)sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
     close(fd);
-    return {data,(int)sb.st_size};
+    return Map(data,(int)sb.st_size);
 }
 Map::~Map() { munmap((void*)data,size); }
 

@@ -54,7 +54,7 @@ struct Month : Grid<Text> {
         static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
         const int nofDays[12] = { 31, !(date.year%4)&&(date.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
         for(int i=0;i<7;i++) append(copy(days[i]));
-        int first = date.weekDay+1 - date.day%7;
+        int first = (35+date.weekDay+1-date.day)%7;
         for(int i=0;i<first;i++) append(Text(dec(nofDays[(date.month+11)%12]-first+i+1,2),16,128)); //previous month
         for(int i=0;i<nofDays[date.month];i++) append(dec(i+1,2)); //current month
         for(int i=1;count()<7*6;i++) append(Text(dec(i,2),16,128)); //next month
@@ -144,6 +144,7 @@ struct TaskBar : Poll {
     }
     void removeStatusNotifierItem(string name, string, string) {
         for(uint i=0;i<status.array<StatusNotifierItem>::size();i++) if(status[i].item.target == name) status.removeAt(i);
+        panel.update(); window.render();
     }
 
     static int xErrorHandler(Display* x, XErrorEvent* error) {
@@ -190,21 +191,18 @@ struct TaskBar : Poll {
         XFlush(x);
     }
     void raise(int) {
-        if(ownWM)  {
-            XMapWindow(x, tasks.active().id);
-            XRaiseWindow(x, tasks.active().id);
-        } else {
-            XSetInputFocus(x, tasks.active().id, RevertToPointerRoot, CurrentTime);
-            XEvent xev; clear(xev);
-            xev.type = ClientMessage;
-            xev.xclient.window = tasks.active().id;
-            xev.xclient.message_type = Atom(_NET_ACTIVE_WINDOW);
-            xev.xclient.format = 32;
-            xev.xclient.data.l[0] = 2;
-            xev.xclient.data.l[1] = 0;
-            xev.xclient.data.l[2] = 0;
-            XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
-        }
+        XMapWindow(x, tasks.active().id);
+        XRaiseWindow(x, tasks.active().id);
+        XSetInputFocus(x, tasks.active().id, RevertToPointerRoot, CurrentTime);
+        XEvent xev; clear(xev);
+        xev.type = ClientMessage;
+        xev.xclient.window = tasks.active().id;
+        xev.xclient.message_type = Atom(_NET_ACTIVE_WINDOW);
+        xev.xclient.format = 32;
+        xev.xclient.data.l[0] = 2;
+        xev.xclient.data.l[1] = 0;
+        xev.xclient.data.l[2] = 0;
+        XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
         XFlush(x);
     }
     void event(pollfd) override {
@@ -231,7 +229,7 @@ struct TaskBar : Poll {
                 } else {
                     if(e.type == PropertyNotify) {
                         if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].text.text = getTitle(id);
-                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].icon = getIcon(id), needUpdate = true;
+                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].icon = getIcon(id);
                         else if(e.xproperty.atom==Atom(_NET_WM_WINDOW_TYPE) || e.xproperty.atom==Atom(_NET_WM_STATE)) {
                             if(skipTaskbar(id)) tasks.removeAt(i);
                         } else continue;
