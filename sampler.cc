@@ -35,7 +35,7 @@ void Sampler::open(const string& path) {
                 string path = folder+replace(value,"\\"_,"/"_);
                 sample->data = mapFile(path);
                 madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
-                mlock((void*)sample->data.data, min(sample->data.size,1024*1024u));
+                mlock((void*)sample->data.data, sample->data.size);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);

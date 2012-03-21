@@ -68,16 +68,6 @@ template<class T> struct Scroll : ScrollArea, T {
     Widget& parent() { return (ScrollArea&)*this; }
 };
 
-/*/// index_iterator is used to iterate indexable containers
-template<class C, class T> struct index_iterator {
-    C* container;
-    int index;
-    index_iterator(C* container, int index):container(container),index(index){}
-    bool operator!=(const index_iterator& o) const { assert(container==o.container); return o.index != index; }
-    T& operator* () const { assert(container); return container->at(index); }
-    const index_iterator& operator++ () { index++; return *this; }
-};*/
-
 /// Layout is a proxy Widget containing multiple widgets.
 struct Layout : Widget {
     /// Override \a count and \a at to implement widgets storage (\sa Widgets Array Tuple)
@@ -107,14 +97,33 @@ template<class T> struct Array : virtual Layout, array<T> {
     Widget& at(int i) { return array<T>::at(i); }
 };
 
+//convoluted template metaprogramming to get a static tuple allowing dynamic indexing using an offset table
+struct zero { zero(int* list, uint size){clear(list,size);}}; //item "0" make sure the table is cleared so that items can append to list by finding first free slot
+template<class T> struct item : T { //item instanciate a class and append the instance to the offset table
+    void registerInstance(int* list) { int* first=list; while(*first) first++; *first=(byte*)this-(byte*)list; }
+    item(int* list) { registerInstance(list); }
+    item(T&& t, int* list) : T(move(t)) { registerInstance(list); }
+};
+/// \a tuple with static indexing by type and dynamic indexing using an offset table
+template<class... T> struct tuple  : zero, item<T>... {
+    int offsets[sizeof...(T)];
+    tuple() : zero(offsets,sizeof...(T)), item<T>(offsets)... {}
+    tuple(T&&... t) : zero(offsets,sizeof...(T)), item<T>(move(t),offsets)... {}
+    int size() const { return sizeof...(T); }
+    template<class A> operator A&() { return (A&)*this; } //static indexing using type
+    template<class B> B& at(int i) { return *(B*)((byte*)offsets+offsets[i]); }
+    void* at(int i) { return (void*)((byte*)offsets+offsets[i]); }
+};
+
 /// Tuple implements Layout storage using static inheritance
 /// \note It allows a layout to directly contain heterogenous Widgets without managing heap pointers.
-template<class T> struct item : T { item(uint list[]) { while(*list) list++; *list=this-list; } };
-template<class... T> struct Tuple : virtual Layout, item<T>... {
-    uint widgets[sizeof...(T)];
-    Tuple() : T(widgets)... {}
-    int count() const { return sizeof...(T); }
-    Widget& at(int i) { return *(Widget*)((byte*)widgets+widgets[i]); }
+template<class... T> struct Tuple : virtual Layout {
+    tuple<T...> items; //inheriting tuple confuse compiler with multiple Widgets base
+    Tuple() : items() {}
+    Tuple(T&&... t) : items(move(t)...) {}
+    int count() const { return items.size(); }
+    Widget& at(int i) { return *(Widget*)items.at(i); }
+    //Widget& at(int i) { return items.at<Widget>(i); } //expected primary name before > ?
 };
 
 /// Linear divide space between contained widgets
@@ -122,6 +131,7 @@ template<class... T> struct Tuple : virtual Layout, item<T>... {
 struct Linear: virtual Layout {
     /// If true, try to fill parent space to spread out contained items
     bool expanding = false;
+
     int2 sizeHint();
     void update() override;
     virtual int2 xy(int2 xy) =0; //transform coordinates so that x/y always mean along/across the line to reuse same code in Vertical/Horizontal
@@ -154,10 +164,9 @@ struct UniformGrid : virtual Layout {
 };
 
 /// Selection implements selection of active widget/item for a \a Layout
-//TODO: multi selection
 struct Selection : virtual Layout {
     /// User changed active index.
-    signal<int /*active index*/> activeChanged;
+    signal<int /*index*/> activeChanged;
     /// Active index
     int index = -1;
 
@@ -244,6 +253,24 @@ struct Icon : Widget {
     void render(int2 parent);
 };
 
+/// Item is an icon with text
+/*struct Item : Horizontal {
+    Icon icon; Text text; Space space;
+    Item(){}
+    Item(Icon&& icon, Text&& text):icon(move(icon)),text(move(text)){}
+    int count() const { return 3; }
+    Widget& at(int i) { Widget* list[] = {&icon,&text,&space}; return *list[i]; }
+};*/
+struct Item : Horizontal, Tuple<Icon,Text,Space> {
+    Item():Tuple(){}
+    Item(Icon&& icon, Text&& text):Tuple(move(icon),move(text),Space()){}
+    operator Widget&() { return (Horizontal&)*this; }
+};
+//typedef Tuple<Horizontal,Icon,Text> Item;
+
+/// TabBar is a \a Bar containing \a Item elements
+typedef Bar<Item> TabBar;
+
 /// TriggerButton is a clickable Icon
 struct TriggerButton : Icon {
     //using Icon::Icon;
@@ -253,18 +280,6 @@ struct TriggerButton : Icon {
     signal<> triggered;
     bool mouseEvent(int2 position, Event event, Button button) override;
 };
-
-/// Item is an icon with text
-struct Item : Horizontal {
-    Icon icon; Text text; Space space;
-    Item(){}
-    Item(Icon&& icon, Text&& text):icon(move(icon)),text(move(text)){}
-    int count() const { return 3; }
-    Widget& at(int i) { Widget* list[] = {&icon,&text,&space}; return *list[i]; }
-};
-
-/// TabBar is a \a Bar containing \a Item elements
-typedef Bar<Item> TabBar;
 
 /// TriggerButton is a togglable Icon
 struct ToggleButton : Widget {

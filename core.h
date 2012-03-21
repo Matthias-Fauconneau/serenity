@@ -16,6 +16,7 @@
 
 /// Language support
 #define declare(function, attributes...) function __attribute((attributes)); function
+#define offsetof(object, member) __builtin_offsetof (object, member)
 // Traits
 #include <type_traits>
 #define is_convertible(F,T) std::is_convertible<F,T>::value

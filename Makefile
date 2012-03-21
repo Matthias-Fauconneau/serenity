@@ -29,7 +29,7 @@ else ifeq ($(TARGET),music)
  SRCS += file image window font interface alsa resample sequencer sampler midi pdf music
  INSTALL = icons/music.png music.desktop
 else ifeq ($(TARGET),taskbar)
- SRCS += vector signal stream time file image window font interface launcher taskbar
+ SRCS += vector signal stream time file dbus image window font interface launcher taskbar
  ICONS = button shutdown
  #ICONS = system network utility graphics office
 else ifeq ($(TARGET),editor)

@@ -14,10 +14,7 @@ struct Image {
     Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; o.data=0; return *this; }
     Image(byte4* data, int width, int height):data(data),width(width),height(height),own(false){}
     Image(int width, int height):data(allocate<byte4>(width*height)),width(width),height(height),own(true){}
-    Image(array<byte4>&& data, uint width, uint height):data((byte4*)data.data()),width(width),height(height),own(true) {
-        assert(data.size() >= width*height, data.size(), width, height);
-        data.buffer.capacity = 0; //taking ownership
-    }
+    Image(array<byte4>&& data, uint width, uint height);
     explicit Image(array<byte>&& file);
 
     ~Image(){ if(data && own) delete data; }

@@ -4,7 +4,8 @@
 
 #include "array.cc"
 template class array<Widget*>;
-template class array<Text::Blit>;
+//template class array<Text::Blit>;
+template class array<Text>;
 
 /// Sets the array size to \a size, filling with \a value
 template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }

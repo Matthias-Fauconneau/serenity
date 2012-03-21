@@ -31,3 +31,4 @@ dbus.h
 taskbar.cc
 launcher.cc
 launcher.h
+dbus.cc

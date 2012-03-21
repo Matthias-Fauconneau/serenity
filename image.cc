@@ -5,7 +5,12 @@
 #include <zlib.h>
 
 #include "array.cc"
-//template class array<byte4>;
+template class array<byte4>;
+
+Image::Image(array<byte4>&& data, uint width, uint height):data((byte4*)data.data()),width(width),height(height),own(true) {
+    assert(data.size() >= width*height, data.size(), width, height);
+    data.buffer.capacity = 0; //taking ownership
+}
 
 template<template <typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height) {
     typedef vector<T,uint8,N> S;

@@ -1,10 +1,11 @@
 #include "process.h"
+#include "file.h"
 #include "time.h"
 #include "interface.h"
 #include "window.h"
 #include "launcher.h"
 #include "poll.h"
-#include "array.cc"
+#include "array.cc" //array<Task>
 
 #include "dbus.h"
 struct StatusNotifierItem : TriggerButton {
@@ -12,7 +13,7 @@ struct StatusNotifierItem : TriggerButton {
     StatusNotifierItem(DBus::Object&& item, Image&& icon) : TriggerButton(move(icon)), item(move(item)) {}
     bool mouseEvent(int2 position, Event event, Button button) override {
         if(TriggerButton::mouseEvent(position,event,button)) {
-            item.noreply("org.kde.StatusNotifierItem.Activate"_,0,0);
+            item("org.kde.StatusNotifierItem.Activate"_,0,0);
             return true;
         }
         return false;
@@ -99,8 +100,8 @@ struct TaskBar : Poll {
     Image getIcon(XID id) {
         array<ulong> buffer = Window::getProperty<ulong>(id,"_NET_WM_ICON");
         if(buffer.size()<=2) return Image();
-        array<byte4> image(buffer.size());
-        for(uint i=0;i<buffer.size()-2;i++) image << *(byte4*)&buffer[i+2];
+        array<byte4> image(buffer.size()); image.setSize(buffer.size());
+        for(uint i=0;i<buffer.size()-2;i++) image[i] = *(byte4*)&buffer[i+2];
         return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
     }
     bool skipTaskbar(XID id) {
@@ -228,8 +229,8 @@ struct TaskBar : Poll {
                     else continue;
                 } else {
                     if(e.type == PropertyNotify) {
-                        if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].text.text = getTitle(id);
-                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].icon = getIcon(id);
+                        if(e.xproperty.atom==Atom(_NET_WM_NAME)) (Text&)tasks[i] = getTitle(id);
+                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) (Icon&)tasks[i] = getIcon(id);
                         else if(e.xproperty.atom==Atom(_NET_WM_WINDOW_TYPE) || e.xproperty.atom==Atom(_NET_WM_STATE)) {
                             if(skipTaskbar(id)) tasks.removeAt(i);
                         } else continue;
