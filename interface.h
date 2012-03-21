@@ -124,6 +124,7 @@ template<class... T> struct Tuple : virtual Layout {
     int count() const { return items.size(); }
     Widget& at(int i) { return *(Widget*)items.at(i); }
     //Widget& at(int i) { return items.at<Widget>(i); } //expected primary name before > ?
+    template<class A> operator A&() { return items.operator A&(); } //static indexing using type
 };
 
 /// Linear divide space between contained widgets
@@ -254,19 +255,10 @@ struct Icon : Widget {
 };
 
 /// Item is an icon with text
-/*struct Item : Horizontal {
-    Icon icon; Text text; Space space;
-    Item(){}
-    Item(Icon&& icon, Text&& text):icon(move(icon)),text(move(text)){}
-    int count() const { return 3; }
-    Widget& at(int i) { Widget* list[] = {&icon,&text,&space}; return *list[i]; }
-};*/
 struct Item : Horizontal, Tuple<Icon,Text,Space> {
     Item():Tuple(){}
     Item(Icon&& icon, Text&& text):Tuple(move(icon),move(text),Space()){}
-    operator Widget&() { return (Horizontal&)*this; }
 };
-//typedef Tuple<Horizontal,Icon,Text> Item;
 
 /// TabBar is a \a Bar containing \a Item elements
 typedef Bar<Item> TabBar;
