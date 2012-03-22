@@ -1,5 +1,6 @@
 #include "http.h"
 #include "file.h"
+#include "time.h"
 #include <sys/socket.h>
 #include <netdb.h>
 #include <openssl/ssl.h>
@@ -70,34 +71,40 @@ string base64(const string& input) {
 HTTP::HTTP(string&& host, bool secure, string&& authorization) : host(move(host)), authorization(move(authorization)) {
     http.connect(this->host, secure?"https"_/*443*/:"http"_/*80*/, secure);
 }
-array<byte> HTTP::request(const string& path, const string& method, const string& post) {
+array<byte> HTTP::request(const string& path, const string& method, const string& post, const string &header) {
     string request = method+" /"_+path+" HTTP/1.1\r\nHost: "_+host+"\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     if(authorization) request << "Authorization: Basic "_+authorization+"\r\n"_;
     if(post) request << "Content-Length: "_+dec(post.size())+"\r\n"_;
+    if(header) request << header+"\r\n"_;
     http.write( request+"\r\n"_+post );
     uint contentLength=0;
+    array<byte> data;
     if(http.match("HTTP/1.1 200 OK\r\n"_));
+    else if(http.match("HTTP/1.1 304 Not Modified\r\n"_)) { log("304 Not Modified"); return data; }
     else error(host+"/"_+path+":\n"_+http.until("\r\n\r\n"_));
     bool chunked=false;
     for(;;) { //parse header
         if(http.match("\r\n"_)) break;
-        string key = http.until(": "_); string value=http.until("\r\n"_);
+        string key = http.until(": "_); assert(key,http.buffer);
+        string value=http.until("\r\n"_); assert(value,http.buffer);
         if(key=="Content-Length"_) contentLength=toInteger(value);
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
     }
-    if(contentLength) return http.DataStream::read<byte>(contentLength);
+    if(contentLength) data=http.DataStream::read<byte>(contentLength);
     else if(chunked) {
-        array<byte> data;
         for(;;) {
             http.match("\r\n"_);
             int contentLength = toInteger(http.until("\r\n"_),16);
-            if(contentLength == 0) return data;
+            if(contentLength == 0) break;
             data << http.DataStream::read<byte>( contentLength );
         }
-    } else error("Missing content",http.buffer);
+    } else assert(data,"Missing content",http.buffer);
+    assert(data,"Empty content",(string&)http.buffer);
+    log("HTTP::request",data.size()/1024,"KB");
+    return data;
 }
 
-array<byte> HTTP::get(const string& path) { return request(path,"GET"_,""_); }
+array<byte> HTTP::get(const string& path, const string& header) { return request(path,"GET"_,""_,header); }
 
 array<byte> HTTP::post(const string& path, const string& content) { return request(path,"POST"_,content); }
 
@@ -113,12 +120,20 @@ array<byte> HTTP::getURL(const string& url) {
     static int cache=openFolder(strz(getenv("HOME"))+"/.cache"_);
     string name = replace(path,"/"_,"."_);
     string file = host+"/"_+name;
-    if(exists(file,cache)) { //TODO: Expire, If-Modified
-        return readFile(file,cache);
-    } else {
-        if(!exists(host,cache)) createFolder(host,cache);
-        array<byte> content = HTTP(section(host,'@',-2,-1),secure,base64(section(host,'@'))).get(path);
-        writeFile(file,content,cache);
-        return move(content);
+    //TODO: remove old files
+    array<byte> content;
+    if(exists(file,cache)) {
+        long modified = modifiedTime(file,cache);
+        if(currentTime()-modified < 2*60*60) { //less than two hours old
+            array<byte> data = readFile(file,cache);
+            if(data) return data;
+        }
+        string header = "If-Modified-Since: "_+date("ddd, dd MMM yyyy hh:mm:ss TZD"_,date(modified));
+        content = HTTP(section(host,'@',-2,-1),secure,base64(section(host,'@'))).get(path,header);
+        if(!content) content = readFile(file,cache); //304 Not Modified //TODO: touch instead of rewriting
     }
+    if(!exists(host,cache)) createFolder(host,cache);
+    if(!content) content = HTTP(section(host,'@',-2,-1),secure,base64(section(host,'@'))).get(path);
+    writeFile(file,content,cache,true);
+    return content;
 }

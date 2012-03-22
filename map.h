@@ -56,3 +56,8 @@ template<class K, class V> string str(const map<K,V>& m) {
     for(int i=0;i<m.size();i++) { s<<str(m.keys[i])+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }
+template< class V> string str(const map<string,V>& m) {
+    string s="{"_;
+    for(int i=0;i<m.size();i++) { s<<m.keys[i]+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
+    return s+"}"_;
+}

@@ -6,7 +6,7 @@ struct utf8_iterator {
     const char* pointer;
     utf8_iterator(const char* pointer):pointer(pointer){}
     bool operator!=(const utf8_iterator& o) const { return o.pointer != pointer; }
-    int operator* () const;
+    uint operator* () const;
     const utf8_iterator& operator++();
 };
 
@@ -94,6 +94,7 @@ inline string bin(uint64 n, int pad=0) { return itoa(n,2,pad); }
 
 template<> inline string str(void* const& n) { return hex(int64(n)); }
 template<> inline string str(const uint64& n) { return dec(n); }
+template<> inline string str(const int64& n) { return dec(n); }
 template<> inline string str(const uint32& n) { return dec(n); }
 template<> inline string str(const int32& n) { return dec(n); }
 template<> inline string str(const uint16& n) { return dec(n); }

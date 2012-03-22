@@ -34,8 +34,8 @@ struct HTTP {
 
     /// Create an HTTP connection to \a host
     HTTP(string&& host, bool secure=false, string&& authorization=""_);
-    array<byte> request(const string& path, const string& method, const string& post);
-    array<byte> get(const string& path);
+    array<byte> request(const string& path, const string& method, const string& post, const string &header=""_);
+    array<byte> get(const string& path, const string &header=""_);
     static array<byte> getURL(const string& url);
     array<byte> post(const string& path, const string& content);
 };

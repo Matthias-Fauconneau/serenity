@@ -6,6 +6,7 @@ string.h
 string.cc
 process.h
 process.cc
+
 file.h
 file.cc
 stream.h
@@ -14,4 +15,12 @@ xml.h
 xml.cc
 http.h
 http.cc
+
+font.h
+font.cc
+interface.h
+interface.cc
+window.h
+window.cc
+
 browser.cc

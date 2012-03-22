@@ -30,8 +30,8 @@ bool operator==(const Task& a,const Task& b){return a.id==b.id;}
 struct Clock : Text, Timer {
     signal<> render;
     signal<> triggered;
-    Clock():Text(date("hh:mm"_)){ setAbsolute(getUnixTime()/60*60+60); }
-    void expired() { text=date("hh:mm"_); update(); setAbsolute(getUnixTime()+60); render.emit(); }
+    Clock():Text(date("hh:mm"_)){ setAbsolute(currentTime()/60*60+60); }
+    void expired() { text=date("hh:mm"_); update(); setAbsolute(currentTime()+60); render.emit(); }
     bool mouseEvent(int2, Event event, Button button) override {
         if(event==Press && button==LeftButton) { triggered.emit(); return true; }
         return false;
@@ -43,15 +43,15 @@ ICON(shutdown);
 struct Desktop {
     Space space;
     List<Command> shortcuts { readShortcuts() };
-    List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_) };
+    List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     HBox applets { &space, &shortcuts, &system };
-    Window window{&applets,int2(0,0),""_,Image(),255};
+    Window window{&applets,""_,Image(),int2(0,0),255};
     Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
 };
 
 struct Month : Grid<Text> {
     Month() : Grid(7,6) {
-        Date date = currentDate();
+        Date date = ::date();
         static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
         const int nofDays[12] = { 31, !(date.year%4)&&(date.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
         for(int i=0;i<7;i++) append(copy(days[i]));
@@ -66,7 +66,7 @@ struct Calendar {
       Text date { ::date("dddd, dd MMMM yyyy"_) };
       Month month;
      Menu menu { &date, &month };
-    Window window{&menu,int2(-2,-2)};
+    Window window{&menu,""_,Image(),int2(-2,-2)};
     Calendar() {
         window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
         window.setOverrideRedirect(true);
@@ -76,7 +76,7 @@ struct Calendar {
         if(event==Leave) { window.hide(); return true; }
         return false;
     }
-    void show() { window.show(); window.setPosition(int2(-menu.Widget::size.x,0)); }
+    void show() { window.show(); window.setPosition(int2(-menu.sizeHint().x,16)); Window::sync(); }
 };
 
 ICON(button);
@@ -94,7 +94,7 @@ struct TaskBar : Poll {
       Clock clock;
        Calendar calendar;
      HBox panel {&start, &tasks, &status, &clock };
-    Window window{&panel,int2(0,-1),"TaskBar"_,Image(),255};
+    Window window{&panel,"TaskBar"_,Image(),int2(0,-1),255};
 
     string getTitle(XID id) { return Window::getProperty<char>(id,"_NET_WM_NAME"); }
     Image getIcon(XID id) {
@@ -183,13 +183,12 @@ struct TaskBar : Poll {
          tasks.activeChanged.connect(this,&TaskBar::raise);
          clock.render.connect(&window, &Window::render);
          clock.triggered.connect(&calendar,&Calendar::show);
-        panel.update();
 
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
         window.show();
         window.setPosition(int2(0,0));
         XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
-        XFlush(x);
+        Window::sync();
     }
     void raise(int) {
         XMapWindow(x, tasks.active().id);
@@ -241,7 +240,7 @@ struct TaskBar : Poll {
             }
             needUpdate = true;
         }
-        if(needUpdate) {
+        if(needUpdate && window.visible) {
             panel.update(); window.render();
             tasksChanged.emit(tasks.array::size());
         }
@@ -255,5 +254,5 @@ struct Shell : Application {
         taskbar.tasksChanged.connect(this,&Shell::tasksChanged);
         tasksChanged(taskbar.tasks.array::size());
     }
-    void tasksChanged(int count) { desktop.window.setVisible(!count); }
+    void tasksChanged(int count) { if(!count) desktop.window.show(); else desktop.window.hide();  }
 } shell;

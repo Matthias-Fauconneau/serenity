@@ -1,18 +1,18 @@
 #pragma once
 #include "process.h"
 
-/// Returns relative time in milliseconds
-int getRealTime();
+/// Returns Unix real-time in milliseconds
+uint64 getRealTime();
 
 /// Returns Unix real-time in seconds
-int getUnixTime();
+long currentTime();
 
 struct Date { int seconds, minutes, hours, day, month, year, weekDay; };
-/// Returns local time as a calendar date
-Date currentDate();
+/// Convert unix timestamp to a calendar date
+Date date(long time=currentTime());
 
 /// Returns current date formatted using \a format string
-string date(string&& format);
+string date(string&& format, Date date=::date());
 
 struct Timer : Poll {
     int fd;

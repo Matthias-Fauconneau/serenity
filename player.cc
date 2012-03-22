@@ -31,7 +31,7 @@ struct Player : Application {
 
     uint playHotKey = window.addHotKey("XF86AudioPlay"_);
 
-    void start(array<string>&& arguments) {
+    Player() {
         window.keyPress.connect(this, &Player::keyPress);
         playButton.toggled.connect(this, &Player::togglePlay);
         nextButton.triggered.connect(this, &Player::next);
@@ -41,7 +41,8 @@ struct Player : Application {
         titles.activeChanged.connect(this, &Player::play);
         media.audioOutput={audio.frequency,audio.channels};
         audio.read = {&media,&AudioFile::read};
-
+    }
+    void start(array<string>&& arguments) {
         folders = listFiles("/Music"_,Sort|Folders);
         for(auto& folder : folders) albums << Text(section(folder,'/',-2,-1), 10);
 

@@ -25,7 +25,7 @@ bool Search::keyPress(Key key) {
 }
 
 bool Command::mouseEvent(int2, Event event, Button button) {
-    if(event == Press && button == LeftButton) { execute(exec); triggered.emit(); return true; }
+    if(event == Press && button == LeftButton) { execute(path,args); triggered.emit(); return true; }
     return false;
 }
 
@@ -66,24 +66,24 @@ List<Command> readShortcuts() {
             if(exists(path)) { icon=resize(Image(readFile(path)), 32,32); break; }
         }
         auto execPaths = {"/usr/bin/"_,"/usr/local/bin/"_};
-        string exec;
+        string path; array<string> arguments;
         for(const string& folder: execPaths) {
-            string path = folder+section(entries["Exec"_],' ');
-            if(exists(path)) { exec=move(path); break; }
+            string p = folder+section(entries["Exec"_],' ');
+            if(exists(p)) { path=move(p); arguments=slice(split(entries["Exec"_],' '),1); break; }
         }
-        assert(exec,exec);
-        shortcuts << Command(move(icon),move(entries["Name"_]),move(exec));
+        assert(path);
+        shortcuts << Command(move(icon),move(entries["Name"_]),move(path),move(arguments));
     }
     return shortcuts;
 }
 
-Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts })), window(&menu,int2(-3,-3)) {
+Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts })), window(&menu,""_,Image(),int2(-3,-3)) {
+    window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
+    window.setOverrideRedirect(true);
     menu.close.connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(auto& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
-    window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
-    window.setOverrideRedirect(true);
 }
 
-void Launcher::show() { window.show(); window.setPosition(int2(0,0)); window.setFocus(&search); }
+void Launcher::show() { window.show(); window.setPosition(int2(0,0)); window.setFocus(&search); Window::sync(); }
 void Launcher::keyPress(Key key) { if(key==Escape) window.hide(); }

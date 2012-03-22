@@ -1,5 +1,7 @@
 #include "process.h"
 #include "map.h"
+#include "file.h"
+#include "stream.h"
 
 #include <poll.h>
 #include <unistd.h>
@@ -12,24 +14,41 @@
 
 void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
 
-/// limit process ressources to avoid hanging the system when debugging
+/*/// limit process ressources to avoid hanging the system when debugging
 /// \note limits will also apply to child processes
 declare(static void limit_resource(), constructor) {
-    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<26; setrlimit(RLIMIT_STACK,&limit); } //64 MB
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_DATA,&limit); } //256 MB
+    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_STACK,&limit); } //256 MB
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<29; setrlimit(RLIMIT_DATA,&limit); } //512 MB
     { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30; setrlimit(RLIMIT_AS,&limit); } //1 GB
     setPriority(19);
+}*/
+
+uint availableMemory() {
+    int fd = openFile("/proc/meminfo"_);
+    TextBuffer s = ::readUpTo(fd,2048);
+    close(fd);
+    map<string, uint> info;
+    while(s) {
+        string key=s.until(":"_); s.skip();
+        uint value=toInteger(s.untilAny(" \n"_)); s.until("\n"_);
+        info[move(key)]=value;
+    }
+    return info["MemFree"_]+info["Inactive"_];
 }
 
-
+#if DEBUG
 int getCPUTime() {
     rusage usage; getrusage(RUSAGE_SELF,&usage);
     return  usage.ru_stime.tv_sec*1000+usage.ru_stime.tv_usec/1000 + //user time in ms
             usage.ru_utime.tv_sec*1000+usage.ru_utime.tv_usec/1000; //kernel time in ms
 }
+
 map<const char*, int> profile;
+#endif
 
 void execute(const string& path, const array<string>& args) {
+    assert(!contains(path,' '));
+    log("execute",path,args);
     array<string> args0(1+args.size());
     args0 << strz(path);
     for(uint i=0;i<args.size();i++) args0 << strz(args[i]);

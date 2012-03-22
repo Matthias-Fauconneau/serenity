@@ -6,32 +6,21 @@ template class array<string>;
 template int indexOf(const array<string>&, const string&);
 
 /// utf8_iterator
-int utf8_iterator::operator* () const {
-    int code = pointer[0];
-    if(code&0b10000000) {
-        bool test = code&0b00100000;
-        code &= 0b00011111; code <<= 6; code |= pointer[1]&0b111111;
-        if(test) {
-            bool test = code&0b10000000000;
-            code &= 0b00001111111111; code <<= 6; code |= pointer[2]&0b111111;
-            if(test) {
-                bool test = code&0b1000000000000000;
-                if(test) fail();
-                code &= 0b00000111111111111111; code <<= 6; code |= pointer[3]&0b111111;
-            }
-        }
-    }
-    return code;
+uint utf8_iterator::operator* () const {
+    ubyte code = pointer[0];
+    /**/  if((code&0b10000000)==0b00000000) return code;
+    else if((code&0b11100000)==0b11000000) return(code&0b11111)<<6  |(pointer[1]&0b111111);
+    else if((code&0b11110000)==0b11100000) return(code&0b01111)<<12|(pointer[1]&0b111111)<<6  |(pointer[2]&0b111111);
+    else if((code&0b11111000)==0b11110000) return(code&0b00111)<<18|(pointer[1]&0b111111)<<12|(pointer[2]&0b111111)<<6|(pointer[3]&0b111111);
+    else return code; //Windows-1252
 }
 const utf8_iterator& utf8_iterator::operator++() {
-    int code = *pointer++;
-    if(code&0b10000000) { pointer++;
-        if(code&0b00100000) { pointer++;
-            if(code&0b00010000) { pointer++;
-                if(code&0b00001000) fail();
-            }
-        }
-    }
+    ubyte code = *pointer;
+    /**/  if((code&0b10000000)==0b00000000) pointer+=1;
+    else if((code&0b11100000)==0b11000000) pointer+=2;
+    else if((code&0b11110000)==0b11100000) pointer+=3;
+    else if((code&0b11111000)==0b11110000) pointer+=4;
+    else pointer+=1; //Windows-1252
     return *this;
 }
 
@@ -136,7 +125,7 @@ long toInteger(const string& number, int base) {
     long value=0;
     for(;i<number.size();i++) {
         int n = indexOf(string("0123456789abcdef",base), number[i]);
-        assert(n>=0,"Invalid integer",number);
+        assert(n>=0,"Invalid input '"_+number+"'"_);
         value *= base;
         value += n;
     }

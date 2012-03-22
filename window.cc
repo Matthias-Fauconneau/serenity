@@ -11,7 +11,7 @@
 #include <sys/ipc.h>
 Image framebuffer;
 
-Display* Window::x;
+Display* Window::x=0;
 int2 Window::screen;
 int Window::depth;
 Visual* Window::visual;
@@ -20,6 +20,7 @@ signal<Key> Window::keyPress;
 Widget* Window::focus=0;
 
 template<class T> array<T> Window::getProperty(XID window, const char* property) {
+    assert(x);
     Atom atom = XInternAtom(x,property,1);
     Atom type; int format; ulong size, bytesAfter; uint8* data =0;
     XGetWindowProperty(x,window,atom,0,~0,0,0,&type,&format,&size,&bytesAfter,&data);
@@ -31,46 +32,29 @@ template<class T> array<T> Window::getProperty(XID window, const char* property)
 }
 template array<Atom> Window::getProperty(XID window, const char* property);
 
+void Window::sync() { XSync(x,0); }
+
 template<class T> void Window::setProperty(const char* type,const char* name, const array<T>& value) {
+    assert(id);
     XChangeProperty(x, id, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)value.data(), value.size());
     XFlush(x);
 }
 
-Window::Window(Widget* widget, int2 size, const string& name, const Image& icon, ubyte opacity) : widget(*widget), opacity(opacity) {
+Window::Window(Widget* widget, string&& title, Image&& icon, int2 size, ubyte opacity)
+    : size(size), title(move(title)), icon(move(icon)), widget(*widget), opacity(opacity) {
     if(!x) {
         x = XOpenDisplay(0);
         pollfd p={XConnectionNumber(x), POLLIN, 0}; registerPoll(p);
         XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root); screen=int2(root.width,root.height);
         XVisualInfo info; XMatchVisualInfo(x, DefaultScreen(x), 32, TrueColor, &info); depth = info.depth; visual=info.visual;
     }
-
-    if(size.x<0||size.y<0) {
-        int2 hint=widget->sizeHint();
-        if(size.x<0) size.x=abs(hint.x)-size.x-1;
-        if(size.y<0) size.y=abs(hint.y)-size.y-1;
-    }
-    if(size.x==0) size.x=screen.x;
-    if(size.y==0) size.y=screen.y;
-
-    XSetWindowAttributes attrs;
-    attrs.colormap = XCreateColormap(x, DefaultRootWindow(x), visual, AllocNone);
-    attrs.background_pixel = BlackPixel(x,DefaultScreen(x));
-    attrs.border_pixel = BlackPixel(x,DefaultScreen(x));
-    attrs.event_mask = StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
-    id = XCreateWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,depth,InputOutput,visual, CWBackPixel|CWColormap|CWBorderPixel|CWEventMask, &attrs);
-    windows[id] = this;
-    gc = XCreateGC(x, id, 0, 0);
-    setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
-    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
-    if(name) setName(name);
-    if(icon) setIcon(icon);
-    if(!focus) this->focus=widget;
-    this->size=widget->size=size;
-    widget->update();
 }
 
-void Window::event(pollfd) { while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e); windows[e.xany.window]->event(e); } }
+
+void Window::event(pollfd) { update(); }
+void Window::update() { while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e); windows[e.xany.window]->event(e); } }
 void Window::event(const XEvent& e) {
+    assert(id);
     bool needRender=false;
     if(e.type==MotionNotify) {
         needRender |= widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, e.xmotion.state&Button1Mask ? LeftButton : None);
@@ -90,12 +74,13 @@ void Window::event(const XEvent& e) {
         if(this->size != size) {
             this->size=widget.size=size;
             widget.update();
-            needRender=true;
+            if(visible) needRender=true;
         }
     } else if(e.type==MapNotify) {
         visible=true;
+        assert(size);
         widget.update();
-        render();
+        needRender = true;
     } else if(e.type==UnmapNotify) {
         visible=false;
     } else if(e.type==ClientMessage) {
@@ -109,7 +94,9 @@ void Window::event(const XEvent& e) {
 template<class T> T mix(const T& a,const T& b, float t) { return a*t + b*(1-t); }
 
 void Window::render() {
+    assert(id);
     if(!visible || !size) return;
+    //log("render",indexOf(windows.keys,id)); TODO: optimize
     if(!image || image->width != size.x || image->height != size.y) {
         if(image) {
             XShmDetach(x, &shminfo);
@@ -141,26 +128,55 @@ void Window::render() {
     if(position.x+size.x<screen.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
     if(position.x>0 && position.y+size.y<screen.y-1) framebuffer(0,size.y-1) /= 2;
     if(position.x+size.x<screen.x-1 && position.y+size.y<screen.y-1) framebuffer(size.x-1,size.y-1) /= 2;
-
     widget.render(int2(0,0));
     XShmPutImage(x,id,gc,image,0,0,0,0,image->width,image->height,0);
     XFlush(x);
 }
 
-void Window::show() { setVisible(true); }
-void Window::hide() { setVisible(false); }
-void Window::setVisible(bool visible) { if(visible) XMapWindow(x, id);  else XUnmapWindow(x, id); XFlush(x); }
+void Window::create() {
+    assert(!id);
+    setSize(size); //translate special values
+    XSetWindowAttributes attrs;
+    attrs.colormap = XCreateColormap(x, DefaultRootWindow(x), visual, AllocNone);
+    attrs.background_pixel = BlackPixel(x,DefaultScreen(x));
+    attrs.border_pixel = BlackPixel(x,DefaultScreen(x));
+    attrs.event_mask = StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
+    id = XCreateWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,depth,InputOutput,visual, CWBackPixel|CWColormap|CWBorderPixel|CWEventMask, &attrs);
+    windows[id] = this;
+    gc = XCreateGC(x, id, 0, 0);
+    setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
+    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
+    if(title) setTitle(title);
+    if(icon) setIcon(icon);
+    if(!focus) this->focus=&widget;
+}
+
+void Window::show() {
+    if(!id) create();
+    XMapWindow(x, id);
+}
+void Window::hide() { if(id) { XUnmapWindow(x, id); XFlush(x); } }
 
 void Window::setPosition(int2 position) {
+    assert(id);
     if(position.x<0) position.x=screen.x+position.x;
     if(position.y<0) position.y=screen.y+position.y;
-    XMoveWindow(x, id, position.x, position.y); this->position=position; XFlush(x);
+    update();
+    XMoveWindow(x, id, position.x, position.y); XFlush(x);
+    this->position=position;
 }
 
 void Window::setSize(int2 size) {
-    if(!size.x) size.x=screen.x;
-    if(!size.y) size.y=screen.y;
-    XResizeWindow(x, id, size.x, size.y);
+    if(size.x<0||size.y<0) {
+        int2 hint=widget.sizeHint(); assert(hint,hint);
+        if(size.x<0) size.x=abs(hint.x)-size.x-1;
+        if(size.y<0) size.y=abs(hint.y)-size.y-1;
+    }
+    if(size.x==0) size.x=screen.x;
+    if(size.y==0) size.y=screen.y;
+    assert(size);
+    if(id) { XResizeWindow(x, id, size.x, size.y); XFlush(x); }
+    else this->size=widget.size=size;
 }
 
 void Window::setFullscreen(bool) {
@@ -175,7 +191,7 @@ void Window::setFullscreen(bool) {
     XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
 }
 
-void Window::setName(const string& name) { setProperty("UTF8_STRING", "_NET_WM_NAME", name); }
+void Window::setTitle(const string& title) { setProperty("UTF8_STRING", "_NET_WM_NAME", title); }
 
 void Window::setIcon(const Image& icon) {
     int size = 2+icon.width*icon.height;
@@ -188,6 +204,7 @@ void Window::setIcon(const Image& icon) {
 }
 
 void Window::setType(const string& type) {
+    if(!id) create();
     setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {XInternAtom(x,strz(type).data(),1)});
 }
 

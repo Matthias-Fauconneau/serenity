@@ -21,17 +21,15 @@ SRCS = core array string process
  SRCS += vector signal stream file image window font interface alsa ffmpeg resample player
  ICONS = play pause next
 else ifeq ($(TARGET),browser)
- SRCS += stream file http xml browser
- LIBS += -lssl
-else ifeq ($(TARGET),sampler)
- SRCS += vector stream time signal file alsa resample sequencer flac sampler midi music
+ SRCS += stream file time http xml vector image window font interface browser
+ ICONS = rss
 else ifeq ($(TARGET),music)
- SRCS += file image window font interface alsa resample sequencer sampler midi pdf music
+ SRCS += vector stream time signal file alsa resample sequencer flac sampler midi window image font interface music
+ ICONS = music music256
  INSTALL = icons/music.png music.desktop
 else ifeq ($(TARGET),taskbar)
  SRCS += vector signal stream time file dbus image window font interface launcher taskbar
  ICONS = button shutdown
- #ICONS = system network utility graphics office
 else ifeq ($(TARGET),editor)
  SRCS += file image gl window font editor
  GLSL = editor
@@ -54,6 +52,10 @@ endif
 
 ifneq (,$(findstring image,$(SRCS)))
   LIBS += -lz
+endif
+
+ifneq (,$(findstring http,$(SRCS)))
+ LIBS += -lssl
 endif
 
 ifneq (,$(findstring ffmpeg,$(SRCS)))

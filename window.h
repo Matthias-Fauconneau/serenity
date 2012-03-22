@@ -15,10 +15,12 @@
 /// Window embeds \a widget in an X11 window, displaying it and forwarding user input.
 struct Window : Poll {
     no_copy(Window)
-    /// Display \a widget in a window
-    /// \note Make sure the referenced widget is initialized before running this constructor
-    /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1)
-    Window(Widget* widget, int2 size=int2(0,0), const string& name=string(), const Image& icon=Image(), ubyte opacity=192);
+    /// Initialize an X11 window for \a widget
+    /// \note Windows are initially hidden, use \a show to display windows.
+    /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show.
+    Window(Widget* widget, string&& name=string(), Image&& icon=Image(), int2 size=int2(-1,-1), ubyte opacity=192);
+    /// Create the window
+    void create();
     /// Update the window by handling any incoming events
     void update();
     /// Repaint window contents. Called by update after an event is accepted by a widget.
@@ -28,8 +30,6 @@ struct Window : Poll {
     void show();
     /// Hide window
     void hide();
-    /// Set visibility
-    void setVisible(bool visible);
     /// Current visibility
     bool visible = false;
 
@@ -39,8 +39,8 @@ struct Window : Poll {
     void setSize(int2 size);
     /// Toggle windowed/fullscreen mode
     void setFullscreen(bool fullscreen=true);
-    /// Rename window to \a name
-    void setName(const string& name);
+    /// Rename window to \a title
+    void setTitle(const string& title);
     /// Set window icon to \a icon
     void setIcon(const Image& icon);
     /// Set window type (using Extended Window Manager Hints)
@@ -63,6 +63,7 @@ struct Window : Poll {
 
     /// Get X11 property \a name on \a window
     template<class T> static array<T> getProperty(XID window, const char* property);
+    static void sync();
 protected:
     /// Set X11 property \a name to \a value
     template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
@@ -76,11 +77,13 @@ protected:
     static Visual* visual;
     static map<XID, Window*> windows;
 
-    XID id;
+    XID id=0;
     GC gc;
     XImage* image;
     XShmSegmentInfo shminfo;
     int2 position, size;
+    string title;
+    Image icon;
     Widget& widget;
     ubyte opacity;
 };

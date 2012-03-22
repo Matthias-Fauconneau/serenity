@@ -12,11 +12,10 @@
 #include "array.cc"
 
 void Sampler::open(const string& path) {
-    // parse sfz and mmap samples
+    // parse sfz and map samples
     Sample group;
-    int start=getRealTime();
     TextBuffer s(readFile(path));
-    auto folder = section(path,'/',0,-2,true);
+    int folder = openFolder(section(path,'/',0,-2,true));
     Sample* sample=0;
     for(;;) {
         s.whileAny(" \n\r"_);
@@ -31,11 +30,9 @@ void Sampler::open(const string& path) {
             string key = s.until("="_);
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
-                if(getRealTime()-start > 1000) { start=getRealTime(); log("Loading..."_,samples.size()); }
-                string path = folder+replace(value,"\\"_,"/"_);
-                sample->data = mapFile(path);
+                string path = replace(value,"\\"_,"/"_);
+                sample->data = mapFile(path,folder);
                 madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
-                mlock((void*)sample->data.data, sample->data.size);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -51,10 +48,26 @@ void Sampler::open(const string& path) {
         }
     }
 
-    for(int i=0;i<3;i++) { Layer& l=layers[i]; //setup layers and pitch shifting
+    //setup layers and pitch shifting
+    for(int i=0;i<3;i++) { Layer& l=layers[i];
         l.size = round(period*exp2((i-1)/12.0));
         l.buffer = new float[2*l.size];
         if(l.size!=period) new (&l.resampler) Resampler(2, l.size, period);
+    }
+}
+
+void Sampler::lock() {
+    uint size=0; for(const Sample& s : samples) size += s.data.size;
+    //lock samples in memory
+    uint available = availableMemory();
+    bool lock=false;
+    if(size/1024<available) lock=true;
+    else warn(available/1024,"MiB available, need",size/1024/1024,"MiB. Samples will be streamed from disk");
+    uint64 start=getRealTime();
+    int i=0; for(const Sample& s : samples) {
+        if(getRealTime()-start > 1000) { start=getRealTime(); log("Loading "_,i,"/",samples.size()); }
+        mlock((void*)s.data.data, lock?s.data.size:min(s.data.size,64*1024u)); //lock full samples or only 64Kb
+        i++;
     }
 }
 

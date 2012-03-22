@@ -12,8 +12,8 @@ struct Search : TextInput {
 
 struct Command : Item {
     signal<> triggered;
-    string exec;
-    Command(Icon&& icon, Text&& text, string&& exec):Item(move(icon),move(text)),exec(move(exec)){}
+    string path; array<string> args;
+    Command(Icon&& icon, Text&& text, string&& path, array<string>&& args):Item(move(icon),move(text)),path(move(path)),args(move(args)){}
     bool mouseEvent(int2, Event event, Button) override;
 };
 

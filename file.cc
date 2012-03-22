@@ -11,8 +11,8 @@ int openFile(const string& path, int at) {
     return fd;
 }
 
-int createFile(const string& path, int at) {
-    assert(!exists(path,at),path);
+int createFile(const string& path, int at, bool overwrite) {
+    if(!overwrite && exists(path,at)) error("exists",path);
     return openat(at, strz(path).data(),O_CREAT|O_WRONLY|O_TRUNC,0666);
 }
 
@@ -36,8 +36,8 @@ Map mapFile(const string& path, int at) {
 }
 Map::~Map() { munmap((void*)data,size); }
 
-void writeFile(const string& path, const array<byte>& content, int at) {
-    int fd = createFile(path,at);
+void writeFile(const string& path, const array<byte>& content, int at, bool overwrite) {
+    int fd = createFile(path,at,overwrite);
     if(fd < 0) error(path,fd,at);
     write(fd,content);
     close(fd);
@@ -61,6 +61,8 @@ bool exists(const string& path, int at) {
 
 struct stat statFile(const string& path, int at) { struct stat file; fstatat(at, strz(path).data(), &file, 0); return file; }
 bool isFolder(const string& path, int at) { return statFile(path,at).st_mode&S_IFDIR; }
+
+long modifiedTime(const string& path, int at) { return statFile(path,at).st_mtime; }
 
 template<class T> void insertSorted(array<T>& a, T&& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; a.insertAt(i,move(v)); }
 array<string> listFiles(const string& folder, Flags flags) {

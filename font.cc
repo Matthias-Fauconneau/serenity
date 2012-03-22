@@ -41,7 +41,7 @@ GlyphMetrics Font::metrics(int size, int code) {
     assert(face);
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,size<<6,0,0}; FT_Request_Size(face,&req);
     int index = FT_Get_Char_Index(face, code);
-    assert(index, code); //if(!index) index=code;
+    assert(index, hex(code)); //if(!index) index=code;
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
     GlyphMetrics metrics={
     vec2(face->glyph->advance.x / 64.0, face->glyph->advance.y / 64.0),

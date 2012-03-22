@@ -27,16 +27,19 @@ struct Poll {
 
 /// Set process CPU scheduling priority (-20 high priority, 19 low priority)
 void setPriority(int priority);
+
+/// Return available memory in kB
+uint availableMemory();
+
 /// Execute binary at \a path with command line arguments \a args
 void execute(const string& path, const array<string>& args=array<string>());
 
+#if DEBUG
 /// Returns CPU time in milliseconds consumed since start of process
 int getCPUTime();
-
+extern map<const char*, int> profile;
 /// Times \a statements and add to the process CPU usage profile
 /// \note use getCPUTime to profile kernel time and avoid other interference from other processes (adapted to longer tasks)
-#if DEBUG
-extern map<const char*, int> profile;
 #define profile(name, statements ) { int start=getCPUTime(); statements; profile[#name]+=getCPUTime()-start; }
 #else
 #define profile(name, statements ) { statements; }

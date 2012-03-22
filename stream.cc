@@ -9,12 +9,12 @@ template<class T> const T& DataStream::peek() {
     need(sizeof(T));
     return *(T*)(peekData((uint)sizeof(T)).data());
 }
-template<class T> array<T> DataStream::peek(int size) {
+template<class T> array<T> DataStream::peek(uint size) {
     need(size*sizeof(T));
     return array<T>(peekData((uint)size*sizeof(T)));
 }
 template<class T> T DataStream::read() { T t = peek<T>(); advance(sizeof(T)); return t; }
-template<class T> array<T> DataStream::read(int size) { array<T> t = peek<T>(size); advance(size*sizeof(T)); return t; }
+template<class T> array<T> DataStream::read(uint size) { array<T> t = peek<T>(size); advance(size*sizeof(T)); return t; }
 template<class T> array<T> DataStream::readArray() { uint size=read<uint32>(); return read<T>(size); }
 template<class T> array<T> DataStream::readAll() { uint size=available(-1); assert(!(size%sizeof(T))); return read<T>(size/sizeof(T)); }
 
@@ -36,13 +36,13 @@ template<class T> bool DataStream::match(const array<T>& key) {
 }
 template<class T> array<T> DataStream::until(const T& key) {
     array<T> a;
-    for(;;) { T t = read<T>(); if(t==key) break; else a<<t; }
+    while(available(sizeof(T))>=sizeof(T)) { T t = read<T>(); if(t==key) break; else a<<t; }
     return a;
 }
 template<class T> array<T> DataStream::until(const array<T>& key) {
     array<T> a;
-    for(;available(key.size())>=key.size() && peek<T>(key.size()) != key;) a << read<T>();
-    advance(key.size()*sizeof(T));
+    for(;available(key.size()*sizeof(T))>=key.size()*sizeof(T) && peek<T>(key.size()) != key;) a << read<T>();
+    match(key);
     return a;
 }
 template<class T> void DataStream::whileAny(const array<T>& any) { while(matchAny(any)); }
@@ -54,7 +54,7 @@ template<class T> array<T> DataStream::untilAny(const array<T>& any) {
 
 template char DataStream::read();
 template uint DataStream::read();
-template array<char> DataStream::read(int);
+template array<char> DataStream::read(uint);
 template array<char> DataStream::readArray();
 template array<char> DataStream::readAll();
 template bool DataStream::match(const array<char>&);
@@ -68,7 +68,7 @@ template DataStream::ReadOperator::operator uint8();
 Buffer::Buffer(array<byte>&& buffer) : buffer(move(buffer)) {}
 uint Buffer::available(uint) { return buffer.size()-index; }
 void Buffer::advance(int count) { index+=count;  assert(index<=buffer.size()); }
-array<byte> Buffer::peekData(uint size) { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); }
+array<byte> Buffer::peekData(uint size) { assert(index+size<=buffer.size());  return copy(array<byte>(buffer.data()+index,size)); }
 
 void TextStream::skip() { whileAny(" \t\n\r"_); }
 string TextStream::until(const string& key) { return DataStream::until((array<char>&)key); }
@@ -76,4 +76,9 @@ string TextStream::word() {
     string word;
     for(;available(1);) { char c=peek<char>(); if(!(c>='a'&&c<='z')) break; word<<c; advance(1); }
     return word;
+}
+string TextStream::xmlIdentifier() {
+    string identifier;
+    for(;available(1);) { char c=peek<char>(); if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c==':')) break; identifier<<c; advance(1); }
+    return identifier;
 }

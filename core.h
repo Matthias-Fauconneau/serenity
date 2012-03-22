@@ -31,9 +31,12 @@ template<> struct predicate<true> { typedef void* type; };
 #define perfect(T) class T##f, predicate(can_forward(T))
 #define perfect2(T,U) class T##f, class U##f, predicate(can_forward(T)), predicate1(can_forward(U))
 // Move semantics
-template<class T> inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)t; }
+#include <bits/move.h>
+using std::move;
+using std::forward;
+/*template<class T> inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)t; }
 template<class T> inline constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
-template<class T> inline constexpr T&& forward(remove_reference(T)&& t){static_assert(!std::is_lvalue_reference<T>::value,""); return (T&&)t; }
+template<class T> inline constexpr T&& forward(remove_reference(T)&& t){static_assert(!std::is_lvalue_reference<T>::value,""); return (T&&)t; }*/
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
 
 /// Primitive types

@@ -6,15 +6,18 @@
 #include "alsa.h"
 #include "midi.h"
 
-#ifdef UI
+#ifdef PDF
 #include "pdf.h"
+#endif
 #include "interface.h"
 #include "window.h"
-#endif
 
 #include <sys/resource.h>
 
 #include "array.cc"
+
+ICON(music);
+ICON(music256);
 
 struct Music : Application {
     Sequencer seq;
@@ -22,18 +25,20 @@ struct Music : Application {
     AudioOutput audio{true};
     MidiFile midi;
 
-#ifdef UI
-    PDF sheet;
+#ifdef PDF
+    PDF widget;
     //Score score;
     map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
-    Window window{sheet,int2(1280,1024),"Music"_};
+#else
+    Icon widget {move(music256Icon)};
 #endif
+    Window window{&widget,"Music"_,move(musicIcon)};
     void start(array<string>&& arguments) {
-#ifdef UI
+        string instrument;
         window.keyPress.connect(this,&Music::keyPress);
-#endif
         for(auto&& path : arguments) {
             if(endsWith(path, ".sfz"_) && exists(path)) {
+                instrument=section(path,'.',0,-2);
                 sampler.open(path);
                 seq.noteEvent.connect(&sampler,&Sampler::event);
                 audio.read = {&sampler, &Sampler::read};
@@ -46,7 +51,7 @@ struct Music : Application {
                     seq.recordMID(path);
                 }
             }
-#ifdef UI
+#ifdef PDF
             else if(endsWith(path, ".pdf"_) && exists(path)) {
                 //sheet.onGlyph.connect(&score,&Score::onGlyph);
                 //sheet.onPath.connect(&score,&Score::onPath);
@@ -71,12 +76,14 @@ struct Music : Application {
         }
         if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
         //sheet.scroll=1600;
+        window.show(); window.update();
+        assert(window.visible);
+        sampler.lock();
+        window.setTitle(instrument);
 #ifndef DEBUG
         setPriority(-20);
 #endif
         audio.start();
     }
-#ifdef UI
     void keyPress(Key key) { if(key==Escape) running=false; }
-#endif
 } music;

@@ -34,6 +34,7 @@ struct Sampler {
     operator bool() const { return samples.size(); }
 
     void open(const string& path);
+    void lock();
     void event(int key, int vel);
     void read(int16* output, uint size);
     void recordWAV(const string& path);

@@ -28,12 +28,12 @@ struct DataStream : virtual protected Stream {
     /// Peeks at the next raw \a T element in stream without moving \a pos
     template<class T> const T& peek();
     /// Peeks at the next \a size raw \a T elements in stream without moving \a pos
-    template<class T> array<T> peek(int size);
+    template<class T> array<T> peek(uint size);
 
     /// Reads one raw \a T element from stream
     template<class T> T read();
     /// Reads \a size raw \a T elements from stream
-    template<class T> array<T> read(int size);
+    template<class T> array<T> read(uint size);
     /// Read an array of raw \a T elements from stream with the array size encoded as an uint32
     template<class T> array<T> readArray();
     /// Reads the rest of the stream as raw \a T elements
@@ -93,6 +93,7 @@ struct TextStream : DataStream {
     string readAll() { return DataStream::readAll<char>(); }
     string until(const string& key);
     string word();
+    string xmlIdentifier();
 };
 
 struct DataBuffer : DataStream, Buffer {

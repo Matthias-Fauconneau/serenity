@@ -103,9 +103,9 @@ template<class T, class O> array<T> cast(array<O>&& array);
 
 /// Slices an array referencing elements from \a pos to \a pos + \a size
 /// \note Using move semantics, this operation is safe without refcounting the data buffer
-generic array slice(array&& a, uint pos, uint size);
+//generic array slice(array&& a, uint pos, uint size);
 /// Slices an array referencing elements from \a pos to the end of the array
-generic array slice(array&& a, uint pos);
+//generic array slice(array&& a, uint pos);
 
 // Copyable?
 /// Slices an array copying elements from \a pos to \a pos + \a size

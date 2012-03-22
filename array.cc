@@ -94,12 +94,12 @@ generic T* array<T>::end() { return (T*)data()+size(); }
 
 #define array array<T>
 
-generic array slice(array&& a, uint pos, uint size) {
+/*generic array slice(array&& a, uint pos, uint size) {
     assert(pos+size<=a.size());
     assert(pos==0 || a.capacity() == 0); //only allow slicing of referencing arrays. TODO: custom realloc with slicing
     return array(a.data()+pos,size);
 }
-generic array slice(array&& a, uint pos) { return slice(move(a),pos,a.size()-pos); }
+generic array slice(array&& a, uint pos) { return slice(move(a),pos,a.size()-pos); }*/
 
 // Copyable?
 generic array slice(const array& a, uint pos, uint size) {
