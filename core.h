@@ -57,6 +57,9 @@ typedef unsigned long size_t; typedef long ssize_t; typedef unsigned long ptr;
 typedef unsigned int size_t; typedef int ssize_t; typedef unsigned int ptr;
 #endif
 
+#define swap32 __builtin_bswap32
+constexpr uint16 swap16(uint16 x) { return swap32(x)>>16; }
+
 /// Basic operations
 template <class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 template <class T> T min(T a, T b) { return a<b ? a : b; }

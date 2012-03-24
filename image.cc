@@ -97,7 +97,6 @@ Image resize(const Image& image, uint width, uint height) {
     return target;
 }
 
-#define swap32 __builtin_bswap32
 Image swap(Image&& image) {
     uint32* p = (uint32*)image.data;
     for(uint i=0;i<image.width*image.height;i++) p[i] = swap32(p[i]);

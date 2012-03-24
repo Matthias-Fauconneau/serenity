@@ -5,12 +5,7 @@ ifeq (,$(TARGET))
  TARGET = taskbar
 endif
 
-	ifeq ($(BUILD),debug)
-else ifeq ($(BUILD),memdbg)
-else ifeq ($(BUILD),reldbg)
-else ifeq ($(BUILD),release)
-else ifeq ($(BUILD),trace)
-else
+ifeq (,$(BUILD))
  BUILD = release
 endif
 
@@ -20,6 +15,7 @@ SRCS = core array string process
 	 ifeq ($(TARGET),player)
  SRCS += vector signal stream file image window font interface alsa ffmpeg resample player
  ICONS = play pause next
+ INSTALL =icons/player.png  player.desktop
 else ifeq ($(TARGET),browser)
  SRCS += stream file time http xml vector image window font interface browser
  ICONS = rss
@@ -89,11 +85,14 @@ FLAGS += -pipe -std=c++11 -fno-operator-names -Wall -Wextra -Wno-narrowing -Wno-
 ifeq ($(BUILD),debug)
 	FLAGS += -ggdb -DDEBUG -fno-omit-frame-pointer
 	LIBS += -lbfd
-else ifeq ($(BUILD),memdbg)
+else ifeq ($(BUILD),memoryfast)
 	FLAGS += -ggdb -DDEBUG -DTRACE_MALLOC -Ofast -fno-omit-frame-pointer
 	SRCS += memory
 	LIBS += -lbfd
-else ifeq ($(BUILD),reldbg)
+else ifeq ($(BUILD),debugfast)
+	FLAGS += -ggdb -DDEBUG -fno-omit-frame-pointer -Ofast -fno-rtti
+	LIBS += -lbfd
+else ifeq ($(BUILD),gdbfast)
 	FLAGS += -ggdb -Ofast -fno-rtti
 else ifeq ($(BUILD),release)
 	FLAGS += -Ofast -fno-rtti
@@ -134,10 +133,10 @@ clean:
 	rm $(BUILD)/*.o
 
 install_icons/%.png: icons/%.png
-	@cp $< $(PREFIX)/share/icons/hicolor/32x32/apps
+	cp $< $(PREFIX)/share/icons/hicolor/32x32/apps
 
 install_%.desktop: %.desktop
-	@cp $< $(PREFIX)/share/applications/
+	cp $< $(PREFIX)/share/applications/
 
 install: all $(INSTALL:%=install_%)
 	cp $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)

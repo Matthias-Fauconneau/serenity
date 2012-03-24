@@ -18,7 +18,7 @@ struct Window : Poll {
     /// Initialize an X11 window for \a widget
     /// \note Windows are initially hidden, use \a show to display windows.
     /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show.
-    Window(Widget* widget, string&& name=string(), Image&& icon=Image(), int2 size=int2(-1,-1), ubyte opacity=192);
+    Window(Widget* widget, const string &name=string(), const Image &icon=Image(), int2 size=int2(-1,-1), ubyte opacity=192);
     /// Create the window
     void create();
     /// Update the window by handling any incoming events
@@ -69,7 +69,7 @@ protected:
     template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
 
     void event(pollfd);
-    void event(const XEvent& e);
+    bool event(const XEvent& e);
 
     static Display* x;
     static int2 screen;
@@ -78,12 +78,16 @@ protected:
     static map<XID, Window*> windows;
 
     XID id=0;
-    GC gc;
-    XImage* image;
-    XShmSegmentInfo shminfo;
+
     int2 position, size;
     string title;
     Image icon;
+
+    GC gc;
+    XImage* image;
+    XShmSegmentInfo shminfo;
+public:
+    int bgCenter=240,bgOuter=224;
     Widget& widget;
     ubyte opacity;
 };

@@ -26,11 +26,22 @@ template<class T> T read(int fd) {
     return t;
 }
 
+template<class T> inline void write(int fd, const array<T>& s) {
+    uint unused wrote = write(fd,s.data(),(size_t)s.size()*sizeof(T));
+    assert(wrote==s.size());
+}
+
 /// File
 const int CWD = -100;
+/// Open file for reading
 int openFile(const string& path, int at=CWD);
+/// Open file for writing, overwrite if existing
 int createFile(const string& path, int at=CWD, bool overwrite=false);
+/// Open file for writing, append if existing
+int appendFile(const string& path, int at=CWD);
+
 array<byte> readFile(const string& path, int at=CWD);
+
 struct Map {
     no_copy(Map)
     const byte* data=0; uint size=0;
@@ -40,11 +51,14 @@ struct Map {
     Map& operator=(Map&& o){data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
     ~Map();
 };
+
 Map mapFile(const string& path, int at=CWD);
+
 void writeFile(const string& path, const array<byte>& content, int at=CWD, bool overwrite=false);
 
 /// File system
 int openFolder(const string& path, int at=CWD);
+int home();
 bool exists(const string& path, int at=CWD);
 bool createFolder(const string& path, int at);
 bool isFolder(const string& path, int at=CWD);

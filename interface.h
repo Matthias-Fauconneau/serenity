@@ -110,8 +110,11 @@ template<class... T> struct tuple  : zero, item<T>... {
     tuple() : zero(offsets,sizeof...(T)), item<T>(offsets)... {}
     tuple(T&&... t) : zero(offsets,sizeof...(T)), item<T>(move(t),offsets)... {}
     int size() const { return sizeof...(T); }
-    template<class A> operator A&() { return (A&)*this; } //static indexing using type
-    template<class B> B& at(int i) { return *(B*)((byte*)offsets+offsets[i]); }
+
+    template<class A> A& get() { return static_cast<A&>(*this); }
+    template<class A> const A& get() const { return static_cast<const A&>(*this); } //static indexing using type
+
+    //template<class B> B& at(int i) { return *(B*)((byte*)offsets+offsets[i]); } //expected primary name before > ?
     void* at(int i) { return (void*)((byte*)offsets+offsets[i]); }
 };
 
@@ -122,9 +125,13 @@ template<class... T> struct Tuple : virtual Layout {
     Tuple() : items() {}
     Tuple(T&&... t) : items(move(t)...) {}
     int count() const { return items.size(); }
+
+    template<class A> A& get() { return items.get<A>(); } //static indexing using type
+    template<class A> const A& get() const { return items.get<A>(); } //static indexing using type
+    //template<class A> operator const A&() const { return items.operator A&(); } //static indexing using type
+
     Widget& at(int i) { return *(Widget*)items.at(i); }
     //Widget& at(int i) { return items.at<Widget>(i); } //expected primary name before > ?
-    template<class A> operator A&() { return items.operator A&(); } //static indexing using type
 };
 
 /// Linear divide space between contained widgets
@@ -166,6 +173,8 @@ struct UniformGrid : virtual Layout {
 
 /// Selection implements selection of active widget/item for a \a Layout
 struct Selection : virtual Layout {
+    /// User clicked on an item.
+    signal<int /*index*/> itemPressed;
     /// User changed active index.
     signal<int /*index*/> activeChanged;
     /// Active index
@@ -212,20 +221,26 @@ struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(string&& text=""_, int size=16, ubyte opacity=255);
 
+    void setText(string&& text) { this->text=move(text); textSize=zero; }
+    void setSize(int size) { this->size=size; textSize=zero; }
+
     /// Displayed text
     string text;
     /// Font size
     int size;
     /// Opacity
     ubyte opacity;
+    /// Wrap
+    bool wrap=false;
 
     int2 sizeHint();
-    void update() override;
+    void update() override { update(wrap); }
+    void update(bool wrap);
     void render(int2 parent);
 protected:
-    int2 textSize;
+    int2 textSize=zero;
     struct Blit { int2 pos; const Image& image; };
-    array<Blit> layout;
+    array<Blit> blits;
 };
 
 /// TextList is a \a List of \a Text items

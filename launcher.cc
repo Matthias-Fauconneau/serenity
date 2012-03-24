@@ -72,6 +72,8 @@ List<Command> readShortcuts() {
             if(exists(p)) { path=move(p); arguments=slice(split(entries["Exec"_],' '),1); break; }
         }
         assert(path);
+        for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
+        for(uint i=0;i<arguments.size();) if(contains(arguments[i],'%')) arguments.removeAt(i); else i++;
         shortcuts << Command(move(icon),move(entries["Name"_]),move(path),move(arguments));
     }
     return shortcuts;

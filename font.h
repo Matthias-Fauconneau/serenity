@@ -32,7 +32,7 @@ struct Font {
     Font(const char* path);
     Font(string&& data);
     FontMetrics metrics(int size);
-    int kerning(int leftCode, int rightCode);
+    float kerning(int leftCode, int rightCode);
     GlyphMetrics metrics(int size, int code);
     Glyph& glyph(int size, int code);
 };

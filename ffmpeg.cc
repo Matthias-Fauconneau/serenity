@@ -7,7 +7,7 @@ extern "C" {
 }
 
 void AudioFile::open(const string& path) {
-    if(file) close(); else { av_register_all(); av_log_set_level(AV_LOG_ERROR); }
+    if(file) close(); else { av_register_all(); /*av_log_set_level(AV_LOG_ERROR);*/ }
 
     audioPTS=0;
     if(avformat_open_input(&file, strz(path).data(), 0, 0)) { file=0; return; }
@@ -42,12 +42,12 @@ void AudioFile::seek( int time ) {
     if(file && av_seek_frame(file,-1,time*1000*1000,0) < 0) { warn("Seek Error"_); }
     //avformat_seek_file(file,0,0,time*file->file_size/duration(),file->file_size,AVSEEK_FLAG_BYTE);
 }
-void AudioFile::read(int16* output, int outputSize) {
+void AudioFile::read(int16* output, uint outputSize) {
     if(file) timeChanged.emit(position(),duration());
     if(!file) { clear(output,outputSize*2); return; }
     for(;;) {
         if(inputSize>0) {
-            int size = min((int)inputSize,outputSize);
+            int size = min((uint)inputSize,outputSize);
             for(int i=0;i<size*audioOutput.channels;i++)
                 output[i] = clip(-32768,int(input[i]*32768),32767); //copy/convert input buffer to output
             inputSize -= size; input += size*audioInput.channels; //update input buffer
@@ -82,7 +82,7 @@ void AudioFile::read(int16* output, int outputSize) {
             int size = (inputSize*audioOutput.frequency-1)/audioInput.frequency+1;
             buffer = new float[size*audioOutput.channels];
             int in = inputSize, out = size;
-            resampler.filter(input,&in,buffer,&out);
+            resampler.filter(input,&in,buffer,&out,false);
             assert(in == (int)inputSize,in,inputSize,out,size);
             if(audio->sample_fmt != AV_SAMPLE_FMT_FLT) delete[] input;
             input = buffer; inputSize = out;

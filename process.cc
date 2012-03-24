@@ -14,14 +14,16 @@
 
 void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
 
-/*/// limit process ressources to avoid hanging the system when debugging
+#ifdef DEBUG
+/// limit process ressources to avoid hanging the system when debugging
 /// \note limits will also apply to child processes
 declare(static void limit_resource(), constructor) {
-    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_STACK,&limit); } //256 MB
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<29; setrlimit(RLIMIT_DATA,&limit); } //512 MB
+    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<26; setrlimit(RLIMIT_STACK,&limit); } //64 MB
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_DATA,&limit); } //256 MB
     { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30; setrlimit(RLIMIT_AS,&limit); } //1 GB
     setPriority(19);
-}*/
+}
+#endif
 
 uint availableMemory() {
     int fd = openFile("/proc/meminfo"_);
@@ -66,6 +68,7 @@ void execute(const string& path, const array<string>& args) {
 
 static map<Poll*,pollfd> polls __attribute((init_priority(103)));
 void Poll::registerPoll(pollfd poll) { polls.insert(this,poll); }
+void Poll::unregisterPoll() { polls.remove(this); }
 
 /// Application
 

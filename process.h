@@ -21,6 +21,8 @@ struct Application {
 struct Poll {
     /// Add this to the process-wide event loop
     void registerPoll(pollfd);
+    /// Remove this to the process-wide event loop
+    void unregisterPoll();
     /// Callback on new events
     virtual void event(pollfd p) =0;
 };

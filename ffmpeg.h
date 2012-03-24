@@ -15,7 +15,7 @@ struct AudioFile {
     int duration();
     void seek( int time );
     void setup(const AudioFormat& format);
-    void read(int16* output, int size);
+    void read(int16* output, uint size);
     signal<int,int> timeChanged;
 
 protected:

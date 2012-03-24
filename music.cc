@@ -33,7 +33,9 @@ struct Music : Application {
     Icon widget {move(music256Icon)};
 #endif
     Window window{&widget,"Music"_,move(musicIcon)};
+    ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_,CWD,true); }
     void start(array<string>&& arguments) {
+        writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_,CWD,true);
         string instrument;
         window.keyPress.connect(this,&Music::keyPress);
         for(auto&& path : arguments) {
@@ -76,7 +78,7 @@ struct Music : Application {
         }
         if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
         //sheet.scroll=1600;
-        window.show(); window.update();
+        window.show(); Window::sync(); window.update();
         assert(window.visible);
         sampler.lock();
         window.setTitle(instrument);

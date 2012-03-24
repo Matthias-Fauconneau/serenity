@@ -27,7 +27,7 @@ struct Player : Application {
        Scroll<TextList> titles;
       HBox main { &albums.parent(), &titles.parent() };
      VBox layout { &toolbar, &main };
-     Window window{&layout, int2(0,0), "Player"_, pauseIcon};
+     Window window{&layout,"Player"_,copy(pauseIcon),int2(640,-16)};
 
     uint playHotKey = window.addHotKey("XF86AudioPlay"_);
 
@@ -48,7 +48,7 @@ struct Player : Application {
 
         for(auto&& path: arguments) {
             assert(exists(path),path);
-            if(isDirectory(path)) playAlbum(path); else appendFile(move(path));
+            if(isFolder(path)) playAlbum(path); else appendFile(move(path));
         }
         if(!files && exists("/Music/.last"_)) {
             string last = readFile("/Music/.last"_);
@@ -60,9 +60,10 @@ struct Player : Application {
         }
         if(files) next();
         window.show();
+        Window::sync();
         setPriority(-20);
     }
-    ~Player() { if(titles.index<0) return; string& file = files[titles.index]; write(createFile("/Music/.last"_),&file,file.size()); }
+    ~Player() { if(titles.index<0) return; string& file = files[titles.index]; writeFile("/Music/.last"_,file,CWD,true); }
     void keyPress(Key key) {
         /**/ if(key == Escape) quit();
         else if(key == playHotKey) togglePlay(!playButton.enabled);
@@ -76,18 +77,18 @@ struct Player : Application {
         files << move(path);
     }
     void playAlbum(const string& path) {
-        assert(isDirectory(path));
+        assert(isFolder(path));
         array<string> files = listFiles(path,Recursive|Sort|Files);
         for(auto&& file: files) appendFile(move(file));
         layout.update(); window.render();
     }
     void playAlbum(int index) {
         stop(); files.clear(); titles.clear();
-        window.setName(albums.active().text);
+        window.setTitle(albums.active().text);
         playAlbum(folders[index]);
     }
     void play(int index) {
-        window.setName(titles.active().text);
+        window.setTitle(titles.active().text);
         media.open(files[index]);
         audio.start();
         togglePlay(true);
@@ -95,7 +96,7 @@ struct Player : Application {
     void next() {
         if(!playButton.enabled) togglePlay(true);
         if(titles.index+1<titles.count()) play(++titles.index);
-        else window.setName(albums.active().text);
+        else window.setTitle(albums.active().text);
         titles.ensureVisible(titles.active());
     }
     void togglePlay(bool play) {
@@ -116,8 +117,8 @@ struct Player : Application {
         if(position == duration) next();
         if(!window.visible || slider.value == position) return;
         slider.value = position; slider.maximum=duration;
-        elapsed.text=str(uint64(position/60),10,2)+":"_+str(uint64(position%60),10,2);
-        remaining.text=str(uint64((duration-position)/60),10,2)+":"_+str(uint64((duration-position)%60),10,2);
+        elapsed.text=dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2);
+        remaining.text=dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2);
         toolbar.update(); window.render();
     }
 } player;

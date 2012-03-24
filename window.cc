@@ -40,8 +40,8 @@ template<class T> void Window::setProperty(const char* type,const char* name, co
     XFlush(x);
 }
 
-Window::Window(Widget* widget, string&& title, Image&& icon, int2 size, ubyte opacity)
-    : size(size), title(move(title)), icon(move(icon)), widget(*widget), opacity(opacity) {
+Window::Window(Widget* widget, const string& title, const Image& icon, int2 size, ubyte opacity)
+    : size(size), title(copy(title)), icon(copy(icon)), widget(*widget), opacity(opacity) {
     if(!x) {
         x = XOpenDisplay(0);
         pollfd p={XConnectionNumber(x), POLLIN, 0}; registerPoll(p);
@@ -52,43 +52,49 @@ Window::Window(Widget* widget, string&& title, Image&& icon, int2 size, ubyte op
 
 
 void Window::event(pollfd) { update(); }
-void Window::update() { while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e); windows[e.xany.window]->event(e); } }
-void Window::event(const XEvent& e) {
+void Window::update() {
+    array<XID> needRender;
+    while(XEventsQueued(x, QueuedAfterFlush)) {
+        XEvent e; XNextEvent(x,&e);
+        XID id = e.xany.window;
+        if(windows[id]->event(e) && !contains(needRender,id)) needRender << id;
+    }
+    for(XID id: needRender) windows[id]->render();
+}
+bool Window::event(const XEvent& e) {
     assert(id);
-    bool needRender=false;
     if(e.type==MotionNotify) {
-        needRender |= widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, e.xmotion.state&Button1Mask ? LeftButton : None);
+        return widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, e.xmotion.state&Button1Mask ? LeftButton : None);
     } else if(e.type==ButtonPress) {
-        needRender |= widget.mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
+        return widget.mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
     } else if(e.type==KeyPress) {
         auto key = XKeycodeToKeysym(x,e.xkey.keycode,0);
         keyPress.emit((Key)key);
-        if(focus) needRender |= focus->keyPress((Key)key);
+        if(focus) return focus->keyPress((Key)key);
     } else if(e.type==EnterNotify || e.type==LeaveNotify) {
-        needRender |= widget.mouseEvent(int2(e.xcrossing.x,e.xcrossing.y), e.type==EnterNotify?Enter:Leave, None);
+        return widget.mouseEvent(int2(e.xcrossing.x,e.xcrossing.y), e.type==EnterNotify?Enter:Leave, None);
     } else if(e.type==Expose && !e.xexpose.count) {
-        needRender = true;
+        return true;
     } else if(e.type==ConfigureNotify || e.type==ReparentNotify) {
         XWindowAttributes window; XGetWindowAttributes(x,id,&window); int2 size(window.width, window.height);
         this->position=int2(window.x,window.y);
         if(this->size != size) {
             this->size=widget.size=size;
             widget.update();
-            if(visible) needRender=true;
+            if(visible) return true;
         }
     } else if(e.type==MapNotify) {
         visible=true;
         assert(size);
         widget.update();
-        needRender = true;
+        return true;
     } else if(e.type==UnmapNotify) {
         visible=false;
     } else if(e.type==ClientMessage) {
         keyPress.emit(Escape);
         widget.keyPress(Escape);
-        return;
     }
-    if(needRender) render();
+    return false;
 }
 
 template<class T> T mix(const T& a,const T& b, float t) { return a*t + b*(1-t); }
@@ -96,7 +102,7 @@ template<class T> T mix(const T& a,const T& b, float t) { return a*t + b*(1-t); 
 void Window::render() {
     assert(id);
     if(!visible || !size) return;
-    //log("render",indexOf(windows.keys,id)); TODO: optimize
+    //log("render",indexOf(windows.keys,id)); //TODO: optimize
     if(!image || image->width != size.x || image->height != size.y) {
         if(image) {
             XShmDetach(x, &shminfo);
@@ -114,7 +120,7 @@ void Window::render() {
          int2 center = int2(size.x/2,0); int radius=256;
          for_Image(framebuffer) {
             int2 pos = int2(x,y);
-            int g = mix(224,240,min(1.f,length(pos-center)/radius))*opacity/255;
+            int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
             framebuffer(x,y) = byte4(g,g,g,opacity);
          }
     }
@@ -191,13 +197,19 @@ void Window::setFullscreen(bool) {
     XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
 }
 
-void Window::setTitle(const string& title) { setProperty("UTF8_STRING", "_NET_WM_NAME", title); }
+void Window::setTitle(const string& title) {
+    this->title=copy(title);
+    if(!id) return;
+    setProperty("UTF8_STRING", "_NET_WM_NAME", title);
+}
 
 void Window::setIcon(const Image& icon) {
+    this->icon=copy(icon);
+    if(!id) return;
     int size = 2+icon.width*icon.height;
     array<int> buffer(2*size); //CARDINAL is long
-    buffer.buffer.size=2*size; buffer[0]=icon.width, buffer[1]=icon.height;
-    for(uint i=0;i<icon.width*icon.height;i++) buffer[i]=*(uint*)icon.data; //pad to CARDINAL
+    buffer.buffer.size=2*size; buffer[0]=icon.width, buffer[2]=icon.height;
+    for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
     buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
     setProperty("CARDINAL", "_NET_WM_ICON", buffer);
     XFlush(x);

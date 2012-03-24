@@ -31,7 +31,7 @@ AudioOutput::AudioOutput(bool realtime) {
     snd_pcm_sw_params(pcm,sw);
 }
 void AudioOutput::start() { if(running) return; pollfd p; snd_pcm_poll_descriptors(pcm,&p,1); registerPoll(p); running=true; }
-void AudioOutput::stop() { if(!running) return;  snd_pcm_drain(pcm); running=false; }
+void AudioOutput::stop() { if(!running) return; unregisterPoll(); snd_pcm_drain(pcm); running=false; }
 void AudioOutput::event(pollfd p) {
     assert(read.method);
     unsigned short revents;

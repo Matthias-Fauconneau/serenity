@@ -29,7 +29,8 @@ DataStream::ReadOperator DataStream::read() { return {this}; }
 //DataStream& DataStream::operator +=(int count) { index+=count; return *this; }
 
 template<class T> bool DataStream::matchAny(const array<T>& any) {
-    for(const T& e: any) if(available(sizeof(T))>=sizeof(T) && peek<T>() == e) { advance(sizeof(T)); return true; } return false;
+    if(available(sizeof(T))>=sizeof(T)) for(const T& e: any) if(peek<T>() == e) { advance(sizeof(T)); return true; }
+    return false;
 }
 template<class T> bool DataStream::match(const array<T>& key) {
     if(available(key.size()*sizeof(T))>=key.size()*sizeof(T) && peek<T>(key.size()) == key) { advance(key.size()*sizeof(T)); return true; } else return false;
@@ -48,7 +49,7 @@ template<class T> array<T> DataStream::until(const array<T>& key) {
 template<class T> void DataStream::whileAny(const array<T>& any) { while(matchAny(any)); }
 template<class T> array<T> DataStream::untilAny(const array<T>& any) {
     array<T> a;
-    while(!matchAny(any)) a<<read<T>();
+    while(available(sizeof(T))>=sizeof(T) && !matchAny(any)) a<<read<T>();
     return a;
 }
 
@@ -79,6 +80,11 @@ string TextStream::word() {
 }
 string TextStream::xmlIdentifier() {
     string identifier;
-    for(;available(1);) { char c=peek<char>(); if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c==':')) break; identifier<<c; advance(1); }
+    for(;available(1);) {
+        char c=peek<char>();
+        if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c==':'||c=='-'||c=='_')) break;
+        identifier<<c;
+        advance(1);
+    }
     return identifier;
 }

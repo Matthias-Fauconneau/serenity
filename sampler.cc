@@ -60,13 +60,11 @@ void Sampler::lock() {
     uint size=0; for(const Sample& s : samples) size += s.data.size;
     //lock samples in memory
     uint available = availableMemory();
-    bool lock=false;
-    if(size/1024<available) lock=true;
-    else warn(available/1024,"MiB available, need",size/1024/1024,"MiB. Samples will be streamed from disk");
+    if(size/1024>available) warn(available/1024,"MiB available, need",size/1024/1024,"MiB. Samples will be streamed from disk");
     uint64 start=getRealTime();
     int i=0; for(const Sample& s : samples) {
         if(getRealTime()-start > 1000) { start=getRealTime(); log("Loading "_,i,"/",samples.size()); }
-        mlock((void*)s.data.data, lock?s.data.size:min(s.data.size,64*1024u)); //lock full samples or only 64Kb
+        mlock((void*)s.data.data, min(s.data.size,available*1024u)); //lock full samples or fill available memory
         i++;
     }
 }

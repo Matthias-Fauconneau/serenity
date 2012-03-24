@@ -27,6 +27,13 @@ const utf8_iterator& utf8_iterator::operator++() {
 /// string operations
 
 bool startsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data(),a.size())==a; }
+bool contains(const string& s, const string& a) {
+    if(a.size()>s.size()) return false;
+    for(uint i=0;i<=s.size()-a.size();i++) {
+        if(string(s.data()+i,a.size())==a) return true;
+    }
+    return false;
+}
 bool endsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a; }
 
 bool operator <(const string& a, const string& b) {
@@ -95,6 +102,22 @@ string replace(const string& s, const string& before, const string& after) {
     return r;
 }
 
+string toLower(const string& s) {
+    string lower;
+    for(auto c: s) if(c>='A'&&c<='Z') lower<<'a'+c-'A'; else lower << c;
+    return lower;
+}
+
+string utf8(uint c) {
+    assert(c>0x20);
+    string utf8;
+    /**/  if(c<(1<<7))           utf8                                                                                                            << c;
+    else if(c<(1<<(7+6)))     utf8                                             << (0b11000000|(c>>6))                      << (0b10000000|(c&0b111111));
+    else if(c<(1<<(7+6+6))) utf8 << (0b11100000|(c>>12)) << (0b10000000|((c>>6)&0b111111)) << (0b10000000|(c&0b111111));
+    else error(c);
+    return utf8;
+}
+
 /// Human-readable value representation
 
 string itoa(int64 number, int base, int pad) {
@@ -111,12 +134,14 @@ string itoa(int64 number, int base, int pad) {
     return copy(string(buf+i,64-i));
 }
 
-string str(float n, int precision, int base) {
+string ftoa(float n, int precision, int base) {
     if(isnan(n)) return "NaN"_;
     if(isinf(n)) return n>0?"∞"_:"-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;
     return (n>=0?""_:"-"_)+itoa(abs(n),base)+"."_+itoa(int(m*abs(n))%m,base,precision);
 }
+
+bool isInteger(const string& s) { if(!s) return false; for(auto c: s) if(c<'0'||c>'9') return false; return true; }
 
 long toInteger(const string& number, int base) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
@@ -124,6 +149,7 @@ long toInteger(const string& number, int base) {
     uint i=0; if(number[i] == '-' ) i++, sign=-1; else if(number[i] == '+') i++;
     long value=0;
     for(;i<number.size();i++) {
+        if(number[i]==' ') break;
         int n = indexOf(string("0123456789abcdef",base), number[i]);
         assert(n>=0,"Invalid input '"_+number+"'"_);
         value *= base;

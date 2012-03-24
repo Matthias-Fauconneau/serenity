@@ -27,4 +27,3 @@ alsa.h
 resample.cc
 resample.h
 player.cc
-gl.cc

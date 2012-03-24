@@ -177,29 +177,84 @@ void UniformGrid::update() {
 
 /// Text
 
-Text::Text(string&& text, int size, ubyte opacity) : text(move(text)), size(size), opacity(opacity) { update(); }
-void Text::update() {
-    int widestLine = 0;
+// temporary structure to organize code
+struct TextLayout {
+    int size;
+    int wrap;
+    Font& font;
     FontMetrics metrics = font.metrics(size);
     vec2 pen = vec2(0,metrics.ascender);
-    layout.clear();
-    int previous=0;
-    for(int c: text) {
-        if(c=='\n') { widestLine=max(int(pen.x),widestLine); pen.x=0; pen.y+=metrics.height; continue; }
-        const Glyph& glyph = font.glyph(size,c);
-        if(previous) pen.x += font.kerning(previous,c);
-        previous = c;
-        if(glyph.image) layout << Blit{ int2(pen+glyph.offset), glyph.image };
-        pen.x += glyph.advance.x;
+    uint previous=0;
+    struct Character { vec2 pos; const Glyph& glyph; };
+    typedef array<Character> Word;
+    array<Word> line;
+    Word word;
+    array<Character> text;
+
+    void nextLine(bool justify) {
+        if(!line) { pen.y+=metrics.height; return; }
+        //justify
+        float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x; //sum word length
+        float space;
+        if(justify) space = (wrap-length)/line.size();
+        else space = font.metrics(size,' ').advance.x; //compact
+        //assert(space>0 && space<79, space, wrap, length, line.size());
+
+        //layout
+        pen.x=0;
+        for(const Word& word: line) {
+            for(Character c: word) {
+                c.pos += pen;
+                text << c;
+            }
+            pen.x += word.last().pos.x+word.last().glyph.advance.x + space;
+        }
+        line.clear();
+        pen.x=0; pen.y+=metrics.height;
     }
-    widestLine=max(int(pen.x),widestLine);
-    textSize=int2(widestLine,pen.y-metrics.descender);
+
+    TextLayout(int size, int wrap, Font& font, const string& source):size(size),wrap(wrap),font(font) {
+        for(uint c: source) {
+            if(c==' '||c=='\t'||c=='\n') {//next word/line
+                if(!word) { if(c=='\n') nextLine(false); continue; }
+                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font.glyph(size,' ').advance.x; //sum word length
+                if(wrap && length+word.last().pos.x+(c=='\n'?0:word.last().glyph.advance.x)>=wrap) nextLine(true);
+                line << word;
+                word.clear();
+                pen.x=0;
+                if(c=='\n') nextLine(false);
+                continue;
+            }
+            const Glyph& glyph = font.glyph(size,c);
+            if(previous) pen.x += font.kerning(previous,c);
+            previous = c;
+            assert(glyph.image,hex(c));
+            word << i(Character{ vec2(pen.x,0)+glyph.offset, glyph });
+            pen.x += glyph.advance.x;
+        }
+        if(word) line<<word;
+        if(line) nextLine(false);
+    }
+    int2 textSize() {
+       int2 bb=zero;
+        for(Character c: text) bb=max(bb,int2(c.pos)+c.glyph.image.size());
+        bb.y -= metrics.descender;
+        return bb;
+    }
+};
+
+Text::Text(string&& text, int size, ubyte opacity) : text(move(text)), size(size), opacity(opacity) {}
+void Text::update(bool wrap) {
+    TextLayout layout(size, wrap?Widget::size.x:0, font, text);
+    blits.clear();
+    for(const auto& c: layout.text) blits << i(Blit{int2(c.pos),c.glyph.image});
+    textSize = layout.textSize();
 }
-int2 Text::sizeHint() { if(!textSize) update(); assert(textSize); return textSize; }
+int2 Text::sizeHint() { if(!textSize) update(false); assert(!text||(textSize.x>0&&textSize.y>0),textSize,text); return wrap?int2(-textSize.x,textSize.y):textSize; }
 
 void Text::render(int2 parent) {
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
-    for(const Blit& b: layout) {
+    for(const Blit& b: blits) {
         if(b.pos>=int2(-4,0) && b.pos+b.image.size()<=Widget::size+int2(2,2)) {
             blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
         }
@@ -212,7 +267,7 @@ bool TextInput::mouseEvent(int2 position, Event event, Button button) {
     if(event!=Press) return false;
     Window::focus=this;
     int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
-    for(cursor=0;cursor<layout.size() && x>layout[cursor].pos.x+(int)layout[cursor].image.width/2;cursor++) {}
+    for(cursor=0;cursor<blits.size() && x>blits[cursor].pos.x+(int)blits[cursor].image.width/2;cursor++) {}
     if(button==MiddleButton) { string selection=Window::getSelection(); cursor+=selection.size(); text<<move(selection); update(); }
     return true;
 }
@@ -232,7 +287,7 @@ void TextInput::render(int2 parent) {
     Text::render(parent);
     if(Window::focus==this) {
         if(cursor>text.size()) cursor=text.size();
-        int x = cursor < layout.size()? layout[cursor].pos.x : cursor>0 ? layout.last().pos.x+layout.last().image.width : 0;
+        int x = cursor < blits.size()? blits[cursor].pos.x : cursor>0 ? blits.last().pos.x+blits.last().image.width : 0;
         fill(parent+position+max(int2(0,0),(Widget::size-textSize)/2), int2(x,0), int2(x+1,Widget::size.y),gray(0));
     }
 }
@@ -265,12 +320,13 @@ bool Slider::mouseEvent(int2 position, Event event, Button button) {
 bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(Layout::mouseEvent(position,event,button)) return true;
     if(event != Press) return false;
-    if(button == WheelDown && index>0) { index--; activeChanged.emit(index); return true; }
-    if(button == WheelUp && index<count()-1) { index++; activeChanged.emit(index); return true; }
+    if(button == WheelDown && index>0 && index<count()) { index--; activeChanged.emit(index); return true; }
+    if(button == WheelUp && index>=0 && index<count()-1) { index++; activeChanged.emit(index); return true; }
     if(button != LeftButton) return false;
     for(int i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<child.position+child.size) {
-            index=i; activeChanged.emit(index);
+            if(index!=i) { index=i; activeChanged.emit(index); }
+            itemPressed.emit(index);
             return true;
         }
     }
@@ -283,7 +339,7 @@ void HighlightSelection::render(int2 parent) {
     if(index>=0 && index<count()) {
         Widget& current = at(index);
         if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
-            fill(parent+position, current.position, current.position+current.size, byte4(255, 128, 0, 128), Alpha);
+            fill(parent+position, current.position, current.position+current.size, byte4(int4(255, 192, 128, 255)*224/255));
         }
     }
     Layout::render(parent);

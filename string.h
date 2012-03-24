@@ -51,6 +51,7 @@ inline string operator "" _(const char* data, size_t size) { return string(data,
 bool operator <(const string& a, const string& b);
 
 bool startsWith(const string& s, const string& a);
+bool contains(const string& s, const string& a);
 bool endsWith(const string& s, const string& a);
 
 /// Returns a null-terminated string
@@ -71,6 +72,12 @@ string join(const array<string>& list, const string& separator);
 
 /// Replaces every occurrence of the string \a before with the string \a after
 string replace(const string& s, const string& before, const string& after);
+
+/// Lowers case
+string toLower(const string& s);
+
+/// Convert Unicode code point to UTF-8
+string utf8(uint code);
 
 /// Human-readable value representation
 
@@ -103,8 +110,8 @@ template<> inline string str(const uint8& n) { return dec(n); }
 template<> inline string str(const int8& n) { return dec(n); }
 
 /// Converts a floating point number to its human-readable representation
-string str(float number, int precision, int base=10);
-template<> inline string str(const float& number) { return str(number,2); }
+string ftoa(float number, int precision, int base=10);
+template<> inline string str(const float& number) { return ftoa(number,2); }
 
 /// Concatenates string representation of its arguments
 /// \note directly use operator+ to avoid spaces
@@ -125,11 +132,11 @@ template<> inline string str(const array<string>& list) { return "["_+join(list,
 
 /// Enhanced debugging using str(...)
 extern "C" ssize_t write(int fd, const void* buf, size_t size);
-inline void write(int fd, const array<char>& s) { write(fd,s.data(),(size_t)s.size()); }
+inline void write_(int fd, const array<char>& s) { write(fd,s.data(),(size_t)s.size()); }
 
-template<class... Args> void log(const Args&... args) { write(1,str(args...)+"\n"_); }
-template<class A> void log(const cat<A>& a) { write(1,a+"\n"_); }
-template<> inline void log(const string& args) { write(1,args+"\n"_); }
+template<class... Args> void log(const Args&... args) { write_(1,str(args...)+"\n"_); }
+template<class A> void log(const cat<A>& a) { write_(1,a+"\n"_); }
+template<> inline void log(const string& args) { write_(1,args+"\n"_); }
 #define warn log
 
 /// Display variable name and its value
@@ -139,6 +146,8 @@ template<> inline void log(const string& args) { write(1,args+"\n"_); }
 /// Aborts if \a expr evaluates to false and display \a message (except stack trace)
 #define assert(expr, message...) ({debug( if(!(expr)) { trace_off; logTrace(); log(#expr##_, ##message); __builtin_abort();})})
 
+
+bool isInteger(const string& s);
 /// Parses an integer value
 long toInteger(const string& str, int base=10 );
 /// Parses a decimal value

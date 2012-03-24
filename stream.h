@@ -2,9 +2,6 @@
 #include "array.h"
 #include "string.h"
 
-#define swap32 __builtin_bswap32
-constexpr uint16 swap16(uint16 x) { return swap32(x)>>16; }
-
 /// create an array<byte> reference of \a t raw memory representation
 template<class T> array<byte> raw(const T& t) { return array<byte>((byte*)&t,sizeof(T)); }
 /// cast raw memory to a \a T

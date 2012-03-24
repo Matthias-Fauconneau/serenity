@@ -16,6 +16,10 @@ int createFile(const string& path, int at, bool overwrite) {
     return openat(at, strz(path).data(),O_CREAT|O_WRONLY|O_TRUNC,0666);
 }
 
+int appendFile(const string& path, int at) {
+    return openat(at, strz(path).data(),O_CREAT|O_WRONLY|O_APPEND,0666);
+}
+
 array<byte> readFile(const string& path, int at) {
     int fd = openat(at, strz(path).data(), O_RDONLY);
     if(fd < 0) error("File not found"_,"'"_+path+"'"_);
@@ -48,6 +52,12 @@ void writeFile(const string& path, const array<byte>& content, int at, bool over
 int openFolder(const string& path, int at) {
     int fd = openat(at, strz(path).data(), O_RDONLY|O_DIRECTORY);
     if(fd < 0) error("Folder not found"_,"'"_+path+"'"_);
+    return fd;
+}
+
+extern "C" char* getenv(const char* key);
+int home() {
+    static int fd = openFolder(strz(getenv("HOME")));
     return fd;
 }
 

@@ -29,12 +29,12 @@ FontMetrics Font::metrics(int size) {
     return metrics;
 }
 
-int Font::kerning(int leftCode, int rightCode) {
+float Font::kerning(int leftCode, int rightCode) {
     int left = FT_Get_Char_Index(face, leftCode); assert(left,"glyph not found '"_,leftCode,'\'');
     int right = FT_Get_Char_Index(face, rightCode); assert(right,"glyph not found '"_,rightCode,'\'');
     FT_Vector kerning;
     FT_Get_Kerning(face, left, right, FT_KERNING_DEFAULT, &kerning );
-    return kerning.x>>6;
+    return kerning.x/64.f;
 }
 
 GlyphMetrics Font::metrics(int size, int code) {
@@ -44,8 +44,8 @@ GlyphMetrics Font::metrics(int size, int code) {
     assert(index, hex(code)); //if(!index) index=code;
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
     GlyphMetrics metrics={
-    vec2(face->glyph->advance.x / 64.0, face->glyph->advance.y / 64.0),
-    vec2(face->glyph->metrics.width / 64.0, face->glyph->metrics.height / 64.0)
+    vec2(face->glyph->advance.x / 64.f, face->glyph->advance.y / 64.f),
+    vec2(face->glyph->metrics.width / 64.f, face->glyph->metrics.height / 64.f)
     };
     return metrics;
 }
