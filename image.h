@@ -12,10 +12,9 @@ struct Image {
     Image(){}
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), own(o.own) { o.data=0; }
     Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; o.data=0; return *this; }
-    Image(byte4* data, int width, int height):data(data),width(width),height(height),own(false){}
+    Image(byte4* data, int width, int height,bool own):data(data),width(width),height(height),own(own){}
     Image(int width, int height):data(allocate<byte4>(width*height)),width(width),height(height),own(true){}
     Image(array<byte4>&& data, uint width, uint height);
-    explicit Image(array<byte>&& file);
 
     ~Image(){ if(data && own) delete data; }
     explicit operator bool() const { return data; }
@@ -33,3 +32,5 @@ Image swap(Image&& image);
 
 /// Convenience function to iterate all pixels of an image
 #define for_Image(image) for(int y=0,h=image.height;y<h;y++) for(int x=0,w=image.width;x<w;x++)
+
+Image decodeImage(const array<byte>& file);

@@ -60,6 +60,10 @@ typedef unsigned int size_t; typedef int ssize_t; typedef unsigned int ptr;
 #define swap32 __builtin_bswap32
 constexpr uint16 swap16(uint16 x) { return swap32(x)>>16; }
 
+#define floor __builtin_floorf
+#define round __builtin_roundf
+#define ceil __builtin_ceilf
+
 /// Basic operations
 template <class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 template <class T> T min(T a, T b) { return a<b ? a : b; }

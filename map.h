@@ -22,7 +22,11 @@ template <class K, class V> struct map {
     V& at(const K& key) { int i = indexOf(keys, key); assert(i>=0,"Invalid key"_,key,keys); return values[i];}
     template<perfect(V)> Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
     V* find(const K& key) { int i = indexOf(keys, key); return i>=0 ? &values[i] : 0; }
-    template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) { assert(!contains(key)); keys << forward<Kf>(key); values << forward<Vf>(value); }
+    template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) {
+        assert(!contains(key),"Existing",key);
+        keys << forward<Kf>(key);
+        values << forward<Vf>(value);
+    }
     template<perfect(K)> V& insert(Kf&& key) { assert(!contains(key)); keys << forward<Kf>(key); grow(values, keys.size()); return values.last(); }
     //template<perfect(K)> V& operator [](Kf&& key) { int i = indexOf(keys, key); if(i>=0) return values[i]; return insert(forward<Kf>(key)); }
     V& operator [](K key) { int i = indexOf(keys, key); if(i>=0) return values[i]; return insert(key); }

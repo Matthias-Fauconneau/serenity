@@ -13,6 +13,9 @@ enum Key { Escape=XK_Escape, Return=XK_Return, Left=XK_Left, Right=XK_Right, Del
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
+    Widget(){}
+    Widget(Widget&&)=default;
+    virtual ~Widget() {}
 /// Layout
     int2 position; /// position of the widget within its parent widget
     int2 size; /// size of the widget
@@ -83,6 +86,7 @@ struct Layout : Widget {
 /// Widgets implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
 struct Widgets : virtual Layout, array<Widget*> {
+    Widgets(){}
     Widgets(std::initializer_list<Widget*>&& widgets):array(move(widgets)){}
     int count() const;
     Widget& at(int i);
@@ -139,6 +143,7 @@ template<class... T> struct Tuple : virtual Layout {
 struct Linear: virtual Layout {
     /// If true, try to fill parent space to spread out contained items
     bool expanding = false;
+    bool compact = false;
 
     int2 sizeHint();
     void update() override;
@@ -156,12 +161,17 @@ struct Vertical : virtual Linear{
 
 /// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
 struct HBox : Horizontal, Widgets {
+    HBox(){}
     HBox(std::initializer_list<Widget*>&& widgets):Widgets(move(widgets)){}
 };
 /// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
 struct VBox : Vertical, Widgets {
+    VBox(){}
     VBox(std::initializer_list<Widget*>&& widgets):Widgets(move(widgets)){}
 };
+
+template<class T> struct HList : Horizontal, Array<T> {};
+template<class T> struct VList : Vertical, Array<T> {};
 
 /// Layout items on an uniform \a width x \a height grid
 struct UniformGrid : virtual Layout {
@@ -216,10 +226,15 @@ template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelectio
     Grid(int width, int height):UniformGrid(width,height){}
 };
 
+/// Rich text format control code encoded in 10-1F range
+enum Format { Regular=0,Bold=1,Italic=2,BoldItalic=3,Underline=4,Strike=8 };
+inline char format(Format f) { return f+0x10; }
+inline Format format(char f) { return Format(f-0x10); }
+
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(string&& text=""_, int size=16, ubyte opacity=255);
+    Text(string&& text=""_, int size=16, ubyte opacity=255, int wrap=0);
 
     void setText(string&& text) { this->text=move(text); textSize=zero; }
     void setSize(int size) { this->size=size; textSize=zero; }
@@ -230,12 +245,12 @@ struct Text : Widget {
     int size;
     /// Opacity
     ubyte opacity;
-    /// Wrap
-    bool wrap=false;
+    /// Line wrap limit in pixels (0: no wrap, -margin: widget size - margin)
+    int wrap=0;
 
     int2 sizeHint();
     void update() override { update(wrap); }
-    void update(bool wrap);
+    void update(int wrap);
     void render(int2 parent);
 protected:
     int2 textSize=zero;
@@ -257,17 +272,20 @@ protected:
     void render(int2 parent);
 };
 
-/// Icon is a widget displaying a static image
-struct Icon : Widget {
-    Icon(){}
+/// ImageView is a widget displaying a static image
+struct ImageView : Widget {
+    ImageView(){}
+    //~ImageView(){}
+    //ImageView(ImageView&& image)=default;
     /// Create a trigger button displaying \a image
-    Icon(Image&& image):image(move(image)){}
+    ImageView(Image&& image):image(move(image)){}
     /// Displayed image
     Image image;
 
     int2 sizeHint();
     void render(int2 parent);
 };
+typedef ImageView Icon;
 
 /// Item is an icon with text
 struct Item : Horizontal, Tuple<Icon,Text,Space> {
@@ -332,4 +350,4 @@ protected:
 #define ICON(name) \
     extern byte _binary_icons_## name ##_png_start[]; \
     extern byte _binary_icons_## name ##_png_end[]; \
-    static Image name ## Icon (array<byte>(_binary_icons_## name ##_png_start,_binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start))
+    static Image name ## Icon = decodeImage(array<byte>(_binary_icons_## name ##_png_start,_binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start))

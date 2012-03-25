@@ -83,16 +83,20 @@ URL::URL(const string& url) {
     if(contains(url,"://"_)) scheme = s.until("://"_); else scheme="http"_;
     string domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
     host = section(domain,'@',-2,-1);
-    authorization = base64(section(domain,'@'));
+    if(contains(domain,'@')) authorization = base64(section(domain,'@'));
     if(!contains(host,"."_)) { path=move(host); path<<"/"_; }
     path << s.until("#"_);
     fragment = s.readAll();
 }
 URL URL::relative(URL&& url) const {
-    if(url.host && !url.path) url.path=move(url.host);
+    if(url.scheme) return move(url);
+    if(url.host) url.path=url.host+"/"_+url.path;
     if(!url.host) url.host=copy(host);
-    if(!contains(url.host,"."_)) error(host,path,url.host,url.path);
+    if(!contains(url.host,"."_) || url.host=="."_) error(host,path,url.host,url.path);
     return move(url);
+}
+string str(const URL& url) {
+    return url.scheme+"://"_+(url.authorization?url.authorization+"@"_:""_)+url.host+"/"_+url.path+(url.fragment?"#"_+url.fragment:""_);
 }
 
 /// HTTP
@@ -152,7 +156,7 @@ array<byte> getURL(const URL& url) {
     array<byte> content;
     if(exists(file,cache)) {
         long modified = modifiedTime(file,cache);
-        if(currentTime()-modified < 24*60*60) { //less than a day old
+        if(currentTime()-modified < 3*60*60) { //less than 3 hours old
             array<byte> data = readFile(file,cache);
             if(data) return data;
         }

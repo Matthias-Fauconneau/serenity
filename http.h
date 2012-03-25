@@ -31,6 +31,7 @@ struct URL {
     URL(const string& url);
     URL relative(URL&& url) const;
 };
+string str(const URL& url);
 
 /// Connects to \a host and requests \a path using \a method.
 /// \note \a headers and \a content will be added to request

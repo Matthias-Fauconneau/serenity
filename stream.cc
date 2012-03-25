@@ -58,6 +58,7 @@ template uint DataStream::read();
 template array<char> DataStream::read(uint);
 template array<char> DataStream::readArray();
 template array<char> DataStream::readAll();
+template bool DataStream::matchAny(const array<char>&);
 template bool DataStream::match(const array<char>&);
 template array<char> DataStream::until(const char&);
 template array<char> DataStream::until(const array<char>&);

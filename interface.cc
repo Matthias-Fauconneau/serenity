@@ -1,49 +1,13 @@
 #include "interface.h"
 #include "window.h"
 #include "font.h"
+#include "raster.h"
 
 #include "array.cc"
 template class array<Widget*>;
-//template class array<Text::Blit>;
 template class array<Text>;
-
 /// Sets the array size to \a size, filling with \a value
 template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }
-
-/// Primitives (TODO: move to new module: graphics.h)
-extern Image framebuffer;
-
-enum Blend { Opaque, Alpha, Multiply, MultiplyAlpha };
-/// Fill framebuffer area between [target+min, target+max] with \a color
-void fill(int2 target, int2 min, int2 max, byte4 color, Blend blend=Opaque) {
-    for(int y= ::max(target.y+min.y,0);y< ::min<int>(framebuffer.height,target.y+max.y);y++)
-        for(int x= ::max(target.x+min.x,0);x< ::min<int>(framebuffer.width,target.x+max.x);x++) {
-            byte4 s = color;
-            byte4& d = framebuffer(x,y);
-            if(blend == Opaque) d=s;
-            else if(blend==Multiply) d = byte4((int4(s)*int4(d))/255);
-            else if(blend==Alpha) d = byte4((s.a*int4(s) + (255-s.a)*int4(d))/255);
-        }
-}
-
-/// Blit \a source to framebuffer at \a target
-void blit(int2 target, const Image& source, Blend blend=Opaque, int alpha=255) {
-    for(int y=max(target.y,0);y<min<int>(framebuffer.height,target.y+source.height);y++) {
-        for(int x=max(target.x,0);x<min<int>(framebuffer.width,target.x+source.width);x++) {
-            byte4 s = source(x-target.x,y-target.y);
-            byte4& d = framebuffer(x,y);
-            if(blend == Opaque) d=s;
-            else if(blend==Multiply) d = byte4((int4(s)*int4(d))/255);
-            else if(blend==Alpha) d = byte4((s.a*int4(s) + (255-s.a)*int4(d))/255);
-            else if(blend==MultiplyAlpha) {
-                int a = max(int(d.a),s.a*alpha/255);
-                if(d.a) d = byte4((int4(s)*int4(d)*255/d.a)*a/255/255), d.a=a;
-            }
-        }
-    }
-}
-
-byte4 gray(int level) { return byte4(level,level,level,255); }
 
 /// ScrollArea
 
@@ -55,7 +19,7 @@ void ScrollArea::update() {
 }
 
 bool ScrollArea::mouseEvent(int2 position, Event event, Button button) {
-    if(event==Press && (button==WheelDown || button==WheelUp) && size<widget().sizeHint()) {
+    if(event==Press && (button==WheelDown || button==WheelUp) && size.y<widget().sizeHint().y) {
         int2& position = widget().position;
         int2 previous = position;
         position.y += button==WheelUp?-32:32;
@@ -83,10 +47,12 @@ bool Layout::mouseEvent(int2 position, Event event, Button button) {
 }
 
 void Layout::render(int2 parent) {
+    push(Clip{parent+position,parent+position+size});
     for(int i=0;i<count();i++) { Widget& child=at(i);
-        if(position+child.position>=int2(-4,-4) && child.position+child.size<=size+int2(4,4))
-            child.render(parent+position);
+        //if(position+child.position>=int2(-4,-4) && child.position+child.size<=size+int2(4,4))
+        child.render(parent+position);
     }
+    pop();
 }
 
 /// Widgets
@@ -181,11 +147,10 @@ void UniformGrid::update() {
 struct TextLayout {
     int size;
     int wrap;
-    Font& font;
-    FontMetrics metrics = font.metrics(size);
+    Font* font;
+    FontMetrics metrics = font->metrics(size);
     vec2 pen = vec2(0,metrics.ascender);
-    uint previous=0;
-    struct Character { vec2 pos; const Glyph& glyph; };
+    struct Character { int code; vec2 pos; const Glyph& glyph; };
     typedef array<Character> Word;
     array<Word> line;
     Word word;
@@ -195,29 +160,32 @@ struct TextLayout {
         if(!line) { pen.y+=metrics.height; return; }
         //justify
         float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x; //sum word length
-        float space;
-        if(justify) space = (wrap-length)/line.size();
-        else space = font.metrics(size,' ').advance.x; //compact
-        //assert(space>0 && space<79, space, wrap, length, line.size());
+        float space=0;
+        if(justify) space = round((wrap-length)/line.size());
+        if(space<=0||space>32) space = font->metrics(size,' ').advance.x; //compact
 
         //layout
         pen.x=0;
         for(const Word& word: line) {
+            assert(word);
             for(Character c: word) {
                 c.pos += pen;
                 text << c;
             }
-            pen.x += word.last().pos.x+word.last().glyph.advance.x + space;
+            pen.x += word.last().pos.x+word.last().glyph.advance.x+space;
         }
         line.clear();
         pen.x=0; pen.y+=metrics.height;
     }
 
-    TextLayout(int size, int wrap, Font& font, const string& source):size(size),wrap(wrap),font(font) {
+    TextLayout(int size, int wrap, const string& source):size(size),wrap(wrap),font(&defaultSans) {
+        uint previous=' ';
+        Format format=Regular;
         for(uint c: source) {
             if(c==' '||c=='\t'||c=='\n') {//next word/line
+                if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
-                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font.glyph(size,' ').advance.x; //sum word length
+                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font->glyph(size,' ').advance.x;
                 if(wrap && length+word.last().pos.x+(c=='\n'?0:word.last().glyph.advance.x)>=wrap) nextLine(true);
                 line << word;
                 word.clear();
@@ -225,11 +193,18 @@ struct TextLayout {
                 if(c=='\n') nextLine(false);
                 continue;
             }
-            const Glyph& glyph = font.glyph(size,c);
-            if(previous) pen.x += font.kerning(previous,c);
+            if(c>=0x10&&c<0x20) { //10-1F format control (bitmask for bold,oblique,underline,strike)
+                format = ::format(c);
+                assert(format<4);
+                Font* lookup[] = {&defaultSans,&defaultBold,&defaultItalic,&defaultBoldItalic};
+                font=lookup[format];
+                continue;
+            }
+            const Glyph& glyph = font->glyph(size,c);
+            pen.x += font->kerning(previous,c);
             previous = c;
-            assert(glyph.image,hex(c));
-            word << i(Character{ vec2(pen.x,0)+glyph.offset, glyph });
+            assert(glyph.image||c==0xA0,hex(c));
+            if(glyph.image) word << i(Character{ c, vec2(pen.x,0)+glyph.offset, glyph });
             pen.x += glyph.advance.x;
         }
         if(word) line<<word;
@@ -237,27 +212,31 @@ struct TextLayout {
     }
     int2 textSize() {
        int2 bb=zero;
-        for(Character c: text) bb=max(bb,int2(c.pos)+c.glyph.image.size());
+       for(Character c: text) bb=max(bb,int2(c.pos)+c.glyph.image.size());
         bb.y -= metrics.descender;
-        return bb;
+        return int2(round(bb.x),round(bb.y));
     }
 };
 
-Text::Text(string&& text, int size, ubyte opacity) : text(move(text)), size(size), opacity(opacity) {}
-void Text::update(bool wrap) {
-    TextLayout layout(size, wrap?Widget::size.x:0, font, text);
+Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
+void Text::update(int wrap) {
+    TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
     blits.clear();
-    for(const auto& c: layout.text) blits << i(Blit{int2(c.pos),c.glyph.image});
+    for(const auto& c: layout.text) blits << i(Blit{int2(round(c.pos.x),round(c.pos.y)),c.glyph.image});
     textSize = layout.textSize();
 }
-int2 Text::sizeHint() { if(!textSize) update(false); assert(!text||(textSize.x>0&&textSize.y>0),textSize,text); return wrap?int2(-textSize.x,textSize.y):textSize; }
+int2 Text::sizeHint() {
+    if(!textSize) update(0);
+    assert(!text||(textSize.x>0&&textSize.y>0),textSize,"'"_+text+"'"_);
+    return wrap?int2(-textSize.x,textSize.y):textSize;
+}
 
 void Text::render(int2 parent) {
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) {
-        if(b.pos>=int2(-4,0) && b.pos+b.image.size()<=Widget::size+int2(2,2)) {
+        //if(b.pos>=int2(-4,0) && b.pos+b.image.size()<=Widget::size+int2(2,2)) {
             blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
-        }
+        //}
     }
 }
 
@@ -363,8 +342,8 @@ void TabSelection::render(int2 parent) {
 }
 
 /// Icon
-int2 Icon::sizeHint() { return int2(image.width,image.height); }
-void Icon::render(int2 parent) {
+int2 ImageView::sizeHint() { return int2(image.width,image.height); }
+void ImageView::render(int2 parent) {
     if(!image) return;
     blit(parent+position+(Widget::size-image.size())/2, image, Alpha);
 }

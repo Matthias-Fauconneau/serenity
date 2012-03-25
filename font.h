@@ -37,4 +37,7 @@ struct Font {
     Glyph& glyph(int size, int code);
 };
 
-extern Font font;
+extern Font defaultSans;
+extern Font defaultBold;
+extern Font defaultItalic;
+extern Font defaultBoldItalic;

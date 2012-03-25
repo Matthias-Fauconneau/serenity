@@ -53,7 +53,7 @@ Element::Element(TextBuffer& s, bool html) {
         if(contains(voidElements,name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
-            content=s.until("</"_+name+">"_);
+            content=trim(unescape(s.until("</"_+name+">"_)));
             s.skip();
             return;
         }
@@ -61,18 +61,19 @@ Element::Element(TextBuffer& s, bool html) {
     while(!s.match(string("</"_+name+">"_))) {
         //if(s.available(4)<4) { warn("Expecting","</"_+name+">"_,"got EOF"); return; } //warn unclosed tag
         if(s.available(4)<4) {  return; } //ignore unclosed tag
-        if(s.match("<![CDATA["_)) { children << Element(s.until("]]>"_)); }
+        if(s.match("<![CDATA["_)) {
+            string content=trim(unescape(s.until("]]>"_)));
+            if(content) children << Element(move(content));
+        }
         else if(s.match("<!--"_)) { s.until("-->"_); }
         //else if(s.match("</"_)) { log((string)slice(s.buffer,start,s.index-start),"^",s.until(">"_)); error("Expecting","</"_+name+">"_); }
         //else if(s.match("</"_)) { warn("Expecting","</"_+name+">"_,"got",s.until(">"_)); }
         else if(s.match("</"_)) { s.until(">"_); } //ignore
         else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
-        else if(s.match("<"_)) children<<Element(s,html);
+        else if(s.match("<"_)) children << Element(s,html);
         else {
-            string content=s.until("<"_); s.index--;
-            for(auto c: content) if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') goto hasContent;
-            continue;
-            hasContent: children << Element(move(content));
+            string content=trim(unescape(s.until("<"_))); s.index--;
+            if(content) children << Element(move(content));
         }
     }
     //if(!s.match(string(name+">"_))) { /*log((string)slice(s.buffer,start,s.index-start),s.index);*/ log("Expecting", name,"got",s.until(">"_)); }
@@ -135,20 +136,28 @@ template<> Element copy(const Element& o) {
 template<> string str(const Element& e) { return e.str(); }
 
 string unescape(const string& xml) {
+    static map<string, string> entities;
+    if(!entities) {
+        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © laquo « raquo » rsquo ’ oelig œ hellip … ndash – larr ← not ¬ mdash — euro €"_,' ');
+        assert(kv.size()%2==0,kv.size());
+        for(uint i=0;i<kv.size();i+=2) entities.insert(kv[i],kv[i+1]);
+    }
     string out;
     TextBuffer s(copy(xml));
     while(s) {
         out << s.until("&"_);
         if(!s) break;
-        if(s.match("nbsp;"_)) out << " "_;
-        else if(s.match("amp;"_)) out << "&"_;
-        else if(s.match("copy;"_)) out << "©"_;
-        else if(s.match("laquo;"_)) out << "«"_;
-        else if(s.match("raquo;"_)) out << "»"_;
-        else if(s.match("rsquo;"_)) out << "’"_;
-        else if(s.match("#x"_)) out << utf8(toInteger(s.until(";"_),16));
+
+        if(s.match("#x"_)) out << utf8(toInteger(toLower(s.until(";"_)),16));
         else if(s.match("#"_)) out << utf8(toInteger(s.until(";"_)));
-        else out<<"&"_;
+        else {
+            string key=s.word();
+            if(s.match(";"_)) {
+                string* c = entities.find(key);
+                if(c) out<<*c; else warn("Unknown entity",key);
+            }
+            else out<<"&"_; //unescaped &
+        }
     }
     return out;
 }

@@ -23,15 +23,15 @@ Font::Font(const char* path) {
 Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)data.data(),data.size(),0,&face); }
 
 FontMetrics Font::metrics(int size) {
-    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,size<<6,0,0};
+    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,0,0,0};
     FT_Request_Size(face,&req);
     FontMetrics metrics = { face->size->metrics.descender>>6, face->size->metrics.ascender>>6, face->size->metrics.height>>6 };
     return metrics;
 }
 
 float Font::kerning(int leftCode, int rightCode) {
-    int left = FT_Get_Char_Index(face, leftCode); assert(left,"glyph not found '"_,leftCode,'\'');
-    int right = FT_Get_Char_Index(face, rightCode); assert(right,"glyph not found '"_,rightCode,'\'');
+    int left = FT_Get_Char_Index(face, leftCode); assert(left,"glyph not found '"_+hex(leftCode)+"'"_);
+    int right = FT_Get_Char_Index(face, rightCode); assert(right,"glyph not found '"_+hex(rightCode)+"'"_);
     FT_Vector kerning;
     FT_Get_Kerning(face, left, right, FT_KERNING_DEFAULT, &kerning );
     return kerning.x/64.f;
@@ -67,7 +67,7 @@ Glyph& Font::glyph(int size, int code) {
     Image image(width,height);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
         uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
-        image(x,y) = byte4(255-rgb[0],255-rgb[1],255-rgb[2],rgb[0]|rgb[1]|rgb[2]?255:0);
+        image(x,y) = byte4(255-rgb[2],255-rgb[1],255-rgb[0],rgb[0]|rgb[1]|rgb[2]?255:0);
     }
     glyph.image = Image(width,height);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) { //feather alpha
@@ -81,4 +81,7 @@ Glyph& Font::glyph(int size, int code) {
     return glyph;
 }
 
-Font font("/usr/share/fonts/dejavu/DejaVuSans.ttf");
+Font defaultSans("/usr/share/fonts/dejavu/DejaVuSans.ttf");
+Font defaultBold("/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf");
+Font defaultItalic("/usr/share/fonts/dejavu/DejaVuSans-Oblique.ttf");
+Font defaultBoldItalic("/usr/share/fonts/dejavu/DejaVuSans-BoldOblique.ttf");

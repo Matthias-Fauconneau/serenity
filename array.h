@@ -45,9 +45,9 @@ template<class T> struct array {
 
 //referencing constructors
     /// References \a size elements from read-only \a data pointer
-    array(const T* data, int size) : buffer(data, size, 0) {}
+    array(const T* data, uint size) : buffer(data, size, 0) {}
     /// References elements sliced from \a begin to \a end
-    array(const T* begin,const T* end) : buffer(begin, int(end-begin), 0) {}
+    array(const T* begin,const T* end) : buffer(begin, uint(end-begin), 0) {}
 
     /// if the array own the data, destroys all initialized elements and frees the buffer
     ~array();

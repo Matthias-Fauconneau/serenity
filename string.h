@@ -6,8 +6,10 @@ struct utf8_iterator {
     const char* pointer;
     utf8_iterator(const char* pointer):pointer(pointer){}
     bool operator!=(const utf8_iterator& o) const { return o.pointer != pointer; }
+    bool operator==(const utf8_iterator& o) const { return o.pointer == pointer; }
     uint operator* () const;
     const utf8_iterator& operator++();
+    const utf8_iterator& operator--();
 };
 
 /// \a string is an \a array of characters with specialized methods for UTF-8 string handling
@@ -17,8 +19,9 @@ struct string : array<char> {
     explicit string(uint capacity):array<char>(capacity){}
     explicit string(char a){ tag=1; data()[0]=a; }
     string(array<char>&& o):array<char>(move(o)){}
-    string(const char* data, int size):array<char>(data,size){}
+    string(const char* data, uint size):array<char>(data,size){}
     string(const char* begin,const char* end):array<char>(begin,end){}
+    string(utf8_iterator begin,utf8_iterator end):array<char>(begin.pointer,end.pointer){}
 
     const utf8_iterator begin() const { return array::begin(); }
     const utf8_iterator end() const { return array::end(); }
@@ -50,9 +53,9 @@ inline string operator "" _(const char* data, size_t size) { return string(data,
 /// Lexically compare strings
 bool operator <(const string& a, const string& b);
 
-bool startsWith(const string& s, const string& a);
+bool startsWith(const array<byte>& s, const array<byte>& a);
+bool endsWith(const array<byte>& s, const array<byte>& a);
 bool contains(const string& s, const string& a);
-bool endsWith(const string& s, const string& a);
 
 /// Returns a null-terminated string
 string strz(const string& s);
@@ -65,7 +68,7 @@ string strz(const char* s);
 string section(const string& str, char separator, int start=0, int end=1, bool includeSeparator=false);
 
 /// Splits \a str wherever \a separator occurs
-array<string> split(const string& str, char separator=' ');
+array<string> split(const string& str, uint separator=' ');
 
 /// Joins \a list into a single string with each element separated by \a separator
 string join(const array<string>& list, const string& separator);
@@ -75,6 +78,9 @@ string replace(const string& s, const string& before, const string& after);
 
 /// Lowers case
 string toLower(const string& s);
+
+/// Removes heading, trailing and duplicate whitespace
+string trim(const array<byte>& s);
 
 /// Convert Unicode code point to UTF-8
 string utf8(uint code);
@@ -124,7 +130,7 @@ inline string str(const string& a, const string& b) { return a+" "_+b; }
 template<class A> string str(const cat<A>& s) { return s; }
 
 /// String representation of a pointer
-template<class A> string str(A* const& s) { return str(*s); }
+template<class A> string str(A* const& s) { return s?"null"_:str(*s); }
 
 /// String representation of an array
 template<class T> string str(const array<T>& list) { return str(apply<string>(list,[](const T& t){return str(t);})); }

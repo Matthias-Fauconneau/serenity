@@ -1,6 +1,9 @@
 Makefile
 core.h
+core.cc
 array.h
+array.cc
+vector.h
 map.h
 string.h
 string.cc
@@ -16,6 +19,13 @@ xml.cc
 http.h
 http.cc
 
+image.h
+image.cc
+png.cc
+jpeg.cc
+ffmpeg.h
+ffmpeg.cc
+
 font.h
 font.cc
 interface.h
@@ -24,3 +34,8 @@ window.h
 window.cc
 
 browser.cc
+
+html.cc
+html.h
+raster.cc
+raster.h

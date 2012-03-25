@@ -23,10 +23,18 @@ const utf8_iterator& utf8_iterator::operator++() {
     else pointer+=1; //Windows-1252
     return *this;
 }
+const utf8_iterator& utf8_iterator::operator--() {
+    ubyte code = *--pointer;
+    if((code&0b10000000)!=0b00000000) { //UTF8
+        while((code&0b11000000)==0b10000000) code = *--pointer;
+        assert(code==0b11000000);
+    }
+    return *this;
+}
 
 /// string operations
 
-bool startsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data(),a.size())==a; }
+bool startsWith(const array<byte> &s, const array<byte> &a) { return a.size()<=s.size() && string(s.data(),a.size())==a; }
 bool contains(const string& s, const string& a) {
     if(a.size()>s.size()) return false;
     for(uint i=0;i<=s.size()-a.size();i++) {
@@ -34,7 +42,7 @@ bool contains(const string& s, const string& a) {
     }
     return false;
 }
-bool endsWith(const string& s, const string& a) { return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a; }
+bool endsWith(const array<byte>& s, const array<byte>& a) { return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a; }
 
 bool operator <(const string& a, const string& b) {
     for(uint i=0;i<min(a.size(),b.size());i++) {
@@ -72,17 +80,18 @@ string section(const string& s, char separator, int start, int end, bool include
     return copy(string(s.data()+start,end-start));
 }
 
-array<string> split(const string& str, char sep) {
+array<string> split(const string& str, uint sep) {
     array<string> list;
-    uint b=0,e=0;
+    utf8_iterator b=str.begin();
+    utf8_iterator end=str.end();
     for(;;) {
-        while(b<str.size() && str[b]==sep) b++;
-        e=b;
-        while(e<str.size() && str[e]!=sep) e++;
-        if(b==str.size()) break;
-        list << slice(str,b,e-b);
-        if(e==str.size()) break;
-        b=e+1;
+        while(b!=end && *b==sep) ++b;
+        utf8_iterator e = b;
+        while(e!=end && *e!=sep) ++e;
+        if(b==end) break;
+        list << copy(string(b,e));
+        if(e==end) break;
+        b = ++e;
     }
     return list;
 }
@@ -108,8 +117,23 @@ string toLower(const string& s) {
     return lower;
 }
 
+string trim(const array<byte>& s) {
+    string simple;
+    int i=0,end=s.size();
+    //for(;i<end;i++) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
+    //for(;end>i;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
+    for(;i<end;) { //trim duplicate
+        byte c=s[i];
+        if(c=='\r') { i++; continue; }
+        simple << c;
+        i++;
+        if(c==' '||c=='\t'||c=='\n') for(;i<end;i++) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; }
+    }
+    return simple;
+}
+
 string utf8(uint c) {
-    assert(c>0x20);
+    assert(c>='\n',hex(c));
     string utf8;
     /**/  if(c<(1<<7))           utf8                                                                                                            << c;
     else if(c<(1<<(7+6)))     utf8                                             << (0b11000000|(c>>6))                      << (0b10000000|(c&0b111111));

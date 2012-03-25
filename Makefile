@@ -13,27 +13,29 @@ endif
 SRCS = core array string process
 
 	 ifeq ($(TARGET),player)
- SRCS += vector signal stream file image window font interface alsa ffmpeg resample player
+ SRCS += vector signal stream file image png window raster font interface alsa ffmpeg resample player
  ICONS = play pause next
  INSTALL =icons/player.png  player.desktop
 else ifeq ($(TARGET),browser)
- SRCS += stream file time http xml vector image window font interface browser
+ SRCS += stream file time http xml vector image png jpeg window raster font interface html browser
  ICONS = rss
 else ifeq ($(TARGET),music)
  SRCS += vector stream time signal file alsa resample sequencer flac sampler midi window image font interface music
  ICONS = music music256
  INSTALL = icons/music.png music.desktop
 else ifeq ($(TARGET),taskbar)
- SRCS += vector signal stream time file dbus image window font interface launcher taskbar
+ SRCS += vector signal stream time file dbus image window raster font interface launcher taskbar
  ICONS = button shutdown
 else ifeq ($(TARGET),editor)
- SRCS += file image gl window font editor
+ SRCS += file image gl window raster font editor
  GLSL = editor
  GPUS = shader
 else ifeq ($(TARGET),symbolic)
  SRCS += symbolic algebra expression
 else ifeq ($(TARGET),flac)
  SRCS += file vector flac codec disasm
+else ifeq ($(TARGET),jpeg)
+  SRCS += stream file time http vector image png jpeg
 else ifeq ($(TARGET),bspline)
  SRCS += window bspline file image
 endif
@@ -46,7 +48,7 @@ ifneq (,$(findstring alsa,$(SRCS)))
  LIBS += -lasound
 endif
 
-ifneq (,$(findstring image,$(SRCS)))
+ifneq (,$(findstring png,$(SRCS)))
   LIBS += -lz
 endif
 
@@ -85,21 +87,18 @@ FLAGS += -pipe -std=c++11 -fno-operator-names -Wall -Wextra -Wno-narrowing -Wno-
 ifeq ($(BUILD),debug)
 	FLAGS += -ggdb -DDEBUG -fno-omit-frame-pointer
 	LIBS += -lbfd
-else ifeq ($(BUILD),memoryfast)
-	FLAGS += -ggdb -DDEBUG -DTRACE_MALLOC -Ofast -fno-omit-frame-pointer
-	SRCS += memory
-	LIBS += -lbfd
-else ifeq ($(BUILD),debugfast)
+else ifeq ($(BUILD),release)
 	FLAGS += -ggdb -DDEBUG -fno-omit-frame-pointer -Ofast -fno-rtti
 	LIBS += -lbfd
-else ifeq ($(BUILD),gdbfast)
-	FLAGS += -ggdb -Ofast -fno-rtti
-else ifeq ($(BUILD),release)
-	FLAGS += -Ofast -fno-rtti
+	#FLAGS += -Ofast -fno-rtti
 else ifeq ($(BUILD),trace)
 	FLAGS += -g -DDEBUG
 	LIBS += -lbfd
 	FLAGS += -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector -DTRACE
+else ifeq ($(BUILD),memory)
+	FLAGS += -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MALLOC
+	SRCS += memory
+	LIBS += -lbfd
 endif
 
 all: prepare $(SRCS:%=$(BUILD)/%.o)

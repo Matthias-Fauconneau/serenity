@@ -1,0 +1,115 @@
+#include "html.h"
+#include "array.cc"
+#include "raster.h"
+
+void HTML::load(const URL& url) {
+    clear();
+    auto document = getURL(url);
+    if(!document) { append(new Text("Timeout: "_+str(url))); return; }
+    Element html = parseHTML(move(document));
+
+    const Element* best=0; int max=0,second=0;
+    //find node with most direct content
+    html.visit([&best,&max,&second,&url](const Element& div) {
+        int score =0;
+        if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
+        else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 900;
+        if(div.name=="img"_ && div["src"_]) {
+            URL src = url.relative(div["src"_]);
+            if(contains(src.path,"comic"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||contains(src.path,"chapter"_)||contains(src.path,"art/"_)) {
+                int size=0;
+                if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
+                score += size?:4096;
+            }
+        }
+        else if(!div.children) return;
+        array<const Element*> stack;
+        for(auto& c: div.children) stack<<c;
+        while(stack.size()) {
+            const Element& e = *stack.pop();
+            const array<string> contentElement = {"p"_,"a"_,"blockquote"_,"ul"_,"li"_,"em"_,"strong"_};
+            if(contains(contentElement,e.name))
+                for(auto& c: e.children) stack<<c; //content
+            else if(e.name!="script"_ && e.name!="style"_ && e.content)
+                score += e.content.size(); //raw text
+            else if(e.name=="img"_||e.name=="iframe"_) {
+                //int width = isInteger(e["width"_]) ? toInteger(e["width"_]) : 1;
+                int height = isInteger(e["height"_]) ? toInteger(e["height"_]) : 1;
+                if(e.name=="img"_) score += height; //image
+                //else if(e.name=="iframe"_) score += width*height; //video
+            } else if(e.name=="br"_) score += 32; //line break
+        }
+        if(score>max) best=&div, second=max, max=score;
+        else if(score>second) second=score;
+    });
+    assert(best);
+    while(best->name=="a"_ && best->children.size()==1) best=best->children.first();
+    const Element& content = *best;
+
+    //convert HTML to text + images
+    for(auto& c: content.children) layout(url, *c);
+    flushText();
+    flushImages();
+
+    if(max<600) {
+        log("TEXT\n",text);
+        log("HTML\n"_+str(content));
+        log("-------------------------------------------------\n",html);
+        warn(max,second);
+    }
+}
+
+void HTML::layout(const URL& url, const Element &e) {
+    if(e.name=="img"_) { //Images
+       flushText();
+       Image image = decodeImage(getURL(url.relative(e["src"_])));
+       if(image) images << image; else log("Image failed",url.relative(e["src"_]));
+    } else if(!e.name) { //Text
+       flushImages();
+       if(!e.name) text << e.content;
+    } else if(e.name=="p"_||e.name=="br"_||e.name=="a"_||e.name=="blockquote"_) {
+        flushImages();
+        for(auto& c: e.children) layout(url, *c);
+        text<<"\n"_;
+    } else if(e.name=="strong"_||e.name=="em"_) {
+        text << format(Bold);
+        for(auto& c: e.children) layout(url, *c);
+        text << format(Regular);
+    } else {
+        for(auto& c: e.children) layout(url, *c);
+        log("Unknown element",e.name);
+    }
+}
+void HTML::flushText() {
+    if(!trim(text)) return;
+    append( new Text(trim(text),16,255, 512 /*60 characters*/) );
+    text.clear();
+}
+void HTML::flushImages() {
+    if(!images) return;
+    uint w=1,h=1; for(;;) {
+        if(w*h>=images.size()) break; w++;
+        if(w*h>=images.size()) break; h++;
+    }
+    for(uint y=0,i=0;y<h;y++) {
+        auto list = new HList<ImageView>;
+        for(uint x=0;x<w && i<images.size();x++,i++) {
+            *list << ImageView(move(images[i]));
+        }
+        append( list );
+    }
+    images.clear();
+    /*auto grid = new Grid<ImageView>(w,h);
+    for(Image& image: images) grid->append(ImageView(move(image)));
+    page << grid;*/
+}
+
+void HTML::clear() {
+    for(Widget* w: *this) delete w;
+    VBox::clear();
+}
+
+void HTML::render(int2 parent) {
+    fill(parent+position,int2(0,0),Widget::size,byte4(240,240,240,240));
+    VBox::render(parent);
+}

@@ -1,6 +1,7 @@
 #include "process.h"
 #include "window.h"
 #include "array.cc"
+#include "raster.h"
 
 #include <poll.h>
 #include <X11/Xutil.h>
@@ -9,7 +10,6 @@
 #include <X11/extensions/XShm.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
-Image framebuffer;
 
 Display* Window::x=0;
 int2 Window::screen;
@@ -115,7 +115,8 @@ void Window::render() {
         shminfo.readOnly = True;
         XShmAttach(x, &shminfo);
     }
-    framebuffer = Image((byte4*)image->data, image->width, image->height);
+    framebuffer = Image((byte4*)image->data, image->width, image->height, false);
+    push(Clip{int2(0,0),int2(image->width,image->height)});
     {
          int2 center = int2(size.x/2,0); int radius=256;
          for_Image(framebuffer) {
@@ -135,6 +136,7 @@ void Window::render() {
     if(position.x>0 && position.y+size.y<screen.y-1) framebuffer(0,size.y-1) /= 2;
     if(position.x+size.x<screen.x-1 && position.y+size.y<screen.y-1) framebuffer(size.x-1,size.y-1) /= 2;
     widget.render(int2(0,0));
+    finish();
     XShmPutImage(x,id,gc,image,0,0,0,0,image->width,image->height,0);
     XFlush(x);
 }
