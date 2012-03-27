@@ -1,0 +1,1 @@
+TARGET=feeds make install
