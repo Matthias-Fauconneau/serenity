@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Feed Reader
+Exec=feeds
+Type=Application
+Icon=feeds
+Categories=Network;WebBrowser;
