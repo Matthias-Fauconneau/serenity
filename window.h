@@ -48,10 +48,10 @@ struct Window : Poll {
     /// Set window override_redirect attribute
     void setOverrideRedirect(bool override_redirect);
 
-    /// Register global shortcut named \a key (X11 KeySym)
-    static uint addHotKey(const string& key);
-    /// User pressed a key (including global hot keys)
-    static signal<Key> keyPress;
+    /// Register local shortcut on \a key (X11 KeySym)
+    signal<>& localShortcut(const string& key);
+    /// Register global shortcut on \a key (X11 KeySym)
+    static signal<>& globalShortcut(const string& key);
 
     /// Set keyboard input focus
     void setFocus(Widget* focus);
@@ -64,30 +64,44 @@ struct Window : Poll {
     /// Get X11 property \a name on \a window
     template<class T> static array<T> getProperty(XID window, const char* property);
     static void sync();
-protected:
+
     /// Set X11 property \a name to \a value
     template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
 
+    /// X11 Event handler
     void event(pollfd);
     bool event(const XEvent& e);
 
+    /// Connection to X11 display
     static Display* x;
-    static int depth;
-    static Visual* visual;
+    /// Windows managed by this connection
     static map<XID, Window*> windows;
 
+    /// Shortcuts triggered when \a KeySym is pressed and the focus belongs to this window
+    map< KeySym, signal<> > localShortcuts;
+    /// Shortcuts triggered when \a KeySym is pressed
+    static map< KeySym, signal<> > globalShortcuts;
+
+    /// Screen depth
+    static int depth;
+    /// Screen X11 Visual
+    static Visual* visual;
+    /// Screen size
+    static int2 screen;
+
+    /// X11 window Identifier
     XID id=0;
 
-    int2 position, size;
+    int2 position=zero;
+    int2 size=zero;
     string title;
     Image icon;
 
     GC gc;
-    XImage* image;
+    XImage* image=0;
     XShmSegmentInfo shminfo;
-public:
+
     int bgCenter=240,bgOuter=224;
     Widget& widget;
     ubyte opacity;
-    static int2 screen;
 };

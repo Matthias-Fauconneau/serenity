@@ -14,11 +14,13 @@ template<typename... Args> bool operator ==(const delegate<Args...>& a, const de
     return a._this==b._this && a.method==b.method;
 }
 
+#define is_base_of(B,D) std::is_base_of<B,D>::value
+
 template<class T> struct array;
 template<typename... Args> struct signal {
     array< delegate<void> > slots;
     void emit(Args... args) { for(delegate<void>& slot: slots) (*(delegate<void,Args...>*)&slot)(copy(args)...);  }
-    template <class C> void connect(C* _this, void (C::*method)(Args...)) {
+    template <class C, class B, predicate(is_base_of(B,C))> void connect(C* _this, void (B::*method)(Args...)) {
         slots.append( delegate<void>(_this, (void (C::*)())method) );
     }
 };

@@ -5,9 +5,48 @@
 #include "window.h"
 #include "launcher.h"
 #include "poll.h"
+#include "dbus.h"
 #include "array.cc" //array<Task>
 
-#include "dbus.h"
+static Display* x; //TODO: use Window::x
+
+struct Task : Item {
+    XID id;
+    Task(XID id):id(id){} //for indexOf
+    Task(XID id, Icon&& icon, Text&& text):Item(move(icon),move(text)),id(id){}
+    bool mouseEvent(int2, Event event, Button button) override {
+        //TODO: preview on Enter
+        if(button!=LeftButton) return false;
+        if(event==Press) {
+            XID active = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
+            if(active == id ) { //Set maximized
+                XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
+                    {.l={1,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
+                XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+                XFlush(x);
+                return true;
+            } else { //Raise
+                XMapWindow(x, id);
+                XRaiseWindow(x, id);
+                XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+                XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_ACTIVE_WINDOW), 32, {.l={2,0,0,0,0}} };
+                XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+                XFlush(x);
+                return true;
+            }
+        }
+        if(event==Motion) { //Set windowed
+            XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
+                {.l={0,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
+            XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+            XFlush(x);
+            return true;
+        }
+        return false;
+    }
+};
+bool operator==(const Task& a,const Task& b){return a.id==b.id;}
+
 struct StatusNotifierItem : TriggerButton {
     DBus::Object item;
     StatusNotifierItem(DBus::Object&& item, Image&& icon) : TriggerButton(move(icon)), item(move(item)) {}
@@ -20,28 +59,119 @@ struct StatusNotifierItem : TriggerButton {
     }
 };
 
-struct Task : Item {
-    XID id;
-    Task(XID id):id(id){} //for indexOf
-    Task(XID id, Icon&& icon, Text&& text):Item(move(icon),move(text)),id(id){}
-};
-bool operator==(const Task& a,const Task& b){return a.id==b.id;}
-
 struct Clock : Text, Timer {
     signal<> render;
     signal<> triggered;
-    Clock():Text(date("hh:mm"_)){ setAbsolute(currentTime()/60*60+60); }
-    void expired() { text=date("hh:mm"_); update(); setAbsolute(currentTime()+60); render.emit(); }
+    Clock():Text(str(date(),"hh:mm"_)){ setAbsolute(currentTime()/60*60+60); }
+    void expired() { text=str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); render.emit(); }
     bool mouseEvent(int2, Event event, Button button) override {
         if(event==Press && button==LeftButton) { triggered.emit(); return true; }
         return false;
     }
 };
 
-ICON(shutdown);
+/// Returns events occuring on \a query date (-1=unspecified)
+array<string> getEvents(Date query) {
+    array<string> events;
+    TextBuffer s(readFile(".config/events"_,home()));
 
+    map<string, array<Date> > exceptions; //Exceptions for recurring events
+    while(s) { //first parse all exceptions (may occur after recurrence definitions)
+        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until("\n"_); exceptions[move(title)] << except; }
+        else s.until("\n"_);
+    }
+    s.index=0;
+
+    Date until; //End date for recurring events
+    while(s) {
+        s.skip();
+        if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
+        else if(s.match("except "_)) s.until("\n"_); //already parsed
+        else {
+            Date date = parse(s); s.skip();
+            Date end=date; if(s.match("-"_)) { end=parse(s); s.skip(); }
+            string title = s.until("\n"_);
+            if(date.day>=0) { if(date.day!=query.day) continue; }
+            else if(query.day>=0 && query>until) continue;
+            if(date.month>=0) { if(date.month!=query.month) continue; }
+            else if(query.month>=0 && query>until) continue;
+            if(date.year>=0) { if(date.year!=query.year) continue; }
+            else if(query.year>=0 && query>until) continue;
+            if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
+            for(Date date: exceptions[copy(title)]) if(date.day==query.day && date.month==query.month) goto skip;
+            events << str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title;
+            skip:;
+        }
+    }
+    return events;
+}
+
+struct Month : Grid<Text> {
+    array<Date> dates;
+    int todayIndex;
+    Month() : Grid(7,8) {
+        Date date = ::date();
+        static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
+        const int nofDays[12] = { 31, !(date.year%4)&&(date.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+        for(int i=0;i<7;i++) {
+            append(copy(days[i]));
+            dates << Date(-1,-1,-1,-1,-1,-1,i);
+        }
+        int first = (35+date.weekDay+1-date.day)%7;
+        for(int i=0;i<first;i++) { //previous month
+            int previousMonth = (date.month+11)%12;
+            int day = nofDays[previousMonth]-first+i+1;
+            dates << Date(count()%7, day, previousMonth);
+            append(Text(format(Italic)+dec(day,2)));
+        }
+        for(int i=1;i<=nofDays[date.month];i++) { //current month
+            if(i==date.day) todayIndex=count();
+            dates << Date(count()%7, i, date.month);
+            append(string((i==date.day?format(Bold):""_)+dec(i,2))); //current day
+        }
+        for(int i=1;count()<7*8;i++) { //next month
+            dates << Date(count()%7, i, (date.month+1)%12);
+            append(Text(format(Italic)+dec(i,2)));
+        }
+    }
+};
+
+struct Calendar {
+      Text date { format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) };
+      Month month;
+      Text events;
+     Menu menu { &date, &month, &space, &events, &space };
+    Window window{&menu,""_,Image(),int2(300,300)};
+    Calendar() {
+        window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
+        window.setOverrideRedirect(true);
+        menu.close.connect(&window,&Window::hide);
+        month.activeChanged.connect(this,&Calendar::activeChanged);
+        month.setActive(month.todayIndex);
+        menu.update();
+    }
+    void activeChanged(int index) {
+        string text;
+        Date date = month.dates[index];
+        text << string(format(Bold)+(index==month.todayIndex?"Today"_:str(date))+format(Regular)+"\n"_);
+        text << join(::getEvents(date),"\n"_)+"\n"_;
+        if(index==month.todayIndex) {
+            Date date = month.dates[index+1];
+            text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
+            text << join(::getEvents(date),"\n"_);
+        }
+        events.setText(move(text));
+        menu.update(); window.render();
+    }
+    bool mouseEvent(int2, Event event, Button) {
+        if(event==Leave) { window.hide(); return true; }
+        return false;
+    }
+    void show() { window.show(); window.setPosition(int2(-300,16)); Window::sync(); }
+};
+
+ICON(shutdown);
 struct Desktop {
-    Space space;
     List<Command> shortcuts { readShortcuts() };
     List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     HBox applets { &space, &shortcuts, &system };
@@ -49,47 +179,8 @@ struct Desktop {
     Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
 };
 
-struct Month : Grid<Text> {
-    Month() : Grid(7,8) {
-        Date date = ::date();
-        static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
-        const int nofDays[12] = { 31, !(date.year%4)&&(date.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-        for(int i=0;i<7;i++) append(copy(days[i]));
-        int first = (35+date.weekDay+1-date.day)%7;
-        for(int i=0;i<first;i++) { //previous month
-            append(Text(format(Italic)+dec(nofDays[(date.month+11)%12]-first+i+1,2)));
-        }
-        for(int i=1;i<=nofDays[date.month];i++) { //current month
-            if(i==date.day) append(string(format(Bold)+dec(i,2))); //current day
-            else append(dec(i,2));
-        }
-        for(int i=1;count()<7*8;i++) { //next month
-            append(Text(format(Italic)+dec(i,2)));
-        }
-    }
-};
-
-struct Calendar {
-      Text date { ::date("dddd, dd MMMM yyyy"_) };
-      Month month;
-     Menu menu { &date, &month };
-    Window window{&menu,""_,Image(),int2(-2,-2)};
-    Calendar() {
-        window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
-        window.setOverrideRedirect(true);
-        menu.close.connect(&window,&Window::hide);
-    }
-    bool mouseEvent(int2, Event event, Button) {
-        if(event==Leave) { window.hide(); return true; }
-        return false;
-    }
-    void show() { window.show(); window.setPosition(int2(-menu.sizeHint().x,16)); Window::sync(); }
-};
-
 ICON(button);
-
 struct TaskBar : Poll {
-    Display* x;
     DBus dbus;
     bool ownWM=false; //when no WM is detected, basic window management will be provided
     signal<int> tasksChanged;
@@ -184,33 +275,17 @@ struct TaskBar : Poll {
         for(string& name: names) if(startsWith(name,"org.kde.StatusNotifierItem"_)) registerStatusNotifierItem(move(name));
         DBus("org.freedesktop.DBus.RequestName"_, "org.kde.StatusNotifierWatcher"_, (uint)0);
 
-         start.image = resize(buttonIcon, 16,16);
-         start.triggered.connect(&launcher,&Launcher::show);
-         tasks.expanding=true;
-         tasks.activeChanged.connect(this,&TaskBar::raise);
-         clock.render.connect(&window, &Window::render);
-         clock.triggered.connect(&calendar,&Calendar::show);
+        start.image = resize(buttonIcon, 16,16);
+        start.triggered.connect(&launcher,&Launcher::show);
+        tasks.expanding=true;
+        clock.render.connect(&window, &Window::render);
+        clock.triggered.connect(&calendar,&Calendar::show);
 
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
         window.show();
         window.setPosition(int2(0,0));
         XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
         Window::sync();
-    }
-    void raise(int) {
-        XMapWindow(x, tasks.active().id);
-        XRaiseWindow(x, tasks.active().id);
-        XSetInputFocus(x, tasks.active().id, RevertToPointerRoot, CurrentTime);
-        XEvent xev; clear(xev);
-        xev.type = ClientMessage;
-        xev.xclient.window = tasks.active().id;
-        xev.xclient.message_type = Atom(_NET_ACTIVE_WINDOW);
-        xev.xclient.format = 32;
-        xev.xclient.data.l[0] = 2;
-        xev.xclient.data.l[1] = 0;
-        xev.xclient.data.l[2] = 0;
-        XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, &xev);
-        XFlush(x);
     }
     void event(pollfd) override {
         bool needUpdate = false;
@@ -257,9 +332,10 @@ struct TaskBar : Poll {
 struct Shell : Application {
     TaskBar taskbar;
     Desktop desktop;
-    Shell() {
+    Shell(array<string>&&) {
         taskbar.tasksChanged.connect(this,&Shell::tasksChanged);
         tasksChanged(taskbar.tasks.array::size());
     }
-    void tasksChanged(int count) { if(!count) desktop.window.show(); else desktop.window.hide();  }
-} shell;
+    void tasksChanged(int count) { if(!count) desktop.window.show(); else desktop.window.hide(); }
+};
+Application(Shell)

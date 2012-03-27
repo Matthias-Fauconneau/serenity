@@ -46,6 +46,7 @@ struct Space : Widget {
     int2 sizeHint() { return int2(-1,-1); }
     void render(int2) {}
 };
+extern Space space; // same dummy instance can be reused
 
 /// Scroll is a proxy Widget containing a widget in a scrollable area.
 //TODO: flick, scroll indicator, scrollbar
@@ -55,6 +56,8 @@ struct ScrollArea : Widget {
     /// Ensures \a target is visible inside the region of the viewport
     /// \note Assumes \a target is a direct child of the proxied \a widget
     void ensureVisible(Widget& target);
+    /// Expanding directions
+    bool horizontal=false, vertical=true;
 
     int2 sizeHint() { return widget().sizeHint(); }
     void update() override;
@@ -188,6 +191,8 @@ struct Selection : virtual Layout {
     signal<int /*index*/> activeChanged;
     /// Active index
     int index = -1;
+    /// Set active index and emit activeChanged
+    void setActive(int index);
 
     bool mouseEvent(int2 position, Event event, Button button) override;
 };
@@ -234,6 +239,8 @@ inline Format format(char f) { return Format(f-0x10); }
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(string&& text=""_, int size=16, ubyte opacity=255, int wrap=0);
+    Text(Text&&)=default;
+    ~Text();
 
     void setText(string&& text) { this->text=move(text); textSize=zero; }
     void setSize(int size) { this->size=size; textSize=zero; }
@@ -248,7 +255,7 @@ struct Text : Widget {
     int wrap=0;
 
     int2 sizeHint();
-    void update() override { update(wrap); }
+    void update() override { update(min(wrap,Widget::size.x)); }
     void update(int wrap);
     void render(int2 parent);
 protected:

@@ -49,7 +49,6 @@ map<const char*, int> profile;
 
 void execute(const string& path, const array<string>& args) {
     assert(!contains(path,' '));
-    log("execute",path,args);
     array<string> args0(1+args.size());
     args0 << strz(path);
     for(uint i=0;i<args.size();i++) args0 << strz(args[i]);
@@ -72,28 +71,17 @@ string str(const pollfd&) { return "pollfd"_; }
 void Poll::registerPoll(pollfd poll) { polls.insert(this,poll); }
 void Poll::unregisterPoll() { polls.remove(this); }
 
-/// Application
-
-Application* app=0;
-Application::Application() { assert(!app,"Multiple application compiled in executable"_); app=this; }
-int main(int argc, const char** argv) {
-    {
-        array<string> args;
-        for(int i=1;i<argc;i++) args << strz(argv[i]);
-        assert(app,"No application compiled in executable"_);
-        app->start(move(args));
-    }
-    while(polls.size() && app->running) {
-        ::poll((pollfd*)polls.values.data(),polls.size(),-1);
-        for(int i=0;i<polls.size();i++) {
-            int events = polls.values[i].revents;
-            if(events) {
-                assert(events==POLLIN,events);
-                polls.keys[i]->event(polls.values[i]);
-            }
+int waitEvents() {
+    if(!polls.size()) return 0;
+    ::poll((pollfd*)polls.values.data(),polls.size(),-1);
+    for(int i=0;i<polls.size();i++) {
+        int events = polls.values[i].revents;
+        if(events) {
+            assert(events==POLLIN,events);
+            polls.keys[i]->event(polls.values[i]);
         }
     }
-    return 0;
+    return polls.size();
 }
 
 #ifdef DEBUG

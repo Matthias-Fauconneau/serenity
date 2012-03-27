@@ -19,13 +19,20 @@ struct Feeds : Application {
     Scroll<HTML> page;
     HBox main { &news, &page.parent() };
     Window window{&main,"Feeds"_,move(feedsIcon),int2(0,-1),224};
-    Feeds() {
+    Feeds(array<string>&& arguments) {
         window.bgOuter=window.bgCenter;
-        window.keyPress.connect(this, &Feeds::keyPress);
+        window.localShortcut("Escape"_).connect(this, &Feeds::quit);
         news.activeChanged.connect(this,&Feeds::activeChanged);
         news.itemPressed.connect(this,&Feeds::itemPressed);
+        if(arguments) {
+            page.load(arguments.first());
+        } else {
+            array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
+            loadFeeds(feeds);
+        }
+        window.show();
+        Window::sync();
     }
-    void keyPress(Key key) { if(key == Escape) quit(); }
 
     int readConfig = appendFile(".config/read"_,home());
     array<string> read = split(readFile(".config/read"_,home()),'\n');
@@ -86,16 +93,6 @@ struct Feeds : Application {
             }
         }
     }
-    void start(array<string>&& arguments) {
-        if(arguments) {
-            page.load(arguments.first());
-        } else {
-            array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
-            loadFeeds(feeds);
-        }
-        window.show();
-        Window::sync();
-    }
     void activeChanged(int index) {
         Link& link = news[index];
         if(!link.url) return; //header
@@ -119,4 +116,5 @@ struct Feeds : Application {
 
         main.update(); window.render();
     }
-} feeds;
+};
+Application(Feeds)

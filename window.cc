@@ -16,7 +16,7 @@ int2 Window::screen;
 int Window::depth;
 Visual* Window::visual;
 map<XID, Window*> Window::windows;
-signal<Key> Window::keyPress;
+map<KeySym, signal<> > Window::globalShortcuts;
 Widget* Window::focus=0;
 
 template<class T> array<T> Window::getProperty(XID window, const char* property) {
@@ -50,6 +50,7 @@ Window::Window(Widget* widget, const string& title, const Image& icon, int2 size
     }
 }
 
+string str(const Window& window) { return str(window.id); }
 
 void Window::event(pollfd) { update(); }
 void Window::update() {
@@ -57,22 +58,30 @@ void Window::update() {
     while(XEventsQueued(x, QueuedAfterFlush)) {
         XEvent e; XNextEvent(x,&e);
         XID id = e.xany.window;
-        if(windows[id]->event(e) && !contains(needRender,id)) needRender << id;
+        if(e.type==KeyPress||e.type==KeyRelease) {
+            KeySym key = XKeycodeToKeysym(x,e.xkey.keycode,0);
+            signal<>* shortcut = globalShortcuts.find(key);
+            if(shortcut) {  if(e.type==KeyPress) shortcut->emit(); continue; } //global window shortcut
+        }
+        Window** window = windows.find(id);
+        if(!window) { log("Unknown window",id,"for event",e.type,"(windows = ",windows,")"); continue; }
+        if((*window)->event(e) && !contains(needRender,id)) needRender << id;
     }
     for(XID id: needRender) windows[id]->render();
 }
 bool Window::event(const XEvent& e) {
     assert(id);
     if(e.type==MotionNotify) {
-        return widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, e.xmotion.state&Button1Mask ? LeftButton : None);
+        return widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, (e.xmotion.state&Button1Mask)?LeftButton:None);
     } else if(e.type==ButtonPress) {
         return widget.mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
     } else if(e.type==KeyPress) {
-        auto key = XKeycodeToKeysym(x,e.xkey.keycode,0);
-        keyPress.emit((Key)key);
-        if(focus) return focus->keyPress((Key)key);
+        KeySym key = XKeycodeToKeysym(x,e.xkey.keycode,0);
+        signal<>* shortcut = localShortcuts.find(key);
+        if(shortcut) shortcut->emit(); //local window shortcut
+        else if(focus) return focus->keyPress((Key)key); //normal keyPress event
     } else if(e.type==EnterNotify || e.type==LeaveNotify) {
-        return widget.mouseEvent(int2(e.xcrossing.x,e.xcrossing.y), e.type==EnterNotify?Enter:Leave, None);
+        return widget.mouseEvent(int2(e.xcrossing.x,e.xcrossing.y), e.type==EnterNotify?Enter:Leave, (e.xcrossing.state&Button1Mask)?LeftButton:None);
     } else if(e.type==Expose && !e.xexpose.count) {
         return true;
     } else if(e.type==ConfigureNotify || e.type==ReparentNotify) {
@@ -91,8 +100,9 @@ bool Window::event(const XEvent& e) {
     } else if(e.type==UnmapNotify) {
         visible=false;
     } else if(e.type==ClientMessage) {
-        keyPress.emit(Escape);
-        widget.keyPress(Escape);
+        signal<>* shortcut = localShortcuts.find(Escape);
+        if(shortcut) shortcut->emit(); //local window shortcut
+        else widget.keyPress(Escape);
     }
     return false;
 }
@@ -170,20 +180,20 @@ void Window::setPosition(int2 position) {
     if(position.x<0) position.x=screen.x+position.x;
     if(position.y<0) position.y=screen.y+position.y;
     update();
-    XMoveWindow(x, id, position.x, position.y); XFlush(x);
+    XMoveWindow(x, id, position.x, position.y);
     this->position=position;
 }
 
 void Window::setSize(int2 size) {
     if(size.x<0||size.y<0) {
         int2 hint=widget.sizeHint(); assert(hint,hint);
-        if(size.x<0) size.x=abs(hint.x)-size.x-1;
-        if(size.y<0) size.y=abs(hint.y)-size.y-1;
+        if(size.x<0) size.x=max(abs(hint.x),-size.x);
+        if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
     if(size.x==0) size.x=screen.x;
     if(size.y==0) size.y=screen.y;
     assert(size);
-    if(id) { XResizeWindow(x, id, size.x, size.y); XFlush(x); }
+    if(id) XResizeWindow(x, id, size.x, size.y);
     else this->size=widget.size=size;
 }
 
@@ -233,12 +243,19 @@ void Window::setFocus(Widget* focus) {
     XFlush(x);
 }
 
-uint Window::addHotKey(const string& key) {
+signal<>& Window::localShortcut(const string& key) {
+    KeySym keysym = XStringToKeysym(strz(key).data());
+    assert(keysym != NoSymbol);
+    assert(!localShortcuts.contains(keysym));
+    return localShortcuts[keysym];
+}
+
+signal<>& Window::globalShortcut(const string& key) {
     KeySym keysym = XStringToKeysym(strz(key).data());
     assert(keysym != NoSymbol);
     XGrabKey(x, XKeysymToKeycode(x, keysym), AnyModifier, DefaultRootWindow(x), True, GrabModeAsync, GrabModeAsync);
     XFlush(x);
-    return keysym;
+    return globalShortcuts.insert(keysym);
 }
 
 string Window::getSelection() {

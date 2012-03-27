@@ -5,17 +5,23 @@ struct pollfd;
 
 extern "C" char* getenv(const char* key);
 
-/// Application should be inherited to compile an application into an executable
+/// Application can be inherited to interface with the event loop
 struct Application {
-    Application();
-    /// Initializes using the given command line \a args
-    virtual void start(array<string>&& /*args*/) {}
-    /// Flag to exit event loop and return from main()
+    /// Flag to exit event loop and quit application
     bool running=true;
     /// Set running flag to false so as to quit the application when returning to the event loop.
     /// \note Use this method for normal termination. \a exit doesn't destruct stack allocated objects.
     void quit() { running=false; }
 };
+
+/// Convenience macro to startup an Application with the default event loop
+#define Application(App) \
+int main(int argc, const char** argv) { \
+    array<string> args; for(int i=1;i<argc;i++) args << strz(argv[i]); \
+    App* app = new App(move(args)); \
+    while(app->running && waitEvents()) {} \
+    return 0; \
+}
 
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
@@ -26,6 +32,10 @@ struct Poll {
     /// Callback on new events
     virtual void event(pollfd p) =0;
 };
+
+/// Wait for and dispatches events to registered Poll objects
+/// \return count of registered Poll objects
+int waitEvents();
 
 /// Set process CPU scheduling priority (-20 high priority, 19 low priority)
 void setPriority(int priority);

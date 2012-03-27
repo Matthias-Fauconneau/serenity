@@ -121,7 +121,7 @@ string trim(const array<byte>& s) {
     int i=0,end=s.size();
     for(;i<end;i++) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
     for(;end>i;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
-    return slice(s, i, end);
+    return slice(s, i, end-i);
 }
 
 string simplify(const array<byte>& s) {

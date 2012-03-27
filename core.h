@@ -148,3 +148,9 @@ template <class T> void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src
 template <class T> T copy(const T& t) { return t; }
 // explicit buffer copy
 template <class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
+
+/// Compare
+//raw buffer comparison //TODO: SSE
+inline bool compare(const byte* a,const byte* b, int size) { for(int i=0;i<size;i++) if(a[i]!=b[i]) return false; return true; }
+//raw value comparison
+template <class T> bool compare(const T& a,const T& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(T)); }

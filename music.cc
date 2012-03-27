@@ -34,10 +34,10 @@ struct Music : Application {
 #endif
     Window window{&widget,"Music"_,move(musicIcon)};
     ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_,CWD,true); }
-    void start(array<string>&& arguments) {
+    Music(array<string>&& arguments) {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_,CWD,true);
         string instrument;
-        window.keyPress.connect(this,&Music::keyPress);
+        window.localShortcut("Escape"_).connect(this,&Application::quit);
         for(auto&& path : arguments) {
             if(endsWith(path, ".sfz"_) && exists(path)) {
                 instrument=section(path,'.',0,-2);
@@ -88,4 +88,5 @@ struct Music : Application {
         audio.start();
     }
     void keyPress(Key key) { if(key==Escape) running=false; }
-} music;
+};
+Application(Music)

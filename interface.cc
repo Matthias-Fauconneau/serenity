@@ -9,12 +9,14 @@ template class array<Text>;
 /// Sets the array size to \a size, filling with \a value
 template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }
 
+Space space;
+
 /// ScrollArea
 
 void ScrollArea::update() {
     int2 hint = abs(widget().sizeHint());
     widget().position = min(int2(0,0), max(size-hint, widget().position));
-    widget().size = max(hint, size);
+    widget().size = max(int2(horizontal?hint.x:0,vertical?hint.y:0), size);
     widget().update();
 }
 
@@ -89,7 +91,6 @@ void Linear::update() {
             expandingWidth += -hint; //compute minimum total expanding size
         }
     }
-    assert(width>=0);
     width -= expandingWidth;
     bool expanding=sharing;
     if(!expanding) sharing=count(); //if no expanding: all widgets will share the extra space
@@ -106,7 +107,6 @@ void Linear::update() {
             int second=first; for(int e: sizes) if(e>second && e<first) second=e;
             int delta = first-second;
             if(delta==0 || delta>-width/sharing) delta=-width/sharing; //if no change or bigger than necessary
-            assert(delta>0,width);
             first -= delta; width += delta;
         }
     }
@@ -157,9 +157,10 @@ struct TextLayout {
         if(!line) { pen.y+=metrics.height; return; }
         //justify
         float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x; //sum word length
+        length += line.last().last().glyph.image.width - line.last().last().glyph.advance.x; //for last word of line, use glyph bound instead of advance
         float space=0;
-        if(justify) space = (wrap-length)/line.size();
-        if(space<=0||space>32) space = font->metrics(size,' ').advance.x; //compact
+        if(justify) space = (wrap-length)/(line.size()-1);
+        if(space<=0||space>64) space = font->metrics(size,' ').advance.x; //compact
 
         //layout
         pen.x=0;
@@ -182,9 +183,10 @@ struct TextLayout {
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
-                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font->glyph(size,' ').advance.x;
-                if(wrap && length+word.last().pos.x+(c=='\n'?0:word.last().glyph.advance.x)>=wrap) nextLine(true);
-                line << word;
+                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font->metrics(size,' ').advance.x;
+                length += word.last().pos.x+word.last().glyph.image.width; //last word
+                if(wrap && length>=wrap) nextLine(true); //doesn't fit
+                line << word; //add to current line (or first of new line)
                 word.clear();
                 pen.x=0;
                 if(c=='\n') nextLine(false);
@@ -204,8 +206,6 @@ struct TextLayout {
             if(glyph.image) word << i(Character{ c, vec2(pen.x,0)+glyph.offset, glyph });
             pen.x += glyph.advance.x;
         }
-        if(word) line<<word;
-        if(line) nextLine(false);
     }
     int2 textSize() {
        int2 bb=zero;
@@ -216,25 +216,24 @@ struct TextLayout {
 };
 
 Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
+Text::~Text()=default;
 void Text::update(int wrap) {
-    TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
     blits.clear();
+    if(!text) { textSize=int2(1,defaultSans.metrics(size).height); return; }
+    if(text.last()!='\n') text << '\n';
+    TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
     for(const auto& c: layout.text) blits << i(Blit{int2(round(c.pos.x),round(c.pos.y)),c.glyph.image});
     textSize = layout.textSize();
 }
 int2 Text::sizeHint() {
     if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
-    assert(!text||(textSize.x>0&&textSize.y>0),textSize,"'"_+text+"'"_);
     return wrap?int2(-textSize.x,textSize.y):textSize;
 }
 
 void Text::render(int2 parent) {
+    if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
-    for(const Blit& b: blits) {
-        //if(b.pos>=int2(-4,0) && b.pos+b.image.size()<=Widget::size+int2(2,2)) {
-            blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
-        //}
-    }
+    for(const Blit& b: blits) blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
 }
 
 /// TextInput
@@ -307,6 +306,11 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
         }
     }
     return false;
+}
+
+void Selection::setActive(int i) {
+    assert(i>=0 && i<count());
+    if(index!=i) { index=i; activeChanged.emit(index); }
 }
 
 /// HighlightSelection

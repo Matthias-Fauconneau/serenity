@@ -8,7 +8,8 @@ extern struct Zero {} zero; //dummy type to call zero-initializing constructor
 //TODO: SIMD
 template <template <typename> class V, class T, int N> struct vector : V<T> {
     static const int size = N;
-    vector()debug(:V<T>{}){}
+    //vector()debug(:V<T>{}){}
+    vector():V<T>{}{}
     vector(Zero):V<T>{}{}
     template<class... Args> explicit vector(Args... args):V<T>{args...}{static_assert(sizeof...(args) == N, "Invalid number of arguments");}
     template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }

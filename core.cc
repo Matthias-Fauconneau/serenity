@@ -15,6 +15,7 @@ template void grow(array<T>& a, uint size); \
 template void resize(array<T>& a, uint size); \
 /*Comparable*/ \
 template bool contains(const array<T>&, const T&); \
+template int indexOf(const array<T>& a, const T& value); \
 template bool operator ==(const array<T>&, const array<T>&); \
 template bool operator !=(const array<T>&, const array<T>&);
 
