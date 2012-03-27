@@ -79,8 +79,10 @@ string replace(const string& s, const string& before, const string& after);
 /// Lowers case
 string toLower(const string& s);
 
-/// Removes heading, trailing and duplicate whitespace
+/// Removes heading, trailing whitespace
 string trim(const array<byte>& s);
+/// Removes duplicate whitespace
+string simplify(const array<byte>& s);
 
 /// Convert Unicode code point to UTF-8
 string utf8(uint code);

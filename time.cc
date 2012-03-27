@@ -12,26 +12,40 @@ Date date(long time) {
     return { t.tm_sec, t.tm_min, t.tm_hour, t.tm_mday, t.tm_mon, 1900+t.tm_year, (t.tm_wday+6)%7/*0=Monday*/ };
 }
 
-string date(string&& format, Date date) {
+static const string days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
+static const string months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
+
+string str(Date date, string&& format) {
     TextBuffer s(move(format));
     string r;
-    static const string days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
-    static const string months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
     while(s) {
-        /**/ if(s.match("ss"_))  r << dec(date.seconds,2);
-        else if(s.match("mm"_))  r << dec(date.minutes,2);
-        else if(s.match("hh"_))  r << dec(date.hours,2);
-        else if(s.match("dddd"_))   r << days[date.weekDay];
-        else if(s.match("ddd"_))   r << slice(days[date.weekDay],0,3);
-        else if(s.match("dd"_))   r << dec(date.day,2);
-        else if(s.match("MMMM"_))  r << months[date.month];
-        else if(s.match("MMM"_))  r << slice(months[date.month],0,3);
-        else if(s.match("MM"_))  r << dec(date.month+1,2);
-        else if(s.match("yyyy"_)) r << dec(date.year);
+        /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); }
+        else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); }
+        else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); }
+        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << days[date.weekDay]; }
+        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << slice(days[date.weekDay],0,3); }
+        else if(s.match("dd"_)){ if(date.day>=0) r << dec(date.day,2); }
+        else if(s.match("MMMM"_)){ if(date.month>=0)  r << months[date.month]; }
+        else if(s.match("MMM"_)){ if(date.month>=0)  r << slice(months[date.month],0,3); }
+        else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); }
+        else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); }
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
         else r << s.read<byte>();
     }
-    return r;
+    return simplify(trim(r));
+}
+
+Date parse(TextBuffer& s) {
+    Date date = {-1,-1,-1,-1,-1,-1,-1};
+    for(int i=0;i<7;i++) if(s.match(days[i])) { date.weekDay=i; break; }
+    s.whileAny(" ,\t"_);
+    int number = s.number();
+    if(number<0) return date;
+    if(s.match(":"_)) date.hours=number, date.minutes=s.number();
+    else date.day = number;
+    s.whileAny(" ,\t"_);
+    for(int i=0;i<12;i++) if(s.match(months[i])) date.month=i;
+    return date;
 }
 
 Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll({fd, POLLIN}); }

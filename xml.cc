@@ -53,7 +53,7 @@ Element::Element(TextBuffer& s, bool html) {
         if(contains(voidElements,name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
-            content=trim(unescape(s.until("</"_+name+">"_)));
+            content=simplify(unescape(s.until("</"_+name+">"_)));
             s.skip();
             return;
         }
@@ -62,7 +62,7 @@ Element::Element(TextBuffer& s, bool html) {
         //if(s.available(4)<4) { warn("Expecting","</"_+name+">"_,"got EOF"); return; } //warn unclosed tag
         if(s.available(4)<4) {  return; } //ignore unclosed tag
         if(s.match("<![CDATA["_)) {
-            string content=trim(unescape(s.until("]]>"_)));
+            string content=simplify(unescape(s.until("]]>"_)));
             if(content) children << Element(move(content));
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
@@ -72,7 +72,7 @@ Element::Element(TextBuffer& s, bool html) {
         else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
         else if(s.match("<"_)) children << Element(s,html);
         else {
-            string content=trim(unescape(s.until("<"_))); s.index--;
+            string content=simplify(unescape(s.until("<"_))); s.index--;
             if(content) children << Element(move(content));
         }
     }
@@ -138,7 +138,7 @@ template<> string str(const Element& e) { return e.str(); }
 string unescape(const string& xml) {
     static map<string, string> entities;
     if(!entities) {
-        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © laquo « raquo » rsquo ’ oelig œ hellip … ndash – larr ← not ¬ mdash — euro €"_,' ');
+        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓"_,' ');
         assert(kv.size()%2==0,kv.size());
         for(uint i=0;i<kv.size();i+=2) entities.insert(kv[i],kv[i+1]);
     }

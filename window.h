@@ -72,7 +72,6 @@ protected:
     bool event(const XEvent& e);
 
     static Display* x;
-    static int2 screen;
     static int depth;
     static Visual* visual;
     static map<XID, Window*> windows;
@@ -90,4 +89,5 @@ public:
     int bgCenter=240,bgOuter=224;
     Widget& widget;
     ubyte opacity;
+    static int2 screen;
 };

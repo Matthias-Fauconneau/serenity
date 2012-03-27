@@ -34,14 +34,15 @@ Image decodePNG(const array<byte>& file) {
     z_stream z; clear(z); inflateInit(&z);
     array<byte> idat(s.buffer.size()*16); //FIXME
     z.next_out = (Bytef*)idat.data(), z.avail_out = (uint)idat.capacity();
-    uint width=0,height=0,depth=0;
+    uint width=0,height=0,depth=0; uint8 type=0;
+    array<byte> palette;
     while(s) {
         uint32 size = s.read();
         string name = s.read<byte>(4);
         if(name == "IHDR"_) {
-            width = (int)(uint32)s.read(), height = (int)(uint32)s.read();
+            width = s.read(), height = s.read();
             uint8 unused bitDepth = s.read(); assert(bitDepth==8,(int)bitDepth);
-            uint8 type = s.read(); depth = (int[]){0,0,3,0,2,0,4}[type]; assert(depth,type);
+            type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth,type);
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
             uint8 unused interlace = s.read(); assert(interlace==0);
@@ -50,6 +51,8 @@ Image decodePNG(const array<byte>& file) {
             auto buffer = s.read<byte>(size);
             z.next_in = (Bytef*)buffer.data();
             inflate(&z, Z_NO_FLUSH);
+        } else if(name == "PLTE"_) {
+            palette = s.read<byte>(size);
         } else s.advance(size);
          s.advance(4); //CRC
     }
@@ -58,9 +61,14 @@ Image decodePNG(const array<byte>& file) {
     idat.setSize( (int)z.total_out );
     assert(idat.size() == height*(1+width*depth), idat.size(), width, height, depth, z.avail_in);
     byte4* data = allocate<byte4>(width*height);
-    /**/ if(depth==2) filter<ia,2>(data,idat.data(),width,height);
+    /**/ if(depth==1) filter<luma,1>(data,idat.data(),width,height);
+    else if(depth==2) filter<ia,2>(data,idat.data(),width,height);
     else if(depth==3) filter<rgb,3>(data,idat.data(),width,height);
     else if(depth==4) filter<rgba,4>(data,idat.data(),width,height);
     else error("depth"_,depth);
+    if(type==3) { assert(palette);
+        rgb3* lookup = (rgb3*)palette.data();
+        for(uint i=0;i<width*height;i++) data[i]=lookup[data[i].r];
+    }
     return Image(data,width,height,true);
 }

@@ -116,7 +116,7 @@ void Window::render() {
         XShmAttach(x, &shminfo);
     }
     framebuffer = Image((byte4*)image->data, image->width, image->height, false);
-    push(Clip{int2(0,0),int2(image->width,image->height)});
+    push(Rect(int2(image->width,image->height)));
     {
          int2 center = int2(size.x/2,0); int radius=256;
          for_Image(framebuffer) {
@@ -209,8 +209,8 @@ void Window::setIcon(const Image& icon) {
     this->icon=copy(icon);
     if(!id) return;
     int size = 2+icon.width*icon.height;
-    array<int> buffer(2*size); //CARDINAL is long
-    buffer.buffer.size=2*size; buffer[0]=icon.width, buffer[2]=icon.height;
+    array<int> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
+    buffer[0]=icon.width, buffer[2]=icon.height;
     for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
     buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
     setProperty("CARDINAL", "_NET_WM_ICON", buffer);

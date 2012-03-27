@@ -50,15 +50,22 @@ struct Desktop {
 };
 
 struct Month : Grid<Text> {
-    Month() : Grid(7,6) {
+    Month() : Grid(7,8) {
         Date date = ::date();
         static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
         const int nofDays[12] = { 31, !(date.year%4)&&(date.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
         for(int i=0;i<7;i++) append(copy(days[i]));
         int first = (35+date.weekDay+1-date.day)%7;
-        for(int i=0;i<first;i++) append(Text(dec(nofDays[(date.month+11)%12]-first+i+1,2),16,128)); //previous month
-        for(int i=0;i<nofDays[date.month];i++) append(dec(i+1,2)); //current month
-        for(int i=1;count()<7*6;i++) append(Text(dec(i,2),16,128)); //next month
+        for(int i=0;i<first;i++) { //previous month
+            append(Text(format(Italic)+dec(nofDays[(date.month+11)%12]-first+i+1,2)));
+        }
+        for(int i=1;i<=nofDays[date.month];i++) { //current month
+            if(i==date.day) append(string(format(Bold)+dec(i,2))); //current day
+            else append(dec(i,2));
+        }
+        for(int i=1;count()<7*8;i++) { //next month
+            append(Text(format(Italic)+dec(i,2)));
+        }
     }
 };
 
@@ -128,7 +135,7 @@ struct TaskBar : Poll {
         string name = item.get<string>("IconName"_);
         for(const string& folder: iconPaths) {
             string path = replace(folder,"$size"_,"16x16"_)+name+".png"_;
-            if(exists(path)) { icon=resize(Image(readFile(path)), 16,16); break; }
+            if(exists(path)) { icon=resize(decodeImage(readFile(path)), 16,16); break; }
         }
         if(!icon) {
             auto icons = item.get< array<DBusIcon> >("IconPixmap"_);
@@ -228,8 +235,8 @@ struct TaskBar : Poll {
                     else continue;
                 } else {
                     if(e.type == PropertyNotify) {
-                        if(e.xproperty.atom==Atom(_NET_WM_NAME)) (Text&)tasks[i] = getTitle(id);
-                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) (Icon&)tasks[i] = getIcon(id);
+                        if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().text = getTitle(id);
+                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
                         else if(e.xproperty.atom==Atom(_NET_WM_WINDOW_TYPE) || e.xproperty.atom==Atom(_NET_WM_STATE)) {
                             if(skipTaskbar(id)) tasks.removeAt(i);
                         } else continue;

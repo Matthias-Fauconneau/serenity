@@ -1,6 +1,5 @@
 #include "vector.h"
 
-
 #define generic template <template <typename> class V, class T, int N>
 #define vector vector<V,T,N>
 
@@ -68,6 +67,8 @@ uvector(rgb,uint8,3)
 vector(rgb,int,3)
 uvector(ia,uint8,2)
 vector(ia,int,2)
+uvector(luma,uint8,1)
+vector(luma,int,1)
 
 float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }

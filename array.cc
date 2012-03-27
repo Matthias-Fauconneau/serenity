@@ -59,6 +59,7 @@ template<class T, class O> array<T> cast(array<O>&& o) {
         copy((byte*)&r, (byte*)&o, sizeof(array<T>));
         r.tag = o.tag*sizeof(O)/sizeof(T);
     }
+    assert(r.size()*sizeof(T) == o.size()*sizeof(O));
     return r;
 }
 

@@ -118,11 +118,15 @@ string toLower(const string& s) {
 }
 
 string trim(const array<byte>& s) {
-    string simple;
     int i=0,end=s.size();
-    //for(;i<end;i++) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
-    //for(;end>i;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
-    for(;i<end;) { //trim duplicate
+    for(;i<end;i++) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
+    for(;end>i;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
+    return slice(s, i, end);
+}
+
+string simplify(const array<byte>& s) {
+    string simple;
+    for(int i=0,end=s.size();i<end;) { //trim duplicate
         byte c=s[i];
         if(c=='\r') { i++; continue; }
         simple << c;

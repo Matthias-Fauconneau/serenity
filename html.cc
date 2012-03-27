@@ -3,6 +3,7 @@
 #include "raster.h"
 
 void HTML::load(const URL& url) {
+    expanding=true;
     clear();
     auto document = getURL(url);
     if(!document) { append(new Text("Timeout: "_+str(url))); return; }
@@ -14,12 +15,13 @@ void HTML::load(const URL& url) {
         int score =0;
         if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
         else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 900;
+        else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
             if(contains(src.path,"comic"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||contains(src.path,"chapter"_)||contains(src.path,"art/"_)) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
-                score += size?:4096;
+                score += size?:16300;
             }
         }
         else if(!div.children) return;
@@ -47,42 +49,47 @@ void HTML::load(const URL& url) {
     const Element& content = *best;
 
     //convert HTML to text + images
-    for(auto& c: content.children) layout(url, *c);
+    layout(url, content);
     flushText();
     flushImages();
 
-    if(max<600) {
-        log("TEXT\n",text);
-        log("HTML\n"_+str(content));
-        log("-------------------------------------------------\n",html);
-        warn(max,second);
-    }
+    /*log("TEXT\n",text);
+    log("HTML\n"_+str(content));
+    log("-------------------------------------------------\n",html);
+    warn(url,max,second);*/
 }
 
-void HTML::layout(const URL& url, const Element &e) {
+void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connection to load images
     if(e.name=="img"_) { //Images
        flushText();
        Image image = decodeImage(getURL(url.relative(e["src"_])));
        if(image) images << image; else log("Image failed",url.relative(e["src"_]));
+    } else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
+        flushText();
+        TextBuffer s(copy(e["style"_])); s.match("background-image:url("_); string src=s.until(")"_);
+        Image image = decodeImage(getURL(url.relative(src)));
+        if(image) images << image; else log("Image failed",url.relative(src));
     } else if(!e.name) { //Text
        flushImages();
        if(!e.name) text << e.content;
-    } else if(e.name=="p"_||e.name=="br"_||e.name=="a"_||e.name=="blockquote"_) {
+    } else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
         flushImages();
         for(auto& c: e.children) layout(url, *c);
         text<<"\n"_;
-    } else if(e.name=="strong"_||e.name=="em"_) {
+    } else if(e.name=="strong"_||e.name=="em"_) { //Bold
         text << format(Bold);
         for(auto& c: e.children) layout(url, *c);
         text << format(Regular);
-    } else {
+    } else { //Unknown
         for(auto& c: e.children) layout(url, *c);
-        log("Unknown element",e.name);
+        if(e.name=="a"_||e.name=="blockquote"_||e.name=="span"_||e.name=="li"_||e.name=="ul"_) {} //Ignored
+        else log("Unknown element",e.name);
     }
 }
 void HTML::flushText() {
-    if(!trim(text)) return;
-    append( new Text(trim(text),16,255, 512 /*60 characters*/) );
+    string paragraph = simplify(trim(text));
+    if(!paragraph) return;
+    append( new Text(move(paragraph),16,255, 640 /*60 characters*/) );
     text.clear();
 }
 void HTML::flushImages() {
@@ -99,9 +106,6 @@ void HTML::flushImages() {
         append( list );
     }
     images.clear();
-    /*auto grid = new Grid<ImageView>(w,h);
-    for(Image& image: images) grid->append(ImageView(move(image)));
-    page << grid;*/
 }
 
 void HTML::clear() {
@@ -110,6 +114,6 @@ void HTML::clear() {
 }
 
 void HTML::render(int2 parent) {
-    fill(parent+position,int2(0,0),Widget::size,byte4(240,240,240,240));
+    fill(parent+position+Rect(int2(0,0),Widget::size),byte4(240,240,240,240));
     VBox::render(parent);
 }

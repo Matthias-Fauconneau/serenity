@@ -38,6 +38,7 @@ using std::forward;
 template<class T> inline constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
 template<class T> inline constexpr T&& forward(remove_reference(T)&& t){static_assert(!std::is_lvalue_reference<T>::value,""); return (T&&)t; }*/
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
+#define default_constructors(o) o(){} o(o&&)=default;
 
 /// Primitive types
 typedef signed char int8;

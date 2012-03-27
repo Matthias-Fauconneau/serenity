@@ -143,7 +143,6 @@ template<class... T> struct Tuple : virtual Layout {
 struct Linear: virtual Layout {
     /// If true, try to fill parent space to spread out contained items
     bool expanding = false;
-    bool compact = false;
 
     int2 sizeHint();
     void update() override;
@@ -228,7 +227,7 @@ template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelectio
 
 /// Rich text format control code encoded in 10-1F range
 enum Format { Regular=0,Bold=1,Italic=2,BoldItalic=3,Underline=4,Strike=8 };
-inline char format(Format f) { return f+0x10; }
+inline string format(Format f) { string s; s << (f+0x10); return s; }
 inline Format format(char f) { return Format(f-0x10); }
 
 /// Text is a \a Widget displaying text (can be multiple lines)

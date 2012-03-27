@@ -63,7 +63,7 @@ List<Command> readShortcuts() {
         Image icon;
         for(const string& folder: iconPaths) {
             string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
-            if(exists(path)) { icon=resize(Image(readFile(path)), 32,32); break; }
+            if(exists(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
         }
         auto execPaths = {"/usr/bin/"_,"/usr/local/bin/"_};
         string path; array<string> arguments;

@@ -77,6 +77,7 @@ struct Buffer : virtual Stream {
     uint index=0;
     Buffer(){}
     Buffer(array<byte>&& buffer);
+    Buffer(Buffer&& o){index=o.index; buffer=move(o.buffer);}
     uint available(uint) override;
     array<byte> peekData(uint size) override;
     void advance(int count) override;
@@ -91,6 +92,7 @@ struct TextStream : DataStream {
     string until(const string& key);
     string word();
     string xmlIdentifier();
+    int number();
 };
 
 struct DataBuffer : DataStream, Buffer {

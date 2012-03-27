@@ -12,18 +12,18 @@ template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(s
 /// ScrollArea
 
 void ScrollArea::update() {
-    int2 hint = widget().sizeHint();
+    int2 hint = abs(widget().sizeHint());
     widget().position = min(int2(0,0), max(size-hint, widget().position));
     widget().size = max(hint, size);
     widget().update();
 }
 
 bool ScrollArea::mouseEvent(int2 position, Event event, Button button) {
-    if(event==Press && (button==WheelDown || button==WheelUp) && size.y<widget().sizeHint().y) {
+    if(event==Press && (button==WheelDown || button==WheelUp) && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
         int2 previous = position;
         position.y += button==WheelUp?-32:32;
-        position = max(size-widget().sizeHint(),min(int2(0,0),position));
+        position = max(size-abs(widget().sizeHint()),min(int2(0,0),position));
         if(position != previous) update();
         return true;
     }
@@ -47,11 +47,8 @@ bool Layout::mouseEvent(int2 position, Event event, Button button) {
 }
 
 void Layout::render(int2 parent) {
-    push(Clip{parent+position,parent+position+size});
-    for(int i=0;i<count();i++) { Widget& child=at(i);
-        //if(position+child.position>=int2(-4,-4) && child.position+child.size<=size+int2(4,4))
-        child.render(parent+position);
-    }
+    push(Rect(parent+position,parent+position+size));
+    for(int i=0;i<count();i++) at(i).render(parent+position);
     pop();
 }
 
@@ -161,7 +158,7 @@ struct TextLayout {
         //justify
         float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x; //sum word length
         float space=0;
-        if(justify) space = round((wrap-length)/line.size());
+        if(justify) space = (wrap-length)/line.size();
         if(space<=0||space>32) space = font->metrics(size,' ').advance.x; //compact
 
         //layout
@@ -226,7 +223,7 @@ void Text::update(int wrap) {
     textSize = layout.textSize();
 }
 int2 Text::sizeHint() {
-    if(!textSize) update(0);
+    if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
     assert(!text||(textSize.x>0&&textSize.y>0),textSize,"'"_+text+"'"_);
     return wrap?int2(-textSize.x,textSize.y):textSize;
 }
@@ -267,7 +264,7 @@ void TextInput::render(int2 parent) {
     if(Window::focus==this) {
         if(cursor>text.size()) cursor=text.size();
         int x = cursor < blits.size()? blits[cursor].pos.x : cursor>0 ? blits.last().pos.x+blits.last().image.width : 0;
-        fill(parent+position+max(int2(0,0),(Widget::size-textSize)/2), int2(x,0), int2(x+1,Widget::size.y),gray(0));
+        fill(parent+position+max(int2(0,0),(Widget::size-textSize)/2)+Rect(int2(x,0), int2(x+1,Widget::size.y)),gray(0));
     }
 }
 
@@ -278,10 +275,10 @@ int2 Slider::sizeHint() { return int2(-height,height); }
 void Slider::render(int2 parent) {
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = size.x*(value-minimum)/(maximum-minimum);
-        fill(parent+position, int2(0,0), int2(x,size.y), gray(128));
-        fill(parent+position, int2(x,0), size, gray(192));
+        fill(parent+position+Rect(int2(0,0), int2(x,size.y)), gray(128));
+        fill(parent+position+Rect(int2(x,0), size), gray(192));
     } else {
-        fill(parent+position, int2(0,0), size, gray(128));
+        fill(parent+position+Rect(int2(0,0), size), gray(128));
     }
 }
 
@@ -318,7 +315,7 @@ void HighlightSelection::render(int2 parent) {
     if(index>=0 && index<count()) {
         Widget& current = at(index);
         if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
-            fill(parent+position, current.position, current.position+current.size, byte4(int4(255, 192, 128, 255)*224/255));
+            fill(parent+position+current.position+Rect(current.size), byte4(int4(255, 192, 128, 255)*224/255));
         }
     }
     Layout::render(parent);
@@ -330,15 +327,15 @@ void TabSelection::render(int2 parent) {
     Layout::render(parent);
     if(index<0 || index>=count()) {
         //darken whole tabbar
-        fill(parent+position, int2(0,0), size, gray(224), Multiply);
+        fill(parent+position+Rect(size), gray(224), Multiply);
         return;
     }
     Widget& current = at(index);
 
     //darken inactive tabs
-    fill(parent+position, int2(0,0), int2(current.position.x, size.y), gray(224), Multiply);
+    fill(parent+position+Rect(int2(current.position.x, size.y)), gray(224), Multiply);
     if(current.position.x+current.size.x<size.x-1-count()) //dont darken only margin
-        fill(parent+position, int2(current.position.x+current.size.x, 0), size, gray(224), Multiply);
+        fill(parent+position+Rect( int2(current.position.x+current.size.x, 0), size ), gray(224), Multiply);
 }
 
 /// Icon

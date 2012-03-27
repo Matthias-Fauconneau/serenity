@@ -70,6 +70,8 @@ template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r
 typedef vector<rgb,uint8,3> rgb3;
 template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a};}};
 typedef vector<ia,uint8,2> byte2;
+template<class T> struct luma { T i; operator byte4()const{return byte4{i,i,i,255};}};
+typedef vector<luma,uint8,1> byte1;
 
 inline float cross(vec2 a, vec2 b);
 inline vec3 cross(vec3 a, vec3 b);

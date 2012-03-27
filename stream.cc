@@ -89,3 +89,10 @@ string TextStream::xmlIdentifier() {
     }
     return identifier;
 }
+
+int TextStream::number() {
+    string number;
+    for(;available(1);) { char c=peek<char>(); if(!(c>='0'&&c<='9')) break; number<<c; advance(1); }
+    if(!number) return -1;
+    return toInteger(number);
+}
