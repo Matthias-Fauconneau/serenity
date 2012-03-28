@@ -1,5 +1,7 @@
 #pragma once
 #include "stream.h"
+#include "process.h"
+#include "signal.h"
 
 /// \a Socket is a network socket
 struct Socket : Buffer {
@@ -33,34 +35,39 @@ string base64(const string& input);
 
 struct URL {
     string scheme,authorization,host,path,fragment;
+    URL(){}
     URL(const string& url);
     URL relative(URL&& url) const;
+    explicit operator bool() { return host.size(); }
 };
 string str(const URL& url);
 
-struct HTTP {
+struct HTTP : Poll {
     TextSocket http;
     string host;
     string path;
+    delegate<void, array<byte>&&> handler;
+
     bool secure;
     array<string> headers;
     string method;
     string content;
 
-    HTTP(HTTP&&)=default;
-
 /// Connects to \a host and requests \a path using \a method.
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
-    HTTP(const string& host, const string& path, bool secure=false,
-         const array<string>& headers={}, const string& method="GET"_, const string& content=""_);
-/// Reads answer from server
-    array<byte> read();
+/// \note HTTP should always be allocated on heap and no references should be taken.
+    HTTP(const string& host, const string& path, delegate<void, array<byte>&&> handler,
+         bool secure=false, const array<string>& headers={}, const string& method="GET"_, const string& content=""_);
+    void event(pollfd) override;
 
     explicit operator bool() { return http.fd; }
 };
 
-/// Gets ressource at \a url
+/// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used
-/// \note If \a wait is false \a url is not cached, request the ressource without blocking
-array<byte> getURL(const URL &url, bool wait=true);
+void getURL(const URL &url, delegate<void, array<byte>&&> handler);
+
+template <class C, class B, predicate(is_base_of(B,C))> inline void getURL(const URL &url, C* _this, void (B::*method)(array<byte>&&)) {
+    getURL(url, delegate<void, array<byte>&&>(_this, method));
+}

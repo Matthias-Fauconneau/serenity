@@ -9,6 +9,7 @@ string.h
 string.cc
 process.h
 process.cc
+signal.h
 
 file.h
 file.cc

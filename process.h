@@ -29,6 +29,7 @@ struct Poll {
     void registerPoll(pollfd);
     /// Remove this to the process-wide event loop
     void unregisterPoll();
+    virtual ~Poll() { unregisterPoll(); }
     /// Callback on new events
     virtual void event(pollfd p) =0;
 };

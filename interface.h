@@ -280,13 +280,16 @@ protected:
 
 /// ImageView is a widget displaying a static image
 struct ImageView : Widget {
-    ImageView(){}
-    //~ImageView(){}
-    //ImageView(ImageView&& image)=default;
-    /// Create a trigger button displaying \a image
-    ImageView(Image&& image):image(move(image)){}
     /// Displayed image
     Image image;
+    /// Displayed image was changed
+    signal<> imageChanged;
+
+    ImageView(){}
+    /// Create a widget displaying \a image
+    ImageView(Image&& image):image(move(image)){}
+    /// Load image from file and trigger \a imageChanged
+    void load(array<byte>&& file);
 
     int2 sizeHint();
     void render(int2 parent);

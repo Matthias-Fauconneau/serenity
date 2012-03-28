@@ -105,25 +105,38 @@ string str(const URL& url) {
 
 /// HTTP
 
-HTTP::HTTP(const string& host, const string& path, bool secure, const array<string>& headers, const string& method, const string& content)
-    : host(copy(host)), path(copy(path)), secure(secure), headers(copy(headers)), method(copy(method)), content(copy(content)) {
-    if(!http.connect(host, secure?"https"_/*443*/:"http"_/*80*/, secure)) return;
+static int cache=openFolder(strz(getenv("HOME"))+"/.cache"_);
+string cacheFile(const string& host, const string& path) {
+    string name = replace(path,"/"_,"."_);
+    if(!name || name=="."_) name="index.htm"_;
+    return host+"/"_+name;
+}
+
+HTTP::HTTP(const string& host, const string& path, delegate<void, array<byte>&&> handler,
+           bool secure, const array<string>& headers, const string& method, const string& content)
+    : host(copy(host)), path(copy(path)), handler(handler),
+      secure(secure), headers(copy(headers)), method(copy(method)), content(copy(content)) {
+    if(!http.connect(host, secure?"https"_/*443*/:"http"_/*80*/, secure)) { delete this; return; } //TODO: async connect
     string request = method+" /"_+path+" HTTP/1.1\r\nHost: "_+host+"\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     if(content) request << "Content-Length: "_+dec(content.size())+"\r\n"_;
     for(const string& header: headers) request << header+"\r\n"_;
     http.write( request+"\r\n"_+content );
+    registerPoll({http.fd, POLLIN, 0});
 }
-
-array<byte> HTTP::read() {
-    if(!http.fd) return ""_;
+void HTTP::event(pollfd) {
+    if(!http.fd) { delete this; return; }
+    string file = cacheFile(host,path);
     int status;
     uint contentLength=0;
     if(http.match("HTTP/1.1 200 OK\r\n"_)) status=200;
     else if(http.match("HTTP/1.1 301 Moved Permanently\r\n"_)) { log("301 Moved Permanently"); status=301; }
     else if(http.match("HTTP/1.1 302 Found\r\n"_)) { log("302 Found"); status=302; }
     else if(http.match("HTTP/1.1 302 Moved Temporarily\r\n"_)) { log("302 Moved Temporarily"); status=302; }
-    else if(http.match("HTTP/1.1 304 Not Modified\r\n"_)) { log("304 Not Modified"); return ""_; }
-    else { log(http.until("\r\n\r\n"_)); warn("Unhandled response for",host+"/"_+path,headers);  return ""_; }
+    else if(http.match("HTTP/1.1 304 Not Modified\r\n"_)) { log("304 Not Modified");
+        if(!content && exists(file,cache)) content = readFile(file,cache); //Not Modified //TODO: touch instead of rewriting
+        delete this; return;
+    }
+    else { log(http.until("\r\n\r\n"_)); warn("Unhandled response for",host+"/"_+path,headers);  delete this; return; }
     bool chunked=false;
     for(;;) { //parse header
         if(http.match("\r\n"_)) break;
@@ -133,84 +146,40 @@ array<byte> HTTP::read() {
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
         else if(key=="Location"_ && (status==301||status==302)) {
             URL url = URL(host).relative(value);
-            log(value,url.host,url.path);
-            return HTTP(url.host,url.path,secure,headers,method,content).read(); //TODO: reuse connection
+            new HTTP(url.host,url.path,handler,secure,headers,method,content); //TODO: reuse connection
+            delete this;
+            return;
         }
     }
 
-    array<byte> data;
-    if(contentLength) data=http.DataStream::read<byte>(contentLength);
+    array<byte> content;
+    if(contentLength) content=http.DataStream::read<byte>(contentLength);
     else if(chunked) {
         for(;;) {
             http.match("\r\n"_);
             int contentLength = toInteger(http.until("\r\n"_),16);
             if(contentLength == 0) break;
-            data << http.DataStream::read<byte>( contentLength );
+            content << http.DataStream::read<byte>( contentLength );
         }
-    } else assert(data,"Missing content",http.buffer);
-    assert(data,"Empty content",(string&)http.buffer);
-    log("Downloaded",data.size()/1024,"KB");
-    return data;
+    } else assert(content,"Missing content",http.buffer);
+    assert(content,"Empty content",(string&)http.buffer);
+    log(host,path,content.size()/1024,"KB");
+    writeFile(file,content,cache,true);
+    handler(move(content));
+    delete this;
 }
 
-static int cache=openFolder(strz(getenv("HOME"))+"/.cache"_);
-static array<HTTP> pipeline;
-
-// Cache unread requests for next time
-declare(static void flush_pipeline(), destructor) {
-    if(!pipeline) return;
-    log(pipeline.size(),"unread requests, caching...");
-    for(uint i=0;i<pipeline.size();i++) { HTTP& request = pipeline[i];
-        array<byte> content=request.read();
-        if(!content) continue;
-        string name = replace(request.path,"/"_,"."_);
-        if(!name || name=="."_) name="index.htm"_;
-        string file = request.host+"/"_+name;
-        writeFile(file,content,cache,true);
-    }
-}
-
-array<byte> getURL(const URL& url, bool wait) {
-    // Map URL -> cache
-    string name = replace(url.path,"/"_,"."_);
-    if(!name || name=="."_) name="index.htm"_;
-    string file = url.host+"/"_+name;
-
-    array<byte> content;
-
-    // Check pipelined requests to be read
-    for(uint i=0;i<pipeline.size();i++) { HTTP& request = pipeline[i];
-        if(request.host==url.host && request.path==url.path) {
-            content=request.read();
-            if(!content && exists(file,cache)) content = readFile(file,cache); //Not Modified //TODO: touch instead of rewriting
-            pipeline.removeAt(i);
-            break;
-        }
-    }
-
+void getURL(const URL &url, delegate<void, array<byte>&&> handler) {
+    string file = cacheFile(url.host,url.path);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;
-
     // Check if cached
-    if(!content && exists(file,cache)) {
+    if(exists(file,cache)) {
         long modified = modifiedTime(file,cache);
-        if(currentTime()-modified < 15*60) return readFile(file,cache); //less than 15min old
+        if(currentTime()-modified < 60*60) { handler(readFile(file,cache)); return; }
         headers<< "If-Modified-Since: "_+str(date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
-
     // Create cache folder for new domains
     if(!exists(url.host,cache)) createFolder(url.host,cache);
-
-    if(!content) {
-        if(wait) {
-            content = HTTP(url.host,url.path,url.scheme=="https"_,headers).read();
-            if(!content && exists(file,cache)) content = readFile(file,cache); //Not Modified //TODO: touch instead of rewriting
-        } else {
-            pipeline<<HTTP(url.host,url.path,url.scheme=="https"_,headers);
-            return ""_;
-        }
-    }
-    assert(content);
-    writeFile(file,content,cache,true);
-    return content;
+    new HTTP(url.host,url.path,handler, url.scheme=="https"_,headers);
 }

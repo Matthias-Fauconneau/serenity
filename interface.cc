@@ -342,7 +342,9 @@ void TabSelection::render(int2 parent) {
         fill(parent+position+Rect( int2(current.position.x+current.size.x, 0), size ), gray(224), Multiply);
 }
 
-/// Icon
+/// ImageView
+
+void ImageView::load(array<byte>&& file) { image=decodeImage(file); imageChanged.emit(); }
 int2 ImageView::sizeHint() { return int2(image.width,image.height); }
 void ImageView::render(int2 parent) {
     if(!image) return;
