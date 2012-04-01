@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <dirent.h>
+#include <unistd.h>
 
 /// File
 int openFile(const string& path, int at) {
@@ -42,7 +43,7 @@ Map::~Map() { munmap((void*)data,size); }
 
 void writeFile(const string& path, const array<byte>& content, int at, bool overwrite) {
     int fd = createFile(path,at,overwrite);
-    if(fd < 0) error(path,fd,at);
+    if(fd < 0) { warn("Creation failed",path,fd,at); return; }
     write(fd,content);
     close(fd);
 }
@@ -67,6 +68,11 @@ bool exists(const string& path, int at) {
     int fd = openat(at, strz(path).data(), O_RDONLY);
     if(fd >= 0) { close(fd); return true; }
     return false;
+}
+
+void symlink(const string& target,const string& name, int at) {
+    unlinkat(at,strz(name).data(),0);
+    if(symlinkat(strz(target).data(),at,strz(name).data())<0) log("symlink failed",name,"->",target);
 }
 
 struct stat statFile(const string& path, int at) { struct stat file; fstatat(at, strz(path).data(), &file, 0); return file; }

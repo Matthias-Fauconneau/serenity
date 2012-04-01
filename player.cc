@@ -59,7 +59,6 @@ struct Player : Application {
         Window::sync();
         setPriority(-20);
     }
-    ~Player() { if(titles.index<0) return; string& file = files[titles.index]; writeFile("/Music/.last"_,file,CWD,true); }
     void appendFile(string&& path) {
         string title = section(section(path,'/',-2,-1),'.',0,-2);
         uint i=indexOf(title, '-'); i++; //skip album name
@@ -84,6 +83,7 @@ struct Player : Application {
         media.open(files[index]);
         audio.start();
         setPlaying(true);
+        writeFile("/Music/.last"_,files[index],CWD,true);
     }
     void next() {
         if(!playButton.enabled) setPlaying(true);

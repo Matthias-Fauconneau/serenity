@@ -31,9 +31,9 @@
 #include <math.h>
 
 //TODO: store FIR of order 48 in registers
-static inline float inner_product_single(const float *a, const float *b, int len) {
+static inline float inner_product_single(const float* kernel, const float* signal, int len) {
     float4 sum = {0,0,0,0};
-    for(int i=0;i<len-4;i+=4) sum += loadu_ps(a+i) * loadu_ps(b+i); //TODO: align
+    for(int i=0;i<len;i+=4) sum += loada_ps(kernel+i) * loadu_ps(signal+i); //TODO: align
     sum += movehl_ps(sum, sum);
     sum += shuffle_ps(sum, sum, 0x55);
     return extract_s(sum, 0);
@@ -41,7 +41,7 @@ static inline float inner_product_single(const float *a, const float *b, int len
 
 const int filterSize = 256;
 const float bandwidth = 0.975;
-const int windowOversample = 64;
+const int windowOversample = 32;
 static double kaiser12[68] = {
     0.99859849, 1.00000000, 0.99859849, 0.99440475, 0.98745105, 0.97779076, 0.96549770, 0.95066529,
     0.93340547, 0.91384741, 0.89213598, 0.86843014, 0.84290116, 0.81573067, 0.78710866, 0.75723148,

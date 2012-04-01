@@ -3437,6 +3437,6 @@ unsigned char *decompress_jpeg_image_from_file(const char *pSrc_filename, int *w
 Image decodeJPEG(const array<byte>& file) {
     int width, height, depth;
     byte4* data = (byte4*)decompress_jpeg_image_from_memory((ubyte*)file.data(),file.size(),&width,&height,&depth,4);
-    assert(data); assert(depth==3,depth);
+    assert(data); assert(depth==1||depth==3,depth);
     return Image(data,width,height,true);
 }

@@ -40,7 +40,7 @@ void ScrollArea::ensureVisible(Widget& target) {
 /// Layout
 
 bool Layout::mouseEvent(int2 position, Event event, Button button) {
-    for(int i=0;i<count();i++) { Widget& child=at(i);
+    for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position >= child.position && position < child.position+child.size) {
             if(child.mouseEvent(position-child.position,event,button)) return true;
         }
@@ -50,13 +50,13 @@ bool Layout::mouseEvent(int2 position, Event event, Button button) {
 
 void Layout::render(int2 parent) {
     push(Rect(parent+position,parent+position+size));
-    for(int i=0;i<count();i++) at(i).render(parent+position);
+    for(uint i=0;i<count();i++) at(i).render(parent+position);
     pop();
 }
 
 /// Widgets
 
-int Widgets::count() const { return array::size(); }
+uint Widgets::count() const { return array::size(); }
 Widget& Widgets::at(int i) { return *array::at(i); }
 
 /// Linear
@@ -64,7 +64,7 @@ Widget& Widgets::at(int i) { return *array::at(i); }
 int2 Linear::sizeHint() {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
-    for(int i=0;i<count();i++) { Widget& child=at(i);
+    for(uint i=0;i<count();i++) { Widget& child=at(i);
         int2 size=xy(child.sizeHint());
         if(size.y<0) expandingHeight=true;
         height = max(height,abs(size.y));
@@ -80,7 +80,7 @@ void Linear::update() {
     int width = size.x /*remaining space*/, sharing=0 /*expanding count*/, expandingWidth=0, height=0;
     array<int> hints; fill(hints,-1,count()); array<int> sizes; fill(sizes,-1,count());
     //allocate fixed space and convert to expanding if not enough space
-    for(int i=0;i<count();i++) {
+    for(uint i=0;i<count();i++) {
         int2 sizeHint = xy(at(i).sizeHint());
         int hint = sizeHint.x; height=sizeHint.y<0?size.y:max(height,sizeHint.y);
         if(hint >= width) hint = -hint; //convert to expanding if not enough space
@@ -96,12 +96,12 @@ void Linear::update() {
     if(!expanding) sharing=count(); //if no expanding: all widgets will share the extra space
     if(width > 0 || sharing==1) { //share extra space evenly between expanding/all widgets
         int extra = width/(sharing+!expanding); //if no expanding: keep space for margins
-        for(int i=0;i<count();i++) {
+        for(uint i=0;i<count();i++) {
             sizes[i] = hints[i] + ((!expanding || sizes[i]<0)?extra:0);
         }
         width -= extra*sharing; //remaining margin due to integer rounding
     } else { //reduce biggest widgets first until all fit
-        for(int i=0;i<count();i++) if(sizes[i]<0) sizes[i]=hints[i]; //allocate all widgets
+        for(uint i=0;i<count();i++) if(sizes[i]<0) sizes[i]=hints[i]; //allocate all widgets
         while(width<-sharing) {
             int& first = max(sizes);
             int second=first; for(int e: sizes) if(e>second && e<first) second=e;
@@ -111,7 +111,7 @@ void Linear::update() {
         }
     }
     int2 pen = int2(width/2,(size.y-min(height,size.y))/2); //external margin
-    for(int i=0;i<count();i++) {
+    for(uint i=0;i<count();i++) {
         at(i).size = xy(int2(sizes[i],min(height,size.y)));
         at(i).position = xy(pen);
         at(i).update();
@@ -122,18 +122,22 @@ void Linear::update() {
 /// UniformGrid
 
 int2 UniformGrid::sizeHint() {
+    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
+
     int2 max(0,0);
-    for(int i=0;i<count();i++) {
+    for(uint i=0;i<count();i++) {
         int2 size=at(i).sizeHint();
         max = ::max(max,size);
     }
-    return int2(width,height)*max;
+    return int2(w,h)*max;
 }
 
 void UniformGrid::update() {
-    int2 size(Widget::size.x/width,  Widget::size.y/height);
-    int2 margin = (Widget::size - int2(width,height)*size) / 2;
-    int i=0; for(int y=0;y<height;y++) for(int x=0;x<width;x++,i++) { if(i>=count()) return; Widget& child=at(i);
+    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
+
+    int2 size(Widget::size.x/w,  Widget::size.y/h);
+    int2 margin = (Widget::size - int2(w,h)*size) / 2;
+    uint i=0; for(uint y=0;y<h;y++) for(uint x=0;x<w;x++,i++) { if(i>=count()) return; Widget& child=at(i);
         child.position = margin + int2(x,y)*size; child.size=size;
     }
 }
@@ -295,12 +299,12 @@ bool Slider::mouseEvent(int2 position, Event event, Button button) {
 bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(Layout::mouseEvent(position,event,button)) return true;
     if(event != Press) return false;
-    if(button == WheelDown && index>0 && index<count()) { index--; activeChanged.emit(index); return true; }
-    if(button == WheelUp && index>=0 && index<count()-1) { index++; activeChanged.emit(index); return true; }
+    if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
+    if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
     if(button != LeftButton) return false;
-    for(int i=0;i<count();i++) { Widget& child=at(i);
+    for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<child.position+child.size) {
-            if(index!=i) { index=i; activeChanged.emit(index); }
+            if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
             itemPressed.emit(index);
             return true;
         }
@@ -308,15 +312,15 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     return false;
 }
 
-void Selection::setActive(int i) {
-    assert(i>=0 && i<count());
-    if(index!=i) { index=i; activeChanged.emit(index); }
+void Selection::setActive(uint i) {
+    assert(i<count());
+    if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
 }
 
 /// HighlightSelection
 
 void HighlightSelection::render(int2 parent) {
-    if(index>=0 && index<count()) {
+    if(index<count()) {
         Widget& current = at(index);
         if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
             fill(parent+position+current.position+Rect(current.size), byte4(int4(255, 192, 128, 255)*224/255));
@@ -329,7 +333,7 @@ void HighlightSelection::render(int2 parent) {
 
 void TabSelection::render(int2 parent) {
     Layout::render(parent);
-    if(index<0 || index>=count()) {
+    if(index>=count()) {
         //darken whole tabbar
         fill(parent+position+Rect(size), gray(224), Multiply);
         return;
@@ -338,13 +342,12 @@ void TabSelection::render(int2 parent) {
 
     //darken inactive tabs
     fill(parent+position+Rect(int2(current.position.x, size.y)), gray(224), Multiply);
-    if(current.position.x+current.size.x<size.x-1-count()) //dont darken only margin
+    if(current.position.x+current.size.x<size.x-1-int(count())) //dont darken only margin
         fill(parent+position+Rect( int2(current.position.x+current.size.x, 0), size ), gray(224), Multiply);
 }
 
 /// ImageView
 
-void ImageView::load(array<byte>&& file) { image=decodeImage(file); imageChanged.emit(); }
 int2 ImageView::sizeHint() { return int2(image.width,image.height); }
 void ImageView::render(int2 parent) {
     if(!image) return;

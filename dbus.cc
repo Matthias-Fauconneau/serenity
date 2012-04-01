@@ -43,9 +43,9 @@ template<class T> void read(DataBuffer& s, array<T>& output) {
     align(s, 4); uint length = s.read();
     for(uint start=s.index;s.index<start+length;) { T e; read(s,e); output << move(e); }
 }
-void read(DataBuffer& s, string& output) { align(s, 4); output = copy(s.readArray<byte>()); s.advance(1);/*0*/ }
+void read(DataBuffer& s, string& output) { align(s, 4); output = copy(s.readArray()); s.advance(1);/*0*/ }
 void read(DataBuffer&) {}
-void read(DataBuffer& s, DBusIcon& output) { align(s, 8); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray<byte>()); }
+void read(DataBuffer& s, DBusIcon& output) { align(s, 8); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray()); }
 template<class Arg, class... Args> void read(DataBuffer& s, Arg& arg, Args&... args) { read(s,arg); read(s, args i(...)); }
 
 template<class... Outputs> void DBus::read(uint32 serial, Outputs&... outputs) {
@@ -75,11 +75,11 @@ template<class... Outputs> void DBus::read(uint32 serial, Outputs&... outputs) {
                 return;
             } else if(header.message == Signal) {
                 auto signal = signals_.find(name);
-                if(signal) signal->emit(move(name),s.readAll<byte>());
+                if(signal) signal->emit(move(name),s.readAll());
                 if(!serial) return;
             } else if(header.message == MethodCall) {
                 auto method = methods.at(name);
-                method(header.serial,move(name),s.readAll<byte>());
+                method(header.serial,move(name),s.readAll());
                 if(!serial) return;
             } else fail();
         } else if(header.message == MethodReturn && replySerial==serial) return;

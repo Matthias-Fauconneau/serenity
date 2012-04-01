@@ -13,7 +13,9 @@ struct Image {
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), own(o.own) { o.data=0; }
     Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; o.data=0; return *this; }
     Image(byte4* data, int width, int height,bool own):data(data),width(width),height(height),own(own){}
-    Image(int width, int height):data(allocate<byte4>(width*height)),width(width),height(height),own(true){}
+    Image(int width, int height):data(allocate<byte4>(width*height)),width(width),height(height),own(true){
+        debug(clear(data,width*height,byte4(zero));)
+    }
     Image(array<byte4>&& data, uint width, uint height);
 
     ~Image(){ if(data && own) delete data; }
@@ -25,12 +27,18 @@ struct Image {
     int2 size() const { return int2(width,height); }
 };
 inline Image copy(const Image& image) { Image copy(image.width,image.height); ::copy(copy.data,image.data,image.width*image.height); return copy; }
+
 /// Returns a copy of the image resized to \a width x \a height
 Image resize(const Image& image, uint width, uint height);
-/// Swap ARGB <-> BGRA in place
+
+/// Swaps ARGB <-> BGRA in place
 Image swap(Image&& image);
+
+/// Flip the image around the horizontal axis in place
+Image flip(Image&& image);
 
 /// Convenience function to iterate all pixels of an image
 #define for_Image(image) for(int y=0,h=image.height;y<h;y++) for(int x=0,w=image.width;x<w;x++)
 
+/// Decodes \a file to an Image
 Image decodeImage(const array<byte>& file);

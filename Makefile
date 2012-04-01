@@ -15,17 +15,10 @@ FLAGS_memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MALL
 
 FLAGS_font = -I/usr/include/freetype2
 
-SRCS = $(SRCS_$(TARGET))
-SRCS_player := png
-SRCS_music := png
-SRCS_taskbar := png
-SRCS_feeds := png jpeg
+#SRCS = $(SRCS_$(TARGET))
+SRCS += png jpeg ico
 
 LIBS_debug = bfd
-LIBS_fast = bfd
-LIBS_trace = bfd
-LIBS_memory = bfd
-
 LIBS_time= rt
 LIBS_alsa := asound
 LIBS_png := z

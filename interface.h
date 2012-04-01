@@ -39,6 +39,10 @@ struct Widget {
     /// \note \a keyPress is directly called on the current \a Window::focus
     /// \return whether the key press should trigger a repaint
     virtual bool keyPress(Key) { return false; }
+    /// Override \a selectEvent to handle or forward user input
+    /// \note \a selectEvent is called by \a Selection
+    /// \return whether the select event should trigger a repaint
+    virtual bool selectEvent() { return false; }
 };
 
 /// Space is a proxy Widget to add space as needed
@@ -77,7 +81,7 @@ template<class T> struct Scroll : ScrollArea, T {
 /// Layout is a proxy Widget containing multiple widgets.
 struct Layout : Widget {
     /// Override \a count and \a at to implement widgets storage (\sa Widgets Array Tuple)
-    virtual int count() const =0;
+    virtual uint count() const =0;
     virtual Widget& at(int) =0;
 
     /// Forwards event to intersecting child widgets until accepted
@@ -91,7 +95,7 @@ struct Layout : Widget {
 struct Widgets : virtual Layout, array<Widget*> {
     Widgets(){}
     Widgets(std::initializer_list<Widget*>&& widgets):array(move(widgets)){}
-    int count() const;
+    uint count() const;
     Widget& at(int i);
 };
 
@@ -99,8 +103,8 @@ struct Widgets : virtual Layout, array<Widget*> {
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
 template<class T> struct Array : virtual Layout, array<T> {
     Array(){}
-    Array(std::initializer_list<T>&& items) : array<T>(move(items)){}
-    int count() const { return array<T>::size(); }
+    Array(array<T>&& items) : array<T>(move(items)){}
+    uint count() const { return array<T>::size(); }
     Widget& at(int i) { return array<T>::at(i); }
 };
 
@@ -131,7 +135,7 @@ template<class... T> struct Tuple : virtual Layout {
     tuple<T...> items; //inheriting tuple confuse compiler with multiple Widgets base
     Tuple() : items() {}
     Tuple(T&&... t) : items(move(t)...) {}
-    int count() const { return items.size(); }
+    uint count() const { return items.size(); }
 
     template<class A> A& get() { return items.get<A>(); } //static indexing using type
     template<class A> const A& get() const { return items.get<A>(); } //static indexing using type
@@ -147,7 +151,7 @@ struct Linear: virtual Layout {
     /// If true, try to fill parent space to spread out contained items
     bool expanding = false;
 
-    int2 sizeHint();
+    int2 sizeHint() override;
     void update() override;
     virtual int2 xy(int2 xy) =0; //transform coordinates so that x/y always mean along/across the line to reuse same code in Vertical/Horizontal
 };
@@ -177,22 +181,23 @@ template<class T> struct VList : Vertical, Array<T> {};
 
 /// Layout items on an uniform \a width x \a height grid
 struct UniformGrid : virtual Layout {
+    /// horizontal and vertical element count, 0 means automatic
     int width,height;
-    UniformGrid(int width, int height):width(width),height(height){}
+    UniformGrid(int width=0, int height=0):width(width),height(height){}
     int2 sizeHint();
     void update();
 };
 
 /// Selection implements selection of active widget/item for a \a Layout
 struct Selection : virtual Layout {
-    /// User clicked on an item.
-    signal<int /*index*/> itemPressed;
     /// User changed active index.
     signal<int /*index*/> activeChanged;
     /// Active index
-    int index = -1;
+    uint index = -1;
     /// Set active index and emit activeChanged
-    void setActive(int index);
+    void setActive(uint index);
+    /// User clicked on an item.
+    signal<int /*index*/> itemPressed;
 
     bool mouseEvent(int2 position, Event event, Button button) override;
 };
@@ -210,7 +215,7 @@ struct TabSelection : virtual Selection {
 /// ListSelection is an \a Array with \a Selection
 template<class T> struct ListSelection : Array<T>, virtual Selection {
     ListSelection(){}
-    ListSelection(std::initializer_list<T>&& items) : Array<T>(move(items)){}
+    ListSelection(array<T>&& items) : Array<T>(move(items)){}
     /// Return active item (last selection)
     inline T& active() { return array<T>::at(this->index); }
 };
@@ -228,6 +233,7 @@ template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {
 /// Grid is an \a UniformGrid layout of selectable items (\sa ListSelection)
 template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelection {
     Grid(int width, int height):UniformGrid(width,height){}
+    Grid(array<T>&& items) : ListSelection<T>(move(items)){}
 };
 
 /// Rich text format control code encoded in 10-1F range
@@ -282,14 +288,10 @@ protected:
 struct ImageView : Widget {
     /// Displayed image
     Image image;
-    /// Displayed image was changed
-    signal<> imageChanged;
 
     ImageView(){}
     /// Create a widget displaying \a image
     ImageView(Image&& image):image(move(image)){}
-    /// Load image from file and trigger \a imageChanged
-    void load(array<byte>&& file);
 
     int2 sizeHint();
     void render(int2 parent);

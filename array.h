@@ -20,8 +20,8 @@ template<class T> struct array {
     Buffer buffer; //+16
     ubyte cache[sizeof(T)>63?0:sizeof(T)==1?7:40]; //+7/40 to make sizeof(array) = 31/64 bytes (inline char[30], inline string[2])
     static constexpr uint32 inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
-    T* data();
-    const T* data() const;
+    T* data() { return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
+    const T* data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
     uint size() const;
     void setSize(uint size);
     uint capacity() const;

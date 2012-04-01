@@ -87,11 +87,9 @@ bool Window::event(const XEvent& e) {
     } else if(e.type==ConfigureNotify || e.type==ReparentNotify) {
         XWindowAttributes window; XGetWindowAttributes(x,id,&window); int2 size(window.width, window.height);
         this->position=int2(window.x,window.y);
-        if(this->size != size) {
-            this->size=widget.size=size;
-            widget.update();
-            if(visible) return true;
-        }
+        this->size=widget.size=size;
+        widget.update();
+        if(visible) return true;
     } else if(e.type==MapNotify) {
         visible=true;
         assert(size);

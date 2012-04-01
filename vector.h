@@ -1,5 +1,6 @@
 #pragma once
 #include "string.h"
+#include "debug.h"
 
 template<class T> T sq(const T& x) { return x*x; }
 template<class T> T cb(const T& x) { return x*x*x; }

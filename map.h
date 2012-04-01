@@ -1,6 +1,7 @@
 #pragma once
 #include "array.h"
 #include "string.h"
+#include "debug.h"
 
 template <class K, class V> struct const_pair { const K& key; const V& value; };
 template <class K, class V> struct pair { K& key; V& value; };
@@ -23,7 +24,7 @@ template <class K, class V> struct map {
     template<perfect(V)> Vf value(const K& key, Vf&& value) { int i = keys.indexOf(key); return i>=0 ? values[i] : forward<Vf>(value); }
     V* find(const K& key) { int i = indexOf(keys, key); return i>=0 ? &values[i] : 0; }
     template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) {
-        assert(!contains(key),"Existing",key);
+        assert(!contains(key));
         keys << forward<Kf>(key);
         values << forward<Vf>(value);
     }

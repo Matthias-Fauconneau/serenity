@@ -1,10 +1,8 @@
 #include "array.h"
 #include "string.h"
+#include "debug.h"
 
 #define generic template<class T>
-
-generic T* array<T>::data() { return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
-generic const T* array<T>::data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
 generic uint array<T>::size() const { return tag>=0?tag:buffer.size; }
 generic void array<T>::setSize(uint size) { assert(size<=capacity()); if(tag>=0) tag=size; else buffer.size=size;}
 generic uint array<T>::capacity() const { return tag>=0 ? inline_capacity() : buffer.capacity; }
@@ -50,16 +48,18 @@ generic void array<T>::reserve(uint capacity) {
 
 template<class T, class O> array<T> cast(array<O>&& o) {
     array<T> r;
+    assert(o.size()*sizeof(O)/sizeof(T)*sizeof(T) == o.size()*sizeof(O));
     if(o.tag<0) {
         r.tag=o.tag;
         r.buffer.data=(const T*)o.buffer.data;
         r.buffer.size = o.buffer.size*sizeof(O)/sizeof(T);
         r.buffer.capacity = o.buffer.capacity*sizeof(O)/sizeof(T);
+        o.tag = 0;
     } else {
-        copy((byte*)&r, (byte*)&o, sizeof(array<T>));
+        assert(r.inline_capacity()>=o.inline_capacity());
+        copy((byte*)r.data(), (byte*)o.data(), o.size()*sizeof(O));
         r.tag = o.tag*sizeof(O)/sizeof(T);
     }
-    assert(r.size()*sizeof(T) == o.size()*sizeof(O));
     return r;
 }
 

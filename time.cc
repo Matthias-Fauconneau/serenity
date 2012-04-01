@@ -30,7 +30,7 @@ string str(Date date, string&& format) {
         else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); else s.until(" "_); }
         else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(" "_); }
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
-        else r << s.read<byte>();
+        else r << s.read(1);
     }
     r = simplify(trim(r));
     if(endsWith(r,","_)) r.removeLast();

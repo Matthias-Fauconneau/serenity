@@ -1,6 +1,7 @@
 #pragma once
 #include "array.h"
 #include "string.h"
+#include "debug.h"
 #pragma GCC diagnostic ignored "-Wpmf-conversions"
 #define is_base_of(B,D) std::is_base_of<B,D>::value
 

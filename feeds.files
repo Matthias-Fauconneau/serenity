@@ -22,10 +22,9 @@ http.cc
 
 image.h
 image.cc
+ico.cc
 png.cc
 jpeg.cc
-ffmpeg.h
-ffmpeg.cc
 
 font.h
 font.cc

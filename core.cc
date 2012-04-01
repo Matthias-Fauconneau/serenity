@@ -2,8 +2,6 @@
 
 #define array(T) \
 template class array<T>; \
-/*template array<T> slice(array<T>&& a, uint pos, uint size);*/ \
-/*template array<T> slice(array<T>&& a, uint pos);*/ \
 /*Copyable*/ \
 template array<T> slice(const array<T>& a, uint pos, uint size); \
 template array<T> slice(const array<T>& a, uint pos); \

@@ -32,7 +32,7 @@ Element::Element(TextBuffer& s, bool html) {
     s.skip();
     while(!s.match(">"_)) {
         if(s.match("/>"_)) { s.skip(); return; }
-        else if(s.matchAny("/\"'"_)) s.skip(); //common errors
+        else if(s.match("/"_)) s.skip(); //spurious /
         string key=s.xmlIdentifier(); s.skip();
         if(!key) { log("Attribute syntax error",(string)slice(s.buffer,start,s.index-start),"^",s.until(">"_)); break; }
         if(html) key=toLower(key);
@@ -42,7 +42,7 @@ Element::Element(TextBuffer& s, bool html) {
             if(s.match("\""_)) value=s.until("\""_); //FIXME: escape
             else if(s.match("'"_)) value=s.until("'"_); //FIXME: escape
             else { value=s.untilAny(" \t\n>"_); if(s.buffer[s.index-1]=='>') s.index--; }
-            //if(!value) { error("Attribute syntax error",(string)slice(s.buffer,start,s.index-start),"^",s.until(">"_)); break; }
+            s.match("\""_); //duplicate "
         }
         attributes[move(key)]=move(value);
         s.skip();
@@ -81,6 +81,8 @@ Element::Element(TextBuffer& s, bool html) {
 
 string Element::text() const { string text; visit([&text](const Element& e) { text<<e.content; }); return text; }
 
+string Element::text(const string& path) const { string text; xpath(path,[&text](const Element& e) { text<<e.text(); }); return text; }
+
 string Element::operator[](const string& attribute) const {
     //assert(attributes.contains(attribute),"attribute", attribute,"not found in",*this);
     if(!attributes.contains(attribute)) return ""_;
@@ -117,16 +119,16 @@ bool Element::match(const string& path) const {
 }
 
 string Element::str(const string& prefix) const {
+    if(!name&&!trim(content)) return ""_;
     string line; line<< prefix;
     if(name||attributes) line << "<"_+name;
     for(const_pair<string,string> attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
     if(content||children) {
         if(name||attributes) line << ">\n"_;
-        if(content) { assert(!children); line << join(split(content,'\n'),"\n"_+prefix); }
+        if(content) { assert(!children); line << join(split(content,'\n'),"\n"_+prefix)+"\n"_; }
         if(children) for(const auto& e: children) line << e->str(prefix+" "_);
-        if(name||attributes) line << prefix+"</"_+name+">"_;
-    } else if(name||attributes) line << "/>"_;
-    if(prefix) line << "\n"_;
+        if(name||attributes) line << prefix+"</"_+name+">\n"_;
+    } else if(name||attributes) line << "/>\n"_;
     return line;
 }
 
@@ -138,7 +140,7 @@ template<> string str(const Element& e) { return e.str(); }
 string unescape(const string& xml) {
     static map<string, string> entities;
     if(!entities) {
-        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓"_,' ');
+        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot ·"_,' ');
         assert(kv.size()%2==0,kv.size());
         for(uint i=0;i<kv.size();i+=2) entities.insert(kv[i],kv[i+1]);
     }

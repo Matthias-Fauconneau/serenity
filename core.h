@@ -19,6 +19,7 @@
 #define offsetof(object, member) __builtin_offsetof (object, member)
 // Traits
 #include <type_traits>
+#define is_same(A,B) std::is_same<A,B>::value
 #define is_convertible(F,T) std::is_convertible<F,T>::value
 #define remove_reference(T) typename std::remove_reference<T>::type
 // Predicates

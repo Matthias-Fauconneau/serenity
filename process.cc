@@ -14,16 +14,6 @@
 
 void setPriority(int priority) { setpriority(PRIO_PROCESS,0,priority); }
 
-#if 0
-/// limit process ressources to avoid hanging the system when debugging
-/// \note limits will also apply to child processes
-declare(static void limit_resource(), constructor) {
-    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<26; setrlimit(RLIMIT_STACK,&limit); } //64 MB
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<28; setrlimit(RLIMIT_DATA,&limit); } //256 MB
-    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30; setrlimit(RLIMIT_AS,&limit); } //1 GB
-}
-#endif
-
 uint availableMemory() {
     int fd = openFile("/proc/meminfo"_);
     TextBuffer s = ::readUpTo(fd,2048);
@@ -48,7 +38,6 @@ map<const char*, int> profile;
 #endif
 
 void execute(const string& path, const array<string>& args) {
-    assert(!contains(path,' '));
     array<string> args0(1+args.size());
     args0 << strz(path);
     for(uint i=0;i<args.size();i++) args0 << strz(args[i]);
@@ -65,11 +54,8 @@ void execute(const string& path, const array<string>& args) {
 /// Poll
 
 static map<Poll*,pollfd> polls __attribute((init_priority(103)));
-string str(const Poll&) { return "Poll"_; }
-string str(const pollfd&) { return "pollfd"_; }
-
 void Poll::registerPoll(pollfd poll) { polls.insert(this,poll); }
-void Poll::unregisterPoll() { polls.remove(this); }
+void Poll::unregisterPoll() { if(polls.contains(this)) polls.remove(this); }
 
 int waitEvents() {
     if(!polls.size()) return 0;
@@ -77,77 +63,15 @@ int waitEvents() {
     for(int i=0;i<polls.size();i++) {
         int events = polls.values[i].revents;
         if(events) {
-            assert(events==POLLIN,events);
+            if(!(events&POLLIN)) warn("!POLLIN"_);
+            if(events&POLLHUP) { warn("POLLHUP"_); polls.remove(polls.keys[i]); i--; continue; }
             polls.keys[i]->event(polls.values[i]);
         }
     }
     return polls.size();
 }
 
-#ifdef DEBUG
-
-/// Debug symbols
-
-#include <bfd.h>
-#include <cxxabi.h>
-
-static bfd* abfd;
-static void* syms;
-declare(static void read_debug_symbols(), constructor(101)) {
-    bfd_init();
-    abfd = bfd_openr("/proc/self/exe",0);
-    assert(!bfd_check_format(abfd, bfd_archive));
-    char** matching; assert(bfd_check_format_matches(abfd, bfd_object, &matching));
-    if ((bfd_get_file_flags(abfd) & HAS_SYMS) != 0) {
-        unsigned int size=0;
-        long symcount = bfd_read_minisymbols(abfd, false, &syms, &size);
-        if(symcount == 0) symcount = bfd_read_minisymbols(abfd, true, &syms, &size);
-        assert(symcount >= 0);
-    }
-}
-struct Symbol { string file,function; uint line; };
-Symbol findNearestLine(void* address) {
-    for(bfd_section* s=abfd->sections;s;s=s->next) {
-        if((bfd_vma)address < s->vma || (bfd_vma)address >= s->vma + s->size) continue;
-        const char* path=0; const char* func=0; uint line=0;
-        if(bfd_find_nearest_line(abfd, s, (bfd_symbol**)syms, (bfd_vma)address - s->vma, &path, &func, &line)) {
-            if(!path || !func || !line) continue;
-            static size_t length=128; static char* buffer=(char*)malloc(length); int status;
-            buffer=abi::__cxa_demangle(func,buffer,&length,&status);
-            return i({ section(strz(path),'/',-2,-1), strz(!status?buffer:func), (int)line });
-        }
-    }
-    return i({string(),string(),0});
-}
-
-/// Stack
-
-struct StackFrame {
-    StackFrame* caller_frame; void* return_address;
-    static inline StackFrame* current() { register StackFrame* ebp __asm__("ebp"); return ebp; }
-};
-int backtrace(void** frames, int capacity, StackFrame* frame) {
-    int i=0;
-    for(;i<capacity;i++) {
-        frame=frame->caller_frame;
-        if(uint64(frame)<0x10 || uint64(frame)>0x10000000000000) break;
-        frames[i]=frame->return_address;
-    }
-    return i;
-}
-void logBacktrace(StackFrame* frame) {
-    void* frames[8];
-    int size = backtrace(frames,8,frame);
-    for(int i=size-1; i>=0; i--) {
-        Symbol s = findNearestLine(frames[i]);
-        if(s.function && s.function[0]!='_') { log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
-    }
-}
-
 #ifdef TRACE
-
-/// Call Trace
-
 bool trace_enable = false;
 struct Trace {
     // trace ring buffer
@@ -204,12 +128,7 @@ no_trace(extern "C" void __cyg_profile_func_enter(void* function, void*)) { if(t
 no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enable) { trace_off; trace.trace(0); trace_on; } }
 
 void logTrace() { trace.log(); logBacktrace(StackFrame::current()->caller_frame); }
-#else
-void logTrace(int skip) {
-    StackFrame* frame = StackFrame::current();
-    while(skip-- && uint64(frame->caller_frame)<0x10 && uint64(frame->caller_frame)>0x10000000000000) frame=frame->caller_frame;
-    logBacktrace(frame);
-}
+#endif
 
 #ifdef PROFILE
 /// Profiler
@@ -245,49 +164,4 @@ void logProfile() {
     }
     trace_on;
 }
-#endif
-#endif
-
-/// Signal handler
-
-#define signal _signal
-#include <signal.h>
-#undef signal
-
-#include <fenv.h>
-
-enum SW { IE = 1, DE = 2, ZE = 4, OE = 8, UE = 16, PE = 32 };
-static void handler(int sig, siginfo*, void* ctx) {
-    ucontext* context = (ucontext*)ctx;
-    if(sig == SIGSEGV) log("Segmentation violation"_);
-    else if(sig == SIGPIPE) log("Broken Pipe"_);
-    else if(sig == SIGFPE) {
-        log("Arithmetic exception "_);
-        const string flags[] = {"Invalid Operand"_,"Denormal Operand"_,"Zero Divide"_,"Overflow"_,"Underflow"_};
-        string s;
-        for(int i=0;i<=4;i++) if(context->uc_mcontext.fpregs->mxcsr & (1<<i)) s<<flags[i]+" "_;
-        log(s);
-    }
-    else error("Unhandled signal"_);
-#if __WORDSIZE == 64
-    logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
-    Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
-#else
-    logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_EBP]));
-    Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_EIP]);
-#endif
-    log(s.file+":"_+str(s.line)+"   \t"_+s.function);
-    __builtin_abort();
-}
-
-declare(static void catch_sigsegv(), constructor) {
-    struct sigaction sa; clear(sa);
-    sa.sa_sigaction = &handler;
-    sa.sa_flags = SA_SIGINFO;
-    sigaction(SIGSEGV, &sa, 0);
-    sigaction(SIGPIPE, &sa, 0);
-    sigaction(SIGFPE, &sa, 0);
-    feenableexcept(FE_DIVBYZERO|FE_INVALID); //|FE_OVERFLOW
-}
-
 #endif

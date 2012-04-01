@@ -36,6 +36,8 @@ struct Element {
     explicit operator bool() { return name||content; }
     /// Collects text content of descendants
     string text() const;
+    /// Collects text content of descendants matching path
+    string text(const string& path) const;
     /// Returns value for \a attribute
     string operator[](const string& attribute) const;
     /// Returns child element with tag \a name

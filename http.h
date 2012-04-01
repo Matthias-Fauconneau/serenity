@@ -11,9 +11,12 @@ struct Socket : Buffer {
     /// Connects to \a service on \a host
     bool connect(const string& host, const string& service);
     ~Socket();
+    /// Socket
     virtual array<byte> read(int size)=0;
     virtual void write(const array<byte>& buffer)=0;
+    /// Stream
     uint available(uint need) override;
+    array<byte> get(uint size) override;
 };
 
 typedef struct ssl_st SSL;
@@ -41,24 +44,31 @@ struct URL {
     explicit operator bool() { return host.size(); }
 };
 string str(const URL& url);
+inline bool operator ==(const URL& a, const URL& b) {
+    return a.scheme==b.scheme&&a.authorization==b.authorization&&a.host==b.host&&a.path==b.path&&a.fragment==b.fragment;
+}
+inline bool operator !=(const URL& a, const URL& b) { return !(a==b); }
+
+typedef delegate<void, const URL&, array<byte>&&> Handler;
 
 struct HTTP : Poll {
     TextSocket http;
-    string host;
-    string path;
-    delegate<void, array<byte>&&> handler;
+    URL url;
+    Handler handler;
 
-    bool secure;
     array<string> headers;
     string method;
     string content;
+    array<string> redirect;
 
 /// Connects to \a host and requests \a path using \a method.
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(const string& host, const string& path, delegate<void, array<byte>&&> handler,
-         bool secure=false, const array<string>& headers={}, const string& method="GET"_, const string& content=""_);
+    HTTP(const URL& url, Handler handler,
+         const array<string>& headers={}, const string& method="GET"_, const string& content=""_, array<string>&& redirect={});
+
+    void request();
     void event(pollfd) override;
 
     explicit operator bool() { return http.fd; }
@@ -66,8 +76,14 @@ struct HTTP : Poll {
 
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used
-void getURL(const URL &url, delegate<void, array<byte>&&> handler);
+void getURL(const URL &url, Handler handler);
 
-template <class C, class B, predicate(is_base_of(B,C))> inline void getURL(const URL &url, C* _this, void (B::*method)(array<byte>&&)) {
-    getURL(url, delegate<void, array<byte>&&>(_this, method));
+template <class C, class B, predicate(is_base_of(B,C))> inline void getURL(const URL &url, C* _this, void (B::*method)(const URL& url, array<byte>&&)) {
+    getURL(url, Handler(_this, method));
 }
+
+/// Returns path to cache file for \a url
+string cacheFile(const URL& url);
+
+/// descriptor to cache folder
+extern int cache;

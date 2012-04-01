@@ -2,13 +2,26 @@
 #include "array.cc"
 #include "raster.h"
 
-void HTML::load(array<byte>&& document) {
+ImageLoader::ImageLoader(const URL& url, Image* target, delegate<void> imageLoaded, int2 size):target(target),imageLoaded(imageLoaded),size(size){
+    getURL(url, this, &ImageLoader::load);
+}
+
+void ImageLoader::load(const URL&, array<byte>&& file) {
+    Image image = decodeImage(file);
+    if(!image.size()) return;
+    if(size) *target = resize(image,size.x,size.y);
+    else *target = move(image);
+    imageLoaded();
+    delete this;
+}
+
+void HTML::load(const URL& url, array<byte>&& document) {
     expanding=true; clear();
     Element html = parseHTML(move(document));
 
     const Element* best=0; int max=0,second=0;
     //find node with most direct content
-    html.visit([this,&best,&max,&second](const Element& div) {
+    html.visit([&url,&best,&max,&second](const Element& div) {
         int score =0;
         if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
         else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 900;
@@ -46,18 +59,16 @@ void HTML::load(array<byte>&& document) {
     const Element& content = *best;
 
     //convert HTML to text + images
-    layout(content);
+    layout(url, content);
     flushText();
     flushImages();
 
-    /*log("TEXT\n",text);
-    log("HTML\n"_+str(content));
-    log("-------------------------------------------------\n",html);
-    warn(url,max,second);*/
+    /*log("HTML\n"_+str(content));
+    warn(url,max,second,count());*/
     contentChanged.emit();
 }
 
-void HTML::layout(const Element &e) { //TODO: keep same connection to load images
+void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connection to load images
     if(e.name=="img"_) { //Images
        flushText();
        images << url.relative(e["src"_]);
@@ -70,16 +81,16 @@ void HTML::layout(const Element &e) { //TODO: keep same connection to load image
        if(!e.name) text << e.content;
     } else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
         flushImages();
-        for(auto& c: e.children) layout(*c);
+        for(auto& c: e.children) layout(url, *c);
         text<<"\n"_;
     } else if(e.name=="strong"_||e.name=="em"_) { //Bold
         text << format(Bold);
-        for(auto& c: e.children) layout(*c);
+        for(auto& c: e.children) layout(url, *c);
         text << format(Regular);
     } else { //Unknown
-        for(auto& c: e.children) layout(*c);
-        if(e.name=="a"_||e.name=="blockquote"_||e.name=="span"_||e.name=="li"_||e.name=="ul"_) {} //Ignored
-        else log("Unknown element",e.name);
+        for(auto& c: e.children) layout(url, *c);
+        /*if(e.name=="a"_||e.name=="blockquote"_||e.name=="span"_||e.name=="li"_||e.name=="ul"_) {} //Ignored
+        else log("Unknown element",e.name);*/
     }
 }
 void HTML::flushText() {
@@ -96,10 +107,10 @@ void HTML::flushImages() {
     }
     for(uint y=0,i=0;y<h;y++) {
         auto list = new HList<ImageView>;
+        list->reserve(w);
         for(uint x=0;x<w && i<images.size();x++,i++) {
             *list << ImageView();
-            getURL(images[i], &(*list).last(), &ImageView::load);
-            (*list).last().imageChanged.connect(&this->contentChanged);
+            new ImageLoader(images[i], &(*list).last().image,delegate<void>(&this->contentChanged,&signal<>::emit));
         }
         append( list );
     }

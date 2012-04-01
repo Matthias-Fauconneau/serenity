@@ -14,22 +14,23 @@ struct Task : Item {
     XID id;
     Task(XID id):id(id){} //for indexOf
     Task(XID id, Icon&& icon, Text&& text):Item(move(icon),move(text)),id(id){}
+    bool selectEvent() override { //Raise
+        XMapWindow(x, id);
+        XRaiseWindow(x, id);
+        XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+        XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_ACTIVE_WINDOW), 32, {.l={2,0,0,0,0}} };
+        XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+        XFlush(x);
+        return true;
+    }
     bool mouseEvent(int2, Event event, Button button) override {
-        //TODO: preview on Enter
+        //TODO: preview on hover
         if(button!=LeftButton) return false;
         if(event==Press) {
             XID active = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
             if(active == id ) { //Set maximized
                 XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
                     {.l={1,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
-                XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
-                XFlush(x);
-                return true;
-            } else { //Raise
-                XMapWindow(x, id);
-                XRaiseWindow(x, id);
-                XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
-                XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_ACTIVE_WINDOW), 32, {.l={2,0,0,0,0}} };
                 XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
                 XFlush(x);
                 return true;
