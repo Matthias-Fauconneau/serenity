@@ -139,6 +139,7 @@ generic array replace(array&& a, const T& before, const T& after);
 // Orderable?
 generic const T& min(const array& a);
 generic T& max(array& a);
+generic void insertSorted(array& a, T&& v);
 
 #undef generic
 #undef array

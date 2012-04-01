@@ -59,7 +59,6 @@ Image decodePNG(const array<byte>& file) {
         } else if(name == "PLTE"_) {
             palette = s.read(size);
         } else {
-            debug( if(name!="sBIT"_&&name!="pHYs"_&&name!="tEXt"_&&name!="iCCP"_&&name!="cHRM"_) log(name); )
             s.advance(size);
         }
         s.advance(4); //CRC

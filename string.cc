@@ -4,6 +4,7 @@
 #include "array.cc"
 template class array<string>;
 template int indexOf(const array<string>&, const string&);
+template void insertSorted(array<string>&, string&&);
 
 /// utf8_iterator
 uint utf8_iterator::operator* () const {

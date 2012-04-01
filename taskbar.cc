@@ -86,7 +86,8 @@ array<string> getEvents(Date query) {
     Date until; //End date for recurring events
     while(s) {
         s.skip();
-        if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
+        if(s.match("#"_)) s.until("\n"_); //comment
+        else if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
         else if(s.match("except "_)) s.until("\n"_); //already parsed
         else {
             Date date = parse(s); s.skip();
@@ -100,7 +101,7 @@ array<string> getEvents(Date query) {
             else if(query.year>=0 && query>until) continue;
             if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
             for(Date date: exceptions[copy(title)]) if(date.day==query.day && date.month==query.month) goto skip;
-            events << str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title;
+            insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title));
             skip:;
         }
     }
@@ -108,49 +109,59 @@ array<string> getEvents(Date query) {
 }
 
 struct Month : Grid<Text> {
+    Date active;
     array<Date> dates;
     int todayIndex;
-    Month() : Grid(7,8) {
-        Date date = ::date();
+    Month() : Grid(7,8) {}
+    void setActive(Date active) {
+        clear(); dates.clear();
+        todayIndex=-1; this->active=active;
         static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
-        const int nofDays[12] = { 31, !(date.year%4)&&(date.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+        const int nofDays[12] = { 31, !(active.year%4)&&(active.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
         for(int i=0;i<7;i++) {
             append(copy(days[i]));
             dates << Date(-1,-1,-1,-1,-1,-1,i);
         }
-        int first = (35+date.weekDay+1-date.day)%7;
+        int first = (35+active.weekDay+1-active.day)%7;
         for(int i=0;i<first;i++) { //previous month
-            int previousMonth = (date.month+11)%12;
+            int previousMonth = (active.month+11)%12;
             int day = nofDays[previousMonth]-first+i+1;
             dates << Date(count()%7, day, previousMonth);
             append(Text(format(Italic)+dec(day,2)));
         }
-        for(int i=1;i<=nofDays[date.month];i++) { //current month
-            if(i==date.day) todayIndex=count();
-            dates << Date(count()%7, i, date.month);
-            append(string((i==date.day?format(Bold):""_)+dec(i,2))); //current day
+        Date today=::date();
+        for(int i=1;i<=nofDays[active.month];i++) { //current month
+            bool isToday = today.month==active.month && i==today.day;
+            if(isToday) todayIndex=count();
+            dates << Date(count()%7, i, active.month);
+            append(string((isToday?format(Bold):""_)+dec(i,2))); //current day
         }
         for(int i=1;count()<7*8;i++) { //next month
-            dates << Date(count()%7, i, (date.month+1)%12);
+            dates << Date(count()%7, i, (active.month+1)%12);
             append(Text(format(Italic)+dec(i,2)));
         }
+        Selection::setActive(todayIndex);
+        update();
     }
+    void previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
+    void nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 };
 
 struct Calendar {
-      Text date { format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) };
-      Month month;
-      Text events;
-     Menu menu { &date, &month, &space, &events, &space };
+    HList<Text> date = { "<"_, ""_, ">"_ }; //< date >
+    Month month;
+    Text events;
+    Menu menu { &date, &month, &space, &events, &space };
     Window window{&menu,""_,Image(),int2(300,300)};
     Calendar() {
+        date[0].textClicked.connect(this, &Calendar::previousMonth);
+        date[2].textClicked.connect(this, &Calendar::nextMonth);
         window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
         window.setOverrideRedirect(true);
         menu.close.connect(&window,&Window::hide);
-        month.activeChanged.connect(this,&Calendar::activeChanged);
-        month.setActive(month.todayIndex);
-        menu.update();
     }
+    void previousMonth() { month.previousMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) ); }
+    void nextMonth() { month.nextMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) ); }
     void activeChanged(int index) {
         string text;
         Date date = month.dates[index];
@@ -168,7 +179,13 @@ struct Calendar {
         if(event==Leave) { window.hide(); return true; }
         return false;
     }
-    void show() { window.show(); window.setPosition(int2(-300,16)); Window::sync(); }
+    void show() {
+         date[1].setText( format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) );
+         month.setActive(::date());
+         month.activeChanged.connect(this,&Calendar::activeChanged);
+         menu.update();
+        window.show(); window.setPosition(int2(-300,16)); Window::sync();
+    }
 };
 
 ICON(shutdown);

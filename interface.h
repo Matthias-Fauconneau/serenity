@@ -176,8 +176,12 @@ struct VBox : Vertical, Widgets {
     VBox(std::initializer_list<Widget*>&& widgets):Widgets(move(widgets)){}
 };
 
-template<class T> struct HList : Horizontal, Array<T> {};
-template<class T> struct VList : Vertical, Array<T> {};
+template<class T> struct HList : Horizontal, Array<T> {
+    HList(std::initializer_list<T>&& widgets):Array<T>(move(widgets)){}
+};
+template<class T> struct VList : Vertical, Array<T> {
+    VList(std::initializer_list<T>&& widgets):Array<T>(move(widgets)){}
+};
 
 /// Layout items on an uniform \a width x \a height grid
 struct UniformGrid : virtual Layout {
@@ -261,6 +265,8 @@ struct Text : Widget {
     ubyte opacity;
     /// Line wrap limit in pixels (0: no wrap, -margin: widget size - margin)
     int wrap=0;
+    /// User clicked on this Text
+    signal<> textClicked;
     /// User clicked on a \a Format::Link
     signal<const string&> linkActivated;
 

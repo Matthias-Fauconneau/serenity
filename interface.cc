@@ -200,7 +200,7 @@ struct TextLayout {
                 continue;
             }
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
-                assert(c==Format::Regular||c==Format::Italic||c==(Format::Link|Format::Bold));
+                assert(c==Format::Regular||c==Format::Bold||c==Format::Italic||c==(Format::Link|Format::Bold));
                 if(format&Format::Link) {
                     link.end=glyphCount;
                     links << Text::Link{link.begin,link.end,move(link.identifier)};
@@ -266,6 +266,7 @@ bool Text::mouseEvent(int2 position, Event event, Button) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated.emit(link.identifier); return true; }
         }
     }
+    if(textClicked.slots) { textClicked.emit(); return true; }
     return false;
 }
 
@@ -342,8 +343,8 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
 }
 
 void Selection::setActive(uint i) {
-    assert(i<count());
-    if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
+    assert(int(i)==-1 || i<count());
+    if(index!=i) { index=i; if(index!=-1) { at(index).selectEvent(); activeChanged.emit(index); } }
 }
 
 /// HighlightSelection

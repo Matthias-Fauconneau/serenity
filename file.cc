@@ -80,7 +80,6 @@ bool isFolder(const string& path, int at) { return statFile(path,at).st_mode&S_I
 
 long modifiedTime(const string& path, int at) { return statFile(path,at).st_mtime; }
 
-template<class T> void insertSorted(array<T>& a, T&& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; a.insertAt(i,move(v)); }
 array<string> listFiles(const string& folder, Flags flags) {
     array<string> list;
     DIR* dir = opendir(folder?strz(folder).data():".");

@@ -139,6 +139,7 @@ generic array replace(array&& a, const T& before, const T& after) {
 // Orderable?
 generic const T& min(const array& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
 generic T& max(array& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
+generic void insertSorted(array& a, T&& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; a.insertAt(i,move(v)); }
 
 #undef generic
 #undef array
