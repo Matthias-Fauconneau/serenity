@@ -108,6 +108,11 @@ string str(const URL& url) {
     return (url.scheme?url.scheme+"://"_:""_)+(url.authorization?url.authorization+"@"_:""_)+url.host+"/"_+url.path+(url.fragment?"#"_+url.fragment:""_);
 }
 
+test {
+    array<string> urls = split(readFile(".config/feeds"_,home()),' ');
+    log(apply<string>(urls,[](const string& s){return URL(s).host;}));
+}
+
 /// HTTP
 
 int cache=openFolder(".cache"_,home());
@@ -119,8 +124,8 @@ string cacheFile(const URL& url) {
 }
 
 HTTP::HTTP(const URL& url, delegate<void, const URL&, array<byte>&&> handler,
-           const array<string>& headers, const string& method, const string& content, array<string>&& redirect)
-    : url(str(url)), handler(handler), headers(copy(headers)), method(copy(method)), content(copy(content)), redirect(move(redirect)) { request(); }
+           array<string>&& headers, string&& method, string&& content, array<string>&& redirect)
+    : url(str(url)), handler(handler), headers(move(headers)), method(move(method)), content(move(content)), redirect(move(redirect)) { request(); }
 void HTTP::request() {
     if(!url.scheme) url.scheme="http"_;
     if(!http.connect(url.host, url.scheme, url.scheme=="https"_)) { delete this; return; } //TODO: async connect
@@ -133,26 +138,33 @@ void HTTP::request() {
 void HTTP::event(pollfd) {
     if(!http.fd) { delete this; return; }
     string file = cacheFile(url);
-    int status;
-    uint contentLength=0;
-    if(http.match("HTTP/1.1 200 OK\r\n"_)) status=200;
-    else if(http.match("HTTP/1.1 301 Moved Permanently\r\n"_)) status=301;
-    else if(http.match("HTTP/1.1 302 Found\r\n"_)) status=302;
-    else if(http.match("HTTP/1.1 302 Moved Temporarily\r\n"_)) status=302;
-    else if(http.match("HTTP/1.1 304 Not Modified\r\n"_)) {
+
+    // Status
+    if(!http.match("HTTP/1.1 "_)) { log(http.until("\r\n\r\n"_)); warn("No HTTP",url); delete this; return; }
+    int status = toInteger(http.until(" "_));
+    http.until("\r\n"_);
+    if(status==200||status==301||status==302) {}
+    else if(status==304) { //Not Modified
         if(exists(file,cache)) {
-            array<byte> content = readFile(file,cache); //Not Modified //TODO: touch instead of rewriting
+            array<byte> content = readFile(file,cache);
             if(!exists(url.host,cache)) createFolder(url.host,cache);
-            writeFile(file,content,cache,true);
+            writeFile(file,content,cache,true); //TODO: touch instead of rewriting
             debug( log("Not Modified",url); )
             handler(url,move(content));
         }
         delete this; return;
+    } else if(status==404) {
+        warn("Not Found",url); writeFile(file,""_,cache,true);
+        delete this; return;
+    } else {
+        log(http.until("\r\n\r\n"_)); warn("Unhandled response for",url,headers);
+        delete this; return;
     }
-    else if(http.match("HTTP/1.1 404 Not Found\r\n"_)) { warn("Not Found",url); writeFile(file,""_,cache,true); delete this; return; }
-    else { log(http.until("\r\n\r\n"_)); warn("Unhandled response for",url,headers);  delete this; return; }
+
+    // Headers
+    uint contentLength=0;
     bool chunked=false;
-    for(;;) { //parse header
+    for(;;) {
         if(http.match("\r\n"_)) break;
         string key = http.until(": "_); assert(key,http.buffer);
         string value=http.until("\r\n"_);
@@ -167,13 +179,14 @@ void HTTP::event(pollfd) {
             if(url.host==next.host && url.path==next.path) warn(status,"Redirect",url,next,value);
             else {
                 redirect << file;
-                new HTTP(next,handler,headers,method,content,move(redirect)); //TODO: reuse connection
+                new HTTP(next,handler,move(headers),move(method),move(content),move(redirect)); //TODO: reuse connection
             }
             delete this;
             return;
         }
     }
 
+    // Content
     array<byte> content;
     if(contentLength) content=http.TextStream::read(contentLength);
     else if(chunked) {
@@ -186,27 +199,27 @@ void HTTP::event(pollfd) {
     } else assert(content,"Missing content",http.buffer);
     assert(content,"Empty content",(string&)http.buffer);
     log("Downloaded",url,content.size()/1024,"KB");
+
+    // Cache
     redirect << file;
     for(const string& file: redirect) {
-        if(!exists(section(file,'/'),cache)) {
-            log(section(file,'/'));
-            createFolder(section(file,'/'),cache); //Create cache folder for new domains
-        }
+        if(!exists(section(file,'/'),cache)) createFolder(section(file,'/'),cache);
         writeFile(file,content,cache,true);
     }
+
     handler(url,move(content));
     delete this;
 }
 
-void getURL(const URL &url, delegate<void, const URL&, array<byte>&&> handler) {
+void getURL(const URL &url, delegate<void, const URL&, array<byte>&&> handler, uint maximumAge) {
     string file = cacheFile(url);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;
     // Check if cached
     if(exists(file,cache)) {
         long modified = modifiedTime(file,cache);
-        if(currentTime()-modified < 60*60) { debug( log("Cached",url); ) handler(url,readFile(file,cache)); return; }
+        if(currentTime()-modified < maximumAge) { debug( log("Cached",url); ) handler(url,readFile(file,cache)); return; }
         headers<< "If-Modified-Since: "_+str(date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
-    new HTTP(url,handler,headers);
+    new HTTP(url,handler,move(headers));
 }

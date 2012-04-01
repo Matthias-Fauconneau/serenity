@@ -23,6 +23,9 @@ int main(int argc, const char** argv) { \
     return 0; \
 }
 
+/// Convenience macro to startup an Application with the default event loop only if no Application() is defined
+#define Test(App) int main(int argc, const char** argv) __attribute((weak)); Application(App)
+
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
     /// Add this to the process-wide event loop

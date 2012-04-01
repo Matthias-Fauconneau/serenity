@@ -9,7 +9,7 @@ static Element parse(array<byte>&& document, bool html) {
     Element root;
     while(s) {
         s.skip();
-        if(s.match("</"_)) { log(root,"\n--------------------\n",(string)slice(s.buffer,0,s.index)); error("Unexpected","</"_+s.until(">"_)+">"_); }
+        if(s.match("</"_)) warn("Unexpected","</"_+s.until(">"_)+">"_);
         else if(s.match("<"_)) root.children << Element(s,html);
         else error("Unexpected '",s.until("\n"_),"'");
         s.skip();

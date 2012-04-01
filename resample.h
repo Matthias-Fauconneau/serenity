@@ -7,7 +7,7 @@ struct Resampler {
     ~Resampler();
     void filter(const float *source, int *sourceSize, float *target, int *targetSize, bool mix);
     operator bool() const;
-private:
+
     int sourceRate=0;
     int targetRate=0;
 

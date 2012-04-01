@@ -26,15 +26,22 @@ struct Feeds : Application {
     int readConfig = appendFile(".config/read"_,home());
     array<string> read = split(readFile(".config/read"_,home()),'\n');
 
-    Feeds(array<string>&& /*arguments*/) {
+    Feeds(array<string>&& arguments) {
         news.reserve(256); //realloc would invalidate delegates
         window.bgOuter=window.bgCenter;
         window.localShortcut("Escape"_).connect(this, &Feeds::quit);
         news.activeChanged.connect(this,&Feeds::activeChanged);
         news.itemPressed.connect(this,&Feeds::itemPressed);
         window.show();
-        array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
-        for(const string& url: feeds) getURL(url, this, &Feeds::loadFeed);
+        if(arguments) {
+            content = new Scroll<HTML>;
+            content->contentChanged.connect(this, &Feeds::render);
+            main << &content->parent();
+            content->go(arguments.first());
+        } else {
+            array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
+            for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 15*60);
+        }
         Window::sync();
     }
     ~Feeds() { close(readConfig); }
@@ -70,9 +77,8 @@ struct Feeds : Application {
 
         string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
         if(exists(favicon,cache)) {
-            log(favicon);
             news.last().get<Icon>().image = resize(decodeImage(readFile(favicon,cache)),16,16);
-        } else getURL(link, this, &Feeds::getFavicon);
+        } else getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
 
         int count=0;
         auto addItem = [this,&count](const Element& e) {
@@ -89,7 +95,7 @@ struct Feeds : Application {
                 news << move(entry);
                 Entry& item = news.last();
                 item.content= new Scroll<HTML>();
-                getURL(item.link, item.content, &HTML::load); //preload unread entries
+                item.content->go(item.link); //preload unread entries
             }
         };
         feed.xpath("feed/entry"_,addItem); //Atom
@@ -103,7 +109,7 @@ struct Feeds : Application {
         if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink("../"_+cacheFile(url.relative(icon)),cacheFile(url.relative("/favicon.ico"_)),cache);
         for(Entry& entry: news) {
             if(contains(entry.link,url.host)) {
-                new ImageLoader(url.relative(icon), &entry.get<Icon>().image, delegate<void>(this,&Feeds::render), int2(16,16));
+                new ImageLoader(url.relative(icon), &entry.get<Icon>().image, delegate<void>(this,&Feeds::render), int2(16,16), 7*24*60*60);
                 break; //only header
             }
         }
@@ -132,9 +138,10 @@ struct Feeds : Application {
             content= entry.content= new Scroll<HTML>();
             content->contentChanged.connect(this, &Feeds::render);
             main << &news << &content->parent();
-            getURL(entry.link, content, &HTML::load);
+            content->go(entry.link);
         }
         render();
+        log(entry.link);
     }
     void render() { main.update(); window.render(); }
 };

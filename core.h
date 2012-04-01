@@ -108,6 +108,8 @@ void logTrace(int skip=1);
 /// Aborts the process without any message, stack trace is logged
 #define fail() ({debug( trace_off; logTrace(); )  __builtin_abort(); })
 
+#define test int main() __attribute((weak)); int main()
+
 /// Memory
 #define _NEW
 inline void* operator new(size_t, void* p) { return p; } //placement new

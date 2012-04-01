@@ -25,9 +25,28 @@ const utf8_iterator& utf8_iterator::operator++() {
 }
 const utf8_iterator& utf8_iterator::operator--() {
     ubyte code = *--pointer;
-    if((code&0b10000000)!=0b00000000) { //UTF8
-        while((code&0b11000000)==0b10000000) code = *--pointer;
-        assert(code==0b11000000);
+    if(code>=128) {
+        //assert((code&0b11000000)==0b10000000,bin(code,8),(char)code,code,hex(code));
+        if((code&0b11000000)!=0b10000000) {} //Windows-1252
+        else { //UTF-8
+            int i=0; for(;(code&0b11000000)==0b10000000;i++) code = *(--pointer);
+#define WINDOWS_1252 1
+            if(i==1) { if((code&0b11100000)!=0b11000000) pointer++; }
+            else if(i==2) { if((code&0b11110000)!=0b11100000) pointer+=2; }
+            else if(i==3) { if((code&0b11111000)!=0b11110000) pointer+=3; }
+            else if(i==4) { if((code&0b11111100)!=0b11111000) pointer+=4; }
+            else if(i==5) { if((code&0b11111110)!=0b11111100) pointer+=5; }
+            else error(i);
+#if WINDOWS_1252
+#else
+            /**/  if(i==1) assert((code&0b11100000)==0b11000000);
+            else if(i==2) assert((code&0b11110000)==0b11100000);
+            else if(i==3) assert((code&0b11111000)==0b11110000);
+            else if(i==4) assert((code&0b11111100)==0b11111000);
+            else if(i==5) assert((code&0b11111110)==0b11111100);
+            else error(i);
+#endif
+        }
     }
     return *this;
 }
@@ -55,29 +74,31 @@ bool operator <(const string& a, const string& b) {
 string strz(const string& s) { return s+"\0"_; }
 string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return copy(string(s,i)); }
 
-void section_(const string& s, char sep, int& start, int& end, bool includeSep) {
+string section(const string& s, uint separator, int start, int end, bool includeSeparator) {
+    if(!s) return ""_;
     uint b,e;
     if(start>=0) {
         b=0;
-        for(uint i=0;i<(uint)start && b<s.size();b++) if(s[b]==sep) i++;
+        utf8_iterator it=s.begin(); for(uint i=0;i<(uint)start && it!=s.end();++it,b++) if(*it==separator) i++;
     } else {
         b=s.size();
-        if(start!=-1) for(uint i=0;b-- > 0;) { if(s[b]==sep) { i++; if(i>=uint(-start-1)) break; } }
-        b++; //skip separator
+        if(start!=-1) {
+            utf8_iterator it=s.end(); --it; --b;
+            for(uint i=0;;--it,--b) { if(*it==separator) { i++; if(i>=uint(-start-1)) { if(!includeSeparator) b++; break; } } if(it == s.begin()) break; }
+        }
     }
     if(end>=0) {
         e=0;
-        for(uint i=0;e<s.size();e++) if(s[e]==sep) { i++; if(i>=(uint)end) { if(includeSep) e++; break; } }
+        utf8_iterator it=s.begin(); for(uint i=0;it!=s.end();++it,e++) if(*it==separator) { i++; if(i>=(uint)end) { if(includeSeparator) e++; break; } }
     } else {
         e=s.size();
-        if(end!=-1) for(uint i=0;e-- > 0;) { if(s[e]==sep) { i++; if(i>=uint(-end-1)) { if(includeSep) e++; break; } } }
+        if(end!=-1) {
+            utf8_iterator it=s.end(); --it; --e;
+            for(uint i=0;;--it,--e) { if(*it==separator) { i++; if(i>=uint(-end-1)) { if(includeSeparator) e++; break; } } if(it == s.begin()) break; }
+        }
     }
-    assert(e>=b);
-    start=b; end=e;
-}
-string section(const string& s, char separator, int start, int end, bool includeSeparator) {
-    section_(s,separator,start,end,includeSeparator);
-    return copy(string(s.data()+start,end-start));
+    assert(e>=b,"'"_+s+"'"_,separator,start,end,includeSeparator,e,b);
+    return copy(string(s.data()+b,e-b));
 }
 
 array<string> split(const string& str, uint sep) {
@@ -102,9 +123,9 @@ string join(const array<string>& list, const string& separator) {
     return str;
 }
 
-string replace(const string& s, const string& before, const string& after) {
-    string r(s.size());
-    for(uint i=0;i<s.size();) { //->utf8_iterator
+array<char> replace(const array<char>& s, const array<char>& before, const array<char>& after) {
+    array<char> r(s.size());
+    for(uint i=0;i<s.size();) {
         if(i<=s.size()-before.size() && string(s.data()+i, before.size())==before) { r<<after; i+=before.size(); }
         else { r << s[i]; i++; }
     }
@@ -137,7 +158,6 @@ string simplify(const array<byte>& s) {
 }
 
 string utf8(uint c) {
-    assert(c>='\n',hex(c));
     string utf8;
     /**/  if(c<(1<<7))           utf8                                                                                                            << c;
     else if(c<(1<<(7+6)))     utf8                                             << (0b11000000|(c>>6))                      << (0b10000000|(c&0b111111));
@@ -174,32 +194,15 @@ bool isInteger(const string& s) { if(!s) return false; for(auto c: s) if(c<'0'||
 long toInteger(const string& number, int base) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     int sign=1;
-    uint i=0; if(number[i] == '-' ) i++, sign=-1; else if(number[i] == '+') i++;
+    utf8_iterator i=number.begin();
+    if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
     long value=0;
-    for(;i<number.size();i++) {
-        if(number[i]==' ') break;
-        int n = indexOf(string("0123456789abcdef",base), number[i]);
-        assert(n>=0,"Invalid input '"_+number+"'"_);
+    for(;i!=number.end();++i) {
+        if(*i==' ') break;
+        assert((*i>='0' && *i<='9')||(*i>='a'&&*i<='f'),"Invalid input '"_+number+"'"_);
+        int n = indexOf(array<char>("0123456789abcdef",base), (char)*i);
         value *= base;
         value += n;
     }
     return sign*value;
 }
-
-/*double readFloat(const char*& s, int base ) {
-    assert(base>2 && base<16,"Unsupported base"_,base);
-    int neg=0;
-    if(*s == '-') s++, neg=1; else if(*s == '+') s++;
-    int exponent = 1;
-    int significand = 0;
-    for(bool gotDot=false;*s;s++) {
-        if(*s == '.') { gotDot=true; continue; }
-        int n = indexOf(string("0123456789ABCDEF",base), *s);
-        if(n < 0) break; //assert(n>=0,"Invalid float",str);
-        significand *= base;
-        significand += n;
-        if(gotDot) exponent *= base;
-    }
-    return neg ? -float(significand)/float(exponent) : float(significand)/float(exponent);
-}
-double readFloat(const string& str, int base ) { const char* s=str.data(); return readFloat(s,base); }*/

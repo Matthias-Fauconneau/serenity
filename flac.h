@@ -24,7 +24,7 @@ struct BitReader : array<byte> {
     uint unary();
     /// Reads an UCS-2 encoded value
     uint utf8();
-protected:
+
     void setData(array<byte>&& buffer);
 };
 

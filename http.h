@@ -65,8 +65,7 @@ struct HTTP : Poll {
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(const URL& url, Handler handler,
-         const array<string>& headers={}, const string& method="GET"_, const string& content=""_, array<string>&& redirect={});
+    HTTP(const URL& url, Handler handler, array<string>&& headers={}, string&& method="GET"_, string&& content=""_, array<string>&& redirect={});
 
     void request();
     void event(pollfd) override;
@@ -75,12 +74,8 @@ struct HTTP : Poll {
 };
 
 /// Requests ressource at \a url and call \a handler when available
-/// \note Persistent disk caching will be used
-void getURL(const URL &url, Handler handler);
-
-template <class C, class B, predicate(is_base_of(B,C))> inline void getURL(const URL &url, C* _this, void (B::*method)(const URL& url, array<byte>&&)) {
-    getURL(url, Handler(_this, method));
-}
+/// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge
+void getURL(const URL &url, Handler handler, uint maximumAge);
 
 /// Returns path to cache file for \a url
 string cacheFile(const URL& url);

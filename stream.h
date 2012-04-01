@@ -31,7 +31,7 @@ struct Buffer : virtual Stream {
 };
 
 /// \a DataStream provides a convenient interface to parse binaries
-struct DataStream : virtual protected Stream {
+struct DataStream : virtual Stream {
     bool bigEndian = false;
 
     /// Returns true if there is data to read
@@ -64,7 +64,7 @@ struct DataStream : virtual protected Stream {
 };
 
 /// \a TextStream provides a convenient interface to parse texts
-struct TextStream : virtual protected Stream {
+struct TextStream : virtual Stream {
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
     /// Reads \a size bytes from stream

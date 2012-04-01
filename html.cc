@@ -2,8 +2,9 @@
 #include "array.cc"
 #include "raster.h"
 
-ImageLoader::ImageLoader(const URL& url, Image* target, delegate<void> imageLoaded, int2 size):target(target),imageLoaded(imageLoaded),size(size){
-    getURL(url, this, &ImageLoader::load);
+ImageLoader::ImageLoader(const URL& url, Image* target, delegate<void> imageLoaded, int2 size, uint maximumAge)
+    : target(target), imageLoaded(imageLoaded), size(size) {
+    getURL(url, Handler(this, &ImageLoader::load), maximumAge);
 }
 
 void ImageLoader::load(const URL&, array<byte>&& file) {
@@ -14,6 +15,10 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
     imageLoaded();
     delete this;
 }
+
+static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"ul"_,"li"_,"em"_,"strong"_,"dt"_,"dl"_,"h2"_,"code"_};
+
+void HTML::go(const string& url) { getURL(url, Handler(this, &HTML::load), 30*60); }
 
 void HTML::load(const URL& url, array<byte>&& document) {
     expanding=true; clear();
@@ -28,10 +33,10 @@ void HTML::load(const URL& url, array<byte>&& document) {
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(contains(src.path,"comic"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||contains(src.path,"chapter"_)||contains(src.path,"art/"_)) {
+            if(contains(src.path,"comic"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_)) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
-                score += size?:16300;
+                score += size?:16800;
             }
         }
         else if(!div.children) return;
@@ -39,9 +44,8 @@ void HTML::load(const URL& url, array<byte>&& document) {
         for(auto& c: div.children) stack<<c;
         while(stack.size()) {
             const Element& e = *stack.pop();
-            const array<string> contentElement = {"p"_,"a"_,"blockquote"_,"ul"_,"li"_,"em"_,"strong"_};
-            if(contains(contentElement,e.name))
-                for(auto& c: e.children) stack<<c; //content
+            if(contains(textElement,e.name))
+                for(auto& c: e.children) stack<<c; //text
             else if(e.name!="script"_ && e.name!="style"_ && e.content)
                 score += e.content.size(); //raw text
             else if(e.name=="img"_||e.name=="iframe"_) {
@@ -51,7 +55,7 @@ void HTML::load(const URL& url, array<byte>&& document) {
                 //else if(e.name=="iframe"_) score += width*height; //video
             } else if(e.name=="br"_) score += 32; //line break
         }
-        if(score>max) best=&div, second=max, max=score;
+        if(score>=max) best=&div, second=max, max=score;
         else if(score>second) second=score;
     });
     assert(best);
@@ -79,24 +83,32 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
     } else if(!e.name) { //Text
        flushImages();
        if(!e.name) text << e.content;
+    } else if(e.name=="a"_) { //Link
+        flushImages();
+        bool inlineText=true; //TODO:
+        e.visit([&inlineText](const Element& e){if(e.name&&!contains(textElement,e.name))inlineText=false;});
+        if(inlineText) text << format(Format::Bold|Format::Link) << e["href"_] << " "_;
+        for(auto& c: e.children) layout(url, *c);
+        if(inlineText) text << format(Format::Regular);
     } else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
         flushImages();
         for(auto& c: e.children) layout(url, *c);
         text<<"\n"_;
-    } else if(e.name=="strong"_||e.name=="em"_) { //Bold
-        text << format(Bold);
+    } else if(e.name=="strong"_||e.name=="em"_) { //Emphasis
+        text << format(Format::Italic);
         for(auto& c: e.children) layout(url, *c);
-        text << format(Regular);
-    } else { //Unknown
+        text << format(Format::Regular);
+    } else { // Format
         for(auto& c: e.children) layout(url, *c);
-        /*if(e.name=="a"_||e.name=="blockquote"_||e.name=="span"_||e.name=="li"_||e.name=="ul"_) {} //Ignored
-        else log("Unknown element",e.name);*/
+        if(!contains(textElement,e.name)) log("Unknown element",e.name);
     }
 }
 void HTML::flushText() {
     string paragraph = simplify(trim(text));
     if(!paragraph) return;
-    append( new Text(move(paragraph),16,255, 640 /*60 characters*/) );
+    auto textLayout = new Text(move(paragraph),16,255, 640 /*60 characters*/);
+    textLayout->linkActivated.connect(this, &HTML::go);
+    append(textLayout);
     text.clear();
 }
 void HTML::flushImages() {

@@ -144,7 +144,6 @@ void UniformGrid::update() {
 
 /// Text
 
-// temporary structure to organize code
 struct TextLayout {
     int size;
     int wrap;
@@ -156,6 +155,7 @@ struct TextLayout {
     array<Word> line;
     Word word;
     array<Character> text;
+    array<Text::Link> links;
 
     void nextLine(bool justify) {
         if(!line) { pen.y+=metrics.height; return; }
@@ -180,10 +180,13 @@ struct TextLayout {
         pen.x=0; pen.y+=metrics.height;
     }
 
-    TextLayout(int size, int wrap, const string& source):size(size),wrap(wrap),font(&defaultSans) {
+    TextLayout(int size, int wrap, const string& s):size(size),wrap(wrap),font(&defaultSans) {
         uint previous=' ';
-        Format format=Regular;
-        for(uint c: source) {
+        Format format=Format::Regular;
+        Text::Link link;
+        uint glyphCount=0;
+        for(utf8_iterator it=s.begin();it!=s.end();++it) {
+            uint c = *it;
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
@@ -196,18 +199,32 @@ struct TextLayout {
                 if(c=='\n') nextLine(false);
                 continue;
             }
-            if(c>=0x10&&c<0x20) { //10-1F format control (bitmask for bold,oblique,underline,strike)
+            if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
+                assert(c==Format::Regular||c==Format::Italic||c==(Format::Link|Format::Bold));
+                if(format&Format::Link) {
+                    link.end=glyphCount;
+                    links << Text::Link{link.begin,link.end,move(link.identifier)};
+                }
                 format = ::format(c);
-                assert(format<4);
                 Font* lookup[] = {&defaultSans,&defaultBold,&defaultItalic,&defaultBoldItalic};
-                font=lookup[format];
+                font=lookup[format&(Format::Bold|Format::Italic)];
+                if(format&Link) {
+                    for(;;) {
+                        ++it;
+                        assert(it!=s.end(),s);
+                        uint c = *it;
+                        if(c == ' ') break;
+                        link.identifier << utf8(c);
+                    }
+                    link.begin=glyphCount;
+                }
                 continue;
             }
             const Glyph& glyph = font->glyph(size,c);
             pen.x += font->kerning(previous,c);
             previous = c;
             assert(glyph.image||c==0xA0,hex(c));
-            if(glyph.image) word << i(Character{ c, vec2(pen.x,0)+glyph.offset, glyph });
+            if(glyph.image) word << i(Character{ c, vec2(pen.x,0)+glyph.offset, glyph }); glyphCount++;
             pen.x += glyph.advance.x;
         }
     }
@@ -227,6 +244,7 @@ void Text::update(int wrap) {
     if(text.last()!='\n') text << '\n';
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
     for(const auto& c: layout.text) blits << i(Blit{int2(round(c.pos.x),round(c.pos.y)),c.glyph.image});
+    links = move(layout.links);
     textSize = layout.textSize();
 }
 int2 Text::sizeHint() {
@@ -238,6 +256,17 @@ void Text::render(int2 parent) {
     if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
+}
+
+bool Text::mouseEvent(int2 position, Event event, Button) {
+    if(event!=Press) return false;
+    position -= max(int2(0,0),(Widget::size-textSize)/2);
+    for(uint i=0;i<blits.size();i++) { const Blit& b=blits[i];
+        if(position>=b.pos && position<=b.pos+b.image.size()) {
+            for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated.emit(link.identifier); return true; }
+        }
+    }
+    return false;
 }
 
 /// TextInput

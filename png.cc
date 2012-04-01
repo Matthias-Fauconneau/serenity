@@ -58,9 +58,12 @@ Image decodePNG(const array<byte>& file) {
             break;
         } else if(name == "PLTE"_) {
             palette = s.read(size);
-        } else { if(name!="sBIT"_&&name!="pHYs"_&&name!="tEXt"_) log(name); s.advance(size); }
-         s.advance(4); //CRC
-         assert(s);
+        } else {
+            debug( if(name!="sBIT"_&&name!="pHYs"_&&name!="tEXt"_&&name!="iCCP"_&&name!="cHRM"_) log(name); )
+            s.advance(size);
+        }
+        s.advance(4); //CRC
+        assert(s);
     }
     inflate(&z, Z_FINISH);
     inflateEnd(&z);
@@ -69,7 +72,7 @@ Image decodePNG(const array<byte>& file) {
     byte* data= idat.data();
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
-    for(int i=0;interlace && i<7;i++) {
+    for(int i=0;i==0 || (interlace && i<7);i++) {
         int xStride=1,yStride=1;
         int offset=0;
         if(interlace) {

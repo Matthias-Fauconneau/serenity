@@ -236,10 +236,12 @@ template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelectio
     Grid(array<T>&& items) : ListSelection<T>(move(items)){}
 };
 
-/// Rich text format control code encoded in 10-1F range
-enum Format { Regular=0,Bold=1,Italic=2,BoldItalic=3,Underline=4,Strike=8 };
-inline string format(Format f) { string s; s << (f+0x10); return s; }
-inline Format format(char f) { return Format(f-0x10); }
+/// Rich text format control code encoded in 00-1F range
+/// \note Strike|Bold (\t) and Strike|Italic (\n) cannot be used
+/// \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
+enum Format { Regular=0,Bold=1,Italic=2,Underline=4,Strike=8,Link=16 };
+inline string format(Format f) { assert(f<32); string s; s << (char)f; return s; }
+inline Format format(uint f) { assert(f<32); return Format(f); }
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
@@ -259,15 +261,26 @@ struct Text : Widget {
     ubyte opacity;
     /// Line wrap limit in pixels (0: no wrap, -margin: widget size - margin)
     int wrap=0;
+    /// User clicked on a \a Format::Link
+    signal<const string&> linkActivated;
 
     int2 sizeHint();
     void update() override { update(min(wrap,Widget::size.x)); }
     void update(int wrap);
     void render(int2 parent);
-protected:
+    bool mouseEvent(int2 position, Event event, Button button) override;
+
+    // cache layout bounding box
     int2 textSize=zero;
+
+    // laid out glyphs to blit
     struct Blit { int2 pos; const Image& image; };
     array<Blit> blits;
+    //struct Line { int2 min,max; }; array<Line> lines; TODO: underline/strike
+
+    // inline text links
+    struct Link { uint begin,end; string identifier;};
+    array<Link> links;
 };
 
 /// TextList is a \a List of \a Text items
@@ -276,7 +289,6 @@ typedef List<Text> TextList;
 /// TextInput is an editable \a Text
 //TODO: multiline
 struct TextInput : Text {
-protected:
     uint cursor=0;
 
     bool mouseEvent(int2 position, Event event, Button button) override;
@@ -332,7 +344,6 @@ struct ToggleButton : Widget {
     void render(int2 parent);
     bool mouseEvent(int2 position, Event event, Button button) override;
 
-protected:
     const Image& enableIcon;
     const Image& disableIcon;
     static const int size = 32;
@@ -351,7 +362,6 @@ struct Slider : Widget {
     void render(int2 parent);
     bool mouseEvent(int2 position, Event event, Button button) override;
 
-protected:
     static const int height = 32;
 };
 

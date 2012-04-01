@@ -17,11 +17,13 @@ struct string : array<char> {
     //using array<char>::array<char>;
     string() {}
     explicit string(uint capacity):array<char>(capacity){}
-    //explicit string(char a){ tag=1; data()[0]=a; }
     string(array<char>&& o):array<char>(move(o)){}
     string(const char* data, uint size):array<char>(data,size){}
     string(const char* begin,const char* end):array<char>(begin,end){}
     string(utf8_iterator begin,utf8_iterator end):array<char>(begin.pointer,end.pointer){}
+
+    uint at(uint index) const { utf8_iterator it=begin(); for(uint i=0;it!=end();++it,++i) if(i==index) return *it; fail(); }
+    uint operator [](uint i) const { return at(i); }
 
     const utf8_iterator begin() const { return array::begin(); }
     const utf8_iterator end() const { return array::end(); }
@@ -65,7 +67,7 @@ string strz(const char* s);
 /// Returns a copy of the string between the \a{start}th and \a{end}th occurence of \a separator
 /// \note You can use a negative \a start or \a end to count from the right
 /// \note This is a shortcut to join(split(str,sep).slice(start,end),sep)
-string section(const string& str, char separator, int start=0, int end=1, bool includeSeparator=false);
+string section(const string& str, uint separator, int start=0, int end=1, bool includeSeparator=false);
 
 /// Splits \a str wherever \a separator occurs
 array<string> split(const string& str, uint separator=' ');
@@ -74,7 +76,7 @@ array<string> split(const string& str, uint separator=' ');
 string join(const array<string>& list, const string& separator);
 
 /// Replaces every occurrence of the string \a before with the string \a after
-string replace(const string& s, const string& before, const string& after);
+array<char> replace(const array<char> &s, const array<char> &before, const array<char> &after);
 
 /// Lowers case
 string toLower(const string& s);

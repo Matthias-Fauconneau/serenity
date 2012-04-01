@@ -18,7 +18,6 @@ struct AudioFile {
     void read(int16* output, uint size);
     signal<int,int> timeChanged;
 
-protected:
     struct AVFormatContext* file=0;
     struct AVStream* audioStream=0;
     struct AVCodecContext* audio=0;
