@@ -61,10 +61,10 @@ struct StatusNotifierItem : TriggerButton {
 };
 
 struct Clock : Text, Timer {
-    signal<> render;
+    signal<> timeout;
     signal<> triggered;
     Clock():Text(str(date(),"hh:mm"_)){ setAbsolute(currentTime()/60*60+60); }
-    void expired() { text=str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); render.emit(); }
+    void expired() { text=str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout.emit(); }
     bool mouseEvent(int2, Event event, Button button) override {
         if(event==Press && button==LeftButton) { triggered.emit(); return true; }
         return false;
@@ -93,12 +93,26 @@ array<string> getEvents(Date query) {
             Date date = parse(s); s.skip();
             Date end=date; if(s.match("-"_)) { end=parse(s); s.skip(); }
             string title = s.until("\n"_);
-            if(date.day>=0) { if(date.day!=query.day) continue; }
-            else if(query.day>=0 && query>until) continue;
-            if(date.month>=0) { if(date.month!=query.month) continue; }
-            else if(query.month>=0 && query>until) continue;
-            if(date.year>=0) { if(date.year!=query.year) continue; }
-            else if(query.year>=0 && query>until) continue;
+            if(query.day>=0) {
+                if(date.day>=0) { if(date.day!=query.day) continue; }
+                else if(query>until) continue;
+            }
+            if(query.month>=0) {
+                if(date.month>=0) { if(date.month!=query.month) continue; }
+                else if(query>until) continue;
+            }
+            if(query.year>=0) {
+                if(date.year>=0) { if(date.year!=query.year) continue; }
+                else if(query>until) continue;
+            }
+            if(query.hours>=0) {
+                if(date.hours>=0) { if(date.hours!=query.hours) continue; }
+                else if(query>until) continue;
+            }
+            if(query.minutes>=0) {
+                if(date.minutes>=0) { if(date.minutes!=query.minutes) continue; }
+                else if(query>until) continue;
+            }
             if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
             for(Date date: exceptions[copy(title)]) if(date.day==query.day && date.month==query.month) goto skip;
             insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title));
@@ -180,12 +194,14 @@ struct Calendar {
         return false;
     }
     void show() {
+        if(window.visible) { window.hide(); return; }
          date[1].setText( format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) );
-         month.setActive(::date());
          month.activeChanged.connect(this,&Calendar::activeChanged);
+         month.setActive(::date());
          menu.update();
         window.show(); window.setPosition(int2(-300,16)); Window::sync();
     }
+    void checkAlarm() { if(getEvents(::date(currentTime()+5*60))) show(); }
 };
 
 ICON(shutdown);
@@ -296,7 +312,8 @@ struct TaskBar : Poll {
         start.image = resize(buttonIcon, 16,16);
         start.triggered.connect(&launcher,&Launcher::show);
         tasks.expanding=true;
-        clock.render.connect(&window, &Window::render);
+        clock.timeout.connect(&window, &Window::render);
+        clock.timeout.connect(&calendar, &Calendar::checkAlarm);
         clock.triggered.connect(&calendar,&Calendar::show);
 
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);

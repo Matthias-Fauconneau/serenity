@@ -72,7 +72,7 @@ bool exists(const string& path, int at) {
 
 void symlink(const string& target,const string& name, int at) {
     unlinkat(at,strz(name).data(),0);
-    if(symlinkat(strz(target).data(),at,strz(name).data())<0) log("symlink failed",name,"->",target);
+    if(symlinkat(strz(target).data(),at,strz(name).data())<0) warn("symlink failed",name,"->",target);
 }
 
 struct stat statFile(const string& path, int at) { struct stat file; fstatat(at, strz(path).data(), &file, 0); return file; }

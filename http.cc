@@ -54,7 +54,7 @@ SSLSocket::~SSLSocket() { if(ssl) SSL_shutdown(ssl); }
 array<byte> SSLSocket::read(int size) {
     array<byte> buffer(size);
     if(ssl) size=SSL_read(ssl, buffer.data(), size); else size=::read(fd,buffer.data(),size);
-    if(size<0) { log("Read error",strerror(errno)); return ""_; }
+    if(size<0) { warn("Read error",strerror(errno)); return ""_; }
     buffer.setSize(size);
     return buffer;
 }
@@ -106,11 +106,6 @@ URL URL::relative(URL&& url) const {
 }
 string str(const URL& url) {
     return (url.scheme?url.scheme+"://"_:""_)+(url.authorization?url.authorization+"@"_:""_)+url.host+"/"_+url.path+(url.fragment?"#"_+url.fragment:""_);
-}
-
-test {
-    array<string> urls = split(readFile(".config/feeds"_,home()),' ');
-    log(apply<string>(urls,[](const string& s){return URL(s).host;}));
 }
 
 /// HTTP

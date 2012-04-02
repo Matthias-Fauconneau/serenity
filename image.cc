@@ -67,7 +67,7 @@ Image decodeImage(const array<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
-    else { log("Unknown image format",slice(file,0,4)); return Image(); }
+    else { warn("Unknown image format",slice(file,0,4)); return Image(); }
 }
 
 #include "file.h"

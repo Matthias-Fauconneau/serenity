@@ -33,6 +33,7 @@ Element::Element(TextBuffer& s, bool html) {
     while(!s.match(">"_)) {
         if(s.match("/>"_)) { s.skip(); return; }
         else if(s.match("/"_)) s.skip(); //spurious /
+        else if(s.match("<"_)) break; //forgotten >
         string key=s.xmlIdentifier(); s.skip();
         if(!key) { log("Attribute syntax error",(string)slice(s.buffer,start,s.index-start),"^",s.until(">"_)); break; }
         if(html) key=toLower(key);

@@ -55,9 +55,12 @@ inline string operator "" _(const char* data, size_t size) { return string(data,
 /// Lexically compare strings
 bool operator <(const string& a, const string& b);
 
-bool startsWith(const array<byte>& s, const array<byte>& a);
-bool endsWith(const array<byte>& s, const array<byte>& a);
-bool contains(const string& s, const string& a);
+/// Returns true if \a str starts with \a sub
+bool startsWith(const array<byte>& str, const array<byte>& sub);
+/// Returns true if \a str ends with \a sub
+bool endsWith(const array<byte>& str, const array<byte>& sub);
+/// Returns true if \a str contains \a sub
+bool contains(const string& str, const string& sub);
 
 /// Returns a null-terminated string
 string strz(const string& s);

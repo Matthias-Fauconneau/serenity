@@ -4,9 +4,9 @@
 #include "map.h"
 
 struct FontMetrics {
-    long descender;
-    long ascender;
-    long height;
+    float descender;
+    float ascender;
+    float height;
 };
 
 struct GlyphMetrics {

@@ -25,7 +25,7 @@ Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_B
 FontMetrics Font::metrics(int size) {
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,0,0,0};
     FT_Request_Size(face,&req);
-    FontMetrics metrics = { face->size->metrics.descender>>6, face->size->metrics.ascender>>6, face->size->metrics.height>>6 };
+    FontMetrics metrics = { face->size->metrics.descender/64.f, face->size->metrics.ascender/64.f, face->size->metrics.height/64.f };
     return metrics;
 }
 

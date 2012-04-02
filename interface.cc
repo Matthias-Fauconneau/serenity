@@ -156,6 +156,8 @@ struct TextLayout {
     Word word;
     array<Character> text;
     array<Text::Link> links;
+    struct Line { int begin,end; };
+    array<Line> lines;
 
     void nextLine(bool justify) {
         if(!line) { pen.y+=metrics.height; return; }
@@ -184,6 +186,7 @@ struct TextLayout {
         uint previous=' ';
         Format format=Format::Regular;
         Text::Link link;
+        uint underlineBegin=0;
         uint glyphCount=0;
         for(utf8_iterator it=s.begin();it!=s.end();++it) {
             uint c = *it;
@@ -205,9 +208,11 @@ struct TextLayout {
                     link.end=glyphCount;
                     links << Text::Link{link.begin,link.end,move(link.identifier)};
                 }
+                if(format&Underline) lines << Line{underlineBegin,glyphCount};
                 format = ::format(c);
                 Font* lookup[] = {&defaultSans,&defaultBold,&defaultItalic,&defaultBoldItalic};
                 font=lookup[format&(Format::Bold|Format::Italic)];
+                if(format&Underline) underlineBegin=glyphCount;
                 if(format&Link) {
                     for(;;) {
                         ++it;
@@ -224,15 +229,15 @@ struct TextLayout {
             pen.x += font->kerning(previous,c);
             previous = c;
             assert(glyph.image||c==0xA0,hex(c));
-            if(glyph.image) word << i(Character{ c, vec2(pen.x,0)+glyph.offset, glyph }); glyphCount++;
+            if(glyph.image) word << i(Character{c, vec2(pen.x,0)+glyph.offset, glyph }); glyphCount++;
             pen.x += glyph.advance.x;
         }
     }
     int2 textSize() {
-       int2 bb=zero;
-       for(Character c: text) bb=max(bb,int2(c.pos)+c.glyph.image.size());
-        bb.y -= metrics.descender;
-        return int2(round(bb.x),round(bb.y));
+       int2 max;
+       for(Character c: text) max=::max(max,int2(c.pos)+c.glyph.image.size());
+       if(max.y<metrics.height) max.y=metrics.height;
+       return max;
     }
 };
 
@@ -243,7 +248,17 @@ void Text::update(int wrap) {
     if(!text) { textSize=int2(1,defaultSans.metrics(size).height); return; }
     if(text.last()!='\n') text << '\n';
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
-    for(const auto& c: layout.text) blits << i(Blit{int2(round(c.pos.x),round(c.pos.y)),c.glyph.image});
+    for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2(round(c.pos.x),round(c.pos.y)),c.glyph.image});
+    for(const TextLayout::Line& l: layout.lines) {
+        Line line;
+        const auto& c = layout.text[l.begin];
+        line.min=int2(c.pos-c.glyph.offset);
+        for(int i=l.begin;i<l.end;i++) {
+            const auto& c = layout.text[i];
+            if(c.pos<line.min) lines<<line, line.min=c.pos; else line.max=c.pos+int2(c.glyph.advance.x,0);
+        }
+        if(line.max!=line.min) lines<<line;
+    }
     links = move(layout.links);
     textSize = layout.textSize();
 }
@@ -256,6 +271,7 @@ void Text::render(int2 parent) {
     if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
+    for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
 }
 
 bool Text::mouseEvent(int2 position, Event event, Button) {
@@ -267,6 +283,7 @@ bool Text::mouseEvent(int2 position, Event event, Button) {
         }
     }
     if(textClicked.slots) { textClicked.emit(); return true; }
+    log("false"_);
     return false;
 }
 
@@ -343,8 +360,8 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
 }
 
 void Selection::setActive(uint i) {
-    assert(int(i)==-1 || i<count());
-    if(index!=i) { index=i; if(index!=-1) { at(index).selectEvent(); activeChanged.emit(index); } }
+    assert(i==uint(-1) || i<count());
+    if(index!=i) { index=i; if(index!=uint(-1)) { at(index).selectEvent(); activeChanged.emit(index); } }
 }
 
 /// HighlightSelection

@@ -16,7 +16,10 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
     delete this;
 }
 
-static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"ul"_,"li"_,"em"_,"strong"_,"dt"_,"dl"_,"h2"_,"code"_};
+static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"u"_,"hr"_,"ul"_,"li"_,"i"_
+"cite"_,"b"_,"em"_,"strong"_,"ol"_,"dt"_,"dl"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_};
+static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"footer"_,"base"_,
+"form"_,"script"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_};
 
 void HTML::go(const string& url) { getURL(url, Handler(this, &HTML::load), 30*60); }
 
@@ -33,7 +36,8 @@ void HTML::load(const URL& url, array<byte>&& document) {
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(contains(src.path,"comic"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_)) {
+            if(contains(src.path,"comic"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||
+                    contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_)) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
                 score += size?:16800;
@@ -44,16 +48,18 @@ void HTML::load(const URL& url, array<byte>&& document) {
         for(auto& c: div.children) stack<<c;
         while(stack.size()) {
             const Element& e = *stack.pop();
-            if(contains(textElement,e.name))
+            if(contains(textElement,e.name)) {
                 for(auto& c: e.children) stack<<c; //text
-            else if(e.name!="script"_ && e.name!="style"_ && e.content)
+            } else if(!e.name) {
                 score += e.content.size(); //raw text
-            else if(e.name=="img"_||e.name=="iframe"_) {
+            } else if(e.name=="img"_||e.name=="iframe"_) {
                 //int width = isInteger(e["width"_]) ? toInteger(e["width"_]) : 1;
                 int height = isInteger(e["height"_]) ? toInteger(e["height"_]) : 1;
                 if(e.name=="img"_) score += height; //image
                 //else if(e.name=="iframe"_) score += width*height; //video
-            } else if(e.name=="br"_) score += 32; //line break
+            } else if(e.name=="br"_) { score += 32; //line break
+            } else if(contains(ignoreElement,e.name)) {
+            } else if(!contains(e.name,":"_)) warn("Unknown HTML tag",e.name);
         }
         if(score>=max) best=&div, second=max, max=score;
         else if(score>second) second=score;
@@ -87,21 +93,20 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
         flushImages();
         bool inlineText=true; //TODO:
         e.visit([&inlineText](const Element& e){if(e.name&&!contains(textElement,e.name))inlineText=false;});
-        if(inlineText) text << format(Format::Bold|Format::Link) << e["href"_] << " "_;
+        if(inlineText) text << format(Format::Underline|Format::Link) << e["href"_] << " "_;
         for(auto& c: e.children) layout(url, *c);
         if(inlineText) text << format(Format::Regular);
     } else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
         flushImages();
         for(auto& c: e.children) layout(url, *c);
         text<<"\n"_;
-    } else if(e.name=="strong"_||e.name=="em"_) { //Emphasis
+    } else if(e.name=="strong"_||e.name=="em"_||e.name=="i"_) { //Emphasis
         text << format(Format::Italic);
         for(auto& c: e.children) layout(url, *c);
         text << format(Format::Regular);
-    } else { // Format
-        for(auto& c: e.children) layout(url, *c);
-        if(!contains(textElement,e.name)) log("Unknown element",e.name);
-    }
+    } else if(contains(textElement,e.name)) { for(auto& c: e.children) layout(url, *c); // Unhandled format tags
+    } else if(contains(ignoreElement,e.name)) { return; // Ignored elements
+    } else warn("Unknown HTML tag",e.name);
 }
 void HTML::flushText() {
     string paragraph = simplify(trim(text));

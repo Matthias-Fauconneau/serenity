@@ -177,9 +177,11 @@ struct VBox : Vertical, Widgets {
 };
 
 template<class T> struct HList : Horizontal, Array<T> {
+    HList(){}
     HList(std::initializer_list<T>&& widgets):Array<T>(move(widgets)){}
 };
 template<class T> struct VList : Vertical, Array<T> {
+    VList(){}
     VList(std::initializer_list<T>&& widgets):Array<T>(move(widgets)){}
 };
 
@@ -282,7 +284,8 @@ struct Text : Widget {
     // laid out glyphs to blit
     struct Blit { int2 pos; const Image& image; };
     array<Blit> blits;
-    //struct Line { int2 min,max; }; array<Line> lines; TODO: underline/strike
+    struct Line { int2 min,max; };
+    array<Line> lines;
 
     // inline text links
     struct Link { uint begin,end; string identifier;};

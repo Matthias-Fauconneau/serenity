@@ -141,7 +141,6 @@ struct Feeds : Application {
             content->go(entry.link);
         }
         render();
-        log(entry.link);
     }
     void render() { main.update(); window.render(); }
 };
