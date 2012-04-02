@@ -19,7 +19,7 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
 static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"u"_,"hr"_,"ul"_,"li"_,"i"_
 "cite"_,"b"_,"em"_,"strong"_,"ol"_,"dt"_,"dl"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_};
 static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"footer"_,"base"_,
-"form"_,"script"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_};
+"form"_,"script"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_,"area"_,"map"_};
 
 void HTML::go(const string& url) { getURL(url, Handler(this, &HTML::load), 30*60); }
 

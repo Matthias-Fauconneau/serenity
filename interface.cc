@@ -255,7 +255,8 @@ void Text::update(int wrap) {
         line.min=int2(c.pos-c.glyph.offset);
         for(int i=l.begin;i<l.end;i++) {
             const auto& c = layout.text[i];
-            if(c.pos<line.min) lines<<line, line.min=c.pos; else line.max=c.pos+int2(c.glyph.advance.x,0);
+            int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
+            if(p<line.min) lines<<line, line.min=p; else line.max=p+int2(c.glyph.advance.x,0);
         }
         if(line.max!=line.min) lines<<line;
     }
