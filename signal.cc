@@ -1,5 +1,5 @@
 #include "signal.h"
 
 #include "array.cc"
-template class array< delegate<void> >;
-template class array< signal<> >;
+template struct array< delegate<void> >;
+template struct array< signal<> >;

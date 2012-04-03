@@ -1,17 +1,20 @@
-CC = g++-4.8.0-alpha20120304
 PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
+
+COMPILER = clang
+CC = $(CC_$(COMPILER))
+CC_gcc := g++-4.8.0-alpha20120304 -Wno-pmf-conversions
+CC_clang := clang++
+
 FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -march=native
-#-fno-operator-names
+FLAGS += $(FLAGS__$(BUILD))
 
-FLAGS += $(FLAGS_$(BUILD))
-
-FLAGS_debug := -ggdb -DDEBUG -fno-omit-frame-pointer
-FLAGS_fast := -ggdb -DDEBUG -fno-omit-frame-pointer -Ofast -fno-rtti
-FLAGS_release := -Ofast -fno-rtti
-FLAGS_trace := -g -DDEBUG -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector -DTRACE
-FLAGS_memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MALLOC
+FLAGS__debug := -ggdb -DDEBUG -fno-omit-frame-pointer
+FLAGS__fast := -ggdb -DDEBUG -fno-omit-frame-pointer -O3 -ffast-math -fno-rtti
+FLAGS__release := -O3 -ffast-math -fno-rtti
+FLAGS__trace := -g -DDEBUG -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector -DTRACE
+FLAGS__memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MALLOC
 
 FLAGS_font = -I/usr/include/freetype2
 
@@ -56,7 +59,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	$(CC) $(FLAGS) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d -MF $@ $<
+	$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(BUILD)/$(TARGET).l

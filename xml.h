@@ -9,17 +9,14 @@ template<class T> struct pointer {
     no_copy(pointer)
     pointer(T&& value):value(new T(move(value))){}
     pointer(pointer&& o) : value(o.value) { o.value=0; }
-    //pointer& operator=(pointer&& o) { this->~pointer(); value=o.value; o.value=0; return *this; }
     ~pointer() { if(value) { value->~T(); value=0; } }
     T* value=0;
     const T& operator *() const { return *value; }
-    //T& operator *() { return *value; }
     const T* operator ->() const { return value; }
     T* operator ->() { return value; }
     explicit operator bool() const { return value; }
     bool operator !() const { return !value; }
     operator const T*() const { return value; }
-    //operator T*() { return value; }
 };
 template<class T> pointer<T> copy(const pointer<T>& p) { assert(p.value); return pointer<T>(copy(*p.value)); }
 template<class T> string str(const pointer<T>& p) { assert(p.value); return str(*p.value); }
@@ -30,7 +27,6 @@ struct Element {
     map< string, string > attributes;
     array< pointer<Element> > children;
     Element(){}
-    //Element(Element&&)=default;
     Element(string&& content):content(move(content)){}
     Element(TextBuffer& s, bool html=false);
     explicit operator bool() { return name||content; }
@@ -48,8 +44,6 @@ struct Element {
     void xpath(const string& path, const std::function<void(const Element&)>& visitor) const;
     /// Tests if \a path match any elements
     bool match(const string& path) const;
-    /// return value of \a attribute from elements with matching \a path
-    //array<string> xpath(const string& path, const string& attribute) const;
     /// Returns element as parseable string
     string str(const string& prefix=""_) const;
 };

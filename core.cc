@@ -1,7 +1,7 @@
 #include "array.cc"
 
 #define array(T) \
-template class array<T>; \
+template struct array<T>; \
 /*Copyable*/ \
 template array<T> slice(const array<T>& a, uint pos, uint size); \
 template array<T> slice(const array<T>& a, uint pos); \

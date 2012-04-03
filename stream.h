@@ -24,7 +24,7 @@ struct Buffer : virtual Stream {
     uint index=0;
     Buffer(){}
     Buffer(array<byte>&& buffer) : buffer(move(buffer)) {}
-    Buffer(Buffer&& o){index=o.index; buffer=move(o.buffer);}
+    Buffer(Buffer&& o):buffer(move(o.buffer)),index(o.index){}
     uint available(uint) override { return buffer.size()-index; }
     array<byte> get(uint size) override { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); } //copy?
     void advance(int count) override { index+=count;  assert(index<=buffer.size()); }

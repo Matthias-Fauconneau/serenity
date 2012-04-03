@@ -118,7 +118,7 @@ string cacheFile(const URL& url) {
     return url.host+"/"_+name;
 }
 
-HTTP::HTTP(const URL& url, delegate<void, const URL&, array<byte>&&> handler,
+HTTP::HTTP(const URL& url, delegate<void(const URL&, array<byte>&&)> handler,
            array<string>&& headers, string&& method, string&& content, array<string>&& redirect)
     : url(str(url)), handler(handler), headers(move(headers)), method(move(method)), content(move(content)), redirect(move(redirect)) { request(); }
 void HTTP::request() {
@@ -206,7 +206,7 @@ void HTTP::event(pollfd) {
     delete this;
 }
 
-void getURL(const URL &url, delegate<void, const URL&, array<byte>&&> handler, uint maximumAge) {
+void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, uint maximumAge) {
     string file = cacheFile(url);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;

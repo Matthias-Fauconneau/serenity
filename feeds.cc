@@ -109,7 +109,7 @@ struct Feeds : Application {
         if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink("../"_+cacheFile(url.relative(icon)),cacheFile(url.relative("/favicon.ico"_)),cache);
         for(Entry& entry: news) {
             if(contains(entry.link,url.host)) {
-                new ImageLoader(url.relative(icon), &entry.get<Icon>().image, delegate<void>(this,&Feeds::render), int2(16,16), 7*24*60*60);
+                new ImageLoader(url.relative(icon), &entry.get<Icon>().image, delegate<void()>(this,&Feeds::render), int2(16,16), 7*24*60*60);
                 break; //only header
             }
         }
@@ -121,7 +121,7 @@ struct Feeds : Application {
         if(!isRead(entry)) {
             Text& text = entry.get<Text>();
             setRead(entry);
-            text.setSize(8);
+            text.setSize(12);
         }
         //TODO: show if in cache
         main.update(); window.render();

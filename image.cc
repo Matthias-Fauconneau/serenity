@@ -5,7 +5,7 @@
 #include <zlib.h>
 
 #include "array.cc"
-template class array<byte4>;
+template struct array<byte4>;
 
 Image::Image(array<byte4>&& data, uint width, uint height):data((byte4*)data.data()),width(width),height(height),own(true) {
     assert(data.size() >= width*height, data.size(), width, height);

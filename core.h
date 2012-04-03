@@ -11,7 +11,7 @@
 #define unused
 #else
 #define i( ignore... ) ignore
-#define unused __attribute__ (unused)
+#define unused __attribute((unused))
 #endif
 
 /// Language support
@@ -60,7 +60,7 @@ typedef unsigned int size_t; typedef int ssize_t; typedef unsigned int ptr;
 #endif
 
 #define swap32 __builtin_bswap32
-constexpr uint16 swap16(uint16 x) { return swap32(x)>>16; }
+inline uint16 swap16(uint16 x) { return swap32(x)>>16; }
 
 #define floor __builtin_floorf
 #define round __builtin_roundf

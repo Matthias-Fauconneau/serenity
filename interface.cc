@@ -4,8 +4,8 @@
 #include "raster.h"
 
 #include "array.cc"
-template class array<Widget*>;
-template class array<Text>;
+template struct array<Widget*>;
+template struct array<Text>;
 /// Sets the array size to \a size, filling with \a value
 template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }
 
@@ -203,7 +203,7 @@ struct TextLayout {
                 continue;
             }
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
-                assert(c==Format::Regular||c==Format::Bold||c==Format::Italic||c==(Format::Link|Format::Bold));
+                assert(c==Format::Regular||c==Format::Bold||c==Format::Italic||c==(Format::Link|Format::Underline));
                 if(format&Format::Link) {
                     link.end=glyphCount;
                     links << Text::Link{link.begin,link.end,move(link.identifier)};
@@ -229,7 +229,7 @@ struct TextLayout {
             pen.x += font->kerning(previous,c);
             previous = c;
             assert(glyph.image||c==0xA0,hex(c));
-            if(glyph.image) word << i(Character{c, vec2(pen.x,0)+glyph.offset, glyph }); glyphCount++;
+            if(glyph.image) { word << i(Character{c, vec2(pen.x,0)+glyph.offset, glyph }); glyphCount++; }
             pen.x += glyph.advance.x;
         }
     }
@@ -284,7 +284,6 @@ bool Text::mouseEvent(int2 position, Event event, Button) {
         }
     }
     if(textClicked.slots) { textClicked.emit(); return true; }
-    log("false"_);
     return false;
 }
 

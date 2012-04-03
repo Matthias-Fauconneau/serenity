@@ -49,7 +49,7 @@ inline bool operator ==(const URL& a, const URL& b) {
 }
 inline bool operator !=(const URL& a, const URL& b) { return !(a==b); }
 
-typedef delegate<void, const URL&, array<byte>&&> Handler;
+typedef delegate<void(const URL&, array<byte>&&)> Handler;
 
 struct HTTP : Poll {
     TextSocket http;

@@ -5,7 +5,7 @@
 template<template <typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
     typedef vector<T,uint8,N> S;
     typedef vector<T,int,N> V;
-    S prior[width]; clear(prior,width,S(zero));
+    S* prior = new S[width]; clear(prior,width,S(zero));
     for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         int filter = *raw++; assert(filter>=0 && filter<=4);
         S* src = (S*)raw;
@@ -26,6 +26,7 @@ template<template <typename> class T, int N> void filter(byte4* dst, const byte*
             }
         }
     }
+    delete[] prior;
 }
 
 Image decodePNG(const array<byte>& file) {

@@ -95,15 +95,15 @@ string utf8(uint code);
 /// Human-readable value representation
 
 /// Base template for conversion to human-readable value representation
-template<class A> string str(const A&) { static_assert(sizeof(A) && 0,"No string representation defined for type"); return ""; }
+template<class A> string str(const A&) { static_assert(sizeof(A) & 0,"No string representation defined for type"); return ""_; }
 
 /// String representation of a boolean
 template<> inline string str(const bool& b) { return b?"true"_:"false"_; }
 /// String representation of an ASCII character
 template<> inline string str(const char& c) { return string(&c,1); }
 /// String representation of a C string literal
-inline string str(const char* s) { int l=0;for(;s[l];l++); return string(s,l); }
-inline string str(char* s) { int l=0;for(;s[l];l++); return string(s,l); }
+inline string str(const char* s) { int l=0; for(;s[l];l++){} return string(s,l); }
+inline string str(char* s) { int l=0; for(;s[l];l++){} return string(s,l); }
 
 /// Converts a machine integer to its human-readable representation
 string itoa(int64 number, int base=10, int pad=0);

@@ -2,7 +2,7 @@
 #include "math.h" //isnan/isinf
 
 #include "array.cc"
-template class array<string>;
+template struct array<string>;
 template int indexOf(const array<string>&, const string&);
 template void insertSorted(array<string>&, string&&);
 

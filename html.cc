@@ -2,7 +2,7 @@
 #include "array.cc"
 #include "raster.h"
 
-ImageLoader::ImageLoader(const URL& url, Image* target, delegate<void> imageLoaded, int2 size, uint maximumAge)
+ImageLoader::ImageLoader(const URL& url, Image* target, delegate<void()> imageLoaded, int2 size, uint maximumAge)
     : target(target), imageLoaded(imageLoaded), size(size) {
     getURL(url, Handler(this, &ImageLoader::load), maximumAge);
 }
@@ -16,10 +16,10 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
     delete this;
 }
 
-static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"u"_,"hr"_,"ul"_,"li"_,"i"_
+static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"u"_,"hr"_,"ul"_,"li"_,"i"_,
 "cite"_,"b"_,"em"_,"strong"_,"ol"_,"dt"_,"dl"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_};
 static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"footer"_,"base"_,
-"form"_,"script"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_,"area"_,"map"_};
+"form"_,"script"_,"style"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_,"area"_,"map"_};
 
 void HTML::go(const string& url) { getURL(url, Handler(this, &HTML::load), 30*60); }
 
@@ -59,7 +59,7 @@ void HTML::load(const URL& url, array<byte>&& document) {
                 //else if(e.name=="iframe"_) score += width*height; //video
             } else if(e.name=="br"_) { score += 32; //line break
             } else if(contains(ignoreElement,e.name)) {
-            } else if(!contains(e.name,":"_)) warn("Unknown HTML tag",e.name);
+            } else if(!contains(e.name,":"_)) warn("load: Unknown HTML tag",e.name);
         }
         if(score>=max) best=&div, second=max, max=score;
         else if(score>second) second=score;
@@ -106,7 +106,7 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
         text << format(Format::Regular);
     } else if(contains(textElement,e.name)) { for(auto& c: e.children) layout(url, *c); // Unhandled format tags
     } else if(contains(ignoreElement,e.name)) { return; // Ignored elements
-    } else warn("Unknown HTML tag",e.name);
+    } else if(!contains(e.name,":"_)) warn("layout: Unknown HTML tag",e.name);
 }
 void HTML::flushText() {
     string paragraph = simplify(trim(text));
@@ -127,7 +127,7 @@ void HTML::flushImages() {
         list->reserve(w);
         for(uint x=0;x<w && i<images.size();x++,i++) {
             *list << ImageView();
-            new ImageLoader(images[i], &(*list).last().image,delegate<void>(&this->contentChanged,&signal<>::emit));
+            new ImageLoader(images[i], &(*list).last().image,delegate<void()>(&this->contentChanged,&signal<>::emit));
         }
         append( list );
     }

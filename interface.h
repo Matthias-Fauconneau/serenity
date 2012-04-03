@@ -137,8 +137,8 @@ template<class... T> struct Tuple : virtual Layout {
     Tuple(T&&... t) : items(move(t)...) {}
     uint count() const { return items.size(); }
 
-    template<class A> A& get() { return items.get<A>(); } //static indexing using type
-    template<class A> const A& get() const { return items.get<A>(); } //static indexing using type
+    template<class A> A& get() { return items.template get<A>(); } //static indexing using type
+    template<class A> const A& get() const { return items.template get<A>(); } //static indexing using type
     //template<class A> operator const A&() const { return items.operator A&(); } //static indexing using type
 
     Widget& at(int i) { return *(Widget*)items.at(i); }
