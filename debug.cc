@@ -46,7 +46,7 @@ int backtrace(void** frames, int capacity, StackFrame* frame) {
     int i=0;
     for(;i<capacity;i++) {
         frame=frame->caller_frame;
-        if(uint64(frame)<0x10 || uint64(frame)>0x10000000000000) break;
+        if(uint64(frame)<0x100 || uint64(frame)>0x10000000000000) break;
         frames[i]=frame->return_address;
     }
     return i;

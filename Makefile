@@ -2,7 +2,7 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
 
-COMPILER = clang
+COMPILER = gcc
 CC = $(CC_$(COMPILER))
 CC_gcc := g++-4.8.0-alpha20120304 -Wno-pmf-conversions
 CC_clang := clang++

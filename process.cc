@@ -27,13 +27,13 @@ uint availableMemory() {
     return info["MemFree"_]+info["Inactive"_];
 }
 
-#if DEBUG
 int getCPUTime() {
     rusage usage; getrusage(RUSAGE_SELF,&usage);
     return  usage.ru_stime.tv_sec*1000+usage.ru_stime.tv_usec/1000 + //user time in ms
             usage.ru_utime.tv_sec*1000+usage.ru_utime.tv_usec/1000; //kernel time in ms
 }
 
+#if DEBUG
 map<const char*, int> profile;
 #endif
 

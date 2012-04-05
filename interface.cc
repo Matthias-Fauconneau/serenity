@@ -23,10 +23,8 @@ void ScrollArea::update() {
 bool ScrollArea::mouseEvent(int2 position, Event event, Button button) {
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
-        int2 previous = position;
         position.y += button==WheelUp?-32:32;
         position = max(size-abs(widget().sizeHint()),min(int2(0,0),position));
-        if(position != previous) update();
         return true;
     }
     if(widget().mouseEvent(position-widget().position,event,button)) return true;
@@ -165,7 +163,7 @@ struct TextLayout {
         float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x; //sum word length
         length += line.last().last().glyph.image.width - line.last().last().glyph.advance.x; //for last word of line, use glyph bound instead of advance
         float space=0;
-        if(justify) space = (wrap-length)/(line.size()-1);
+        if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
         if(space<=0||space>64) space = font->metrics(size,' ').advance.x; //compact
 
         //layout
@@ -244,6 +242,8 @@ struct TextLayout {
 Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
 Text::~Text()=default;
 void Text::update(int wrap) {
+    tsc time;
+    lines.clear();
     blits.clear();
     if(!text) { textSize=int2(1,defaultSans.metrics(size).height); return; }
     if(text.last()!='\n') text << '\n';
@@ -256,12 +256,13 @@ void Text::update(int wrap) {
         for(int i=l.begin;i<l.end;i++) {
             const auto& c = layout.text[i];
             int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
-            if(p<line.min) lines<<line, line.min=p; else line.max=p+int2(c.glyph.advance.x,0);
+            if(p.y!=line.min.y) lines<<line, line.min=p; else line.max=p+int2(c.glyph.advance.x,0);
         }
         if(line.max!=line.min) lines<<line;
     }
     links = move(layout.links);
     textSize = layout.textSize();
+    log("Text::update",time/(2000*1024),"ms");
 }
 int2 Text::sizeHint() {
     if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
@@ -269,10 +270,12 @@ int2 Text::sizeHint() {
 }
 
 void Text::render(int2 parent) {
+    tsc time;
     if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
+    log("Text::render",time/(2000*1024),"ms");
 }
 
 bool Text::mouseEvent(int2 position, Event event, Button) {

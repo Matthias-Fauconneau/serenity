@@ -17,9 +17,10 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
 }
 
 static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"u"_,"hr"_,"ul"_,"li"_,"i"_,
-"cite"_,"b"_,"em"_,"strong"_,"ol"_,"dt"_,"dl"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_};
-static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"footer"_,"base"_,
-"form"_,"script"_,"style"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_,"area"_,"map"_};
+"cite"_,"em"_,"ol"_,"dt"_,"dl"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_,"th"_};
+static const array<string>  boldElement = {"b"_,"strong"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_};
+static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"footer"_,"base"_,"form"_,
+"script"_,"style"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_,"area"_,"map"_,"button"_,"sup"_};
 
 void HTML::go(const string& url) { getURL(url, Handler(this, &HTML::load), 30*60); }
 
@@ -30,7 +31,7 @@ void HTML::load(const URL& url, array<byte>&& document) {
     const Element* best=0; int max=0,second=0;
     //find node with most direct content
     html.visit([&url,&best,&max,&second](const Element& div) {
-        int score =0;
+        int score = 0;
         if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
         else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 900;
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
@@ -48,7 +49,7 @@ void HTML::load(const URL& url, array<byte>&& document) {
         for(auto& c: div.children) stack<<c;
         while(stack.size()) {
             const Element& e = *stack.pop();
-            if(contains(textElement,e.name)) {
+            if(contains(textElement,e.name)||contains(boldElement,e.name)) {
                 for(auto& c: e.children) stack<<c; //text
             } else if(!e.name) {
                 score += e.content.size(); //raw text
@@ -100,10 +101,15 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
         flushImages();
         for(auto& c: e.children) layout(url, *c);
         text<<"\n"_;
-    } else if(e.name=="strong"_||e.name=="em"_||e.name=="i"_) { //Emphasis
+    } else if(contains(boldElement,e.name)) { //Bold
+        text << format(Format::Bold);
+        for(auto& c: e.children) layout(url, *c);
+        text << format(Format::Regular);
+    } else if(e.name=="em"_||e.name=="i"_) { //Italic
         text << format(Format::Italic);
         for(auto& c: e.children) layout(url, *c);
         text << format(Format::Regular);
+    } else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; //wikipedia [edit]
     } else if(contains(textElement,e.name)) { for(auto& c: e.children) layout(url, *c); // Unhandled format tags
     } else if(contains(ignoreElement,e.name)) { return; // Ignored elements
     } else if(!contains(e.name,":"_)) warn("layout: Unknown HTML tag",e.name);

@@ -87,13 +87,15 @@ bool Window::event(const XEvent& e) {
     } else if(e.type==ConfigureNotify || e.type==ReparentNotify) {
         XWindowAttributes window; XGetWindowAttributes(x,id,&window); int2 size(window.width, window.height);
         this->position=int2(window.x,window.y);
-        this->size=widget.size=size;
-        widget.update();
+        this->size=size;
+        if(widget.size!=size) {
+            widget.size=size;
+            widget.update();
+        }
         if(visible) return true;
     } else if(e.type==MapNotify) {
         visible=true;
         assert(size);
-        widget.update();
         return true;
     } else if(e.type==UnmapNotify) {
         visible=false;
@@ -192,7 +194,7 @@ void Window::setSize(int2 size) {
     if(size.y==0) size.y=screen.y;
     assert(size);
     if(id) XResizeWindow(x, id, size.x, size.y);
-    else this->size=widget.size=size;
+    else this->size=size;
 }
 
 void Window::setFullscreen(bool) {

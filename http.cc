@@ -135,7 +135,7 @@ void HTTP::event(pollfd) {
     string file = cacheFile(url);
 
     // Status
-    if(!http.match("HTTP/1.1 "_)) { log(http.until("\r\n\r\n"_)); warn("No HTTP",url); delete this; return; }
+    if(!http.match("HTTP/1.1 "_)&&!http.match("HTTP/1.0 "_)) { log(http.until("\r\n\r\n"_)); warn("No HTTP",url); delete this; return; }
     int status = toInteger(http.until(" "_));
     http.until("\r\n"_);
     if(status==200||status==301||status==302) {}
@@ -167,18 +167,19 @@ void HTTP::event(pollfd) {
             contentLength=toInteger(value);
             if(contentLength==0) { delete this; return; }
         } else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
-        else if(key=="Location"_ && (status==301||status==302)) {
+        else if((key=="Location"_ && (status==301||status==302)) || key=="Refresh"_) {
+            if(startsWith(value,"0;URL="_)) value=slice(value,6);
             URL next = url.relative(value);
             assert(!contains(url.host,'/'),url);
             assert(!contains(next.host,'/'),url,next);
-            if(url.host==next.host && url.path==next.path) warn(status,"Redirect",url,next,value);
+            if(url.scheme==next.scheme && url.host==next.host && url.path==next.path) warn("recursive",url,next,value,(string&)http.buffer);
             else {
                 redirect << file;
                 new HTTP(next,handler,move(headers),move(method),move(content),move(redirect)); //TODO: reuse connection
             }
             delete this;
             return;
-        }
+        } else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }
 
     // Content
@@ -191,8 +192,8 @@ void HTTP::event(pollfd) {
             if(contentLength == 0) break;
             content << http.TextStream::read(contentLength);
         }
-    } else assert(content,"Missing content",http.buffer);
-    assert(content,"Empty content",(string&)http.buffer);
+    }
+    if(content.size()<=232)log("Missing content",(string&)http.buffer);
     log("Downloaded",url,content.size()/1024,"KB");
 
     // Cache
@@ -205,6 +206,13 @@ void HTTP::event(pollfd) {
     handler(url,move(content));
     delete this;
 }
+
+/*struct HTTPTest : Application {
+    void handler(const URL&, array<byte>&& content) { log("Content"_,(string&)content); }
+    HTTPTest(array<string>&&) {
+        new HTTP("http://mail.google.com"_, Handler(this,&HTTPTest::handler));
+    }
+}; Test(HTTPTest)*/
 
 void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, uint maximumAge) {
     string file = cacheFile(url);

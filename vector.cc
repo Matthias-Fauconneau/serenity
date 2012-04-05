@@ -39,7 +39,7 @@ generic string str(vector v) {
 #undef generic
 
 #define uvector(V,T,N) \
-    template class vector<V,T,N>; \
+    template struct vector<V,T,N>; \
     template vector<V,T,N> operator *(float s, vector<V,T,N> v); \
     template vector<V,T,N> min(vector<V,T,N> a, vector<V,T,N> b); \
     template vector<V,T,N> max(vector<V,T,N> a, vector<V,T,N> b); \
