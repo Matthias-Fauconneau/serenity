@@ -63,8 +63,8 @@ Image decodePNG(const array<byte>& file) {
         assert(s);
     }
     size_t size=0;
-    byte* data = (byte*)tinfl_decompress_mem_to_heap(buffer.data(),buffer.size(),&size,0);
-    if(size < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
+    byte* data = (byte*)tinfl_decompress_mem_to_heap(buffer.data(),buffer.size(),&size,1);
+    if(size < height*(1+width*depth)) { warn("Invalid PNG",size,height*(1+width*depth)); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
     byte* src=data;

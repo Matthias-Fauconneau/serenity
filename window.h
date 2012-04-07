@@ -101,7 +101,6 @@ struct Window : Poll {
     XImage* image=0;
     XShmSegmentInfo shminfo;
 
-    int bgCenter=240,bgOuter=224;
     Widget& widget;
     ubyte opacity;
 };

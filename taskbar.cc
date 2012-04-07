@@ -9,6 +9,7 @@
 #include "array.cc" //array<Task>
 
 static Display* x; //TODO: use Window::x
+static bool ownWM=false; //when no WM is detected, basic window management will be provided
 
 struct Task : Item {
     XID id;
@@ -18,8 +19,10 @@ struct Task : Item {
         XMapWindow(x, id);
         XRaiseWindow(x, id);
         XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
-        XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_ACTIVE_WINDOW), 32, {.l={2,0,0,0,0}} };
-        XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+        if(!ownWM) {
+            XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_ACTIVE_WINDOW), 32, {.l={2,0,0,0,0}} };
+            XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+        }
         XFlush(x);
         return true;
     }
@@ -29,18 +32,26 @@ struct Task : Item {
         if(event==Press) {
             XID active = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
             if(active == id ) { //Set maximized
-                XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
-                    {.l={1,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
-                XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
-                XFlush(x);
+                if(ownWM) {
+                    XMoveResizeWindow(x,id, 0,16,Window::screen.x,Window::screen.y-16);
+                } else {
+                    XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
+                        {.l={1,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
+                    XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+                    XFlush(x);
+                }
                 return true;
             }
         }
         if(event==Motion) { //Set windowed
-            XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
-                {.l={0,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
-            XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
-            XFlush(x);
+            if(ownWM) {
+                XMoveResizeWindow(x,id, 0,16,Window::screen.x/2,(Window::screen.y-16)/2);
+            } else {
+                XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
+                    {.l={0,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
+                XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
+                XFlush(x);
+            }
             return true;
         }
         return false;
@@ -210,7 +221,6 @@ struct Desktop {
 ICON(button);
 struct TaskBar : Poll {
     DBus dbus;
-    bool ownWM=false; //when no WM is detected, basic window management will be provided
     signal<int> tasksChanged;
 
       TriggerButton start;
@@ -263,7 +273,7 @@ struct TaskBar : Poll {
             icon=swap(resize(Image(cast<byte4>(move(dbusIcon.data)),dbusIcon.width,dbusIcon.height),16,16));
         }
         status << StatusNotifierItem(move(item), move(icon));
-        panel.update(); window.render();
+        panel.update(); if(window.id) window.render();
     }
     variant<int> Get(string interface, string property) {
         if(interface=="org.kde.StatusNotifierWatcher"_ && property=="ProtocolVersion"_) return 1;
@@ -293,15 +303,18 @@ struct TaskBar : Poll {
         for(XID id: list) {
             addTask(id);
             XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+            if(ownWM) XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
         }
 
-        dbus.bind("Get"_,this,&TaskBar::Get);
-        dbus.bind("RegisterStatusNotifierItem"_,this,&TaskBar::registerStatusNotifierItem);
-        dbus.connect("NameOwnerChanged"_,this,&TaskBar::removeStatusNotifierItem);
-        DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
-        array<string> names = DBus("org.freedesktop.DBus.ListNames"_);
-        for(string& name: names) if(startsWith(name,"org.kde.StatusNotifierItem"_)) registerStatusNotifierItem(move(name));
-        DBus("org.freedesktop.DBus.RequestName"_, "org.kde.StatusNotifierWatcher"_, (uint)0);
+        if(dbus) {
+            dbus.bind("Get"_,this,&TaskBar::Get);
+            dbus.bind("RegisterStatusNotifierItem"_,this,&TaskBar::registerStatusNotifierItem);
+            dbus.connect("NameOwnerChanged"_,this,&TaskBar::removeStatusNotifierItem);
+            DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
+            array<string> names = DBus("org.freedesktop.DBus.ListNames"_);
+            for(string& name: names) if(startsWith(name,"org.kde.StatusNotifierItem"_)) registerStatusNotifierItem(move(name));
+            DBus("org.freedesktop.DBus.RequestName"_, "org.kde.StatusNotifierWatcher"_, (uint)0);
+        }
 
         start.image = resize(buttonIcon, 16,16);
         start.triggered.connect(&launcher,&Launcher::show);
@@ -313,29 +326,55 @@ struct TaskBar : Poll {
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
         window.show();
         window.setPosition(int2(0,0));
-        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|PropertyChangeMask);
+        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|SubstructureRedirectMask|PropertyChangeMask|ButtonPressMask);
+        log(ownWM);
         Window::sync();
     }
     void event(pollfd) override {
         bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
+            ///WM
+            if(e.type == ButtonPress || e.type==ButtonRelease) {
+                log(e.xbutton.window,e.xbutton.root,e.xbutton.subwindow);
+                XID id = e.xbutton.window;
+                XMapWindow(x, id);
+                XRaiseWindow(x, id);
+                XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+                XAllowEvents(x, ReplayPointer, CurrentTime);
+            }
+            else if( e.type == MapRequest || e.type == MapNotify ) {
+                XRaiseWindow(x,e.xmap.window);
+            }
+            /*else if(e.type == ConfigureNotify) {
+                XWindowAttributes wa; XGetWindowAttributes(x, e.xconfigure.window, &wa);
+                wa.x=max(0,wa.x); wa.y=max(0,wa.y);
+                wa.width=min(Window::screen.x,c.width); wa.height=min(Window::screen.y,c.height);
+                //if(!wa.override_redirect) wa.x = (Window::screen.x - wa.width)/2, wa.y = (Window::screen.y - wa.height)/2;
+                XMoveResizeWindow(x, e.xconfigure.window,wa.x,wa.y,wa.width,wa.height);
+            }*/
+
+            ///Taskbar
             if(e.type==PropertyNotify && e.xproperty.window==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
                 XID id = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
                 int i = indexOf(tasks, Task(id));
                 if(i<0) i=addTask(id);
                 if(i<0) continue;
                 tasks.index=i;
-            } else if(e.type>=CreateNotify && e.type<=PropertyNotify) {
+            }
+            else if(e.type==CreateNotify||e.type==ReparentNotify||e.type==MapNotify||e.type==PropertyNotify||e.type==UnmapNotify) {
                 //offset for window field
 #define o(name) offsetof(X##name##Event,window)
                 const int window[13] = {o(CreateWindow),o(DestroyWindow),o(Unmap),o(Map),o(MapRequest),o(Reparent),o(Configure),
                                         o(ConfigureRequest), o(Gravity),o(ResizeRequest),o(Circulate),o(CirculateRequest),o(Property)};
 #undef o
                 XID id = *(XID*)((byte*)&e+window[e.type-CreateNotify]);
+                if(id==DefaultRootWindow(x)) continue;
                 int i = indexOf(tasks, Task(id));
                 if(i<0) {
-                    if(e.type == CreateNotify || e.type==ReparentNotify) XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
-                    else if(e.type == MapNotify) i=addTask(id);
+                    if(e.type == CreateNotify || e.type==ReparentNotify) {
+                        XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+                        if(ownWM) XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
+                    } else if(e.type == MapNotify) i=addTask(id);
                     else continue;
                 } else {
                     if(e.type == PropertyNotify) {

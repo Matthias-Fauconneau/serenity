@@ -7,7 +7,7 @@ int imm(ubyte*& c, int size) {
     else if(size==1) imm=*(int16*)c, c+=2;
     else if(size==2) imm=*(int32*)c, c+=4;
     else if(size==3) imm=*(int64*)c, c+=8;
-    else fail();
+    else error("Unknown size");
     return imm;
 }
 

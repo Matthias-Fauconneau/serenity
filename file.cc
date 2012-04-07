@@ -101,3 +101,18 @@ array<string> listFiles(const string& folder, Flags flags) {
     closedir(dir);
     return list;
 }
+
+string findFile(const string& folder, const string& file) {
+    DIR* dir = opendir(folder?strz(folder).data():".");
+    assert(dir, "Folder not found"_, folder);
+    for(dirent* dirent; (dirent=readdir(dir));) {
+        string name = strz(dirent->d_name);
+        if(name!="."_ && name!=".."_) {
+            string path = folder+"/"_+name;
+            if(::isFolder(path)) { path=findFile(path,file); if(path) return path; }
+            else if(file==name) return path;
+        }
+    }
+    closedir(dir);
+    return ""_;
+}

@@ -98,4 +98,5 @@ struct DBus : Poll {
 
     DBus();
     void event(pollfd) override;
+    explicit operator bool() { return fd; }
 };

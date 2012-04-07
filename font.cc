@@ -1,4 +1,5 @@
 #include "font.h"
+#include "file.h"
 
 #undef abort
 #undef exit
@@ -16,11 +17,11 @@ struct InitFreeType {
     }
 } static_this;
 
-Font::Font(const char* path) {
-    FT_New_Face(ft, path, 0, &face);
-    assert(face,strz(path));
+Font::Font(string name) {
+    FT_New_Face(ft, strz(findFile("/usr/share/fonts"_,name)).data(), 0, &face);
+    assert(face,name);
 }
-Font::Font(string&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)data.data(),data.size(),0,&face); }
+Font::Font(array<byte>&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)data.data(),data.size(),0,&face); }
 
 FontMetrics Font::metrics(int size) {
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,0,0,0};
@@ -81,7 +82,7 @@ Glyph& Font::glyph(int size, int code) {
     return glyph;
 }
 
-Font defaultSans("/usr/share/fonts/dejavu/DejaVuSans.ttf");
-Font defaultBold("/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf");
-Font defaultItalic("/usr/share/fonts/dejavu/DejaVuSans-Oblique.ttf");
-Font defaultBoldItalic("/usr/share/fonts/dejavu/DejaVuSans-BoldOblique.ttf");
+Font defaultSans("DejaVuSans.ttf"_);
+Font defaultBold("DejaVuSans-Bold.ttf"_);
+Font defaultItalic("DejaVuSans-Oblique.ttf"_);
+Font defaultBoldItalic("DejaVuSans-BoldOblique.ttf"_);

@@ -2,15 +2,17 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
 
-COMPILER = clang
-CC = $(CC_$(COMPILER))
-CC_gcc := g++-4.8.0-alpha20120401 -Wno-pmf-conversions
-CC_clang := clang++
+COMPILER = gcc
+CCX ?= $(CCX_$(COMPILER))
+CCX_gcc := g++-4.8 -Wno-pmf-conversions
+CCX_clang := clang++
 
 FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -march=native
 FLAGS += $(FLAGS__$(BUILD))
 
 FLAGS__debug := -ggdb -DDEBUG -fno-omit-frame-pointer
+FLAGS__gdb := -ggdb -fno-omit-frame-pointer
+FLAGS__normal := -fno-omit-frame-pointer
 FLAGS__fast := -ggdb -DDEBUG -fno-omit-frame-pointer -O3 -ffast-math -fno-rtti
 FLAGS__release := -O3 -ffast-math -fno-rtti
 FLAGS__trace := -g -DDEBUG -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector -DTRACE
@@ -24,13 +26,13 @@ SRCS_player += png inflate
 SRCS_taskbar += png inflate
 SRCS_feeds += png inflate jpeg ico
 
-LIBS_debug = bfd
-LIBS_time= rt
-LIBS_alsa := asound
-LIBS_http := ssl
-LIBS_ffmpeg := avformat avcodec
-LIBS_font := freetype
-LIBS_window := X11 Xext
+LIBS__debug = bfd
+LIBS_time = rt
+LIBS_alsa = asound
+LIBS_http = ssl
+LIBS_ffmpeg = avformat avcodec
+LIBS_font = freetype
+LIBS_window = X11 Xext
 
 ICONS = $(ICONS_$(TARGET))
 ICONS_player := play pause next
@@ -54,18 +56,18 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	$(CC) $(LIBS_$(BUILD):%=-l%) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	$(CCX) $(LIBS__$(BUILD):%=-l%) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+	$(CCX) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(BUILD)/$(TARGET).l
 endif
 
 $(BUILD)/%.o : %.cc
-	$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
+	$(CCX) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
 
 $(BUILD)/%.o: %.png
 	@test -e $(dir $@) || mkdir -p $(dir $@)
@@ -78,6 +80,7 @@ clean:
 	rm -f $(BUILD)/*.l
 	rm -f $(BUILD)/*.d
 	rm -f $(BUILD)/*.o
+	rm -f $(BUILD)/$(TARGET)
 	rm -fR $(BUILD)/icons
 	rmdir $(BUILD)
 

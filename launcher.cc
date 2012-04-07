@@ -41,9 +41,10 @@ bool Menu::keyPress(Key key) {
     return false;
 }
 
-map<string,string> readConfig(const string& path) {
+map<string,string> readSettings(const string& path, int at=CWD) {
     map<string,string> entries;
-    for(TextBuffer s(readFile(path));s;) {
+    if(!exists(path,at)) { warn("Missing settings file",path); return entries; }
+    for(TextBuffer s(readFile(path,at));s;) {
         if(s.match("["_)) s.until("\n"_);
         else {
             string key = s.until("="_), value=s.until("\n"_);
@@ -56,10 +57,10 @@ map<string,string> readConfig(const string& path) {
 
 List<Command> readShortcuts() {
     List<Command> shortcuts;
-    auto config = readConfig(strz(getenv("HOME"))+"/.config/launcher"_);
+    auto config = readSettings(".config/launcher"_,home());
     for(const string& desktop: split(config["Favorites"_],',')) {
         if(!exists(desktop)) continue;
-        auto entries = readConfig(desktop);
+        auto entries = readSettings(desktop);
         Image icon;
         for(const string& folder: iconPaths) {
             string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;

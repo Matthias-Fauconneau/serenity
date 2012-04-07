@@ -12,7 +12,7 @@ generic array<T>::array(array<T>&& o) {
 }
 
 generic array<T>& array<T>::operator=(array<T>&& o) {
-    //array<T>::~array<T>();
+    array<T>::~array<T>(); //crash clang
     if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(*this));
     o.tag=0;
     return *this;

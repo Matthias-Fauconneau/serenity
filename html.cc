@@ -93,7 +93,7 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
     } else if(e.name=="a"_) { //Link
         flushImages();
         bool inlineText=true; //TODO:
-        e.visit([&inlineText](const Element& e){if(e.name&&!contains(textElement,e.name))inlineText=false;});
+        e.visit([&inlineText](const Element& e)->void{if(e.name&&!contains(textElement,e.name))inlineText=false;});
         if(inlineText) text << format(Format::Underline|Format::Link) << e["href"_] << " "_;
         for(auto& c: e.children) layout(url, *c);
         if(inlineText) text << format(Format::Regular);

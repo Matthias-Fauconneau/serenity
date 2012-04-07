@@ -28,9 +28,8 @@ struct Font {
     map<int, map<int, Glyph> > cache;
     array<float> widths;
 
-    Font(){}
-    Font(const char* path);
-    Font(string&& data);
+    Font(string path);
+    Font(array<byte>&& data);
     FontMetrics metrics(int size);
     float kerning(int leftCode, int rightCode);
     GlyphMetrics metrics(int size, int code);

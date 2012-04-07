@@ -190,7 +190,7 @@ void FLAC::readFrame() {
             else if(order==3) predictor[0]=1, predictor[1]=-3, predictor[2]=3;
             else if(order==4) predictor[0]=-1, predictor[1]=4, predictor[2]=-6, predictor[3]=4;
             shift=0;
-        } else fail();
+        } else error("Unknown type");
 
         //Residual
         int method = binary(2); assert(method<=1,method);

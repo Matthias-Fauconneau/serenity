@@ -81,7 +81,7 @@ struct Feeds : Application {
         } else getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
 
         int count=0;
-        auto addItem = [this,&count](const Element& e) {
+        auto addItem = [this,&count](const Element& e)->void{
             if(count++>32) return;
             string text=e("title"_).text();
             text=trim(unescape(text));
@@ -104,7 +104,7 @@ struct Feeds : Application {
     void getFavicon(const URL& url, array<byte>&& document) {
         Element page = parseHTML(move(document));
         string icon;
-        page.xpath("html/head/link"_,[&icon](const Element& e) { if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
+        page.xpath("html/head/link"_,[&icon](const Element& e)->void{ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
         if(!icon) icon="/favicon.ico"_;
         if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink("../"_+cacheFile(url.relative(icon)),cacheFile(url.relative("/favicon.ico"_)),cache);
         for(Entry& entry: news) {

@@ -67,3 +67,4 @@ void symlink(const string& target,const string& name, int at=CWD);
 long modifiedTime(const string& path, int at=CWD);
 enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
 array<string> listFiles(const string& folder, Flags flags);
+string findFile(const string& folder, const string& file);

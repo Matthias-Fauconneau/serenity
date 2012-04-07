@@ -6,7 +6,6 @@
 #include <poll.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
-#include <X11/extensions/Xcomposite.h>
 #include <X11/extensions/XShm.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
@@ -122,16 +121,8 @@ void Window::render() {
         XShmAttach(x, &shminfo);
     }
     framebuffer = Image((byte4*)image->data, image->width, image->height, false);
-    push(Rect(int2(image->width,image->height)));
-    {
-         int2 center = int2(size.x/2,0); int radius=256;
-         for_Image(framebuffer) {
-            int2 pos = int2(x,y);
-            int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
-            framebuffer(x,y) = byte4(g,g,g,opacity);
-         }
-    }
-    //feather edges //TODO: shadow
+    clear(framebuffer.data,framebuffer.width*framebuffer.height,byte4(240,240,240,240));
+    /*//feather edges //TODO: shadow
     if(position.y>0) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
     if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
     if(position.x+size.x<screen.x-1) for(int y=0;y<size.y;y++) framebuffer(size.x-1,y) /= 2;
@@ -140,11 +131,12 @@ void Window::render() {
     if(position.x>0 && position.y>0) framebuffer(0,0) /= 2;
     if(position.x+size.x<screen.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
     if(position.x>0 && position.y+size.y<screen.y-1) framebuffer(0,size.y-1) /= 2;
-    if(position.x+size.x<screen.x-1 && position.y+size.y<screen.y-1) framebuffer(size.x-1,size.y-1) /= 2;
+    if(position.x+size.x<screen.x-1 && position.y+size.y<screen.y-1) framebuffer(size.x-1,size.y-1) /= 2;*/
     if(widget.size!=size) {
         widget.size=size;
         widget.update();
     }
+    push(Rect(int2(image->width,image->height)));
     widget.render(int2(0,0));
     finish();
     XShmPutImage(x,id,gc,image,0,0,0,0,image->width,image->height,0);

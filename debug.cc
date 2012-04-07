@@ -40,7 +40,16 @@ Symbol findNearestLine(void* address) {
 
 struct StackFrame {
     StackFrame* caller_frame; void* return_address;
-    static inline StackFrame* current() { register StackFrame* ebp __asm__("ebp"); return ebp; }
+    static inline StackFrame* current() {
+#if __x86_64__ || __i386__
+        register StackFrame* ebp __asm__("ebp");
+#elif __arm__
+        register StackFrame* ebp __asm__("fp");
+#else
+        #error Unsupported architecture
+#endif
+return ebp;
+}
 };
 int backtrace(void** frames, int capacity, StackFrame* frame) {
     int i=0;
@@ -80,18 +89,25 @@ static void handler(int sig, siginfo*, void* ctx) {
     else if(sig == SIGPIPE) log("Broken Pipe"_);
     else if(sig == SIGFPE) {
         log("Arithmetic exception "_);
+#if __x86_64__ || __i386__
         const string flags[] = {"Invalid Operand"_,"Denormal Operand"_,"Zero Divide"_,"Overflow"_,"Underflow"_};
         string s;
         for(int i=0;i<=4;i++) if(context->uc_mcontext.fpregs->mxcsr & (1<<i)) s<<flags[i]+" "_;
         log(s);
+#endif
     }
     else error("Unhandled signal"_);
-#if __WORDSIZE == 64
+#if __x86_64__
     logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
-#else
+#elif __i386__
     logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_EBP]));
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_EIP]);
+#elif __arm__
+    logBacktrace((StackFrame*)(context->uc_mcontext.arm_fp));
+    Symbol s = findNearestLine((void*)context->uc_mcontext.arm_ip);
+#else
+#error Unsupported architecture
 #endif
     log(s.file+":"_+str(s.line)+"   \t"_+s.function);
     __builtin_abort();

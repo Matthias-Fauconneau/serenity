@@ -47,6 +47,7 @@ void read(DataBuffer& s, DBusIcon& output) { align(s, 8); output.width=s.read();
 template<class Arg, class... Args> void read(DataBuffer& s, Arg& arg, Args&... args) { read(s,arg); read(s, args i(...)); }
 
 template<class... Outputs> void DBus::read(uint32 serial, Outputs&... outputs) {
+    if(!fd) { warn("Not connected to D-BUS"); return; }
     for(;;) {
         auto header = ::read<Header>(fd);
         if(header.message == MethodCall) assert(header.flag==0);
@@ -79,7 +80,7 @@ template<class... Outputs> void DBus::read(uint32 serial, Outputs&... outputs) {
                 auto method = methods.at(name);
                 method(header.serial,move(name),s.readAll());
                 if(!serial) return;
-            } else fail();
+            } else error("Unknown message");
         } else if(header.message == MethodReturn && replySerial==serial) return;
     }
 }
@@ -115,6 +116,7 @@ template<> void write(array<byte>& s, signature<>) { s << 0 << 0; }
 
 template<class... Args> uint32 DBus::write(int type, int32 replySerial, const string& target, const string& object,
                                            const string& interface, const string& member, const Args&... args) {
+    if(!fd) { warn("Not connected to D-BUS"); return 0; }
     array<byte> out;
     out << raw( Header{ 'l', type, replySerial==-2, 1, 0, ++serial, 0 } );
     //Fields
@@ -235,7 +237,7 @@ DBus::DBus() {
      addr.sun_family = AF_UNIX;
      string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
      addr.sun_path[0]=0; copy(addr.sun_path+1,path.data(),path.size());
-     if(::connect(fd,(sockaddr*)&addr,3+path.size())) fail();
+     if(!::connect(fd,(sockaddr*)&addr,3+path.size())) { fd=0; warn("Couldn't connect to D-Bus"); return; }
      ::write(fd,"\0AUTH EXTERNAL 30\r\n"_); ::read(fd,37);/*OK*/ ::write(fd,"BEGIN \r\n"_);
      name = Object(this,"org.freedesktop.DBus"_,"/org/freedesktop/DBus"_)("org.freedesktop.DBus.Hello"_);
      registerPoll({fd, POLLIN});

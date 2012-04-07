@@ -80,7 +80,7 @@ typedef double double2 __attribute__ ((vector_size(16)));
 #define xor_pd __builtin_ia32_xorpd
 #define loadu_ps __builtin_ia32_loadups
 #define loadu_pd __builtin_ia32_loadupd
-#define loada_ps __builtin_ia32_loadaps
+#define loada_ps(e) (*(float4*)(e))
 #define movehl_ps __builtin_ia32_movhlps
 #define shuffle_ps __builtin_ia32_shufps
 #define extract_s __builtin_ia32_vec_ext_v4sf
@@ -107,8 +107,6 @@ extern bool trace_enable;
 void logTrace(int skip=1);
 /// Aborts the process without any message, stack trace is logged
 #define fail() ({debug( trace_off; logTrace(); )  __builtin_abort(); })
-
-#define test int main() __attribute((weak)); int main()
 
 /// Memory
 #define _NEW
