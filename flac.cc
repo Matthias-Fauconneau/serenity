@@ -1,6 +1,13 @@
 #include "flac.h"
 #include "process.h"
 
+/// Returns the number of cycles used to execute \a statements
+inline uint64 rdtsc() {
+    asm volatile("xorl %%eax,%%eax \n cpuid" ::: "%rax", "%rbx", "%rcx", "%rdx"); //serialize
+    uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
+#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
+struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
+
 #define swap64 __builtin_bswap64
 
 void BitReader::setData(array<byte>&& buffer) { array<byte>::operator=(move(buffer)); data=(ubyte*)array::data(); bsize=8*array::size(); index=0; }

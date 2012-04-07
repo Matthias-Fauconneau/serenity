@@ -67,10 +67,3 @@ void disasm(array<ubyte> code);
     begin: statements; end: \
     static bool once=false; if(!once) disasm(array<ubyte>((ubyte*)&&begin,(ubyte*)&&end)), once=true; \
 }
-
-/// Returns the number of cycles used to execute \a statements
-inline uint64 rdtsc() {
-    asm volatile("xorl %%eax,%%eax \n cpuid" ::: "%rax", "%rbx", "%rcx", "%rdx"); //serialize
-    uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
-#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
-struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };

@@ -51,8 +51,8 @@ typedef unsigned short uint16;
 typedef int int32;
 typedef unsigned int uint32;
 typedef unsigned int uint;
-typedef long int64;
-typedef unsigned long uint64;
+typedef long long int64;
+typedef unsigned long long uint64;
 #if __WORDSIZE == 64
 typedef unsigned long size_t; typedef long ssize_t; typedef unsigned long ptr;
 #else

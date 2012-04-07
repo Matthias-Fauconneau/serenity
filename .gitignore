@@ -1,6 +1,7 @@
 debug
-memdbg
-reldbg
+fast
 release
+trace
+memory
 *.creator*
 serenity.files

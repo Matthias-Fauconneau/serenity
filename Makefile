@@ -78,6 +78,8 @@ clean:
 	rm -f $(BUILD)/*.l
 	rm -f $(BUILD)/*.d
 	rm -f $(BUILD)/*.o
+	rm -fR $(BUILD)/icons
+	rmdir $(BUILD)
 
 install_icons/%.png: icons/%.png
 	cp $< $(PREFIX)/share/icons/hicolor/32x32/apps
