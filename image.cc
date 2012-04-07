@@ -63,7 +63,6 @@ declare(Image decodeJPEG(const array<byte>&),weak) { error("JPEG support not lin
 declare(Image decodeICO(const array<byte>&),weak) { error("ICO support not linked"); }
 
 Image decodeImage(const array<byte>& file) {
-    if(file.size()<4) return Image();
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);

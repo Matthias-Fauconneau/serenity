@@ -21,6 +21,7 @@ time.cc
 image.h
 image.cc
 png.cc
+jpeg.cc
 font.h
 font.cc
 interface.h

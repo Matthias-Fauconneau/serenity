@@ -1,19 +1,9 @@
-#include "image.h"
-#include "stream.h"
-//TODO: trim
 // Public domain, Rich Geldreich <richgel99@gmail.com>
+#include "image.h"
 #include <stdlib.h>
-#include <stdio.h>
+#include <assert.h>
 #include <setjmp.h>
 #include <string.h>
-
-// Loads a JPEG image from a memory buffer or a file.
-// req_comps can be 1 (grayscale), 3 (RGB), or 4 (RGBA).
-// On return, width/height will be set to the image's dimensions, and actual_comps will be set to the either 1 (grayscale) or 3 (RGB).
-// Notes: For more control over where and how the source data is read, see the decompress_jpeg_image_from_stream() function below, or call the jpeg_decoder class directly.
-// Requesting a 8 or 32bpp image is currently a little faster than 24bpp because the jpeg_decoder class itself currently always unpacks to either 8 or 32bpp.
-unsigned char *decompress_jpeg_image_from_memory(const unsigned char *pSrc_data, int src_data_size, int *width, int *height, int *actual_comps, int req_comps);
-unsigned char *decompress_jpeg_image_from_file(const char *pSrc_filename, int *width, int *height, int *actual_comps, int req_comps);
 
 // Success/failure error codes.
 enum jpgd_status
@@ -48,25 +38,6 @@ public:
     // Returns -1 on error, otherwise return the number of bytes actually written to the buffer (which may be 0).
     // Notes: This method will be called in a loop until you set *pEOF_flag to true or the internal buffer is full.
     virtual int read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag) = 0;
-};
-
-// stdio FILE stream class.
-class jpeg_decoder_file_stream : public jpeg_decoder_stream
-{
-    jpeg_decoder_file_stream(const jpeg_decoder_file_stream &);
-    jpeg_decoder_file_stream &operator =(const jpeg_decoder_file_stream &);
-
-    FILE *m_pFile;
-    bool m_eof_flag, m_error_flag;
-
-public:
-    jpeg_decoder_file_stream();
-    virtual ~jpeg_decoder_file_stream();
-
-    bool open(const char *Pfilename);
-    void close();
-
-    virtual int read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag);
 };
 
 // Memory stream class.
@@ -3222,76 +3193,6 @@ jpeg_decoder::~jpeg_decoder()
     free_all_blocks();
 }
 
-jpeg_decoder_file_stream::jpeg_decoder_file_stream()
-{
-    m_pFile = NULL;
-    m_eof_flag = false;
-    m_error_flag = false;
-}
-
-void jpeg_decoder_file_stream::close()
-{
-    if (m_pFile)
-    {
-        fclose(m_pFile);
-        m_pFile = NULL;
-    }
-
-    m_eof_flag = false;
-    m_error_flag = false;
-}
-
-jpeg_decoder_file_stream::~jpeg_decoder_file_stream()
-{
-    close();
-}
-
-bool jpeg_decoder_file_stream::open(const char *Pfilename)
-{
-    close();
-
-    m_eof_flag = false;
-    m_error_flag = false;
-
-#if defined(_MSC_VER)
-    m_pFile = NULL;
-    fopen_s(&m_pFile, Pfilename, "rb");
-#else
-    m_pFile = fopen(Pfilename, "rb");
-#endif
-    return m_pFile != NULL;
-}
-
-int jpeg_decoder_file_stream::read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag)
-{
-    if (!m_pFile)
-        return -1;
-
-    if (m_eof_flag)
-    {
-        *pEOF_flag = true;
-        return 0;
-    }
-
-    if (m_error_flag)
-        return -1;
-
-    int bytes_read = static_cast<int>(fread(pBuf, 1, max_bytes_to_read, m_pFile));
-    if (bytes_read < max_bytes_to_read)
-    {
-        if (ferror(m_pFile))
-        {
-            m_error_flag = true;
-            return -1;
-        }
-
-        m_eof_flag = true;
-        *pEOF_flag = true;
-    }
-
-    return bytes_read;
-}
-
 bool jpeg_decoder_mem_stream::open(const uint8 *pSrc_data, uint size)
 {
     close();
@@ -3420,23 +3321,9 @@ unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, i
     return pImage_data;
 }
 
-unsigned char *decompress_jpeg_image_from_memory(const unsigned char *pSrc_data, int src_data_size, int *width, int *height, int *actual_comps, int req_comps)
-{
-    jpeg_decoder_mem_stream mem_stream(pSrc_data, src_data_size);
-    return decompress_jpeg_image_from_stream(&mem_stream, width, height, actual_comps, req_comps);
-}
-
-unsigned char *decompress_jpeg_image_from_file(const char *pSrc_filename, int *width, int *height, int *actual_comps, int req_comps)
-{
-    jpeg_decoder_file_stream file_stream;
-    if (!file_stream.open(pSrc_filename))
-        return NULL;
-    return decompress_jpeg_image_from_stream(&file_stream, width, height, actual_comps, req_comps);
-}
-
 Image decodeJPEG(const array<byte>& file) {
     int width, height, depth;
-    byte4* data = (byte4*)decompress_jpeg_image_from_memory((ubyte*)file.data(),file.size(),&width,&height,&depth,4);
-    assert(data); assert(depth==1||depth==3,depth);
+    jpeg_decoder_mem_stream mem_stream((uint8*)file.data(), file.size());
+    byte4* data = (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4);
     return Image(data,width,height,true);
 }

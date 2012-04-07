@@ -226,7 +226,6 @@ struct TextLayout {
             const Glyph& glyph = font->glyph(size,c);
             pen.x += font->kerning(previous,c);
             previous = c;
-            assert(glyph.image||c==0xA0,hex(c));
             if(glyph.image) { word << i(Character{c, vec2(pen.x,0)+glyph.offset, glyph }); glyphCount++; }
             pen.x += glyph.advance.x;
         }

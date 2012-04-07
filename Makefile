@@ -19,10 +19,10 @@ FLAGS__memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MAL
 FLAGS_font = -I/usr/include/freetype2
 
 SRCS = $(SRCS_$(TARGET))
-SRCS_music += png
-SRCS_player += png
-SRCS_taskbar += png
-SRCS_feeds += png jpeg ico
+SRCS_music += png inflate
+SRCS_player += png inflate
+SRCS_taskbar += png inflate
+SRCS_feeds += png inflate jpeg ico
 
 LIBS_debug = bfd
 LIBS_time= rt

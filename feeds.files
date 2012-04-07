@@ -24,9 +24,9 @@ http.cc
 image.h
 image.cc
 ico.cc
+inflate.cc
 png.cc
 jpeg.cc
-
 font.h
 font.cc
 raster.cc

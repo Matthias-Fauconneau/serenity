@@ -1,6 +1,7 @@
 #include "image.h"
 #include "stream.h"
-#include <zlib.h>
+
+void *tinfl_decompress_mem_to_heap(const void *data, size_t size, size_t* outputSize, int flags);
 
 template<template <typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
     typedef vector<T,uint8,N> S;
@@ -33,9 +34,7 @@ Image decodePNG(const array<byte>& file) {
     DataBuffer s(array<byte>(file.data(),file.size())); s.bigEndian=true;
     if(s.get(8)!="\x89PNG\r\n\x1A\n"_) error("Invalid PNG"_);
     s.advance(8);
-    z_stream z; clear(z); inflateInit(&z);
-    array<byte> idat(s.buffer.size()*16); //FIXME
-    z.next_out = (Bytef*)idat.data(), z.avail_out = (uint)idat.capacity();
+    array<byte> buffer;
     uint width=0,height=0,depth=0; uint8 type=0, interlace=0;
     array<byte> palette;
     for(;;) {
@@ -50,10 +49,7 @@ Image decodePNG(const array<byte>& file) {
             uint8 unused filter = s.read(); assert(filter==0);
             interlace  = s.read();
         } else if(name == "IDAT"_) {
-            z.avail_in = size;
-            auto buffer = s.read(size);
-            z.next_in = (Bytef*)buffer.data();
-            inflate(&z, Z_NO_FLUSH);
+            buffer << s.read(size);
         } else if(name=="IEND"_) {
             assert(size==0);
             s.advance(4); //CRC
@@ -66,13 +62,12 @@ Image decodePNG(const array<byte>& file) {
         s.advance(4); //CRC
         assert(s);
     }
-    inflate(&z, Z_FINISH);
-    inflateEnd(&z);
-    idat.setSize( (int)z.total_out );
-    if(idat.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
-    byte* data= idat.data();
+    size_t size=0;
+    byte* data = (byte*)tinfl_decompress_mem_to_heap(buffer.data(),buffer.size(),&size,0);
+    if(size < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
+    byte* src=data;
     for(int i=0;i==0 || (interlace && i<7);i++) {
         int xStride=1,yStride=1;
         int offset=0;
@@ -87,11 +82,11 @@ Image decodePNG(const array<byte>& file) {
             w=width/xStride;
             h=height/yStride;
         }
-        if(depth==1) filter<luma,1>(image+offset,data,w,h,xStride,yStride);
-        if(depth==2) filter<ia,2>(image+offset,data,w,h,xStride,yStride);
-        if(depth==3) filter<rgb,3>(image+offset,data,w,h,xStride,yStride);
-        if(depth==4) filter<rgba,4>(image+offset,data,w,h,xStride,yStride);
-        data += h*(1+w*depth);
+        if(depth==1) filter<luma,1>(image+offset,src,w,h,xStride,yStride);
+        if(depth==2) filter<ia,2>(image+offset,src,w,h,xStride,yStride);
+        if(depth==3) filter<rgb,3>(image+offset,src,w,h,xStride,yStride);
+        if(depth==4) filter<rgba,4>(image+offset,src,w,h,xStride,yStride);
+        src += h*(1+w*depth);
     }
     if(type==3) { assert(palette);
         rgb3* lookup = (rgb3*)palette.data();
