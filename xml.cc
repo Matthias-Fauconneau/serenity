@@ -141,7 +141,7 @@ template<> string str(const Element& e) { return e.str(); }
 string unescape(const string& xml) {
     static map<string, string> entities;
     if(!entities) {
-        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot ·"_,' ');
+        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull •"_,' ');
         assert(kv.size()%2==0,kv.size());
         for(uint i=0;i<kv.size();i+=2) entities.insert(kv[i],kv[i+1]);
     }

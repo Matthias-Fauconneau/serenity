@@ -2,9 +2,9 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
 
-COMPILER = gcc
+COMPILER = clang
 CC = $(CC_$(COMPILER))
-CC_gcc := g++-4.8.0-alpha20120304 -Wno-pmf-conversions
+CC_gcc := g++-4.8.0-alpha20120401 -Wno-pmf-conversions
 CC_clang := clang++
 
 FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -march=native
@@ -27,7 +27,6 @@ SRCS_feeds += png jpeg ico
 LIBS_debug = bfd
 LIBS_time= rt
 LIBS_alsa := asound
-LIBS_png := z
 LIBS_http := ssl
 LIBS_ffmpeg := avformat avcodec
 LIBS_font := freetype

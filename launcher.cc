@@ -7,7 +7,7 @@
 #include "file.h"
 
 #include "array.cc"
-template class array<Command>;
+template struct array<Command>;
 
 const string iconPaths[4] = {
     "/usr/share/pixmaps/"_,

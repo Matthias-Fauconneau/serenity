@@ -142,14 +142,14 @@ void HTTP::event(pollfd) {
     else if(status==304) { //Not Modified
         if(exists(file,cache)) {
             array<byte> content = readFile(file,cache);
-            if(!exists(url.host,cache)) createFolder(url.host,cache);
+            assert(content);
             writeFile(file,content,cache,true); //TODO: touch instead of rewriting
             debug( log("Not Modified",url); )
             handler(url,move(content));
         }
         delete this; return;
     } else if(status==404) {
-        warn("Not Found",url); writeFile(file,""_,cache,true);
+        warn("Not Found",url);
         delete this; return;
     } else {
         log(http.until("\r\n\r\n"_)); warn("Unhandled response for",url,headers);
@@ -193,7 +193,7 @@ void HTTP::event(pollfd) {
             content << http.TextStream::read(contentLength);
         }
     }
-    if(content.size()<=232)log("Missing content",(string&)http.buffer);
+    if(!content) { log("Missing content",(string&)http.buffer); delete this; return; }
     log("Downloaded",url,content.size()/1024,"KB");
 
     // Cache
@@ -221,7 +221,13 @@ void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, u
     // Check if cached
     if(exists(file,cache)) {
         long modified = modifiedTime(file,cache);
-        if(currentTime()-modified < maximumAge) { debug( log("Cached",url); ) handler(url,readFile(file,cache)); return; }
+        if(currentTime()-modified < maximumAge) {
+            debug( log("Cached",url); )
+            array<byte> content = readFile(file,cache);
+            assert(content,file);
+            handler(url,move(content));
+            return;
+        }
         headers<< "If-Modified-Since: "_+str(date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
     new HTTP(url,handler,move(headers));

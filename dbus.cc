@@ -16,15 +16,13 @@ void align(Buffer& s, int width) { s.index=align(width, s.index); }
 
 enum Message { InvalidType, MethodCall, MethodReturn, Error, Signal };
 struct Header {
-    byte endianness='l';
+    byte endianness;
     ubyte message;
-    ubyte flag = 0;
-    ubyte version = 1;
+    ubyte flag;
+    ubyte version;
     uint32 length;
     uint32 serial;
     uint32 fieldsSize;
-    Header(){}
-    Header(byte message, uint32 serial):message(message),serial(serial){}
 };
 enum Field { InvalidField, Path, Interface, Member, ErrorName, ReplySerial, Destination, Sender, Signature };
 
@@ -101,7 +99,7 @@ template<>void sign< variant<string> >(string& s) { s<<"v"_; }
 template<>void sign< variant<int> >(string& s) { s<<"v"_; }
 
 //  D-Bus arguments serializer
-template<class A> void write(array<byte>& s, const A&) { static_assert(sizeof(A) && 0,"No serializer defined for type"); }
+template<class A> void write(array<byte>&, const A&) { static_assert(sizeof(A) & 0,"No serializer defined for type"); }
 template<class Arg, class... Args> void write(array<byte>& s, const Arg& arg, const Args&... args) { write(s,arg); write(s, args i(...)); }
 void write(array<byte>&) {}
 
@@ -118,10 +116,7 @@ template<> void write(array<byte>& s, signature<>) { s << 0 << 0; }
 template<class... Args> uint32 DBus::write(int type, int32 replySerial, const string& target, const string& object,
                                            const string& interface, const string& member, const Args&... args) {
     array<byte> out;
-    //Header
-    Header header(type,++serial);
-    if(replySerial==-2) header.flag=1; //NoReply
-    out << raw(header);
+    out << raw( Header{ 'l', type, replySerial==-2, 1, 0, ++serial, 0 } );
     //Fields
     // Path
     assert( !(type==MethodCall||type==Signal) || object );
@@ -193,21 +188,21 @@ void DBus::methodWrapper(uint32 serial, string name, array<byte>) {
 template<class A> void DBus::methodWrapper(uint32 serial, string name, array<byte> data) {
     DataBuffer in(move(data));
     A a; ::read(in,a);
-    (*(delegate<void,A>*)&delegates.at(name))(move(a));
+    (*(delegate<void(A)>*)&delegates.at(name))(move(a));
     write(MethodReturn,serial,""_,""_,""_,""_);
 }
 /// Unpack one argument and call method delegate and return reply
 template<class R, class A> void DBus::methodWrapper(uint32 serial, string name, array<byte> data) {
     DataBuffer in(move(data));
     A a; ::read(in,a);
-    R r = (*(delegate<R,A>*)&delegates.at(name))(move(a));
+    R r = (*(delegate<R(A)>*)&delegates.at(name))(move(a));
     write(MethodReturn,serial,""_,""_,""_,""_,r);
 }
 /// Unpack two arguments and call the method delegate and return reply
 template<class R, class A, class B> void DBus::methodWrapper(uint32 serial, string name, array<byte> data) {
     DataBuffer in(move(data));
     A a; B b; ::read(in,a,b);
-    R r = (*(delegate<R,A,B>*)&delegates.at(name))(move(a),move(b));
+    R r = (*(delegate<R(A,B)>*)&delegates.at(name))(move(a),move(b));
     write(MethodReturn,serial,""_,""_,""_,""_,r);
 }
 
@@ -219,17 +214,17 @@ void DBus::signalWrapper(string name, array<byte>) {
 template<class A> void DBus::signalWrapper(string name, array<byte> data) {
     DataBuffer in(move(data));
     A a; ::read(in,a);
-    (*(delegate<void,A>*)&delegates.at(name))(move(a));
+    (*(delegate<void(A)>*)&delegates.at(name))(move(a));
 }
 template<class A, class B> void DBus::signalWrapper(string name, array<byte> data) {
     DataBuffer in(move(data));
     A a; B b; ::read(in,a,b);
-    (*(delegate<void,A,B>*)&delegates.at(name))(move(a),move(b));
+    (*(delegate<void(A,B)>*)&delegates.at(name))(move(a),move(b));
 }
 template<class A, class B, class C> void DBus::signalWrapper(string name, array<byte> data) {
     DataBuffer in(move(data));
     A a; B b; C c; ::read(in,a,b,c);
-    (*(delegate<void,A,B,C>*)&delegates.at(name))(move(a),move(b),move(c));
+    (*(delegate<void(A,B,C)>*)&delegates.at(name))(move(a),move(b),move(c));
 }
 
 /// Connection

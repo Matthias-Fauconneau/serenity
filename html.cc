@@ -17,10 +17,10 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
 }
 
 static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"u"_,"hr"_,"ul"_,"li"_,"i"_,
-"cite"_,"em"_,"ol"_,"dt"_,"dl"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_,"th"_};
+"cite"_,"em"_,"ol"_,"dt"_,"dl"_,"dd"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_,"th"_};
 static const array<string>  boldElement = {"b"_,"strong"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_};
 static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"footer"_,"base"_,"form"_,
-"script"_,"style"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_,"area"_,"map"_,"button"_,"sup"_};
+                                            "script"_,"style"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tr"_,"table"_,"left"_,"area"_,"map"_,"button"_,"sup"_,"param"_,"embed"_,"object"_};
 
 void HTML::go(const string& url) { getURL(url, Handler(this, &HTML::load), 30*60); }
 
@@ -37,8 +37,8 @@ void HTML::load(const URL& url, array<byte>&& document) {
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(contains(src.path,"comic"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||
-                    contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_)) {
+            if(!endsWith(src.path,".gif"_)&&(contains(src.path,"comics/"_)||contains(src.path,"comic/"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||
+                    contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
                 score += size?:16800;

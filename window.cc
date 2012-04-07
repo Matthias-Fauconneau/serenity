@@ -88,10 +88,6 @@ bool Window::event(const XEvent& e) {
         XWindowAttributes window; XGetWindowAttributes(x,id,&window); int2 size(window.width, window.height);
         this->position=int2(window.x,window.y);
         this->size=size;
-        if(widget.size!=size) {
-            widget.size=size;
-            widget.update();
-        }
         if(visible) return true;
     } else if(e.type==MapNotify) {
         visible=true;
@@ -145,6 +141,10 @@ void Window::render() {
     if(position.x+size.x<screen.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
     if(position.x>0 && position.y+size.y<screen.y-1) framebuffer(0,size.y-1) /= 2;
     if(position.x+size.x<screen.x-1 && position.y+size.y<screen.y-1) framebuffer(size.x-1,size.y-1) /= 2;
+    if(widget.size!=size) {
+        widget.size=size;
+        widget.update();
+    }
     widget.render(int2(0,0));
     finish();
     XShmPutImage(x,id,gc,image,0,0,0,0,image->width,image->height,0);
@@ -179,7 +179,6 @@ void Window::setPosition(int2 position) {
     assert(id);
     if(position.x<0) position.x=screen.x+position.x;
     if(position.y<0) position.y=screen.y+position.y;
-    update();
     XMoveWindow(x, id, position.x, position.y);
     this->position=position;
 }

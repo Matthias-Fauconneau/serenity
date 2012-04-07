@@ -262,7 +262,7 @@ void Text::update(int wrap) {
     }
     links = move(layout.links);
     textSize = layout.textSize();
-    log("Text::update",time/(2000*1024),"ms");
+    //log("Text::update",time/(2000*1024),"ms");
 }
 int2 Text::sizeHint() {
     if(!textSize) update(wrap>=0 ? wrap : Window::screen.y);
@@ -275,7 +275,7 @@ void Text::render(int2 parent) {
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image, MultiplyAlpha, opacity);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
-    log("Text::render",time/(2000*1024),"ms");
+    //log("Text::render",time/(2000*1024),"ms");
 }
 
 bool Text::mouseEvent(int2 position, Event event, Button) {

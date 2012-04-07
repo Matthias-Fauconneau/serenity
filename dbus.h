@@ -21,9 +21,9 @@ struct DBus : Poll {
     uint32 serial = 0; // Serial number to match messages and their replies
     /// DBus read loop is able to dynamically dispatch notifications on signals and methods call
     /// \note the necessary IPC wrappers are generated using template metaprogramming when registering delegates
-    map<string, delegate<void, uint32, string, array<byte> > > methods; //wrappers to parse arguments, call methods and serialize reply
+    map<string, delegate<void(uint32, string, array<byte>)> > methods; //wrappers to parse arguments, call methods and serialize reply
     map<string, signal< string, array<byte> > > signals_; //wrappers to parse arguments and emit signals
-    map<string, delegate<void> > delegates; //actual methods/signals implementations by delegates
+    map<string, delegate<void()> > delegates; //actual methods/signals implementations by delegates
 
     /// Read messages and parse \a outputs from first reply (without type checking)
     template<class... Outputs> void read(uint32 serial, Outputs&... outputs);
@@ -73,12 +73,12 @@ struct DBus : Poll {
 
     /// Generates an IPC wrapper for \a method and bind it to \a name
     template<class C, class R, class... Args> void bind(const string& name, C* object, R (C::*method)(Args...) ) {
-        methods.insert(copy(name), delegate<void, uint32, string, array<byte> >(this,&DBus::methodWrapper<R,Args...>));
-        delegates.insert(copy(name), delegate<void>(object, (void (C::*)())method));
+        methods.insert(copy(name), delegate<void(uint32, string, array<byte>)>(this,&DBus::methodWrapper<R,Args...>));
+        delegates.insert(copy(name), delegate<void()>(object, (void (C::*)())method));
     }
     template<class C, class... Args> void bind(const string& name, C* object, void (C::*method)(Args...) ) {
-        methods.insert(copy(name), delegate<void, uint32, string, array<byte> >(this,&DBus::methodWrapper<Args...>));
-        delegates.insert(copy(name), delegate<void>(object, (void (C::*)())method));
+        methods.insert(copy(name), delegate<void(uint32, string, array<byte>)>(this,&DBus::methodWrapper<Args...>));
+        delegates.insert(copy(name), delegate<void()>(object, (void (C::*)())method));
     }
 
     /// call signal delegate
@@ -93,7 +93,7 @@ struct DBus : Poll {
     /// Generates an IPC wrapper for \a signal and connect it to \a name
     template<class C, class... Args> void connect(const string& name, C* object, void (C::*signal)(Args...) ) {
         signals_[copy(name)].connect(this,&DBus::signalWrapper<Args...>);
-        delegates.insert(copy(name), delegate<void>(object, (void (C::*)())signal) );
+        delegates.insert(copy(name), delegate<void()>(object, (void (C::*)())signal) );
     }
 
     DBus();

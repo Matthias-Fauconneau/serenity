@@ -105,14 +105,8 @@ array<string> getEvents(Date query) {
                 if(date.year>=0) { if(date.year!=query.year) continue; }
                 else if(query>until) continue;
             }
-            if(query.hours>=0) {
-                if(date.hours>=0) { if(date.hours!=query.hours) continue; }
-                else if(query>until) continue;
-            }
-            if(query.minutes>=0) {
-                if(date.minutes>=0) { if(date.minutes!=query.minutes) continue; }
-                else if(query>until) continue;
-            }
+            if(query.hours>=0 && date.hours!=query.hours) continue;
+            if(query.minutes>=0 && date.minutes!=query.minutes) continue;
             if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
             for(Date date: exceptions[copy(title)]) if(date.day==query.day && date.month==query.month) goto skip;
             insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title));
