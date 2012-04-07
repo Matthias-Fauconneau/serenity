@@ -1,0 +1,1 @@
+TARGET=player make install

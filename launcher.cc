@@ -18,7 +18,7 @@ const string iconPaths[4] = {
 
 bool Search::keyPress(Key key) {
     if(key == Return) {
-        execute("/usr/lib64/chromium-browser/chromium-launcher.sh"_,{"google.com/search?q="_+text});
+        execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text});
         text.clear(); update(); triggered.emit(); return true;
     }
     else return TextInput::keyPress(key);
@@ -41,10 +41,10 @@ bool Menu::keyPress(Key key) {
     return false;
 }
 
-map<string,string> readSettings(const string& path, int at=CWD) {
+map<string,string> readSettings(const string& path) {
     map<string,string> entries;
-    if(!exists(path,at)) { warn("Missing settings file",path); return entries; }
-    for(TextBuffer s(readFile(path,at));s;) {
+    if(!exists(path)) { warn("Missing settings file",path); return entries; }
+    for(TextBuffer s(readFile(path));s;) {
         if(s.match("["_)) s.until("\n"_);
         else {
             string key = s.until("="_), value=s.until("\n"_);
@@ -57,8 +57,8 @@ map<string,string> readSettings(const string& path, int at=CWD) {
 
 List<Command> readShortcuts() {
     List<Command> shortcuts;
-    auto config = readSettings(".config/launcher"_,home());
-    for(const string& desktop: split(config["Favorites"_],',')) {
+    if(!exists(".config/launcher"_,home())) { warn("No launcher settings [.config/launcher]"); return shortcuts; }
+    for(const string& desktop: split(readFile(".config/launcher"_,home()),'\n')) {
         if(!exists(desktop)) continue;
         auto entries = readSettings(desktop);
         Image icon;

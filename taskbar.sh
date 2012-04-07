@@ -1,1 +1,1 @@
-TARGET=taskbar make && killall taskbar && TARGET=taskbar make install
+BUILD=release TARGET=taskbar make && killall taskbar && TARGET=taskbar make install

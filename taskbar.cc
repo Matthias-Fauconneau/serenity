@@ -16,7 +16,6 @@ struct Task : Item {
     Task(XID id):id(id){} //for indexOf
     Task(XID id, Icon&& icon, Text&& text):Item(move(icon),move(text)),id(id){}
     bool selectEvent() override { //Raise
-        XMapWindow(x, id);
         XRaiseWindow(x, active=id);
         XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
         XFlush(x);
@@ -232,6 +231,7 @@ struct TaskBar : Poll {
         string title = getTitle(id);
         if(!title) return -1;
         Image icon = getIcon(id);
+        if(!icon) return -1;
         tasks << Task(id,move(icon),move(title));
         return tasks.array::size()-1;
     }
@@ -309,6 +309,7 @@ struct TaskBar : Poll {
         clock.triggered.connect(&calendar,&Calendar::show);
 
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
+        window.setOverrideRedirect(true);
         window.setPosition(int2(0,0));
         window.show();
     }
@@ -320,23 +321,22 @@ struct TaskBar : Poll {
                 if(id==window.id) continue;
                 XSelectInput(x,id , StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
                 XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
-                addTask(id);
-                tasksChanged.emit(tasks.array::size());
                 continue;
             } else if(e.type == MapRequest || e.type == MapNotify) {
                 XID id = e.xmaprequest.window;
                 XMapWindow(x, id);
                 XRaiseWindow(x, active=id);
+                XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
                 int i = indexOf(tasks, Task(id));
-                if(i>=0) tasks.index=i;
-            } else if(e.type == UnmapNotify) {
-            } else if(e.type == ConfigureNotify) {
+                if(i<0) i=addTask(id), tasksChanged.emit(tasks.array::size());
+                if(i<0) continue;
+                tasks.index=i;
             } else if(e.type == ConfigureRequest) {
                 XID id = e.xconfigure.window;
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
                 wa.x=max(0,wa.x); wa.y=max(id==window.id?0:16,wa.y);
-                wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y,wa.height);
-                //if(!wa.override_redirect) wa.x = (Window::screen.x - wa.width)/2, wa.y = (Window::screen.y - wa.height)/2;
+                wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
+                if(!wa.override_redirect) wa.x = (Window::screen.x - wa.width)/2, wa.y = (Window::screen.y - wa.height)/2;
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
                 continue;
             } else if(e.type == ButtonPress) {
@@ -352,7 +352,7 @@ struct TaskBar : Poll {
                 int i = indexOf(tasks, Task(id));
                 if(i<0) i=addTask(id);
                 if(i<0) continue;
-                if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().text = getTitle(id);
+                if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().setText( getTitle(id) );
                 else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
                 else continue;
             } else if(e.type == DestroyNotify) {
@@ -365,7 +365,7 @@ struct TaskBar : Poll {
                     else tasks.index=-1;
                 }
                 tasksChanged.emit(tasks.array::size());
-            } else log(e.type);
+            } else continue;
             needUpdate = true;
         }
         if(needUpdate && window.visible) { panel.update(); window.render(); }
