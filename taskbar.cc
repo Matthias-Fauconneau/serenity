@@ -329,6 +329,8 @@ struct TaskBar : Poll {
                 XRaiseWindow(x, active=id);
                 int i = indexOf(tasks, Task(id));
                 if(i>=0) tasks.index=i;
+            } else if(e.type == UnmapNotify) {
+            } else if(e.type == ConfigureNotify) {
             } else if(e.type == ConfigureRequest) {
                 XID id = e.xconfigure.window;
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
@@ -346,10 +348,12 @@ struct TaskBar : Poll {
                 int i = indexOf(tasks, Task(id));
                 if(i>=0) tasks.index=i;
             } else if(e.type==PropertyNotify) {
-                int i = indexOf(tasks, Task(e.xproperty.window));
+                XID id = e.xproperty.window;
+                int i = indexOf(tasks, Task(id));
+                if(i<0) i=addTask(id);
                 if(i<0) continue;
-                if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().text = getTitle(e.xproperty.window);
-                else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(e.xproperty.window);
+                if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().text = getTitle(id);
+                else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
                 else continue;
             } else if(e.type == DestroyNotify) {
                 int i = indexOf(tasks, Task(e.xdestroywindow.window));
@@ -361,7 +365,7 @@ struct TaskBar : Poll {
                     else tasks.index=-1;
                 }
                 tasksChanged.emit(tasks.array::size());
-            }
+            } else log(e.type);
             needUpdate = true;
         }
         if(needUpdate && window.visible) { panel.update(); window.render(); }
