@@ -9,7 +9,7 @@
 #include "array.cc" //array<Task>
 
 static Display* x; //TODO: use Window::x
-static bool ownWM=false; //when no WM is detected, basic window management will be provided
+static XID active;
 
 struct Task : Item {
     XID id;
@@ -17,12 +17,8 @@ struct Task : Item {
     Task(XID id, Icon&& icon, Text&& text):Item(move(icon),move(text)),id(id){}
     bool selectEvent() override { //Raise
         XMapWindow(x, id);
-        XRaiseWindow(x, id);
+        XRaiseWindow(x, active=id);
         XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
-        if(!ownWM) {
-            XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_ACTIVE_WINDOW), 32, {.l={2,0,0,0,0}} };
-            XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
-        }
         XFlush(x);
         return true;
     }
@@ -30,28 +26,15 @@ struct Task : Item {
         //TODO: preview on hover
         if(button!=LeftButton) return false;
         if(event==Press) {
-            XID active = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
-            if(active == id ) { //Set maximized
-                if(ownWM) {
-                    XMoveResizeWindow(x,id, 0,16,Window::screen.x,Window::screen.y-16);
-                } else {
-                    XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
-                        {.l={1,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
-                    XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
-                    XFlush(x);
-                }
+            if(active==id) { //Set maximized
+                XMoveResizeWindow(x,id, 0,16,Window::screen.x,Window::screen.y-16);
+                XFlush(x);
                 return true;
             }
         }
         if(event==Motion) { //Set windowed
-            if(ownWM) {
-                XMoveResizeWindow(x,id, 0,16,Window::screen.x/2,(Window::screen.y-16)/2);
-            } else {
-                XClientMessageEvent e {ClientMessage,0,0,0, id, Atom(_NET_WM_STATE), 32,
-                    {.l={0,Atom(_NET_WM_STATE_MAXIMIZED_HORZ),Atom(_NET_WM_STATE_MAXIMIZED_VERT),2,0}} };
-                XSendEvent(x, DefaultRootWindow(x), 0, SubstructureNotifyMask, (XEvent*)&e);
-                XFlush(x);
-            }
+            XMoveResizeWindow(x,id, 0,16,Window::screen.x/2,(Window::screen.y-16)/2);
+            XFlush(x);
             return true;
         }
         return false;
@@ -179,8 +162,13 @@ struct Calendar {
         window.setOverrideRedirect(true);
         menu.close.connect(&window,&Window::hide);
     }
-    void previousMonth() { month.previousMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) ); }
-    void nextMonth() { month.nextMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) ); }
+    void previousMonth() {
+        month.previousMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
+        events.setText(""_); menu.update(); window.render(); }
+    void nextMonth() {
+        month.nextMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
+        events.setText(""_); menu.update(); window.render();
+    }
     void activeChanged(int index) {
         string text;
         Date date = month.dates[index];
@@ -200,11 +188,11 @@ struct Calendar {
     }
     void show() {
         if(window.visible) { window.hide(); return; }
-         date[1].setText( format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) );
-         month.activeChanged.connect(this,&Calendar::activeChanged);
-         month.setActive(::date());
-         menu.update();
-        window.show(); window.setPosition(int2(-300,16)); Window::sync();
+        date[1].setText( format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) );
+        month.activeChanged.connect(this,&Calendar::activeChanged);
+        month.setActive(::date());
+        menu.update();
+        window.setPosition(int2(-300,16)); window.show();
     }
     void checkAlarm() { if(getEvents(::date(currentTime()+5*60))) show(); }
 };
@@ -230,28 +218,33 @@ struct TaskBar : Poll {
       Clock clock;
        Calendar calendar;
      HBox panel {&start, &tasks, &status, &clock };
-    Window window{&panel,"TaskBar"_,Image(),int2(0,-1),255};
+    Window window{&panel,""_,Image(),int2(0,-1),255};
 
     string getTitle(XID id) { return Window::getProperty<char>(id,"_NET_WM_NAME"); }
     Image getIcon(XID id) {
         array<ulong> buffer = Window::getProperty<ulong>(id,"_NET_WM_ICON");
-        if(buffer.size()<=2) return Image();
+        if(buffer.size()<=4) return Image();
         array<byte4> image(buffer.size()); image.setSize(buffer.size());
         for(uint i=0;i<buffer.size()-2;i++) image[i] = *(byte4*)&buffer[i+2];
         return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
     }
-    bool skipTaskbar(XID id) {
-        return Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE") != array<Atom>{Atom(_NET_WM_WINDOW_TYPE_NORMAL)}
-        || contains(Window::getProperty<Atom>(id,"_NET_WM_STATE"),Atom(_NET_WM_SKIP_TASKBAR));
-    }
     int addTask(XID id) {
-        if(skipTaskbar(id)) return -1;
         string title = getTitle(id);
         if(!title) return -1;
         Image icon = getIcon(id);
         tasks << Task(id,move(icon),move(title));
         return tasks.array::size()-1;
     }
+    void initializeTasks() {
+        XID root,parent; XID* children; uint count=0; XQueryTree(x,DefaultRootWindow(x),&root,&parent,&children,&count);
+        array<XID> list(children,count);
+        for(XID id: list) {
+            addTask(id);
+            XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+            XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
+        }
+    }
+
 
     void registerStatusNotifierItem(string service) {
         for(const auto& s: status) if(s.item.target == service) return;
@@ -294,17 +287,9 @@ struct TaskBar : Poll {
         XSetWindowAttributes attributes; attributes.cursor=XCreateFontCursor(x,68);
         XChangeWindowAttributes(x,DefaultRootWindow(x),CWCursor,&attributes);
         registerPoll({XConnectionNumber(x), POLLIN});
-        array<XID> list = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_CLIENT_LIST");
-        if(!list && !Window::getProperty<XID>(DefaultRootWindow(x),"_NET_SUPPORTING_WM_CHECK")) {
-            XID root,parent; XID* children; uint count=0; XQueryTree(x,DefaultRootWindow(x),&root,&parent,&children,&count);
-            list = array<XID>(children,count);
-            ownWM = true;
-        }
-        for(XID id: list) {
-            addTask(id);
-            XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
-            if(ownWM) XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
-        }
+        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|SubstructureRedirectMask|PropertyChangeMask|ButtonPressMask);
+        initializeTasks();
+        XFlush(x);
 
         if(dbus) {
             dbus.bind("Get"_,this,&TaskBar::Get);
@@ -324,76 +309,62 @@ struct TaskBar : Poll {
         clock.triggered.connect(&calendar,&Calendar::show);
 
         window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
-        window.show();
         window.setPosition(int2(0,0));
-        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|SubstructureRedirectMask|PropertyChangeMask|ButtonPressMask);
-        log(ownWM);
-        Window::sync();
+        window.show();
     }
     void event(pollfd) override {
         bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
-            ///WM
-            if(e.type == ButtonPress || e.type==ButtonRelease) {
-                log(e.xbutton.window,e.xbutton.root,e.xbutton.subwindow);
+            if(e.type==CreateNotify) {
+                XID id = e.xcreatewindow.window;
+                if(id==window.id) continue;
+                XSelectInput(x,id , StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+                XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
+                addTask(id);
+                tasksChanged.emit(tasks.array::size());
+                continue;
+            } else if(e.type == MapRequest || e.type == MapNotify) {
+                XID id = e.xmaprequest.window;
+                XMapWindow(x, id);
+                XRaiseWindow(x, active=id);
+                int i = indexOf(tasks, Task(id));
+                if(i>=0) tasks.index=i;
+            } else if(e.type == ConfigureRequest) {
+                XID id = e.xconfigure.window;
+                XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
+                wa.x=max(0,wa.x); wa.y=max(id==window.id?0:16,wa.y);
+                wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y,wa.height);
+                //if(!wa.override_redirect) wa.x = (Window::screen.x - wa.width)/2, wa.y = (Window::screen.y - wa.height)/2;
+                XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
+                continue;
+            } else if(e.type == ButtonPress) {
                 XID id = e.xbutton.window;
                 XMapWindow(x, id);
-                XRaiseWindow(x, id);
+                XRaiseWindow(x, active=id);
                 XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
                 XAllowEvents(x, ReplayPointer, CurrentTime);
-            }
-            else if( e.type == MapRequest || e.type == MapNotify ) {
-                XRaiseWindow(x,e.xmap.window);
-            }
-            /*else if(e.type == ConfigureNotify) {
-                XWindowAttributes wa; XGetWindowAttributes(x, e.xconfigure.window, &wa);
-                wa.x=max(0,wa.x); wa.y=max(0,wa.y);
-                wa.width=min(Window::screen.x,c.width); wa.height=min(Window::screen.y,c.height);
-                //if(!wa.override_redirect) wa.x = (Window::screen.x - wa.width)/2, wa.y = (Window::screen.y - wa.height)/2;
-                XMoveResizeWindow(x, e.xconfigure.window,wa.x,wa.y,wa.width,wa.height);
-            }*/
-
-            ///Taskbar
-            if(e.type==PropertyNotify && e.xproperty.window==DefaultRootWindow(x) && e.xproperty.atom == Atom(_NET_ACTIVE_WINDOW)) {
-                XID id = Window::getProperty<XID>(DefaultRootWindow(x),"_NET_ACTIVE_WINDOW").first();
                 int i = indexOf(tasks, Task(id));
-                if(i<0) i=addTask(id);
+                if(i>=0) tasks.index=i;
+            } else if(e.type==PropertyNotify) {
+                int i = indexOf(tasks, Task(e.xproperty.window));
                 if(i<0) continue;
-                tasks.index=i;
-            }
-            else if(e.type==CreateNotify||e.type==ReparentNotify||e.type==MapNotify||e.type==PropertyNotify||e.type==UnmapNotify) {
-                //offset for window field
-#define o(name) offsetof(X##name##Event,window)
-                const int window[13] = {o(CreateWindow),o(DestroyWindow),o(Unmap),o(Map),o(MapRequest),o(Reparent),o(Configure),
-                                        o(ConfigureRequest), o(Gravity),o(ResizeRequest),o(Circulate),o(CirculateRequest),o(Property)};
-#undef o
-                XID id = *(XID*)((byte*)&e+window[e.type-CreateNotify]);
-                if(id==DefaultRootWindow(x)) continue;
-                int i = indexOf(tasks, Task(id));
-                if(i<0) {
-                    if(e.type == CreateNotify || e.type==ReparentNotify) {
-                        XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
-                        if(ownWM) XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
-                    } else if(e.type == MapNotify) i=addTask(id);
-                    else continue;
-                } else {
-                    if(e.type == PropertyNotify) {
-                        if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().text = getTitle(id);
-                        else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
-                        else if(e.xproperty.atom==Atom(_NET_WM_WINDOW_TYPE) || e.xproperty.atom==Atom(_NET_WM_STATE)) {
-                            if(skipTaskbar(id)) tasks.removeAt(i);
-                        } else continue;
-                    }
-                    else if(e.type == DestroyNotify || e.type == UnmapNotify || e.type==ReparentNotify) tasks.removeAt(i);
-                    else continue;
+                if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().text = getTitle(e.xproperty.window);
+                else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(e.xproperty.window);
+                else continue;
+            } else if(e.type == DestroyNotify) {
+                int i = indexOf(tasks, Task(e.xdestroywindow.window));
+                if(i<0) continue;
+                tasks.removeAt(i);
+                if(tasks.index==uint(i)) {
+                    if(i>0) tasks.setActive(i-1);
+                    else if(tasks) tasks.setActive(i);
+                    else tasks.index=-1;
                 }
+                tasksChanged.emit(tasks.array::size());
             }
             needUpdate = true;
         }
-        if(needUpdate && window.visible) {
-            panel.update(); window.render();
-            tasksChanged.emit(tasks.array::size());
-        }
+        if(needUpdate && window.visible) { panel.update(); window.render(); }
    }
 };
 

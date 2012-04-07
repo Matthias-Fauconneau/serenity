@@ -237,7 +237,7 @@ DBus::DBus() {
      addr.sun_family = AF_UNIX;
      string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
      addr.sun_path[0]=0; copy(addr.sun_path+1,path.data(),path.size());
-     if(!::connect(fd,(sockaddr*)&addr,3+path.size())) { fd=0; warn("Couldn't connect to D-Bus"); return; }
+     if(::connect(fd,(sockaddr*)&addr,3+path.size())) { fd=0; warn("Couldn't connect to D-Bus"); return; }
      ::write(fd,"\0AUTH EXTERNAL 30\r\n"_); ::read(fd,37);/*OK*/ ::write(fd,"BEGIN \r\n"_);
      name = Object(this,"org.freedesktop.DBus"_,"/org/freedesktop/DBus"_)("org.freedesktop.DBus.Hello"_);
      registerPoll({fd, POLLIN});

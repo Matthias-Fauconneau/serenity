@@ -63,7 +63,6 @@ struct Window : Poll {
 
     /// Get X11 property \a name on \a window
     template<class T> static array<T> getProperty(XID window, const char* property);
-    static void sync();
 
     /// Set X11 property \a name to \a value
     template<class T> void setProperty(const char* type,const char* name, const array<T>& value);

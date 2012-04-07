@@ -31,8 +31,6 @@ template<class T> array<T> Window::getProperty(XID window, const char* property)
 }
 template array<Atom> Window::getProperty(XID window, const char* property);
 
-void Window::sync() { XSync(x,0); }
-
 template<class T> void Window::setProperty(const char* type,const char* name, const array<T>& value) {
     assert(id);
     XChangeProperty(x, id, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)value.data(), value.size());
@@ -148,10 +146,11 @@ void Window::create() {
     setSize(size); //translate special values
     XSetWindowAttributes attrs;
     attrs.colormap = XCreateColormap(x, DefaultRootWindow(x), visual, AllocNone);
-    attrs.background_pixel = BlackPixel(x,DefaultScreen(x));
+    attrs.background_pixel = 0xF0F0F0F0;
     attrs.border_pixel = BlackPixel(x,DefaultScreen(x));
     attrs.event_mask = StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
-    id = XCreateWindow(x,DefaultRootWindow(x),0,0,size.x,size.y,0,depth,InputOutput,visual, CWBackPixel|CWColormap|CWBorderPixel|CWEventMask, &attrs);
+    id = XCreateWindow(x,DefaultRootWindow(x),position.x,position.y,size.x,size.y,0,depth,InputOutput,visual,
+                       CWBackPixel|CWColormap|CWBorderPixel|CWEventMask, &attrs);
     windows[id] = this;
     gc = XCreateGC(x, id, 0, 0);
     setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
@@ -164,14 +163,15 @@ void Window::create() {
 void Window::show() {
     if(!id) create();
     XMapWindow(x, id);
+    XSync(x,0);
+    update();
 }
 void Window::hide() { if(id) { XUnmapWindow(x, id); XFlush(x); } }
 
 void Window::setPosition(int2 position) {
-    assert(id);
     if(position.x<0) position.x=screen.x+position.x;
     if(position.y<0) position.y=screen.y+position.y;
-    XMoveWindow(x, id, position.x, position.y);
+    if(id) XMoveWindow(x, id, position.x, position.y);
     this->position=position;
 }
 
@@ -215,7 +215,6 @@ void Window::setIcon(const Image& icon) {
     for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
     buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
     setProperty("CARDINAL", "_NET_WM_ICON", buffer);
-    XFlush(x);
 }
 
 void Window::setType(const string& type) {

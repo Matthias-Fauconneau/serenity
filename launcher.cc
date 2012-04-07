@@ -88,5 +88,5 @@ Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts 
     for(auto& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
 }
 
-void Launcher::show() { window.show(); window.setPosition(int2(0,0)); window.setFocus(&search); Window::sync(); }
+void Launcher::show() { window.setPosition(int2(0,0)); window.show(); window.setFocus(&search); }
 void Launcher::keyPress(Key key) { if(key==Escape) window.hide(); }

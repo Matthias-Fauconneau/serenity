@@ -56,7 +56,6 @@ struct Player : Application {
         }
         if(files) next();
         window.show();
-        Window::sync();
         setPriority(-20);
     }
     void appendFile(string&& path) {

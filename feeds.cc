@@ -32,7 +32,6 @@ struct Feeds : Application {
         window.localShortcut("Escape"_).connect(this, &Feeds::quit);
         news.activeChanged.connect(this,&Feeds::activeChanged);
         news.itemPressed.connect(this,&Feeds::itemPressed);
-        window.show();
         if(arguments) {
             content = new Scroll<HTML>;
             content->contentChanged.connect(this, &Feeds::render);
@@ -42,7 +41,7 @@ struct Feeds : Application {
             array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
             for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 15*60);
         }
-        Window::sync();
+        window.show();
     }
     ~Feeds() { close(readConfig); }
 
@@ -100,6 +99,7 @@ struct Feeds : Application {
         };
         feed.xpath("feed/entry"_,addItem); //Atom
         feed.xpath("rss/channel/item"_,addItem); //RSS
+        render();
     }
     void getFavicon(const URL& url, array<byte>&& document) {
         Element page = parseHTML(move(document));
@@ -124,7 +124,7 @@ struct Feeds : Application {
             text.setSize(12);
         }
         //TODO: show if in cache
-        main.update(); window.render();
+        render();
     }
     void itemPressed(int index) {
         Entry& entry = news[index];
@@ -142,6 +142,6 @@ struct Feeds : Application {
         }
         render();
     }
-    void render() { main.update(); window.render(); }
+    void render() { if(window.visible) { main.update(); window.render(); }}
 };
 Application(Feeds)
