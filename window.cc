@@ -154,8 +154,8 @@ void Window::create() {
                        CWBackPixel|CWColormap|CWBorderPixel|CWEventMask|CWOverrideRedirect, &attributes);
     windows[id] = this;
     gc = XCreateGC(x, id, 0, 0);
-    //setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
-    //setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
+    setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
+    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
     if(title) setTitle(title);
     if(icon) setIcon(icon);
 }
@@ -217,9 +217,9 @@ void Window::setIcon(const Image& icon) {
     setProperty("CARDINAL", "_NET_WM_ICON", buffer);
 }
 
-void Window::setType(const string& /*type*/) {
-    /*if(!id) create();
-    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {XInternAtom(x,strz(type).data(),1)});*/
+void Window::setType(Atom type) {
+    this->type=type;
+    if(id) setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {type});
 }
 
 void Window::setOverrideRedirect(bool overrideRedirect) {

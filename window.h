@@ -10,7 +10,7 @@
 #undef Font
 #include <X11/extensions/XShm.h>
 
-#define Atom(name) XInternAtom(x, #name, 1)
+#define Atom(name) XInternAtom(Window::x, #name, 1)
 
 /// Window embeds \a widget in an X11 window, displaying it and forwarding user input.
 struct Window : Poll {
@@ -44,7 +44,7 @@ struct Window : Poll {
     /// Set window icon to \a icon
     void setIcon(const Image& icon);
     /// Set window type (using Extended Window Manager Hints)
-    void setType(const string& type);
+    void setType(Atom type);
     /// Set window override_redirect attribute
     void setOverrideRedirect(bool overrideRedirect);
 
@@ -95,6 +95,7 @@ struct Window : Poll {
     int2 size=zero;
     string title;
     Image icon;
+    Atom type;
     bool overrideRedirect=false;
 
     GC gc;

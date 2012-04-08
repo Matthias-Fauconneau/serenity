@@ -69,13 +69,12 @@ List<Command> readShortcuts() {
 }
 
 Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts })), window(&menu,""_,Image(),int2(-3,-3)) {
-    window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
+    window.setType(Atom("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"));
     window.setOverrideRedirect(true);
-    window.setPosition(int2(0,0));
     menu.close.connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(auto& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
 }
 
-void Launcher::show() { window.show(); /*window.setFocus(&search);*/ }
+void Launcher::show() { window.show(); window.setFocus(&search); }
 void Launcher::keyPress(Key key) { if(key==Escape) window.hide(); }

@@ -86,9 +86,8 @@ void Month::nextMonth() { active.month++; if(active.month>11) active.year++, act
 Calendar::Calendar() {
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
-    window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
+    window.setType(Atom("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"));
     window.setOverrideRedirect(true);
-    window.setPosition(int2(-300,16));
     menu.close.connect(&window,&Window::hide);
 }
 

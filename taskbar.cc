@@ -9,6 +9,8 @@
 #include "dbus.h"
 #include "array.cc" //array<Task>
 
+static enum { Top, Bottom } taskBarPosition = Top;
+
 static Display* x; //TODO: use Window::x
 static array<XID> history; //stack order. to restore previous window on close
 void raise(XID id) {
@@ -32,16 +34,16 @@ struct Task : Item {
         if(button!=LeftButton) return false;
         if(event==Press) {
             if(history && history.last()==id) { //Set maximized
-                XMoveResizeWindow(x,id, 0,16,Window::screen.x,Window::screen.y-16);
+                XMoveResizeWindow(x,id, 0, taskBarPosition==Top?16:0, Window::screen.x,Window::screen.y-16);
                 XFlush(x);
                 return true;
             }
         }
-        if(event==Motion) { //Set windowed
+        /*if(event==Motion) { //Set windowed
             XMoveResizeWindow(x,id, Window::screen.x/4,16+(Window::screen.y-16)/4,Window::screen.x/2,(Window::screen.y-16)/2);
             XFlush(x);
             return true;
-        }
+        }*/
         return false;
     }
 };
@@ -76,7 +78,7 @@ struct Desktop {
     List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     HBox applets { &space, &shortcuts, &system };
     Window window{&applets,""_,Image(),int2(0,0),255};
-    Desktop() { window.setType("_NET_WM_WINDOW_TYPE_DESKTOP"_); }
+    Desktop() { window.setType(Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)); }
 };
 
 ICON(button);
@@ -93,7 +95,11 @@ struct TaskBar : Poll {
      HBox panel {&start, &tasks, &status, &clock };
     Window window{&panel,""_,Image(),int2(0,-1),255};
 
-    string getTitle(XID id) { return Window::getProperty<char>(id,"_NET_WM_NAME"); }
+    string getTitle(XID id) {
+        string name = Window::getProperty<char>(id,"_NET_WM_NAME");
+        if(!name) name = Window::getProperty<char>(id,"WM_NAME");
+        return move(name);
+    }
     Image getIcon(XID id) {
         array<ulong> buffer = Window::getProperty<ulong>(id,"_NET_WM_ICON");
         if(buffer.size()<=4) return Image();
@@ -102,10 +108,13 @@ struct TaskBar : Poll {
         return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
     }
     int addTask(XID id) {
+        XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect||wa.map_state!=IsViewable) return -1;
+        array<Atom> type=Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE");
+        if(type.size()>=1 && type.first()!=Atom(_NET_WM_WINDOW_TYPE_NORMAL)) return -1;
+        if(contains(Window::getProperty<Atom>(id,"_NET_WM_STATE"),Atom(_NET_WM_SKIP_TASKBAR))) return -1;
         string title = getTitle(id);
         if(!title) return -1;
         Image icon = getIcon(id);
-        if(!icon) return -1;
         tasks << Task(id,move(icon),move(title));
         return tasks.array::size()-1;
     }
@@ -183,9 +192,12 @@ struct TaskBar : Poll {
         clock.timeout.connect(&calendar, &Calendar::checkAlarm);
         clock.triggered.connect(&calendar,&Calendar::show);
 
-        window.setType("_NET_WM_WINDOW_TYPE_DOCK"_);
+        window.setPosition(int2(0, taskBarPosition==Top?0:-16));
+        calendar.window.setPosition(int2(-300, taskBarPosition==Top?16:-316));
+        launcher.window.setPosition(int2(0, taskBarPosition==Top?16:-16-launcher.menu.sizeHint().y));
+
+        window.setType(Atom("_NET_WM_WINDOW_TYPE_DOCK"_));
         window.setOverrideRedirect(true);
-        window.setPosition(int2(0,0));
         window.show();
     }
     void event(pollfd) override {
@@ -213,8 +225,7 @@ struct TaskBar : Poll {
                 if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
                 if(!wa.override_redirect) {
                     wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
-                    wa.x=max(0,wa.x); wa.y=max(16,wa.y);
-                    //wa.x = (Window::screen.x - wa.width)/2, wa.y = 16+(Window::screen.y - wa.height)/2;
+                    wa.x = (Window::screen.x - wa.width)/2, wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y - wa.height)/2;
                 }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
                 continue;
@@ -236,15 +247,16 @@ struct TaskBar : Poll {
                 XID id = e.xdestroywindow.window;
                 removeOne(history, id);
                 int i = indexOf(tasks, Task(id));
-                if(i<0) continue;
-                tasks.removeAt(i);
-                if(tasks.index==uint(i)) {
-                    if(history) {
-                        i = indexOf(tasks, Task(history.last()));
-                        if(i>=0) tasks.setActive(i);
-                        else tasks.setActive(-1);
-                    } else tasks.setActive(-1);
+                if(i>=0) {
+                    tasks.removeAt(i);
+                    if(tasks.index == uint(i)) tasks.index=-1;
                 }
+                if(tasks.index!=uint(-1)) {
+                    raise(tasks.active().id);
+                } else if(history) {
+                    raise(history.last());
+                     tasks.setActive(indexOf(tasks, Task(history.last())));
+                } else tasks.setActive(-1);
                 tasksChanged.emit(tasks.array::size());
             } else continue;
             needUpdate = true;
@@ -256,7 +268,9 @@ struct TaskBar : Poll {
 struct Shell : Application {
     TaskBar taskbar;
     Desktop desktop;
-    Shell(array<string>&&) {
+    Shell(array<string>&& arguments) {
+        if(contains(arguments,"top"_)) taskBarPosition=Top;
+        if(contains(arguments,"bottom"_)) taskBarPosition=Bottom;
         taskbar.tasksChanged.connect(this,&Shell::tasksChanged);
         tasksChanged(taskbar.tasks.array::size());
     }
