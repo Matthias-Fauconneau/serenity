@@ -18,7 +18,7 @@ struct Window : Poll {
     /// Initialize an X11 window for \a widget
     /// \note Windows are initially hidden, use \a show to display windows.
     /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show.
-    Window(Widget* widget, const string &name=string(), const Image &icon=Image(), int2 size=int2(-1,-1), ubyte opacity=192);
+    Window(Widget* widget, const string &name=string(), const Image &icon=Image(), int2 size=int2(-1,-1));
     /// Create the window
     void create();
     /// Update the window by handling any incoming events
@@ -103,5 +103,4 @@ struct Window : Poll {
     XShmSegmentInfo shminfo;
 
     Widget& widget;
-    ubyte opacity;
 };

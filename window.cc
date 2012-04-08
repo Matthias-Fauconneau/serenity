@@ -37,8 +37,7 @@ template<class T> void Window::setProperty(const char* type,const char* name, co
     XFlush(x);
 }
 
-Window::Window(Widget* widget, const string& title, const Image& icon, int2 size, ubyte opacity)
-    : size(size), title(copy(title)), icon(copy(icon)), widget(*widget), opacity(opacity) {
+Window::Window(Widget* widget, const string& title, const Image& icon, int2 size) : size(size), title(copy(title)), icon(copy(icon)), widget(*widget) {
     if(!x) {
         x = XOpenDisplay(0);
         pollfd p={XConnectionNumber(x), POLLIN, 0}; registerPoll(p);
@@ -163,6 +162,7 @@ void Window::create() {
 void Window::show() {
     if(!id) create();
     XMapWindow(x, id);
+    XRaiseWindow(x, id);
     XSync(x,0);
     update();
 }
@@ -182,7 +182,7 @@ void Window::setSize(int2 size) {
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
     if(size.x==0) size.x=screen.x;
-    if(size.y==0) size.y=screen.y;
+    if(size.y==0) size.y=screen.y-16;
     assert(size);
     if(id) XResizeWindow(x, id, size.x, size.y);
     else this->size=size;

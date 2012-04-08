@@ -9,15 +9,25 @@
 #include "dbus.h"
 #include "array.cc" //array<Task>
 
-static enum { Top, Bottom } taskBarPosition = Top;
+enum ScreenEdge { Top, Bottom };
+static ScreenEdge taskBarPosition = Top;
 
 static Display* x; //TODO: use Window::x
-static array<XID> history; //stack order. to restore previous window on close
+static XID* topLevelWindowList=0;
+static array<XID> getWindows() {
+    if(topLevelWindowList) XFree(topLevelWindowList);
+    XID root,parent; uint count=0; XQueryTree(x,DefaultRootWindow(x),&root,&parent,&topLevelWindowList,&count);
+    return array<XID>(topLevelWindowList,count); //to be freed with XFree
+}
 void raise(XID id) {
     XRaiseWindow(x, id);
     XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
-    removeOne(history, id);
-    history << id;
+    for(XID w: getWindows()) {
+        if(Window::getProperty<Atom>(w,"WM_TRANSIENT_FOR") == array<Atom>{id}) {
+            XRaiseWindow(x, w);
+            XSetInputFocus(x, w, RevertToPointerRoot, CurrentTime);
+        }
+    }
 }
 
 struct Task : Item {
@@ -33,7 +43,7 @@ struct Task : Item {
         //TODO: preview on hover
         if(button!=LeftButton) return false;
         if(event==Press) {
-            if(history && history.last()==id) { //Set maximized
+            if(getWindows().last()==id) { //Set maximized
                 XMoveResizeWindow(x,id, 0, taskBarPosition==Top?16:0, Window::screen.x,Window::screen.y-16);
                 XFlush(x);
                 return true;
@@ -77,7 +87,7 @@ struct Desktop {
     List<Command> shortcuts { readShortcuts() };
     List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     HBox applets { &space, &shortcuts, &system };
-    Window window{&applets,""_,Image(),int2(0,0),255};
+    Window window{&applets,""_,Image(),int2(0,Window::screen.y-16)};
     Desktop() { window.setType(Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)); }
 };
 
@@ -93,7 +103,7 @@ struct TaskBar : Poll {
       Clock clock;
        Calendar calendar;
      HBox panel {&start, &tasks, &status, &clock };
-    Window window{&panel,""_,Image(),int2(0,-1),255};
+    Window window{&panel,""_,Image(),int2(0,-1)};
 
     string getTitle(XID id) {
         string name = Window::getProperty<char>(id,"_NET_WM_NAME");
@@ -118,17 +128,6 @@ struct TaskBar : Poll {
         tasks << Task(id,move(icon),move(title));
         return tasks.array::size()-1;
     }
-    void initializeTasks() {
-        XID root,parent; XID* children; uint count=0; XQueryTree(x,DefaultRootWindow(x),&root,&parent,&children,&count);
-        array<XID> list(children,count);
-        for(XID id: list) {
-            addTask(id);
-            XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
-            XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
-            XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
-        }
-    }
-
 
     void registerStatusNotifierItem(string service) {
         for(const auto& s: status) if(s.item.target == service) return;
@@ -172,7 +171,12 @@ struct TaskBar : Poll {
         XChangeWindowAttributes(x,DefaultRootWindow(x),CWCursor,&attributes);
         registerPoll({XConnectionNumber(x), POLLIN});
         XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|SubstructureRedirectMask|PropertyChangeMask|ButtonPressMask);
-        initializeTasks();
+        for(XID id: getWindows()) {
+            addTask(id);
+            XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+            XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
+            XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
+        }
         XFlush(x);
 
         if(dbus) {
@@ -192,14 +196,15 @@ struct TaskBar : Poll {
         clock.timeout.connect(&calendar, &Calendar::checkAlarm);
         clock.triggered.connect(&calendar,&Calendar::show);
 
-        window.setPosition(int2(0, taskBarPosition==Top?0:-16));
-        calendar.window.setPosition(int2(-300, taskBarPosition==Top?16:-316));
-        launcher.window.setPosition(int2(0, taskBarPosition==Top?16:-16-launcher.menu.sizeHint().y));
-
         window.setType(Atom("_NET_WM_WINDOW_TYPE_DOCK"_));
         window.setOverrideRedirect(true);
         window.show();
     }
+    void setPosition(ScreenEdge position) {
+       window.setPosition(int2(0, position==Top?0:-16));
+       calendar.window.setPosition(int2(-300, position==Top?16:-316));
+       launcher.window.setPosition(int2(0, position==Top?16:(-16-abs(launcher.menu.sizeHint().y))));
+   }
     void event(pollfd) override {
         bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
@@ -209,12 +214,12 @@ struct TaskBar : Poll {
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
                 XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
                 continue;
-            } else if(e.type == MapRequest || e.type == MapNotify) {
+            } else if(e.type == MapRequest) {
                 XID id = e.xmaprequest.window;
                 XMapWindow(x, id);
                 raise(id);
                 int i = indexOf(tasks, Task(id));
-                if(i<0) i=addTask(id), tasksChanged.emit(tasks.array::size());
+                if(i<0) { i=addTask(id); if(i>=0) tasksChanged.emit(tasks.array::size()); }
                 if(i<0) continue;
                 tasks.index=i;
             } else if(e.type == ConfigureRequest) {
@@ -225,7 +230,7 @@ struct TaskBar : Poll {
                 if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
                 if(!wa.override_redirect) {
                     wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
-                    wa.x = (Window::screen.x - wa.width)/2, wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y - wa.height)/2;
+                    wa.x = (Window::screen.x - wa.width)/2, wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16 - wa.height)/2;
                 }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
                 continue;
@@ -243,21 +248,21 @@ struct TaskBar : Poll {
                 if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().setText( getTitle(id) );
                 else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
                 else continue;
-            } else if(e.type == DestroyNotify) {
-                XID id = e.xdestroywindow.window;
-                removeOne(history, id);
+            } else if(e.type == UnmapNotify || e.type == DestroyNotify) {
+                XID id = (e.type==UnmapNotify?e.xunmap.window:e.xdestroywindow.window);
                 int i = indexOf(tasks, Task(id));
                 if(i>=0) {
                     tasks.removeAt(i);
                     if(tasks.index == uint(i)) tasks.index=-1;
+                    tasksChanged.emit(tasks.array::size());
                 }
-                if(tasks.index!=uint(-1)) {
-                    raise(tasks.active().id);
-                } else if(history) {
-                    raise(history.last());
-                     tasks.setActive(indexOf(tasks, Task(history.last())));
-                } else tasks.setActive(-1);
-                tasksChanged.emit(tasks.array::size());
+
+                array<XID> windows = getWindows();
+                if(windows) {
+                    XID id=windows.last();
+                    //XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+                    if(tasks.index==uint(-1)) tasks.setActive(indexOf(tasks, Task(id)));
+                }
             } else continue;
             needUpdate = true;
         }
@@ -269,10 +274,15 @@ struct Shell : Application {
     TaskBar taskbar;
     Desktop desktop;
     Shell(array<string>&& arguments) {
-        if(contains(arguments,"top"_)) taskBarPosition=Top;
-        if(contains(arguments,"bottom"_)) taskBarPosition=Bottom;
+        if(contains(arguments,"bottom"_)) {
+            taskbar.setPosition(taskBarPosition=Bottom);
+        } else {
+            taskbar.setPosition(taskBarPosition=Top);
+            desktop.window.setPosition(int2(0,16));
+        }
         taskbar.tasksChanged.connect(this,&Shell::tasksChanged);
         tasksChanged(taskbar.tasks.array::size());
+        taskbar.window.show();
     }
     void tasksChanged(int count) { if(!count) desktop.window.show(); else desktop.window.hide(); }
 };

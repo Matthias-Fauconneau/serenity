@@ -75,7 +75,7 @@ struct HTTP : Poll {
 
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge
-void getURL(const URL &url, Handler handler, uint maximumAge);
+void getURL(const URL &url, Handler handler, int maximumAge);
 
 /// Returns path to cache file for \a url
 string cacheFile(const URL& url);

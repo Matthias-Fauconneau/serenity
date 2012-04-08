@@ -214,7 +214,7 @@ void HTTP::event(pollfd) {
     }
 }; Test(HTTPTest)*/
 
-void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, uint maximumAge) {
+void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, int maximumAge) {
     string file = cacheFile(url);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;

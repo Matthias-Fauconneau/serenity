@@ -361,6 +361,7 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
     if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
     if(button != LeftButton) return false;
+    Window::focus=this;
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<child.position+child.size) {
             if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
@@ -368,6 +369,12 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
             return true;
         }
     }
+    return false;
+}
+
+bool Selection::keyPress(Key key) {
+    if(key==Down && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
+    if(key==Up && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
     return false;
 }
 

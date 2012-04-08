@@ -47,7 +47,7 @@ List<Command> readShortcuts() {
     List<Command> shortcuts;
     if(!exists(".config/launcher"_,home())) { warn("No launcher settings [.config/launcher]"); return shortcuts; }
     for(const string& desktop: split(readFile(".config/launcher"_,home()),'\n')) {
-        if(!exists(desktop)) continue;
+        if(!exists(desktop)) { warn("Missing application settings",desktop); continue; }
         auto entries = readSettings(desktop);
         Image icon;
         for(const string& folder: iconPaths) {

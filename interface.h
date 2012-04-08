@@ -9,7 +9,10 @@ enum Event { Motion, Press, Release, Enter, Leave };
 enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
 /// Key code
 #include "X11/keysym.h"
-enum Key { Escape=XK_Escape, Return=XK_Return, Left=XK_Left, Right=XK_Right, Delete=XK_Delete, BackSpace=XK_BackSpace };
+enum Key {
+    Escape=XK_Escape, Return=XK_Return, Delete=XK_Delete, BackSpace=XK_BackSpace,
+    Left=XK_Left, Right=XK_Right, Up=XK_Up, Down=XK_Down
+};
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
@@ -206,6 +209,7 @@ struct Selection : virtual Layout {
     signal<int /*index*/> itemPressed;
 
     bool mouseEvent(int2 position, Event event, Button button) override;
+    bool keyPress(Key key) override;
 };
 
 /// Displays a selection using a blue highlight

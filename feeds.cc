@@ -20,7 +20,7 @@ ICON(feeds);
 struct Feeds : Application {
     List<Entry> news;
     HBox main { &news };
-    Window window{&main,"Feeds"_,move(feedsIcon),int2(0,0),224};
+    Window window{&main,"Feeds"_,move(feedsIcon),int2(0,0)};
     Scroll<HTML>* content=0;
 
     int readConfig = appendFile(".config/read"_,home());
@@ -80,7 +80,7 @@ struct Feeds : Application {
 
         int count=0;
         auto addItem = [this,&count](const Element& e)->void{
-            if(count++>32) return;
+            if(count++>16) return;
             string text=e("title"_).text();
             text=trim(unescape(text));
 
@@ -89,11 +89,11 @@ struct Feeds : Application {
 
             Entry entry(move(text),move(url));
             if(!isRead(entry)) {
-                if(news.count()>=256){warn("Too many news"); return;}
+                if(news.count()>=64){warn("Too many news"); return;}
                 news << move(entry);
                 Entry& item = news.last();
                 item.content= new Scroll<HTML>();
-                item.content->go(item.link); //preload unread entries
+                if(count<=4) item.content->go(item.link); //preload unread entries
             }
         };
         feed.xpath("feed/entry"_,addItem); //Atom
