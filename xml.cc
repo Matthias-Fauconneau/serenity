@@ -80,9 +80,9 @@ Element::Element(TextBuffer& s, bool html) {
     //if(!s.match(string(name+">"_))) { /*log((string)slice(s.buffer,start,s.index-start),s.index);*/ log("Expecting", name,"got",s.until(">"_)); }
 }
 
-string Element::text() const { string text; visit([&text](const Element& e) { text<<e.content; }); return text; }
+string Element::text() const { string text; visit([&text](const Element& e)->void{ text<<e.content; }); return text; }
 
-string Element::text(const string& path) const { string text; xpath(path,[&text](const Element& e) { text<<e.text(); }); return text; }
+string Element::text(const string& path) const { string text; xpath(path,[&text](const Element& e)->void{ text<<e.text(); }); return text; }
 
 string Element::operator[](const string& attribute) const {
     //assert(attributes.contains(attribute),"attribute", attribute,"not found in",*this);
@@ -104,7 +104,7 @@ void Element::xpath(const string& path, const std::function<void(const Element &
     assert(path);
     if(startsWith(path,"//"_)) {
         const string& next = slice(path,2);
-        visit([&next,&visitor](const Element& e) { e.xpath(next,visitor); });
+        visit([&next,&visitor](const Element& e)->void{ e.xpath(next,visitor); });
     }
     string first = section(path,'/');
     string next = section(path,'/',1,-1);
@@ -115,7 +115,7 @@ void Element::xpath(const string& path, const std::function<void(const Element &
 
 bool Element::match(const string& path) const {
     bool match=false;
-    xpath(path,[&match](const Element&) { match=true; });
+    xpath(path,[&match](const Element&)->void{ match=true; });
     return match;
 }
 

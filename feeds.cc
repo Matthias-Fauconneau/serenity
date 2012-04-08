@@ -28,7 +28,6 @@ struct Feeds : Application {
 
     Feeds(array<string>&& arguments) {
         news.reserve(256); //realloc would invalidate delegates
-        window.bgOuter=window.bgCenter;
         window.localShortcut("Escape"_).connect(this, &Feeds::quit);
         news.activeChanged.connect(this,&Feeds::activeChanged);
         news.itemPressed.connect(this,&Feeds::itemPressed);

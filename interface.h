@@ -242,6 +242,15 @@ template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelectio
     Grid(array<T>&& items) : ListSelection<T>(move(items)){}
 };
 
+/// Menu is a \a VBox which send \a close signal on mouse leave or when accepting any event.
+/// \note Dropdown menus can be implemented by embedding \a Menu in a \a Window
+struct Menu : VBox {
+    signal<> close;
+    Menu(std::initializer_list<Widget*>&& widgets):VBox(move(widgets)){}
+    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool keyPress(Key key) override;
+};
+
 /// Rich text format control code encoded in 00-1F range
 /// \note Strike|Bold (\t) and Strike|Italic (\n) cannot be used
 /// \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.

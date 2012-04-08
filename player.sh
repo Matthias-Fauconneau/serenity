@@ -1,1 +1,1 @@
-TARGET=player make install
+BUILD=release TARGET=player make install

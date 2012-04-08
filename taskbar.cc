@@ -4,20 +4,26 @@
 #include "interface.h"
 #include "window.h"
 #include "launcher.h"
+#include "calendar.h"
 #include "poll.h"
 #include "dbus.h"
 #include "array.cc" //array<Task>
 
 static Display* x; //TODO: use Window::x
-static XID active;
+static array<XID> history; //stack order. to restore previous window on close
+void raise(XID id) {
+    XRaiseWindow(x, id);
+    XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+    removeOne(history, id);
+    history << id;
+}
 
 struct Task : Item {
     XID id;
     Task(XID id):id(id){} //for indexOf
     Task(XID id, Icon&& icon, Text&& text):Item(move(icon),move(text)),id(id){}
     bool selectEvent() override { //Raise
-        XRaiseWindow(x, active=id);
-        XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+        raise(id);
         XFlush(x);
         return true;
     }
@@ -25,14 +31,14 @@ struct Task : Item {
         //TODO: preview on hover
         if(button!=LeftButton) return false;
         if(event==Press) {
-            if(active==id) { //Set maximized
+            if(history && history.last()==id) { //Set maximized
                 XMoveResizeWindow(x,id, 0,16,Window::screen.x,Window::screen.y-16);
                 XFlush(x);
                 return true;
             }
         }
         if(event==Motion) { //Set windowed
-            XMoveResizeWindow(x,id, 0,16,Window::screen.x/2,(Window::screen.y-16)/2);
+            XMoveResizeWindow(x,id, Window::screen.x/4,16+(Window::screen.y-16)/4,Window::screen.x/2,(Window::screen.y-16)/2);
             XFlush(x);
             return true;
         }
@@ -62,138 +68,6 @@ struct Clock : Text, Timer {
         if(event==Press && button==LeftButton) { triggered.emit(); return true; }
         return false;
     }
-};
-
-/// Returns events occuring on \a query date (-1=unspecified)
-array<string> getEvents(Date query) {
-    array<string> events;
-    TextBuffer s(readFile(".config/events"_,home()));
-
-    map<string, array<Date> > exceptions; //Exceptions for recurring events
-    while(s) { //first parse all exceptions (may occur after recurrence definitions)
-        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until("\n"_); exceptions[move(title)] << except; }
-        else s.until("\n"_);
-    }
-    s.index=0;
-
-    Date until; //End date for recurring events
-    while(s) {
-        s.skip();
-        if(s.match("#"_)) s.until("\n"_); //comment
-        else if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
-        else if(s.match("except "_)) s.until("\n"_); //already parsed
-        else {
-            Date date = parse(s); s.skip();
-            Date end=date; if(s.match("-"_)) { end=parse(s); s.skip(); }
-            string title = s.until("\n"_);
-            if(query.day>=0) {
-                if(date.day>=0) { if(date.day!=query.day) continue; }
-                else if(query>until) continue;
-            }
-            if(query.month>=0) {
-                if(date.month>=0) { if(date.month!=query.month) continue; }
-                else if(query>until) continue;
-            }
-            if(query.year>=0) {
-                if(date.year>=0) { if(date.year!=query.year) continue; }
-                else if(query>until) continue;
-            }
-            if(query.hours>=0 && date.hours!=query.hours) continue;
-            if(query.minutes>=0 && date.minutes!=query.minutes) continue;
-            if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
-            for(Date date: exceptions[copy(title)]) if(date.day==query.day && date.month==query.month) goto skip;
-            insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title));
-            skip:;
-        }
-    }
-    return events;
-}
-
-struct Month : Grid<Text> {
-    Date active;
-    array<Date> dates;
-    int todayIndex;
-    Month() : Grid(7,8) {}
-    void setActive(Date active) {
-        clear(); dates.clear();
-        todayIndex=-1; this->active=active;
-        static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
-        const int nofDays[12] = { 31, !(active.year%4)&&(active.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-        for(int i=0;i<7;i++) {
-            append(copy(days[i]));
-            dates << Date(-1,-1,-1,-1,-1,-1,i);
-        }
-        int first = (35+active.weekDay+1-active.day)%7;
-        for(int i=0;i<first;i++) { //previous month
-            int previousMonth = (active.month+11)%12;
-            int day = nofDays[previousMonth]-first+i+1;
-            dates << Date(count()%7, day, previousMonth);
-            append(Text(format(Italic)+dec(day,2)));
-        }
-        Date today=::date();
-        for(int i=1;i<=nofDays[active.month];i++) { //current month
-            bool isToday = today.month==active.month && i==today.day;
-            if(isToday) todayIndex=count();
-            dates << Date(count()%7, i, active.month);
-            append(string((isToday?format(Bold):""_)+dec(i,2))); //current day
-        }
-        for(int i=1;count()<7*8;i++) { //next month
-            dates << Date(count()%7, i, (active.month+1)%12);
-            append(Text(format(Italic)+dec(i,2)));
-        }
-        Selection::setActive(todayIndex);
-        update();
-    }
-    void previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
-    void nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
-};
-
-struct Calendar {
-    HList<Text> date = { "<"_, ""_, ">"_ }; //< date >
-    Month month;
-    Text events;
-    Menu menu { &date, &month, &space, &events, &space };
-    Window window{&menu,""_,Image(),int2(300,300)};
-    Calendar() {
-        date[0].textClicked.connect(this, &Calendar::previousMonth);
-        date[2].textClicked.connect(this, &Calendar::nextMonth);
-        window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
-        window.setOverrideRedirect(true);
-        menu.close.connect(&window,&Window::hide);
-    }
-    void previousMonth() {
-        month.previousMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
-        events.setText(""_); menu.update(); window.render(); }
-    void nextMonth() {
-        month.nextMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
-        events.setText(""_); menu.update(); window.render();
-    }
-    void activeChanged(int index) {
-        string text;
-        Date date = month.dates[index];
-        text << string(format(Bold)+(index==month.todayIndex?"Today"_:str(date))+format(Regular)+"\n"_);
-        text << join(::getEvents(date),"\n"_)+"\n"_;
-        if(index==month.todayIndex) {
-            Date date = month.dates[index+1];
-            text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
-            text << join(::getEvents(date),"\n"_);
-        }
-        events.setText(move(text));
-        menu.update(); window.render();
-    }
-    bool mouseEvent(int2, Event event, Button) {
-        if(event==Leave) { window.hide(); return true; }
-        return false;
-    }
-    void show() {
-        if(window.visible) { window.hide(); return; }
-        date[1].setText( format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) );
-        month.activeChanged.connect(this,&Calendar::activeChanged);
-        month.setActive(::date());
-        menu.update();
-        window.setPosition(int2(-300,16)); window.show();
-    }
-    void checkAlarm() { if(getEvents(::date(currentTime()+5*60))) show(); }
 };
 
 ICON(shutdown);
@@ -241,6 +115,7 @@ struct TaskBar : Poll {
         for(XID id: list) {
             addTask(id);
             XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+            XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
             XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
         }
     }
@@ -318,32 +193,34 @@ struct TaskBar : Poll {
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
             if(e.type==CreateNotify) {
                 XID id = e.xcreatewindow.window;
-                if(id==window.id) continue;
-                XSelectInput(x,id , StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+                XSelectInput(x,id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
+                XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
                 XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
                 continue;
             } else if(e.type == MapRequest || e.type == MapNotify) {
                 XID id = e.xmaprequest.window;
                 XMapWindow(x, id);
-                XRaiseWindow(x, active=id);
-                XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+                raise(id);
                 int i = indexOf(tasks, Task(id));
                 if(i<0) i=addTask(id), tasksChanged.emit(tasks.array::size());
                 if(i<0) continue;
                 tasks.index=i;
             } else if(e.type == ConfigureRequest) {
-                XID id = e.xconfigure.window;
+                XConfigureRequestEvent& c = e.xconfigurerequest;
+                XID id = e.xconfigurerequest.window;
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
-                wa.x=max(0,wa.x); wa.y=max(id==window.id?0:16,wa.y);
-                wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
-                if(!wa.override_redirect) wa.x = (Window::screen.x - wa.width)/2, wa.y = (Window::screen.y - wa.height)/2;
+                if(c.value_mask & CWX) wa.x=c.x; if(c.value_mask & CWY) wa.y=c.y;
+                if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
+                if(!wa.override_redirect) {
+                    wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
+                    wa.x=max(0,wa.x); wa.y=max(16,wa.y);
+                    //wa.x = (Window::screen.x - wa.width)/2, wa.y = 16+(Window::screen.y - wa.height)/2;
+                }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
                 continue;
             } else if(e.type == ButtonPress) {
                 XID id = e.xbutton.window;
-                XMapWindow(x, id);
-                XRaiseWindow(x, active=id);
-                XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+                raise(id);
                 XAllowEvents(x, ReplayPointer, CurrentTime);
                 int i = indexOf(tasks, Task(id));
                 if(i>=0) tasks.index=i;
@@ -356,13 +233,17 @@ struct TaskBar : Poll {
                 else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
                 else continue;
             } else if(e.type == DestroyNotify) {
-                int i = indexOf(tasks, Task(e.xdestroywindow.window));
+                XID id = e.xdestroywindow.window;
+                removeOne(history, id);
+                int i = indexOf(tasks, Task(id));
                 if(i<0) continue;
                 tasks.removeAt(i);
                 if(tasks.index==uint(i)) {
-                    if(i>0) tasks.setActive(i-1);
-                    else if(tasks) tasks.setActive(i);
-                    else tasks.index=-1;
+                    if(history) {
+                        i = indexOf(tasks, Task(history.last()));
+                        if(i>=0) tasks.setActive(i);
+                        else tasks.setActive(-1);
+                    } else tasks.setActive(-1);
                 }
                 tasksChanged.emit(tasks.array::size());
             } else continue;

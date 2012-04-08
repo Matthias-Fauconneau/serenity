@@ -29,18 +29,6 @@ bool Command::mouseEvent(int2, Event event, Button button) {
     return false;
 }
 
-bool Menu::mouseEvent(int2 position, Event event, Button button) {
-    if(Vertical::mouseEvent(position,event,button)) return true;
-    if(event==Leave) close.emit();
-    return false;
-}
-
-bool Menu::keyPress(Key key) {
-    if(Vertical::keyPress(key)) return true;
-    if(key==Escape) { close.emit(); return true; }
-    return false;
-}
-
 map<string,string> readSettings(const string& path) {
     map<string,string> entries;
     if(!exists(path)) { warn("Missing settings file",path); return entries; }
@@ -66,13 +54,13 @@ List<Command> readShortcuts() {
             string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
             if(exists(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
         }
-        auto execPaths = {"/usr/bin/"_,"/usr/local/bin/"_};
+        auto execPaths = {""_, "/usr/bin/"_,"/usr/local/bin/"_};
         string path; array<string> arguments;
         for(const string& folder: execPaths) {
             string p = folder+section(entries["Exec"_],' ');
             if(exists(p)) { path=move(p); arguments=slice(split(entries["Exec"_],' '),1); break; }
         }
-        assert(path);
+        if(!path) { warn("Executable not found for",section(entries["Exec"_],' ')); continue; }
         for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
         for(uint i=0;i<arguments.size();) if(contains(arguments[i],'%')) arguments.removeAt(i); else i++;
         shortcuts << Command(move(icon),move(entries["Name"_]),move(path),move(arguments));
@@ -83,10 +71,11 @@ List<Command> readShortcuts() {
 Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts })), window(&menu,""_,Image(),int2(-3,-3)) {
     window.setType("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"_);
     window.setOverrideRedirect(true);
+    window.setPosition(int2(0,0));
     menu.close.connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(auto& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
 }
 
-void Launcher::show() { window.setPosition(int2(0,0)); window.show(); window.setFocus(&search); }
+void Launcher::show() { window.show(); /*window.setFocus(&search);*/ }
 void Launcher::keyPress(Key key) { if(key==Escape) window.hide(); }

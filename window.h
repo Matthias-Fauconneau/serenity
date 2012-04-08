@@ -46,7 +46,7 @@ struct Window : Poll {
     /// Set window type (using Extended Window Manager Hints)
     void setType(const string& type);
     /// Set window override_redirect attribute
-    void setOverrideRedirect(bool override_redirect);
+    void setOverrideRedirect(bool overrideRedirect);
 
     /// Register local shortcut on \a key (X11 KeySym)
     signal<>& localShortcut(const string& key);
@@ -95,6 +95,7 @@ struct Window : Poll {
     int2 size=zero;
     string title;
     Image icon;
+    bool overrideRedirect=false;
 
     GC gc;
     XImage* image=0;

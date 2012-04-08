@@ -144,20 +144,20 @@ void Window::render() {
 void Window::create() {
     assert(!id);
     setSize(size); //translate special values
-    XSetWindowAttributes attrs;
-    attrs.colormap = XCreateColormap(x, DefaultRootWindow(x), visual, AllocNone);
-    attrs.background_pixel = 0xF0F0F0F0;
-    attrs.border_pixel = BlackPixel(x,DefaultScreen(x));
-    attrs.event_mask = StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
+    XSetWindowAttributes attributes;
+    attributes.colormap = XCreateColormap(x, DefaultRootWindow(x), visual, AllocNone);
+    attributes.background_pixel = 0xF0F0F0F0;
+    attributes.border_pixel = BlackPixel(x,DefaultScreen(x));
+    attributes.event_mask = StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
+    attributes.override_redirect = overrideRedirect;
     id = XCreateWindow(x,DefaultRootWindow(x),position.x,position.y,size.x,size.y,0,depth,InputOutput,visual,
-                       CWBackPixel|CWColormap|CWBorderPixel|CWEventMask, &attrs);
+                       CWBackPixel|CWColormap|CWBorderPixel|CWEventMask|CWOverrideRedirect, &attributes);
     windows[id] = this;
     gc = XCreateGC(x, id, 0, 0);
-    setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
-    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
+    //setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
+    //setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
     if(title) setTitle(title);
     if(icon) setIcon(icon);
-    if(!focus) this->focus=&widget;
 }
 
 void Window::show() {
@@ -217,14 +217,15 @@ void Window::setIcon(const Image& icon) {
     setProperty("CARDINAL", "_NET_WM_ICON", buffer);
 }
 
-void Window::setType(const string& type) {
-    if(!id) create();
-    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {XInternAtom(x,strz(type).data(),1)});
+void Window::setType(const string& /*type*/) {
+    /*if(!id) create();
+    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {XInternAtom(x,strz(type).data(),1)});*/
 }
 
-void Window::setOverrideRedirect(bool override_redirect) {
-    XSetWindowAttributes attributes; attributes.override_redirect=override_redirect;
-    XChangeWindowAttributes(x,id,CWOverrideRedirect,&attributes);
+void Window::setOverrideRedirect(bool overrideRedirect) {
+    XSetWindowAttributes attributes; attributes.override_redirect=overrideRedirect;
+    if(id) XChangeWindowAttributes(x,id,CWOverrideRedirect,&attributes);
+    this->overrideRedirect=overrideRedirect;
 }
 
 void Window::setFocus(Widget* focus) {

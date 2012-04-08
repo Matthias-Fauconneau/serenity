@@ -34,3 +34,5 @@ taskbar.cc
 launcher.cc
 launcher.h
 dbus.cc
+calendar.h
+calendar.cc
