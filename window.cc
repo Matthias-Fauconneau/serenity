@@ -37,9 +37,16 @@ template<class T> void Window::setProperty(const char* type,const char* name, co
     XFlush(x);
 }
 
+static int xErrorHandler(Display* x, XErrorEvent* error) {
+    char buffer[64]; XGetErrorText(x,error->error_code,buffer,sizeof(buffer)); log(buffer);
+    return 0;
+}
+
 Window::Window(Widget* widget, const string& title, const Image& icon, int2 size) : size(size), title(copy(title)), icon(copy(icon)), widget(*widget) {
     if(!x) {
+        XSetErrorHandler(xErrorHandler);
         x = XOpenDisplay(0);
+        if(!x) error("Cannot open X display");
         pollfd p={XConnectionNumber(x), POLLIN, 0}; registerPoll(p);
         XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root); screen=int2(root.width,root.height);
         XVisualInfo info; XMatchVisualInfo(x, DefaultScreen(x), 32, TrueColor, &info); depth = info.depth; visual=info.visual;
@@ -210,11 +217,18 @@ void Window::setIcon(const Image& icon) {
     this->icon=copy(icon);
     if(!id) return;
     int size = 2+icon.width*icon.height;
-    array<int> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
-    buffer[0]=icon.width, buffer[2]=icon.height;
-    for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
-    buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
-    setProperty("CARDINAL", "_NET_WM_ICON", buffer);
+    if(sizeof(long)==4) {
+        array<int> buffer(size); buffer.setSize(size); //CARDINAL is long
+        buffer[0]=icon.width, buffer[1]=icon.height;
+        for(uint i=0;i<icon.width*icon.height;i++) buffer[2+i]=*(uint*)&icon.data[i]; //pad to CARDINAL
+        //setProperty("CARDINAL", "_NET_WM_ICON", buffer);
+    } else {
+        array<int> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
+        buffer[0]=icon.width, buffer[2]=icon.height;
+        for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
+        buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
+        setProperty("CARDINAL", "_NET_WM_ICON", buffer);
+    }
 }
 
 void Window::setType(Atom type) {

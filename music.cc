@@ -78,8 +78,7 @@ struct Music : Application {
         }
         if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
         //sheet.scroll=1600;
-        window.show(); Window::sync(); window.update();
-        assert(window.visible);
+        window.show();
         sampler.lock();
         window.setTitle(instrument);
 #ifndef DEBUG

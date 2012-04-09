@@ -6,6 +6,7 @@
 #define Font XID
 #define Window XID
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #undef Window
 #undef Font
 #include <X11/extensions/XShm.h>

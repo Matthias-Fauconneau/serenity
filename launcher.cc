@@ -33,7 +33,7 @@ map<string,string> readSettings(const string& path) {
     map<string,string> entries;
     if(!exists(path)) { warn("Missing settings file",path); return entries; }
     for(TextBuffer s(readFile(path));s;) {
-        if(s.match("["_)) s.until("\n"_);
+        if(s.matchAny("[#"_)) s.until("\n"_);
         else {
             string key = s.until("="_), value=s.until("\n"_);
             entries.insert(move(key),move(value));

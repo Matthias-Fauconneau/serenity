@@ -228,9 +228,18 @@ struct TaskBar : Poll {
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
                 if(c.value_mask & CWX) wa.x=c.x; if(c.value_mask & CWY) wa.y=c.y;
                 if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
+                /*XSizeHints hints; long supplied; XGetWMNormalHints(x, id, &hints, &supplied);
                 if(!wa.override_redirect) {
+                wa.width=min(Window::screen.x,wa.width); wa.height=min(max(min(Window::screen.y,hints.height),Window::screen.y-16),wa.height);
+                wa.x = (Window::screen.x - wa.width)/2;
+                if(wa.height<=Window::screen.y-16) wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16-wa.height)/2;
+                else wa.y = (Window::screen.y-wa.height)/2;
+                }*/
+                array<Atom> motif = Window::getProperty<Atom>(id,"_MOTIF_WM_HINTS");
+                if(!wa.override_redirect && (!motif || motif[0]!=3 || motif[1]!=0)) {
                     wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
-                    wa.x = (Window::screen.x - wa.width)/2, wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16 - wa.height)/2;
+                    wa.x = (Window::screen.x - wa.width)/2;
+                    wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16-wa.height)/2;
                 }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
                 continue;
@@ -248,8 +257,8 @@ struct TaskBar : Poll {
                 if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().setText( getTitle(id) );
                 else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
                 else continue;
-            } else if(e.type == UnmapNotify || e.type == DestroyNotify) {
-                XID id = (e.type==UnmapNotify?e.xunmap.window:e.xdestroywindow.window);
+            } else if(e.type == UnmapNotify || e.type == DestroyNotify || e.type == ReparentNotify || e.type == VisibilityNotify) {
+                XID id = (e.type==VisibilityNotify?e.xvisibility.window:e.xunmap.window);
                 int i = indexOf(tasks, Task(id));
                 if(i>=0) {
                     tasks.removeAt(i);

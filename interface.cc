@@ -20,14 +20,24 @@ void ScrollArea::update() {
     widget().update();
 }
 
-bool ScrollArea::mouseEvent(int2 position, Event event, Button button) {
+bool ScrollArea::mouseEvent(int2 cursor, Event event, Button button) {
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
         position.y += button==WheelUp?-32:32;
         position = max(size-abs(widget().sizeHint()),min(int2(0,0),position));
         return true;
     }
-    if(widget().mouseEvent(position-widget().position,event,button)) return true;
+    if(widget().mouseEvent(cursor-widget().position,event,button)) return true;
+    static int dragStart=0, flickStart=0;
+    if(event==Press && button==LeftButton) {
+        dragStart=cursor.y, flickStart=widget().position.y;
+    }
+    if(event==Motion && button==LeftButton && size.y<abs(widget().sizeHint().y)) {
+        int2& position = widget().position;
+        position.y = flickStart+cursor.y-dragStart;
+        position = max(size-abs(widget().sizeHint()),min(int2(0,0),position));
+        return true;
+    }
     return false;
 }
 

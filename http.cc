@@ -135,7 +135,7 @@ void HTTP::event(pollfd) {
     string file = cacheFile(url);
 
     // Status
-    if(!http.match("HTTP/1.1 "_)&&!http.match("HTTP/1.0 "_)) { log(http.until("\r\n\r\n"_)); warn("No HTTP",url); delete this; return; }
+    if(!http.match("HTTP/1.1 "_)&&!http.match("HTTP/1.0 "_)) { log(http.buffer); warn("No HTTP",url); delete this; return; }
     int status = toInteger(http.until(" "_));
     http.until("\r\n"_);
     if(status==200||status==301||status==302) {}
