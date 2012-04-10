@@ -55,10 +55,8 @@ void HTML::load(const URL& url, array<byte>&& document) {
             } else if(!e.name) {
                 score += e.content.size(); //raw text
             } else if(e.name=="img"_||e.name=="iframe"_) {
-                //int width = isInteger(e["width"_]) ? toInteger(e["width"_]) : 1;
                 int height = isInteger(e["height"_]) ? toInteger(e["height"_]) : 1;
-                if(e.name=="img"_) score += height; //image
-                //else if(e.name=="iframe"_) score += width*height; //video
+                if(e.name=="img"_ && !endsWith(e["src"_],".gif"_)) score += height; //image
             } else if(e.name=="br"_) { score += 32; //line break
             } else if(contains(ignoreElement,e.name)) {
             } else if(!contains(e.name,":"_)) warn("load: Unknown HTML tag",e.name);

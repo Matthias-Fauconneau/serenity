@@ -169,7 +169,7 @@ void Window::create() {
     windows[id] = this;
     gc = XCreateGC(x, id, 0, 0);
     setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
-    setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {Atom(_NET_WM_WINDOW_TYPE_NORMAL)});
+    setType(type?:Atom(_NET_WM_WINDOW_TYPE_NORMAL));
     if(title) setTitle(title);
     if(icon) setIcon(icon);
 }
@@ -232,7 +232,7 @@ void Window::setIcon(const Image& icon) {
         //setProperty("CARDINAL", "_NET_WM_ICON", buffer);
     } else {
         array<int> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
-        buffer[0]=icon.width, buffer[2]=icon.height;
+        buffer[0]=icon.width, buffer[1]=0; buffer[2]=icon.height, buffer[3]=0;
         for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
         buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
         setProperty("CARDINAL", "_NET_WM_ICON", buffer);

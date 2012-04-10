@@ -222,8 +222,9 @@ struct TextLayout {
                     link.end=glyphCount;
                     links << Text::Link{link.begin,link.end,move(link.identifier)};
                 }
-                if(format&Underline) lines << Line{underlineBegin,glyphCount};
-                format = ::format(c);
+                auto newFormat = ::format(c);
+                if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line{underlineBegin,glyphCount};
+                format=newFormat;
                 Font* lookup[] = {&defaultSans,&defaultBold,&defaultItalic,&defaultBoldItalic};
                 font=lookup[format&(Format::Bold|Format::Italic)];
                 if(format&Underline) underlineBegin=glyphCount;

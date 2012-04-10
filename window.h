@@ -98,7 +98,7 @@ struct Window : Poll {
     int2 size=zero;
     string title;
     Image icon;
-    Atom type;
+    Atom type=0;
     bool overrideRedirect=false;
 
     GC gc;

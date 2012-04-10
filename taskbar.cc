@@ -87,17 +87,16 @@ struct TaskBar : Application, Poll {
 
     void startButton() {
         if(!launcher.window.visible) { launcher.show(); return; }
+        launcher.window.hide();
+        tasks.setActive(-1);
+        window.render();
         for(XID id: getWindows()) {
             array<Atom> type=Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE");
             if(type.size()>=1 && (type[0]==Atom(_NET_WM_WINDOW_TYPE_DESKTOP)||type[0]==Atom(_NET_WM_WINDOW_TYPE_DOCK))) {
                 XRaiseWindow(x, id);
-            } else {
-                XLowerWindow(x, id);
             }
         }
         XFlush(x);
-        tasks.setActive(-1);
-        window.render();
     }
 
     string getTitle(XID id) {
@@ -195,7 +194,7 @@ struct TaskBar : Application, Poll {
         calendar.eventAlarm.connect(&calendar,&Popup<Calendar>::toggle);
         clock.triggered.connect(&calendar,&Popup<Calendar>::toggle);
 
-        window.setType(Atom("_NET_WM_WINDOW_TYPE_DOCK"_));
+        window.setType(Atom(_NET_WM_WINDOW_TYPE_DOCK));
         window.setOverrideRedirect(true);
         window.setPosition(int2(0, taskBarPosition==Top?0:-16));
         calendar.window.setOverrideRedirect(true);

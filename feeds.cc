@@ -7,7 +7,7 @@
 #include "window.h"
 #include "array.cc"
 
-Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; }
+Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
 Entry::Entry(string&& name, string&& link, Image&& icon):Item(move(icon),move(name)),link(move(link)){}
 Entry::~Entry() { if(content) delete content; }
 
@@ -133,7 +133,7 @@ void Feeds::itemPressed(int index) {
 void Feeds::readNext() {
     uint i=index;
     if(i>=count()-1) { window.hide(); return; }
-    while(!array::at(++i).content && isRead(array::at(i))) {}
+    while(array::at(++i).isHeader || isRead(array::at(i))) {}
     setActive(i);
     itemPressed(i);
 }

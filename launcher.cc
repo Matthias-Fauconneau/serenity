@@ -69,7 +69,7 @@ List<Command> readShortcuts() {
 }
 
 Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts })), window(&menu,""_,Image(),int2(-3,-3)) {
-    window.setType(Atom("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"));
+    window.setType(Atom(NET_WM_WINDOW_TYPE_DROPDOWN_MENU));
     window.setOverrideRedirect(true);
     window.localShortcut("Leave"_).connect(&window,&Window::hide);
     window.localShortcut("Escape"_).connect(&window,&Window::hide);

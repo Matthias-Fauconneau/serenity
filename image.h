@@ -13,7 +13,7 @@ struct Image {
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), own(o.own) { o.data=0; }
     Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; o.data=0; return *this; }
     Image(byte4* data, int width, int height,bool own):data(data),width(width),height(height),own(own){}
-    Image(int width, int height):data(allocate<byte4>(width*height)),width(width),height(height),own(true){
+    Image(int width, int height):data(width*height?allocate<byte4>(width*height):0),width(width),height(height),own(true){
         debug(clear(data,width*height,byte4(zero));)
     }
     Image(array<byte4>&& data, uint width, uint height);
