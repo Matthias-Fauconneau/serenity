@@ -71,28 +71,8 @@ struct StatusNotifierItem : TriggerButton {
     }
 };
 
-struct Clock : Text, Timer {
-    signal<> timeout;
-    signal<> triggered;
-    Clock():Text(str(date(),"hh:mm"_)){ setAbsolute(currentTime()/60*60+60); }
-    void expired() { text=str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout.emit(); }
-    bool mouseEvent(int2, Event event, Button button) override {
-        if(event==Press && button==LeftButton) { triggered.emit(); return true; }
-        return false;
-    }
-};
-
-ICON(shutdown);
-struct Desktop {
-    List<Command> shortcuts { readShortcuts() };
-    List<Command> system { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
-    HBox applets { &space, &shortcuts, &system };
-    Window window{&applets,""_,Image(),int2(0,Window::screen.y-16)};
-    Desktop() { window.setType(Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)); }
-};
-
 ICON(button);
-struct TaskBar : Poll {
+struct TaskBar : Application, Poll {
     DBus dbus;
     signal<int> tasksChanged;
 
@@ -101,7 +81,7 @@ struct TaskBar : Poll {
       Bar<Task> tasks;
       Bar<StatusNotifierItem> status;
       Clock clock;
-       Calendar calendar;
+       Popup<Calendar> calendar;
      HBox panel {&start, &tasks, &status, &clock };
     Window window{&panel,""_,Image(),int2(0,-1)};
 
@@ -164,7 +144,9 @@ struct TaskBar : Poll {
         char buffer[64]; XGetErrorText(x,error->error_code,buffer,sizeof(buffer)); log(buffer);
         return 0;
     }
-    TaskBar() {
+    TaskBar(array<string>&& arguments) {
+        taskBarPosition= contains(arguments,"bottom"_) ? Bottom : Top;
+
         XSetErrorHandler(xErrorHandler);
         x = XOpenDisplay(0);
         XSetWindowAttributes attributes; attributes.cursor=XCreateFontCursor(x,68);
@@ -194,17 +176,16 @@ struct TaskBar : Poll {
         tasks.expanding=true;
         clock.timeout.connect(&window, &Window::render);
         clock.timeout.connect(&calendar, &Calendar::checkAlarm);
-        clock.triggered.connect(&calendar,&Calendar::show);
+        calendar.eventAlarm.connect(&calendar,&Popup<Calendar>::toggle);
+        clock.triggered.connect(&calendar,&Popup<Calendar>::toggle);
 
         window.setType(Atom("_NET_WM_WINDOW_TYPE_DOCK"_));
         window.setOverrideRedirect(true);
+        window.setPosition(int2(0, taskBarPosition==Top?0:-16));
+        calendar.window.setPosition(int2(-300, taskBarPosition==Top?16:-316));
+        launcher.window.setPosition(int2(0, taskBarPosition==Top?16:(-16-abs(launcher.menu.sizeHint().y))));
         window.show();
     }
-    void setPosition(ScreenEdge position) {
-       window.setPosition(int2(0, position==Top?0:-16));
-       calendar.window.setPosition(int2(-300, position==Top?16:-316));
-       launcher.window.setPosition(int2(0, position==Top?16:(-16-abs(launcher.menu.sizeHint().y))));
-   }
     void event(pollfd) override {
         bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
@@ -278,21 +259,4 @@ struct TaskBar : Poll {
         if(needUpdate && window.visible) { panel.update(); window.render(); }
    }
 };
-
-struct Shell : Application {
-    TaskBar taskbar;
-    Desktop desktop;
-    Shell(array<string>&& arguments) {
-        if(contains(arguments,"bottom"_)) {
-            taskbar.setPosition(taskBarPosition=Bottom);
-        } else {
-            taskbar.setPosition(taskBarPosition=Top);
-            desktop.window.setPosition(int2(0,16));
-        }
-        taskbar.tasksChanged.connect(this,&Shell::tasksChanged);
-        tasksChanged(taskbar.tasks.array::size());
-        taskbar.window.show();
-    }
-    void tasksChanged(int count) { if(!count) desktop.window.show(); else desktop.window.hide(); }
-};
-Application(Shell)
+Application(TaskBar)

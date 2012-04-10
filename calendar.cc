@@ -83,21 +83,19 @@ void Month::previousMonth() { active.month--; if(active.month<0) active.year--, 
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
 
-Calendar::Calendar() {
+Calendar::Calendar():VBox({ &space, &date, &month, &space, &events, &space }) {
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
-    window.setType(Atom("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"));
-    window.setOverrideRedirect(true);
-    menu.close.connect(&window,&Window::hide);
+    month.activeChanged.connect(this,&Calendar::activeChanged);
 }
 
 void Calendar::previousMonth() {
     month.previousMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
-    events.setText(""_); menu.update(); window.render();
+    events.setText(""_); update();
 }
 void Calendar::nextMonth() {
     month.nextMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
-    events.setText(""_); menu.update(); window.render();
+    events.setText(""_); update();
 }
 
 void Calendar::activeChanged(int index) {
@@ -111,16 +109,12 @@ void Calendar::activeChanged(int index) {
         text << join(::getEvents(date),"\n"_);
     }
     events.setText(move(text));
-    if(window.visible) { menu.update(); window.render(); }
 }
 
-void Calendar::show() {
-    if(window.visible) { window.hide(); return; }
+void Calendar::update() {
     date[1].setText( format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) );
-    month.activeChanged.connect(this,&Calendar::activeChanged);
     month.setActive(::date());
-    menu.update();
-    window.show();
+    VBox::update();
 }
 
-void Calendar::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) show(); }
+void Calendar::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm.emit(); }

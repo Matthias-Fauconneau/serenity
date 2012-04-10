@@ -1,146 +1,119 @@
-#include "process.h"
+#include "feeds.h"
 #include "file.h"
 #include "http.h"
 #include "xml.h"
 #include "html.h"
-#include "array.cc"
 #include "interface.h"
 #include "window.h"
+#include "array.cc"
 
-struct Entry : Item {
-    string link;
-    Scroll<HTML>* content=0;
-    Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; }
-    Entry(string&& name, string&& link, Image&& icon=Image()):Item(move(icon),move(name)),link(move(link)){}
-    ~Entry() { if(content) delete content; }
-};
+Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; }
+Entry::Entry(string&& name, string&& link, Image&& icon):Item(move(icon),move(name)),link(move(link)){}
+Entry::~Entry() { if(content) delete content; }
 
-ICON(feeds);
+Feeds::Feeds() {
+    window.localShortcut("Escape"_).connect(&window, &Window::hide);
+    readConfig = appendFile(".config/read"_,home());
+    read = split(readFile(".config/read"_,home()),'\n');
+    reserve(256); //realloc would invalidate delegates
+    List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
+    List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
+    array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
+    for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 15*60);
+}
+Feeds::~Feeds() { close(readConfig); }
 
-struct Feeds : Application {
-    List<Entry> news;
-    HBox main { &news };
-    Window window{&main,"Feeds"_,move(feedsIcon),int2(0,0)};
-    Scroll<HTML>* content=0;
+bool Feeds::isRead(const Entry& entry) {
+    const Text& text = entry.get<Text>();
+    string id = text.text+entry.link;
+    return contains(read,id);
+}
+void Feeds::setRead(const Entry& entry) {
+    const Text& text = entry.get<Text>();
+    string id = text.text+entry.link;
+    id=replace(id,"\n"_,""_);
+    if(contains(read,id)) return;
+    read << id;
+    ::write(readConfig,string(id+"\n"_));
+}
 
-    int readConfig = appendFile(".config/read"_,home());
-    array<string> read = split(readFile(".config/read"_,home()),'\n');
+void Feeds::loadFeed(const URL& url, array<byte>&& document) {
+    Element feed = parseXML(move(document));
 
-    Feeds(array<string>&& arguments) {
-        news.reserve(256); //realloc would invalidate delegates
-        window.localShortcut("Escape"_).connect(this, &Feeds::quit);
-        news.activeChanged.connect(this,&Feeds::activeChanged);
-        news.itemPressed.connect(this,&Feeds::itemPressed);
-        if(arguments) {
-            content = new Scroll<HTML>;
-            content->contentChanged.connect(this, &Feeds::render);
-            main << &content->parent();
-            content->go(arguments.first());
-        } else {
-            array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
-            for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 15*60);
-        }
-        window.show();
-    }
-    ~Feeds() { close(readConfig); }
+    //Header
+    string title = feed.text("rss/channel/title"_); //RSS
+    if(!title) title = feed("feed"_)("title"_).text(); //Atom
+    if(!title) { warn("Invalid feed"_,url); return; }
+    array<string> words = split(title,' ');
+    if(words.size()>4) title=join(slice(words,0,4)," "_);
 
-    bool isRead(const Entry& entry) {
-        const Text& text = entry.get<Text>();
-        string id = text.text+entry.link;
-        return contains(read,id);
-    }
-    void setRead(const Entry& entry) {
-        const Text& text = entry.get<Text>();
-        string id = text.text+entry.link;
-        id=replace(id,"\n"_,""_);
-        if(contains(read,id)) return;
-        read << id;
-        ::write(readConfig,string(id+"\n"_));
-    }
-    void loadFeed(const URL&, array<byte>&& document) {
-        Element feed = parseXML(move(document));
+    string link = feed.text("rss/channel/link"_); //RSS
+    if(!link) link = feed("feed"_)("link"_)["href"_]; //Atom
+    if(!link) { warn("Invalid feed"_,url); return; }
 
-        //Header
-        string title = feed.text("rss/channel/title"_); //RSS
-        if(!title) title = feed("feed"_)("title"_).text(); //Atom
-        assert(title,feed);
-        array<string> words = split(title,' ');
-        if(words.size()>4) title=join(slice(words,0,4)," "_);
+    append( Entry(move(title),copy(link)) );
 
-        string link = feed.text("rss/channel/link"_); //RSS
-        if(!link) link = feed("feed"_)("link"_)["href"_]; //Atom
-        assert(link,feed);
+    string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
+    if(exists(favicon,cache)) {
+        last().get<Icon>().image = resize(decodeImage(readFile(favicon,cache)),16,16);
+    } else getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
 
-        news << Entry(move(title),copy(link));
+    int itemCount=0;
+    auto addItem = [this,&itemCount](const Element& e)->void{
+        if(itemCount++>32) return;
+        string text=e("title"_).text();
+        text=trim(unescape(text));
 
-        string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
-        if(exists(favicon,cache)) {
-            news.last().get<Icon>().image = resize(decodeImage(readFile(favicon,cache)),16,16);
-        } else getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
+        string url=e("link"_).text(); //RSS
+        if(!url) url=e("link"_)["href"_]; //Atom
 
-        int count=0;
-        auto addItem = [this,&count](const Element& e)->void{
-            if(count++>16) return;
-            string text=e("title"_).text();
-            text=trim(unescape(text));
-
-            string url=e("link"_).text(); //RSS
-            if(!url) url=e("link"_)["href"_]; //Atom
-
-            Entry entry(move(text),move(url));
-            if(!isRead(entry)) {
-                if(news.count()>=64){warn("Too many news"); return;}
-                news << move(entry);
-                Entry& item = news.last();
-                item.content= new Scroll<HTML>();
-                if(count<=4) item.content->go(item.link); //preload unread entries
-            }
-        };
-        feed.xpath("feed/entry"_,addItem); //Atom
-        feed.xpath("rss/channel/item"_,addItem); //RSS
-        render();
-    }
-    void getFavicon(const URL& url, array<byte>&& document) {
-        Element page = parseHTML(move(document));
-        string icon;
-        page.xpath("html/head/link"_,[&icon](const Element& e)->void{ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
-        if(!icon) icon="/favicon.ico"_;
-        if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink("../"_+cacheFile(url.relative(icon)),cacheFile(url.relative("/favicon.ico"_)),cache);
-        for(Entry& entry: news) {
-            if(contains(entry.link,url.host)) {
-                new ImageLoader(url.relative(icon), &entry.get<Icon>().image, delegate<void()>(this,&Feeds::render), int2(16,16), 7*24*60*60);
-                break; //only header
-            }
-        }
-    }
-
-    void activeChanged(int index) {
-        Entry& entry = news[index];
-        if(!entry.content) return; //header
+        Entry entry(move(text),move(url));
         if(!isRead(entry)) {
-            Text& text = entry.get<Text>();
-            setRead(entry);
-            text.setSize(12);
+            if(count()>=64){warn("Too many news"); return;}
+            append(move(entry));
+            Entry& item = last();
+            item.content= new Scroll<HTML>();
+            if(itemCount<=4) item.content->go(item.link); //preload unread entries
         }
-        //TODO: show if in cache
-        render();
-    }
-    void itemPressed(int index) {
-        Entry& entry = news[index];
-        main.clear();
-        if(content) content->contentChanged.disconnect(this);
-        if(entry.content) {
-            content= entry.content;
-            content->contentChanged.connect(this, &Feeds::render);
-            main << &news << &content->parent();
-        } else {
-            content= entry.content= new Scroll<HTML>();
-            content->contentChanged.connect(this, &Feeds::render);
-            main << &news << &content->parent();
-            content->go(entry.link);
+    };
+    feed.xpath("feed/entry"_,addItem); //Atom
+    feed.xpath("rss/channel/item"_,addItem); //RSS
+    contentChanged.emit();
+}
+
+void Feeds::getFavicon(const URL& url, array<byte>&& document) {
+    Element page = parseHTML(move(document));
+    string icon;
+    page.xpath("html/head/link"_,[&icon](const Element& e)->void{ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
+    if(!icon) icon="/favicon.ico"_;
+    if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink("../"_+cacheFile(url.relative(icon)),cacheFile(url.relative("/favicon.ico"_)),cache);
+    for(Entry& entry: *this) {
+        if(contains(entry.link,url.host)) {
+            new ImageLoader(url.relative(icon), &entry.get<Icon>().image, contentChanged, int2(16,16), 7*24*60*60);
+            break; //only header
         }
-        render();
+   }
+}
+
+void Feeds::activeChanged(int index) {
+    Entry& entry = array::at(index);
+    if(!entry.content) return; //header
+    if(!isRead(entry)) {
+        Text& text = entry.get<Text>();
+        setRead(entry);
+        text.setSize(12);
     }
-    void render() { if(window.visible) { main.update(); window.render(); }}
-};
-Application(Feeds)
+    contentChanged.emit();
+}
+
+void Feeds::itemPressed(int index) {
+    Entry& entry = array::at(index);
+    Scroll<HTML>* content = entry.content?:new Scroll<HTML>();
+    window.widget = &content->parent();
+    window.setTitle(entry.get<Text>().text);
+    window.setIcon(entry.get<Icon>().image);
+    window.setSize(int2(0,0));
+    if(!entry.content) { entry.content=content; content->go(entry.link); }
+    window.show();
+    content->contentChanged.connect(&window, &Window::render);
+}

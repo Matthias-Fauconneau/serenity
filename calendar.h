@@ -16,16 +16,32 @@ struct Month : Grid<Text> {
     void nextMonth();
 };
 
-struct Calendar {
+struct Calendar : VBox {
     HList<Text> date = { "<"_, ""_, ">"_ };
     Month month;
     Text events;
-    Menu menu { &date, &month, &space, &events, &space };
-    Window window{&menu,""_,Image(),int2(300,300)};
+    signal<> eventAlarm;
     Calendar();
     void previousMonth();
     void nextMonth();
     void activeChanged(int index);
-    void show();
+    void update();
     void checkAlarm();
+};
+
+template<class T> struct Popup : T {
+    Window window{this,""_,Image(),int2(300,300)};
+    Popup() { window.localShortcut("Leave"_).connect(&window,&Window::hide); }
+    void toggle() { if(window.visible) window.hide(); else { T::update(); window.show(); } }
+};
+
+struct Clock : Text, Timer {
+    signal<> timeout;
+    signal<> triggered;
+    Clock(int size=16):Text(str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
+    void expired() { text=str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout.emit(); }
+    bool mouseEvent(int2, Event event, Button button) override {
+        if(event==Press && button==LeftButton) { triggered.emit(); return true; }
+        return false;
+    }
 };

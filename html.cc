@@ -77,6 +77,7 @@ void HTML::load(const URL& url, array<byte>&& document) {
 
     /*log("HTML\n"_+str(content));
     warn(url,max,second,count());*/
+    update();
     contentChanged.emit();
 }
 
@@ -134,19 +135,18 @@ void HTML::flushImages() {
         list->reserve(w);
         for(uint x=0;x<w && i<images.size();x++,i++) {
             *list << ImageView();
-            new ImageLoader(images[i], &(*list).last().image,delegate<void()>(&this->contentChanged,&signal<>::emit));
+            new ImageLoader(images[i], &(*list).last().image,delegate<void()>(this,&HTML::imageLoaded));
         }
         append( list );
     }
     images.clear();
 }
+void HTML::imageLoaded() {
+    update();
+    contentChanged.emit();
+}
 
 void HTML::clear() {
     for(Widget* w: *this) delete w;
     VBox::clear();
-}
-
-void HTML::render(int2 parent) {
-    fill(parent+position+Rect(int2(0,0),Widget::size),byte4(240,240,240,240));
-    VBox::render(parent);
 }

@@ -11,7 +11,7 @@ static Element parse(array<byte>&& document, bool html) {
         s.skip();
         if(s.match("</"_)) warn("Unexpected","</"_+s.until(">"_)+">"_);
         else if(s.match("<"_)) root.children << Element(s,html);
-        else error("Unexpected '",s.until("\n"_),"'");
+        else warn("Unexpected '",s.until("\n"_),"'");
         s.skip();
     }
     return root;
@@ -27,7 +27,7 @@ Element::Element(TextBuffer& s, bool html) {
     else if(s.match("!--"_)) { s.until("-->"_); return; }
     else if(s.match("?"_)){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
     else name=s.xmlIdentifier();
-    if(!name) { log((string)slice(s.buffer,0,s.index)); error("expected tag name got",s.until("\n"_)); }
+    if(!name) { log((string)slice(s.buffer,0,s.index)); warn("expected tag name got",s.until("\n"_)); }
     if(html) name=toLower(name);
     s.skip();
     while(!s.match(">"_)) {
@@ -67,8 +67,6 @@ Element::Element(TextBuffer& s, bool html) {
             if(content) children << Element(move(content));
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
-        //else if(s.match("</"_)) { log((string)slice(s.buffer,start,s.index-start),"^",s.until(">"_)); error("Expecting","</"_+name+">"_); }
-        //else if(s.match("</"_)) { warn("Expecting","</"_+name+">"_,"got",s.until(">"_)); }
         else if(s.match("</"_)) { s.until(">"_); } //ignore
         else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
         else if(s.match("<"_)) children << Element(s,html);

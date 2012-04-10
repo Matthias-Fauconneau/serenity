@@ -90,9 +90,11 @@ typedef double double2 __attribute__ ((vector_size(16)));
 #ifdef DEBUG
 /// compile \a statements in executable only if \a DEBUG flag is set
 #define debug( statements... ) statements
+void logTrace(int skip=1);
 /// compile \a statements in executable only if \a DEBUG flag is not set
 #else
 #define debug( statements... )
+void logTrace() {}
 #endif
 
 #ifdef TRACE
@@ -103,10 +105,6 @@ extern bool trace_enable;
 #define trace_on
 #define trace_off
 #endif
-
-void logTrace(int skip=1);
-/// Aborts the process without any message, stack trace is logged
-#define fail() ({debug( trace_off; logTrace(); )  __builtin_abort(); })
 
 /// Memory
 #define _NEW

@@ -194,7 +194,7 @@ void HTTP::event(pollfd) {
         }
     }
     if(!content) { log("Missing content",(string&)http.buffer); delete this; return; }
-    log("Downloaded",url,content.size()/1024,"KB");
+    log("Downloaded",url,content.size()/1024,"KB",chunked);
 
     // Cache
     redirect << file;

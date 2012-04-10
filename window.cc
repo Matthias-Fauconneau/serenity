@@ -42,7 +42,7 @@ static int xErrorHandler(Display* x, XErrorEvent* error) {
     return 0;
 }
 
-Window::Window(Widget* widget, const string& title, const Image& icon, int2 size) : size(size), title(copy(title)), icon(copy(icon)), widget(*widget) {
+Window::Window(Widget* widget, const string& title, const Image& icon, int2 size) : size(size), title(copy(title)), icon(copy(icon)), widget(widget) {
     if(!x) {
         XSetErrorHandler(xErrorHandler);
         x = XOpenDisplay(0);
@@ -75,16 +75,18 @@ void Window::update() {
 bool Window::event(const XEvent& e) {
     assert(id);
     if(e.type==MotionNotify) {
-        return widget.mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, (e.xmotion.state&Button1Mask)?LeftButton:None);
+        return widget->mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, (e.xmotion.state&Button1Mask)?LeftButton:None);
     } else if(e.type==ButtonPress) {
-        return widget.mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
+        return widget->mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
     } else if(e.type==KeyPress) {
         KeySym key = XKeycodeToKeysym(x,e.xkey.keycode,0);
         signal<>* shortcut = localShortcuts.find(key);
         if(shortcut) shortcut->emit(); //local window shortcut
         else if(focus) return focus->keyPress((Key)key); //normal keyPress event
     } else if(e.type==EnterNotify || e.type==LeaveNotify) {
-        return widget.mouseEvent(int2(e.xcrossing.x,e.xcrossing.y), e.type==EnterNotify?Enter:Leave, (e.xcrossing.state&Button1Mask)?LeftButton:None);
+        signal<>* shortcut = localShortcuts.find(Leave);
+        if(shortcut) shortcut->emit(); //local window shortcut
+        return widget->mouseEvent(int2(e.xcrossing.x,e.xcrossing.y), e.type==EnterNotify?Enter:Leave, (e.xcrossing.state&Button1Mask)?LeftButton:None);
     } else if(e.type==Expose && !e.xexpose.count) {
         return true;
     } else if(e.type==ConfigureNotify || e.type==ReparentNotify) {
@@ -101,7 +103,7 @@ bool Window::event(const XEvent& e) {
     } else if(e.type==ClientMessage) {
         signal<>* shortcut = localShortcuts.find(Escape);
         if(shortcut) shortcut->emit(); //local window shortcut
-        else widget.keyPress(Escape);
+        else widget->keyPress(Escape);
     }
     return false;
 }
@@ -136,12 +138,12 @@ void Window::render() {
     if(position.x+size.x<screen.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
     if(position.x>0 && position.y+size.y<screen.y-1) framebuffer(0,size.y-1) /= 2;
     if(position.x+size.x<screen.x-1 && position.y+size.y<screen.y-1) framebuffer(size.x-1,size.y-1) /= 2;*/
-    if(widget.size!=size) {
-        widget.size=size;
-        widget.update();
+    if(widget->size!=size) {
+        widget->size=size;
+        widget->update();
     }
     push(Rect(int2(image->width,image->height)));
-    widget.render(int2(0,0));
+    widget->render(int2(0,0));
     finish();
     XShmPutImage(x,id,gc,image,0,0,0,0,image->width,image->height,0);
     XFlush(x);
@@ -184,7 +186,7 @@ void Window::setPosition(int2 position) {
 
 void Window::setSize(int2 size) {
     if(size.x<0||size.y<0) {
-        int2 hint=widget.sizeHint(); assert(hint,hint);
+        int2 hint=widget->sizeHint(); assert(hint,hint);
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
@@ -209,8 +211,8 @@ void Window::setFullscreen(bool) {
 
 void Window::setTitle(const string& title) {
     this->title=copy(title);
-    if(!id) return;
-    setProperty("UTF8_STRING", "_NET_WM_NAME", title);
+    if(!title) { logTrace(); warn("Empty window title"); }
+    if(id) setProperty("UTF8_STRING", "_NET_WM_NAME", title);
 }
 
 void Window::setIcon(const Image& icon) {
@@ -249,6 +251,7 @@ void Window::setFocus(Widget* focus) {
 }
 
 signal<>& Window::localShortcut(const string& key) {
+    if(key=="Leave"_) return localShortcuts[Leave];
     KeySym keysym = XStringToKeysym(strz(key).data());
     assert(keysym != NoSymbol);
     assert(!localShortcuts.contains(keysym));

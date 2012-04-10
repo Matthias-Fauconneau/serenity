@@ -23,10 +23,12 @@ FLAGS_font = -I/usr/include/freetype2
 SRCS = $(SRCS_$(TARGET))
 SRCS_music += png inflate
 SRCS_player += png inflate
-SRCS_taskbar += png inflate
-SRCS_feeds += png inflate jpeg ico
+SRCS_taskbar += png inflate jpeg ico
 
 LIBS__debug = bfd
+LIBS__fast = bfd
+LIBS__trace = bfd
+LIBS__memory = bfd
 LIBS_time = rt
 LIBS_alsa = asound
 LIBS_http = ssl

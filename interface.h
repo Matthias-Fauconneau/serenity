@@ -50,7 +50,8 @@ struct Widget {
 
 /// Space is a proxy Widget to add space as needed
 struct Space : Widget {
-    int2 sizeHint() { return int2(-1,-1); }
+    int2 size=int2(-1,-1);
+    int2 sizeHint() { return size; }
     void render(int2) {}
 };
 extern Space space; // same dummy instance can be reused
@@ -244,15 +245,6 @@ template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {
 template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelection {
     Grid(int width, int height):UniformGrid(width,height){}
     Grid(array<T>&& items) : ListSelection<T>(move(items)){}
-};
-
-/// Menu is a \a VBox which send \a close signal on mouse leave or when accepting any event.
-/// \note Dropdown menus can be implemented by embedding \a Menu in a \a Window
-struct Menu : VBox {
-    signal<> close;
-    Menu(std::initializer_list<Widget*>&& widgets):VBox(move(widgets)){}
-    bool mouseEvent(int2 position, Event event, Button button) override;
-    bool keyPress(Key key) override;
 };
 
 /// Rich text format control code encoded in 00-1F range

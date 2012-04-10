@@ -22,10 +22,9 @@ List<Command> readShortcuts();
 struct Launcher {
     Search search;
     List<Command> shortcuts;
-    Menu menu;
+    VBox menu;
     Window window;
 
     Launcher();
     void show();
-    void keyPress(Key key);
 };

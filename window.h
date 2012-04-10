@@ -103,5 +103,5 @@ struct Window : Poll {
     XImage* image=0;
     XShmSegmentInfo shminfo;
 
-    Widget& widget;
+    Widget* widget;
 };

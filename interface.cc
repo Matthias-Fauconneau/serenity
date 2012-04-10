@@ -150,20 +150,6 @@ void UniformGrid::update() {
     }
 }
 
-/// Menu
-
-bool Menu::mouseEvent(int2 position, Event event, Button button) {
-    if(Vertical::mouseEvent(position,event,button)) return true;
-    if(event==Leave) close.emit();
-    return false;
-}
-
-bool Menu::keyPress(Key key) {
-    if(Vertical::keyPress(key)) return true;
-    if(key==Escape) { close.emit(); return true; }
-    return false;
-}
-
 /// Text
 
 struct TextLayout {
