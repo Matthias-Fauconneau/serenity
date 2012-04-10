@@ -21,9 +21,10 @@ FLAGS__memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MAL
 FLAGS_font = -I/usr/include/freetype2
 
 SRCS = $(SRCS_$(TARGET))
-SRCS_music += png inflate
+SRCS_taskbar += png inflate
+SRCS_desktop += png inflate jpeg ico
 SRCS_player += png inflate
-SRCS_taskbar += png inflate jpeg ico
+SRCS_music += png inflate
 
 LIBS__debug = bfd
 LIBS__fast = bfd
@@ -37,10 +38,10 @@ LIBS_font = freetype
 LIBS_window = X11 Xext
 
 ICONS = $(ICONS_$(TARGET))
+ICONS_taskbar := button
+ICONS_desktop := shutdown
 ICONS_player := play pause next
-ICONS_feeds := feeds
 ICONS_music := music music256
-ICONS_taskbar := button shutdown
 
 SRCS += $(ICONS:%=icons/%)
 

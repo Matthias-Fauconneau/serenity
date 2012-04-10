@@ -152,7 +152,7 @@ void HTTP::event(pollfd) {
         warn("Not Found",url);
         delete this; return;
     } else {
-        log(http.until("\r\n\r\n"_)); warn("Unhandled response for",url,headers);
+        log(http.until("\r\n\r\n"_)); warn("Unhandled status",status,"from",url,headers);
         delete this; return;
     }
 
@@ -194,7 +194,7 @@ void HTTP::event(pollfd) {
         }
     }
     if(!content) { log("Missing content",(string&)http.buffer); delete this; return; }
-    log("Downloaded",url,content.size()/1024,"KB",chunked);
+    log("Downloaded",url,content.size()/1024,"KB");
 
     // Cache
     redirect << file;

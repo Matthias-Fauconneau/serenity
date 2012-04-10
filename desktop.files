@@ -40,3 +40,5 @@ html.cc
 html.h
 
 feeds.cc
+desktop.cc
+taskbar.cc

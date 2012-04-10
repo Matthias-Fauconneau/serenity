@@ -33,10 +33,6 @@ int getCPUTime() {
             usage.ru_utime.tv_sec*1000+usage.ru_utime.tv_usec/1000; //kernel time in ms
 }
 
-#if DEBUG
-map<const char*, int> profile;
-#endif
-
 void execute(const string& path, const array<string>& args) {
     array<string> args0(1+args.size());
     args0 << strz(path);
@@ -71,75 +67,16 @@ int waitEvents() {
     return polls.size();
 }
 
-#ifdef TRACE
-bool trace_enable = false;
-struct Trace {
-    // trace ring buffer
-    void** buffer;
-    int size=256;
-    int index=0;
-    // keep call stack leading to beginning of trace ring buffer
-    array<void*> stack;
-
-    Trace() { buffer=new void*[size]; clear(buffer,size); }
-    void trace(void* function) {
-        for(int loopSize=1;loopSize<=16;loopSize++) { //foreach loop size
-            int depth=0;
-            for(int i=loopSize;i>0;i--) { //find loop
-                if(buffer[(index+size-i)%size]/*current*/ != buffer[(index+size-i-loopSize)%size]/*previous iteration*/) {
-                    goto mismatch;
-                }
-                if(buffer[(index+size-i)%size]) depth++; else depth--;
-                if(depth<0) goto mismatch;
-            }
-            if(depth!=0) goto mismatch;
-            //found loop, erase repetition
-            index = (index+size-loopSize)%size;
-            break;
-            mismatch: ;
-        }
-        void* last = buffer[index];
-        if(last) stack << last;
-        else if(stack.size) stack.removeLast();
-        buffer[index++] = function;
-        if(index==size) index=0;
-    }
-    void log() {
-        trace_off;
-        int depth=0;
-        for(;depth<stack.size-1;depth++) {
-            Symbol s = findNearestLine(stack[depth]);
-            for(int i=0;i<depth;i++) ::log_(' ');
-            ::log(s.function);
-        }
-        for(int i=0;i<size;i++) {
-            void* function = buffer[index++];
-            if(index==size) index=0;
-            if(!function) { depth--; continue; } else depth++;
-            Symbol s = findNearestLine(function);
-            for(int i=0;i<depth-1;i++) ::log_(' ');
-            ::log(s.function);
-        }
-    }
-} trace __attribute((init_priority(102)));
-
-#define no_trace(function) declare(function,no_instrument_function)
-no_trace(extern "C" void __cyg_profile_func_enter(void* function, void*)) { if(trace_enable) { trace_off; trace.trace(function); trace_on; }}
-no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enable) { trace_off; trace.trace(0); trace_on; } }
-
-void logTrace() { trace.log(); logBacktrace(StackFrame::current()->caller_frame); }
-#endif
-
 #ifdef PROFILE
 /// Profiler
 
-bool trace_enable = false;
-struct Trace {
+static bool trace = false;
+struct Profile {
     array<void*> stack;
     array<int> enter;
     map<void*,int> profile;
 
-    Trace() { trace_enable=true; }
+    Profile() { trace=true; }
     void trace(void* function) {
         if(function) {
             stack << function;
@@ -151,17 +88,17 @@ struct Trace {
             profile[function] += time;
         }
     }
-} trace __attribute((init_priority(102)));
+} profile __attribute((init_priority(102)));
 
 #define no_trace(function) declare(function,no_instrument_function)
-no_trace(extern "C" void __cyg_profile_func_enter(void* function, void*)) { if(trace_enable) { trace_off; trace.trace(function); trace_on; }}
-no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace_enable) { trace_off; trace.trace(0); trace_on; } }
+no_trace(extern "C" void __cyg_profile_func_enter(void* function, void*)) { if(trace) { trace=0; profile.trace(function); trace=1; }}
+no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace) { trace=0; profile.trace(0); trace=1; } }
 
 void logProfile() {
-    trace_off;
-    for(auto e: trace.profile) {
+    trace=0;
+    for(auto e: profile.profile) {
         if(e.value>40) log(toString(e.value)+"\t"_+findNearestLine(e.key).function);
     }
-    trace_on;
+    trace=1;
 }
 #endif

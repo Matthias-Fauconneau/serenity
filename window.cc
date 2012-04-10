@@ -55,8 +55,8 @@ Window::Window(Widget* widget, const string& title, const Image& icon, int2 size
 
 string str(const Window& window) { return str(window.id); }
 
-void Window::event(pollfd) { update(); }
-void Window::update() {
+void Window::event(pollfd) { processEvents(); }
+void Window::processEvents() {
     array<XID> needRender;
     while(XEventsQueued(x, QueuedAfterFlush)) {
         XEvent e; XNextEvent(x,&e);
@@ -109,6 +109,12 @@ bool Window::event(const XEvent& e) {
 }
 
 template<class T> T mix(const T& a,const T& b, float t) { return a*t + b*(1-t); }
+
+void Window::update() {
+    widget->size=size;
+    widget->update();
+    render();
+}
 
 void Window::render() {
     assert(id);
@@ -173,7 +179,7 @@ void Window::show() {
     XMapWindow(x, id);
     XRaiseWindow(x, id);
     XSync(x,0);
-    update();
+    processEvents();
 }
 void Window::hide() { if(id) { XUnmapWindow(x, id); XFlush(x); } }
 

@@ -64,7 +64,7 @@ struct ScrollArea : Widget {
     /// Ensures \a target is visible inside the region of the viewport
     /// \note Assumes \a target is a direct child of the proxied \a widget
     void ensureVisible(Widget& target);
-    /// Expanding directions
+    /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
 
     int2 sizeHint() { return widget().sizeHint(); }

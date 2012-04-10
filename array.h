@@ -2,9 +2,6 @@
 #include "core.h"
 #include <initializer_list>
 
-// inline \a at cannot use assert from string.h
-#define fail() ({debug( trace_off; logTrace(); )  __builtin_abort(); })
-
 inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
 
 /// \a array is a typed and bound-checked handle to a memory buffer using move semantics to avoid reference counting
@@ -67,8 +64,8 @@ template<class T> struct array {
 
     /// Accessors
     /// \note For arrays always allocated on heap, array.buffer[i] can be used to avoid checking for the inline array case
-    const T& at(uint i) const { debug(if(i>=size())fail();) return data()[i]; }
-    T& at(uint i) { debug(if(i>=size())fail();) return (T&)data()[i]; }
+    const T& at(uint i) const { debug(if(i>=size())logTrace(),__builtin_abort();) return data()[i]; }
+    T& at(uint i) { debug(if(i>=size())logTrace(),__builtin_abort();) return (T&)data()[i]; }
     const T& operator [](uint i) const { return at(i); }
     T& operator [](uint i) { return at(i); }
     const T& first() const { return at(0); }

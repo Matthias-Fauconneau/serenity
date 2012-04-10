@@ -52,14 +52,6 @@ void execute(const string& path, const array<string>& args=array<string>());
 
 /// Returns CPU time in milliseconds consumed since start of process
 int getCPUTime();
-#if DEBUG
-extern map<const char*, int> profile;
-/// Times \a statements and add to the process CPU usage profile
-/// \note use getCPUTime to profile kernel time and avoid other interference from other processes (adapted to longer tasks)
-#define profile(name, statements ) { int start=getCPUTime(); statements; profile[#name]+=getCPUTime()-start; }
-#else
-#define profile(name, statements ) { statements; }
-#endif
 
 /// Log the corresponding assembly the first time \a statements is executed
 void disasm(array<ubyte> code);

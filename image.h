@@ -18,7 +18,7 @@ struct Image {
     }
     Image(array<byte4>&& data, uint width, uint height);
 
-    ~Image(){ if(data && own) delete data; }
+    ~Image(){ if(data && own) { delete data; data=0; } }
     explicit operator bool() const { return data; }
 
     byte4 get(uint x, uint y) const { if(x>=width||y>=height) return byte4(0,0,0,0); return data[y*width+x]; }

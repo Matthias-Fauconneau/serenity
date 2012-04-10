@@ -1,13 +1,12 @@
 #pragma once
 #include "interface.h"
 #include "window.h"
-
-struct URL;
-struct HTML;
+#include "html.h"
 
 struct Entry : Item {
+    bool isHeader=false;
     string link;
-    Scroll<HTML>* content=0;
+    Scroll<HTML>* content=new Scroll<HTML>;
     Entry(Entry&& o);
     Entry(string&& name, string&& link, Image&& icon=Image());
     ~Entry();

@@ -85,6 +85,21 @@ struct TaskBar : Application, Poll {
      HBox panel {&start, &tasks, &status, &clock };
     Window window{&panel,""_,Image(),int2(0,-1)};
 
+    void startButton() {
+        if(!launcher.window.visible) { launcher.show(); return; }
+        for(XID id: getWindows()) {
+            array<Atom> type=Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE");
+            if(type.size()>=1 && (type[0]==Atom(_NET_WM_WINDOW_TYPE_DESKTOP)||type[0]==Atom(_NET_WM_WINDOW_TYPE_DOCK))) {
+                XRaiseWindow(x, id);
+            } else {
+                XLowerWindow(x, id);
+            }
+        }
+        XFlush(x);
+        tasks.setActive(-1);
+        window.render();
+    }
+
     string getTitle(XID id) {
         string name = Window::getProperty<char>(id,"_NET_WM_NAME");
         if(!name) name = Window::getProperty<char>(id,"WM_NAME");
@@ -144,6 +159,7 @@ struct TaskBar : Application, Poll {
         char buffer[64]; XGetErrorText(x,error->error_code,buffer,sizeof(buffer)); log(buffer);
         return 0;
     }
+
     TaskBar(array<string>&& arguments) {
         taskBarPosition= contains(arguments,"bottom"_) ? Bottom : Top;
 
@@ -172,7 +188,7 @@ struct TaskBar : Application, Poll {
         }
 
         start.image = resize(buttonIcon, 16,16);
-        start.triggered.connect(&launcher,&Launcher::show);
+        start.triggered.connect(this,&TaskBar::startButton);
         tasks.expanding=true;
         clock.timeout.connect(&window, &Window::render);
         clock.timeout.connect(&calendar, &Calendar::checkAlarm);
@@ -182,10 +198,12 @@ struct TaskBar : Application, Poll {
         window.setType(Atom("_NET_WM_WINDOW_TYPE_DOCK"_));
         window.setOverrideRedirect(true);
         window.setPosition(int2(0, taskBarPosition==Top?0:-16));
+        calendar.window.setOverrideRedirect(true);
         calendar.window.setPosition(int2(-300, taskBarPosition==Top?16:-316));
         launcher.window.setPosition(int2(0, taskBarPosition==Top?16:(-16-abs(launcher.menu.sizeHint().y))));
         window.show();
     }
+
     void event(pollfd) override {
         bool needUpdate = false;
         while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);

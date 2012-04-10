@@ -13,6 +13,6 @@ template<> inline void log(const string& args) { write_(1,args+"\n"_); }
 /// Display variable name and its value
 #define var(v) ({ auto t=v; debug( log(#v##_, t); )  t; })
 /// Aborts unconditionally and display \a message
-#define error(message...) ({debug( trace_off; logTrace(); ) log(message); __builtin_abort();})
+#define error(message...) ({ logTrace(); log(message); __builtin_abort();})
 /// Aborts if \a expr evaluates to false and display \a message (except stack trace)
-#define assert(expr, message...) ({debug( if(!(expr)) { trace_off; logTrace(); log(#expr##_, ##message); __builtin_abort();})})
+#define assert(expr, message...) ({debug( if(!(expr)) { logTrace(); log(#expr##_, ##message); __builtin_abort();})})

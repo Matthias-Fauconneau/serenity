@@ -14,7 +14,7 @@ template<class R, class... Args> struct delegate<R(Args...)> {
     };
     delegate():_this(0),member(0){}
     template<class C, class B, predicate(is_base_of(B,C))> delegate(C* _this, R (B::*method)(Args...))
-        : _this((VoidClass*)(B*)_this), member((R(VoidClass::*)(Args...))method) {}
+        : _this((VoidClass*)static_cast<B*>(_this)), member((R(VoidClass::*)(Args...))method) {}
     R operator ()(Args... args) const { assert(this); return method(_this,move(args)...); }
 };
 template<class... Args> bool operator ==(const delegate<Args...>& a, const delegate<Args...>& b) {
@@ -26,7 +26,7 @@ template<class... Args> struct signal {
     array< delegate<void()> > slots;
     void emit(Args... args) { for(delegate<void()>& slot: slots) (*(delegate<void(Args...)>*)&slot)(copy(args)...);  }
     template<class C, class B, predicate(is_base_of(B,C))> void connect(C* _this, void (B::*method)(Args...)) {
-        slots.append( delegate<void()>(_this, (void (C::*)())method) );
+        slots.append( delegate<void()>(_this, (void (B::*)())method) );
     }
     void connect(signal<Args...>* signal) { connect(signal, &signal::emit); }
     operator delegate<void()>() { return delegate<void()>(this, &signal::emit); }

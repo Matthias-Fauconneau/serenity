@@ -22,7 +22,7 @@ struct string : array<char> {
     string(const char* begin,const char* end):array<char>(begin,end){}
     string(utf8_iterator begin,utf8_iterator end):array<char>(begin.pointer,end.pointer){}
 
-    uint at(uint index) const { utf8_iterator it=begin(); for(uint i=0;it!=end();++it,++i) if(i==index) return *it; fail(); }
+    uint at(uint index) const { utf8_iterator it=begin(); for(uint i=0;it!=end();++it,++i) if(i==index) return *it; logTrace(); __builtin_abort(); }
     uint operator [](uint i) const { return at(i); }
 
     const utf8_iterator begin() const { return array::begin(); }

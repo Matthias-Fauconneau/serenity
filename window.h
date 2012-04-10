@@ -13,18 +13,20 @@
 
 #define Atom(name) XInternAtom(Window::x, #name, 1)
 
-/// Window embeds \a widget in an X11 window, displaying it and forwarding user input.
+/// Window embeds \a widget in an X11 window, displaying it and forwarding user input
 struct Window : Poll {
     no_copy(Window)
     /// Initialize an X11 window for \a widget
     /// \note Windows are initially hidden, use \a show to display windows.
-    /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show.
+    /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show
     Window(Widget* widget, const string &name=string(), const Image &icon=Image(), int2 size=int2(-1,-1));
     /// Create the window
     void create();
-    /// Update the window by handling any incoming events
+    /// Process any incoming events
+    void processEvents();
+    /// Recursively \a update the whole widget hierarchy and render
     void update();
-    /// Repaint window contents. Called by update after an event is accepted by a widget.
+    /// Repaint window contents. Also automatically called when any event is accepted by a widget
     void render();
 
     /// Show window

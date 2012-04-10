@@ -94,16 +94,7 @@ void logTrace(int skip=1);
 /// compile \a statements in executable only if \a DEBUG flag is not set
 #else
 #define debug( statements... )
-void logTrace() {}
-#endif
-
-#ifdef TRACE
-extern bool trace_enable;
-#define trace_on trace_enable=true
-#define trace_off trace_enable=false
-#else
-#define trace_on
-#define trace_off
+inline void logTrace() {}
 #endif
 
 /// Memory

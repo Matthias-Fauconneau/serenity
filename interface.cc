@@ -6,6 +6,9 @@
 #include "array.cc"
 template struct array<Widget*>;
 template struct array<Text>;
+template struct array<Text::Blit>;
+template struct array<Text::Line>;
+template struct array<Text::Link>;
 /// Sets the array size to \a size, filling with \a value
 template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }
 
@@ -15,8 +18,11 @@ Space space;
 
 void ScrollArea::update() {
     int2 hint = abs(widget().sizeHint());
-    widget().position = min(int2(0,0), max(size-hint, widget().position));
-    widget().size = max(int2(horizontal?hint.x:0,vertical?hint.y:0), size);
+    if(size.x > hint.x) widget().position.x = (size.x-hint.x)/2;
+    else widget().position.x = min(0, max(size.x-hint.x, widget().position.x));
+    if(size.y > hint.y) widget().position.y = (size.y-hint.y)/2;
+    else widget().position.y = min(0, max(size.y-hint.y, widget().position.y));
+    widget().size = int2(hint.x,hint.y);
     widget().update();
 }
 
@@ -24,7 +30,7 @@ bool ScrollArea::mouseEvent(int2 cursor, Event event, Button button) {
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
         position.y += button==WheelUp?-32:32;
-        position = max(size-abs(widget().sizeHint()),min(int2(0,0),position));
+        position.y = max(size.y-abs(widget().sizeHint().y),min(0,position.y));
         return true;
     }
     if(widget().mouseEvent(cursor-widget().position,event,button)) return true;
@@ -35,7 +41,7 @@ bool ScrollArea::mouseEvent(int2 cursor, Event event, Button button) {
     if(event==Motion && button==LeftButton && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
         position.y = flickStart+cursor.y-dragStart;
-        position = max(size-abs(widget().sizeHint()),min(int2(0,0),position));
+        position.y = max(size.y-abs(widget().sizeHint().y),min(0,position.y));
         return true;
     }
     return false;
@@ -137,7 +143,7 @@ int2 UniformGrid::sizeHint() {
         int2 size=at(i).sizeHint();
         max = ::max(max,size);
     }
-    return int2(w,h)*max;
+    return int2(-w,-h)*max; //always expanding
 }
 
 void UniformGrid::update() {

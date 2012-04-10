@@ -17,6 +17,7 @@ struct ImageLoader {
 
 /// Crude HTML layout engine
 struct HTML : VBox {
+    URL url;
     /// Signal content changes to trigger updates
     signal<> contentChanged;
 
@@ -27,12 +28,11 @@ struct HTML : VBox {
     /// Clear any content
     void clear();
 
-    int2 sizeHint() override { int2 hint=VBox::sizeHint(); return int2(-max(1024,abs(hint.x)),hint.y); }
+    int2 sizeHint() override { int2 hint=VBox::sizeHint(); return int2(hint.x,hint.y); }
 
     void layout(const URL& url, const Element& e);
     void flushText();
     void flushImages();
-    void imageLoaded();
 
     string text;
     array<URL> images;
