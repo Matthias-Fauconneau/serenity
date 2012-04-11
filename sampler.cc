@@ -5,11 +5,13 @@
 #include "flac.h"
 #include "time.h"
 
-#include <math.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 #include "array.cc"
+
+double exp2(double x) { return __builtin_exp2(x); }
+double exp10(double x) { return __builtin_exp10(x); }
 
 void Sampler::open(const string& path) {
     // parse sfz and map samples
@@ -98,7 +100,7 @@ void Sampler::event(int key, int velocity) {
 }
 
 void Sampler::read(int16 *output, uint period) {
-    assert(period==layers[1].size,"period != 1024"_);
+    assert(period==layers[1].size,"period",period,"!=",layers[1].size);
     timeChanged.emit(time);
     for(Layer& layer : layers) layer.active=false;
     for(uint i=0;i<active.size();i++) { Note& n = active[i];

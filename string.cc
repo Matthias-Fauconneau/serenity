@@ -1,5 +1,4 @@
 #include "string.h"
-#include "math.h" //isnan/isinf
 
 #include "array.cc"
 template struct array<string>;
@@ -184,8 +183,9 @@ string itoa(int64 number, int base, int pad) {
 }
 
 string ftoa(float n, int precision, int base) {
-    if(isnan(n)) return "NaN"_;
-    if(isinf(n)) return n>0?"∞"_:"-∞"_;
+    if(__builtin_isnanf(n)) return "NaN"_;
+    if(n==__builtin_inff()) return "∞"_;
+    if(n==-__builtin_inff()) return "-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;
     return (n>=0?""_:"-"_)+itoa(abs(n),base)+"."_+itoa(int(m*abs(n))%m,base,precision);
 }

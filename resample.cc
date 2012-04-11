@@ -28,7 +28,6 @@
 */
 #include "resample.h"
 #include "string.h"
-#include <math.h>
 
 //TODO: store FIR of order 48 in registers
 static inline float inner_product_single(const float* kernel, const float* signal, int len) {
@@ -64,11 +63,13 @@ static double window(float x) {
     interp[1] = 1-interp[3]-interp[2]-interp[0];
     return interp[0]*kaiser12[i] + interp[1]*kaiser12[i+1] + interp[2]*kaiser12[i+2] + interp[3]*kaiser12[i+3];
 }
+const double PI = 3.14159265358979323846;
+double sin(double t) { return __builtin_sin(t); }
 static float sinc(double cutoff, double x, int N) {
-    if (fabs(x)<1e-6) return cutoff;
-    else if (fabs(x) > N/2.0) return 0;
+    if (abs(x)<1e-6) return cutoff;
+    else if (abs(x) > N/2.0) return 0;
     double xx = x * cutoff;
-    return cutoff*sin(M_PI*xx)/(M_PI*xx) * window(fabs(2*x/N));
+    return cutoff*sin(PI*xx)/(PI*xx) * window(abs(2*x/N));
 }
 
 /// Returns the largest positive integer that divides the numbers without a remainder
