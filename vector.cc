@@ -55,12 +55,8 @@ generic string str(vector v) {
 
 vector(xy,int,2)
 vector(xy,float,2)
-vector(xyz,float,3)
-vector(xyz,int,3)
-vector(xyzw,float,4)
 uvector(bgra,uint8,4)
 vector(bgra,int,4)
-vector(bgra,float,4)
 uvector(rgba,uint8,4)
 vector(rgba,int,4)
 uvector(rgb,uint8,3)
@@ -69,6 +65,3 @@ uvector(ia,uint8,2)
 vector(ia,int,2)
 uvector(luma,uint8,1)
 vector(luma,int,1)
-
-float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
-vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }

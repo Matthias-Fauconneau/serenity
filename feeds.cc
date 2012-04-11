@@ -16,6 +16,10 @@ Entry::~Entry() { if(content) delete content; }
 Feeds::Feeds() {
     window.localShortcut("Escape"_).connect(&window, &Window::hide);
     window.localShortcut("Right"_).connect(this, &Feeds::readNext);
+#if __arm__
+    buttons.keyPress[KEY_POWER].connect(&window, &Window::hide);
+    buttons.keyPress[BTN_EXTRA].connect(this, &Feeds::readNext);
+#endif
     readConfig = appendFile(".config/read"_,home());
     read = split(readFile(".config/read"_,home()),'\n');
     reserve(256); //realloc would invalidate delegates
@@ -38,6 +42,11 @@ void Feeds::setRead(const Entry& entry) {
     if(contains(read,id)) return;
     read << id;
     ::write(readConfig,string(id+"\n"_));
+}
+void Feeds::setAllRead() {
+    for(Entry& entry: *this) {
+        setRead(entry);
+    }
 }
 
 void Feeds::loadFeed(const URL& url, array<byte>&& document) {

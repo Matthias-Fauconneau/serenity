@@ -16,7 +16,8 @@ struct Desktop : Application {
     HBox applets { &feeds, &timeBox, &shortcuts };
     Window window{&applets,""_,Image(),int2(0,Window::screen.y-16)};
     Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
-    Desktop(array<string>&&) {
+    Desktop(array<string>&& arguments) {
+        if(contains(arguments,"setAllRead"_)) feeds.setAllRead();
         feeds.contentChanged.connect(&window,&Window::update);
         clock.timeout.connect(&window, &Window::render);
         window.setType(Atom(_NET_WM_WINDOW_TYPE_DESKTOP));

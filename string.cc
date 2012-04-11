@@ -3,6 +3,7 @@
 #include "array.cc"
 template struct array<string>;
 template int indexOf(const array<string>&, const string&);
+template bool contains(const array<string>&, const string&);
 template void insertSorted(array<string>&, string&&);
 
 /// utf8_iterator

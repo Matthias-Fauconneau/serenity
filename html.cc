@@ -21,7 +21,7 @@ static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"cente
 static const array<string>  boldElement = {"b"_,"strong"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_};
 static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"fieldset"_,
 "footer"_,"base"_,"form"_,"script"_,"style"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tt"_,
-"tr"_,"table"_,"left"_,"area"_,"map"_,"button"_,"sup"_,"param"_,"embed"_,"object"_,"noindex"_,"optgroup"_,"tbody"_,"acronym"_,"del"_};
+"tr"_,"table"_,"left"_,"area"_,"map"_,"button"_,"sup"_,"param"_,"embed"_,"object"_,"noindex"_,"optgroup"_,"tbody"_,"acronym"_,"del"_,"video"_};
 
 void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 30*60); }
 

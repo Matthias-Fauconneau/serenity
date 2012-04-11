@@ -119,7 +119,6 @@ void Window::update() {
 void Window::render() {
     assert(id);
     if(!visible || !size) return;
-    //log("render",indexOf(windows.keys,id)); //TODO: optimize
     if(!image || image->width != size.x || image->height != size.y) {
         if(image) {
             XShmDetach(x, &shminfo);
@@ -134,16 +133,6 @@ void Window::render() {
     }
     framebuffer = Image((byte4*)image->data, image->width, image->height, false);
     clear(framebuffer.data,framebuffer.width*framebuffer.height,byte4(240,240,240,240));
-    /*//feather edges //TODO: shadow
-    if(position.y>0) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-    if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
-    if(position.x+size.x<screen.x-1) for(int y=0;y<size.y;y++) framebuffer(size.x-1,y) /= 2;
-    if(position.y+size.y<screen.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-    //feather corners
-    if(position.x>0 && position.y>0) framebuffer(0,0) /= 2;
-    if(position.x+size.x<screen.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
-    if(position.x>0 && position.y+size.y<screen.y-1) framebuffer(0,size.y-1) /= 2;
-    if(position.x+size.x<screen.x-1 && position.y+size.y<screen.y-1) framebuffer(size.x-1,size.y-1) /= 2;*/
     if(widget->size!=size) {
         widget->size=size;
         widget->update();
@@ -229,7 +218,7 @@ void Window::setIcon(const Image& icon) {
         array<int> buffer(size); buffer.setSize(size); //CARDINAL is long
         buffer[0]=icon.width, buffer[1]=icon.height;
         for(uint i=0;i<icon.width*icon.height;i++) buffer[2+i]=*(uint*)&icon.data[i]; //pad to CARDINAL
-        //setProperty("CARDINAL", "_NET_WM_ICON", buffer);
+        setProperty("CARDINAL", "_NET_WM_ICON", buffer);
     } else {
         array<int> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
         buffer[0]=icon.width, buffer[1]=0; buffer[2]=icon.height, buffer[3]=0;

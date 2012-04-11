@@ -68,15 +68,3 @@ Image decodeImage(const array<byte>& file) {
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
     else { warn("Unknown image format",slice(file,0,4)); return Image(); }
 }
-
-#if TEST
-#include "file.h"
-#include "window.h"
-struct ImageTest : Application {
-    array<string> icons= split("www.phoronix.com/favicon.ico,www.pcinpact.com/favicon.ico,www.blender.org/favicon.ico,www.blendernation.com/favicon.ico,mango.blender.org/favicon.ico,planet.gentoo.org/favicon.ico,dot.kde.org/favicon.ico,planetKDE.org/favicon.ico,www.thedreamlandchronicles.com/favicon.ico,thedreamercomic.com/favicon.ico,www.questionablecontent.net/favicon.ico,wintersinlavelle.com/favicon.ico,www.redmoonrising.org/favicon.ico,waywardsons.keenspot.com/favicon.ico,www.girlgeniusonline.com/favicon.ico,www.sandraandwoo.com/favicon.ico,satwcomic.com/favicon.ico,www.gunnerkrigg.com/favicon.ico,www.misfile.com/favicon.ico,twokinds.keenspot.com/favicon.ico,www.egscomics.com/favicon.ico,www.terra-comic.com/favicon.ico,www.meekcomic.com/favicon.ico,www.kiwiblitz.com/favicon.ico,xkcd.com/favicon.ico,www.spindrift-comic.com/favicon.ico,www.sandraandwoo.com/favicon.ico,www.straysonline.com/favicon.ico,carciphona.com/favicon.ico,tryinghuman.com/favicon.ico,mail.google.com/favicon.ico"_,',');
-    Grid<ImageView> grid=apply<ImageView>(icons, [](const string& file){ return decodeImage(readFile("/root/.cache/"_+file)); });
-    Window window {&grid};
-    ImageTest(array<string>&&){ window.localShortcut("Escape"_).connect(this, &Application::quit); window.show(); window.sync(); }
-};
-Test(ImageTest)
-#endif

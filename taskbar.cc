@@ -226,13 +226,6 @@ struct TaskBar : Application, Poll {
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
                 if(c.value_mask & CWX) wa.x=c.x; if(c.value_mask & CWY) wa.y=c.y;
                 if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
-                /*XSizeHints hints; long supplied; XGetWMNormalHints(x, id, &hints, &supplied);
-                if(!wa.override_redirect) {
-                wa.width=min(Window::screen.x,wa.width); wa.height=min(max(min(Window::screen.y,hints.height),Window::screen.y-16),wa.height);
-                wa.x = (Window::screen.x - wa.width)/2;
-                if(wa.height<=Window::screen.y-16) wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16-wa.height)/2;
-                else wa.y = (Window::screen.y-wa.height)/2;
-                }*/
                 array<Atom> motif = Window::getProperty<Atom>(id,"_MOTIF_WM_HINTS");
                 if(!wa.override_redirect && (!motif || motif[0]!=3 || motif[1]!=0)) {
                     wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);

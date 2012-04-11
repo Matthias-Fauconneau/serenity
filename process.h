@@ -34,7 +34,7 @@ struct Poll {
     void unregisterPoll();
     virtual ~Poll() { unregisterPoll(); }
     /// Callback on new events
-    virtual void event(pollfd p) =0;
+    virtual void event(pollfd) =0;
 };
 
 /// Wait for and dispatches events to registered Poll objects

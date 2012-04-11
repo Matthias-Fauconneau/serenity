@@ -55,13 +55,6 @@ template<class T> struct xy { T x,y; };
 typedef vector<xy,int,2> int2;
 typedef vector<xy,float,2> vec2;
 
-template<class T> struct xyz { T x,y,z; vector<xy,T,2> xy()const{return vector< ::xy,T,2>{x,y};} };
-typedef vector<xyz,float,3> vec3;
-typedef vector<xyz,int,3> int3;
-
-template<class T> struct xyzw { T x,y,z,w; vec2 xy()const{return vec2{x,y};} };
-typedef vector<xyzw,float,4> vec4;
-
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 typedef vector<bgra,int,4> int4;
@@ -74,6 +67,3 @@ template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a}
 typedef vector<ia,uint8,2> byte2;
 template<class T> struct luma { T i; operator byte4()const{return byte4{i,i,i,255};}};
 typedef vector<luma,uint8,1> byte1;
-
-inline float cross(vec2 a, vec2 b);
-inline vec3 cross(vec3 a, vec3 b);

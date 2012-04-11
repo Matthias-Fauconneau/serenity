@@ -39,6 +39,9 @@ window.cc
 html.cc
 html.h
 
+calendar.cc
 feeds.cc
 desktop.cc
 taskbar.cc
+input.h
+input.cc

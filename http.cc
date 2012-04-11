@@ -12,7 +12,7 @@
 
 bool Socket::connect(const string& host, const string& service) {
     addrinfo* ai=0; getaddrinfo(strz(host).data(), strz(service).data(), 0, &ai);
-    if(!ai) warn(service,"on"_,host,"not found"_);
+    if(!ai) { warn(service,"on"_,host,"not found"_); return false; }
     fd = socket(ai->ai_family,ai->ai_socktype,ai->ai_protocol);
     fcntl(fd,F_SETFL,O_NONBLOCK); //allow to timeout connections
     ::connect(fd, ai->ai_addr, ai->ai_addrlen);
@@ -85,7 +85,7 @@ string base64(const string& input) {
 /// URL
 
 URL::URL(const string& url) {
-    if(!url) warn("Empty url");
+    if(!url) { warn("Empty url"); return; }
     TextBuffer s(copy(url));
     if(contains(url,"://"_)) scheme = s.until("://"_);
     else s.match("//"_); //net_path
