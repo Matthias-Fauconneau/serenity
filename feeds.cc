@@ -7,6 +7,8 @@
 #include "window.h"
 #include "array.cc"
 
+ICON(network);
+
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
 Entry::Entry(string&& name, string&& link, Image&& icon):Item(move(icon),move(name)),link(move(link)){}
 Entry::~Entry() { if(content) delete content; }
@@ -59,7 +61,10 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
     if(exists(favicon,cache)) {
         last().get<Icon>().image = resize(decodeImage(readFile(favicon,cache)),16,16);
-    } else getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
+    } else {
+        last().get<Icon>().image = resize(networkIcon,16,16);
+        getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
+    }
 
     array<Entry> items;
     auto addItem = [this,&items](const Element& e)->void{
@@ -81,7 +86,10 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     for(int i=items.size()-1;i>=0;i--) { //oldest first
         append(move(items[i]));
         Entry& item = last(); //reference shouldn't move while loading
-        if(i<=16) item.content->go(item.link); //preload
+        if(i<=16) {
+            item.content = new Scroll<HTML>;
+            item.content->go(item.link); //preload
+        }
     }
     contentChanged.emit();
 }
@@ -97,7 +105,7 @@ void Feeds::getFavicon(const URL& url, array<byte>&& document) {
             new ImageLoader(url.relative(icon), &entry.get<Icon>().image, contentChanged, int2(16,16), 7*24*60*60);
             break; //only header
         }
-   }
+    }
 }
 
 void Feeds::activeChanged(int index) {
@@ -113,7 +121,9 @@ void Feeds::activeChanged(int index) {
 
 void Feeds::itemPressed(int index) {
     Entry& entry = array::at(index);
-    Scroll<HTML>* content = entry.content;
+    if(content) delete content; //release read items
+    if(!entry.content) entry.content = new Scroll<HTML>;
+    content = entry.content; entry.content=0; //move preloaded content to window
     content->contentChanged.disconnect(&window);
     window.widget = &content->parent();
     window.setTitle(entry.get<Text>().text);
@@ -132,8 +142,11 @@ void Feeds::itemPressed(int index) {
 
 void Feeds::readNext() {
     uint i=index;
-    if(i>=count()-1) { window.hide(); return; }
-    while(array::at(++i).isHeader || isRead(array::at(i))) {}
+    for(;;) {
+        i++;
+        if(i>=count()) { window.hide(); return; }
+        if(!array::at(i).isHeader && !isRead(array::at(i))) break;
+    }
     setActive(i);
     itemPressed(i);
 }

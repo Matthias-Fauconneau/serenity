@@ -39,7 +39,7 @@ LIBS_window = X11 Xext
 
 ICONS = $(ICONS_$(TARGET))
 ICONS_taskbar := button
-ICONS_desktop := shutdown
+ICONS_desktop := shutdown network
 ICONS_player := play pause next
 ICONS_music := music music256
 

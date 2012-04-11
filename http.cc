@@ -88,6 +88,7 @@ URL::URL(const string& url) {
     if(!url) warn("Empty url");
     TextBuffer s(copy(url));
     if(contains(url,"://"_)) scheme = s.until("://"_);
+    else s.match("//"_); //net_path
     string domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
     host = section(domain,'@',-2,-1);
     if(contains(domain,'@')) authorization = base64(section(domain,'@'));
@@ -96,12 +97,19 @@ URL::URL(const string& url) {
     fragment = s.untilEnd();
 }
 URL URL::relative(URL&& url) const {
-    if(url.scheme) return move(url);
-    if(url.host) { swap(url.path,url.host); if(url.host) url.path << "/"_+url.host; url.host.clear(); }
+    if(url.scheme) { assert(url.host); return move(url); } //already complete URL
+    if(url.host && url.path) { url.scheme=copy(scheme); return move(url); } //missing only scheme
+    if(url.host) { //relative path URLs could be misparsed into host field if first path element contains dots
+        swap(url.path,url.host);
+        if(url.host) {
+            if(!startsWith(url.host,"/"_)) url.path<<"/"_;
+            url.path << move(url.host);
+        }
+    }
     if(!url.host) url.host=copy(host);
     if(!contains(url.host,"."_) || url.host=="."_) error(host,path,url.host,url.path);
     if(startsWith(url.path,"."_)) url.path=slice(url.path,1);
-    if(startsWith(url.path,"/"_)) url.path=slice(url.path,1);
+    while(startsWith(url.path,"/"_)) url.path=slice(url.path,1);
     return move(url);
 }
 string str(const URL& url) {

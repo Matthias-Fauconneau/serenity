@@ -96,7 +96,7 @@ void Linear::update() {
     //allocate fixed space and convert to expanding if not enough space
     for(uint i=0;i<count();i++) {
         int2 sizeHint = xy(at(i).sizeHint());
-        int hint = sizeHint.x; height=sizeHint.y<0?size.y:max(height,sizeHint.y);
+        int hint = sizeHint.x; if(abs(sizeHint.y)>abs(height)) height=sizeHint.y;
         if(hint >= width) hint = -hint; //convert to expanding if not enough space
         if(hint >= 0) width -= (sizes[i]=hints[i]=hint); //allocate fixed size
         else {
@@ -124,9 +124,13 @@ void Linear::update() {
             first -= delta; width += delta;
         }
     }
-    int2 pen = int2(width/2,(size.y-min(height,size.y))/2); //external margin
+    int2 pen = int2(width/2,0); //external margin
+    if(align>=0) {
+        pen.y=size.y-min(abs(height),size.y); //align right/bottom
+        if(align==0) pen.y/=2; //align center
+    } //else align top/left
     for(uint i=0;i<count();i++) {
-        at(i).size = xy(int2(sizes[i],min(height,size.y)));
+        at(i).size = xy(int2(sizes[i],min(abs(height),size.y)));
         at(i).position = xy(pen);
         at(i).update();
         pen.x += sizes[i];
@@ -363,12 +367,11 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(event != Press) return false;
     if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
     if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
-    if(button != LeftButton) return false;
     Window::focus=this;
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<child.position+child.size) {
             if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
-            itemPressed.emit(index);
+            if(button == LeftButton) itemPressed.emit(index);
             return true;
         }
     }

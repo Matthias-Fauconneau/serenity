@@ -12,7 +12,7 @@ struct Desktop : Application {
     List<Command> shortcuts = readShortcuts();
      Clock clock { 128 };
      Calendar calendar;
-    VBox timeBox { &space, &clock, &calendar };
+    VBox timeBox { &clock, &calendar };
     HBox applets { &feeds, &timeBox, &shortcuts };
     Window window{&applets,""_,Image(),int2(0,Window::screen.y-16)};
     Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };

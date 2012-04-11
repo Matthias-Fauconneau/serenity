@@ -6,7 +6,7 @@
 struct Entry : Item {
     bool isHeader=false;
     string link;
-    Scroll<HTML>* content=new Scroll<HTML>;
+    Scroll<HTML>* content=0;
     Entry(Entry&& o);
     Entry(string&& name, string&& link, Image&& icon=Image());
     ~Entry();
@@ -16,6 +16,7 @@ struct Feeds : List<Entry> {
     int readConfig;
     array<string> read;
     signal<> contentChanged;
+    Scroll<HTML>* content=0;
     Window window {0}; //keep the same window to implement \a nextItem
 
     Feeds();

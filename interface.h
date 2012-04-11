@@ -154,6 +154,8 @@ template<class... T> struct Tuple : virtual Layout {
 struct Linear: virtual Layout {
     /// If true, try to fill parent space to spread out contained items
     bool expanding = false;
+    /// Align to { -1 = left/top, 0 = center, 1 = right/bottom }
+    int align=0;
 
     int2 sizeHint() override;
     void update() override;

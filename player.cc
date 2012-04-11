@@ -25,7 +25,7 @@ struct Player : Application {
        Scroll<TextList> titles;
       HBox main { &albums.parent(), &titles.parent() };
      VBox layout { &toolbar, &main };
-     Window window{&layout,"Player"_,copy(pauseIcon),int2(640,-16)};
+     Window window{&layout,"Player"_,copy(pauseIcon),int2(-16,-16)};
 
     Player(array<string>&& arguments) {
         window.globalShortcut("XF86AudioPlay"_).connect(this, &Player::togglePlay);
@@ -70,7 +70,7 @@ struct Player : Application {
         assert(isFolder(path));
         array<string> files = listFiles(path,Recursive|Sort|Files);
         for(auto&& file: files) appendFile(move(file));
-        layout.update(); window.render();
+        window.setSize(int2(-16,-16)); layout.update(); window.render();
     }
     void playAlbum(int index) {
         stop(); files.clear(); titles.clear();
