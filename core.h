@@ -62,16 +62,23 @@ typedef unsigned int size_t; typedef int ssize_t; typedef unsigned int ptr;
 #define swap32 __builtin_bswap32
 inline uint16 swap16(uint16 x) { return swap32(x)>>16; }
 
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
-
 /// Basic operations
 template <class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 template <class T> T min(T a, T b) { return a<b ? a : b; }
 template <class T> T max(T a, T b) { return a>b ? a : b; }
 template <class T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 template <class T> T abs(T x) { return x>=0 ? x : -x; }
+
+/// Mathematic primitives
+
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
+
+const double PI = 3.14159265358979323846;
+inline float sin(float t) { return __builtin_sinf(t); }
+inline float sqrt(float f) { return __builtin_sqrtf(f); }
+inline float atan(float f) { return __builtin_atanf(f); }
 
 /// SIMD
 typedef float float4 __attribute__ ((vector_size(16)));

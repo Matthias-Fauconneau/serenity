@@ -14,6 +14,7 @@ Display* Window::x=0;
 int2 Window::screen;
 int Window::depth;
 Visual* Window::visual;
+int2 Window::cursor;
 map<XID, Window*> Window::windows;
 map<KeySym, signal<> > Window::globalShortcuts;
 Widget* Window::focus=0;
@@ -31,11 +32,11 @@ template<class T> array<T> Window::getProperty(XID window, const char* property)
 }
 template array<Atom> Window::getProperty(XID window, const char* property);
 
-template<class T> void Window::setProperty(const char* type,const char* name, const array<T>& value) {
-    assert(id);
-    XChangeProperty(x, id, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)value.data(), value.size());
+template<class T> void Window::setProperty(XID window, const char* type,const char* name, const array<T>& value) {
+    XChangeProperty(x, window, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)value.data(), value.size());
     XFlush(x);
 }
+template void Window::setProperty(XID window, const char* type,const char* name, const array<Atom>& value);
 
 static int xErrorHandler(Display* x, XErrorEvent* error) {
     char buffer[64]; XGetErrorText(x,error->error_code,buffer,sizeof(buffer)); log(buffer);
@@ -77,6 +78,7 @@ bool Window::event(const XEvent& e) {
     if(e.type==MotionNotify) {
         return widget->mouseEvent(int2(e.xmotion.x,e.xmotion.y), Motion, (e.xmotion.state&Button1Mask)?LeftButton:None);
     } else if(e.type==ButtonPress) {
+        cursor=int2(e.xbutton.x_root,e.xbutton.y_root);
         return widget->mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
     } else if(e.type==KeyPress) {
         KeySym key = XKeycodeToKeysym(x,e.xkey.keycode,0);
@@ -157,7 +159,7 @@ void Window::create() {
                        CWBackPixel|CWColormap|CWBorderPixel|CWEventMask|CWOverrideRedirect, &attributes);
     windows[id] = this;
     gc = XCreateGC(x, id, 0, 0);
-    setProperty<uint>("ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
+    setProperty<uint>(id, "ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
     setType(type?:Atom(_NET_WM_WINDOW_TYPE_NORMAL));
     if(title) setTitle(title);
     if(icon) setIcon(icon);
@@ -207,7 +209,7 @@ void Window::setFullscreen(bool) {
 void Window::setTitle(const string& title) {
     this->title=copy(title);
     if(!title) { logTrace(); warn("Empty window title"); }
-    if(id) setProperty("UTF8_STRING", "_NET_WM_NAME", title);
+    if(id) setProperty(id, "UTF8_STRING", "_NET_WM_NAME", title);
 }
 
 void Window::setIcon(const Image& icon) {
@@ -218,19 +220,19 @@ void Window::setIcon(const Image& icon) {
         array<int> buffer(size); buffer.setSize(size); //CARDINAL is long
         buffer[0]=icon.width, buffer[1]=icon.height;
         for(uint i=0;i<icon.width*icon.height;i++) buffer[2+i]=*(uint*)&icon.data[i]; //pad to CARDINAL
-        setProperty("CARDINAL", "_NET_WM_ICON", buffer);
+        setProperty(id, "CARDINAL", "_NET_WM_ICON", buffer);
     } else {
         array<int> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
         buffer[0]=icon.width, buffer[1]=0; buffer[2]=icon.height, buffer[3]=0;
         for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
         buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements
-        setProperty("CARDINAL", "_NET_WM_ICON", buffer);
+        setProperty(id, "CARDINAL", "_NET_WM_ICON", buffer);
     }
 }
 
 void Window::setType(Atom type) {
     this->type=type;
-    if(id) setProperty<uint>("ATOM", "_NET_WM_WINDOW_TYPE", {type});
+    if(id) setProperty<uint>(id, "ATOM", "_NET_WM_WINDOW_TYPE", {type});
 }
 
 void Window::setOverrideRedirect(bool overrideRedirect) {

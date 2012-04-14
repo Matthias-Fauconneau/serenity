@@ -69,19 +69,24 @@ template<class... Outputs> void DBus::read(uint32 serial, Outputs&... outputs) {
             align(s, 8);
         }
         if(header.length) {
-            if(header.message == MethodReturn && replySerial==serial) {
-                ::read(s, outputs i(...));
-                return;
+            if(header.message == MethodReturn) {
+                if(replySerial==serial) {
+                    ::read(s, outputs i(...));
+                    return;
+                }
             } else if(header.message == Signal) {
                 auto signal = signals_.find(name);
                 if(signal) signal->emit(move(name),s.readAll());
-                if(!serial) return;
             } else if(header.message == MethodCall) {
                 auto method = methods.at(name);
                 method(header.serial,move(name),s.readAll());
-                if(!serial) return;
-            } else error("Unknown message");
-        } else if(header.message == MethodReturn && replySerial==serial) return;
+            } else error("Unknown message",header.message);
+        } else {
+            if(header.message == MethodReturn && replySerial==serial) return;
+            warn("Unhandled message",header.message);
+        }
+        if(!serial) return;
+        if(replySerial>=serial) { error("replySerial>=serial",replySerial,serial); return; }
     }
 }
 
@@ -173,6 +178,14 @@ template<class A, class B> DBus::Reply DBus::Object::operator()(const string& me
     string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
     return Reply(d,d->write(MethodCall,-1,target,object,interface,member, a, b));
 }
+template<class A> void DBus::Object::noreply(const string& method, const A& a) {
+    string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
+    d->write(MethodCall,-2,target,object,interface,member, a);
+}
+template<class A, class B> void DBus::Object::noreply(const string& method, const A& a, const B& b) {
+    string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
+    d->write(MethodCall,-2,target,object,interface,member, a, b);
+}
 template<class T> T DBus::Object::get(const string& property) {
     d->write(MethodCall,-1,target,object,"org.freedesktop.DBus.Properties"_,"Get"_,""_,property);
     variant<T> t; d->read(d->serial,t); return move(t);
@@ -246,11 +259,14 @@ DBus::DBus() {
 
  /// Explicit template instanciations
 
+ template DBus::Reply::operator uint();
 template DBus::Reply::operator array<string>();
-template DBus::Reply DBus::Object::operator()(const string&, const string&);
-template DBus::Reply DBus::Object::operator()(const string&, const int&, const int&);
-template DBus::Reply DBus::Object::operator()(const string&, const string&, const uint&);
+template void DBus::Object::noreply(const string&, const string&);
+template void DBus::Object::noreply(const string&, const string&, const uint&);
+template void DBus::Object::noreply(const string&, const int&, const int&);
+template void DBus::Object::noreply(const string&, const int&, const string&);
 template string DBus::Object::get(const string&);
+template uint32 DBus::Object::get(const string&);
 template array<DBusIcon> DBus::Object::get(const string&);
 
 template void DBus::methodWrapper<variant<int>, string, string>(unsigned int, string, array<char>);

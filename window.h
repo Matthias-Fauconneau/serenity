@@ -68,7 +68,7 @@ struct Window : Poll {
     template<class T> static array<T> getProperty(XID window, const char* property);
 
     /// Set X11 property \a name to \a value
-    template<class T> void setProperty(const char* type,const char* name, const array<T>& value);
+    template<class T> static void setProperty(XID window, const char* type,const char* name, const array<T>& value);
 
     /// X11 Event handler
     void event(pollfd);
@@ -90,6 +90,8 @@ struct Window : Poll {
     static Visual* visual;
     /// Screen size
     static int2 screen;
+    /// Screen mouse cursor position;
+    static int2 cursor;
 
     /// X11 window Identifier
     XID id=0;

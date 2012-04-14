@@ -63,8 +63,6 @@ static double window(float x) {
     interp[1] = 1-interp[3]-interp[2]-interp[0];
     return interp[0]*kaiser12[i] + interp[1]*kaiser12[i+1] + interp[2]*kaiser12[i+2] + interp[3]*kaiser12[i+3];
 }
-const double PI = 3.14159265358979323846;
-double sin(double t) { return __builtin_sin(t); }
 static float sinc(double cutoff, double x, int N) {
     if (abs(x)<1e-6) return cutoff;
     else if (abs(x) > N/2.0) return 0;

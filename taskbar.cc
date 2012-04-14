@@ -13,12 +13,27 @@ enum ScreenEdge { Top, Bottom };
 static ScreenEdge taskBarPosition = Top;
 
 static Display* x; //TODO: use Window::x
+
+string getTitle(XID id) {
+    string name = Window::getProperty<char>(id,"_NET_WM_NAME");
+    if(!name) name = Window::getProperty<char>(id,"WM_NAME");
+    return move(name);
+}
+Image getIcon(XID id) {
+    array<ulong> buffer = Window::getProperty<ulong>(id,"_NET_WM_ICON");
+    if(buffer.size()<=4) return Image();
+    array<byte4> image(buffer.size()); image.setSize(buffer.size());
+    for(uint i=0;i<buffer.size()-2;i++) image[i] = *(byte4*)&buffer[i+2];
+    return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
+}
+
 static XID* topLevelWindowList=0;
 static array<XID> getWindows() {
     if(topLevelWindowList) XFree(topLevelWindowList);
     XID root,parent; uint count=0; XQueryTree(x,DefaultRootWindow(x),&root,&parent,&topLevelWindowList,&count);
-    return array<XID>(topLevelWindowList,count); //to be freed with XFree
+    return array<XID>(topLevelWindowList,count);
 }
+
 void raise(XID id) {
     XRaiseWindow(x, id);
     XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
@@ -61,10 +76,22 @@ bool operator==(const Task& a,const Task& b){return a.id==b.id;}
 
 struct StatusNotifierItem : TriggerButton {
     DBus::Object item;
-    StatusNotifierItem(DBus::Object&& item, Image&& icon) : TriggerButton(move(icon)), item(move(item)) {}
+    string id;
+    StatusNotifierItem(DBus::Object&& item, Image&& icon, string&& id) : TriggerButton(move(icon)), item(move(item)), id(move(id)) {}
     bool mouseEvent(int2 position, Event event, Button button) override {
         if(TriggerButton::mouseEvent(position,event,button)) {
-            item("org.kde.StatusNotifierItem.Activate"_,0,0);
+            int2 c=Window::cursor;
+            if(button==LeftButton) {
+                for(XID w: getWindows()) { //Assume Activate toggle a window (doing it in taskbar as applications don't properly detect if they are visible)
+                    XWindowAttributes wa; XGetWindowAttributes(x, w, &wa); if(wa.override_redirect||wa.map_state!=IsViewable) continue;
+                    if(contains(getTitle(w),id)) { XUnmapWindow(x, w); XFlush(x); return true; }
+                }
+                item.noreply("org.kde.StatusNotifierItem.Activate"_, 0,0);
+            }
+            if(button==RightButton) item.noreply("org.kde.StatusNotifierItem.ContextMenu"_, c.x,taskBarPosition==Top?16:Window::screen.y-16);
+            if(button==MiddleButton) item.noreply("org.kde.StatusNotifierItem.SecondaryActivate"_, 0,0);
+            if(button==WheelDown) item.noreply("org.kde.StatusNotifierItem.Scroll"_, -1, "vertical"_);
+            if(button==WheelUp) item.noreply("org.kde.StatusNotifierItem.Scroll"_, 1, "vertical"_);
             return true;
         }
         return false;
@@ -99,18 +126,6 @@ struct TaskBar : Application, Poll {
         XFlush(x);
     }
 
-    string getTitle(XID id) {
-        string name = Window::getProperty<char>(id,"_NET_WM_NAME");
-        if(!name) name = Window::getProperty<char>(id,"WM_NAME");
-        return move(name);
-    }
-    Image getIcon(XID id) {
-        array<ulong> buffer = Window::getProperty<ulong>(id,"_NET_WM_ICON");
-        if(buffer.size()<=4) return Image();
-        array<byte4> image(buffer.size()); image.setSize(buffer.size());
-        for(uint i=0;i<buffer.size()-2;i++) image[i] = *(byte4*)&buffer[i+2];
-        return resize(Image(move(image), buffer[0], buffer[1]), 16,16);
-    }
     int addTask(XID id) {
         XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect||wa.map_state!=IsViewable) return -1;
         array<Atom> type=Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE");
@@ -127,7 +142,7 @@ struct TaskBar : Application, Poll {
         for(const auto& s: status) if(s.item.target == service) return;
 
         DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
-        DBus("org.freedesktop.DBus.AddMatch"_,string("member='NameOwnerChanged',arg0='"_+service+"'"_));
+        DBus.noreply("org.freedesktop.DBus.AddMatch"_,string("member='NameOwnerChanged',arg0='"_+service+"'"_));
 
         DBus::Object item(&dbus,move(service),"/StatusNotifierItem"_);
         Image icon;
@@ -142,7 +157,8 @@ struct TaskBar : Application, Poll {
             DBusIcon dbusIcon = move(icons.first());
             icon=swap(resize(Image(cast<byte4>(move(dbusIcon.data)),dbusIcon.width,dbusIcon.height),16,16));
         }
-        status << StatusNotifierItem(move(item), move(icon));
+        string id = item.get<string>("Id"_);
+        status << StatusNotifierItem(move(item), move(icon), move(id));
         panel.update(); if(window.id) window.render();
     }
     variant<int> Get(string interface, string property) {
@@ -183,7 +199,7 @@ struct TaskBar : Application, Poll {
             DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
             array<string> names = DBus("org.freedesktop.DBus.ListNames"_);
             for(string& name: names) if(startsWith(name,"org.kde.StatusNotifierItem"_)) registerStatusNotifierItem(move(name));
-            DBus("org.freedesktop.DBus.RequestName"_, "org.kde.StatusNotifierWatcher"_, (uint)0);
+            DBus.noreply("org.freedesktop.DBus.RequestName"_, "org.kde.StatusNotifierWatcher"_, (uint)0);
         }
 
         start.image = resize(buttonIcon, 16,16);
@@ -227,13 +243,20 @@ struct TaskBar : Application, Poll {
                 if(c.value_mask & CWX) wa.x=c.x; if(c.value_mask & CWY) wa.y=c.y;
                 if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
                 array<Atom> motif = Window::getProperty<Atom>(id,"_MOTIF_WM_HINTS");
-                if(!wa.override_redirect && (!motif || motif[0]!=3 || motif[1]!=0)) {
+                array<Atom> type = Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE");
+                if(!wa.override_redirect && (!type || type[0]==Atom(_NET_WM_WINDOW_TYPE_NORMAL)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
                     wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
                     wa.x = (Window::screen.x - wa.width)/2;
                     wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16-wa.height)/2;
                 }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
-                continue;
+                if(wa.map_state==IsViewable) {
+                    raise(id);
+                    int i = indexOf(tasks, Task(id));
+                    if(i<0) { i=addTask(id); if(i>=0) tasksChanged.emit(tasks.array::size()); }
+                    if(i<0) continue;
+                    tasks.index=i;
+                }
             } else if(e.type == ButtonPress) {
                 XID id = e.xbutton.window;
                 raise(id);

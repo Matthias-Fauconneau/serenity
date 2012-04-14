@@ -7,6 +7,7 @@
 
 template <class T> struct variant : T { variant(){} variant(T&& t):T(move(t)){} operator const T&() const { return *this; } };
 template <> struct variant<int> { int t; variant(){} variant(int t):t(t){} operator const int&() const { return t; } };
+template <> struct variant<uint> { uint t; variant(){} variant(uint t):t(t){} operator const uint&() const { return t; } };
 
 //TODO: tuples
 struct DBusIcon {
@@ -56,6 +57,8 @@ struct DBus : Poll {
         Reply operator ()(const string& method);
         template<class A> Reply operator ()(const string& method, const A& a);
         template<class A, class B> Reply operator()(const string& method, const A&, const B&);
+        template<class A> void noreply(const string& method, const A&);
+        template<class A, class B> void noreply(const string& method, const A&, const B&);
         template<class T> T get(const string& property);
     };
 

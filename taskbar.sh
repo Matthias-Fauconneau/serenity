@@ -1,1 +1,4 @@
-BUILD=release TARGET=taskbar make && killall taskbar && TARGET=taskbar make install
+export BUILD=debug 
+export TARGET=taskbar 
+make && killall taskbar 
+make install

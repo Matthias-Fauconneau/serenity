@@ -75,8 +75,9 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
         getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
     }
 
-    array<Entry> items;
-    auto addItem = [this,&items](const Element& e)->void{
+    array<Entry> items; int history=0;
+    auto addItem = [this,&history,&items](const Element& e)->void{
+        if(history++>=64) return; //avoid getting old unreads on feeds with big history
         if(items.size()>=32) return;
         string text=e("title"_).text();
         text=trim(unescape(text));
@@ -153,7 +154,10 @@ void Feeds::readNext() {
     uint i=index;
     for(;;) {
         i++;
-        if(i>=count()) { window.hide(); return; }
+        if(i>=count()) {
+            execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); //FIXME: release leaked memory
+            return;
+        }
         if(!array::at(i).isHeader && !isRead(array::at(i))) break;
     }
     setActive(i);
