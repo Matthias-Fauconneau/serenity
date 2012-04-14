@@ -250,13 +250,7 @@ struct TaskBar : Application, Poll {
                     wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16-wa.height)/2;
                 }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
-                if(wa.map_state==IsViewable) {
-                    raise(id);
-                    int i = indexOf(tasks, Task(id));
-                    if(i<0) { i=addTask(id); if(i>=0) tasksChanged.emit(tasks.array::size()); }
-                    if(i<0) continue;
-                    tasks.index=i;
-                }
+                continue;
             } else if(e.type == ButtonPress) {
                 XID id = e.xbutton.window;
                 raise(id);
@@ -286,7 +280,17 @@ struct TaskBar : Application, Poll {
                     //XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
                     if(tasks.index==uint(-1)) tasks.setActive(indexOf(tasks, Task(id)));
                 }
-            } else continue;
+            } else if(e.type == ClientMessage) {
+                XID id = e.xclient.window;
+                if(e.xclient.message_type==Atom(_NET_ACTIVE_WINDOW)) {
+                    XMapWindow(x, id);
+                    raise(id);
+                    int i = indexOf(tasks, Task(id));
+                    if(i<0) { i=addTask(id); if(i>=0) tasksChanged.emit(tasks.array::size()); }
+                    if(i<0) continue;
+                    tasks.index=i;
+                }
+            }
             needUpdate = true;
         }
         if(needUpdate && window.visible) { panel.update(); window.render(); }

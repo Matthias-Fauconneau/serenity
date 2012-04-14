@@ -31,7 +31,7 @@ bool Command::mouseEvent(int2, Event event, Button button) {
 
 map<string,string> readSettings(const string& path) {
     map<string,string> entries;
-    if(!exists(path)) { warn("Missing settings file",path); return entries; }
+    if(!exists(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
     for(TextBuffer s(readFile(path));s;) {
         if(s.matchAny("[#"_)) s.until("\n"_);
         else {
@@ -47,7 +47,6 @@ List<Command> readShortcuts() {
     List<Command> shortcuts;
     if(!exists(".config/launcher"_,home())) { warn("No launcher settings [.config/launcher]"); return shortcuts; }
     for(const string& desktop: split(readFile(".config/launcher"_,home()),'\n')) {
-        if(!exists(desktop)) { warn("Missing application settings",desktop); continue; }
         auto entries = readSettings(desktop);
         Image icon;
         for(const string& folder: iconPaths) {

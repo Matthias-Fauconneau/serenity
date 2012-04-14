@@ -56,6 +56,8 @@ struct Window : Poll {
     /// Register global shortcut on \a key (X11 KeySym)
     static signal<>& globalShortcut(const string& key);
 
+    /// Returns if this window has keyboard input focus
+    bool hasFocus();
     /// Set keyboard input focus
     void setFocus(Widget* focus);
     /// Current widget that has the keyboard input focus

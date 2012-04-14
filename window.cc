@@ -247,6 +247,12 @@ void Window::setFocus(Widget* focus) {
     XFlush(x);
 }
 
+bool Window::hasFocus() {
+    XID window; int revert;
+    XGetInputFocus(x, &window, &revert);
+    return window==id;
+}
+
 signal<>& Window::localShortcut(const string& key) {
     if(key=="Leave"_) return localShortcuts[Leave];
     KeySym keysym = XStringToKeysym(strz(key).data());

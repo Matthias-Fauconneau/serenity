@@ -428,7 +428,7 @@ void ImageView::render(int2 parent) {
 
 /// TriggerButton
 
-bool TriggerButton::mouseEvent(int2, Event event, Button button) {
+bool TriggerButton::mouseEvent(int2, Event event, Button) {
     if(event==Press) { triggered.emit(); return true; }
     return false;
 }
