@@ -244,7 +244,9 @@ struct TaskBar : Application, Poll {
                 if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
                 array<Atom> motif = Window::getProperty<Atom>(id,"_MOTIF_WM_HINTS");
                 array<Atom> type = Window::getProperty<Atom>(id,"_NET_WM_WINDOW_TYPE");
-                if(!wa.override_redirect && (!type || type[0]==Atom(_NET_WM_WINDOW_TYPE_NORMAL)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
+                if(!wa.override_redirect &&
+                        (!type || type[0]==Atom(_NET_WM_WINDOW_TYPE_NORMAL) || type[0]==Atom(_NET_WM_WINDOW_TYPE_DESKTOP))
+                        && (!motif || motif[0]!=3 || motif[1]!=0)) {
                     wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
                     wa.x = (Window::screen.x - wa.width)/2;
                     wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16-wa.height)/2;

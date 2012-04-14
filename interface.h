@@ -11,7 +11,7 @@ enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
 #include "X11/keysym.h"
 enum Key {
     Escape=XK_Escape, Return=XK_Return, Delete=XK_Delete, BackSpace=XK_BackSpace,
-    Left=XK_Left, Right=XK_Right, Up=XK_Up, Down=XK_Down
+    Left=XK_Left, Right=XK_Right, Up=XK_Up, Down=XK_Down, Home=XK_Home, End=XK_End
 };
 
 /// Widget is an abstract component to compose user interfaces

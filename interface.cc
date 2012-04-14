@@ -321,9 +321,11 @@ bool TextInput::keyPress(Key key) {
     if(cursor>text.size()) cursor=text.size();
     /**/ if(key==Left && cursor>0) cursor--;
     else if(key==Right && cursor<text.size()) cursor++;
+    else if(key==Home) cursor=0;
+    else if(key==End) cursor=text.size();
     else if(key==Delete && cursor<text.size()) { text.removeAt(cursor); update(); }
     else if(key==BackSpace && cursor>0) { text.removeAt(--cursor); update(); }
-    else if(!(key&0xff00)) { text.insertAt(cursor++,(char)key); update(); }
+    else if(!(key&0xff00)) { text.insertAt(cursor++,(char)key); update(); } //TODO: shift
     else return false;
     return true;
 }
