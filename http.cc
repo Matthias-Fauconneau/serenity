@@ -187,7 +187,7 @@ void HTTP::event(pollfd) {
             }
             delete this;
             return;
-        } else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
+        } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }
 
     // Content

@@ -26,7 +26,9 @@ struct Desktop : Application {
         window.setType(Atom(_NET_WM_WINDOW_TYPE_DESKTOP));
         window.show();
         window.localShortcut("Escape"_).connect(&shutdownPopup,&Popup<Command>::toggle);
+#if __arm__
         buttons.keyPress[KEY_POWER].connect(this,&Desktop::keyPress);
+#endif
     }
     void keyPress() { if(window.hasFocus()) shutdownPopup.toggle(); }
 };

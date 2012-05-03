@@ -91,11 +91,11 @@ Calendar::Calendar():VBox({ &space, &date, &month, &space, &events, &space }) {
 
 void Calendar::previousMonth() {
     month.previousMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
-    events.setText(""_); update();
+    events.setText(""_); VBox::update();
 }
 void Calendar::nextMonth() {
     month.nextMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
-    events.setText(""_); update();
+    events.setText(""_); VBox::update();
 }
 
 void Calendar::activeChanged(int index) {
