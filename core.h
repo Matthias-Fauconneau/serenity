@@ -151,5 +151,4 @@ template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0
 //raw memory comparison //TODO: SSE
 inline bool compare(const byte* a,const byte* b, int size) { for(int i=0;i<size;i++) if(a[i]!=b[i]) return false; return true; }
 //raw value comparison
-#define RawCompare(T) inline bool operator ==(const T& a, const T& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(T)); }
-template<class A, class B> inline bool operator !=(const A& a, const B& b) { return !(a==b); }
+//template<class A, class B> inline bool operator !=(const A& a, const B& b) { return !(a==b); }

@@ -7,26 +7,25 @@
 #include <bfd.h>
 #include <cxxabi.h>
 
-static bfd* abfd;
-static void* syms;
-declare(static void read_debug_symbols(), constructor(101)) {
-    bfd_init();
-    abfd = bfd_openr("/proc/self/exe",0);
-    assert(!bfd_check_format(abfd, bfd_archive));
-    char** matching; assert(bfd_check_format_matches(abfd, bfd_object, &matching));
-    if ((bfd_get_file_flags(abfd) & HAS_SYMS) != 0) {
-        unsigned int size=0;
-        long symcount = bfd_read_minisymbols(abfd, false, &syms, &size);
-        if(symcount == 0) symcount = bfd_read_minisymbols(abfd, true, &syms, &size);
-        assert(symcount >= 0);
-    }
-}
-struct Symbol { string file,function; uint line; };
 Symbol findNearestLine(void* address) {
-    for(bfd_section* s=abfd->sections;s;s=s->next) {
+    static bfd* bfd = 0;
+    static void* syms = 0;
+    if(!bfd) {
+        bfd_init();
+        bfd = bfd_openr("/proc/self/exe",0);
+        assert(!bfd_check_format(bfd, bfd_archive));
+        char** matching; assert(bfd_check_format_matches(bfd, bfd_object, &matching));
+        if ((bfd_get_file_flags(bfd) & HAS_SYMS) != 0) {
+            unsigned int size=0;
+            long symcount = bfd_read_minisymbols(bfd, false, &syms, &size);
+            if(symcount == 0) symcount = bfd_read_minisymbols(bfd, true, &syms, &size);
+            assert(symcount >= 0);
+        }
+    }
+    for(bfd_section* s=bfd->sections;s;s=s->next) {
         if((bfd_vma)address < s->vma || (bfd_vma)address >= s->vma + s->size) continue;
         const char* path=0; const char* func=0; uint line=0;
-        if(bfd_find_nearest_line(abfd, s, (bfd_symbol**)syms, (bfd_vma)address - s->vma, &path, &func, &line)) {
+        if(bfd_find_nearest_line(bfd, s, (bfd_symbol**)syms, (bfd_vma)address - s->vma, &path, &func, &line)) {
             if(!path || !func || !line) continue;
             static size_t length=128; static char* buffer=(char*)malloc(length); int status;
             buffer=abi::__cxa_demangle(func,buffer,&length,&status);

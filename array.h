@@ -86,7 +86,6 @@ template<class T> struct array {
     array& operator <<(T&& v);
     void append(array&& a);
     array& operator <<(array&& a);
-    void insertAt(int index, T&& v);
 
     /// Iterators
     const T* begin() const { return data(); }
@@ -118,6 +117,9 @@ generic array& operator <<(array& a, const T& v);
 generic array& operator <<(array& a, const array& b);
 /// Copies all elements in a new array
 generic array copy(const array& a);
+/// Inserts /a v into /a a at /a index
+generic T& insertAt(array& a, int index, T&& v);
+generic T& insertAt(array& a, int index, const T& v);
 
 // DefaultConstructible?
 /// Allocates memory for \a size elements and initializes added elements with their default constructor
@@ -139,11 +141,8 @@ generic array replace(array&& a, const T& before, const T& after);
 // Orderable?
 generic const T& min(const array& a);
 generic T& max(array& a);
-generic void insertSorted(array& a, T&& v);
+generic int insertSorted(array& a, T&& v);
+generic int insertSorted(array& a, const T& v);
 
 #undef generic
 #undef array
-
-/*template<class O, class T, class F> array<O> apply(const array<T>& collection, F function) {
-    array<O> r; for(const T& e: collection) r << function(e); return r;
-}*/

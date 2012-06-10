@@ -65,7 +65,7 @@ Image decodePNG(const array<byte>& file) {
         s.advance(4); //CRC
         assert(s);
     }
-    array<byte> data = inflate(buffer);
+    array<byte> data = inflate(buffer, true);
     if(data.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;

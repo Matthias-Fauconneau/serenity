@@ -29,7 +29,7 @@ struct Date {
     Date(int seconds, int minutes, int hours, int day, int month, int year, int weekDay) :
         seconds(seconds),minutes(minutes),hours(hours),day(day),month(month),year(year),weekDay(weekDay){ invariant(); }
 };
-RawCompare(Date)
+inline bool operator ==(const T& a, const T& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(T)); }
 inline bool operator >(const Date& a, const Date& b) {
     if(a.year!=-1 && b.year!=-1) { if(a.year>b.year) return true; else if(a.year<b.year) return false; }
     if(a.month!=-1 && b.month!=-1) { if(a.month>b.month) return true; else if(a.month<b.month) return false; }

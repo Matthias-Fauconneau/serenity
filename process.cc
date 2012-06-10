@@ -9,6 +9,7 @@
 #include <sched.h>
 
 #include "array.cc"
+PlainArray(void*)
 PlainArray(Poll*)
 Array(pollfd)
 
@@ -24,9 +25,9 @@ uint availableMemory() {
     while(s) {
         string key=s.until(":"_); s.skip();
         uint value=toInteger(s.untilAny(" \n"_)); s.until("\n"_);
-        info[move(key)]=value;
+        info.insert(move(key), value);
     }
-    return info["MemFree"_]+info["Inactive"_];
+    return info.at("MemFree"_)+info.at("Inactive"_);
 }
 
 int getCPUTime() {
@@ -76,9 +77,15 @@ static bool trace = false;
 struct Profile {
     array<void*> stack;
     array<int> enter;
-    map<void*,int> profile;
+    map<void*, int> profile;
 
-    Profile() { trace=true; }
+    Profile() { ::trace=true; }
+    ~Profile() {
+        ::trace=false;
+        map<int, void*> sort;
+        for(auto e: profile) if(e.value>0) sort.insertMulti(e.value, e.key);
+        for(auto e: sort) log(str(e.key)+"\t"_+findNearestLine(e.value).function);
+    }
     void trace(void* function) {
         if(function) {
             stack << function;
@@ -96,11 +103,4 @@ struct Profile {
 no_trace(extern "C" void __cyg_profile_func_enter(void* function, void*)) { if(trace) { trace=0; profile.trace(function); trace=1; }}
 no_trace(extern "C" void __cyg_profile_func_exit(void*, void*)) { if(trace) { trace=0; profile.trace(0); trace=1; } }
 
-void logProfile() {
-    trace=0;
-    for(auto e: profile.profile) {
-        if(e.value>40) log(toString(e.value)+"\t"_+findNearestLine(e.key).function);
-    }
-    trace=1;
-}
 #endif

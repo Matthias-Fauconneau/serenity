@@ -2,7 +2,10 @@
 #include "string.h"
 #include "map.h"
 #include "stream.h"
+
+#if FUNCTIONAL
 #include <functional>
+#endif
 
 /// unique pointer to a heap-allocated value (using move semantics)
 template<class T> struct pointer {
@@ -30,20 +33,24 @@ struct Element {
     Element(string&& content):content(move(content)){}
     Element(TextBuffer& s, bool html=false);
     explicit operator bool() { return name||content; }
-    /// Collects text content of descendants
-    string text() const;
-    /// Collects text content of descendants matching path
-    string text(const string& path) const;
-    /// Returns value for \a attribute
+    /// Returns value for \a attribute (fail if missing)
+    string at(const string& attribute) const;
+    /// Returns value for \a attribute (empty string if missing)
     string operator[](const string& attribute) const;
     /// Returns child element with tag \a name
     Element operator()(const string& name) const;
+#if FUNCTIONAL
     /// Depth-first visits all descendants
     void visit(const std::function<void(const Element&)>& visitor) const;
     /// process elements with matching \a path
     void xpath(const string& path, const std::function<void(const Element&)>& visitor) const;
     /// Tests if \a path match any elements
     bool match(const string& path) const;
+    /// Collects text content of descendants
+    string text() const;
+    /// Collects text content of descendants matching path
+    string text(const string& path) const;
+#endif
     /// Returns element as parseable string
     string str(const string& prefix=""_) const;
 };

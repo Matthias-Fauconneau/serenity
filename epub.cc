@@ -12,8 +12,13 @@ struct EPub : Application {
     EPub(array<string>&& arguments) {
         //window.localShortcut("Escape"_).connect(this, &Application::quit);
         //window.show();
-        //log(slice(readFile(arguments.first()),0,100));
-        log(parseXML(move(readZip(readFile(arguments.first())).at("content.opf"_))));
+        auto zip = mapFile(arguments.first());
+        auto files = readZip(array<byte>(zip));
+        Element package = parseXML(files.at("content.opf"_))("package"_);
+        map<string, string> itemMap;
+        for(const auto& item: package("manifest"_).children) itemMap.insert(item->at("id"_), item->at("href"_));
+        array<string> items; for(const auto& itemref: package("spine"_).children) items << itemMap.at(itemref->at("idref"_));
+        log(items);
     }
 };
 Application(EPub)

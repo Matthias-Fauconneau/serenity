@@ -10,6 +10,10 @@ template<class A> inline void log(const cat<A>& a) { write_(1,a+"\n"_); }
 template<> inline void log(const string& args) { write_(1,args+"\n"_); }
 #define warn log
 
+
+struct Symbol { string file,function; uint line; };
+Symbol findNearestLine(void* address);
+
 /// Display variable name and its value
 #define var(v) ({ auto t=v; debug( log(#v##_, t); )  t; })
 /// Aborts unconditionally and display \a message

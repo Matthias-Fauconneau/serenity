@@ -81,12 +81,6 @@ generic array<T>& array<T>::operator <<(T&& v) { append(move(v)); return *this; 
 generic void array<T>::append(array&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); }
 generic array<T>& array<T>::operator <<(array<T>&& a) { append(move(a)); return *this; }
 
-generic void array<T>::insertAt(int index, T&& v) {
-    reserve(size()+1); setSize(size()+1);
-    for(int i=size()-2;i>=index;i--) copy(at(i+1),at(i));
-    new (&at(index)) T(move(v));
-}
-
 #define array array<T>
 
 /*generic array slice(array&& a, uint pos, uint size) {
@@ -109,6 +103,20 @@ generic array& operator <<(array& a, const array& b) {
     return a;
 }
 generic array copy(const array& a) { array r(a.size()); r.setSize(a.size()); for(uint i=0;i<a.size();i++) new (&r.at(i)) T(copy(a[i])); return  r; }
+
+generic T& insertAt(array& a, int index, T&& v) {
+    a.reserve(a.size()+1); a.setSize(a.size()+1);
+    for(int i=a.size()-2;i>=index;i--) copy(a.at(i+1),a.at(i));
+    new (&a.at(index)) T(move(v));
+    return a.at(index);
+}
+
+generic T& insertAt(array& a, int index, const T& v) {
+    a.reserve(a.size()+1); a.setSize(a.size()+1);
+    for(int i=a.size()-2;i>=index;i--) copy(a.at(i+1),a.at(i));
+    new (&a.at(index)) T(copy(v));
+    return a.at(index);
+}
 
 // DefaultConstructible?
 generic void grow(array& a, uint size) { uint old=a.size(); assert(size>old); a.reserve(size); a.setSize(size); for(uint i=old;i<size;i++) new (&a.at(i)) T(); }
@@ -133,19 +141,24 @@ generic array replace(array&& a, const T& before, const T& after) {
 // Orderable?
 generic const T& min(const array& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
 generic T& max(array& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
-generic void insertSorted(array& a, T&& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; a.insertAt(i,move(v)); }
+generic int insertSorted(array& a, T&& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; insertAt(a, i,move(v)); return i; }
+generic int insertSorted(array& a, const T& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; insertAt(a,i,v); return i; }
 
 #undef generic
 #undef array
 
-#define Array(T) template struct array< T >;
+/// Convenience macros for explicit template instanciation
+
+#define Array(T) template struct array< T >; \
+template T& insertAt(array<T>& a, int index, T&& v);
 #define Copy(T) \
 template array<T> slice(const array<T>& a, uint pos, uint size); \
 template array<T> slice(const array<T>& a, uint pos); \
 template array<T>& operator <<(array<T>& a, T const& v); \
 template array<T>& operator <<(array<T>& a, const array<T>& b); \
-template array<T> copy(const array<T>& a);
-#define DefaultConstructor(T) \
+template array<T> copy(const array<T>& a); \
+template T& insertAt(array<T>& a, int index, T const& v);
+#define Default(T) \
 template void grow(array<T>& a, uint size); \
 template void resize(array<T>& a, uint size);
 #define Compare(T) \
@@ -153,7 +166,10 @@ template bool contains(const array<T>&, T const&); \
 template int indexOf(const array<T>& a, T const& value); \
 template bool operator ==(const array<T>&, const array<T>&); \
 template bool operator !=(const array<T>&, const array<T>&);
+#define Sort(T) \
+template int insertSorted(array<T>& a, T&& v); \
+template int insertSorted(array<T>& a, T const& v);
 #define ArrayOfCopyable(T) Array(T) Copy(T)
-#define ArrayOfDefaultConstructible(T) Array(T) DefaultConstructor(T)
+#define ArrayOfDefaultConstructible(T) Array(T) Default(T)
 #define ArrayOfComparable(T) Array(T) Compare(T)
-#define PlainArray(T) Array(T) Copy(T) DefaultConstructor(T) Compare(T)
+#define PlainArray(T) Array(T) Copy(T) Default(T) Compare(T) Sort(T)

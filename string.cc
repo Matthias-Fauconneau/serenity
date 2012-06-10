@@ -2,7 +2,6 @@
 
 #include "array.cc"
 PlainArray(string)
-template void insertSorted(array<string>&, string&&);
 
 /// utf8_iterator
 uint utf8_iterator::operator* () const {
@@ -190,7 +189,7 @@ string itoa(int64 number, int base, int pad) {
 }
 
 string ftoa(float n, int precision, int base) {
-    if(__builtin_isnanf(n)) return "NaN"_;
+    if(__builtin_isnan(n)) return "NaN"_;
     if(n==__builtin_inff()) return "∞"_;
     if(n==-__builtin_inff()) return "-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;

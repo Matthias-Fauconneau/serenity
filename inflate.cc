@@ -1,6 +1,4 @@
 // Public domain, Rich Geldreich <richgel99@gmail.com>
-#include <stdlib.h>
-#include <string.h>
 #include "debug.h"
 
 // Decompression flags.
@@ -181,7 +179,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
           }
         }
         n = min(min((size_t)(pOut_buf_end - pOut_buf_cur), (size_t)(pIn_buf_end - pIn_buf_cur)), counter);
-        memcpy(pOut_buf_cur, pIn_buf_cur, n); pIn_buf_cur += n; pOut_buf_cur += n; counter -= (uint)n;
+        copy(pOut_buf_cur, pIn_buf_cur, n); pIn_buf_cur += n; pOut_buf_cur += n; counter -= (uint)n;
       }
     }
     else if (r->m_type == 3)
@@ -193,7 +191,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
       if (r->m_type == 1)
       {
         uint8 *p = r->m_tables[0].m_code_size; uint i;
-        r->m_table_sizes[0] = 288; r->m_table_sizes[1] = 32; memset(r->m_tables[1].m_code_size, 5, 32);
+        r->m_table_sizes[0] = 288; r->m_table_sizes[1] = 32; clear(r->m_tables[1].m_code_size, 32, ubyte(5));
         for ( i = 0; i <= 143; ++i) *p++ = 8; for ( ; i <= 255; ++i) *p++ = 9; for ( ; i <= 279; ++i) *p++ = 7; for ( ; i <= 287; ++i) *p++ = 8;
       }
       else
@@ -237,13 +235,13 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
               CR_RETURN_FOREVER(17, STATUS_FAILED);
             }
             num_extra = "\02\03\07"[dist - 16]; GET_BITS(18, s, num_extra); s += "\03\03\013"[dist - 16];
-            memset(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s); counter += s;
+            clear(r->m_len_codes + counter, s, ubyte((dist == 16) ? r->m_len_codes[counter - 1] : 0)); counter += s;
           }
           if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter)
           {
             CR_RETURN_FOREVER(21, STATUS_FAILED);
           }
-          memcpy(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]); memcpy(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
+          copy(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]); copy(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
         }
       }
       for ( ; ; )

@@ -1,6 +1,9 @@
 #include "zip.h"
 #include "inflate.h"
 
+#include "array.cc"
+Array(ZipFile)
+
 struct LocalHeader {
     ubyte signature[4] = {'P','K', 3, 4};  //local file header signature
     uint16 features; //version needed to extract
@@ -57,9 +60,9 @@ struct DirectoryEnd {
     uint16 commentLength;
 } packed;
 
-map< string,array<byte> > readZip(DataBuffer s) {
-    map< string,array<byte> > files;
-    s.until(DirectoryEnd().signature);
+map<string, ZipFile > readZip(DataBuffer s) {
+    map<string, ZipFile > files;
+    s.seekLast(raw(DirectoryEnd().signature));
     DirectoryEnd directory = s.read();
     for(int i=0;i<directory.nofEntries;i++) {
         s.seek(directory.offset);
@@ -73,44 +76,8 @@ map< string,array<byte> > readZip(DataBuffer s) {
             LocalHeader local = s.read();
             s.advance(local.nameLength);
             s.advance(local.extraLength);
-            auto data = s.read(header.compressedSize);
-            if(header.compression==8) data=inflate(data, false);
-            else assert(header.compression==0);
-            files.insert(move(name), move(data));
+            files.insert(move(name), ZipFile(s.read(header.compressedSize), header.compression==8));
         }
     }
     return files;
 }
-
-/*class File {
-    string name;
-    FileHeader header;
-    LocalHeader local;
-    ubyte[] raw;
-    ubyte[] _data;
-    this( string name, FileHeader header, LocalHeader local, ubyte[] raw ) {
- this.name=name; this.header=header; this.local=local; this.raw=raw; }
-    string str() {
-        return .str(header.size)~"\t"~
-            (header.compression==0?"Raw":header.compression==8?"Deflate":"Unknow")~"\t"~
-            .str(header.compressedSize)~"\t"~.str(header.features)~"\t"~name;
-    }
-    ubyte[] data() {
-        if( !_data && header.size ) {
-            if( header.compression == 0 ) _data = raw;
-            else if( header.compression == 8 ) _data=inflate( new BinaryStream(raw) );
-            if( !_data ) error(str);
-        }
-        return _data;
-    }
-    void data( ubyte[] data ) { _data=data;
-        header.compression = 0; //if( header.size == 0 ) { header.compression = 0; }
-        if( header.compression == 0 ) raw=data;
-        else if( header.compression == 8 ) raw=deflate( data );
-        else error();
-        local.compression = header.compression;
-        local.size = header.size = data.length;
-        local.compressedSize = header.compressedSize = raw.length;
-        local.crc = header.crc = CRC( data );
-    }
-}*/

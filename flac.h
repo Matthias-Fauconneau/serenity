@@ -3,8 +3,6 @@
 #include "string.h"
 #include "vector.h"
 
-#pragma GCC optimize(3)
-
 /// Stream reader for encoded packed bits
 struct BitReader : array<byte> {
     ubyte* data=0;

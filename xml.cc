@@ -3,7 +3,7 @@
 
 #include "array.cc"
 Array(Element)
-PlainArray(const Element*)
+PlainArray(Element*)
 ArrayOfCopyable(pointer<Element>)
 
 static Element parse(array<byte>&& document, bool html) {
@@ -49,7 +49,7 @@ Element::Element(TextBuffer& s, bool html) {
             else { value=s.untilAny(" \t\n>"_); if(s.buffer[s.index-1]=='>') s.index--; }
             s.match("\""_); //duplicate "
         }
-        attributes[move(key)]=move(value);
+        attributes.insert(move(key), move(value));
         s.skip();
     }
     if(html) {
@@ -75,27 +75,31 @@ Element::Element(TextBuffer& s, bool html) {
         else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
         else if(s.match("<"_)) children << Element(s,html);
         else {
-            string content=simplify(unescape(s.until("<"_))); s.index--;
+            string content=simplify(trim(unescape(s.until("<"_)))); s.index--;
             if(content) children << Element(move(content));
         }
     }
     //if(!s.match(string(name+">"_))) { /*log((string)slice(s.buffer,start,s.index-start),s.index);*/ log("Expecting", name,"got",s.until(">"_)); }
 }
 
-string Element::text() const { string text; visit([&text](const Element& e)->void{ text<<e.content; }); return text; }
+string Element::at(const string& attribute) const {
+    assert(attributes.contains(attribute),"attribute", attribute,"not found in",*this);
+    return copy(attributes.at(attribute));
+}
 
-string Element::text(const string& path) const { string text; xpath(path,[&text](const Element& e)->void{ text<<e.text(); }); return text; }
 
 string Element::operator[](const string& attribute) const {
-    //assert(attributes.contains(attribute),"attribute", attribute,"not found in",*this);
     if(!attributes.contains(attribute)) return ""_;
     return copy(attributes.at(attribute));
 }
 
 Element Element::operator()(const string& name) const {
     for(const auto& e: children) if(e->name==name) return copy(*e);
-    return Element();
+    //return Element();
+    error("children", name, "not found in", *this);
 }
+
+#if FUNCTIONAL
 
 template struct std::function<void(const Element&)>;
 void Element::visit(const std::function<void(const Element&)>& visitor) const {
@@ -122,6 +126,15 @@ bool Element::match(const string& path) const {
     return match;
 }
 
+string Element::text() const { string text; visit([&text](const Element& e)->void{ text<<e.content; }); return text; }
+
+string Element::text(const string& path) const {
+    string text;
+    xpath(path,[&text](const Element& e){ text<<e.text(); });
+    return text;
+}
+#endif
+
 string Element::str(const string& prefix) const {
     if(!name&&!trim(content)&&!children) return ""_;
     string line; line<< prefix;
@@ -144,9 +157,12 @@ template<> string str(const Element& e) { return e.str(); }
 string unescape(const string& xml) {
     static map<string, string> entities;
     if(!entities) {
-        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull • agrave à acirc â egrave è ocirc ô ecirc ê"_,' ');
+        array<string> kv = split(
+"quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — "
+"euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull • "
+"agrave à acirc â egrave è ocirc ô ecirc ê"_,' ');
         assert(kv.size()%2==0,kv.size());
-        for(uint i=0;i<kv.size();i+=2) entities.insert(kv[i],kv[i+1]);
+        for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
     string out;
     TextBuffer s(copy(xml));

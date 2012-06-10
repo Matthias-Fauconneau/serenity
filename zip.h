@@ -1,5 +1,13 @@
 #pragma once
 #include "stream.h"
 #include "map.h"
+#include "inflate.h"
 
-map< string,array<byte> > readZip(DataBuffer);
+struct ZipFile {
+    array<byte> data;
+    bool compressed;
+    ZipFile(array<byte>&& data, bool compressed=false) : data(move(data)), compressed(compressed) {}
+    operator array<byte>() { return compressed ? inflate(data, false) : copy(data); }
+};
+
+map< string, ZipFile> readZip(DataBuffer);

@@ -34,6 +34,12 @@ struct Buffer : virtual Stream {
     /// Seeks stream to /a index
     void seek(uint index) { assert(index<buffer.size()); this->index=index; }
 
+    /// Seeks last match for \a key.
+    bool seekLast(const array<byte>& key) {
+        for(index=buffer.size()-key.size();index>0;index--) { if(get(key.size()) == key) return true; }
+        return false;
+    }
+
     uint available(uint) override { return buffer.size()-index; }
     array<byte> get(uint size) override { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); }
     void advance(int count) override { index+=count;  assert(index<=buffer.size()); }
@@ -42,12 +48,6 @@ struct Buffer : virtual Stream {
 /// \a DataStream provides a convenient interface to parse binaries
 struct DataStream : virtual Stream {
     bool bigEndian = false;
-
-    /// Advances until stream match \a key.
-    template<class T> bool until(const T& key) {
-        while(available(sizeof(key))>=sizeof(key)) { if(get(sizeof(key)) == raw(key)) return true; advance(1); }
-        return false;
-    }
 
     /// Reads one raw \a T element from stream
     template<class T> T read() { T t = raw<T>(get(sizeof(T))); advance(sizeof(T)); return t; } //inline for custom types

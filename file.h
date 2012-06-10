@@ -51,6 +51,8 @@ struct Map {
     Map(Map&& o):data(o.data),size(o.size){o.data=0,o.size=0;}
     Map& operator=(Map&& o){data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
     ~Map();
+    /// Returns an /a array reference to the map, valid only while the map exists.
+    operator array<byte>() { return array<byte>(data,size); }
 };
 
 Map mapFile(const string& path, int at=CWD);
