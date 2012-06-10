@@ -8,13 +8,13 @@ inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(wi
 /// \note array transparently store small arrays inline when possible
 /// \note #include "array.cc" to compile arrays or method definitions for custom types
 template<class T> struct array {
-    /// \a Buffer is a lightweight handle to memory
+    /// \a array::Buffer is a lightweight handle to memory (heap allocation, mmaped file, stack reference, ...)
     struct Buffer {
         const T* data = 0;
         uint size = 0;
         uint capacity = 0; //0 = not owned
         Buffer(const T* data=0, int size=0, int capacity=0):data(data),size(size),capacity(capacity){}
-    } __attribute((packed));
+    } packed;
 
     int8 tag=-1; /*>=0: inline, -1 = heap, -2 = static*/ int8 pad_[7]; //1+7 bytes
     Buffer buffer; //+16
@@ -22,7 +22,7 @@ template<class T> struct array {
     static constexpr uint32 inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
     T* data() { return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
     const T* data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
-    uint size() const;
+    uint size() const { return tag>=0?tag:buffer.size; }
     void setSize(uint size);
     uint capacity() const;
 
@@ -89,11 +89,11 @@ template<class T> struct array {
     void insertAt(int index, T&& v);
 
     /// Iterators
-    const T* begin() const;
-    const T* end() const;
-    T* begin();
-    T* end();
-}__attribute((packed));
+    const T* begin() const { return data(); }
+    const T* end() const { return data()+size(); }
+    T* begin() { return (T*)data(); }
+    T* end() { return (T*)data()+size(); }
+} packed;
 
 /// Reinterpret cast \a array to array<T>
 template<class T, class O> array<T> cast(array<O>&& array);
@@ -144,6 +144,6 @@ generic void insertSorted(array& a, T&& v);
 #undef generic
 #undef array
 
-template<class O, class T, class L> array<O> apply(const array<T>& collection, L function) {
+/*template<class O, class T, class F> array<O> apply(const array<T>& collection, F function) {
     array<O> r; for(const T& e: collection) r << function(e); return r;
-}
+}*/

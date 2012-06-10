@@ -1,14 +1,15 @@
 #include "process.h"
 #include "window.h"
-#include "array.cc"
 #include "raster.h"
 
 #include <poll.h>
-#include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/extensions/XShm.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
+
+#include "array.cc"
+PlainArray(Window*)
 
 Display* Window::x=0;
 int2 Window::screen;
@@ -30,12 +31,15 @@ template<class T> array<T> Window::getProperty(XID window, const char* property)
     XFree(data);
     return list;
 }
+template array<char> Window::getProperty(XID window, const char* property);
 template array<Atom> Window::getProperty(XID window, const char* property);
 
 template<class T> void Window::setProperty(XID window, const char* type,const char* name, const array<T>& value) {
     XChangeProperty(x, window, XInternAtom(x,name,1), XInternAtom(x,type,1), sizeof(T)*8, PropModeReplace, (uint8*)value.data(), value.size());
     XFlush(x);
 }
+template void Window::setProperty(XID window, const char* type,const char* name, const array<char>& value);
+template void Window::setProperty(XID window, const char* type,const char* name, const array<uint>& value);
 template void Window::setProperty(XID window, const char* type,const char* name, const array<Atom>& value);
 
 static int xErrorHandler(Display* x, XErrorEvent* error) {
@@ -63,7 +67,7 @@ void Window::processEvents() {
         XEvent e; XNextEvent(x,&e);
         XID id = e.xany.window;
         if(e.type==KeyPress||e.type==KeyRelease) {
-            KeySym key = XKeycodeToKeysym(x,e.xkey.keycode,0);
+            KeySym key = XkbKeycodeToKeysym(x,e.xkey.keycode,0,0);
             signal<>* shortcut = globalShortcuts.find(key);
             if(shortcut) {  if(e.type==KeyPress) shortcut->emit(); continue; } //global window shortcut
         }
@@ -81,7 +85,7 @@ bool Window::event(const XEvent& e) {
         cursor=int2(e.xbutton.x_root,e.xbutton.y_root);
         return widget->mouseEvent(int2(e.xbutton.x,e.xbutton.y), Press, (Button)e.xbutton.button);
     } else if(e.type==KeyPress) {
-        KeySym key = XKeycodeToKeysym(x,e.xkey.keycode,0);
+        KeySym key = XkbKeycodeToKeysym(x,e.xkey.keycode,0,0);
         signal<>* shortcut = localShortcuts.find(key);
         if(shortcut) shortcut->emit(); //local window shortcut
         else if(focus) return focus->keyPress((Key)key); //normal keyPress event
@@ -217,12 +221,12 @@ void Window::setIcon(const Image& icon) {
     if(!id) return;
     int size = 2+icon.width*icon.height;
     if(sizeof(long)==4) {
-        array<int> buffer(size); buffer.setSize(size); //CARDINAL is long
+        array<uint> buffer(size); buffer.setSize(size); //CARDINAL is long
         buffer[0]=icon.width, buffer[1]=icon.height;
         for(uint i=0;i<icon.width*icon.height;i++) buffer[2+i]=*(uint*)&icon.data[i]; //pad to CARDINAL
         setProperty(id, "CARDINAL", "_NET_WM_ICON", buffer);
     } else {
-        array<int> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
+        array<uint> buffer(2*size); buffer.setSize(2*size); //CARDINAL is long
         buffer[0]=icon.width, buffer[1]=0; buffer[2]=icon.height, buffer[3]=0;
         for(uint i=0;i<icon.width*icon.height;i++) buffer[4+2*i]=*(uint*)&icon.data[i]; //pad to CARDINAL
         buffer.buffer.size /= 2; //XChangeProperty will read in CARDINAL (long) elements

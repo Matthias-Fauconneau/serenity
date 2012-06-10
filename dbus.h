@@ -5,9 +5,9 @@
 
 /// D-Bus
 
-template <class T> struct variant : T { variant(){} variant(T&& t):T(move(t)){} operator const T&() const { return *this; } };
-template <> struct variant<int> { int t; variant(){} variant(int t):t(t){} operator const int&() const { return t; } };
-template <> struct variant<uint> { uint t; variant(){} variant(uint t):t(t){} operator const uint&() const { return t; } };
+template<class T> struct variant : T { variant(){} variant(T&& t):T(move(t)){} operator const T&() const { return *this; } };
+template<> struct variant<int> { int t; variant(){} variant(int t):t(t){} operator const int&() const { return t; } };
+template<> struct variant<uint> { uint t; variant(){} variant(uint t):t(t){} operator const uint&() const { return t; } };
 
 //TODO: tuples
 struct DBusIcon {
@@ -22,8 +22,10 @@ struct DBus : Poll {
     uint32 serial = 0; // Serial number to match messages and their replies
     /// DBus read loop is able to dynamically dispatch notifications on signals and methods call
     /// \note the necessary IPC wrappers are generated using template metaprogramming when registering delegates
-    map<string, delegate<void(uint32, string, array<byte>)> > methods; //wrappers to parse arguments, call methods and serialize reply
-    map<string, signal< string, array<byte> > > signals_; //wrappers to parse arguments and emit signals
+    typedef delegate<void(uint32, string, array<byte>)> RawMethod;
+    map<string, RawMethod> methods; //wrappers to parse arguments, call methods and serialize reply
+    typedef signal< string, array<byte> > RawSignal;
+    map<string, RawSignal> signals_; //wrappers to parse arguments and emit signals
     map<string, delegate<void()> > delegates; //actual methods/signals implementations by delegates
 
     /// Read messages and parse \a outputs from first reply (without type checking)

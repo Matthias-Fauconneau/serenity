@@ -7,6 +7,7 @@
 #define Window XID
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/XKBlib.h>
 #undef Window
 #undef Font
 #include <X11/extensions/XShm.h>
@@ -110,4 +111,13 @@ struct Window : Poll {
     XShmSegmentInfo shminfo;
 
     Widget* widget;
+};
+
+template<class T> struct Popup : T {
+    Window window{this,""_,Image(),int2(300,300)};
+    Popup(T&& t=T()) : T(move(t)) {
+        window.setType(Atom(_NET_WM_WINDOW_TYPE_DROPDOWN_MENU));
+        window.localShortcut("Leave"_).connect(&window,&Window::hide);
+    }
+    void toggle() { if(window.visible) window.hide(); else { T::update(); window.show(); } }
 };

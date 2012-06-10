@@ -12,6 +12,7 @@
 #else
 #define i( ignore... ) ignore
 #define unused __attribute((unused))
+#define packed __attribute((packed))
 #endif
 
 /// Language support
@@ -63,11 +64,11 @@ typedef unsigned int size_t; typedef int ssize_t; typedef unsigned int ptr;
 inline uint16 swap16(uint16 x) { return swap32(x)>>16; }
 
 /// Basic operations
-template <class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
-template <class T> T min(T a, T b) { return a<b ? a : b; }
-template <class T> T max(T a, T b) { return a>b ? a : b; }
-template <class T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
-template <class T> T abs(T x) { return x>=0 ? x : -x; }
+template<class T> inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+template<class T> inline T min(T a, T b) { return a<b ? a : b; }
+template<class T> inline T max(T a, T b) { return a>b ? a : b; }
+template<class T> inline T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
+template<class T> inline T abs(T x) { return x>=0 ? x : -x; }
 
 /// Mathematic primitives
 
@@ -116,38 +117,39 @@ void* allocate_(int size, const char* type=0);
 void* reallocate_(void* buffer, int oldsize, int size);
 void unallocate_(void* buffer);
 #include <typeinfo>
-template<class T> T* allocate(int size) { return (T*)allocate_(size*sizeof(T), typeid(T).name()); }
-template<class T> T* reallocate(const T* buffer, int oldSize, int size) { return (T*)reallocate_((void*)buffer,sizeof(T)*oldSize,sizeof(T)*size); }
-template<class T> void unallocate(T* buffer) { unallocate_((void*)buffer); }
+template<class T> inline T* allocate(int size) { return (T*)allocate_(size*sizeof(T), typeid(T).name()); }
+template<class T> inline T* reallocate(const T* buffer, int oldSize, int size) { return (T*)reallocate_((void*)buffer,sizeof(T)*oldSize,sizeof(T)*size); }
+template<class T> inline void unallocate(T* buffer) { unallocate_((void*)buffer); }
 #else
 // Allocates an uninitialized memory buffer for \a size elements
-template<class T> T* allocate(int size) { return (T*)malloc(size*sizeof(T)); }
+template<class T> inline T* allocate(int size) { return (T*)malloc(size*sizeof(T)); }
 // Reallocates memory \a buffer to new \a size
-template<class T> T* reallocate(const T* buffer, int, int size) { return (T*)realloc((void*)buffer,sizeof(T)*size); }
+template<class T> inline T* reallocate(const T* buffer, int, int size) { return (T*)realloc((void*)buffer,sizeof(T)*size); }
 // Free memory \a buffer
-template<class T> void unallocate(T* buffer) { free((void*)buffer); }
+template<class T> inline void unallocate(T* buffer) { free((void*)buffer); }
 #endif
 
 /// Clear
 //raw buffer zero initialization //TODO: SSE
 inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }
 //unsafe  (ignoring constructors) raw value zero initialization
-template <class T> void clear(T& dst) { clear((byte*)&dst,sizeof(T)); }
+template<class T> inline void clear(T& dst) { clear((byte*)&dst,sizeof(T)); }
 //safe buffer default initialization
-template <class T> void clear(T* data, int count, const T& value=T()) { for(int i=0;i<count;i++) data[i]=value; }
+template<class T> inline void clear(T* data, int count, const T& value=T()) { for(int i=0;i<count;i++) data[i]=value; }
 
 /// Copy
 //raw buffer copy //TODO: SSE
 inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
 //unsafe (ignoring constructors) raw value copy
-template <class T> void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src,sizeof(T)); }
+template<class T> inline void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src,sizeof(T)); }
 // base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
-template <class T> T copy(const T& t) { return t; }
+template<class T> inline T copy(const T& t) { return t; }
 // explicit buffer copy
-template <class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
+template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
 
 /// Compare
-//raw buffer comparison //TODO: SSE
+//raw memory comparison //TODO: SSE
 inline bool compare(const byte* a,const byte* b, int size) { for(int i=0;i<size;i++) if(a[i]!=b[i]) return false; return true; }
 //raw value comparison
-template <class T> bool compare(const T& a,const T& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(T)); }
+#define RawCompare(T) inline bool operator ==(const T& a, const T& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(T)); }
+template<class A, class B> inline bool operator !=(const A& a, const B& b) { return !(a==b); }

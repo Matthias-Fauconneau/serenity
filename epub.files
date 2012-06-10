@@ -1,3 +1,4 @@
+Makefile
 core.h
 core.cc
 debug.h
@@ -9,22 +10,23 @@ string.h
 string.cc
 process.h
 process.cc
-signal.h
 
 file.h
 file.cc
 stream.h
 stream.cc
-xml.h
-xml.cc
+inflate.h
+inflate.cc
+zip.h
+zip.cc
 
 font.h
 font.cc
 raster.cc
 raster.h
-interface.h
-interface.cc
 window.h
 window.cc
 
 epub.cc
+map.cc
+inflate.h

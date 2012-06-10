@@ -22,8 +22,12 @@ struct string : array<char> {
     string(const char* begin,const char* end):array<char>(begin,end){}
     string(utf8_iterator begin,utf8_iterator end):array<char>(begin.pointer,end.pointer){}
 
-    uint at(uint index) const { utf8_iterator it=begin(); for(uint i=0;it!=end();++it,++i) if(i==index) return *it; logTrace(); __builtin_abort(); }
-    uint operator [](uint i) const { return at(i); }
+    /*uint at(uint index) const {
+        utf8_iterator it=begin();
+        for(uint i=0;it!=end();++it,++i) if(i==index) return *it;
+        logTrace(); __builtin_abort();
+    }*/
+    //uint operator [](uint i) const { return at(i); }
 
     const utf8_iterator begin() const { return array::begin(); }
     const utf8_iterator end() const { return array::end(); }
@@ -106,13 +110,13 @@ inline string str(const char* s) { int l=0; for(;s[l];l++){} return string(s,l);
 inline string str(char* s) { int l=0; for(;s[l];l++){} return string(s,l); }
 
 /// Converts a machine integer to its human-readable representation
+string utoa(uint64 number, int base=10, int pad=0);
 string itoa(int64 number, int base=10, int pad=0);
 inline string hex(int64 n, int pad=0) { return itoa(n,16,pad); }
 inline string dec(int64 n, int pad=0) { return itoa(n,10,pad); }
 inline string oct(int64 n, int pad=0) { return itoa(n,8,pad); }
 inline string bin(uint64 n, int pad=0) { return itoa(n,2,pad); }
 
-template<> inline string str(void* const& n) { return hex(int64(n)); }
 template<> inline string str(const uint64& n) { return dec(n); }
 template<> inline string str(const int64& n) { return dec(n); }
 template<> inline string str(const unsigned long& n) { return dec(n); }
@@ -130,19 +134,20 @@ template<> inline string str(const float& number) { return ftoa(number,2); }
 
 /// Concatenates string representation of its arguments
 /// \note directly use operator+ to avoid spaces
-template<class A, class... Args, predicate(!is_convertible(A,string))> string str(const A& a, const Args&... args) { return str(a)+" "_+str(args...); }
-template<class... Args> string str(const string& s, const Args&... args) { return s+" "_+str(args...); }
-template<class A, predicate(!is_convertible(A,string))> string str(const A& a, const string& s) { return str(a)+" "_+s; }
+template<class A, class... Args, predicate(!is_convertible(A,string))> inline string str(const A& a, const Args&... args) { return str(a)+" "_+str(args...); }
+template<class... Args> inline string str(const string& s, const Args&... args) { return s+" "_+str(args...); }
+template<class A, predicate(!is_convertible(A,string))> inline string str(const A& a, const string& s) { return str(a)+" "_+s; }
 inline string str(const string& a, const string& b) { return a+" "_+b; }
 
 /// String representation of a cat (force conversion to string)
-template<class A> string str(const cat<A>& s) { return s; }
+template<class A> inline string str(const cat<A>& s) { return s; }
 
 /// String representation of a pointer
-template<class A> string str(A* const& s) { return s?"null"_:str(*s); }
+template<class A> inline string str(A* const& s) { return s?"null"_:str(*s); }
+template<> inline string str(void* const& n) { return utoa(ptr(n),16); }
 
 /// String representation of an array
-template<class T> string str(const array<T>& list) { return str(apply<string>(list,[](const T& t){return str(t);})); }
+template<class T> inline string str(const array<T>& list) { array<string> r; for(const T& e: list) r << str(e); return str(r); }
 template<> inline string str(const array<string>& list) { return "["_+join(list,", "_)+"]"_; }
 
 bool isInteger(const string& s);

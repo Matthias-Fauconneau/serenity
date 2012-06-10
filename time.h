@@ -8,7 +8,7 @@ uint64 getRealTime();
 /// Returns Unix real-time in seconds
 long currentTime();
 
-template<class T> bool inRange(T min, T x, T max) { return x>=min && x<=max; }
+template<class T> inline bool inRange(T min, T x, T max) { return x>=min && x<=max; }
 struct Date {
     int seconds=-1, minutes=-1, hours=-1, day=-1, month=-1, year=-1, weekDay=-1;
     void invariant() {
@@ -29,8 +29,7 @@ struct Date {
     Date(int seconds, int minutes, int hours, int day, int month, int year, int weekDay) :
         seconds(seconds),minutes(minutes),hours(hours),day(day),month(month),year(year),weekDay(weekDay){ invariant(); }
 };
-inline bool operator ==(const Date& a, const Date& b) { return compare(a,b); }
-inline bool operator !=(const Date& a, const Date& b) { return !compare(a,b); }
+RawCompare(Date)
 inline bool operator >(const Date& a, const Date& b) {
     if(a.year!=-1 && b.year!=-1) { if(a.year>b.year) return true; else if(a.year<b.year) return false; }
     if(a.month!=-1 && b.month!=-1) { if(a.month>b.month) return true; else if(a.month<b.month) return false; }

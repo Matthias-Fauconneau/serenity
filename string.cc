@@ -1,9 +1,7 @@
 #include "string.h"
 
 #include "array.cc"
-template struct array<string>;
-template int indexOf(const array<string>&, const string&);
-template bool contains(const array<string>&, const string&);
+PlainArray(string)
 template void insertSorted(array<string>&, string&&);
 
 /// utf8_iterator
@@ -27,26 +25,15 @@ const utf8_iterator& utf8_iterator::operator++() {
 const utf8_iterator& utf8_iterator::operator--() {
     ubyte code = *--pointer;
     if(code>=128) {
-        //assert((code&0b11000000)==0b10000000,bin(code,8),(char)code,code,hex(code));
         if((code&0b11000000)!=0b10000000) {} //Windows-1252
         else { //UTF-8
             int i=0; for(;(code&0b11000000)==0b10000000;i++) code = *(--pointer);
-#define WINDOWS_1252 1
             if(i==1) { if((code&0b11100000)!=0b11000000) pointer++; }
             else if(i==2) { if((code&0b11110000)!=0b11100000) pointer+=2; }
             else if(i==3) { if((code&0b11111000)!=0b11110000) pointer+=3; }
             else if(i==4) { if((code&0b11111100)!=0b11111000) pointer+=4; }
             else if(i==5) { if((code&0b11111110)!=0b11111100) pointer+=5; }
             else error(i);
-#if WINDOWS_1252
-#else
-            /**/  if(i==1) assert((code&0b11100000)==0b11000000);
-            else if(i==2) assert((code&0b11110000)==0b11100000);
-            else if(i==3) assert((code&0b11111000)==0b11110000);
-            else if(i==4) assert((code&0b11111100)==0b11111000);
-            else if(i==5) assert((code&0b11111110)==0b11111100);
-            else error(i);
-#endif
         }
     }
     return *this;
@@ -62,7 +49,9 @@ bool contains(const string& s, const string& a) {
     }
     return false;
 }
-bool endsWith(const array<byte>& s, const array<byte>& a) { return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a; }
+bool endsWith(const array<byte>& s, const array<byte>& a) {
+    return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a;
+}
 
 bool operator <(const string& a, const string& b) {
     for(uint i=0;i<min(a.size(),b.size());i++) {
@@ -85,17 +74,24 @@ string section(const string& s, uint separator, int start, int end, bool include
         b=s.size();
         if(start!=-1) {
             utf8_iterator it=s.end(); --it; --b;
-            for(uint i=0;;--it,--b) { if(*it==separator) { i++; if(i>=uint(-start-1)) { if(!includeSeparator) b++; break; } } if(it == s.begin()) break; }
+            for(uint i=0;;--it,--b) {
+                if(*it==separator) { i++; if(i>=uint(-start-1)) { if(!includeSeparator) b++; break; } }
+                if(it == s.begin()) break;
+            }
         }
     }
     if(end>=0) {
         e=0;
-        utf8_iterator it=s.begin(); for(uint i=0;it!=s.end();++it,e++) if(*it==separator) { i++; if(i>=(uint)end) { if(includeSeparator) e++; break; } }
+        utf8_iterator it=s.begin();
+        for(uint i=0;it!=s.end();++it,e++) if(*it==separator) { i++; if(i>=(uint)end) { if(includeSeparator) e++; break; } }
     } else {
         e=s.size();
         if(end!=-1) {
             utf8_iterator it=s.end(); --it; --e;
-            for(uint i=0;;--it,--e) { if(*it==separator) { i++; if(i>=uint(-end-1)) { if(includeSeparator) e++; break; } } if(it == s.begin()) break; }
+            for(uint i=0;;--it,--e) {
+                if(*it==separator) { i++; if(i>=uint(-end-1)) { if(includeSeparator) e++; break; } }
+                if(it == s.begin()) break;
+            }
         }
     }
     assert(e>=b,"'"_+s+"'"_,separator,start,end,includeSeparator,e,b);
@@ -160,14 +156,25 @@ string simplify(const array<byte>& s) {
 
 string utf8(uint c) {
     string utf8;
-    /**/  if(c<(1<<7))           utf8                                                                                                            << c;
-    else if(c<(1<<(7+6)))     utf8                                             << (0b11000000|(c>>6))                      << (0b10000000|(c&0b111111));
+    /**/  if(c<(1<<7)) utf8 << c;
+    else if(c<(1<<(7+6))) utf8 << (0b11000000|(c>>6)) << (0b10000000|(c&0b111111));
     else if(c<(1<<(7+6+6))) utf8 << (0b11100000|(c>>12)) << (0b10000000|((c>>6)&0b111111)) << (0b10000000|(c&0b111111));
     else error(c);
     return utf8;
 }
 
 /// Human-readable value representation
+
+string utoa(uint64 n, int base, int pad) {
+    assert(base>=2 && base<=16,"Unsupported base"_,base);
+    char buf[64]; int i=64;
+    do {
+        buf[--i] = "0123456789abcdef"[n%base];
+        n /= base;
+    } while( n!=0 );
+    while(64-i<pad) buf[--i] = '0';
+    return copy(string(buf+i,64-i));
+}
 
 string itoa(int64 number, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
@@ -178,8 +185,7 @@ string itoa(int64 number, int base, int pad) {
         n /= base;
     } while( n!=0 );
     while(64-i<pad) buf[--i] = '0';
-    if(number<0) buf[--i]='-',
-    assert(i>=0);
+    if(number<0) buf[--i]='-';
     return copy(string(buf+i,64-i));
 }
 
@@ -188,7 +194,7 @@ string ftoa(float n, int precision, int base) {
     if(n==__builtin_inff()) return "∞"_;
     if(n==-__builtin_inff()) return "-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;
-    return (n>=0?""_:"-"_)+itoa(abs(n),base)+"."_+itoa(int(m*abs(n))%m,base,precision);
+    return (n>=0?""_:"-"_)+utoa(abs(n),base)+"."_+utoa(int(m*abs(n))%m,base,precision);
 }
 
 bool isInteger(const string& s) { if(!s) return false; for(auto c: s) if(c<'0'||c>'9') return false; return true; }

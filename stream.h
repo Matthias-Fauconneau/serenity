@@ -4,11 +4,11 @@
 #include "debug.h"
 
 /// create an array<byte> reference of \a t raw memory representation
-template<class T> array<byte> raw(const T& t) { return array<byte>((byte*)&t,sizeof(T)); }
+template<class T> inline array<byte> raw(const T& t) { return array<byte>((byte*)&t,sizeof(T)); }
 /// cast raw memory to a \a T
-template<class T> T raw(const array<byte>& a) { assert(a.size()==sizeof(T)); return *(T*)a.data(); }
+template<class T> inline T raw(const array<byte>& a) { assert(a.size()==sizeof(T)); return *(T*)a.data(); }
 
-/// \a Stream is an abstract interface used by \a DataStream, TextStream and implemented by Buffer,File,Socket
+/// \a Stream is an interface used by \a DataStream, TextStream and implemented by Buffer, File, Socket
 struct Stream {
     /// Returns number of bytes available, reading \a need bytes from underlying device if possible
     virtual uint available(uint need) = 0;
@@ -16,17 +16,26 @@ struct Stream {
     virtual array<byte> get(uint size) = 0;
     /// Advances \a count bytes in stream
     virtual void advance(int count) = 0;
+
+    /// Returns true if there is data to read
+    explicit operator bool() { return available(1); }
 };
 
 /// Buffer is an in-memory \a Stream
 struct Buffer : virtual Stream {
     array<byte> buffer;
     uint index=0;
+
     Buffer(){}
-    Buffer(array<byte>&& buffer) : buffer(move(buffer)) {}
     Buffer(Buffer&& o):buffer(move(o.buffer)),index(o.index){}
+    /// Returns a Buffer to stream /a array
+    Buffer(array<byte>&& array) : buffer(move(array)) {}
+
+    /// Seeks stream to /a index
+    void seek(uint index) { assert(index<buffer.size()); this->index=index; }
+
     uint available(uint) override { return buffer.size()-index; }
-    array<byte> get(uint size) override { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); } //copy?
+    array<byte> get(uint size) override { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); }
     void advance(int count) override { index+=count;  assert(index<=buffer.size()); }
 };
 
@@ -34,8 +43,11 @@ struct Buffer : virtual Stream {
 struct DataStream : virtual Stream {
     bool bigEndian = false;
 
-    /// Returns true if there is data to read
-    explicit operator bool() { return available(1); }
+    /// Advances until stream match \a key.
+    template<class T> bool until(const T& key) {
+        while(available(sizeof(key))>=sizeof(key)) { if(get(sizeof(key)) == raw(key)) return true; advance(1); }
+        return false;
+    }
 
     /// Reads one raw \a T element from stream
     template<class T> T read() { T t = raw<T>(get(sizeof(T))); advance(sizeof(T)); return t; } //inline for custom types
@@ -65,8 +77,6 @@ struct DataStream : virtual Stream {
 
 /// \a TextStream provides a convenient interface to parse texts
 struct TextStream : virtual Stream {
-    /// Returns true if there is data to read
-    explicit operator bool() { return available(1); }
     /// Reads \a size bytes from stream
     array<byte> read(uint size) { array<byte> t = get(size); advance(size); return t; }
 
@@ -78,7 +88,7 @@ struct TextStream : virtual Stream {
     void whileAny(const array<char>& any);
     /// Reads until stream match \a key
     string until(const string& key);
-    /// Reads until stream match any of \a key
+    /// Reads until stream match any character of \a key
     string untilAny(const array<char>& any);
     /// Reads until the end of stream
     string untilEnd();

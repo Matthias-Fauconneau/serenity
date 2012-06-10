@@ -5,13 +5,19 @@
 #include "html.h"
 #include "interface.h"
 #include "window.h"
-#include "array.cc"
 
 ICON(network);
 
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
 Entry::Entry(string&& name, string&& link, Image&& icon):Item(move(icon),move(name)),link(move(link)){}
 Entry::~Entry() { if(content) delete content; }
+#include "array.cc"
+template struct array<Entry>;
+template struct Array<Entry>;
+template struct ListSelection<Entry>;
+template struct List<Entry>;
+
+template struct Scroll<HTML>;
 
 Feeds::Feeds() {
     window.localShortcut("Escape"_).connect(&window, &Window::hide);
@@ -40,8 +46,8 @@ void Feeds::setRead(const Entry& entry) {
     string id = text.text+entry.link;
     id=replace(id,"\n"_,""_);
     if(contains(read,id)) return;
-    read << id;
     ::write(readConfig,string(id+"\n"_));
+    read << move(id);
 }
 void Feeds::setAllRead() {
     for(Entry& entry: *this) {
@@ -86,17 +92,15 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
         if(!url) url=e("link"_)["href"_]; //Atom
 
         Entry entry(move(text),move(url));
-        if(!isRead(entry)) {
-            if(count()>=64){warn("Too many news"); return;}
-            items.append(move(entry));
-        }
+        if(!isRead(entry)) items.append(move(entry));
     };
     feed.xpath("feed/entry"_,addItem); //Atom
     feed.xpath("rss/channel/item"_,addItem); //RSS
+    int preload=0;
     for(int i=items.size()-1;i>=0;i--) { //oldest first
         append(move(items[i]));
         Entry& item = last(); //reference shouldn't move while loading
-        if(i<=16) {
+        if(preload++<=16) { //preload first items
             item.content = new Scroll<HTML>;
             item.content->go(item.link); //preload
         }

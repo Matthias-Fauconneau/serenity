@@ -29,19 +29,6 @@ struct Calendar : VBox {
     void checkAlarm();
 };
 
-template<class T> struct Popup : T {
-    Window window{this,""_,Image(),int2(300,300)};
-    Popup() {
-        window.setType(Atom(_NET_WM_WINDOW_TYPE_DROPDOWN_MENU));
-        window.localShortcut("Leave"_).connect(&window,&Window::hide);
-    }
-    Popup(T&& t) : T(move(t)) {
-        window.setType(Atom(_NET_WM_WINDOW_TYPE_DROPDOWN_MENU));
-        window.localShortcut("Leave"_).connect(&window,&Window::hide);
-    }
-    void toggle() { if(window.visible) window.hide(); else { T::update(); window.show(); } }
-};
-
 struct Clock : Text, Timer {
     signal<> timeout;
     signal<> triggered;

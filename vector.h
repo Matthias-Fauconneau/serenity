@@ -7,7 +7,7 @@ template<class T> T cb(const T& x) { return x*x*x; }
 
 extern struct Zero {} zero; //dummy type to call zero-initializing constructor
 //TODO: SIMD
-template <template <typename> class V, class T, int N> struct vector : V<T> {
+template<template<typename> class V, class T, int N> struct vector : V<T> {
     static const int size = N;
     //vector()debug(:V<T>{}){}
     vector():V<T>{}{}
@@ -38,7 +38,7 @@ template <template <typename> class V, class T, int N> struct vector : V<T> {
     explicit operator bool() const;
 };
 
-#define generic template <template <typename> class V, class T, int N>
+#define generic template<template<typename> class V, class T, int N>
 generic vector<V,T,N> operator *(float s, vector<V,T,N> v);
 generic vector<V,T,N> abs(vector<V,T,N> v);
 generic vector<V,T,N> sign(vector<V,T,N> v);

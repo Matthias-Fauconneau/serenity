@@ -4,7 +4,7 @@
 #include "stream.h"
 #include <functional>
 
-/// unique pointer to a heap-allocated value with move semantics (useful for recursive types)
+/// unique pointer to a heap-allocated value (using move semantics)
 template<class T> struct pointer {
     no_copy(pointer)
     pointer(T&& value):value(new T(move(value))){}
@@ -18,8 +18,8 @@ template<class T> struct pointer {
     bool operator !() const { return !value; }
     operator const T*() const { return value; }
 };
-template<class T> pointer<T> copy(const pointer<T>& p) { assert(p.value); return pointer<T>(copy(*p.value)); }
-template<class T> string str(const pointer<T>& p) { assert(p.value); return str(*p.value); }
+template<class T> inline pointer<T> copy(const pointer<T>& p) { assert(p.value); return pointer<T>(copy(*p.value)); }
+template<class T> inline string str(const pointer<T>& p) { assert(p.value); return str(*p.value); }
 
 /// XML element
 struct Element {

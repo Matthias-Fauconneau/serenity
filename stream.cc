@@ -17,8 +17,7 @@ void TextStream::whileAny(const array<char>& any) { while(matchAny(any)){} }
 
 string TextStream::until(const string& key) {
     string a;
-    for(;available(key.size())>=key.size() && get(key.size()) != key;) a << read(1);
-    match(key);
+    while(available(key.size())>=key.size()) { if(get(key.size()) == key) { advance(key.size()); break; } a << read(1); }
     return a;
 }
 

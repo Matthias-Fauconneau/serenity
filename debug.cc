@@ -38,39 +38,33 @@ Symbol findNearestLine(void* address) {
 
 /// Stack
 
-struct StackFrame {
-    StackFrame* caller_frame; void* return_address;
-    static inline StackFrame* current() {
+
 #if __x86_64__ || __i386__
-        register StackFrame* ebp __asm__("ebp");
+void* caller_frame(void* fp) { return *(void**)fp; }
+void* return_address(void* fp) { return *((void**)fp+1); }
 #elif __arm__
-        register StackFrame* ebp __asm__("fp");
+void* caller_frame(void* fp) { return *((void**)fp-3); }
+void* return_address(void* fp) { return *((void**)fp-1); }
 #else
-        #error Unsupported architecture
+       #error Unsupported architecture
 #endif
-return ebp;
-}
-};
-int backtrace(void** frames, int capacity, StackFrame* frame) {
-    int i=0;
-    for(;i<capacity;i++) {
-        frame=frame->caller_frame;
-        if(uint64(frame)<0x100 || uint64(frame)>0x10000000000000) break;
-        frames[i]=frame->return_address;
-    }
-    return i;
-}
-void logBacktrace(StackFrame* frame) {
+
+void logBacktrace(void* frame) {
     void* frames[8];
-    int size = backtrace(frames,8,frame);
-    for(int i=size-1; i>=0; i--) {
+    int i=0;
+    for(;i<8;i++) {
+        if(!frame) break;
+        frames[i]=return_address(frame);
+        frame=caller_frame(frame);
+    }
+    for(i--; i>=0; i--) {
         Symbol s = findNearestLine(frames[i]);
         if(s.function && s.function[0]!='_') { log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
     }
 }
-void logTrace(int skip) {
-    StackFrame* frame = StackFrame::current();
-    while(skip-- && uint64(frame->caller_frame)<0x10 && uint64(frame->caller_frame)>0x10000000000000) frame=frame->caller_frame;
+void logTrace(int /*skip*/) {
+    void* frame = __builtin_frame_address(0);
+    //while(skip-- && uint64(frame->caller_frame)<0x10 && uint64(frame->caller_frame)>0x10000000000000) frame=frame->caller_frame;
     logBacktrace(frame);
 }
 
@@ -98,13 +92,13 @@ static void handler(int sig, siginfo*, void* ctx) {
     }
     else error("Unhandled signal"_);
 #if __x86_64__
-    logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_RBP]));
+    logBacktrace(context->uc_mcontext.gregs[REG_RBP]);
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
 #elif __i386__
-    logBacktrace((StackFrame*)(context->uc_mcontext.gregs[REG_EBP]));
+    logBacktrace(context->uc_mcontext.gregs[REG_EBP]);
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_EIP]);
 #elif __arm__
-    logBacktrace((StackFrame*)(context->uc_mcontext.arm_fp));
+    logBacktrace((void*)context->uc_mcontext.arm_fp);
     Symbol s = findNearestLine((void*)context->uc_mcontext.arm_ip);
 #else
 #error Unsupported architecture

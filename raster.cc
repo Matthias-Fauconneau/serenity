@@ -1,5 +1,7 @@
 #include "raster.h"
+
 #include "array.cc"
+ArrayOfCopyable(Rect)
 
 Image framebuffer;
 

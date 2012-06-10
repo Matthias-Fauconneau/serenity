@@ -1,6 +1,8 @@
 #include "image.h"
 #include "stream.h"
-#include "array.cc" //cast<byte4>
+
+#include "array.cc"
+template array<byte4> cast(array<byte>&& array);
 
 struct Directory { uint16 reserved, type, count; };
 struct Entry { ubyte width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };

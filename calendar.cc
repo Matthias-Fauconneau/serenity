@@ -1,6 +1,14 @@
 #include "calendar.h"
 #include "file.h"
-#include "array.cc" //array<Date>
+
+#include "array.cc"
+PlainArray(Date)
+template struct array< array<Date> >;
+
+template struct Array<Text>;
+template struct ListSelection<Text>;
+template struct HList<Text>;
+template struct Grid<Text>;
 
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query) {
@@ -10,7 +18,7 @@ array<string> getEvents(Date query) {
 
     map<string, array<Date> > exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
-        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until("\n"_); exceptions[move(title)] << except; }
+        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until("\n"_); exceptions.insert(move(title),array<Date>{except}); }
         else s.until("\n"_);
     }
     s.index=0;
@@ -40,7 +48,7 @@ array<string> getEvents(Date query) {
             if(query.hours>=0 && date.hours!=query.hours) continue;
             if(query.minutes>=0 && date.minutes!=query.minutes) continue;
             if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
-            for(Date date: exceptions[copy(title)]) if(date.day==query.day && date.month==query.month) goto skip;
+            if(exceptions.contains(title)) for(Date date: exceptions.at(title)) if(date.day==query.day && date.month==query.month) goto skip;
             insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title));
             skip:;
         }

@@ -14,8 +14,6 @@
 
 #include <sys/resource.h>
 
-#include "array.cc"
-
 ICON(music);
 ICON(music256);
 

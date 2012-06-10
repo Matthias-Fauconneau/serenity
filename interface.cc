@@ -3,14 +3,22 @@
 #include "font.h"
 #include "raster.h"
 
+template struct item<Icon>;
+template struct item<Text>;
+template struct item<Space>;
+template struct tuple<Icon,Text,Space>;
+template struct Tuple<Icon,Text,Space>;
+
 #include "array.cc"
 template struct array<Widget*>;
 template struct array<Text>;
 template struct array<Text::Blit>;
-template struct array<Text::Line>;
+ArrayOfCopyable(Text::Line)
 template struct array<Text::Link>;
+template struct array<ImageView>;
+
 /// Sets the array size to \a size, filling with \a value
-template<class T> void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }
+template<class T> inline void fill(array<T>& a, const T& value, int size) { a.reserve(size); a.setSize(size); for(int i=0;i<size;i++) new (&a[i]) T(copy(value)); }
 
 Space space;
 
@@ -87,6 +95,8 @@ int2 Linear::sizeHint() {
     }
     return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
 }
+
+template int& max<int>(array<int>&);
 
 void Linear::update() {
     if(!count()) return;
@@ -214,8 +224,7 @@ struct TextLayout {
                 float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font->metrics(size,' ').advance.x;
                 length += word.last().pos.x+word.last().glyph.image.width; //last word
                 if(wrap && length>=wrap) nextLine(true); //doesn't fit
-                line << word; //add to current line (or first of new line)
-                word.clear();
+                line << move(word); //add to current line (or first of new line)
                 pen.x=0;
                 if(c=='\n') nextLine(false);
                 continue;
@@ -258,6 +267,10 @@ struct TextLayout {
        return max;
     }
 };
+
+ArrayOfCopyable(TextLayout::Character)
+Array(TextLayout::Word)
+Array(TextLayout::Line)
 
 Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
 Text::~Text()=default;

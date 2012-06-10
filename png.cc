@@ -1,9 +1,8 @@
 #include "image.h"
 #include "stream.h"
+#include "inflate.h"
 
-void *tinfl_decompress_mem_to_heap(const void *data, size_t size, size_t* outputSize, int flags);
-
-template<template <typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
+template<template<typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
     typedef vector<T,uint8,N> S;
     typedef vector<T,int,N> V;
     S* prior = new S[width]; clear(prior,width,S(zero));
@@ -29,6 +28,10 @@ template<template <typename> class T, int N> void filter(byte4* dst, const byte*
     }
     delete[] prior;
 }
+template void filter<luma,1>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
+template void filter<ia,2>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
+template void filter<rgb,3>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
+template void filter<rgba,4>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 
 Image decodePNG(const array<byte>& file) {
     DataBuffer s(array<byte>(file.data(),file.size())); s.bigEndian=true;
@@ -43,7 +46,7 @@ Image decodePNG(const array<byte>& file) {
         if(name == "IHDR"_) {
             width = s.read(), height = s.read();
             uint8 unused bitDepth = s.read();
-            if(bitDepth!=8){ warn("Unsupported PNG bitdepth",bitDepth); return Image(); }
+            if(bitDepth!=8){ warn("Unsupported PNG bitdepth"_,bitDepth); return Image(); }
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
@@ -62,12 +65,11 @@ Image decodePNG(const array<byte>& file) {
         s.advance(4); //CRC
         assert(s);
     }
-    size_t size=0;
-    byte* data = (byte*)tinfl_decompress_mem_to_heap(buffer.data(),buffer.size(),&size,1);
-    if(size < height*(1+width*depth)) { warn("Invalid PNG",size,height*(1+width*depth)); return Image(); }
+    array<byte> data = inflate(buffer);
+    if(data.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
-    byte* src=data;
+    byte* src=data.data();
     for(int i=0;i==0 || (interlace && i<7);i++) {
         int xStride=1,yStride=1;
         int offset=0;

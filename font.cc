@@ -8,6 +8,8 @@
 #include <freetype/ftlcdfil.h>
 
 #include "array.cc"
+ArrayOfDefaultConstructible(Glyph)
+ArrayOfDefaultConstructible(Font::GlyphCache)
 
 static FT_Library ft;
 struct InitFreeType {
@@ -52,7 +54,7 @@ GlyphMetrics Font::metrics(int size, int code) {
 }
 
 Glyph& Font::glyph(int size, int code) {
-    map<int, Glyph>& glyphs = cache[size];
+    GlyphCache& glyphs = cache[size];
     if(!glyphs.values) glyphs.values.reserve(256); //FIXME: dynamic array would invalid any references
     assert(glyphs.values.capacity()==256);
     Glyph& glyph = glyphs[code]; //TODO: lookup for code in [0x20..0x80]

@@ -5,7 +5,10 @@
 #include <sys/un.h>
 #include <poll.h>
 
-#include "array.cc" //array<DBusIcon>
+#include "array.cc"
+Array(DBusIcon)
+Array(DBus::RawMethod)
+ArrayOfDefaultConstructible(DBus::RawSignal)
 
 /// Align array size appending default elements
 void align(array<byte>& a, int width) { int s=a.size(), n=align(width, s); if(n>s) grow(a, n); }

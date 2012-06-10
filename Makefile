@@ -4,7 +4,7 @@ BUILD ?= release
 
 COMPILER = gcc
 CCX ?= $(CCX_$(COMPILER))
-CCX_gcc := g++-4.8 -Wno-pmf-conversions
+CCX_gcc := g++-4.7 -Wno-pmf-conversions -fno-implicit-templates -mapcs
 CCX_clang := clang++
 
 FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions -march=native
@@ -19,12 +19,13 @@ FLAGS__trace := -g -DDEBUG -finstrument-functions -finstrument-functions-exclude
 FLAGS__memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MALLOC
 
 FLAGS_font = -I/usr/include/freetype2
+#FLAGS_dbus = -fimplicit-templates
 
 SRCS = $(SRCS_$(TARGET))
-SRCS_taskbar += png inflate
-SRCS_desktop += png inflate jpeg ico
-SRCS_player += png inflate
-SRCS_music += png inflate
+SRCS_taskbar += png
+SRCS_desktop += png jpeg ico
+SRCS_player += png
+SRCS_music += png
 
 LIBS__debug = bfd
 LIBS__fast = bfd

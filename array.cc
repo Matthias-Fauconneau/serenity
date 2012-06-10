@@ -2,7 +2,6 @@
 #include "debug.h"
 
 #define generic template<class T>
-generic uint array<T>::size() const { return tag>=0?tag:buffer.size; }
 generic void array<T>::setSize(uint size) { assert(size<=capacity()); if(tag>=0) tag=size; else buffer.size=size;}
 generic uint array<T>::capacity() const { return tag>=0 ? inline_capacity() : buffer.capacity; }
 
@@ -12,7 +11,8 @@ generic array<T>::array(array<T>&& o) {
 }
 
 generic array<T>& array<T>::operator=(array<T>&& o) {
-    array<T>::~array<T>(); //crash clang
+    //array<T>::~array<T>(); //crash clang
+    if(capacity()) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-1) unallocate(buffer.data); }
     if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(*this));
     o.tag=0;
     return *this;
@@ -87,11 +87,6 @@ generic void array<T>::insertAt(int index, T&& v) {
     new (&at(index)) T(move(v));
 }
 
-generic const T* array<T>::begin() const { return data(); }
-generic const T* array<T>::end() const { return data()+size(); }
-generic T* array<T>::begin() { return (T*)data(); }
-generic T* array<T>::end() { return (T*)data()+size(); }
-
 #define array array<T>
 
 /*generic array slice(array&& a, uint pos, uint size) {
@@ -107,7 +102,7 @@ generic array slice(const array& a, uint pos, uint size) {
     return copy(array(a.data()+pos,size));
 }
 generic array slice(const array& a, uint pos) { return slice(a,pos,a.size()-pos); }
-generic array& operator <<(array& a, const T& v) { a.append(copy(v)); return a; }
+generic array& operator <<(array& a, T const& v) { a.append(copy(v)); return a; }
 generic array& operator <<(array& a, const array& b) {
     int old=a.size(); a.reserve(old+b.size()); a.setSize(old+b.size());
     for(uint i=0;i<b.size();i++) new (&a.at(old+i)) T(copy(b[i]));
@@ -142,3 +137,23 @@ generic void insertSorted(array& a, T&& v) { uint i=0; for(;i<a.size();i++) if(v
 
 #undef generic
 #undef array
+
+#define Array(T) template struct array< T >;
+#define Copy(T) \
+template array<T> slice(const array<T>& a, uint pos, uint size); \
+template array<T> slice(const array<T>& a, uint pos); \
+template array<T>& operator <<(array<T>& a, T const& v); \
+template array<T>& operator <<(array<T>& a, const array<T>& b); \
+template array<T> copy(const array<T>& a);
+#define DefaultConstructor(T) \
+template void grow(array<T>& a, uint size); \
+template void resize(array<T>& a, uint size);
+#define Compare(T) \
+template bool contains(const array<T>&, T const&); \
+template int indexOf(const array<T>& a, T const& value); \
+template bool operator ==(const array<T>&, const array<T>&); \
+template bool operator !=(const array<T>&, const array<T>&);
+#define ArrayOfCopyable(T) Array(T) Copy(T)
+#define ArrayOfDefaultConstructible(T) Array(T) DefaultConstructor(T)
+#define ArrayOfComparable(T) Array(T) Compare(T)
+#define PlainArray(T) Array(T) Copy(T) DefaultConstructor(T) Compare(T)

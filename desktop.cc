@@ -5,6 +5,11 @@
 #include "calendar.h"
 #include "feeds.h"
 
+template struct Array<Command>;
+template struct ListSelection<Command>;
+template struct List<Command>;
+template struct Popup<Command>;
+
 ICON(shutdown);
 
 struct Desktop : Application {

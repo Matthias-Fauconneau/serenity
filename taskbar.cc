@@ -7,7 +7,10 @@
 #include "calendar.h"
 #include "poll.h"
 #include "dbus.h"
-#include "array.cc" //array<Task>
+
+template struct Array<Command>;
+template struct ListSelection<Command>;
+template struct List<Command>;
 
 enum ScreenEdge { Top, Bottom };
 static ScreenEdge taskBarPosition = Top;
@@ -97,6 +100,18 @@ struct StatusNotifierItem : TriggerButton {
         return false;
     }
 };
+
+#include "array.cc"
+ArrayOfComparable(Task)
+Array(StatusNotifierItem)
+template array<byte4> cast(array<byte>&& array);
+template struct Array<Task>;
+template struct ListSelection<Task>;
+template struct Bar<Task>;
+template struct Array<StatusNotifierItem>;
+template struct ListSelection<StatusNotifierItem>;
+template struct Bar<StatusNotifierItem>;
+template struct Popup<Calendar>;
 
 ICON(button);
 struct TaskBar : Application, Poll {

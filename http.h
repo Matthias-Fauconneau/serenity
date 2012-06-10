@@ -47,7 +47,6 @@ string str(const URL& url);
 inline bool operator ==(const URL& a, const URL& b) {
     return a.scheme==b.scheme&&a.authorization==b.authorization&&a.host==b.host&&a.path==b.path&&a.fragment==b.fragment;
 }
-inline bool operator !=(const URL& a, const URL& b) { return !(a==b); }
 
 typedef delegate<void(const URL&, array<byte>&&)> Handler;
 

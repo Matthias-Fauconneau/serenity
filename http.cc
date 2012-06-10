@@ -8,6 +8,9 @@
 #include <poll.h>
 #include <errno.h>
 
+#include "array.cc"
+template struct array<URL>;
+
 /// Socket
 
 bool Socket::connect(const string& host, const string& service) {
@@ -182,7 +185,7 @@ void HTTP::event(pollfd) {
             assert(!contains(next.host,'/'),url,next);
             if(url.scheme==next.scheme && url.host==next.host && url.path==next.path) warn("recursive",url,next,value,(string&)http.buffer);
             else {
-                redirect << file;
+                redirect << move(file);
                 new HTTP(next,handler,move(headers),move(method),move(content),move(redirect)); //TODO: reuse connection
             }
             delete this;
@@ -205,7 +208,7 @@ void HTTP::event(pollfd) {
     log("Downloaded",url,content.size()/1024,"KB");
 
     // Cache
-    redirect << file;
+    redirect << move(file);
     for(const string& file: redirect) {
         if(!exists(section(file,'/'),cache)) createFolder(section(file,'/'),cache);
         writeFile(file,content,cache,true);
@@ -214,13 +217,6 @@ void HTTP::event(pollfd) {
     handler(url,move(content));
     delete this;
 }
-
-/*struct HTTPTest : Application {
-    void handler(const URL&, array<byte>&& content) { log("Content"_,(string&)content); }
-    HTTPTest(array<string>&&) {
-        new HTTP("http://mail.google.com"_, Handler(this,&HTTPTest::handler));
-    }
-}; Test(HTTPTest)*/
 
 void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, int maximumAge) {
     string file = cacheFile(url);

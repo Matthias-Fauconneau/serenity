@@ -1,6 +1,10 @@
 #include "xml.h"
 #include "string.h"
+
 #include "array.cc"
+Array(Element)
+PlainArray(const Element*)
+ArrayOfCopyable(pointer<Element>)
 
 static Element parse(array<byte>&& document, bool html) {
     assert(document);
@@ -93,6 +97,7 @@ Element Element::operator()(const string& name) const {
     return Element();
 }
 
+template struct std::function<void(const Element&)>;
 void Element::visit(const std::function<void(const Element&)>& visitor) const {
     for(const auto& e: children) e->visit(visitor);
     visitor(*this);
@@ -118,7 +123,7 @@ bool Element::match(const string& path) const {
 }
 
 string Element::str(const string& prefix) const {
-    if(!name&&!trim(content)) return ""_;
+    if(!name&&!trim(content)&&!children) return ""_;
     string line; line<< prefix;
     if(name||attributes) line << "<"_+name;
     for(const_pair<string,string> attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
@@ -139,7 +144,7 @@ template<> string str(const Element& e) { return e.str(); }
 string unescape(const string& xml) {
     static map<string, string> entities;
     if(!entities) {
-        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull •"_,' ');
+        array<string> kv = split("quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull • agrave à acirc â egrave è ocirc ô ecirc ê"_,' ');
         assert(kv.size()%2==0,kv.size());
         for(uint i=0;i<kv.size();i+=2) entities.insert(kv[i],kv[i+1]);
     }

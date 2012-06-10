@@ -18,13 +18,10 @@ struct Application {
 #define Application(App) \
 int main(int argc, const char** argv) { \
     array<string> args; for(int i=1;i<argc;i++) args << strz(argv[i]); \
-    App* app = new App(move(args)); \
-    while(app->running && waitEvents()) {} \
+    App app(move(args)); \
+    while(app.running && waitEvents()) {} \
     return 0; \
 }
-
-/// Convenience macro to startup an Application with the default event loop only if no Application() is defined
-#define Test(App) int main(int argc, const char** argv) __attribute((weak)); Application(App)
 
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {

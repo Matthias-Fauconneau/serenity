@@ -9,6 +9,8 @@
 #include <sched.h>
 
 #include "array.cc"
+PlainArray(Poll*)
+Array(pollfd)
 
 /// Process
 
@@ -50,7 +52,7 @@ void execute(const string& path, const array<string>& args) {
 /// Poll
 
 static map<Poll*,pollfd> polls __attribute((init_priority(103)));
-void Poll::registerPoll(pollfd poll) { polls.insert(this,poll); }
+void Poll::registerPoll(pollfd poll) { polls.insert(this,move(poll)); }
 void Poll::unregisterPoll() { if(polls.contains(this)) polls.remove(this); }
 
 int waitEvents() {
