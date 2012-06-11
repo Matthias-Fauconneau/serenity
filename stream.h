@@ -83,13 +83,13 @@ struct TextStream : virtual Stream {
     /// If stream match \a key, advances \a pos by \a key size
     bool match(const string& key);
     /// If stream match any of \a key, advances \a pos
-    bool matchAny(const array<char>& any);
+    bool matchAny(const array<byte>& any);
     /// advances \a pos while stream match any of \a key
-    void whileAny(const array<char>& any);
+    void whileAny(const array<byte>& any);
     /// Reads until stream match \a key
     string until(const string& key);
     /// Reads until stream match any character of \a key
-    string untilAny(const array<char>& any);
+    string untilAny(const array<byte>& any);
     /// Reads until the end of stream
     string untilEnd();
     /// Skips whitespaces

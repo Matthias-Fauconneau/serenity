@@ -272,6 +272,6 @@ template string DBus::Object::get(const string&);
 template uint32 DBus::Object::get(const string&);
 template array<DBusIcon> DBus::Object::get(const string&);
 
-template void DBus::methodWrapper<variant<int>, string, string>(unsigned int, string, array<char>);
-template void DBus::methodWrapper<string>(unsigned int, string, array<char>);
-template void DBus::signalWrapper<string, string, string>(string, array<char>);
+template void DBus::methodWrapper<variant<int>, string, string>(unsigned int, string, array<byte>);
+template void DBus::methodWrapper<string>(unsigned int, string, array<byte>);
+template void DBus::signalWrapper<string, string, string>(string, array<byte>);

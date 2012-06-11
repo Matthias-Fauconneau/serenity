@@ -38,6 +38,12 @@ const utf8_iterator& utf8_iterator::operator--() {
     return *this;
 }
 
+uint string::at(uint index) const {
+    utf8_iterator it=begin();
+    for(uint i=0;it!=end();++it,++i) if(i==index) return *it;
+    error("Invalid UTF8");
+}
+
 /// string operations
 
 bool startsWith(const array<byte> &s, const array<byte> &a) { return a.size()<=s.size() && string(s.data(),a.size())==a; }
@@ -60,8 +66,20 @@ bool operator <(const string& a, const string& b) {
     return a.size() < b.size();
 }
 
-string strz(const string& s) { return s+"\0"_; }
-string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return copy(string(s,i)); }
+bool CString::busy = 0; //flag for multiple strz usage in a statement
+CString strz(const string& s) {
+    CString cstr;
+    //optimization to avoid copy, valid so long the referenced string doesn't change
+    if(s.capacity()>s.size()) { ((byte*)s.data())[s.size()]=0; cstr.tag=0; cstr.data=(char*)s.data(); return cstr; }
+    //optimization to avoid allocation, dangling after ~CString (on statement end) until any reuse
+    if(!CString::busy) { CString::busy=1; static char buffer[256]; cstr.tag=1; cstr.data=buffer; }
+    //temporary allocation, dangling after ~CString (on statement end) until any malloc
+    else { cstr.tag=2; cstr.data=allocate<char>(s.size()+1); }
+    copy(cstr.data,(char*)s.data(),s.size()); cstr.data[s.size()]=0;
+    return cstr;
+}
+string str(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string((byte*)s,i); }
+string strz(const char* s) { return copy(str(s)); }
 
 string section(const string& s, uint separator, int start, int end, bool includeSeparator) {
     if(!s) return ""_;
@@ -119,8 +137,8 @@ string join(const array<string>& list, const string& separator) {
     return str;
 }
 
-array<char> replace(const array<char>& s, const array<char>& before, const array<char>& after) {
-    array<char> r(s.size());
+array<byte> replace(const array<byte>& s, const array<byte>& before, const array<byte>& after) {
+    array<byte> r(s.size());
     for(uint i=0;i<s.size();) {
         if(i<=s.size()-before.size() && string(s.data()+i, before.size())==before) { r<<after; i+=before.size(); }
         else { r << s[i]; i++; }
@@ -166,7 +184,7 @@ string utf8(uint c) {
 
 string utoa(uint64 n, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
-    char buf[64]; int i=64;
+    byte buf[64]; int i=64;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
@@ -177,7 +195,7 @@ string utoa(uint64 n, int base, int pad) {
 
 string itoa(int64 number, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
-    char buf[64]; int i=64;
+    byte buf[64]; int i=64;
     uint64 n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
@@ -207,7 +225,7 @@ long toInteger(const string& number, int base) {
     for(;i!=number.end();++i) {
         if(*i==' ') break;
         assert((*i>='0' && *i<='9')||(*i>='a'&&*i<='f'),"Invalid input '"_+number+"'"_);
-        int n = indexOf(array<char>("0123456789abcdef",base), (char)*i);
+        int n = indexOf(array<byte>((byte*)"0123456789abcdef",base), (byte)*i);
         value *= base;
         value += n;
     }

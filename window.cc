@@ -52,7 +52,7 @@ Window::Window(Widget* widget, const string& title, const Image& icon, int2 size
         XSetErrorHandler(xErrorHandler);
         x = XOpenDisplay(0);
         if(!x) error("Cannot open X display");
-        pollfd p={XConnectionNumber(x), POLLIN, 0}; registerPoll(p);
+        registerPoll({XConnectionNumber(x), POLLIN});
         XWindowAttributes root; XGetWindowAttributes(x, DefaultRootWindow(x), &root); screen=int2(root.width,root.height);
         XVisualInfo info; XMatchVisualInfo(x, DefaultScreen(x), 32, TrueColor, &info); depth = info.depth; visual=info.visual;
     }

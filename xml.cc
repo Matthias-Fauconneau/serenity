@@ -3,7 +3,7 @@
 
 #include "array.cc"
 Array(Element)
-PlainArray(Element*)
+Array(Element*)
 ArrayOfCopyable(pointer<Element>)
 
 static Element parse(array<byte>&& document, bool html) {

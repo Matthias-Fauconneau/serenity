@@ -7,7 +7,7 @@
 Input::Input(const char* path) {
     fd = open(path, O_RDONLY|O_NONBLOCK);
     assert(fd>0);
-    registerPoll({fd, POLLIN, 0});
+    registerPoll({fd, POLLIN});
 }
 
 Input::~Input() { close(fd); }

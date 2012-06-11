@@ -139,7 +139,7 @@ void HTTP::request() {
     if(content) request << "Content-Length: "_+dec(content.size())+"\r\n"_;
     for(const string& header: headers) request << header+"\r\n"_;
     http.write( request+"\r\n"_+content );
-    registerPoll({http.fd, POLLIN, 0});
+    registerPoll({http.fd, POLLIN});
 }
 void HTTP::event(pollfd) {
     if(!http.fd) { delete this; return; }

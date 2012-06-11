@@ -81,9 +81,9 @@ Sequencer::~Sequencer() {
 
     int fd = createFile(record);
     struct { char name[4]={'M','T','h','d'}; int32 size=swap32(6); int16 format=swap16(0);
-        int16 trackCount=swap16(1); int16 timeDivision=swap16(500); } __attribute__ ((packed)) MThd;
+        int16 trackCount=swap16(1); int16 timeDivision=swap16(500); } packed MThd;
     write(fd,raw(MThd));
-    struct { char name[4]={'M','T','r','k'}; int32 size=0; } __attribute__ ((packed)) MTrk; MTrk.size=swap32(track.size());
+    struct { char name[4]={'M','T','r','k'}; int32 size=0; } packed MTrk; MTrk.size=swap32(track.size());
     write(fd,raw(MTrk));
     write(fd,track);
     close(fd);

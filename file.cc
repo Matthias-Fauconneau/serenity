@@ -7,22 +7,22 @@
 
 /// File
 int openFile(const string& path, int at) {
-    int fd = openat(at, strz(path).data(), O_RDONLY);
+    int fd = openat(at, strz(path), O_RDONLY);
     if(fd < 0) error("File not found"_,"'"_+path+"'"_);
     return fd;
 }
 
 int createFile(const string& path, int at, bool overwrite) {
     if(!overwrite && exists(path,at)) error("exists",path);
-    return openat(at, strz(path).data(),O_CREAT|O_WRONLY|O_TRUNC,0666);
+    return openat(at, strz(path),O_CREAT|O_WRONLY|O_TRUNC,0666);
 }
 
 int appendFile(const string& path, int at) {
-    return openat(at, strz(path).data(),O_CREAT|O_WRONLY|O_APPEND,0666);
+    return openat(at, strz(path),O_CREAT|O_WRONLY|O_APPEND,0666);
 }
 
 array<byte> readFile(const string& path, int at) {
-    int fd = openat(at, strz(path).data(), O_RDONLY);
+    int fd = openat(at, strz(path), O_RDONLY);
     if(fd < 0) error("File not found"_,"'"_+path+"'"_);
     struct stat sb; fstat(fd, &sb);
     array<byte> file = read(fd,sb.st_size);
@@ -32,7 +32,7 @@ array<byte> readFile(const string& path, int at) {
 }
 
 Map mapFile(const string& path, int at) {
-    int fd = openat(at, strz(path).data(), O_RDONLY);
+    int fd = openat(at, strz(path), O_RDONLY);
     if(fd < 0) error("File not found"_,"'"_+path+"'"_);
     struct stat sb; fstat(fd, &sb);
     const byte* data = (byte*)mmap(0,(size_t)sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
@@ -51,7 +51,7 @@ void writeFile(const string& path, const array<byte>& content, int at, bool over
 /// File system
 
 int openFolder(const string& path, int at) {
-    int fd = openat(at, strz(path).data(), O_RDONLY|O_DIRECTORY);
+    int fd = openat(at, strz(path), O_RDONLY|O_DIRECTORY);
     if(fd < 0) error("Folder not found"_,"'"_+path+"'"_);
     return fd;
 }
@@ -62,27 +62,27 @@ int home() {
     return fd;
 }
 
-bool createFolder(const string& path, int at) { return mkdirat(at, strz(path).data(), 0666)==0; }
+bool createFolder(const string& path, int at) { return mkdirat(at, strz(path), 0666)==0; }
 
 bool exists(const string& path, int at) {
-    int fd = openat(at, strz(path).data(), O_RDONLY);
+    int fd = openat(at, strz(path), O_RDONLY);
     if(fd >= 0) { close(fd); return true; }
     return false;
 }
 
 void symlink(const string& target,const string& name, int at) {
-    unlinkat(at,strz(name).data(),0);
-    if(symlinkat(strz(target).data(),at,strz(name).data())<0) warn("symlink failed",name,"->",target);
+    unlinkat(at,strz(name),0);
+    if(symlinkat(strz(target),at,strz(name))<0) warn("symlink failed",name,"->",target);
 }
 
-struct stat statFile(const string& path, int at) { struct stat file; fstatat(at, strz(path).data(), &file, 0); return file; }
+struct stat statFile(const string& path, int at) { struct stat file; fstatat(at, strz(path), &file, 0); return file; }
 bool isFolder(const string& path, int at) { return statFile(path,at).st_mode&S_IFDIR; }
 
 long modifiedTime(const string& path, int at) { return statFile(path,at).st_mtime; }
 
 array<string> listFiles(const string& folder, Flags flags) {
     array<string> list;
-    DIR* dir = opendir(folder?strz(folder).data():".");
+    DIR* dir = opendir(folder?strz(folder):".");
     assert(dir, "Folder not found"_, folder);
     for(dirent* dirent; (dirent=readdir(dir));) {
         string name = strz(dirent->d_name);
@@ -103,7 +103,7 @@ array<string> listFiles(const string& folder, Flags flags) {
 }
 
 string findFile(const string& folder, const string& file) {
-    DIR* dir = opendir(folder?strz(folder).data():".");
+    DIR* dir = opendir(folder?strz(folder):".");
     assert(dir, "Folder not found"_, folder);
     for(dirent* dirent; (dirent=readdir(dir));) {
         string name = strz(dirent->d_name);

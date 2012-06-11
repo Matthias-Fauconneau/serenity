@@ -38,17 +38,21 @@ struct Poll {
 /// \return count of registered Poll objects
 int waitEvents();
 
-/// Set process CPU scheduling priority (-20 high priority, 19 low priority)
-void setPriority(int priority);
-
-/// Return available memory in kB
-uint availableMemory();
-
 /// Execute binary at \a path with command line arguments \a args
 void execute(const string& path, const array<string>& args=array<string>());
 
+/// Set process CPU scheduling priority (-20 high priority, 19 low priority)
+void setPriority(int priority);
+
+#if RUSAGE
 /// Returns CPU time in milliseconds consumed since start of process
 int getCPUTime();
+#endif
+
+#if PROCFS
+/// Return available memory in kB
+uint availableMemory();
+#endif
 
 /// Log the corresponding assembly the first time \a statements is executed
 void disasm(array<ubyte> code);

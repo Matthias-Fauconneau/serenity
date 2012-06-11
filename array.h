@@ -4,21 +4,20 @@
 
 inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
 
-/// \a array is a typed and bound-checked handle to a memory buffer using move semantics to avoid reference counting
+/// \a array is a typed and bound-checked handle to a memory buffer (using move semantics)
 /// \note array transparently store small arrays inline when possible
 /// \note #include "array.cc" to compile arrays or method definitions for custom types
 template<class T> struct array {
-    /// \a array::Buffer is a lightweight handle to memory (heap allocation, mmaped file, stack reference, ...)
+    /// \a array::Buffer is a lightweight handle to memory (static, stack, heap, mmap...)
     struct Buffer {
         const T* data = 0;
         uint size = 0;
         uint capacity = 0; //0 = not owned
         Buffer(const T* data=0, int size=0, int capacity=0):data(data),size(size),capacity(capacity){}
-    } packed;
+    };
 
-    int8 tag=-1; /*>=0: inline, -1 = heap, -2 = static*/ int8 pad_[7]; //1+7 bytes
-    Buffer buffer; //+16
-    ubyte pad__[sizeof(T)>63?0:sizeof(T)==1?7:40]; //+7/40 to make sizeof(array) = 31/64 bytes (inline char[30], inline string[2])
+    int8 tag = -1; //0: empty, >0: inline, -1 = not owned (reference), -2 = owned (heap)
+    Buffer buffer;
     static constexpr uint32 inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
     T* data() { return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
     const T* data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
@@ -49,8 +48,10 @@ template<class T> struct array {
     /// References elements sliced from \a begin to \a end
     array(const T* begin,const T* end) : buffer(begin, uint(end-begin), 0) {}
 
-    /// if the array own the data, destroys all initialized elements and frees the buffer
-    ~array();
+    /// If the array own the data, destroys all initialized elements and frees the buffer
+    void destroy();
+    /// Inline destructor for references
+    ~array() { if(tag!=-1) destroy(); }
 
     /// Allocates enough memory for \a capacity elements
     void reserve(uint capacity);
@@ -63,7 +64,7 @@ template<class T> struct array {
     explicit operator bool() const { return size(); }
 
     /// Accessors
-    /// \note For arrays always allocated on heap, array.buffer[i] can be used to avoid checking for the inline array case
+    /// \note array.buffer[i] can be used to avoid inline and bound checking.
     const T& at(uint i) const { debug(if(i>=size())logTrace(),__builtin_abort();) return data()[i]; }
     T& at(uint i) { debug(if(i>=size())logTrace(),__builtin_abort();) return (T&)data()[i]; }
     const T& operator [](uint i) const { return at(i); }
@@ -73,7 +74,7 @@ template<class T> struct array {
     const T& last() const { return at(size()-1); }
     T& last() { return at(size()-1); }
 
-    /// Remove
+    /// Remove elements
     void removeAt(uint i);
     void removeLast();
     T take(int i);
@@ -81,7 +82,7 @@ template<class T> struct array {
     T takeLast();
     T pop();
 
-    /// Append
+    /// Append moveable elements
     void append(T&& v);
     array& operator <<(T&& v);
     void append(array&& a);
@@ -92,7 +93,7 @@ template<class T> struct array {
     const T* end() const { return data()+size(); }
     T* begin() { return (T*)data(); }
     T* end() { return (T*)data()+size(); }
-} packed;
+};
 
 /// Reinterpret cast \a array to array<T>
 template<class T, class O> array<T> cast(array<O>&& array);
@@ -134,7 +135,7 @@ generic bool operator !=(const array& a, const array& b);
 generic int indexOf(const array& a, const T& value);
 /// Returns true if the array contains an occurrence of \a value
 generic bool contains(const array& a, const T& value);
-generic void removeOne(array& a, T v);
+generic int removeOne(array& a, T v);
 /// Replaces in \a array every occurence of \a before with \a after
 generic array replace(array&& a, const T& before, const T& after);
 

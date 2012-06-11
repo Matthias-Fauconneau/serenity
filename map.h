@@ -14,7 +14,7 @@ template<class K, class V> struct map {
     map(map&&)=default;
     map& operator =(map&&)=default;
 
-    int size() const { return keys.size(); }
+    uint size() const { return keys.size(); }
     bool contains(const K& key) const { return ::contains(keys, key); }
     explicit operator bool() const { return keys.size(); }
     void clear() { keys.clear(); values.clear(); }
@@ -77,6 +77,6 @@ template<class V> inline string str(const map<string,V>& m) {
 }
 template<> inline string str(const map<string,string>& m) {
     string s="{"_;
-    for(int i=0;i<m.size();i++) { s<<m.keys[i]+": "_+m.values[i]; if(i<m.size()-1) s<<", "_; }
+    for(uint i=0;i<m.size();i++) { s<<m.keys[i]+": "_+m.values[i]; if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }

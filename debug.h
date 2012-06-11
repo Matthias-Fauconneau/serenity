@@ -3,7 +3,7 @@
 
 /// Enhanced debugging using str(...)
 extern "C" ssize_t write(int fd, const void* buf, size_t size);
-inline void write_(int fd, const array<char>& s) { write(fd,s.data(),(size_t)s.size()); }
+inline void write_(int fd, const array<byte>& s) { write(fd,s.data(),(size_t)s.size()); }
 
 template<class... Args> inline void log(const Args&... args) { write_(1,str(args...)+"\n"_); }
 template<class A> inline void log(const cat<A>& a) { write_(1,a+"\n"_); }

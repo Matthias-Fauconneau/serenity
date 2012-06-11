@@ -3,7 +3,6 @@
 /// Missing C++11 IDE support workarounds
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
 #define for()
-#define constexpr
 #define override
 #define _
 #define DEBUG
@@ -33,26 +32,26 @@ template<> struct predicate<true> { typedef void* type; };
 #define perfect(T) class T##f, predicate(can_forward(T))
 #define perfect2(T,U) class T##f, class U##f, predicate(can_forward(T)), predicate1(can_forward(U))
 // Move semantics
-#include <bits/move.h>
-using std::move;
-using std::forward;
-/*template<class T> inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)t; }
+//#include <bits/move.h>
+//using std::move;
+//using std::forward;
+template<class T> inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)t; }
 template<class T> inline constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
-template<class T> inline constexpr T&& forward(remove_reference(T)&& t){static_assert(!std::is_lvalue_reference<T>::value,""); return (T&&)t; }*/
+template<class T> inline constexpr T&& forward(remove_reference(T)&& t){static_assert(!std::is_lvalue_reference<T>::value,""); return (T&&)t; }
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
 #define default_constructors(o) o(){} o(o&&)=default;
 
 /// Primitive types
 typedef signed char int8;
-typedef char byte;
+typedef signed char byte;
 typedef unsigned char uint8;
 typedef unsigned char ubyte;
-typedef short int16;
+typedef signed short int16;
 typedef unsigned short uint16;
-typedef int int32;
+typedef signed int int32;
 typedef unsigned int uint32;
 typedef unsigned int uint;
-typedef long long int64;
+typedef signed long long int64;
 typedef unsigned long long uint64;
 #if __WORDSIZE == 64
 typedef unsigned long size_t; typedef long ssize_t; typedef unsigned long ptr;

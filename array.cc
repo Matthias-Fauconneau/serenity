@@ -11,23 +11,23 @@ generic array<T>::array(array<T>&& o) {
 }
 
 generic array<T>& array<T>::operator=(array<T>&& o) {
-    //array<T>::~array<T>(); //crash clang
-    if(capacity()) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-1) unallocate(buffer.data); }
+    if(tag!=-1) destroy();
     if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(*this));
     o.tag=0;
     return *this;
 }
 
-generic array<T>::array(uint capacity) : tag(0) { reserve(capacity); }
+generic void array<T>::destroy() { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data); }
+
+generic array<T>::array(uint capacity) { reserve(capacity); }
 generic array<T>::array(std::initializer_list<T>&& list) {
     reserve(list.size()); setSize(list.size());
     for(uint i=0;i<list.size();i++) new (&at(i)) T(move(((T*)list.begin())[i]));
 }
-generic array<T>::~array() { if(capacity()) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-1) unallocate(buffer.data); } }
 
 generic void array<T>::reserve(uint capacity) {
     if(capacity <= array::capacity()) return;
-    if(tag==-1 && buffer.capacity) {
+    if(tag==-2 && buffer.capacity) {
         buffer.data=reallocate<T>(buffer.data,buffer.capacity,capacity);
         buffer.capacity=capacity;
     } else if(capacity <= inline_capacity()) {
@@ -40,7 +40,7 @@ generic void array<T>::reserve(uint capacity) {
         copy((byte*)heap,(byte*)data(),size()*sizeof(T));
         buffer.data=heap;
         if(tag>=0) buffer.size=tag;
-        tag=-1;
+        tag=-2;
         buffer.capacity=capacity;
     }
 }
@@ -62,7 +62,11 @@ template<class T, class O> array<T> cast(array<O>&& o) {
     return r;
 }
 
-generic void array<T>::shrink(uint size) { assert(size<array::size()); if(capacity()) for(uint i=size;i<array::size();i++) at(i).~T(); setSize(size); }
+generic void array<T>::shrink(uint size) {
+    assert(size<array::size());
+    if(tag!=-1) for(uint i=size;i<array::size();i++) at(i).~T();
+    setSize(size);
+}
 generic void array<T>::clear() { if(size()) shrink(0); }
 
 generic void array<T>::removeAt(uint i) {
@@ -131,7 +135,7 @@ generic bool operator ==(const array& a, const array& b) {
 generic bool operator !=(const array& a, const array& b) { return !(a==b); }
 generic int indexOf(const array& a, const T& value) { for(uint i=0;i<a.size();i++) { if(a[i]==value) return i; } return -1; }
 generic bool contains(const array& a, const T& value) { return indexOf(a,value)>=0; }
-generic void removeOne(array& a, T v) { int i=indexOf(a, v); if(i>=0) a.removeAt(i); }
+generic int removeOne(array& a, T v) { int i=indexOf(a, v); if(i>=0) a.removeAt(i); return i; }
 generic void appendOnce(array& a, T&& v) { if(!contains(a,v)) a.append(move(v)); }
 generic void appendOnce(array& a, const T& v) { if(!contains(a,v)) a.append(copy(v)); }
 generic array replace(array&& a, const T& before, const T& after) {
@@ -165,11 +169,13 @@ template void resize(array<T>& a, uint size);
 template bool contains(const array<T>&, T const&); \
 template int indexOf(const array<T>& a, T const& value); \
 template bool operator ==(const array<T>&, const array<T>&); \
-template bool operator !=(const array<T>&, const array<T>&);
+template bool operator !=(const array<T>&, const array<T>&); \
+template int removeOne(array<T>& a, T v);
 #define Sort(T) \
 template int insertSorted(array<T>& a, T&& v); \
 template int insertSorted(array<T>& a, T const& v);
 #define ArrayOfCopyable(T) Array(T) Copy(T)
-#define ArrayOfDefaultConstructible(T) Array(T) Default(T)
 #define ArrayOfComparable(T) Array(T) Compare(T)
+#define ArrayOfDefaultConstructible(T) Array(T) Default(T)
+#define ArrayOfCopyableComparable(T) Array(T) Copy(T) Compare(T)
 #define PlainArray(T) Array(T) Copy(T) Default(T) Compare(T) Sort(T)
