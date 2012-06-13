@@ -1,6 +1,7 @@
+EPub viewer
+Build optimization: remove all system headers, remove C++11 headers, build time graph
+Text Editor, File Manager
+IDE, Compiler (C++11,D,Clay)
+IMAP, Wiki, PDF, Search, Video
+System: Onscreen Keyboard | Handwriting Recognition
 Touchbook: rotate screen, fix touchscreen sensivity, use trigger level instead of polling accelerometer
-Browser: image tooltip/links, gmail|IMAP, async IO, new window, search, poll feeds
-PDF Viewer
-Home: Files/Folders, Calculator
-System: onscreen keyboard | handwriting recognition
-Video Player, Text Editor ...

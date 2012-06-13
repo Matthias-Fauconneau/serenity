@@ -1,13 +1,6 @@
 #include "flac.h"
 #include "process.h"
 
-/// Returns the number of cycles used to execute \a statements
-inline uint64 rdtsc() {
-    asm volatile("xorl %%eax,%%eax \n cpuid" ::: "%rax", "%rbx", "%rcx", "%rdx"); //serialize
-    uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
-#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
-struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
-
 #define swap64 __builtin_bswap64
 
 void BitReader::setData(array<byte>&& buffer) { array<byte>::operator=(move(buffer)); data=(ubyte*)array::data(); bsize=8*array::size(); index=0; }
@@ -33,7 +26,7 @@ int BitReader::sbinary(int size) {
 }
 
 static uint8 log2[256];
-declare(static void generate_log2(), constructor) { int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); }
+static_this() { int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); }
 uint BitReader::unary() {
     uint64 w = swap64(*(uint64*)(data+index/8)) << (index&7);
     assert(w);
@@ -154,8 +147,7 @@ void FLAC::readFrame() {
         int* end = out;
         double buffer1[blockSize]; double* context = buffer1;
         double buffer2[blockSize+1]; double* odd = buffer2+1;
-        if(ptr(context)%16) odd=buffer1, context=buffer2+1;
-        assert(ptr(context)%16==0 && ptr(odd)%16==8,hex(int64(context)%16),hex(int64(odd)%16)); //copy of context aligned so as to filter odd samples
+        if(ulong(context)%16) odd=buffer1, context=buffer2+1;
 
         int rawSampleSize = sampleSize;
         if(channel == 0) { if(channels==RightSide) rawSampleSize++; }

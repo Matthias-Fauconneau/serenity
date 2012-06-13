@@ -3,12 +3,11 @@
 #include "stream.h"
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <poll.h>
 
 #include "array.cc"
 Array(DBusIcon)
 Array(DBus::RawMethod)
-ArrayOfDefaultConstructible(DBus::RawSignal)
+Array(DBus::RawSignal)
 
 /// Align array size appending default elements
 void align(array<byte>& a, int width) { int s=a.size(), n=align(width, s); if(n>s) grow(a, n); }

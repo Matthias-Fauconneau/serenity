@@ -3,23 +3,10 @@
 #include "debug.h"
 
 /// Input/Output
-extern "C" ssize_t read(int fd, void* buf, size_t size);
-extern "C" ssize_t write(int fd, const void* buf, size_t size);
-extern "C" int close(int fd);
 
-inline array<byte> readUpTo(int fd, uint capacity) {
-    array<byte> buffer(capacity);
-    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
-    buffer.setSize(size);
-    return buffer;
-}
-inline array<byte> read(int fd, uint capacity) {
-    array<byte> buffer(capacity);
-    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
-    assert((uint)size==capacity,size);
-    buffer.setSize(size);
-    return buffer;
-}
+array<byte> readUpTo(int fd, uint capacity);
+array<byte> read(int fd, uint capacity);
+
 template<class T> T read(int fd) {
     T t;
     int unused size = read(fd,(byte*)&t,sizeof(T));
@@ -68,5 +55,5 @@ bool isFolder(const string& path, int at=CWD);
 void symlink(const string& target,const string& name, int at=CWD);
 long modifiedTime(const string& path, int at=CWD);
 enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
-array<string> listFiles(const string& folder, Flags flags);
-string findFile(const string& folder, const string& file);
+array<string> listFiles(const string& folder, Flags flags, int at=CWD);
+string findFile(const string& folder, const string& file, int at=CWD);

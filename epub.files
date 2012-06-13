@@ -1,18 +1,10 @@
-Makefile
 core.h
 core.cc
-debug.h
 array.h
 array.cc
 vector.h
-map.h
 string.h
 string.cc
-process.h
-process.cc
-
-file.h
-file.cc
 stream.h
 stream.cc
 inflate.h
@@ -24,9 +16,16 @@ font.h
 font.cc
 raster.cc
 raster.h
+widget.h
 window.h
 window.cc
 
+layout.h
+layout.cc
+text.h
+text.cc
+interface.h
+interface.cc
+
 epub.cc
-map.cc
-inflate.h
+profile.cc

@@ -27,7 +27,6 @@ struct Font {
     FT_FaceRec_* face=0;
     typedef map<int, Glyph> GlyphCache;
     map<int, GlyphCache> cache;
-    array<float> widths;
 
     Font(string path);
     Font(array<byte>&& data);

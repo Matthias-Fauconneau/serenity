@@ -2,7 +2,7 @@
 #include "file.h"
 
 #include "array.cc"
-PlainArray(Date)
+Array_Copy_Compare_Sort_Default(Date)
 template struct array< array<Date> >;
 
 template struct Array<Text>;

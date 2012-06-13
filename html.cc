@@ -1,5 +1,5 @@
 #include "html.h"
-#include "raster.h"
+//#include "raster.h"
 
 template struct Array<ImageView>;
 template struct HList<ImageView>;
@@ -28,13 +28,13 @@ static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"
 
 void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 30*60); }
 
-void HTML::load(const URL& url, array<byte>&& document) {
-    expanding=true; clear();
+void HTML::load(const URL& url, array<byte>&& document) { clear(); append(url,move(document)); }
+void HTML::append(const URL& url, array<byte>&& document) {
     Element html = parseHTML(move(document));
 
-    const Element* best=0; int max=0,second=0;
+    const Element* best = &html; int max=0,second=0;
     //find node with most direct content
-    html.visit([&url,&best,&max,&second](const Element& div) {
+    html.visit([&url,&best,&max,&second](const Element& div){
         int score = 0;
         if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
         else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 900;
@@ -47,14 +47,10 @@ void HTML::load(const URL& url, array<byte>&& document) {
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
                 score += size?:16800;
             }
-        }
-        else if(!div.children) return;
-        array<const Element*> stack;
-        for(auto& c: div.children) stack<<c;
-        while(stack.size()) {
-            const Element& e = *stack.pop();
+        } else if(!div.children) return;
+        div.mayVisit([&score](const Element& e)->bool{
             if(contains(textElement,e.name)||contains(boldElement,e.name)) {
-                for(auto& c: e.children) stack<<c; //text
+                return true; //visit children
             } else if(!e.name) {
                 score += e.content.size(); //raw text
             } else if(e.name=="img"_||e.name=="iframe"_) {
@@ -63,12 +59,12 @@ void HTML::load(const URL& url, array<byte>&& document) {
             } else if(e.name=="br"_) { score += 32; //line break
             } else if(contains(ignoreElement,e.name)) {
             } else if(!contains(e.name,":"_)) warn("load: Unknown HTML tag",e.name);
-        }
+            return false;
+        });
         if(score>=max) best=&div, second=max, max=score;
         else if(score>second) second=score;
     });
-    assert(best);
-    while(best->name=="a"_ && best->children.size()==1) best=best->children.first();
+    while(best->name=="a"_ && best->children.size()==1) best=&best->children.first();
     const Element& content = *best;
 
     //convert HTML to text + images
@@ -97,22 +93,22 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
         bool inlineText=true; //TODO:
         e.visit([&inlineText](const Element& e)->void{if(e.name&&!contains(textElement,e.name))inlineText=false;});
         if(inlineText) text << format(Format::Underline|Format::Link) << e["href"_] << " "_;
-        for(auto& c: e.children) layout(url, *c);
+        for(const auto& c: e.children) layout(url, c);
         if(inlineText) text << format(Format::Regular);
     } else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
         flushImages();
-        for(auto& c: e.children) layout(url, *c);
+        for(const auto& c: e.children) layout(url, c);
         text<<"\n"_;
     } else if(contains(boldElement,e.name)) { //Bold
         text << format(Format::Bold);
-        for(auto& c: e.children) layout(url, *c);
+        for(const auto& c: e.children) layout(url, c);
         text << format(Format::Regular);
     } else if(e.name=="em"_||e.name=="i"_) { //Italic
         text << format(Format::Italic);
-        for(auto& c: e.children) layout(url, *c);
+        for(const auto& c: e.children) layout(url, c);
         text << format(Format::Regular);
     } else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; //wikipedia [edit]
-    } else if(contains(textElement,e.name)) { for(auto& c: e.children) layout(url, *c); // Unhandled format tags
+    } else if(contains(textElement,e.name)) { for(const auto& c: e.children) layout(url, c); // Unhandled format tags
     } else if(contains(ignoreElement,e.name)) { return; // Ignored elements
     } else if(!contains(e.name,":"_)) warn("layout: Unknown HTML tag",e.name);
 }
@@ -121,7 +117,7 @@ void HTML::flushText() {
     if(!paragraph) return;
     auto textLayout = new Text(move(paragraph),16,255, 640 /*60 characters*/);
     textLayout->linkActivated.connect(this, &HTML::go);
-    append(textLayout);
+    VBox::append(textLayout);
     text.clear();
 }
 void HTML::flushImages() {
@@ -137,7 +133,7 @@ void HTML::flushImages() {
             *list << ImageView();
             new ImageLoader(images[i], &(*list).last().image, contentChanged);
         }
-        append( list );
+        VBox::append( list );
     }
     images.clear();
 }

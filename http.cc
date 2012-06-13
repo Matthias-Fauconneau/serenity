@@ -1,12 +1,15 @@
 #include "http.h"
 #include "file.h"
 #include "time.h"
+#include "process.h"
+
 #include <sys/socket.h>
 #include <netdb.h>
 #include <openssl/ssl.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <errno.h>
+
+extern "C" int close(int fd);
 
 #include "array.cc"
 template struct array<URL>;
@@ -14,7 +17,7 @@ template struct array<URL>;
 /// Socket
 
 bool Socket::connect(const string& host, const string& service) {
-    addrinfo* ai=0; getaddrinfo(strz(host).data(), strz(service).data(), 0, &ai);
+    addrinfo* ai=0; getaddrinfo(strz(host), strz(service), 0, &ai);
     if(!ai) { warn(service,"on"_,host,"not found"_); return false; }
     fd = socket(ai->ai_family,ai->ai_socktype,ai->ai_protocol);
     fcntl(fd,F_SETFL,O_NONBLOCK); //allow to timeout connections
@@ -40,7 +43,7 @@ array<byte> Socket::get(uint size) {
 
 /// SSLSocket
 
-declare(static void ssl_init(), constructor) {
+static_this() {
       SSL_library_init();
 }
 bool SSLSocket::connect(const string& host, const string& service, bool secure) {
@@ -57,7 +60,7 @@ SSLSocket::~SSLSocket() { if(ssl) SSL_shutdown(ssl); }
 array<byte> SSLSocket::read(int size) {
     array<byte> buffer(size);
     if(ssl) size=SSL_read(ssl, buffer.data(), size); else size=::read(fd,buffer.data(),size);
-    if(size<0) { warn("Read error",strerror(errno)); return ""_; }
+    if(size<0) { warn("Read error",strz(strerror(errno))); return ""_; }
     buffer.setSize(size);
     return buffer;
 }

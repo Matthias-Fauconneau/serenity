@@ -106,7 +106,7 @@ static void handler(int sig, siginfo*, void* ctx) {
     __builtin_abort();
 }
 
-declare(static void catch_sigsegv(), constructor) {
+static_this() {
     struct sigaction sa; clear(sa);
     sa.sa_sigaction = &handler;
     sa.sa_flags = SA_SIGINFO;

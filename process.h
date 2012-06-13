@@ -1,8 +1,9 @@
 #pragma once
 #include "string.h"
-#include "map.h"
-struct pollfd;
 
+struct pollfd { int fd; short events, revents; };
+enum { POLLIN = 1, POLLOUT=4, POLLHUP = 16 };
+extern "C" int poll(pollfd* fds, size_t nfds, int timeout);
 extern "C" char* getenv(const char* key);
 
 /// Application can be inherited to interface with the event loop
@@ -44,9 +45,12 @@ void execute(const string& path, const array<string>& args=array<string>());
 /// Set process CPU scheduling priority (-20 high priority, 19 low priority)
 void setPriority(int priority);
 
-#if RUSAGE
-/// Returns CPU time in milliseconds consumed since start of process
-int getCPUTime();
+#if __x86_64__
+inline uint64 rdtsc() {
+    uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
+/// Returns the number of cycles used to execute \a statements
+#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
+struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
 #endif
 
 #if PROCFS

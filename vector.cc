@@ -51,17 +51,4 @@ generic string str(vector v) {
 
 #define vector(V,T,N) \
     uvector(V,T,N) \
-    template vector<V,T,N> abs(vector<V,T,N> v); \
-
-vector(xy,int,2)
-vector(xy,float,2)
-uvector(bgra,uint8,4)
-vector(bgra,int,4)
-uvector(rgba,uint8,4)
-vector(rgba,int,4)
-uvector(rgb,uint8,3)
-vector(rgb,int,3)
-uvector(ia,uint8,2)
-vector(ia,int,2)
-uvector(luma,uint8,1)
-vector(luma,int,1)
+    template vector<V,T,N> abs(vector<V,T,N> v);

@@ -1,7 +1,7 @@
 #include "string.h"
 
 #include "array.cc"
-PlainArray(string)
+Array_Copy_Compare_Sort_Default(string)
 
 /// utf8_iterator
 uint utf8_iterator::operator* () const {
@@ -182,28 +182,28 @@ string utf8(uint c) {
 
 /// Human-readable value representation
 
-string utoa(uint64 n, int base, int pad) {
+string utoa(uint n, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
-    byte buf[64]; int i=64;
+    byte buf[32]; int i=32;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    while(64-i<pad) buf[--i] = '0';
-    return copy(string(buf+i,64-i));
+    while(32-i<pad) buf[--i] = '0';
+    return copy(string(buf+i,32-i));
 }
 
-string itoa(int64 number, int base, int pad) {
+string itoa(int number, int base, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
-    byte buf[64]; int i=64;
+    byte buf[32]; int i=32;
     uint64 n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    while(64-i<pad) buf[--i] = '0';
+    while(32-i<pad) buf[--i] = '0';
     if(number<0) buf[--i]='-';
-    return copy(string(buf+i,64-i));
+    return copy(string(buf+i,32-i));
 }
 
 string ftoa(float n, int precision, int base) {

@@ -81,9 +81,9 @@ generic T array<T>::takeLast() { return take(size()-1); }
 generic T array<T>::pop() { return takeLast(); }
 
 generic void array<T>::append(T&& v) { int s=size()+1; reserve(s); new (end()) T(move(v)); setSize(s); }
-generic array<T>& array<T>::operator <<(T&& v) { append(move(v)); return *this; }
+generic array<T>& array<T>::operator <<(T&& v) { int s=size()+1; reserve(s); new (end()) T(move(v)); setSize(s); return *this; }
 generic void array<T>::append(array&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); }
-generic array<T>& array<T>::operator <<(array<T>&& a) { append(move(a)); return *this; }
+generic array<T>& array<T>::operator <<(array<T>&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); return *this; }
 
 #define array array<T>
 
@@ -100,7 +100,7 @@ generic array slice(const array& a, uint pos, uint size) {
     return copy(array(a.data()+pos,size));
 }
 generic array slice(const array& a, uint pos) { return slice(a,pos,a.size()-pos); }
-generic array& operator <<(array& a, T const& v) { a.append(copy(v)); return a; }
+generic array& operator <<(array& a, T const& v) { int s=a.size()+1; a.reserve(s); new (a.end()) T(v); a.setSize(s); return a; }
 generic array& operator <<(array& a, const array& b) {
     int old=a.size(); a.reserve(old+b.size()); a.setSize(old+b.size());
     for(uint i=0;i<b.size();i++) new (&a.at(old+i)) T(copy(b[i]));
@@ -174,8 +174,9 @@ template int removeOne(array<T>& a, T v);
 #define Sort(T) \
 template int insertSorted(array<T>& a, T&& v); \
 template int insertSorted(array<T>& a, T const& v);
-#define ArrayOfCopyable(T) Array(T) Copy(T)
-#define ArrayOfComparable(T) Array(T) Compare(T)
-#define ArrayOfDefaultConstructible(T) Array(T) Default(T)
-#define ArrayOfCopyableComparable(T) Array(T) Copy(T) Compare(T)
-#define PlainArray(T) Array(T) Copy(T) Default(T) Compare(T) Sort(T)
+#define Array_Copy(T) Array(T) Copy(T)
+#define Array_Compare(T) Array(T) Compare(T)
+#define Array_Default(T) Array(T) Default(T)
+#define Array_Copy_Compare(T) Array(T) Copy(T) Compare(T)
+#define Array_Copy_Compare_Sort(T) Array(T) Copy(T) Compare(T) Sort(T)
+#define Array_Copy_Compare_Sort_Default(T) Array(T) Copy(T) Default(T) Compare(T) Sort(T)

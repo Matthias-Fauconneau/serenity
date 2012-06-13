@@ -21,10 +21,12 @@ struct HTML : VBox {
     /// Signal content changes to trigger updates
     signal<> contentChanged;
 
-    /// Download \a link and layout
+    /// Replace layout with content downloaded from \a link
     void go(const string& link);
-    /// Layout existing \a document
+    /// Replace layout with existing \a document
     void load(const URL& url, array<byte>&& document);
+    /// Append existing \a document to layout
+    void append(const URL& url, array<byte>&& document);
     /// Clear any content
     void clear();
 

@@ -8,7 +8,6 @@ struct snd_output_t;
 #include <alsa/pcm.h>
 #include <alsa/timer.h>
 #include <alsa/control.h>
-#include <poll.h>
 
 AudioOutput::AudioOutput(bool realtime) {
     snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK|SND_PCM_NO_SOFTVOL);

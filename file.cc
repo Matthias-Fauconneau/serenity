@@ -5,6 +5,24 @@
 #include <dirent.h>
 #include <unistd.h>
 
+/// Input/Output
+
+array<byte> readUpTo(int fd, uint capacity) {
+    array<byte> buffer(capacity);
+    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
+    buffer.setSize(size);
+    return buffer;
+}
+
+array<byte> read(int fd, uint capacity) {
+    array<byte> buffer(capacity);
+    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
+    assert((uint)size==capacity,size);
+    buffer.setSize(size);
+    return buffer;
+}
+
+
 /// File
 int openFile(const string& path, int at) {
     int fd = openat(at, strz(path), O_RDONLY);
@@ -51,7 +69,7 @@ void writeFile(const string& path, const array<byte>& content, int at, bool over
 /// File system
 
 int openFolder(const string& path, int at) {
-    int fd = openat(at, strz(path), O_RDONLY|O_DIRECTORY);
+    int fd = openat(at, path?strz(path):".", O_RDONLY|O_DIRECTORY);
     if(fd < 0) error("Folder not found"_,"'"_+path+"'"_);
     return fd;
 }
@@ -80,39 +98,38 @@ bool isFolder(const string& path, int at) { return statFile(path,at).st_mode&S_I
 
 long modifiedTime(const string& path, int at) { return statFile(path,at).st_mtime; }
 
-array<string> listFiles(const string& folder, Flags flags) {
+#include "syscall.h"
+struct linux_dirent { long ino, off; short len; char name[]; };
+
+array<string> listFiles(const string& folder, Flags flags, int at) {
+    int fd = openFolder(folder,at);
+    assert(fd, "Folder not found"_, folder);
     array<string> list;
-    DIR* dir = opendir(folder?strz(folder):".");
-    assert(dir, "Folder not found"_, folder);
-    for(dirent* dirent; (dirent=readdir(dir));) {
-        string name = strz(dirent->d_name);
-        if(name!="."_ && name!=".."_) {
-            string path = folder+"/"_+name;
-            bool isFolder = ::isFolder(path);
-            if(isFolder && flags&Recursive) {
-                if(flags&Sort) for(auto&& e: listFiles(path,flags)) insertSorted(list, move(e));
-                else list << move(listFiles(path,flags));
-            } else if((isFolder && flags&Folders) || (!isFolder && flags&Files)) {
-                if(flags&Sort) insertSorted(list, move(path));
-                else list << move(path);
-            }
+    int i=0; for(linux_dirent entry; syscall(SYS_getdents,fd,&entry,sizeof(entry))>0;i++) { if(i<2) continue;
+        string name = strz(entry.name);
+        string path = folder+"/"_+name;
+        int type = *((byte*)&entry + entry.len - 1);
+        if(type==DT_DIR && flags&Recursive) {
+            if(flags&Sort) for(auto&& e: listFiles(path,flags,at)) insertSorted(list, move(e));
+            else list << move(listFiles(path,flags,at));
+        } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
+            if(flags&Sort) insertSorted(list, move(path));
+            else list << move(path);
         }
     }
-    closedir(dir);
+    close(fd);
     return list;
 }
 
-string findFile(const string& folder, const string& file) {
-    DIR* dir = opendir(folder?strz(folder):".");
-    assert(dir, "Folder not found"_, folder);
-    for(dirent* dirent; (dirent=readdir(dir));) {
-        string name = strz(dirent->d_name);
-        if(name!="."_ && name!=".."_) {
-            string path = folder+"/"_+name;
-            if(::isFolder(path)) { path=findFile(path,file); if(path) return path; }
-            else if(file==name) return path;
-        }
+string findFile(const string& folder, const string& file, int at) {
+    int fd = openFolder(folder,at);
+    assert(fd, "Folder not found"_, folder);
+    int i=0; for(linux_dirent entry; syscall(SYS_getdents,fd,&entry,sizeof(entry))>0;i++) { if(i<2) continue;
+        string name = strz(entry.name);
+        int type = *((byte*)&entry + entry.len - 1);
+        if(type==DT_DIR) { string path=findFile(name,file,fd); if(path) return folder+"/"_+path; }
+        else if(type==DT_REG && file==name) return folder+"/"_+name;
     }
-    closedir(dir);
+    close(fd);
     return ""_;
 }

@@ -102,7 +102,7 @@ struct StatusNotifierItem : TriggerButton {
 };
 
 #include "array.cc"
-ArrayOfComparable(Task)
+Array_Compare(Task)
 Array(StatusNotifierItem)
 template array<byte4> cast(array<byte>&& array);
 template struct Array<Task>;

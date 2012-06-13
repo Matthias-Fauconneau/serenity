@@ -14,7 +14,6 @@ struct snd_output_t;
 #include <alsa/seq_event.h>
 #include <alsa/seq.h>
 #include <alsa/seqmid.h>
-#include <poll.h>
 
 Sequencer::Sequencer() {
     snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0);

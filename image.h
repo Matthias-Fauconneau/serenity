@@ -2,6 +2,10 @@
 #include "array.h"
 #include "vector.h"
 
+template<class T> struct bgra { T b,g,r,a; };
+typedef vector<bgra,uint8,4> byte4;
+typedef vector<bgra,int,4> int4;
+
 struct Image {
     no_copy(Image)
 

@@ -1,11 +1,35 @@
 #include "time.h"
 #include "stream.h"
-#include <poll.h>
 #include <sys/timerfd.h>
 
-uint64 getRealTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
-
+long realTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
+long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000+ts.tv_nsec/1000; }
+
+template<class T> inline bool inRange(T min, T x, T max) { return x>=min && x<=max; }
+void Date::invariant() {
+    //Hour
+    if(seconds>=0) { assert(inRange(0, seconds, 59)); assert(minutes>=0); }
+    if(minutes>=0) { assert(inRange(0, minutes, 59)); assert(hours>=0); }
+    if(hours>=0) { assert(inRange(0, hours, 23)); }
+    //Date
+    if(day>=0) { assert(inRange(1, day, 31)); assert(month>=0); }
+    if(month>=0) { assert(inRange(0, month, 11)); }
+    if(weekDay>=0) {
+        assert(inRange(0, weekDay, 6));
+        //if(day>=0) TODO: check if valid
+    }
+}
+template<class T> bool operator ==(const T& a, const T& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(T)); }
+inline bool operator >(const Date& a, const Date& b) {
+    if(a.year!=-1 && b.year!=-1) { if(a.year>b.year) return true; else if(a.year<b.year) return false; }
+    if(a.month!=-1 && b.month!=-1) { if(a.month>b.month) return true; else if(a.month<b.month) return false; }
+    if(a.day!=-1 && b.day!=-1) { if(a.day>b.day) return true; else if(a.day<b.day) return false; }
+    if(a.hours!=-1 && b.hours!=-1) { if(a.hours>b.hours) return true; else if(a.hours<b.hours) return false; }
+    if(a.minutes!=-1 && b.minutes!=-1) { if(a.minutes>b.minutes) return true; else if(a.minutes<b.minutes) return false; }
+    if(a.seconds!=-1 && b.seconds!=-1) { if(a.seconds>b.seconds) return true; else if(a.seconds<b.seconds) return false; }
+    return false;
+}
 
 Date date(long time) {
     tm t; localtime_r(&time,&t);

@@ -2,6 +2,7 @@
 #include "file.h"
 #include "zip.h"
 #include "xml.h"
+#include "html.h"
 //#include "interface.h"
 //#include "window.h"
 
@@ -12,13 +13,18 @@ struct EPub : Application {
     EPub(array<string>&& arguments) {
         //window.localShortcut("Escape"_).connect(this, &Application::quit);
         //window.show();
-        auto zip = mapFile(arguments.first());
-        auto files = readZip(array<byte>(zip));
-        Element package = parseXML(files.at("content.opf"_))("package"_);
+        Map zip = mapFile(arguments.first());
+        map<string, ZipFile> files = readZip(array<byte>(zip));
+        return;
+        Element content = parseXML(files.at("content.opf"_));
+        const Element& package = content("package"_);
         map<string, string> itemMap;
-        for(const auto& item: package("manifest"_).children) itemMap.insert(item->at("id"_), item->at("href"_));
-        array<string> items; for(const auto& itemref: package("spine"_).children) items << itemMap.at(itemref->at("idref"_));
-        log(items);
+        for(const auto& item: package("manifest"_).children) itemMap.insert(item.at("id"_), item.at("href"_));
+        array<string> items; for(const auto& itemref: package("spine"_).children) items << itemMap.at(itemref.at("idref"_));
+        for(const string& item: items) {
+            log(parseHTML(files.at(item)));
+            break;
+        }
     }
 };
 Application(EPub)

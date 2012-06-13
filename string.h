@@ -57,6 +57,8 @@ bool operator <(const string& a, const string& b);
 bool startsWith(const array<byte>& str, const array<byte>& sub);
 /// Returns true if \a str ends with \a sub
 bool endsWith(const array<byte>& str, const array<byte>& sub);
+/// Returns true if \a str contains \a c
+inline bool contains(const string& str, char c) { return contains<byte>(str, c); }
 /// Returns true if \a str contains \a sub
 bool contains(const string& str, const string& sub);
 
@@ -105,12 +107,12 @@ template<class A> string str(const A&) { static_assert(sizeof(A) & 0,"No string 
 string str(const char* s);
 
 /// Converts a machine integer to its human-readable representation
-string utoa(uint64 number, int base=10, int pad=0);
-string itoa(int64 number, int base=10, int pad=0);
-inline string bin(uint64 n, int pad=0) { return itoa(n,2,pad); }
-inline string oct(int64 n, int pad=0) { return itoa(n,8,pad); }
-inline string dec(int64 n, int pad=0) { return itoa(n,10,pad); }
-inline string hex(int64 n, int pad=0) { return itoa(n,16,pad); }
+string utoa(uint number, int base=10, int pad=0);
+string itoa(int number, int base=10, int pad=0);
+inline string bin(int n, int pad=0) { return itoa(n,2,pad); }
+inline string oct(int n, int pad=0) { return itoa(n,8,pad); }
+inline string dec(int n, int pad=0) { return itoa(n,10,pad); }
+inline string hex(int n, int pad=0) { return itoa(n,16,pad); }
 
 template<> inline string str(const bool& b) { return b?"true"_:"false"_; }
 template<> inline string str(const uint8& n) { return dec(n); }
@@ -119,8 +121,6 @@ template<> inline string str(const uint16& n) { return dec(n); }
 template<> inline string str(const int16& n) { return dec(n); }
 template<> inline string str(const uint32& n) { return dec(n); }
 template<> inline string str(const int32& n) { return dec(n); }
-template<> inline string str(const uint64& n) { return dec(n); }
-template<> inline string str(const int64& n) { return dec(n); }
 
 /// Converts a floating point number to its human-readable representation
 string ftoa(float number, int precision, int base=10);
@@ -138,7 +138,7 @@ template<class A> inline string str(const cat<A>& s) { return s; }
 
 /// String representation of a pointer
 template<class A> inline string str(A* const& s) { return s?"null"_:str(*s); }
-template<> inline string str(void* const& n) { return utoa(ptr(n),16); }
+template<> inline string str(void* const& n) { return utoa(int(n),16); }
 
 /// String representation of an array
 template<class T> inline string str(const array<T>& list) { array<string> r; for(const T& e: list) r << str(e); return str(r); }

@@ -1,16 +1,27 @@
 #pragma once
-#include "interface.h"
 #include "process.h"
-
-#define None None
-#define Font XID
-#define Window XID
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/XKBlib.h>
-#undef Window
-#undef Font
-#include <X11/extensions/XShm.h>
+#include "signal.h"
+#include "image.h"
+#include "map.h"
+struct Widget;
+struct Display;
+struct Visual;
+typedef ulong XID;
+typedef ulong KeySym;
+#if __WORDSIZE == 64
+typedef ulong Atom;
+#else //ulong==uint but require extra useless array<ulong> instance
+typedef uint Atom;
+#endif
+typedef void* GC;
+struct XImage;
+struct XEvent;
+struct XShmSegmentInfo {
+    size_t shmseg;
+    int shmid;
+    char *shmaddr;
+    int readOnly;
+};
 
 #define Atom(name) XInternAtom(Window::x, #name, 1)
 
@@ -80,12 +91,12 @@ struct Window : Poll {
     /// Connection to X11 display
     static Display* x;
     /// Windows managed by this connection
-    static map<XID, Window*> windows;
+    static map<uint, Window*> windows;
 
     /// Shortcuts triggered when \a KeySym is pressed and the focus belongs to this window
-    map< KeySym, signal<> > localShortcuts;
+    map<uint, signal<> > localShortcuts;
     /// Shortcuts triggered when \a KeySym is pressed
-    static map< KeySym, signal<> > globalShortcuts;
+    static map<uint, signal<> > globalShortcuts;
 
     /// Screen depth
     static int depth;
@@ -111,13 +122,4 @@ struct Window : Poll {
     XShmSegmentInfo shminfo;
 
     Widget* widget;
-};
-
-template<class T> struct Popup : T {
-    Window window{this,""_,Image(),int2(300,300)};
-    Popup(T&& t=T()) : T(move(t)) {
-        window.setType(Atom(_NET_WM_WINDOW_TYPE_DROPDOWN_MENU));
-        window.localShortcut("Leave"_).connect(&window,&Window::hide);
-    }
-    void toggle() { if(window.visible) window.hide(); else { T::update(); window.show(); } }
 };

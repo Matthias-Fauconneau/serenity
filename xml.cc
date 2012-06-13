@@ -3,8 +3,6 @@
 
 #include "array.cc"
 Array(Element)
-Array(Element*)
-ArrayOfCopyable(pointer<Element>)
 
 static Element parse(array<byte>&& document, bool html) {
     assert(document);
@@ -93,9 +91,8 @@ string Element::operator[](const string& attribute) const {
     return copy(attributes.at(attribute));
 }
 
-Element Element::operator()(const string& name) const {
-    for(const auto& e: children) if(e->name==name) return copy(*e);
-    //return Element();
+const Element& Element::operator()(const string& name) const {
+    for(const auto& e: children) if(e.name==name) return e;
     error("children", name, "not found in", *this);
 }
 
@@ -103,8 +100,13 @@ Element Element::operator()(const string& name) const {
 
 template struct std::function<void(const Element&)>;
 void Element::visit(const std::function<void(const Element&)>& visitor) const {
-    for(const auto& e: children) e->visit(visitor);
+    for(const auto& e: children) e.visit(visitor);
     visitor(*this);
+}
+
+template struct std::function<bool(const Element&)>;
+void Element::mayVisit(const std::function<bool(const Element&)>& visitor) const {
+    if(visitor(*this)) for(const auto& e: children) e.mayVisit(visitor);
 }
 
 void Element::xpath(const string& path, const std::function<void(const Element &)>& visitor) const {
@@ -116,15 +118,15 @@ void Element::xpath(const string& path, const std::function<void(const Element &
     string first = section(path,'/');
     string next = section(path,'/',1,-1);
     array<Element> collect;
-    if(next) { for(const auto& e: children) if(e->name==first) e->xpath(next,visitor); }
-    else { for(const auto& e: children) if(e->name==first) visitor(*e); }
+    if(next) { for(const auto& e: children) if(e.name==first) e.xpath(next,visitor); }
+    else { for(const auto& e: children) if(e.name==first) visitor(e); }
 }
 
-bool Element::match(const string& path) const {
+/*bool Element::match(const string& path) const {
     bool match=false;
-    xpath(path,[&match](const Element&)->void{ match=true; });
+    xpath(path,[&match](const Element&){ match=true; });
     return match;
-}
+}*/
 
 string Element::text() const { string text; visit([&text](const Element& e)->void{ text<<e.content; }); return text; }
 
@@ -143,14 +145,10 @@ string Element::str(const string& prefix) const {
     if(content||children) {
         if(name||attributes) line << ">\n"_;
         if(content) { assert(!children); line << join(split(content,'\n'),"\n"_+prefix)+"\n"_; }
-        if(children) for(const auto& e: children) line << e->str(prefix+" "_);
+        if(children) for(const auto& e: children) line << e.str(prefix+" "_);
         if(name||attributes) line << prefix+"</"_+name+">\n"_;
     } else if(name||attributes) line << "/>\n"_;
     return line;
-}
-
-template<> Element copy(const Element& o) {
-    Element e; e.name=copy(o.name); e.content=copy(o.content); e.attributes=copy(o.attributes); e.children=copy(o.children); return e;
 }
 template<> string str(const Element& e) { return e.str(); }
 

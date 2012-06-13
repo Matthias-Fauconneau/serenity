@@ -78,6 +78,7 @@ map<string, ZipFile > readZip(DataBuffer s) {
             s.advance(local.extraLength);
             files.insert(move(name), ZipFile(s.read(header.compressedSize), header.compression==8));
         }
+        break;
     }
     return files;
 }

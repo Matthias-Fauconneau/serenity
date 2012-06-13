@@ -15,17 +15,27 @@ FLAGS__gdb := -ggdb -fno-omit-frame-pointer
 FLAGS__normal := -fno-omit-frame-pointer
 FLAGS__fast := -ggdb -DDEBUG -fno-omit-frame-pointer -O3 -ffast-math -fno-rtti
 FLAGS__release := -O3 -ffast-math -fno-rtti
-FLAGS__profile := -g -DDEBUG -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector -DPROFILE
+FLAGS__profile := -g -DDEBUG -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector,array,map,profile
 FLAGS__memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MALLOC
 
 FLAGS_font = -I/usr/include/freetype2
 #FLAGS_dbus = -fimplicit-templates
 
-SRCS = $(SRCS_$(TARGET))
+SRCS = $(SRCS__$(BUILD)) $(SRCS_$(TARGET))
+SRCS__profile += profile
+SRCS__memory += memory
 SRCS_taskbar += png
 SRCS_desktop += png jpeg ico
 SRCS_player += png
 SRCS_music += png
+
+ICONS = $(ICONS_$(TARGET))
+ICONS_taskbar := button
+ICONS_desktop := shutdown network
+ICONS_player := play pause next
+ICONS_music := music music256
+
+SRCS += $(ICONS:%=icons/%)
 
 LIBS__debug = bfd
 LIBS__fast = bfd
@@ -37,14 +47,6 @@ LIBS_http = ssl
 LIBS_ffmpeg = avformat avcodec
 LIBS_font = freetype
 LIBS_window = X11 Xext
-
-ICONS = $(ICONS_$(TARGET))
-ICONS_taskbar := button
-ICONS_desktop := shutdown network
-ICONS_player := play pause next
-ICONS_music := music music256
-
-SRCS += $(ICONS:%=icons/%)
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

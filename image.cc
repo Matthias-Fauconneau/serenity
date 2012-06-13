@@ -7,6 +7,10 @@
 #include "array.cc"
 template struct array<byte4>;
 
+#include "vector.cc"
+uvector(bgra,uint8,4)
+vector(bgra,int,4)
+
 Image::Image(array<byte4>&& data, uint width, uint height):data((byte4*)data.data()),width(width),height(height),own(true) {
     assert(data.size() >= width*height, data.size(), width, height);
     assert(data.buffer.capacity);
@@ -58,9 +62,9 @@ Image flip(Image&& image) {
     return move(image);
 }
 
-declare(Image decodePNG(const array<byte>&),weak) { error("PNG support not linked"); }
-declare(Image decodeJPEG(const array<byte>&),weak) { error("JPEG support not linked"); }
-declare(Image decodeICO(const array<byte>&),weak) { error("ICO support not linked"); }
+weak(Image decodePNG(const array<byte>&)) { error("PNG support not linked"); }
+weak(Image decodeJPEG(const array<byte>&)) { error("JPEG support not linked"); }
+weak(Image decodeICO(const array<byte>&)) { error("ICO support not linked"); }
 
 Image decodeImage(const array<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);

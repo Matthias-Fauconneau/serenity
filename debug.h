@@ -1,8 +1,10 @@
 #pragma once
 #include "string.h"
 
-/// Enhanced debugging using str(...)
+extern "C" ssize_t read(int fd, void* buf, size_t size);
 extern "C" ssize_t write(int fd, const void* buf, size_t size);
+
+/// Enhanced debugging using str(...)
 inline void write_(int fd, const array<byte>& s) { write(fd,s.data(),(size_t)s.size()); }
 
 template<class... Args> inline void log(const Args&... args) { write_(1,str(args...)+"\n"_); }

@@ -54,16 +54,3 @@ generic string str( vector<V,T,N> v);
 template<class T> struct xy { T x,y; };
 typedef vector<xy,int,2> int2;
 typedef vector<xy,float,2> vec2;
-
-template<class T> struct bgra { T b,g,r,a; };
-typedef vector<bgra,uint8,4> byte4;
-typedef vector<bgra,int,4> int4;
-
-template<class T> struct rgba { T r,g,b,a; operator byte4()const{return byte4{b,g,r,a};} };
-typedef vector<rgba,uint8,4> rgba4;
-template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r,255};} };
-typedef vector<rgb,uint8,3> rgb3;
-template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a};}};
-typedef vector<ia,uint8,2> byte2;
-template<class T> struct luma { T i; operator byte4()const{return byte4{i,i,i,255};}};
-typedef vector<luma,uint8,1> byte1;

@@ -2,4 +2,4 @@
 
 #include "array.cc"
 Array(delegate<void()>);
-ArrayOfDefaultConstructible(signal<>);
+Array_Default(signal<>);

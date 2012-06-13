@@ -8,19 +8,17 @@
 #include <freetype/ftlcdfil.h>
 
 #include "array.cc"
-ArrayOfDefaultConstructible(Glyph)
-ArrayOfDefaultConstructible(Font::GlyphCache)
+Array_Default(Glyph)
+Array_Default(Font::GlyphCache)
 
 static FT_Library ft;
-struct InitFreeType {
-    InitFreeType() {
-        FT_Init_FreeType(&ft);
-        FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
-    }
-} static_this;
+static_this() {
+    FT_Init_FreeType(&ft);
+    FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
+}
 
 Font::Font(string name) {
-    FT_New_Face(ft, strz(findFile("/usr/share/fonts"_,name)).data(), 0, &face);
+    FT_New_Face(ft, strz("/usr/share/fonts/"_+name), 0, &face);
     assert(face,name);
 }
 Font::Font(array<byte>&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)data.data(),data.size(),0,&face); }
@@ -84,7 +82,7 @@ Glyph& Font::glyph(int size, int code) {
     return glyph;
 }
 
-Font defaultSans("DejaVuSans.ttf"_);
-Font defaultBold("DejaVuSans-Bold.ttf"_);
-Font defaultItalic("DejaVuSans-Oblique.ttf"_);
-Font defaultBoldItalic("DejaVuSans-BoldOblique.ttf"_);
+Font defaultSans("truetype/ttf-dejavu/DejaVuSans.ttf"_);
+Font defaultBold("truetype/ttf-dejavu/DejaVuSans-Bold.ttf"_);
+Font defaultItalic("truetype/ttf-dejavu/DejaVuSans-Oblique.ttf"_);
+Font defaultBoldItalic("truetype/ttf-dejavu/DejaVuSans-BoldOblique.ttf"_);
