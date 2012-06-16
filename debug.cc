@@ -29,7 +29,7 @@ Symbol findNearestLine(void* address) {
             if(!path || !func || !line) continue;
             static size_t length=128; static char* buffer=(char*)malloc(length); int status;
             buffer=abi::__cxa_demangle(func,buffer,&length,&status);
-            return i({ section(strz(path),'/',-2,-1), strz(!status?buffer:func), (int)line });
+            return i({section(strz(path),'/',-2,-1), strz(!status?buffer:func), (int)line});
         }
     }
     return i({string(),string(),0});
@@ -45,7 +45,7 @@ void* return_address(void* fp) { return *((void**)fp+1); }
 void* caller_frame(void* fp) { return *((void**)fp-3); }
 void* return_address(void* fp) { return *((void**)fp-1); }
 #else
-       #error Unsupported architecture
+#error Unsupported architecture
 #endif
 
 void logBacktrace(void* frame) {
@@ -89,7 +89,6 @@ static void handler(int sig, siginfo*, void* ctx) {
         log(s);
 #endif
     }
-    else error("Unhandled signal"_);
 #if __x86_64__
     logBacktrace(context->uc_mcontext.gregs[REG_RBP]);
     Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
@@ -111,6 +110,7 @@ static_this() {
     sa.sa_sigaction = &handler;
     sa.sa_flags = SA_SIGINFO;
     sigaction(SIGSEGV, &sa, 0);
+    sigaction(SIGTERM, &sa, 0);
     sigaction(SIGPIPE, &sa, 0);
     sigaction(SIGFPE, &sa, 0);
     feenableexcept(FE_DIVBYZERO|FE_INVALID);

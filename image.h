@@ -1,6 +1,7 @@
 #pragma once
 #include "array.h"
 #include "vector.h"
+#include "debug.h"
 
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;

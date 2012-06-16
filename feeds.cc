@@ -6,6 +6,11 @@
 #include "interface.h"
 #include "window.h"
 
+template<class T> inline void write(int fd, const array<T>& s) {
+    uint unused wrote = write(fd,s.data(),(size_t)s.size()*sizeof(T));
+    assert(wrote==s.size());
+}
+
 ICON(network);
 
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
@@ -32,7 +37,7 @@ Feeds::Feeds() {
     List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
     List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
     array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
-    for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 20*60);
+    for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 60);
 }
 Feeds::~Feeds() { close(readConfig); }
 
@@ -69,6 +74,7 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     if(!link) link = feed("feed"_)("link"_)["href"_]; //Atom
     if(!link) { warn("Invalid feed"_,url); return; }
 
+#if HEADER
     Entry header(move(title),copy(link));
     header.isHeader=true;
     append( move(header) );
@@ -78,13 +84,13 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
         last().get<Icon>().image = resize(decodeImage(readFile(favicon,cache)),16,16);
     } else {
         last().get<Icon>().image = resize(networkIcon,16,16);
-        getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60*60);
+        getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60);
     }
-
+#endif
     array<Entry> items; int history=0;
     auto addItem = [this,&history,&items](const Element& e)->void{
         if(history++>=64) return; //avoid getting old unreads on feeds with big history
-        if(items.size()>=32) return;
+        if(array::size()>=32) return;
         string text=e("title"_).text();
         text=trim(unescape(text));
 
@@ -96,14 +102,11 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     };
     feed.xpath("feed/entry"_,addItem); //Atom
     feed.xpath("rss/channel/item"_,addItem); //RSS
-    int preload=0;
     for(int i=items.size()-1;i>=0;i--) { //oldest first
         append(move(items[i]));
         Entry& item = last(); //reference shouldn't move while loading
-        if(preload++<=16) { //preload first items
-            item.content = new Scroll<HTML>;
-            item.content->go(item.link); //preload
-        }
+        item.content = new Scroll<HTML>;
+        item.content->go(item.link); //preload
     }
     contentChanged.emit();
 }

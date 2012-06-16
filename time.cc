@@ -20,8 +20,7 @@ void Date::invariant() {
         //if(day>=0) TODO: check if valid
     }
 }
-template<class T> bool operator ==(const T& a, const T& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(T)); }
-inline bool operator >(const Date& a, const Date& b) {
+bool operator >(const Date& a, const Date& b) {
     if(a.year!=-1 && b.year!=-1) { if(a.year>b.year) return true; else if(a.year<b.year) return false; }
     if(a.month!=-1 && b.month!=-1) { if(a.month>b.month) return true; else if(a.month<b.month) return false; }
     if(a.day!=-1 && b.day!=-1) { if(a.day>b.day) return true; else if(a.day<b.day) return false; }
@@ -30,6 +29,8 @@ inline bool operator >(const Date& a, const Date& b) {
     if(a.seconds!=-1 && b.seconds!=-1) { if(a.seconds>b.seconds) return true; else if(a.seconds<b.seconds) return false; }
     return false;
 }
+bool operator ==(const Date& a, const Date& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(Date)); }
+
 
 Date date(long time) {
     tm t; localtime_r(&time,&t);

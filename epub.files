@@ -7,10 +7,17 @@ string.h
 string.cc
 stream.h
 stream.cc
+
+profile.cc
+
 inflate.h
 inflate.cc
 zip.h
 zip.cc
+meta.h
+function.h
+xml.h
+xml.cc
 
 font.h
 font.cc
@@ -28,4 +35,3 @@ interface.h
 interface.cc
 
 epub.cc
-profile.cc

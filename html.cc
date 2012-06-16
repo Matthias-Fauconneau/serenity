@@ -1,5 +1,4 @@
 #include "html.h"
-//#include "raster.h"
 
 template struct Array<ImageView>;
 template struct HList<ImageView>;
@@ -26,7 +25,7 @@ static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"
 "tr"_,"table"_,"left"_,"area"_,"map"_,"button"_,"sup"_,"param"_,"embed"_,"object"_,"noindex"_,"optgroup"_,
                                             "tbody"_,"tfoot"_,"thead"_,"acronym"_,"del"_,"video"_,"figure"_,"section"_,"source"_,"noembed"_,"caption"_};
 
-void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 30*60); }
+void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 60); }
 
 void HTML::load(const URL& url, array<byte>&& document) { clear(); append(url,move(document)); }
 void HTML::append(const URL& url, array<byte>&& document) {
@@ -37,7 +36,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
     html.visit([&url,&best,&max,&second](const Element& div){
         int score = 0;
         if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
-        else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 900;
+        else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 400;
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
@@ -48,7 +47,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
                 score += size?:16800;
             }
         } else if(!div.children) return;
-        div.mayVisit([&score](const Element& e)->bool{
+        div.mayVisit([&score](const Element& e){
             if(contains(textElement,e.name)||contains(boldElement,e.name)) {
                 return true; //visit children
             } else if(!e.name) {
@@ -72,8 +71,8 @@ void HTML::append(const URL& url, array<byte>&& document) {
     flushText();
     flushImages();
 
-    /*log("HTML\n"_+str(content));
-    warn(url,max,second,count());*/
+    //log("HTML\n"_+str(content));
+    warn(url,max,second,count());
     contentChanged.emit();
 }
 

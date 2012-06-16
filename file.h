@@ -1,23 +1,12 @@
 #pragma once
 #include "string.h"
-#include "debug.h"
+
+extern "C" int close(int fd);
 
 /// Input/Output
 
 array<byte> readUpTo(int fd, uint capacity);
 array<byte> read(int fd, uint capacity);
-
-template<class T> T read(int fd) {
-    T t;
-    int unused size = read(fd,(byte*)&t,sizeof(T));
-    assert(size==sizeof(T),size,sizeof(T));
-    return t;
-}
-
-template<class T> inline void write(int fd, const array<T>& s) {
-    uint unused wrote = write(fd,s.data(),(size_t)s.size()*sizeof(T));
-    assert(wrote==s.size());
-}
 
 /// File
 const int CWD = -100;

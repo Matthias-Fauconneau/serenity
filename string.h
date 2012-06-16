@@ -51,7 +51,7 @@ inline cat<string> operator +(const string& a, const string& b) { return i({a,b}
 inline string operator "" _(const char* data, size_t size) { return string((byte*)data,size); }
 
 /// Lexically compare strings
-bool operator <(const string& a, const string& b);
+bool operator >(const array<byte>& a, const array<byte>& b);
 
 /// Returns true if \a str starts with \a sub
 bool startsWith(const array<byte>& str, const array<byte>& sub);
@@ -63,9 +63,12 @@ inline bool contains(const string& str, char c) { return contains<byte>(str, c);
 bool contains(const string& str, const string& sub);
 
 struct CString {
+    no_copy(CString)
     static bool busy;
     char* data;
     int tag; //0=inline, 1=static, 2=heap
+    CString(){}
+    CString(CString&& o):data(o.data),tag(o.tag) {o.tag=0;}
     ~CString() { if(tag==1) busy=0; if(tag==2) free(data); }
     operator const char*() { return data; }
 };
@@ -99,13 +102,6 @@ string simplify(const array<byte>& s);
 /// Convert Unicode code point to UTF-8
 string utf8(uint code);
 
-
-/// Base template for conversion to human-readable value representation
-template<class A> string str(const A&) { static_assert(sizeof(A) & 0,"No string representation defined for type"); return ""_; }
-
-/// Returns a bounded reference to the null-terminated string pointer
-string str(const char* s);
-
 /// Converts a machine integer to its human-readable representation
 string utoa(uint number, int base=10, int pad=0);
 string itoa(int number, int base=10, int pad=0);
@@ -114,38 +110,34 @@ inline string oct(int n, int pad=0) { return itoa(n,8,pad); }
 inline string dec(int n, int pad=0) { return itoa(n,10,pad); }
 inline string hex(int n, int pad=0) { return itoa(n,16,pad); }
 
-template<> inline string str(const bool& b) { return b?"true"_:"false"_; }
-template<> inline string str(const uint8& n) { return dec(n); }
-template<> inline string str(const int8& n) { return dec(n); }
-template<> inline string str(const uint16& n) { return dec(n); }
-template<> inline string str(const int16& n) { return dec(n); }
-template<> inline string str(const uint32& n) { return dec(n); }
-template<> inline string str(const int32& n) { return dec(n); }
-
 /// Converts a floating point number to its human-readable representation
 string ftoa(float number, int precision, int base=10);
-template<> inline string str(const float& number) { return ftoa(number,2); }
-
-/// Concatenates string representation of its arguments
-/// \note directly use operator+ to avoid spaces
-template<class A, class... Args, predicate(!is_convertible(A,string))> inline string str(const A& a, const Args&... args) { return str(a)+" "_+str(args...); }
-template<class... Args> inline string str(const string& s, const Args&... args) { return s+" "_+str(args...); }
-template<class A, predicate(!is_convertible(A,string))> inline string str(const A& a, const string& s) { return str(a)+" "_+s; }
-inline string str(const string& a, const string& b) { return a+" "_+b; }
-
-/// String representation of a cat (force conversion to string)
-template<class A> inline string str(const cat<A>& s) { return s; }
-
-/// String representation of a pointer
-template<class A> inline string str(A* const& s) { return s?"null"_:str(*s); }
-template<> inline string str(void* const& n) { return utoa(int(n),16); }
-
-/// String representation of an array
-template<class T> inline string str(const array<T>& list) { array<string> r; for(const T& e: list) r << str(e); return str(r); }
-template<> inline string str(const array<string>& list) { return "["_+join(list,", "_)+"]"_; }
 
 bool isInteger(const string& s);
 /// Parses an integer value
 long toInteger(const string& str, int base=10 );
 /// Parses a decimal value
 double toFloat(const string& str, int base=10 );
+
+/// Base template for conversion to human-readable value representation
+template<class A> string str(const A&) { static_assert(sizeof(A) & 0,"No string representation defined for type"); return ""_; }
+
+/// Returns a bounded reference to the null-terminated string pointer
+string str(const char* s);
+
+inline string str(const bool& b) { return b?"true"_:"false"_; }
+inline string str(const uint8& n) { return dec(n); }
+inline string str(const int8& n) { return dec(n); }
+inline string str(const uint16& n) { return dec(n); }
+inline string str(const int16& n) { return dec(n); }
+inline string str(const uint32& n) { return dec(n); }
+inline string str(const int32& n) { return dec(n); }
+inline string str(const float& n) { return ftoa(n,2); }
+inline const string& str(const string& s) { return s; }
+template<class A> inline string str(const cat<A>& s) { return s; }
+template<class A> inline string str(A* const& p) { return p?utoa(uint(p),16):"null"_; }
+template<class T> inline string str(const array<T>& list) { array<string> r; for(const T& e: list) r << str(e); return str(r); }
+
+/// Concatenates string representation of its arguments
+/// \note directly use operator+ to avoid spaces
+template<class A, class ___ Args> inline string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }

@@ -5,25 +5,32 @@
 #include "window.h"
 #include "launcher.h"
 #include "calendar.h"
-#include "poll.h"
+#include "popup.h"
+#include "x.h"
+#if DBUS
 #include "dbus.h"
+#endif
 
+#ifndef __GXX_EXPERIMENTAL_CXX0X__
+#include "X11/Xlib.h"
+#endif
+
+#include "array.cc"
+
+template struct Popup<Calendar>;
 template struct Array<Command>;
 template struct ListSelection<Command>;
 template struct List<Command>;
 
-enum ScreenEdge { Top, Bottom };
-static ScreenEdge taskBarPosition = Top;
-
-static Display* x; //TODO: use Window::x
+static Display* x;
 
 string getTitle(XID id) {
-    string name = Window::getProperty<char>(id,"_NET_WM_NAME");
-    if(!name) name = Window::getProperty<char>(id,"WM_NAME");
+    string name = Window::getProperty<byte>(id,"_NET_WM_NAME");
+    if(!name) name = Window::getProperty<byte>(id,"WM_NAME");
     return move(name);
 }
 Image getIcon(XID id) {
-    array<ulong> buffer = Window::getProperty<ulong>(id,"_NET_WM_ICON");
+    array<XID> buffer = Window::getProperty<XID>(id,"_NET_WM_ICON");
     if(buffer.size()<=4) return Image();
     array<byte4> image(buffer.size()); image.setSize(buffer.size());
     for(uint i=0;i<buffer.size()-2;i++) image[i] = *(byte4*)&buffer[i+2];
@@ -33,21 +40,20 @@ Image getIcon(XID id) {
 static XID* topLevelWindowList=0;
 static array<XID> getWindows() {
     if(topLevelWindowList) XFree(topLevelWindowList);
-    XID root,parent; uint count=0; XQueryTree(x,DefaultRootWindow(x),&root,&parent,&topLevelWindowList,&count);
+    XID root,parent; uint count=0; XQueryTree(x,x->screens[0].root,&root,&parent,&topLevelWindowList,&count);
     return array<XID>(topLevelWindowList,count);
 }
 
 void raise(XID id) {
     XRaiseWindow(x, id);
-    XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
+    XSetInputFocus(x, id, 1, 0);
     for(XID w: getWindows()) {
         if(Window::getProperty<Atom>(w,"WM_TRANSIENT_FOR") == array<Atom>{id}) {
             XRaiseWindow(x, w);
-            XSetInputFocus(x, w, RevertToPointerRoot, CurrentTime);
+            XSetInputFocus(x, w, 1, 0);
         }
     }
 }
-
 struct Task : Item {
     XID id;
     Task(XID id):id(id){} //for indexOf
@@ -62,7 +68,7 @@ struct Task : Item {
         if(button!=LeftButton) return false;
         if(event==Press) {
             if(getWindows().last()==id) { //Set maximized
-                XMoveResizeWindow(x,id, 0, taskBarPosition==Top?16:0, Window::screen.x,Window::screen.y-16);
+                XMoveResizeWindow(x,id, 0, 16, Window::screen.x,Window::screen.y-16);
                 XFlush(x);
                 return true;
             }
@@ -76,7 +82,12 @@ struct Task : Item {
     }
 };
 bool operator==(const Task& a,const Task& b){return a.id==b.id;}
+Array_Compare(Task)
+template struct Array<Task>;
+template struct ListSelection<Task>;
+template struct Bar<Task>;
 
+#if DBUS
 struct StatusNotifierItem : TriggerButton {
     DBus::Object item;
     string id;
@@ -91,7 +102,7 @@ struct StatusNotifierItem : TriggerButton {
                 }
                 item.noreply("org.kde.StatusNotifierItem.Activate"_, 0,0);
             }
-            if(button==RightButton) item.noreply("org.kde.StatusNotifierItem.ContextMenu"_, c.x,taskBarPosition==Top?16:Window::screen.y-16);
+            if(button==RightButton) item.noreply("org.kde.StatusNotifierItem.ContextMenu"_, c.x, 16);
             if(button==MiddleButton) item.noreply("org.kde.StatusNotifierItem.SecondaryActivate"_, 0,0);
             if(button==WheelDown) item.noreply("org.kde.StatusNotifierItem.Scroll"_, -1, "vertical"_);
             if(button==WheelUp) item.noreply("org.kde.StatusNotifierItem.Scroll"_, 1, "vertical"_);
@@ -100,32 +111,30 @@ struct StatusNotifierItem : TriggerButton {
         return false;
     }
 };
-
-#include "array.cc"
-Array_Compare(Task)
 Array(StatusNotifierItem)
-template array<byte4> cast(array<byte>&& array);
-template struct Array<Task>;
-template struct ListSelection<Task>;
-template struct Bar<Task>;
 template struct Array<StatusNotifierItem>;
 template struct ListSelection<StatusNotifierItem>;
 template struct Bar<StatusNotifierItem>;
-template struct Popup<Calendar>;
+template array<byte4> cast(array<byte>&& array);
+#endif
 
 ICON(button);
 struct TaskBar : Application, Poll {
-    DBus dbus;
     signal<int> tasksChanged;
 
       TriggerButton start;
        Launcher launcher;
       Bar<Task> tasks;
-      Bar<StatusNotifierItem> status;
       Clock clock;
        Popup<Calendar> calendar;
-     HBox panel {&start, &tasks, &status, &clock };
-    Window window{&panel,""_,Image(),int2(0,-1)};
+#if DBUS
+      DBus dbus
+      Bar<StatusNotifierItem> status;
+      HBox panel {&start, &tasks, &status, &clock };
+#else
+       HBox panel {&start, &tasks, &clock };
+#endif
+      Window window{&panel,""_,Image(),int2(0,-1)};
 
     void startButton() {
         if(!launcher.window.visible) { launcher.show(); return; }
@@ -153,6 +162,7 @@ struct TaskBar : Application, Poll {
         return tasks.array::size()-1;
     }
 
+#if DBUS
     void registerStatusNotifierItem(string service) {
         for(const auto& s: status) if(s.item.target == service) return;
 
@@ -184,29 +194,23 @@ struct TaskBar : Application, Poll {
         for(uint i=0;i<status.array<StatusNotifierItem>::size();i++) if(status[i].item.target == name) status.removeAt(i);
         panel.update(); window.render();
     }
+#endif
 
-    static int xErrorHandler(Display* x, XErrorEvent* error) {
-        char buffer[64]; XGetErrorText(x,error->error_code,buffer,sizeof(buffer)); log(buffer);
-        return 0;
-    }
-
-    TaskBar(array<string>&& arguments) {
-        taskBarPosition= contains(arguments,"bottom"_) ? Bottom : Top;
-
-        XSetErrorHandler(xErrorHandler);
+    TaskBar(array<string>&&) {
         x = XOpenDisplay(0);
         XSetWindowAttributes attributes; attributes.cursor=XCreateFontCursor(x,68);
-        XChangeWindowAttributes(x,DefaultRootWindow(x),CWCursor,&attributes);
-        registerPoll({XConnectionNumber(x), POLLIN});
-        XSelectInput(x,DefaultRootWindow(x),SubstructureNotifyMask|SubstructureRedirectMask|PropertyChangeMask|ButtonPressMask);
+        XChangeWindowAttributes(x,x->screens[0].root,CWCursor,&attributes);
+        registerPoll(i({XConnectionNumber(x), POLLIN}));
+        XSelectInput(x,x->screens[0].root,SubstructureNotifyMask|SubstructureRedirectMask|PropertyChangeMask|ButtonPressMask);
         for(XID id: getWindows()) {
             addTask(id);
             XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
             XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
-            XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
+            XGrabButton(x,1,AnyModifier,id,0,ButtonPressMask,0,1,0,0);
         }
         XFlush(x);
 
+#if DBUS
         if(dbus) {
             dbus.bind("Get"_,this,&TaskBar::Get);
             dbus.bind("RegisterStatusNotifierItem"_,this,&TaskBar::registerStatusNotifierItem);
@@ -216,6 +220,7 @@ struct TaskBar : Application, Poll {
             for(string& name: names) if(startsWith(name,"org.kde.StatusNotifierItem"_)) registerStatusNotifierItem(move(name));
             DBus.noreply("org.freedesktop.DBus.RequestName"_, "org.kde.StatusNotifierWatcher"_, (uint)0);
         }
+#endif
 
         start.image = resize(buttonIcon, 16,16);
         start.triggered.connect(this,&TaskBar::startButton);
@@ -227,24 +232,22 @@ struct TaskBar : Application, Poll {
 
         window.setType(Atom(_NET_WM_WINDOW_TYPE_DOCK));
         window.setOverrideRedirect(true);
-        window.setPosition(int2(0, taskBarPosition==Top?0:-16));
+        window.setPosition(int2(0, 0));
         calendar.window.setOverrideRedirect(true);
-        calendar.window.setPosition(int2(-300, taskBarPosition==Top?16:-316));
-        launcher.window.setPosition(int2(0, taskBarPosition==Top?16:(-16-abs(launcher.menu.sizeHint().y))));
+        calendar.window.setPosition(int2(-300, 16));
+        launcher.window.setPosition(int2(0, 16));
         window.show();
     }
 
     void event(pollfd) override {
         bool needUpdate = false;
-        while(XEventsQueued(x, QueuedAfterFlush)) { XEvent e; XNextEvent(x,&e);
+        while(XPending(x)) { XEvent e; XNextEvent(x,&e); XID id = e.window;
             if(e.type==CreateNotify) {
-                XID id = e.xcreatewindow.window;
                 XSelectInput(x,id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
-                XGrabButton(x,Button1,AnyModifier,id,False,ButtonPressMask,GrabModeSync,GrabModeAsync,None,None);
+                XGrabButton(x,1,AnyModifier,id,0,ButtonPressMask,0,1,0,0);
                 continue;
             } else if(e.type == MapRequest) {
-                XID id = e.xmaprequest.window;
                 XMapWindow(x, id);
                 raise(id);
                 int i = indexOf(tasks, Task(id));
@@ -252,8 +255,8 @@ struct TaskBar : Application, Poll {
                 if(i<0) continue;
                 tasks.index=i;
             } else if(e.type == ConfigureRequest) {
-                XConfigureRequestEvent& c = e.xconfigurerequest;
-                XID id = e.xconfigurerequest.window;
+                auto c = (XConfigureRequestEvent&)e;
+                id = c.window;
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
                 if(c.value_mask & CWX) wa.x=c.x; if(c.value_mask & CWY) wa.y=c.y;
                 if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
@@ -264,26 +267,24 @@ struct TaskBar : Application, Poll {
                         && (!motif || motif[0]!=3 || motif[1]!=0)) {
                     wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
                     wa.x = (Window::screen.x - wa.width)/2;
-                    wa.y = (taskBarPosition==Top?16:0)+(Window::screen.y-16-wa.height)/2;
+                    wa.y = 16+(Window::screen.y-16-wa.height)/2;
                 }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
                 continue;
             } else if(e.type == ButtonPress) {
-                XID id = e.xbutton.window;
                 raise(id);
-                XAllowEvents(x, ReplayPointer, CurrentTime);
+                XAllowEvents(x, 2, 0);
                 int i = indexOf(tasks, Task(id));
                 if(i>=0) tasks.index=i;
             } else if(e.type==PropertyNotify) {
-                XID id = e.xproperty.window;
                 int i = indexOf(tasks, Task(id));
                 if(i<0) i=addTask(id);
                 if(i<0) continue;
-                if(e.xproperty.atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().setText( getTitle(id) );
-                else if(e.xproperty.atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
+                Atom atom = ((XPropertyEvent&)e).atom;
+                if(atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().setText( getTitle(id) );
+                else if(atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
                 else continue;
             } else if(e.type == UnmapNotify || e.type == DestroyNotify || e.type == ReparentNotify || e.type == VisibilityNotify) {
-                XID id = (e.type==VisibilityNotify?e.xvisibility.window:e.xunmap.window);
                 int i = indexOf(tasks, Task(id));
                 if(i>=0) {
                     tasks.removeAt(i);
@@ -297,8 +298,7 @@ struct TaskBar : Application, Poll {
                     //XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
                     if(tasks.index==uint(-1)) tasks.setActive(indexOf(tasks, Task(id)));
                 }
-            } else if(e.type == ClientMessage) {
-                XID id = e.xclient.window;
+            } /*else if(e.type == ClientMessage) {
                 if(e.xclient.message_type==Atom(_NET_ACTIVE_WINDOW)) {
                     XMapWindow(x, id);
                     raise(id);
@@ -307,7 +307,7 @@ struct TaskBar : Application, Poll {
                     if(i<0) continue;
                     tasks.index=i;
                 }
-            }
+            }*/
             needUpdate = true;
         }
         if(needUpdate && window.visible) { panel.update(); window.render(); }

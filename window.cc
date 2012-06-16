@@ -2,76 +2,8 @@
 #include "raster.h"
 #include "widget.h"
 
-extern "C" {
-int shmdt(const void* addr);
-int shmget(int key, size_t size, int flag);
-void* shmat(int id, const void* addr, int flag);
-
-Atom XInternAtom(Display*, const char*, bool);
-int XGetWindowProperty(Display*, XID, Atom, long, long, bool, Atom, Atom*, int*, ulong*, ulong*, ubyte**);
-int XFree(void*);
-int XChangeProperty(Display*, XID, Atom, Atom, int, int, const ubyte*, int);
-int XFlush(Display*);
-int XGetErrorText(Display*, int, char*, int);
-struct XErrorEvent { int type; Display* display; XID id; ulong serial; ubyte error_code; };
-typedef int (*XErrorHandler) (Display*, XErrorEvent*);
-XErrorHandler XSetErrorHandler(XErrorHandler);
-Display* XOpenDisplay(const char*);
-int XConnectionNumber(Display*);
-struct XWindowAttributes { int x, y, width, height, border, depth; Visual *visual; };
-int XGetWindowAttributes(Display*, XID, XWindowAttributes*);
-struct Screen { void* private1; Display* display; XID root; int width, height; };
-struct Display { void* private1[2]; int fd;int private2[3]; void* private3; XID private4[3]; int private5; void* private6;
-    int private7[5]; void* private8; int private9[2]; void* private10[2]; int private11; ulong private12[2]; void* private13[4];
-    uint private14; void* private15[3]; int private16[2]; Screen* screens; };
-struct XVisualInfo { Visual* visual; ulong id; int screen,depth,c_class; ulong private1[3]; int private2[2]; };
-int XPending(Display*);
-int XNextEvent(Display*, XEvent*);
-KeySym XkbKeycodeToKeysym(Display*, uint, int, int);
-enum { TrueColor=4 };
-enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, Expose=12,
-       UnmapNotify=18, MapNotify, ReparentNotify=21, ConfigureNotify, ClientMessage=33 };
-enum { Button1Mask=1<<8, AnyModifier=1<<15 };
-struct XEvent { int type; ulong serial; bool send_event; Display *display; XID window;
-                XID root,subwindow; ulong time; int x, y, x_root, y_root; uint state, code; };
-struct XClientMessageEvent { int type; ulong serial; bool send_event; Display *display; XID window;
-                             Atom message_type; int format; long data[5]; };
-struct XSetWindowAttributes {  ulong bg_pixmap, bg_pixel, border_pixmap, border_pixel; int unused1[3]; ulong unused2[2];
-                               bool unused3; long event_mask; long unused4; bool override_redirect; XID colormap, cursor; };
-XID XCreateColormap(Display*, XID, Visual*, int);
-enum { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3,
-       EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15,
-       StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19 };
-
-XImage *XShmCreateImage(Display*, Visual*, uint, int, char*, XShmSegmentInfo*, uint, uint);
-bool XShmAttach(Display*, XShmSegmentInfo*);
-bool XShmDetach(Display*, XShmSegmentInfo*);
-bool XShmPutImage(Display*, XID, GC, XImage*, int, int, int, int, uint, uint, bool);
-XID XCreateWindow(Display*, XID, int, int, uint, uint, uint, int, uint, Visual*, ulong, XSetWindowAttributes*);
-GC XCreateGC(Display*, XID, ulong, void*);
-enum { CWBackPixel=1<<1, CWBorderPixel=1<<3, CWOverrideRedirect=1<<9, CWEventMask=1<<11, CWColormap=1<<13 };
-int XMapWindow(Display*, XID);
-int XUnmapWindow(Display*, XID);
-int XRaiseWindow(Display*, XID);
-int XSync(Display*, bool);
-int XMoveWindow(Display*, XID, int, int);
-int XResizeWindow(Display*, XID, uint, uint);
-int XSendEvent(Display*, XID, bool, long, XEvent*);
-int XChangeWindowAttributes(Display*, XID, ulong, XSetWindowAttributes*);
-int XGetInputFocus(Display*, XID*, int*);
-int XSetInputFocus(Display*, XID, int, ulong);
-KeySym XStringToKeysym(const char*);
-ubyte XKeysymToKeycode(Display*, KeySym);
-XID XGetSelectionOwner(Display*, Atom);
-int XConvertSelection(Display*, Atom, Atom, Atom, XID, ulong);
-int XMatchVisualInfo(Display*, int, int, int, XVisualInfo*);
-struct XImage { int width, height, private1[2]; char *data; int private2[5]; int stride; int private3; ulong private4[3];
-                void* private5[2]; int (*destroy_image)(XImage*); };
-int XGrabKey(Display*, int, uint, XID, bool, int, int);
-}
-
 #include "array.cc"
-Array(Window*)
+Array_Copy_Compare(Window*)
 
 Display* Window::x=0;
 int2 Window::screen;
@@ -122,10 +54,11 @@ Window::Window(Widget* widget, const string& title, const Image& icon, int2 size
         XVisualInfo info; XMatchVisualInfo(x, 0, 32, TrueColor, &info); depth = info.depth; visual=info.visual;
     }
 }
+Window::~Window() { windows.remove(id); }
 
 void Window::event(pollfd) { processEvents(); }
 void Window::processEvents() {
-    array<uint> needRender;
+    array<Window*> needRender;
     while(XPending(x)) {
         XEvent e; XNextEvent(x,&e);
         uint id = e.window;
@@ -133,11 +66,11 @@ void Window::processEvents() {
             signal<>* shortcut = globalShortcuts.find(e.code);
             if(shortcut) {  if(e.type==KeyPress) shortcut->emit(); continue; } //global window shortcut
         }
-        Window** window = windows.find(id);
-        if(!window) { log("Unknown window for event",e.type); continue; }
-        if((*window)->event(e) && !contains(needRender,id)) needRender << id;
+        if(!windows.contains(id)) { log("Unknown window for event",e.type); continue; }
+        Window* window = windows.at(id);
+        if(window->event(e) && !contains(needRender, window)) needRender << window;
     }
-    for(XID id: needRender) windows[id]->render();
+    for(Window* window: needRender) window->render();
 }
 
 bool Window::event(const XEvent& e) {
@@ -224,7 +157,7 @@ void Window::create() {
     attributes.override_redirect = overrideRedirect;
     id = XCreateWindow(x,x->screens[0].root,position.x,position.y,size.x,size.y,0,depth,1,visual,
                        CWBackPixel|CWColormap|CWBorderPixel|CWEventMask|CWOverrideRedirect, &attributes);
-    windows[id] = this;
+    windows.insert(id, this);
     gc = XCreateGC(x, id, 0, 0);
     setProperty<uint>(id, "ATOM", "WM_PROTOCOLS", {Atom(WM_DELETE_WINDOW)});
     setType(type?:Atom(_NET_WM_WINDOW_TYPE_NORMAL));

@@ -2,11 +2,7 @@
 #include "string.h"
 #include "map.h"
 #include "stream.h"
-
-#define FUNCTIONAL 1
-#if FUNCTIONAL
-#include <functional>
-#endif
+#include "function.h"
 
 /// XML element
 struct Element {
@@ -23,20 +19,16 @@ struct Element {
     string operator[](const string& attribute) const;
     /// Returns child element with tag \a name (beware of dangling reference)
     const Element& operator()(const string& name) const;
-#if FUNCTIONAL
     /// Depth-first visits all descendants
-    void visit(const std::function<void(const Element&)>& visitor) const;
+    void visit(const function<void(const Element&)>& visitor) const;
     /// Depth-first visits all descendants, skip element if /a visitor returns false.
-    void mayVisit(const std::function<bool(const Element&)>& visitor) const;
+    void mayVisit(const function<bool(const Element&)>& visitor) const;
     /// Process elements with matching \a path
-    void xpath(const string& path, const std::function<void(const Element&)>& visitor) const;
-    /// Tests if \a path match any elements
-    //bool match(const string& path) const;
+    void xpath(const string& path, const function<void(const Element&)>& visitor) const;
     /// Collects text content of descendants
     string text() const;
     /// Collects text content of descendants matching path
     string text(const string& path) const;
-#endif
     /// Returns element as parseable string
     string str(const string& prefix=""_) const;
 };

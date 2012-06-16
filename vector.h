@@ -1,9 +1,32 @@
 #pragma once
 #include "string.h"
-#include "debug.h"
+
+/// Mathematic primitives
+
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
+
+const double PI = 3.14159265358979323846;
+inline float sin(float t) { return __builtin_sinf(t); }
+inline float sqrt(float f) { return __builtin_sqrtf(f); }
+inline float atan(float f) { return __builtin_atanf(f); }
 
 template<class T> T sq(const T& x) { return x*x; }
 template<class T> T cb(const T& x) { return x*x*x; }
+
+/// SIMD
+typedef float float4 __attribute__ ((vector_size(16)));
+typedef double double2 __attribute__ ((vector_size(16)));
+#define xor_ps __builtin_ia32_xorps
+#define xor_pd __builtin_ia32_xorpd
+#define loadu_ps __builtin_ia32_loadups
+#define loadu_pd __builtin_ia32_loadupd
+#define loada_ps(e) (*(float4*)(e))
+#define movehl_ps __builtin_ia32_movhlps
+#define shuffle_ps __builtin_ia32_shufps
+#define extract_s __builtin_ia32_vec_ext_v4sf
+#define extract_d __builtin_ia32_vec_ext_v2df
 
 extern struct Zero {} zero; //dummy type to call zero-initializing constructor
 //TODO: SIMD
@@ -16,8 +39,8 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }
     const T& u(int i) const { return ((T*)this)[i]; }
     T& u(int i) { return ((T*)this)[i]; }
-    const T& operator[](int i) const { assert(i>=0 && i<N); return u(i); }
-    T& operator[](int i) { assert(i>=0 && i<N); return u(i); }
+    const T& operator[](uint i) const { debug(if(i>=N)logTrace(),__builtin_abort();) return u(i); }
+    T& operator[](uint i) { debug(if(i>=N)logTrace(),__builtin_abort();) return u(i); }
     vector operator +=(vector v);
     vector operator -=(vector v);
     vector operator *=(vector v);

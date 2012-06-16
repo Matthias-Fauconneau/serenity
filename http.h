@@ -21,17 +21,14 @@ struct Socket : Buffer {
 
 typedef struct ssl_st SSL;
 struct SSLSocket : Socket {
-    default_constructors(SSLSocket)
+    ~SSLSocket();
     SSL* ssl=0;
     bool connect(const string& host, const string& service, bool secure=false);
-    ~SSLSocket();
     array<byte> read(int size) override;
     void write(const array<byte>& buffer) override;
 };
 
-struct TextSocket : TextStream, SSLSocket {
-    default_constructors(TextSocket)
-};
+struct TextSSLSocket : TextStream, SSLSocket {};
 
 /// Encodes \a input to Base64 to transfer binary data through text protocol
 string base64(const string& input);
@@ -51,20 +48,19 @@ inline bool operator ==(const URL& a, const URL& b) {
 typedef delegate<void(const URL&, array<byte>&&)> Handler;
 
 struct HTTP : Poll {
-    TextSocket http;
+    struct : TextStream, SSLSocket {} http;
     URL url;
     Handler handler;
-
     array<string> headers;
     string method;
-    string content;
     array<string> redirect;
+    array<byte> content;
 
 /// Connects to \a host and requests \a path using \a method.
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(const URL& url, Handler handler, array<string>&& headers={}, string&& method="GET"_, string&& content=""_, array<string>&& redirect={});
+    HTTP(const URL& url, Handler handler, array<string>&& headers={}, string&& method="GET"_, array<string>&& redirect={});
 
     void request();
     void event(pollfd) override;

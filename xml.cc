@@ -47,7 +47,7 @@ Element::Element(TextBuffer& s, bool html) {
             else { value=s.untilAny(" \t\n>"_); if(s.buffer[s.index-1]=='>') s.index--; }
             s.match("\""_); //duplicate "
         }
-        attributes.insert(move(key), move(value));
+        attributes.insertMulti(move(key), move(value));
         s.skip();
     }
     if(html) {
@@ -96,20 +96,18 @@ const Element& Element::operator()(const string& name) const {
     error("children", name, "not found in", *this);
 }
 
-#if FUNCTIONAL
-
-template struct std::function<void(const Element&)>;
-void Element::visit(const std::function<void(const Element&)>& visitor) const {
+template struct function<void(const Element&)>;
+void Element::visit(const function<void(const Element&)>& visitor) const {
     for(const auto& e: children) e.visit(visitor);
     visitor(*this);
 }
 
-template struct std::function<bool(const Element&)>;
-void Element::mayVisit(const std::function<bool(const Element&)>& visitor) const {
+template struct function<bool(const Element&)>;
+void Element::mayVisit(const function<bool(const Element&)>& visitor) const {
     if(visitor(*this)) for(const auto& e: children) e.mayVisit(visitor);
 }
 
-void Element::xpath(const string& path, const std::function<void(const Element &)>& visitor) const {
+void Element::xpath(const string& path, const function<void(const Element &)>& visitor) const {
     assert(path);
     if(startsWith(path,"//"_)) {
         const string& next = slice(path,2);
@@ -122,20 +120,13 @@ void Element::xpath(const string& path, const std::function<void(const Element &
     else { for(const auto& e: children) if(e.name==first) visitor(e); }
 }
 
-/*bool Element::match(const string& path) const {
-    bool match=false;
-    xpath(path,[&match](const Element&){ match=true; });
-    return match;
-}*/
-
-string Element::text() const { string text; visit([&text](const Element& e)->void{ text<<e.content; }); return text; }
+string Element::text() const { string text; visit([&text](const Element& e){ text<<e.content; }); return text; }
 
 string Element::text(const string& path) const {
     string text;
     xpath(path,[&text](const Element& e){ text<<e.text(); });
     return text;
 }
-#endif
 
 string Element::str(const string& prefix) const {
     if(!name&&!trim(content)&&!children) return ""_;
@@ -158,7 +149,7 @@ string unescape(const string& xml) {
         array<string> kv = split(
 "quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — "
 "euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull • "
-"agrave à acirc â egrave è ocirc ô ecirc ê"_,' ');
+"agrave à acirc â egrave è ocirc ô ecirc ê szlig ß"_,' ');
         assert(kv.size()%2==0,kv.size());
         for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }

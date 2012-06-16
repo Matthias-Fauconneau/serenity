@@ -4,42 +4,35 @@ BUILD ?= release
 
 COMPILER = gcc
 CCX ?= $(CCX_$(COMPILER))
-CCX_gcc := g++-4.7 -Wno-pmf-conversions -fno-implicit-templates -march=native -mapcs
+CCX_gcc := g++-4.7 -Wno-pmf-conversions -fno-implicit-templates -march=native
 CCX_clang := clang++ -Wno-mismatched-tags
 
 FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions
 FLAGS += $(FLAGS__$(BUILD))
-
-FLAGS__debug := -ggdb -DDEBUG -fno-omit-frame-pointer
-FLAGS__gdb := -ggdb -fno-omit-frame-pointer
-FLAGS__normal := -fno-omit-frame-pointer
-FLAGS__fast := -ggdb -DDEBUG -fno-omit-frame-pointer -O3 -ffast-math -fno-rtti
+FLAGS__debug := -g -mapcs -DDEBUG
+FLAGS__fast := -g -mapcs -DDEBUG -O3 -ffast-math -fno-rtti
 FLAGS__release := -O3 -ffast-math -fno-rtti
-FLAGS__profile := -g -DDEBUG -finstrument-functions -finstrument-functions-exclude-file-list=intrin,vector,array,map,profile
-FLAGS__memory := -ggdb -DDEBUG -Ofast -fno-omit-frame-pointer -frtti -DTRACE_MALLOC
-
+FLAGS__profile := -g -mapcs -O -finstrument-functions -finstrument-functions-exclude-file-list=core,array,map,profile
 FLAGS_font = -I/usr/include/freetype2
-#FLAGS_dbus = -fimplicit-templates
 
 SRCS = $(SRCS__$(BUILD)) $(SRCS_$(TARGET))
 SRCS__profile += profile
 SRCS__memory += memory
-SRCS_taskbar += png
-SRCS_desktop += png jpeg ico
-SRCS_player += png
-SRCS_music += png
+SRCS_taskbar += png inflate
+SRCS_desktop += png inflate jpeg ico
+SRCS_player += png inflate
+SRCS_music += png inflate
 
 ICONS = $(ICONS_$(TARGET))
 ICONS_taskbar := button
 ICONS_desktop := shutdown network
 ICONS_player := play pause next
 ICONS_music := music music256
-
 SRCS += $(ICONS:%=icons/%)
 
 LIBS__debug = bfd
 LIBS__fast = bfd
-LIBS__profile = bfd
+LIBS__profile = bfd rt
 LIBS__memory = bfd
 LIBS_time = rt
 LIBS_alsa = asound
@@ -47,6 +40,7 @@ LIBS_http = ssl
 LIBS_ffmpeg = avformat avcodec
 LIBS_font = freetype
 LIBS_window = X11 Xext
+LIBS_png = z
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

@@ -2,9 +2,8 @@
 #include "file.h"
 
 #include "array.cc"
-Array_Copy_Compare_Sort_Default(Date)
-template struct array< array<Date> >;
-
+Array_Copy_Compare_Sort(Date)
+Array(array<Date>)
 template struct Array<Text>;
 template struct ListSelection<Text>;
 template struct HList<Text>;

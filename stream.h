@@ -45,6 +45,9 @@ struct Buffer : virtual Stream {
     void advance(int count) override { index+=count;  assert(index<=buffer.size()); }
 };
 
+#define swap32 __builtin_bswap32
+inline uint16 swap16(uint16 x) { return swap32(x)>>16; }
+
 /// \a DataStream provides a convenient interface to parse binaries
 struct DataStream : virtual Stream {
     bool bigEndian = false;

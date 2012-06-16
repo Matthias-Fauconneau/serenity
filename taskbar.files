@@ -22,12 +22,15 @@ image.h
 image.cc
 png.cc
 jpeg.cc
-font.h
-font.cc
+
 interface.h
 interface.cc
 window.h
 window.cc
+font.h
+font.cc
+text.h
+text.cc
 
 dbus.h
 taskbar.cc
@@ -45,3 +48,4 @@ feeds.cc
 browser.cc
 feeds.h
 desktop.cc
+x.h

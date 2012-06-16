@@ -9,8 +9,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-extern "C" int close(int fd);
-
 #include "array.cc"
 template struct array<URL>;
 
@@ -43,9 +41,7 @@ array<byte> Socket::get(uint size) {
 
 /// SSLSocket
 
-static_this() {
-      SSL_library_init();
-}
+static_this() { SSL_library_init(); }
 bool SSLSocket::connect(const string& host, const string& service, bool secure) {
     if(!Socket::connect(host,service)) return false;
     if(secure) {
@@ -133,19 +129,24 @@ string cacheFile(const URL& url) {
 }
 
 HTTP::HTTP(const URL& url, delegate<void(const URL&, array<byte>&&)> handler,
-           array<string>&& headers, string&& method, string&& content, array<string>&& redirect)
-    : url(str(url)), handler(handler), headers(move(headers)), method(move(method)), content(move(content)), redirect(move(redirect)) { request(); }
+           array<string>&& headers, string&& method, array<string>&& redirect)
+    : url(str(url)), handler(handler), headers(move(headers)), method(move(method)), redirect(move(redirect)) { request(); }
 void HTTP::request() {
     if(!url.scheme) url.scheme="http"_;
     if(!http.connect(url.host, url.scheme, url.scheme=="https"_)) { delete this; return; } //TODO: async connect
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"_; //TODO: Accept-Encoding: gzip,deflate
-    if(content) request << "Content-Length: "_+dec(content.size())+"\r\n"_;
     for(const string& header: headers) request << header+"\r\n"_;
-    http.write( request+"\r\n"_+content );
-    registerPoll({http.fd, POLLIN});
+    http.write( request+"\r\n"_ );
+    registerPoll(i({http.fd, POLLIN}));
+    log( url );
 }
 void HTTP::event(pollfd) {
-    if(!http.fd) { delete this; return; }
+    if(!http.fd) { log("!fd"); delete this; return; }
+    if(content) {
+        handler(url,move(content));
+        delete this;
+        return;
+    }
     string file = cacheFile(url);
 
     // Status
@@ -189,15 +190,14 @@ void HTTP::event(pollfd) {
             if(url.scheme==next.scheme && url.host==next.host && url.path==next.path) warn("recursive",url,next,value,(string&)http.buffer);
             else {
                 redirect << move(file);
-                new HTTP(next,handler,move(headers),move(method),move(content),move(redirect)); //TODO: reuse connection
+                new HTTP(next,handler,move(headers),move(method),move(redirect)); //TODO: reuse connection
             }
             delete this;
             return;
         } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }
 
-    // Content
-    array<byte> content;
+    // Content //TODO: async
     if(contentLength) content=http.TextStream::read(contentLength);
     else if(chunked) {
         for(;;) {
@@ -216,9 +216,6 @@ void HTTP::event(pollfd) {
         if(!exists(section(file,'/'),cache)) createFolder(section(file,'/'),cache);
         writeFile(file,content,cache,true);
     }
-
-    handler(url,move(content));
-    delete this;
 }
 
 void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, int maximumAge) {
@@ -228,7 +225,7 @@ void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, i
     // Check if cached
     if(exists(file,cache)) {
         long modified = modifiedTime(file,cache);
-        if(currentTime()-modified < maximumAge) {
+        if(currentTime()-modified < maximumAge*60) {
             debug( log("Cached",url); )
             array<byte> content = readFile(file,cache);
             assert(content,file);

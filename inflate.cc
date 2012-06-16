@@ -1,6 +1,6 @@
 // Public domain, Rich Geldreich <richgel99@gmail.com>
 #include "debug.h"
-
+#if TINFLATE
 // Decompression flags.
 enum
 {
@@ -25,7 +25,6 @@ typedef enum
 } status;
 
 // Initializes the decompressor to its initial state.
-#define init(r) do { (r)->m_state = 0; } while(0)
 #define get_adler32(r) (r)->m_check_adler32
 
 // Internal/private bits follow.
@@ -55,10 +54,8 @@ struct decompressor {
   uint8 m_raw_header[4], m_len_codes[MAX_HUFF_SYMBOLS_0 + MAX_HUFF_SYMBOLS_1 + 137];
 };
 
-#define CR_BEGIN switch(r->m_state) { case 0:
-#define CR_RETURN(state_index, result) do { status = result; r->m_state = state_index; goto common_exit; case state_index:; } while(0)
-#define CR_RETURN_FOREVER(state_index, result) do { for ( ; ; ) { CR_RETURN(state_index, result); } } while(0)
-#define CR_FINISH }
+#define CR_RETURN(state_index, result) ({ status = result; r->m_state = state_index; goto common_exit; case state_index:; })
+#define CR_RETURN_FOREVER(state_index, result) ({ for ( ; ; ) { CR_RETURN(state_index, result); } })
 
 // TODO: If the caller has indicated that there's no more input, and we attempt to read beyond the input buf, then something is wrong with the input because the inflator never
 // reads ahead more than it needs to. Currently GET_BYTE() pads the end of the stream with 0's in this scenario.
@@ -138,7 +135,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
   if (((out_buf_size_mask + 1) & out_buf_size_mask) || (pOut_buf_next < pOut_buf_start)) { *pIn_buf_size = *pOut_buf_size = 0; return STATUS_BAD_PARAM; }
 
   num_bits = r->m_num_bits; bit_buf = r->m_bit_buf; dist = r->m_dist; counter = r->m_counter; num_extra = r->m_num_extra; dist_from_out_buf_start = r->m_dist_from_out_buf_start;
-  CR_BEGIN
+  switch(r->m_state) { case 0:
 
   bit_buf = num_bits = dist = counter = num_extra = r->m_zhdr0 = r->m_zhdr1 = 0; r->m_z_adler32 = r->m_check_adler32 = 1;
   if (decomp_flags & FLAG_PARSE_ZLIB_HEADER)
@@ -203,7 +200,8 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
       for ( ; (int)r->m_type >= 0; r->m_type--)
       {
         int tree_next, tree_cur; huff_table *pTable;
-        uint i, j, used_syms, total, sym_index, next_code[17], total_syms[16]; pTable = &r->m_tables[r->m_type]; clear(total_syms); clear(pTable->m_look_up); clear(pTable->m_tree);
+        uint i, j, used_syms, total, sym_index, next_code[17], total_syms[16];
+        pTable = &r->m_tables[r->m_type]; clear(total_syms); clear(pTable->m_look_up); clear(pTable->m_tree);
         for (i = 0; i < r->m_table_sizes[r->m_type]; ++i) total_syms[pTable->m_code_size[i]]++;
         used_syms = 0, total = 0; next_code[0] = next_code[1] = 0;
         for (i = 1; i <= 15; ++i) { used_syms += total_syms[i]; next_code[i + 1] = (total = ((total + total_syms[i]) << 1)); }
@@ -366,7 +364,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
     SKIP_BITS(32, num_bits & 7); for (counter = 0; counter < 4; ++counter) { uint s; if (num_bits) GET_BITS(41, s, 8); else GET_BYTE(42, s); r->m_z_adler32 = (r->m_z_adler32 << 8) | s; }
   }
   CR_RETURN_FOREVER(34, STATUS_DONE);
-  CR_FINISH
+  }
 
 common_exit:
   r->m_num_bits = num_bits; r->m_bit_buf = bit_buf; r->m_dist = dist; r->m_counter = counter; r->m_num_extra = num_extra; r->m_dist_from_out_buf_start = dist_from_out_buf_start;
@@ -396,12 +394,12 @@ byte* decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
   byte* buffer = 0;
   size_t src_buf_ofs = 0, out_buf_capacity = 0;
   *pOut_len = 0;
-  init(&decomp);
+  decomp->m_state=0;
   for(;;) {
     size_t src_buf_size = src_buf_len - src_buf_ofs, dst_buf_size = out_buf_capacity - *pOut_len, new_out_buf_capacity;
     status status = decompress(&decomp, (const uint8*)pSrc_buf + src_buf_ofs, &src_buf_size, (uint8*)buffer, buffer ? (uint8*)buffer + *pOut_len : 0, &dst_buf_size,
       (flags & ~FLAG_HAS_MORE_INPUT) | FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
-    assert(status >= 0 && status != STATUS_NEEDS_MORE_INPUT, (int)status, decomp.m_state);
+    assert(status >= 0 && status != STATUS_NEEDS_MORE_INPUT, (int)status, decomp.m_state, pSrc_buf, src_buf_len, src_buf_ofs);
     src_buf_ofs += src_buf_size;
     *pOut_len += dst_buf_size;
     if (status == STATUS_DONE) break;
@@ -420,3 +418,20 @@ array<byte> inflate(const array<byte>& buffer, bool zlib) {
     assert(data); assert(size);
     return array<byte>(data,size);
 }
+#else
+
+#include "zlib.h"
+array<byte> inflate(const array<byte>& buffer, bool unused zlib) {
+    assert(zlib);
+    assert(buffer.data()); assert(buffer.size());
+    z_stream z; clear(z); inflateInit(&z);
+    array<byte> out(buffer.size()*16); //FIXME
+    z.next_out = (Bytef*)out.data(), z.avail_out = (uint)out.capacity();
+    z.next_in = (Bytef*)buffer.data(); z.avail_in = buffer.size();
+    inflate(&z, Z_FINISH); inflateEnd(&z);
+    out.setSize(z.total_out);
+    assert(out.data()); assert(out.size());
+    return out;
+}
+
+#endif

@@ -20,7 +20,7 @@ generic array<T>& array<T>::operator=(array<T>&& o) {
 generic void array<T>::destroy() { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data); }
 
 generic array<T>::array(uint capacity) { reserve(capacity); }
-generic array<T>::array(std::initializer_list<T>&& list) {
+generic array<T>::array(initializer_list<T>&& list) {
     reserve(list.size()); setSize(list.size());
     for(uint i=0;i<list.size();i++) new (&at(i)) T(move(((T*)list.begin())[i]));
 }
@@ -45,7 +45,7 @@ generic void array<T>::reserve(uint capacity) {
     }
 }
 
-template<class T, class O> array<T> cast(array<O>&& o) {
+/*template<class T, class O> array<T> cast(array<O>&& o) {
     array<T> r;
     assert(o.size()*sizeof(O)/sizeof(T)*sizeof(T) == o.size()*sizeof(O));
     if(o.tag<0) {
@@ -60,7 +60,7 @@ template<class T, class O> array<T> cast(array<O>&& o) {
         r.tag = o.tag*sizeof(O)/sizeof(T);
     }
     return r;
-}
+}*/
 
 generic void array<T>::shrink(uint size) {
     assert(size<array::size());
@@ -81,7 +81,7 @@ generic T array<T>::takeLast() { return take(size()-1); }
 generic T array<T>::pop() { return takeLast(); }
 
 generic void array<T>::append(T&& v) { int s=size()+1; reserve(s); new (end()) T(move(v)); setSize(s); }
-generic array<T>& array<T>::operator <<(T&& v) { int s=size()+1; reserve(s); new (end()) T(move(v)); setSize(s); return *this; }
+generic array<T>& array<T>::operator <<(T&& v) { append(move(v)); return *this; }
 generic void array<T>::append(array&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); }
 generic array<T>& array<T>::operator <<(array<T>&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); return *this; }
 
@@ -100,7 +100,7 @@ generic array slice(const array& a, uint pos, uint size) {
     return copy(array(a.data()+pos,size));
 }
 generic array slice(const array& a, uint pos) { return slice(a,pos,a.size()-pos); }
-generic array& operator <<(array& a, T const& v) { int s=a.size()+1; a.reserve(s); new (a.end()) T(v); a.setSize(s); return a; }
+generic array& operator <<(array& a, T const& v) { a.append(copy(v)); return a; }
 generic array& operator <<(array& a, const array& b) {
     int old=a.size(); a.reserve(old+b.size()); a.setSize(old+b.size());
     for(uint i=0;i<b.size();i++) new (&a.at(old+i)) T(copy(b[i]));
@@ -145,8 +145,8 @@ generic array replace(array&& a, const T& before, const T& after) {
 // Orderable?
 generic const T& min(const array& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
 generic T& max(array& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
-generic int insertSorted(array& a, T&& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; insertAt(a, i,move(v)); return i; }
-generic int insertSorted(array& a, const T& v) { uint i=0; for(;i<a.size();i++) if(v < a[i]) break; insertAt(a,i,v); return i; }
+generic int insertSorted(array& a, T&& v) { uint i=0; for(;i<a.size();i++) if(a[i] > v) break; insertAt(a, i,move(v)); return i; }
+generic int insertSorted(array& a, const T& v) { return insertSorted(a,copy(v)); }
 
 #undef generic
 #undef array

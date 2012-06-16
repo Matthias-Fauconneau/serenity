@@ -20,7 +20,7 @@ struct Application {
 int main(int argc, const char** argv) { \
     array<string> args; for(int i=1;i<argc;i++) args << strz(argv[i]); \
     App app(move(args)); \
-    while(app.running && waitEvents()) {} \
+    while(app.running && dispatchEvents(true)) {} \
     return 0; \
 }
 
@@ -30,14 +30,16 @@ struct Poll {
     void registerPoll(pollfd);
     /// Remove this to the process-wide event loop
     void unregisterPoll();
+    /// Wait for all poll events to be processed and call \a event again
+    void wait();
     virtual ~Poll() { unregisterPoll(); }
     /// Callback on new events
     virtual void event(pollfd) =0;
 };
 
-/// Wait for and dispatches events to registered Poll objects
+/// Dispatches events to registered Poll objects
 /// \return count of registered Poll objects
-int waitEvents();
+int dispatchEvents(bool wait);
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const string& path, const array<string>& args=array<string>());

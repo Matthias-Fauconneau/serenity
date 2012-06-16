@@ -58,12 +58,12 @@ bool endsWith(const array<byte>& s, const array<byte>& a) {
     return a.size()<=s.size() && string(s.data()+s.size()-a.size(),a.size())==a;
 }
 
-bool operator <(const string& a, const string& b) {
+bool operator >(const array<byte>& a, const array<byte>& b) {
     for(uint i=0;i<min(a.size(),b.size());i++) {
-        if(a[i] > b[i]) return false;
-        if(a[i] < b[i]) return true;
+        if(a[i] < b[i]) return false;
+        if(a[i] > b[i]) return true;
     }
-    return a.size() < b.size();
+    return a.size() > b.size();
 }
 
 bool CString::busy = 0; //flag for multiple strz usage in a statement

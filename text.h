@@ -1,6 +1,7 @@
 #pragma once
 #include "widget.h"
 #include "signal.h"
+#include "debug.h"
 struct Image;
 
 /// Rich text format control code encoded in 00-1F range

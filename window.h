@@ -3,26 +3,10 @@
 #include "signal.h"
 #include "image.h"
 #include "map.h"
+#include "x.h"
 struct Widget;
-struct Display;
-struct Visual;
-typedef ulong XID;
-typedef ulong KeySym;
-#if __WORDSIZE == 64
-typedef ulong Atom;
-#else //ulong==uint but require extra useless array<ulong> instance
-typedef uint Atom;
-#endif
-typedef void* GC;
-struct XImage;
-struct XEvent;
-struct XShmSegmentInfo {
-    size_t shmseg;
-    int shmid;
-    char *shmaddr;
-    int readOnly;
-};
 
+extern "C" Atom XInternAtom(Display*, const char*, bool);
 #define Atom(name) XInternAtom(Window::x, #name, 1)
 
 /// Window embeds \a widget in an X11 window, displaying it and forwarding user input
@@ -32,10 +16,11 @@ struct Window : Poll {
     /// \note Windows are initially hidden, use \a show to display windows.
     /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show
     Window(Widget* widget, const string &name=string(), const Image &icon=Image(), int2 size=int2(-1,-1));
+    ~Window();
     /// Create the window
     void create();
     /// Process any incoming events
-    void processEvents();
+    static void processEvents();
     /// Recursively \a update the whole widget hierarchy and render
     void update();
     /// Repaint window contents. Also automatically called when any event is accepted by a widget

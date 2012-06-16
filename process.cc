@@ -6,11 +6,14 @@ static array<Poll*> polls;
 Array_Copy(pollfd)
 static array<pollfd> pollfds;
 void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
-void Poll::unregisterPoll() { pollfds.removeAt(removeOne(polls, this)); }
+void Poll::unregisterPoll() { int i=removeOne(polls, this); if(i>=0) pollfds.removeAt(i); }
+static array<Poll*> queue;
+void Poll::wait() { queue << this; }
 
-int waitEvents() {
+
+int dispatchEvents(bool wait) {
     if(!polls.size()) return 0;
-    ::poll((pollfd*)pollfds.data(),polls.size(),-1);
+    ::poll((pollfd*)pollfds.data(),polls.size(),wait?-1:0);
     for(uint i=0;i<polls.size();i++) {
         int events = pollfds[i].revents;
         if(events) {
@@ -19,6 +22,7 @@ int waitEvents() {
             polls[i]->event(pollfds[i]);
         }
     }
+    for(Poll* p: queue) p->event(i({}));
     return polls.size();
 }
 

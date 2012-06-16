@@ -1,5 +1,5 @@
 #include "input.h"
-#include "poll.h"
+#include "vector.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <linux/input.h>
@@ -7,7 +7,7 @@
 Input::Input(const char* path) {
     fd = open(path, O_RDONLY|O_NONBLOCK);
     assert(fd>0);
-    registerPoll({fd, POLLIN});
+    registerPoll(i({fd, POLLIN}));
 }
 
 Input::~Input() { close(fd); }

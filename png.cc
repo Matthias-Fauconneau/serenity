@@ -2,6 +2,11 @@
 #include "stream.h"
 #include "inflate.h"
 
+template<class T> struct rgba { T r,g,b,a; operator byte4()const{return byte4{b,g,r,a};} };
+template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r,255};} };
+template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a};}};
+template<class T> struct luma { T i; operator byte4()const{return byte4{i,i,i,255};}};
+
 #include "vector.cc"
 uvector(rgba,uint8,4)
 vector(rgba,int,4)
@@ -11,11 +16,7 @@ uvector(ia,uint8,2)
 vector(ia,int,2)
 uvector(luma,uint8,1)
 vector(luma,int,1)
-
-template<class T> struct rgba { T r,g,b,a; operator byte4()const{return byte4{b,g,r,a};} };
-template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r,255};} };
-template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a};}};
-template<class T> struct luma { T i; operator byte4()const{return byte4{i,i,i,255};}};
+typedef vector<rgb,uint8,3> rgb3;
 
 template<template<typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
     typedef vector<T,uint8,N> S;

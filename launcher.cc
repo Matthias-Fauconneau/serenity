@@ -36,7 +36,7 @@ map<string,string> readSettings(const string& path) {
         if(s.matchAny("[#"_)) s.until("\n"_);
         else {
             string key = s.until("="_), value=s.until("\n"_);
-            entries.insert(move(key),move(value));
+            entries.insertMulti(move(key),move(value));
         }
         s.whileAny("\n"_);
     }
@@ -53,13 +53,10 @@ List<Command> readShortcuts() {
             string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
             if(exists(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
         }
-        auto execPaths = {""_, "/usr/bin/"_,"/usr/local/bin/"_};
-        string path; array<string> arguments;
-        for(const string& folder: execPaths) {
-            string p = folder+section(entries["Exec"_],' ');
-            if(exists(p)) { path=move(p); arguments=slice(split(entries["Exec"_],' '),1); break; }
-        }
-        if(!path) { warn("Executable not found for",section(entries["Exec"_],' ')); continue; }
+        string path = section(entries["Exec"_],' ');
+        if(!exists(path)) path="/usr/bin/"_+path;
+        if(!exists(path)) { warn("Executable not found",path); continue; }
+        array<string> arguments = slice(split(entries["Exec"_],' '),1);
         for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
         for(uint i=0;i<arguments.size();) if(contains(arguments[i],'%')) arguments.removeAt(i); else i++;
         shortcuts << Command(move(icon),move(entries["Name"_]),move(path),move(arguments));
@@ -67,7 +64,7 @@ List<Command> readShortcuts() {
     return shortcuts;
 }
 
-Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({ &search, &shortcuts })), window(&menu,""_,Image(),int2(-3,-3)) {
+Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({&search, &shortcuts})), window(&menu,""_,Image(),int2(-3,-3)) {
     window.setType(Atom(NET_WM_WINDOW_TYPE_DROPDOWN_MENU));
     window.setOverrideRedirect(true);
     window.localShortcut("Leave"_).connect(&window,&Window::hide);

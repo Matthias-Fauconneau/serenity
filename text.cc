@@ -6,7 +6,7 @@
 #include "array.cc"
 template struct array<Text>;
 template struct array<Text::Blit>;
-Array_Copy(Text::Line)
+Array(Text::Line)
 template struct array<Text::Link>;
 
 struct TextLayout {
@@ -37,10 +37,7 @@ struct TextLayout {
         pen.x=0;
         for(const Word& word: line) {
             assert(word);
-            for(Character c: word) {
-                c.pos += pen;
-                text << c;
-            }
+            for(const Character& c: word) text << Character{c.code,pen+c.pos,c.glyph};
             pen.x += word.last().pos.x+word.last().glyph.advance.x+space;
         }
         line.clear();
@@ -105,7 +102,7 @@ struct TextLayout {
     }
 };
 
-Array_Copy(TextLayout::Character)
+Array(TextLayout::Character)
 Array(TextLayout::Word)
 Array(TextLayout::Line)
 
@@ -125,9 +122,9 @@ void Text::update(int wrap) {
         for(int i=l.begin;i<l.end;i++) {
             const auto& c = layout.text[i];
             int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
-            if(p.y!=line.min.y) lines<<line, line.min=p; else line.max=p+int2(c.glyph.advance.x,0);
+            if(p.y!=line.min.y) lines<<move(line), line.min=p; else line.max=p+int2(c.glyph.advance.x,0);
         }
-        if(line.max!=line.min) lines<<line;
+        if(line.max!=line.min) lines<<move(line);
     }
     links = move(layout.links);
     textSize = layout.textSize();

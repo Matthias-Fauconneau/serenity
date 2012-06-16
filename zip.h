@@ -10,4 +10,4 @@ struct ZipFile {
     operator array<byte>() { return compressed ? inflate(data, false) : copy(data); }
 };
 
-map< string, ZipFile> readZip(DataBuffer);
+map<string, ZipFile> readZip(DataBuffer);

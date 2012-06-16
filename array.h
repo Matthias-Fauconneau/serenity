@@ -1,6 +1,19 @@
 #pragma once
 #include "core.h"
-#include <initializer_list>
+
+namespace std {
+template<class E> class initializer_list {
+    E* _M_array;
+    size_t _M_len;
+    constexpr initializer_list(const E* a, size_t l) : _M_array(a), _M_len(l) { }
+public:
+    constexpr initializer_list() noexcept : _M_array(0), _M_len(0) { }
+    constexpr size_t size() const noexcept { return _M_len; }
+    constexpr const E* begin() const noexcept { return _M_array; }
+    constexpr const E* end() const noexcept { return begin() + size(); }
+};
+}
+using std::initializer_list;
 
 inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
 
@@ -40,7 +53,7 @@ template<class T> struct array {
     /// Allocates a new uninitialized array for \a capacity elements
     explicit array(uint capacity);
     /// Copy elements from an initializer \a list
-    array(std::initializer_list<T>&& list);
+    array(initializer_list<T>&& list);
 
 //referencing constructors
     /// References \a size elements from read-only \a data pointer

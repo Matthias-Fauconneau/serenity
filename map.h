@@ -2,6 +2,7 @@
 #include "array.h"
 #include "string.h"
 #include "debug.h"
+#include "meta.h" //perfect forwarding
 
 template<class K, class V> struct const_pair { const K& key; const V& value; };
 template<class K, class V> struct pair { K& key; V& value; };
@@ -68,15 +69,5 @@ template<class K, class V> inline map<K,V> copy(const map<K,V>& o) {
 template<class K, class V> inline string str(const map<K,V>& m) {
     string s="{"_;
     for(int i=0;i<m.size();i++) { s<<str(m.keys[i])+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
-    return s+"}"_;
-}
-template<class V> inline string str(const map<string,V>& m) {
-    string s="{"_;
-    for(int i=0;i<m.size();i++) { s<<m.keys[i]+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
-    return s+"}"_;
-}
-template<> inline string str(const map<string,string>& m) {
-    string s="{"_;
-    for(uint i=0;i<m.size();i++) { s<<m.keys[i]+": "_+m.values[i]; if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }

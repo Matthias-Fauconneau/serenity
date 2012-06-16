@@ -1,3 +1,4 @@
+Makefile
 core.h
 core.cc
 debug.h
@@ -10,14 +11,17 @@ string.cc
 process.h
 process.cc
 signal.h
-
 file.h
 file.cc
+http.h
+http.cc
 stream.h
 stream.cc
 xml.h
 xml.cc
-
+image.h
+image.cc
+png.cc
 font.h
 font.cc
 raster.cc
@@ -26,5 +30,7 @@ interface.h
 interface.cc
 window.h
 window.cc
-
-epub.cc
+html.h
+html.cc
+feeds.cc
+desktop.cc

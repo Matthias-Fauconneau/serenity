@@ -1,4 +1,6 @@
 #include "file.h"
+#include "debug.h"
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -62,7 +64,8 @@ Map::~Map() { munmap((void*)data,size); }
 void writeFile(const string& path, const array<byte>& content, int at, bool overwrite) {
     int fd = createFile(path,at,overwrite);
     if(fd < 0) { warn("Creation failed",path,fd,at); return; }
-    write(fd,content);
+    uint unused wrote = write(fd,content.data(),(size_t)content.size());
+    assert(wrote==content.size());
     close(fd);
 }
 

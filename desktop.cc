@@ -4,6 +4,7 @@
 #include "launcher.h"
 #include "calendar.h"
 #include "feeds.h"
+#include "popup.h"
 
 template struct Array<Command>;
 template struct ListSelection<Command>;

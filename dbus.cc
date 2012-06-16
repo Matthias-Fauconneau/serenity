@@ -14,6 +14,13 @@ void align(array<byte>& a, int width) { int s=a.size(), n=align(width, s); if(n>
 /// Align the stream position to the next \a width
 void align(Buffer& s, int width) { s.index=align(width, s.index); }
 
+template<class T> T read(int fd) {
+    T t;
+    int unused size = read(fd,(byte*)&t,sizeof(T));
+    assert(size==sizeof(T),size,sizeof(T));
+    return t;
+}
+
 /// Definitions
 
 enum Message { InvalidType, MethodCall, MethodReturn, Error, Signal };
@@ -46,7 +53,7 @@ template<class T> void read(DataBuffer& s, array<T>& output) {
 void read(DataBuffer& s, string& output) { align(s, 4); output = copy(s.readArray()); s.advance(1);/*0*/ }
 void read(DataBuffer&) {}
 void read(DataBuffer& s, DBusIcon& output) { align(s, 8); output.width=s.read(); output.height=s.read(); output.data=copy(s.readArray()); }
-template<class Arg, class... Args> void read(DataBuffer& s, Arg& arg, Args&... args) { read(s,arg); read(s, args i(...)); }
+template<class Arg, class... Args> void read(DataBuffer& s, Arg& arg, Args&... args) { read(s,arg); read(s, args ___); }
 
 template<class... Outputs> void DBus::read(uint32 serial, Outputs&... outputs) {
     if(!fd) { warn("Not connected to D-BUS"); return; }
@@ -73,7 +80,7 @@ template<class... Outputs> void DBus::read(uint32 serial, Outputs&... outputs) {
         if(header.length) {
             if(header.message == MethodReturn) {
                 if(replySerial==serial) {
-                    ::read(s, outputs i(...));
+                    ::read(s, outputs ___);
                     return;
                 }
             } else if(header.message == Signal) {
@@ -108,7 +115,7 @@ template<>void sign< variant<int> >(string& s) { s<<"v"_; }
 
 //  D-Bus arguments serializer
 template<class A> void write(array<byte>&, const A&) { static_assert(sizeof(A) & 0,"No serializer defined for type"); }
-template<class Arg, class... Args> void write(array<byte>& s, const Arg& arg, const Args&... args) { write(s,arg); write(s, args i(...)); }
+template<class Arg, class... Args> void write(array<byte>& s, const Arg& arg, const Args&... args) { write(s,arg); write(s, args ___); }
 void write(array<byte>&) {}
 
 void write(array<byte>& s, const string& input) { align(s, 4); s << raw(input.size()) << input << 0; }
@@ -149,7 +156,7 @@ template<class... Args> uint32 DBus::write(int type, int32 replySerial, const st
     // Body
     align(out, 8);
     int bodyStart = out.size();
-    ::write(out, args i(...));
+    ::write(out, args ___);
     *(uint32*)(&out.at(offsetof(Header,length))) = out.size()-bodyStart;
     //dump(out);
     ::write(fd,out);
@@ -166,7 +173,7 @@ template<class T> DBus::Reply::operator T() {
 }
 /*template<class... Args>DBus:: Reply DBus::Object::operator ()(const string& method, const Args&... args) { //FIXME: find out how to explicitly instantiate
     string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
-    return Reply(d,d->write(MethodCall,-1,target,object,interface,member,args i(...)));
+    return Reply(d,d->write(MethodCall,-1,target,object,interface,member,args ___));
 }*/
 DBus:: Reply DBus::Object::operator ()(const string& method) {
     string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
@@ -251,7 +258,7 @@ DBus::DBus() {
      sockaddr_un addr; clear(addr);
      addr.sun_family = AF_UNIX;
      string path = section(section(strz(getenv("DBUS_SESSION_BUS_ADDRESS")),'=',1,2),',');
-     addr.sun_path[0]=0; copy(addr.sun_path+1,path.data(),path.size());
+     addr.sun_path[0]=0; copy((byte*)addr.sun_path+1,path.data(),path.size());
      if(::connect(fd,(sockaddr*)&addr,3+path.size())) { fd=0; warn("Couldn't connect to D-Bus"); return; }
      ::write(fd,"\0AUTH EXTERNAL 30\r\n"_); ::read(fd,37);/*OK*/ ::write(fd,"BEGIN \r\n"_);
      name = Object(this,"org.freedesktop.DBus"_,"/org/freedesktop/DBus"_)("org.freedesktop.DBus.Hello"_);
