@@ -45,8 +45,8 @@ map<string,string> readSettings(const string& path) {
 
 List<Command> readShortcuts() {
     List<Command> shortcuts;
-    if(!exists(".config/launcher"_,home())) { warn("No launcher settings [.config/launcher]"); return shortcuts; }
-    for(const string& desktop: split(readFile(".config/launcher"_,home()),'\n')) {
+    if(!exists("launcher"_,config)) { warn("No launcher settings [config/launcher]"); return shortcuts; }
+    for(const string& desktop: split(readFile("launcher"_,config),'\n')) {
         auto entries = readSettings(desktop);
         Image icon;
         for(const string& folder: iconPaths) {

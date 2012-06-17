@@ -1,7 +1,5 @@
 debug
-fast
 release
-trace
-memory
+profile
 *.creator*
 serenity.files

@@ -1,6 +1,7 @@
 #include "image.h"
 #include "stream.h"
 #include "inflate.h"
+#include "memory.h"
 
 template<class T> struct rgba { T r,g,b,a; operator byte4()const{return byte4{b,g,r,a};} };
 template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r,255};} };

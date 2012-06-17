@@ -22,7 +22,7 @@ template<typename T> struct is_integral :
 template<bool, typename T = void> struct enable_if {};
 template<typename T> struct enable_if<true, T> { typedef T type; };
 
-template<typename Signature> class function;
+template<typename Signature> struct function;
 
 class _Undefined_class;
 union _Nocopy_types
@@ -58,202 +58,6 @@ enum _Manager_operation
   __clone_functor,
   __destroy_functor
 };
-/*
-template<bool _Unary, bool _Binary, typename _Tp>
-  struct _Reference_wrapper_base_impl;
-
-// None of the nested argument types.
-template<typename _Tp>
-  struct _Reference_wrapper_base_impl<false, false, _Tp>
-  : _Weak_result_type<_Tp>
-  { };
-
-// Nested argument_type only.
-template<typename _Tp>
-  struct _Reference_wrapper_base_impl<true, false, _Tp>
-  : _Weak_result_type<_Tp>
-  {
-    typedef typename _Tp::argument_type argument_type;
-  };
-
-// Nested first_argument_type and second_argument_type only.
-template<typename _Tp>
-  struct _Reference_wrapper_base_impl<false, true, _Tp>
-  : _Weak_result_type<_Tp>
-  {
-    typedef typename _Tp::first_argument_type first_argument_type;
-    typedef typename _Tp::second_argument_type second_argument_type;
-  };
-
-// All the nested argument types.
- template<typename _Tp>
-  struct _Reference_wrapper_base_impl<true, true, _Tp>
-  : _Weak_result_type<_Tp>
-  {
-    typedef typename _Tp::argument_type argument_type;
-    typedef typename _Tp::first_argument_type first_argument_type;
-    typedef typename _Tp::second_argument_type second_argument_type;
-  };
-
-_GLIBCXX_HAS_NESTED_TYPE(argument_type)
-_GLIBCXX_HAS_NESTED_TYPE(first_argument_type)
-_GLIBCXX_HAS_NESTED_TYPE(second_argument_type)
-
-template<typename _Tp>
-  struct _Reference_wrapper_base
-  : _Reference_wrapper_base_impl<
-    __has_argument_type<_Tp>::value,
-    __has_first_argument_type<_Tp>::value
-    && __has_second_argument_type<_Tp>::value,
-    _Tp>
-  { };
-
-// - a function type (unary)
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R(_T1)>
-  : unary_function<_T1, R>
-  { };
-
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R(_T1) const>
-  : unary_function<_T1, R>
-  { };
-
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R(_T1) volatile>
-  : unary_function<_T1, R>
-  { };
-
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R(_T1) const volatile>
-  : unary_function<_T1, R>
-  { };
-
-// - a function type (binary)
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R(_T1, _T2)>
-  : binary_function<_T1, _T2, R>
-  { };
-
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R(_T1, _T2) const>
-  : binary_function<_T1, _T2, R>
-  { };
-
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R(_T1, _T2) volatile>
-  : binary_function<_T1, _T2, R>
-  { };
-
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R(_T1, _T2) const volatile>
-  : binary_function<_T1, _T2, R>
-  { };
-
-// - a function pointer type (unary)
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R(*)(_T1)>
-  : unary_function<_T1, R>
-  { };
-
-// - a function pointer type (binary)
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R(*)(_T1, _T2)>
-  : binary_function<_T1, _T2, R>
-  { };
-
-// - a pointer to member function type (unary, no qualifiers)
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R (_T1::*)()>
-  : unary_function<_T1*, R>
-  { };
-
-// - a pointer to member function type (binary, no qualifiers)
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R (_T1::*)(_T2)>
-  : binary_function<_T1*, _T2, R>
-  { };
-
-// - a pointer to member function type (unary, const)
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R (_T1::*)() const>
-  : unary_function<const _T1*, R>
-  { };
-
-// - a pointer to member function type (binary, const)
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R (_T1::*)(_T2) const>
-  : binary_function<const _T1*, _T2, R>
-  { };
-
-// - a pointer to member function type (unary, volatile)
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R (_T1::*)() volatile>
-  : unary_function<volatile _T1*, R>
-  { };
-
-// - a pointer to member function type (binary, volatile)
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R (_T1::*)(_T2) volatile>
-  : binary_function<volatile _T1*, _T2, R>
-  { };
-
-// - a pointer to member function type (unary, const volatile)
-template<typename R, typename _T1>
-  struct _Reference_wrapper_base<R (_T1::*)() const volatile>
-  : unary_function<const volatile _T1*, R>
-  { };
-
-// - a pointer to member function type (binary, const volatile)
-template<typename R, typename _T1, typename _T2>
-  struct _Reference_wrapper_base<R (_T1::*)(_T2) const volatile>
-  : binary_function<const volatile _T1*, _T2, R>
-  { };
-
-
-template<typename _Tp>
-  class reference_wrapper
-  : public _Reference_wrapper_base<typename remove_cv<_Tp>::type>
-  {
-    _Tp* _M_data;
-
-  public:
-    typedef _Tp type;
-
-    reference_wrapper(_Tp& __indata) noexcept
-    : _M_data(std::addressof(__indata))
-    { }
-
-    reference_wrapper(_Tp&&) = delete;
-
-    reference_wrapper(const reference_wrapper<_Tp>& __inref) noexcept
-    : _M_data(__inref._M_data)
-    { }
-
-    reference_wrapper&
-    operator=(const reference_wrapper<_Tp>& __inref) noexcept
-    {
-  _M_data = __inref._M_data;
-  return *this;
-    }
-
-    operator _Tp&() const noexcept
-    { return this->get(); }
-
-    _Tp&
-    get() const noexcept
-    { return *_M_data; }
-
-    template<typename... _Args>
-  typename result_of<_Tp&(_Args&&...)>::type
-  operator()(_Args&&... __args) const
-  {
-    return __invoke(get(), std::forward<_Args>(__args)...);
-  }
-  };
-
-*/
-
 // Simple type wrapper that helps avoid annoying const problems
 // when casting between void pointers and pointers-to-pointers.
 template<typename _Tp>
@@ -413,13 +217,6 @@ public:
       }
     return false;
   }
-
-  /*static void
-  _M_init_functor(Any_data& __functor, reference_wrapper<Functor> __f)
-  {
-    // TBD: Use address_of function instead.
-    _Base::_M_init_functor(__functor, &__f.get());
-  }*/
     };
 
   Function_base() : _M_manager(0) { }
@@ -472,37 +269,6 @@ template<typename Functor, typename... Args>
       forward<Args>(__args)...);
     }
   };
-/*
-template<typename R, typename Functor, typename... Args>
-  class _Function_handler<R(Args...), reference_wrapper<Functor> >
-  : public Function_base::_Ref_manager<Functor>
-  {
-    typedef Function_base::_Ref_manager<Functor> _Base;
-
-   public:
-    static R
-    _M_invoke(const Any_data& __functor, Args... __args)
-    {
-  return __callable_functor(**_Base::_M_get_pointer(__functor))(
-        forward<Args>(__args)...);
-    }
-  };
-
-template<typename Functor, typename... Args>
-  class _Function_handler<void(Args...), reference_wrapper<Functor> >
-  : public Function_base::_Ref_manager<Functor>
-  {
-    typedef Function_base::_Ref_manager<Functor> _Base;
-
-   public:
-    static void
-    _M_invoke(const Any_data& __functor, Args... __args)
-    {
-  __callable_functor(**_Base::_M_get_pointer(__functor))(
-      forward<Args>(__args)...);
-    }
-  };
-*/
 template<typename _Class, typename _Member, typename R,
      typename... Args>
   class _Function_handler<R(Args...), _Member _Class::*>
@@ -555,7 +321,8 @@ template<typename _Class, typename _Member, typename... Args>
     }
   };
 
-template<typename R, typename... Args> class function<R(Args...)> : private Function_base {
+template<typename R, typename... Args> struct function<R(Args...)> : private Function_base {
+private:
     typedef R _Signature_type(Args...);
 
     struct _Useless { };
@@ -773,6 +540,6 @@ template<typename R, typename... Args>
   function<R(Args...)>::
   operator()(Args... __args) const
   {
-    if (_M_empty()) __builtin_abort();
+    if (_M_empty()) { log("function"); exit(-1); }
     return _M_invoker(_M_functor, forward<Args>(__args)...);
   }

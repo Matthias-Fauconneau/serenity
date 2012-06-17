@@ -2,6 +2,9 @@ Makefile
 core.h
 core.cc
 debug.h
+debug.cc
+memory.h
+memory.cc
 array.h
 array.cc
 vector.h
@@ -21,7 +24,9 @@ xml.h
 xml.cc
 image.h
 image.cc
+inflate.cc
 png.cc
+jpeg.cc
 font.h
 font.cc
 raster.cc

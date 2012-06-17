@@ -9,11 +9,13 @@ template struct ListSelection<Text>;
 template struct HList<Text>;
 template struct Grid<Text>;
 
+static int config = openFolder("config");
+
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query) {
     array<string> events;
-    if(!exists(".config/events"_,home())) { warn("No events settings [.config/events]"); return events; }
-    TextBuffer s(readFile(".config/events"_,home()));
+    if(!exists("events"_,config)) { warn("No events settings [config/events]"); return events; }
+    TextBuffer s(readFile("events"_,config));
 
     map<string, array<Date> > exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)

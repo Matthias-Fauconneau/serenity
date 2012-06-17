@@ -2,6 +2,22 @@
 #include "stream.h"
 
 #include "array.cc"
+template<class T, class O> array<T> cast(array<O>&& o) {
+    array<T> r;
+    assert(o.size()*sizeof(O)/sizeof(T)*sizeof(T) == o.size()*sizeof(O));
+    if(o.tag<0) {
+        r.tag=o.tag;
+        r.buffer.data=(const T*)o.buffer.data;
+        r.buffer.size = o.buffer.size*sizeof(O)/sizeof(T);
+        r.buffer.capacity = o.buffer.capacity*sizeof(O)/sizeof(T);
+        o.tag = 0;
+    } else {
+        assert(r.inline_capacity()>=o.inline_capacity());
+        copy((byte*)r.data(), (byte*)o.data(), o.size()*sizeof(O));
+        r.tag = o.tag*sizeof(O)/sizeof(T);
+    }
+    return r;
+}
 template array<byte4> cast(array<byte>&& array);
 
 struct Directory { uint16 reserved, type, count; };

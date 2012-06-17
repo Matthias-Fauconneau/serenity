@@ -1,5 +1,6 @@
+X -> fb, freetype -> font.cc
 update desktop, taskbar, player 
-EPub viewer: unzip, parse, display, linux framebuffer
+EPub viewer: fix unzip, parse, display, linux framebuffer
 Text Editor, File Manager
 IMAP, Wiki, PDF, Search
 System: Onscreen Keyboard | Handwriting Recognition

@@ -1,5 +1,14 @@
 #include "array.h"
 #include "debug.h"
+#include "memory.h"
+
+#if __WORDSIZE == 64
+typedef unsigned long size_t;
+#else
+typedef unsigned int size_t;
+#endif
+
+inline void* operator new(size_t, void* p) { return p; } //placement new
 
 #define generic template<class T>
 generic void array<T>::setSize(uint size) { assert(size<=capacity()); if(tag>=0) tag=size; else buffer.size=size;}
@@ -17,7 +26,7 @@ generic array<T>& array<T>::operator=(array<T>&& o) {
     return *this;
 }
 
-generic void array<T>::destroy() { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data); }
+generic void array<T>::destroy() { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); }
 
 generic array<T>::array(uint capacity) { reserve(capacity); }
 generic array<T>::array(initializer_list<T>&& list) {
@@ -44,23 +53,6 @@ generic void array<T>::reserve(uint capacity) {
         buffer.capacity=capacity;
     }
 }
-
-/*template<class T, class O> array<T> cast(array<O>&& o) {
-    array<T> r;
-    assert(o.size()*sizeof(O)/sizeof(T)*sizeof(T) == o.size()*sizeof(O));
-    if(o.tag<0) {
-        r.tag=o.tag;
-        r.buffer.data=(const T*)o.buffer.data;
-        r.buffer.size = o.buffer.size*sizeof(O)/sizeof(T);
-        r.buffer.capacity = o.buffer.capacity*sizeof(O)/sizeof(T);
-        o.tag = 0;
-    } else {
-        assert(r.inline_capacity()>=o.inline_capacity());
-        copy((byte*)r.data(), (byte*)o.data(), o.size()*sizeof(O));
-        r.tag = o.tag*sizeof(O)/sizeof(T);
-    }
-    return r;
-}*/
 
 generic void array<T>::shrink(uint size) {
     assert(size<array::size());

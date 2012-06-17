@@ -78,8 +78,8 @@ template<class T> struct array {
 
     /// Accessors
     /// \note array.buffer[i] can be used to avoid inline and bound checking.
-    const T& at(uint i) const { debug(if(i>=size())logTrace(),__builtin_abort();) return data()[i]; }
-    T& at(uint i) { debug(if(i>=size())logTrace(),__builtin_abort();) return (T&)data()[i]; }
+    const T& at(uint i) const { assert_(i<size()); return data()[i]; }
+    T& at(uint i) { assert_(i<size()); return (T&)data()[i]; }
     const T& operator [](uint i) const { return at(i); }
     T& operator [](uint i) { return at(i); }
     const T& first() const { return at(0); }

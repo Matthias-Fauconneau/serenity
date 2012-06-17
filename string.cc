@@ -74,7 +74,7 @@ CString strz(const string& s) {
     //optimization to avoid allocation, dangling after ~CString (on statement end) until any reuse
     if(!CString::busy) { CString::busy=1; static char buffer[256]; cstr.tag=1; cstr.data=buffer; }
     //temporary allocation, dangling after ~CString (on statement end) until any malloc
-    else { cstr.tag=2; cstr.data=allocate<char>(s.size()+1); }
+    else error("heap strz"); //{ cstr.tag=2; cstr.data=allocate<char>(s.size()+1); }
     copy(cstr.data,(char*)s.data(),s.size()); cstr.data[s.size()]=0;
     return cstr;
 }
@@ -182,7 +182,7 @@ string utf8(uint c) {
 
 /// Human-readable value representation
 
-string utoa(uint n, int base, int pad) {
+template<int base> string utoa(uint n, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     byte buf[32]; int i=32;
     do {
@@ -192,11 +192,12 @@ string utoa(uint n, int base, int pad) {
     while(32-i<pad) buf[--i] = '0';
     return copy(string(buf+i,32-i));
 }
+template string utoa<16>(uint,int);
 
-string itoa(int number, int base, int pad) {
+template<int base> string itoa(int number, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     byte buf[32]; int i=32;
-    uint64 n=abs(number);
+    uint n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
@@ -205,14 +206,15 @@ string itoa(int number, int base, int pad) {
     if(number<0) buf[--i]='-';
     return copy(string(buf+i,32-i));
 }
+template string itoa<10>(int,int);
 
-string ftoa(float n, int precision, int base) {
+/*string ftoa(float n, int precision, int base) {
     if(__builtin_isnan(n)) return "NaN"_;
     if(n==__builtin_inff()) return "∞"_;
     if(n==-__builtin_inff()) return "-∞"_;
     int m=1; for(int i=0;i<precision;i++) m*=base;
-    return (n>=0?""_:"-"_)+utoa(abs(n),base)+"."_+utoa(int(m*abs(n))%m,base,precision);
-}
+    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint(m*abs(n))%m,precision);
+}*/
 
 bool isInteger(const string& s) { if(!s) return false; for(auto c: s) if(c<'0'||c>'9') return false; return true; }
 

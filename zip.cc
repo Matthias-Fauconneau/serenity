@@ -63,17 +63,18 @@ struct DirectoryEnd {
 map<string, ZipFile > readZip(DataBuffer s) {
     map<string, ZipFile > files;
     s.seekLast(raw(DirectoryEnd().signature));
-    DirectoryEnd directory = s.read();
+    const DirectoryEnd& directory = s.read();
+    int offset = directory.offset;
     for(int i=0;i<directory.nofEntries;i++) {
-        s.seek(directory.offset);
-        FileHeader header = s.read();
+        s.seek(offset);
+        const FileHeader& header = s.read();
         string name = s.read(header.nameLength);
         s.advance(header.extraLength);
         s.advance(header.commentLength);
-        directory.offset = s.index;
+        offset = s.index;
         if(!endsWith(name,"/"_)) {
             s.seek(header.offset);
-            LocalHeader local = s.read();
+            const LocalHeader& local = s.read();
             s.advance(local.nameLength);
             s.advance(local.extraLength);
             files.insert(move(name), ZipFile(s.read(header.compressedSize), header.compression==8));

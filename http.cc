@@ -120,7 +120,7 @@ string str(const URL& url) {
 
 /// HTTP
 
-int cache=openFolder(".cache"_,home());
+int cache=openFolder("cache"_);
 string cacheFile(const URL& url) {
     string name = replace(url.path,"/"_,"."_);
     if(!name || name=="."_) name="index.htm"_;

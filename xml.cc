@@ -51,8 +51,8 @@ Element::Element(TextBuffer& s, bool html) {
         s.skip();
     }
     if(html) {
-        static array<string> voidElements
-                = {"area"_,"base"_,"br"_,"col"_,"command"_,"embed"_,"hr"_,"img"_,"input"_,"keygen"_,"link"_,"meta"_,"param"_,"source"_,"track"_,"wbr"_};
+        static array<string> voidElements =
+                split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
         if(contains(voidElements,name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
@@ -77,7 +77,6 @@ Element::Element(TextBuffer& s, bool html) {
             if(content) children << Element(move(content));
         }
     }
-    //if(!s.match(string(name+">"_))) { /*log((string)slice(s.buffer,start,s.index-start),s.index);*/ log("Expecting", name,"got",s.until(">"_)); }
 }
 
 string Element::at(const string& attribute) const {

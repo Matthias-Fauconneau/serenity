@@ -1,6 +1,6 @@
 #include "process.h"
-#include "interface.h"
 #include "window.h"
+#include "interface.h"
 #include "launcher.h"
 #include "calendar.h"
 #include "feeds.h"

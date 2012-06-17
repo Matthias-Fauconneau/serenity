@@ -66,10 +66,10 @@ struct CString {
     no_copy(CString)
     static bool busy;
     char* data;
-    int tag; //0=inline, 1=static, 2=heap
+    int tag; //0=inline, 1=static
     CString(){}
     CString(CString&& o):data(o.data),tag(o.tag) {o.tag=0;}
-    ~CString() { if(tag==1) busy=0; if(tag==2) free(data); }
+    ~CString() { if(tag==1) busy=0; }
     operator const char*() { return data; }
 };
 /// Returns a null-terminated string
@@ -103,12 +103,12 @@ string simplify(const array<byte>& s);
 string utf8(uint code);
 
 /// Converts a machine integer to its human-readable representation
-string utoa(uint number, int base=10, int pad=0);
-string itoa(int number, int base=10, int pad=0);
-inline string bin(int n, int pad=0) { return itoa(n,2,pad); }
-inline string oct(int n, int pad=0) { return itoa(n,8,pad); }
-inline string dec(int n, int pad=0) { return itoa(n,10,pad); }
-inline string hex(int n, int pad=0) { return itoa(n,16,pad); }
+template<int base=10> string utoa(uint number, int pad=0);
+template<int base=10> string itoa(int number, int pad=0);
+inline string bin(int n, int pad=0) { return itoa<2>(n,pad); }
+inline string oct(int n, int pad=0) { return itoa<8>(n,pad); }
+inline string dec(int n, int pad=0) { return itoa<10>(n,pad); }
+inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
 
 /// Converts a floating point number to its human-readable representation
 string ftoa(float number, int precision, int base=10);
@@ -132,11 +132,13 @@ inline string str(const uint16& n) { return dec(n); }
 inline string str(const int16& n) { return dec(n); }
 inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
+inline string str(const ulong& n) { return dec(n); }
+inline string str(const long& n) { return dec(n); }
 inline string str(const float& n) { return ftoa(n,2); }
 inline const string& str(const string& s) { return s; }
 template<class A> inline string str(const cat<A>& s) { return s; }
-template<class A> inline string str(A* const& p) { return p?utoa(uint(p),16):"null"_; }
-template<class T> inline string str(const array<T>& list) { array<string> r; for(const T& e: list) r << str(e); return str(r); }
+template<class A> inline string str(A* const& p) { return p?utoa<16>(uint(p)):"null"_; }
+template<class T> inline string str(const array<T>& list) { string r; for(const T& e: list) r << str(e); return r; }
 
 /// Concatenates string representation of its arguments
 /// \note directly use operator+ to avoid spaces

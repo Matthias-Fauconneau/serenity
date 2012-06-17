@@ -1,9 +1,6 @@
 // Public domain, Rich Geldreich <richgel99@gmail.com>
 #include "image.h"
-#include <stdlib.h>
-#include <assert.h>
-#include <setjmp.h>
-#include <string.h>
+#include "memory.h"
 
 // Success/failure error codes.
 enum jpgd_status
@@ -15,7 +12,7 @@ enum jpgd_status
     JPGD_BAD_SOS_COMP_ID, JPGD_W_EXTRA_BYTES_BEFORE_MARKER, JPGD_NO_ARITHMITIC_SUPPORT, JPGD_UNEXPECTED_MARKER,
     JPGD_NOT_JPEG, JPGD_UNSUPPORTED_MARKER, JPGD_BAD_DQT_LENGTH, JPGD_TOO_MANY_BLOCKS,
     JPGD_UNDEFINED_QUANT_TABLE, JPGD_UNDEFINED_HUFF_TABLE, JPGD_NOT_SINGLE_SCAN, JPGD_UNSUPPORTED_COLORSPACE,
-    JPGD_UNSUPPORTED_SAMP_FACTORS, JPGD_DECODE_ERROR, JPGD_BAD_RESTART_MARKER, assertION_ERROR,
+    JPGD_UNSUPPORTED_SAMP_FACTORS, JPGD_DECODE_ERROR, JPGD_BAD_RESTART_MARKER, assert_ION_ERROR,
     JPGD_BAD_SOS_SPECTRAL, JPGD_BAD_SOS_SUCCESSIVE, JPGD_STREAM_READ, JPGD_NOTENOUGHMEM
 };
 
@@ -47,13 +44,13 @@ class jpeg_decoder_mem_stream : public jpeg_decoder_stream
     uint m_ofs, m_size;
 
 public:
-    jpeg_decoder_mem_stream() : m_pSrc_data(NULL), m_ofs(0), m_size(0) { }
+    jpeg_decoder_mem_stream() : m_pSrc_data( 0), m_ofs(0), m_size(0) { }
     jpeg_decoder_mem_stream(const uint8 *pSrc_data, uint size) : m_pSrc_data(pSrc_data), m_ofs(0), m_size(size) { }
 
     virtual ~jpeg_decoder_mem_stream() { }
 
     bool open(const uint8 *pSrc_data, uint size);
-    void close() { m_pSrc_data = NULL; m_ofs = 0; m_size = 0; }
+    void close() { m_pSrc_data =  0; m_ofs = 0; m_size = 0; }
 
     virtual int read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag);
 };
@@ -135,7 +132,6 @@ private:
         char m_data[1];
     };
 
-    jmp_buf m_jmp_state;
     mem_block *m_pMem_blocks;
     int m_image_x_size;
     int m_image_y_size;
@@ -487,8 +483,8 @@ static const uint8 s_idct_col_table[] = { 1, 1, 2, 3, 3, 3, 3, 3, 3, 4, 5, 5, 5,
 
 void idct(const jpgd_block_t* pSrc_ptr, uint8* pDst_ptr, int block_max_zag)
 {
-    assert(block_max_zag >= 1);
-    assert(block_max_zag <= 64);
+    assert_(block_max_zag >= 1);
+    assert_(block_max_zag <= 64);
 
     if (block_max_zag == 1)
     {
@@ -687,7 +683,7 @@ inline uint jpeg_decoder::get_bits(int num_bits)
 
         m_bits_left += 16;
 
-        assert(m_bits_left >= 0);
+        assert_(m_bits_left >= 0);
     }
     else
         m_bit_buf <<= num_bits;
@@ -724,7 +720,7 @@ inline uint jpeg_decoder::get_bits_no_markers(int num_bits)
 
         m_bits_left += 16;
 
-        assert(m_bits_left >= 0);
+        assert_(m_bits_left >= 0);
     }
     else
         m_bit_buf <<= num_bits;
@@ -778,7 +774,7 @@ inline int jpeg_decoder::huff_decode(huff_tables *pH, int& extra_bits)
     }
     else
     {
-        assert(((symbol >> 8) & 31) == pH->code_size[symbol & 255] + ((symbol & 0x8000) ? (symbol & 15) : 0));
+        assert_(((symbol >> 8) & 31) == pH->code_size[symbol & 255] + ((symbol & 0x8000) ? (symbol & 15) : 0));
 
         if (symbol & 0x8000)
         {
@@ -1083,14 +1079,14 @@ struct R_S
 // Unconditionally frees all allocated m_blocks.
 void jpeg_decoder::free_all_blocks()
 {
-    m_pStream = NULL;
+    m_pStream =  0;
     for (mem_block *b = m_pMem_blocks; b; )
     {
         mem_block *n = b->m_pNext;
-        free(b);
+        //unallocate(b); FIXME
         b = n;
     }
-    m_pMem_blocks = NULL;
+    m_pMem_blocks =  0;
 }
 
 // This method handles all errors.
@@ -1099,13 +1095,13 @@ void jpeg_decoder::stop_decoding(jpgd_status status)
 {
     m_error_code = status;
     free_all_blocks();
-    longjmp(m_jmp_state, status);
+    exit(-1);
 }
 
 void *jpeg_decoder::alloc(int nSize, bool zero)
 {
     nSize = (max(nSize, 1) + 3) & ~3;
-    char *rv = NULL;
+    char *rv =  0;
     for (mem_block *b = m_pMem_blocks; b; b = b->m_pNext)
     {
         if ((b->m_used_count + nSize) <= b->m_size)
@@ -1118,14 +1114,14 @@ void *jpeg_decoder::alloc(int nSize, bool zero)
     if (!rv)
     {
         int capacity = max(32768 - 256, (nSize + 2047) & ~2047);
-        mem_block *b = (mem_block*)malloc(sizeof(mem_block) + capacity);
+        mem_block *b = (mem_block*)allocate_(sizeof(mem_block) + capacity);
         if (!b) stop_decoding(JPGD_NOTENOUGHMEM);
         b->m_pNext = m_pMem_blocks; m_pMem_blocks = b;
         b->m_used_count = nSize;
         b->m_size = capacity;
         rv = b->m_data;
     }
-    if (zero) memset(rv, 0, nSize);
+    if(zero) clear(rv, nSize);
     return rv;
 }
 
@@ -1223,8 +1219,8 @@ void jpeg_decoder::read_dht_marker()
             m_huff_val[index] = (uint8 *)alloc(256);
 
         m_huff_ac[index] = (index & 0x10) != 0;
-        memcpy(m_huff_num[index], huff_num, 17);
-        memcpy(m_huff_val[index], huff_val, 256);
+        copy(m_huff_num[index], huff_num, 17);
+        copy(m_huff_val[index], huff_val, 256);
     }
 }
 
@@ -1597,91 +1593,8 @@ int jpeg_decoder::locate_sos_marker()
 // Reset everything to default/uninitialized state.
 void jpeg_decoder::init(jpeg_decoder_stream *pStream)
 {
-    m_pMem_blocks = NULL;
-    m_error_code = JPGD_SUCCESS;
-    m_ready_flag = false;
-    m_image_x_size = m_image_y_size = 0;
+    clear(*this);
     m_pStream = pStream;
-    m_progressive_flag = false;
-
-    memset(m_huff_ac, 0, sizeof(m_huff_ac));
-    memset(m_huff_num, 0, sizeof(m_huff_num));
-    memset(m_huff_val, 0, sizeof(m_huff_val));
-    memset(m_quant, 0, sizeof(m_quant));
-
-    m_scan_type = 0;
-    m_comps_in_frame = 0;
-
-    memset(m_comp_h_samp, 0, sizeof(m_comp_h_samp));
-    memset(m_comp_v_samp, 0, sizeof(m_comp_v_samp));
-    memset(m_comp_quant, 0, sizeof(m_comp_quant));
-    memset(m_comp_ident, 0, sizeof(m_comp_ident));
-    memset(m_comp_h_blocks, 0, sizeof(m_comp_h_blocks));
-    memset(m_comp_v_blocks, 0, sizeof(m_comp_v_blocks));
-
-    m_comps_in_scan = 0;
-    memset(m_comp_list, 0, sizeof(m_comp_list));
-    memset(m_comp_dc_tab, 0, sizeof(m_comp_dc_tab));
-    memset(m_comp_ac_tab, 0, sizeof(m_comp_ac_tab));
-
-    m_spectral_start = 0;
-    m_spectral_end = 0;
-    m_successive_low = 0;
-    m_successive_high = 0;
-    m_max_mcu_x_size = 0;
-    m_max_mcu_y_size = 0;
-    m_blocks_per_mcu = 0;
-    m_max_blocks_per_row = 0;
-    m_mcus_per_row = 0;
-    m_mcus_per_col = 0;
-    m_expanded_blocks_per_component = 0;
-    m_expanded_blocks_per_mcu = 0;
-    m_expanded_blocks_per_row = 0;
-    m_freq_domain_chroma_upsample = false;
-
-    memset(m_mcu_org, 0, sizeof(m_mcu_org));
-
-    m_total_lines_left = 0;
-    m_mcu_lines_left = 0;
-    m_real_dest_bytes_per_scan_line = 0;
-    m_dest_bytes_per_scan_line = 0;
-    m_dest_bytes_per_pixel = 0;
-
-    memset(m_pHuff_tabs, 0, sizeof(m_pHuff_tabs));
-
-    memset(m_dc_coeffs, 0, sizeof(m_dc_coeffs));
-    memset(m_ac_coeffs, 0, sizeof(m_ac_coeffs));
-    memset(m_block_y_mcu, 0, sizeof(m_block_y_mcu));
-
-    m_eob_run = 0;
-
-    memset(m_block_y_mcu, 0, sizeof(m_block_y_mcu));
-
-    m_pIn_buf_ofs = m_in_buf;
-    m_in_buf_left = 0;
-    m_eof_flag = false;
-    m_tem_flag = 0;
-
-    memset(m_in_buf_pad_start, 0, sizeof(m_in_buf_pad_start));
-    memset(m_in_buf, 0, sizeof(m_in_buf));
-    memset(m_in_buf_pad_end, 0, sizeof(m_in_buf_pad_end));
-
-    m_restart_interval = 0;
-    m_restarts_left    = 0;
-    m_next_restart_num = 0;
-
-    m_max_mcus_per_row = 0;
-    m_max_blocks_per_mcu = 0;
-    m_max_mcus_per_col = 0;
-
-    memset(m_last_dc_val, 0, sizeof(m_last_dc_val));
-    m_pMCU_coefficients = NULL;
-    m_pSample_buf = NULL;
-
-    m_total_bytes_read = 0;
-
-    m_pScan_line_0 = NULL;
-    m_pScan_line_1 = NULL;
 
     // Ready the input buffer.
     prep_in_buffer();
@@ -1719,7 +1632,7 @@ void jpeg_decoder::create_look_ups()
 void jpeg_decoder::fix_in_buffer()
 {
     // In case any 0xFF's where pulled into the buffer during marker scanning.
-    assert((m_bits_left & 7) == 0);
+    assert_((m_bits_left & 7) == 0);
 
     if (m_bits_left == 16)
         stuff_char( (uint8)(m_bit_buf & 0xFF));
@@ -1777,8 +1690,8 @@ void jpeg_decoder::transform_mcu_expand(int mcu_row)
     {
         DCT_Upsample::Matrix44 P, Q, R, S;
 
-        assert(m_mcu_block_max_zag[mcu_block] >= 1);
-        assert(m_mcu_block_max_zag[mcu_block] <= 64);
+        assert_(m_mcu_block_max_zag[mcu_block] >= 1);
+        assert_(m_mcu_block_max_zag[mcu_block] <= 64);
 
         switch (s_max_rc[m_mcu_block_max_zag[mcu_block++] - 1])
         {
@@ -1843,7 +1756,7 @@ void jpeg_decoder::transform_mcu_expand(int mcu_row)
             DCT_Upsample::R_S<8, 8>::calc(R, S, pSrc_ptr);
             break;
         default:
-            assert(false);
+            assert_(false);
         }
 
         DCT_Upsample::Matrix44 a(P + Q); P -= Q;
@@ -1880,9 +1793,7 @@ void jpeg_decoder::load_next_row()
     jpgd_quant_t *q;
     int mcu_row, mcu_block, row_block = 0;
     int component_num, component_id;
-    int block_x_mcu[max_COMPONENTS];
-
-    memset(block_x_mcu, 0, max_COMPONENTS * sizeof(int));
+    int block_x_mcu[max_COMPONENTS] = {};
 
     for (mcu_row = 0; mcu_row < m_mcus_per_row; mcu_row++)
     {
@@ -1898,7 +1809,7 @@ void jpeg_decoder::load_next_row()
             jpgd_block_t* pAC = coeff_buf_getp(m_ac_coeffs[component_id], block_x_mcu[component_id] + block_x_mcu_ofs, m_block_y_mcu[component_id] + block_y_mcu_ofs);
             jpgd_block_t* pDC = coeff_buf_getp(m_dc_coeffs[component_id], block_x_mcu[component_id] + block_x_mcu_ofs, m_block_y_mcu[component_id] + block_y_mcu_ofs);
             p[0] = pDC[0];
-            memcpy(&p[1], &pAC[1], 63 * sizeof(jpgd_block_t));
+            copy(&p[1], &pAC[1], 63);
 
             for (i = 63; i > 0; i--)
                 if (p[g_ZAG[i]])
@@ -1980,7 +1891,7 @@ void jpeg_decoder::process_restart()
         stop_decoding(JPGD_BAD_RESTART_MARKER);
 
     // Reset each component's DC prediction values.
-    memset(&m_last_dc_val, 0, m_comps_in_frame * sizeof(uint));
+    clear(m_last_dc_val);
 
     m_eob_run = 0;
 
@@ -2054,7 +1965,7 @@ void jpeg_decoder::decode_next_row()
 
                     s = HUFF_EXTEND(extra_bits, s);
 
-                    assert(k < 64);
+                    assert_(k < 64);
 
                     p[g_ZAG[k]] = static_cast<jpgd_block_t>(dequantize_ac(s, q[k])); //s * q[k];
                 }
@@ -2071,13 +1982,13 @@ void jpeg_decoder::decode_next_row()
                             int kt = k;
                             while (n--)
                             {
-                                assert(kt <= 63);
+                                assert_(kt <= 63);
                                 p[g_ZAG[kt++]] = 0;
                             }
                         }
 
                         k += 16 - 1; // - 1 because the loop counter is k
-                        assert(p[g_ZAG[k]] == 0);
+                        assert_(p[g_ZAG[k]] == 0);
                     }
                     else
                         break;
@@ -2372,9 +2283,6 @@ int jpeg_decoder::decode(const void** pScan_line, uint* pScan_line_len)
 
     if (m_mcu_lines_left == 0)
     {
-        if (setjmp(m_jmp_state))
-            return JPGD_FAILED;
-
         if (m_progressive_flag)
             load_next_row();
         else
@@ -2463,8 +2371,6 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
     int nextfreeentry;
     int currententry;
 
-    pH->ac_table = m_huff_ac[index] != 0;
-
     p = 0;
 
     for (l = 1; l <= 16; l++)
@@ -2493,10 +2399,8 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
         si++;
     }
 
-    memset(pH->look_up, 0, sizeof(pH->look_up));
-    memset(pH->look_up2, 0, sizeof(pH->look_up2));
-    memset(pH->tree, 0, sizeof(pH->tree));
-    memset(pH->code_size, 0, sizeof(pH->code_size));
+    clear(*pH);
+    pH->ac_table = m_huff_ac[index] != 0;
 
     nextfreeentry = -1;
 
@@ -2516,7 +2420,7 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
 
             for (l = 1 << (8 - code_size); l > 0; l--)
             {
-                assert(i < 256);
+                assert_(i < 256);
 
                 pH->look_up[code] = i;
 
@@ -2532,7 +2436,7 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
                     {
                         has_extrabits = true;
                         extra_bits = ((1 << num_extra_bits) - 1) & (code >> (8 - total_codesize));
-                        assert(extra_bits <= 0x7FFF);
+                        assert_(extra_bits <= 0x7FFF);
                         bits_to_fetch += num_extra_bits;
                     }
                 }
@@ -2594,7 +2498,7 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
 void jpeg_decoder::check_quant_tables()
 {
     for (int i = 0; i < m_comps_in_scan; i++)
-        if (m_quant[m_comp_quant[m_comp_list[i]]] == NULL)
+        if (m_quant[m_comp_quant[m_comp_list[i]]] ==  0)
             stop_decoding(JPGD_UNDEFINED_QUANT_TABLE);
 }
 
@@ -2603,10 +2507,10 @@ void jpeg_decoder::check_huff_tables()
 {
     for (int i = 0; i < m_comps_in_scan; i++)
     {
-        if ((m_spectral_start == 0) && (m_huff_num[m_comp_dc_tab[m_comp_list[i]]] == NULL))
+        if ((m_spectral_start == 0) && (m_huff_num[m_comp_dc_tab[m_comp_list[i]]] ==  0))
             stop_decoding(JPGD_UNDEFINED_HUFF_TABLE);
 
-        if ((m_spectral_end > 0) && (m_huff_num[m_comp_ac_tab[m_comp_list[i]]] == NULL))
+        if ((m_spectral_end > 0) && (m_huff_num[m_comp_ac_tab[m_comp_list[i]]] ==  0))
             stop_decoding(JPGD_UNDEFINED_HUFF_TABLE);
     }
 
@@ -2689,7 +2593,7 @@ int jpeg_decoder::init_scan()
 
     check_quant_tables();
 
-    memset(m_last_dc_val, 0, m_comps_in_frame * sizeof(uint));
+    clear(m_last_dc_val, m_comps_in_frame);
 
     m_eob_run = 0;
 
@@ -2783,7 +2687,7 @@ void jpeg_decoder::init_frame()
 
     // Should never happen
     if (m_max_blocks_per_row > max_BLOCKS_PER_ROW)
-        stop_decoding(assertION_ERROR);
+        stop_decoding(assert_ION_ERROR);
 
     // Allocate the coefficient buffer, enough for one MCU
     m_pMCU_coefficients = (jpgd_block_t*)alloc(m_max_blocks_per_mcu * 64 * sizeof(jpgd_block_t));
@@ -2828,7 +2732,7 @@ jpeg_decoder::coeff_buf* jpeg_decoder::coeff_buf_open(int block_num_x, int block
 
 inline jpgd_block_t *jpeg_decoder::coeff_buf_getp(coeff_buf *cb, int block_x, int block_y)
 {
-    assert((block_x < cb->block_num_x) && (block_y < cb->block_num_y));
+    assert_((block_x < cb->block_num_x) && (block_y < cb->block_num_y));
     return (jpgd_block_t *)(cb->pData + block_x * cb->block_size + block_y * (cb->block_size * cb->block_num_x));
 }
 
@@ -3015,15 +2919,12 @@ void jpeg_decoder::decode_block_ac_refine(jpeg_decoder *pD, int component_id, in
 void jpeg_decoder::decode_scan(pDecode_block_func decode_block_func)
 {
     int mcu_row, mcu_col, mcu_block;
-    int block_x_mcu[max_COMPONENTS], m_block_y_mcu[max_COMPONENTS];
-
-    memset(m_block_y_mcu, 0, sizeof(m_block_y_mcu));
+    int m_block_y_mcu[max_COMPONENTS] = {};
 
     for (mcu_col = 0; mcu_col < m_mcus_per_col; mcu_col++)
     {
         int component_num, component_id;
-
-        memset(block_x_mcu, 0, sizeof(block_x_mcu));
+        int block_x_mcu[max_COMPONENTS] = {};
 
         for (mcu_row = 0; mcu_row < m_mcus_per_row; mcu_row++)
         {
@@ -3165,8 +3066,6 @@ void jpeg_decoder::decode_init(jpeg_decoder_stream *pStream)
 
 jpeg_decoder::jpeg_decoder(jpeg_decoder_stream *pStream)
 {
-    if (setjmp(m_jmp_state))
-        return;
     decode_init(pStream);
 }
 
@@ -3176,9 +3075,6 @@ int jpeg_decoder::begin_decoding()
         return JPGD_SUCCESS;
 
     if (m_error_code)
-        return JPGD_FAILED;
-
-    if (setjmp(m_jmp_state))
         return JPGD_FAILED;
 
     decode_start();
@@ -3216,7 +3112,7 @@ int jpeg_decoder_mem_stream::read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF
         *pEOF_flag = true;
     }
 
-    memcpy(pBuf, m_pSrc_data + m_ofs, max_bytes_to_read);
+    copy(pBuf, m_pSrc_data + m_ofs, max_bytes_to_read);
     m_ofs += max_bytes_to_read;
 
     return max_bytes_to_read;
@@ -3225,18 +3121,18 @@ int jpeg_decoder_mem_stream::read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF
 unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, int *width, int *height, int *actual_comps, int req_comps)
 {
     if (!actual_comps)
-        return NULL;
+        return  0;
     *actual_comps = 0;
 
     if ((!pStream) || (!width) || (!height) || (!req_comps))
-        return NULL;
+        return  0;
 
     if ((req_comps != 1) && (req_comps != 3) && (req_comps != 4))
-        return NULL;
+        return  0;
 
     jpeg_decoder decoder(pStream);
     if (decoder.get_error_code() != JPGD_SUCCESS)
-        return NULL;
+        return  0;
 
     const int image_width = decoder.get_width(), image_height = decoder.get_height();
     *width = image_width;
@@ -3244,13 +3140,13 @@ unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, i
     *actual_comps = decoder.get_num_components();
 
     if (decoder.begin_decoding() != JPGD_SUCCESS)
-        return NULL;
+        return  0;
 
     const int dst_bpl = image_width * req_comps;
 
-    uint8 *pImage_data = (uint8*)malloc(dst_bpl * image_height);
+    uint8 *pImage_data = allocate<uint8>(dst_bpl * image_height);
     if (!pImage_data)
-        return NULL;
+        return  0;
 
     for (int y = 0; y < image_height; y++)
     {
@@ -3258,14 +3154,14 @@ unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, i
         uint scan_line_len;
         if (decoder.decode((const void**)&pScan_line, &scan_line_len) != JPGD_SUCCESS)
         {
-            free(pImage_data);
-            return NULL;
+            //free(pImage_data);
+            return  0;
         }
 
         uint8 *pDst = pImage_data + y * dst_bpl;
 
         if (((req_comps == 1) && (decoder.get_num_components() == 1)) || ((req_comps == 4) && (decoder.get_num_components() == 3)))
-            memcpy(pDst, pScan_line, dst_bpl);
+            copy(pDst, pScan_line, dst_bpl);
         else if (decoder.get_num_components() == 1)
         {
             if (req_comps == 3)

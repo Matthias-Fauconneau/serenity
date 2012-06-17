@@ -1,7 +1,6 @@
 #pragma once
 #include "array.h"
 #include "vector.h"
-#include "debug.h"
 
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
@@ -18,17 +17,15 @@ struct Image {
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), own(o.own) { o.data=0; }
     Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; o.data=0; return *this; }
     Image(byte4* data, int width, int height,bool own):data(data),width(width),height(height),own(own){}
-    Image(int width, int height):data(width*height?allocate<byte4>(width*height):0),width(width),height(height),own(true){
-        debug(clear(data,width*height,byte4(zero));)
-    }
+    Image(int width, int height);
     Image(array<byte4>&& data, uint width, uint height);
 
     ~Image(){ if(data && own) { delete data; data=0; } }
     explicit operator bool() const { return data; }
 
     byte4 get(uint x, uint y) const { if(x>=width||y>=height) return byte4(0,0,0,0); return data[y*width+x]; }
-    byte4 operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*width+x]; }
-    byte4& operator()(uint x, uint y) {assert(x<width && y<height); return data[y*width+x]; }
+    byte4 operator()(uint x, uint y) const {assert_(x<width && y<height); return data[y*width+x]; }
+    byte4& operator()(uint x, uint y) {assert_(x<width && y<height); return data[y*width+x]; }
     int2 size() const { return int2(width,height); }
 };
 inline Image copy(const Image& image) { Image copy(image.width,image.height); ::copy(copy.data,image.data,image.width*image.height); return copy; }

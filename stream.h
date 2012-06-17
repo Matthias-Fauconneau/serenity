@@ -6,7 +6,7 @@
 /// create an array<byte> reference of \a t raw memory representation
 template<class T> inline array<byte> raw(const T& t) { return array<byte>((byte*)&t,sizeof(T)); }
 /// cast raw memory to a \a T
-template<class T> inline T raw(const array<byte>& a) { assert(a.size()==sizeof(T)); return *(T*)a.data(); }
+template<class T> inline const T& raw(const array<byte>& a) { assert(a.size()==sizeof(T)); return *(T*)a.data(); }
 
 /// \a Stream is an interface used by \a DataStream, TextStream and implemented by Buffer, File, Socket
 struct Stream {
@@ -53,7 +53,7 @@ struct DataStream : virtual Stream {
     bool bigEndian = false;
 
     /// Reads one raw \a T element from stream
-    template<class T> T read() { T t = raw<T>(get(sizeof(T))); advance(sizeof(T)); return t; } //inline for custom types
+    template<class T> const T& read() { const T& t = raw<T>(get(sizeof(T))); advance(sizeof(T)); return t; }
     /// Reads \a size raw \a T elements from stream
     //template<class T> array<T> read(uint size) { array<T> t = cast<T>(get(size*sizeof(T))); advance(size*sizeof(T)); return t; }
     array<byte> read(uint size) { array<byte> t = get(size); advance(size); return t; }
@@ -72,7 +72,7 @@ struct DataStream : virtual Stream {
         operator uint16() { return s->bigEndian?swap16(s->read<uint16>()):s->read<uint16>(); }
         operator int16() { return operator uint16(); }
         /// Reads a \a T element (deduced from the destination (return type overload))
-        template<class T> operator T() { return s->read<T>(); }
+        template<class T> operator const T&() { return s->read<T>(); }
     };
     /// Returns an operator to deduce the type to read from the destination (return type overload)
     ReadOperator read() { return {this}; }

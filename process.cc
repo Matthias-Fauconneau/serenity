@@ -1,6 +1,6 @@
 #include "process.h"
+#include "linux.h"
 #include "array.cc"
-
 Array_Copy_Compare(Poll*)
 static array<Poll*> polls;
 Array_Copy(pollfd)
@@ -9,7 +9,6 @@ void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
 void Poll::unregisterPoll() { int i=removeOne(polls, this); if(i>=0) pollfds.removeAt(i); }
 static array<Poll*> queue;
 void Poll::wait() { queue << this; }
-
 
 int dispatchEvents(bool wait) {
     if(!polls.size()) return 0;
@@ -26,8 +25,6 @@ int dispatchEvents(bool wait) {
     return polls.size();
 }
 
-extern "C" int fork();
-extern "C" int execv(const char* path, char* const argv[]);
 Array(CString)
 void execute(const string& path, const array<string>& args) {
     array<CString> args0(1+args.size());
@@ -37,18 +34,21 @@ void execute(const string& path, const array<string>& args) {
     for(uint i=0;i<args0.size();i++) argv[i]=args0[i].data;
     argv[args0.size()]=0;
     int pid = fork();
-    if(pid==0) {
-        if(!execv(strz(path),(char* const*)argv)) __builtin_abort();
-    }
+    if(pid==0) if(!execve(strz(path),argv,0)) exit(-1);
 }
 
-extern "C" int setpriority(int which, uint who, int prio);
 void setPriority(int priority) { setpriority(0,0,priority); }
 
 #if PROCFS
 #include "map.h"
 #include "file.h"
 #include "stream.h"
+array<byte> readUpTo(int fd, uint capacity) {
+    array<byte> buffer(capacity);
+    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
+    buffer.setSize(size);
+    return buffer;
+}
 uint availableMemory() {
     int fd = openFile("/proc/meminfo"_);
     TextBuffer s = ::readUpTo(fd,2048);

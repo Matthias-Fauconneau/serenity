@@ -18,7 +18,7 @@ struct Date {
         seconds(seconds),minutes(minutes),hours(hours),day(day),month(month),year(year),weekDay(weekDay){ invariant(); }
 };
 bool operator >(const Date& a, const Date& b);
-bool operator ==(const Date& a, const Date& b);
+//bool operator ==(const Date& a, const Date& b);
 
 /// Convert unix timestamp to a calendar date
 Date date(long time=currentTime());

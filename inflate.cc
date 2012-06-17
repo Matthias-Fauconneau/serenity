@@ -1,5 +1,8 @@
 // Public domain, Rich Geldreich <richgel99@gmail.com>
+#include "memory.h"
 #include "debug.h"
+
+#define TINFLATE 1
 #if TINFLATE
 // Decompression flags.
 enum
@@ -394,7 +397,7 @@ byte* decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
   byte* buffer = 0;
   size_t src_buf_ofs = 0, out_buf_capacity = 0;
   *pOut_len = 0;
-  decomp->m_state=0;
+  decomp.m_state=0;
   for(;;) {
     size_t src_buf_size = src_buf_len - src_buf_ofs, dst_buf_size = out_buf_capacity - *pOut_len, new_out_buf_capacity;
     status status = decompress(&decomp, (const uint8*)pSrc_buf + src_buf_ofs, &src_buf_size, (uint8*)buffer, buffer ? (uint8*)buffer + *pOut_len : 0, &dst_buf_size,
@@ -404,8 +407,7 @@ byte* decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
     *pOut_len += dst_buf_size;
     if (status == STATUS_DONE) break;
     new_out_buf_capacity = out_buf_capacity * 2; if (new_out_buf_capacity < 128) new_out_buf_capacity = 128;
-    buffer = (byte*)realloc(buffer, new_out_buf_capacity);
-    assert(buffer);
+    buffer = (byte*)reallocate(buffer, out_buf_capacity, new_out_buf_capacity);
     out_buf_capacity = new_out_buf_capacity;
   }
   return buffer;

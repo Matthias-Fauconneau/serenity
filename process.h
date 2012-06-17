@@ -3,8 +3,6 @@
 
 struct pollfd { int fd; short events, revents; };
 enum { POLLIN = 1, POLLOUT=4, POLLHUP = 16 };
-extern "C" int poll(pollfd* fds, size_t nfds, int timeout);
-extern "C" char* getenv(const char* key);
 
 /// Application can be inherited to interface with the event loop
 struct Application {
@@ -16,12 +14,14 @@ struct Application {
 };
 
 /// Convenience macro to startup an Application with the default event loop
+extern void* heapEnd;
 #define Application(App) \
-int main(int argc, const char** argv) { \
-    array<string> args; for(int i=1;i<argc;i++) args << strz(argv[i]); \
+extern "C" void _start(int, int, int, int, int argc, const char* arg0, int, int, int, int, int, int, int, int, int, int, int) { \
+    heapEnd = brk(0); \
+    array<string> args; for(int i=1;i<argc;i++) args << str(*(&arg0-i)); \
     App app(move(args)); \
     while(app.running && dispatchEvents(true)) {} \
-    return 0; \
+    exit(0); \
 }
 
 /// Poll is an interface for objects needing to participate in event handling

@@ -2,18 +2,18 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
 
-COMPILER = gcc
-CCX ?= $(CCX_$(COMPILER))
-CCX_gcc := g++-4.7 -Wno-pmf-conversions -fno-implicit-templates -march=native
-CCX_clang := clang++ -Wno-mismatched-tags
+CCX = clang++
+#CCX = g++ -fno-implicit-templates -mapcs
 
-FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -fno-exceptions
+FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions \
+		 -fno-rtti -fno-exceptions
 FLAGS += $(FLAGS__$(BUILD))
-FLAGS__debug := -g -mapcs -DDEBUG
-FLAGS__fast := -g -mapcs -DDEBUG -O3 -ffast-math -fno-rtti
-FLAGS__release := -O3 -ffast-math -fno-rtti
+FLAGS__debug := -g -DDEBUG -fno-omit-frame-pointer
+FLAGS__release := -O3 -ffast-math
 FLAGS__profile := -g -mapcs -O -finstrument-functions -finstrument-functions-exclude-file-list=core,array,map,profile
 FLAGS_font = -I/usr/include/freetype2
+
+FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
 
 SRCS = $(SRCS__$(BUILD)) $(SRCS_$(TARGET))
 SRCS__profile += profile
@@ -30,11 +30,6 @@ ICONS_player := play pause next
 ICONS_music := music music256
 SRCS += $(ICONS:%=icons/%)
 
-LIBS__debug = bfd
-LIBS__fast = bfd
-LIBS__profile = bfd rt
-LIBS__memory = bfd
-LIBS_time = rt
 LIBS_alsa = asound
 LIBS_http = ssl
 LIBS_ffmpeg = avformat avcodec
@@ -56,7 +51,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 		$(eval LIBS= $(filter %.o, $^))
 		$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 		$(eval LIBS= $(LIBS:%=$$(%)))
-		$(CCX) $(LIBS__$(BUILD):%=-l%) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+		ld $(LIBS__$(BUILD):%=-l%) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 
 $(BUILD)/%.d: %.cc
 		@test -e $(dir $@) || mkdir -p $(dir $@)

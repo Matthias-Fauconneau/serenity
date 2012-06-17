@@ -1,11 +1,9 @@
 #pragma once
 #include "string.h"
-
-extern "C" ssize_t read(int fd, void* buf, size_t size);
-extern "C" ssize_t write(int fd, const void* buf, size_t size);
+#include "linux.h"
 
 /// Enhanced debugging using str(...)
-inline void write_(int fd, const array<byte>& s) { write(fd,s.data(),(size_t)s.size()); }
+inline void write_(int fd, const array<byte>& s) { write(fd,s.data(),(ulong)s.size()); }
 
 template<class ___ Args> inline void log(const Args& ___ args) { write_(1,str(args ___)+"\n"_); }
 template<class A> inline void log(const cat<A>& a) { write_(1,a+"\n"_); }
@@ -18,6 +16,11 @@ Symbol findNearestLine(void* address);
 /// Display variable name and its value
 #define var(v) ({ auto t=v; debug( log(#v##_, t); )  t; })
 /// Aborts unconditionally and display \a message
-#define error(message...) ({ logTrace(); log(message); __builtin_abort();})
+#define error(message...) ({ logTrace(); log(message); exit(-1); })
 /// Aborts if \a expr evaluates to false and display \a message (except stack trace)
-#define assert(expr, message...) ({debug( if(!(expr)) { logTrace(); log(#expr##_, ##message); __builtin_abort();})})
+#define assert(expr, message...) ({debug( if(!(expr)) { logTrace(); log(#expr##_, ##message); exit(-1); })})
+
+template<class T> inline string dump(const T& t) {
+    array<uint16> raw((uint16*)&t,sizeof(T));
+    string s; for(uint16 b: raw) s<<hex(b)<<" "_; return s;
+}

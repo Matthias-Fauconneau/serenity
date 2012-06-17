@@ -1,7 +1,8 @@
 #pragma once
-#include "string.h"
 
 /// Mathematic primitives
+
+template<class T> inline T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 
 inline int floor(float f) { return __builtin_floorf(f); }
 inline int round(float f) { return __builtin_roundf(f); }
@@ -39,8 +40,8 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }
     const T& u(int i) const { return ((T*)this)[i]; }
     T& u(int i) { return ((T*)this)[i]; }
-    const T& operator[](uint i) const { debug(if(i>=N)logTrace(),__builtin_abort();) return u(i); }
-    T& operator[](uint i) { debug(if(i>=N)logTrace(),__builtin_abort();) return u(i); }
+    const T& operator[](uint i) const { assert_(i<N); return u(i); }
+    T& operator[](uint i) { assert_(i<N); return u(i); }
     vector operator +=(vector v);
     vector operator -=(vector v);
     vector operator *=(vector v);
@@ -71,6 +72,7 @@ generic vector<V,T,N> clip(T min, vector<V,T,N> x, T max);
 generic float dot( vector<V,T,N> a,  vector<V,T,N> b);
 generic float length( vector<V,T,N> a);
 generic vector<V,T,N> normalize( vector<V,T,N> a);
+struct string;
 generic string str( vector<V,T,N> v);
 #undef generic
 

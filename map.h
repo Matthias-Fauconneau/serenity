@@ -1,8 +1,8 @@
 #pragma once
 #include "array.h"
 #include "string.h"
-#include "debug.h"
 #include "meta.h" //perfect forwarding
+#include "debug.h"
 
 template<class K, class V> struct const_pair { const K& key; const V& value; };
 template<class K, class V> struct pair { K& key; V& value; };

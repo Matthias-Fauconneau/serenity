@@ -2,14 +2,18 @@
 #include "stream.h"
 #include "vector.h"
 #include "string.h"
-#include <zlib.h>
-
+#include "memory.h"
 #include "array.cc"
 template struct array<byte4>;
 
 #include "vector.cc"
 uvector(bgra,uint8,4)
 vector(bgra,int,4)
+
+Image::Image(byte4 *data, int width, int height, bool own) :
+    data(width*height ? allocate<byte4>(width*height) : 0), width(width), height(height), own(true) {
+    debug(clear(data,width*height,byte4(zero));)
+}
 
 Image::Image(array<byte4>&& data, uint width, uint height):data((byte4*)data.data()),width(width),height(height),own(true) {
     assert(data.size() >= width*height, data.size(), width, height);

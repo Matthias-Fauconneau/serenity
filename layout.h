@@ -32,24 +32,19 @@ template<class T> struct Array : virtual Layout, array<T> {
     Widget& at(int i) { return array<T>::at(i); }
 };
 
-//convoluted template metaprogramming to get a static tuple allowing dynamic indexing using an offset table
-struct zero { zero(int* list, uint size){clear(list,size);}}; //item "0" make sure the table is cleared so that items can append to list by finding first free slot
 template<class T> struct item : T { //item instanciate a class and append the instance to the offset table
     void registerInstance(int* list) { int* first=list; while(*first) first++; *first=(byte*)this-(byte*)list; }
     item(int* list) { registerInstance(list); }
     item(T&& t, int* list) : T(move(t)) { registerInstance(list); }
 };
 /// \a tuple with static indexing by type and dynamic indexing using an offset table
-template<class... T> struct tuple  : zero, item<T>... {
-    int offsets[sizeof...(T)];
-    tuple() : zero(offsets,sizeof...(T)), item<T>(offsets)... {}
-    tuple(T&&... t) : zero(offsets,sizeof...(T)), item<T>(move(t),offsets)... {}
+template<class... T> struct tuple  : item<T>... {
+    int offsets[sizeof...(T)] = {};
+    tuple() : item<T>(offsets)... {}
+    tuple(T&&... t) : item<T>(move(t),offsets)... {}
     int size() const { return sizeof...(T); }
-
     template<class A> A& get() { return static_cast<A&>(*this); }
-    template<class A> const A& get() const { return static_cast<const A&>(*this); } //static indexing using type
-
-    //template<class B> B& at(int i) { return *(B*)((byte*)offsets+offsets[i]); } //expected primary name before > ?
+    template<class A> const A& get() const { return static_cast<const A&>(*this); }
     void* at(int i) { return (void*)((byte*)offsets+offsets[i]); }
 };
 
@@ -58,15 +53,11 @@ template<class... T> struct tuple  : zero, item<T>... {
 template<class... T> struct Tuple : virtual Layout {
     tuple<T...> items; //inheriting tuple confuse compiler with multiple Widgets base
     Tuple() : items() {}
-    Tuple(T&&... t) : items(move(t)...) {}
-    uint count() const { return items.size(); }
-
-    template<class A> A& get() { return items.template get<A>(); } //static indexing using type
-    template<class A> const A& get() const { return items.template get<A>(); } //static indexing using type
-    //template<class A> operator const A&() const { return items.operator A&(); } //static indexing using type
-
+    Tuple(T&& ___ t) : items(move(t)___) {}
     Widget& at(int i) { return *(Widget*)items.at(i); }
-    //Widget& at(int i) { return items.at<Widget>(i); } //expected primary name before > ?
+    uint count() const { return items.size(); }
+    template<class A> A& get() { return items.template get<A>(); }
+    template<class A> const A& get() const { return items.template get<A>(); }
 };
 
 /// Linear divide space between contained widgets

@@ -1,6 +1,7 @@
 #include "time.h"
 #include "stream.h"
-#include <sys/timerfd.h>
+//#include <sys/timerfd.h>
+struct timespec { ulong sec,nsec; };
 
 long realTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
@@ -29,7 +30,7 @@ bool operator >(const Date& a, const Date& b) {
     if(a.seconds!=-1 && b.seconds!=-1) { if(a.seconds>b.seconds) return true; else if(a.seconds<b.seconds) return false; }
     return false;
 }
-bool operator ==(const Date& a, const Date& b) { return compare((const byte*)&a,(const byte*)&b,sizeof(Date)); }
+//bool operator ==(const Date& a, const Date& b) { return a.seconds==a.year==b.year ; }
 
 
 Date date(long time) {

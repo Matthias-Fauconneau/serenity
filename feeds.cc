@@ -24,6 +24,8 @@ template struct List<Entry>;
 
 template struct Scroll<HTML>;
 
+static int config = openFolder("config"_);
+
 Feeds::Feeds() {
     window.localShortcut("Escape"_).connect(&window, &Window::hide);
     window.localShortcut("Right"_).connect(this, &Feeds::readNext);
@@ -31,12 +33,12 @@ Feeds::Feeds() {
     buttons.keyPress[KEY_POWER].connect(&window, &Window::hide);
     buttons.keyPress[BTN_EXTRA].connect(this, &Feeds::readNext);
 #endif
-    readConfig = appendFile(".config/read"_,home());
-    read = split(readFile(".config/read"_,home()),'\n');
+    readConfig = appendFile("read"_,config);
+    read = split(readFile("read"_,config),'\n');
     reserve(256); //realloc would invalidate delegates
     List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
     List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
-    array<string> feeds = split(readFile(".config/feeds"_,home()),'\n');
+    array<string> feeds = split(readFile("feeds"_,config),'\n');
     for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 60);
 }
 Feeds::~Feeds() { close(readConfig); }
