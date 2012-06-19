@@ -3,13 +3,9 @@
 #include "signal.h"
 #include "image.h"
 #include "map.h"
-#include "x.h"
 struct Widget;
 
-extern "C" Atom XInternAtom(Display*, const char*, bool);
-#define Atom(name) XInternAtom(Window::x, #name, 1)
-
-/// Window embeds \a widget in an X11 window, displaying it and forwarding user input
+/// Window binds \a widget to display and input
 struct Window : Poll {
     no_copy(Window)
     /// Initialize an X11 window for \a widget

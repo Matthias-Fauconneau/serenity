@@ -8,41 +8,36 @@ template<class T> inline array<byte> raw(const T& t) { return array<byte>((byte*
 /// cast raw memory to a \a T
 template<class T> inline const T& raw(const array<byte>& a) { assert(a.size()==sizeof(T)); return *(T*)a.data(); }
 
-/// \a Stream is an interface used by \a DataStream, TextStream and implemented by Buffer, File, Socket
+template<class T, class O> array<T> cast(array<O>&& o) {
+    assert(o.tag==-1); assert((o.size()*sizeof(O))%sizeof(T) == 0);
+    return array<T>((const T*)o.buffer.data,o.buffer.size*sizeof(O)/sizeof(T));
+}
+
+/// \a Stream is an interface used by \a DataStream, TextStream and enhanced by Socket
 struct Stream {
-    /// Returns number of bytes available, reading \a need bytes from underlying device if possible
-    virtual uint available(uint need) = 0;
-    /// Returns next \a size bytes from stream
-    virtual array<byte> get(uint size) = 0;
-    /// Advances \a count bytes in stream
-    virtual void advance(int count) = 0;
-
-    /// Returns true if there is data to read
-    explicit operator bool() { return available(1); }
-};
-
-/// Buffer is an in-memory \a Stream
-struct Buffer : virtual Stream {
     array<byte> buffer;
     uint index=0;
 
-    Buffer(){}
-    Buffer(Buffer&& o):buffer(move(o.buffer)),index(o.index){}
-    /// Returns a Buffer to stream /a array
-    Buffer(array<byte>&& array) : buffer(move(array)) {}
+    Stream(){}
+    Stream(Stream&& o):buffer(move(o.buffer)),index(o.index){}
+    Stream(array<byte>&& array) : buffer(move(array)) {}
+
+    //TODO: check what is really needed for Socket, merge in DataStream <byte> methods ?
+    /// Returns number of bytes available, reading \a need bytes from underlying device if possible
+    virtual uint available(uint /*need*/) { return buffer.size()-index; }
+    /// Returns next \a size bytes from stream
+    virtual array<byte> get(uint size) const { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); }
+    /// Advances \a count bytes in stream
+    virtual void advance(int count) { index+=count;  assert(index<=buffer.size()); }
+
+    /// Returns the next byte in stream
+    ubyte next() const { return buffer[index]; }
 
     /// Seeks stream to /a index
     void seek(uint index) { assert(index<buffer.size()); this->index=index; }
 
-    /// Seeks last match for \a key.
-    bool seekLast(const array<byte>& key) {
-        for(index=buffer.size()-key.size();index>0;index--) { if(get(key.size()) == key) return true; }
-        return false;
-    }
-
-    uint available(uint) override { return buffer.size()-index; }
-    array<byte> get(uint size) override { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); }
-    void advance(int count) override { index+=count;  assert(index<=buffer.size()); }
+    /// Returns true if there is data to read
+    explicit operator bool() { return available(1); }
 };
 
 #define swap32 __builtin_bswap32
@@ -52,14 +47,33 @@ inline uint16 swap16(uint16 x) { return swap32(x)>>16; }
 struct DataStream : virtual Stream {
     bool bigEndian = false;
 
+    DataStream():Stream(){}
+    DataStream(DataStream&& o):Stream(move(o)),bigEndian(o.bigEndian){}
+    DataStream(array<byte>&& array, bool bigEndian=false) : Stream(move(array)), bigEndian(bigEndian) {}
+    DataStream& operator=(DataStream&& o){buffer=move(o.buffer);index=o.index;bigEndian=o.bigEndian;return *this;}
+
+    /// Slices a stream referencing this data (valid as long as this stream)
+    DataStream slice(int pos, int size) { return DataStream(array<byte>(buffer.data()+pos,size),bigEndian); }
+
+    /// Seeks last match for \a key.
+    bool seekLast(const array<byte>& key) {
+        get(-1); //get most available data into buffer
+        for(index=buffer.size()-key.size();index>0;index--) { if(get(key.size()) == key) return true; }
+        return false;
+    }
+
+    /// Reads \a size bytes from stream
+    array<byte> read(uint size) { array<byte> t = get(size); advance(size); return t; }
+
     /// Reads one raw \a T element from stream
     template<class T> const T& read() { const T& t = raw<T>(get(sizeof(T))); advance(sizeof(T)); return t; }
+
     /// Reads \a size raw \a T elements from stream
-    //template<class T> array<T> read(uint size) { array<T> t = cast<T>(get(size*sizeof(T))); advance(size*sizeof(T)); return t; }
-    array<byte> read(uint size) { array<byte> t = get(size); advance(size); return t; }
-    /// Read an array of raw \a T elements from stream with the array size encoded as an uint32
-    //template<class T> array<T> readArray() { uint size=read<uint32>(); return read<T>(size); }
-    array<byte> readArray() { uint size=read<uint32>(); return read(size); }
+    template<class T> array<T> read(uint size) { array<T> t = cast<T>(get(size*sizeof(T))); advance(size*sizeof(T)); return t; }
+
+    /// Read from stream until next null byte
+    string readString() { string s(buffer.data()+index,(uint)0); while(next()) { s.buffer.size++; advance(1); } advance(1); return s; }
+
     /// Read until the end of stream
     array<byte> readAll() { uint size=available(-1); return read(size); }
 
@@ -103,12 +117,4 @@ struct TextStream : virtual Stream {
     string xmlIdentifier();
     /// Reads a single number
     int number();
-};
-
-struct DataBuffer : DataStream, Buffer {
-    DataBuffer(array<byte>&& buffer):Buffer(move(buffer)){}
-};
-
-struct TextBuffer : TextStream, Buffer {
-    TextBuffer(array<byte>&& buffer):Buffer(move(buffer)){}
 };

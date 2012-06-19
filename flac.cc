@@ -38,23 +38,17 @@ uint BitReader::unary() {
     return size;
 }
 
-/// Reads an UCS-2 encoded value
+/// Reads a byte-aligned UTF-8 encoded value
 uint BitReader::utf8() {
-    uint code = binary(8);
-    if(code&0b10000000) {
-        int test = code;
-        code &= 0b00011111; code <<= 6; code |= binary(8)&0b111111;
-        if(test&0b00100000) {
-            int test = code;
-            code &= 0b00001111111111; code <<= 6; code |= binary(8)&0b111111;
-            if(test&0b10000000000) {
-                assert(!(code&0b1000000000000000));
-                code &= 0b00000111111111111111; code <<= 6; code |= binary(8)&0b111111;
-            }
-        }
-    }
-    return code;
+    assert(index%8==0);
+    ubyte* pointer = data[index/8];
+    ubyte code = pointer[0];
+    /**/  if((code&0b10000000)==0b00000000) { index+=8; return code; }
+    else if((code&0b11100000)==0b11000000) { index+=16; return(code&0b11111)<<6  |(pointer[1]&0b111111); }
+    else if((code&0b11110000)==0b11100000) { index+=24; return(code&0b01111)<<12|(pointer[1]&0b111111)<<6  |(pointer[2]&0b111111); }
+    else if((code&0b11111000)==0b11110000) { index+=32; return(code&0b00111)<<18|(pointer[1]&0b111111)<<12|(pointer[2]&0b111111)<<6|(pointer[3]&0b111111); }
 }
+
 
 void FLAC::open(array<byte>&& data) {
     BitReader::setData(move(data));

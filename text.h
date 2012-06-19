@@ -1,7 +1,7 @@
 #pragma once
 #include "widget.h"
 #include "signal.h"
-struct Image;
+#include "image.h"
 
 /// Rich text format control code encoded in 00-1F range
 /// \note Strike|Bold (\t) and Strike|Italic (\n) cannot be used
@@ -43,7 +43,7 @@ struct Text : Widget {
     int2 textSize=zero;
 
     // laid out glyphs to blit
-    struct Blit { int2 pos; const Image& image; };
+    struct Blit { int2 pos; const Pixmap& pixmap; };
     array<Blit> blits;
     struct Line { int2 min,max; };
     array<Line> lines;

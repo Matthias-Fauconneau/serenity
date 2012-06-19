@@ -1,6 +1,8 @@
 #pragma once
+#include "stream.h"
 #include "vector.h"
 #include "image.h"
+#include "file.h"
 #include "map.h"
 
 struct FontMetrics {
@@ -10,33 +12,27 @@ struct FontMetrics {
 };
 
 struct GlyphMetrics {
-    vec2 advance;
-    vec2 size;
+    int2 advance;
+    int2 size;
 };
 
 struct Glyph {
-    vec2 offset;
-    vec2 advance;
-    Image image;
+    int2 offset;
+    int2 advance;
+    Pixmap pixmap;
 };
 
-struct FT_FaceRec_;
 struct Font {
     string name;
-    string data;
-    FT_FaceRec_* face=0;
+    Map keep;
+    DataStream cmap;
     typedef map<int, Glyph> GlyphCache;
     map<int, GlyphCache> cache;
 
     Font(string path);
-    Font(array<byte>&& data);
+    uint16 index(uint16 code);
     FontMetrics metrics(int size);
     float kerning(int leftCode, int rightCode);
     GlyphMetrics metrics(int size, int code);
     Glyph& glyph(int size, int code);
 };
-
-extern Font defaultSans;
-extern Font defaultBold;
-extern Font defaultItalic;
-extern Font defaultBoldItalic;

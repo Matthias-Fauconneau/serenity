@@ -15,7 +15,6 @@
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define weak(function) function __attribute((weak)); function
-#define static_this static void static_this() __attribute((constructor)); static void static_this
 #define offsetof(object, member) __builtin_offsetof (object, member)
 
 /// Move
@@ -37,11 +36,12 @@ template<> struct predicate<true> { typedef void* type; };
 
 /// Primitives
 typedef signed char int8;
-typedef unsigned char byte;
+typedef signed char byte;
 typedef unsigned char uint8;
 typedef unsigned char ubyte;
 typedef signed short int16;
 typedef unsigned short uint16;
+typedef unsigned short ushort;
 typedef signed int int32;
 typedef unsigned int uint32;
 typedef unsigned int uint;

@@ -14,10 +14,10 @@ struct Application {
 };
 
 /// Convenience macro to startup an Application with the default event loop
-extern void* heapEnd;
+void setupHeap();
 #define Application(App) \
 extern "C" void _start(int, int, int, int, int argc, const char* arg0, int, int, int, int, int, int, int, int, int, int, int) { \
-    heapEnd = brk(0); \
+    setupHeap(); \
     array<string> args; for(int i=1;i<argc;i++) args << str(*(&arg0-i)); \
     App app(move(args)); \
     while(app.running && dispatchEvents(true)) {} \

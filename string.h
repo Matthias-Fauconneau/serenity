@@ -111,7 +111,7 @@ inline string dec(int n, int pad=0) { return itoa<10>(n,pad); }
 inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
 
 /// Converts a floating point number to its human-readable representation
-string ftoa(float number, int precision, int base=10);
+//string ftoa(float number, int precision, int base=10);
 
 bool isInteger(const string& s);
 /// Parses an integer value
@@ -134,7 +134,7 @@ inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
 inline string str(const ulong& n) { return dec(n); }
 inline string str(const long& n) { return dec(n); }
-inline string str(const float& n) { return ftoa(n,2); }
+//inline string str(const float& n) { return ftoa(n,2); }
 inline const string& str(const string& s) { return s; }
 template<class A> inline string str(const cat<A>& s) { return s; }
 template<class A> inline string str(A* const& p) { return p?utoa<16>(uint(p)):"null"_; }

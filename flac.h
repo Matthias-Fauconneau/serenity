@@ -10,7 +10,7 @@ struct BitReader : array<byte> {
     uint index=0;
     BitReader(){}
     BitReader(array<byte>&& buffer){setData(move(buffer));}
-    /// Skip \a count bytes in stream
+    /// Skip \a count bits in stream
     void skip(int count);
     /// Reads one bit in MSB msb encoding
     uint bit();

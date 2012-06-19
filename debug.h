@@ -12,6 +12,7 @@ inline void log(const string& args) { write_(1,args+"\n"_); }
 
 struct Symbol { string file,function; uint line; };
 Symbol findNearestLine(void* address);
+void catchErrors();
 
 /// Display variable name and its value
 #define var(v) ({ auto t=v; debug( log(#v##_, t); )  t; })

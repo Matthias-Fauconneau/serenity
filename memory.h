@@ -1,7 +1,7 @@
 #pragma once
 
 //TODO: change to 8byte granularity (for aligned inline free list (size+next))
-typedef unsigned char byte;
+typedef signed char byte;
 
 byte* allocate_(int size);
 byte* reallocate_(byte* buffer, int size, int need);

@@ -2,12 +2,17 @@
 #include "linux.h"
 
 byte* heapEnd;
+byte* systemEnd;
+
+void setupHeap() {
+    systemEnd = heapEnd = (byte*)brk(0);
+}
 
 byte* allocate_(int size) {
     //TODO: fill free list first
     byte* buffer = heapEnd;
     heapEnd += size;
-    brk(heapEnd);
+    while(heapEnd>systemEnd) systemEnd=(byte*)brk(systemEnd+0x1000);
     return buffer;
 }
 byte* reallocate_(byte* buffer, int size, int need) {

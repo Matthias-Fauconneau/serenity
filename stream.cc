@@ -1,8 +1,6 @@
 #include "stream.h"
 #include "string.h"
 
-/// TextStream
-
 bool TextStream::matchAny(const array<byte>& any) {
     if(available(1)) { byte c=get(1)[0]; for(const byte& e: any) if(c == e) { advance(1); return true; } }
     return false;

@@ -1,52 +1,62 @@
 #include "font.h"
-#include "file.h"
-
-#undef abort
-#undef exit
-#include <ft2build.h>
-#include <freetype/freetype.h>
-#include <freetype/ftlcdfil.h>
 
 #include "array.cc"
 Array_Default(Glyph)
 Array_Default(Font::GlyphCache)
 
-static FT_Library ft;
-static_this() {
-    FT_Init_FreeType(&ft);
-    FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
+static int fonts() { static int fd = openFolder("/usr/share/fonts"_); return fd; }
+
+Font::Font(string name) : keep(mapFile(name,fonts())) {
+    DataStream s(keep);
+    s.bigEndian=true;
+    uint32 unused scaler=s.read();
+    uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
+    for(int i=0;i<numTables;i++) {
+        uint32 tag=s.read<uint32>(), unused checksum=s.read(), table=s.read(), unused size=s.read();
+        if(tag==raw<uint32>("cmap"_)) cmap=DataStream(array<byte>(s.buffer.data()+table,size));
+    }
 }
 
-Font::Font(string name) {
-    FT_New_Face(ft, strz("/usr/share/fonts/"_+name), 0, &face);
-    assert(face,name);
+uint16 Font::index(uint16 code) {
+    cmap.seek(0); DataStream& s = cmap;
+    uint16 unused version=s.read(), numTables=s.read();
+    for(int i=0;i<numTables;i++) {
+        uint16 unused platformID=s.read(), unused platformSpecificID=s.read(); uint32 subtable=s.read();
+        uint index=s.index; s.seek(subtable);
+        uint16 format = s.read(), unused size=s.read(), unused language=s.read();
+        if(format==4) {
+            uint16 segCount=s.read<uint16>()/2, unused searchRange=s.read(),unused entrySelector=s.read(), unused rangeShift=s.read();
+            array<uint16> endCode = s.read<uint16>(segCount);
+            s.advance(2); //pad
+            array<uint16> startCode = s.read<uint16>(segCount);
+            array<uint16> idDelta = s.read<uint16>(segCount);
+            array<uint16> idRangeOffset = s.read<uint16>(segCount);
+            int i=0; while(endCode[i] < code) i++;
+            if(startCode[i]<=code) {
+                if(idRangeOffset[i]) return *( &idRangeOffset[i] + idRangeOffset[i] / 2 + (code - startCode[i]) );
+                else return idDelta[i] + code;
+            }
+        } else error("Unsupported");
+        s.index=index;
+    }
+    error("Not Found");
 }
-Font::Font(array<byte>&& data) : data(move(data)) { FT_New_Memory_Face(ft,(const FT_Byte*)data.data(),data.size(),0,&face); }
 
-FontMetrics Font::metrics(int size) {
-    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,0,0,0};
-    FT_Request_Size(face,&req);
-    FontMetrics metrics = { face->size->metrics.descender/64.f, face->size->metrics.ascender/64.f, face->size->metrics.height/64.f };
+FontMetrics Font::metrics(int /*size*/) {
+    //FontMetrics metrics = { face->size->metrics.descender/64.f, face->size->metrics.ascender/64.f, face->size->metrics.height/64.f };
+    FontMetrics metrics = {};
     return metrics;
 }
 
-float Font::kerning(int leftCode, int rightCode) {
-    int left = FT_Get_Char_Index(face, leftCode); assert(left,"glyph not found '"_+hex(leftCode)+"'"_);
-    int right = FT_Get_Char_Index(face, rightCode); assert(right,"glyph not found '"_+hex(rightCode)+"'"_);
-    FT_Vector kerning;
-    FT_Get_Kerning(face, left, right, FT_KERNING_DEFAULT, &kerning );
-    return kerning.x/64.f;
+float Font::kerning(int /*leftCode*/, int /*rightCode*/) {
+    //return kerning.x/64.f;
+    return 0;
 }
 
-GlyphMetrics Font::metrics(int size, int code) {
-    assert(face);
-    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size<<6,size<<6,0,0}; FT_Request_Size(face,&req);
-    int index = FT_Get_Char_Index(face, code);
-    assert(index, hex(code)); //if(!index) index=code;
-    FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
+GlyphMetrics Font::metrics(int /*size*/, int /*code*/) {
     GlyphMetrics metrics={
-    vec2(face->glyph->advance.x / 64.f, face->glyph->advance.y / 64.f),
-    vec2(face->glyph->metrics.width / 64.f, face->glyph->metrics.height / 64.f)
+    //vec2(face->glyph->advance.x / 64.f, face->glyph->advance.y / 64.f),
+    //vec2(face->glyph->metrics.width / 64.f, face->glyph->metrics.height / 64.f)
     };
     return metrics;
 }
@@ -56,11 +66,11 @@ Glyph& Font::glyph(int size, int code) {
     if(!glyphs.values) glyphs.values.reserve(256); //FIXME: dynamic array would invalid any references
     assert(glyphs.values.capacity()==256);
     Glyph& glyph = glyphs[code]; //TODO: lookup for code in [0x20..0x80]
-    if(glyph.image || glyph.advance.x) return glyph;
+    if(glyph.pixmap || glyph.advance.x) return glyph;
 
     glyph.advance = metrics(size,code).advance;
     if(code == ' ') return glyph;
-    FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
+    /*FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
     glyph.offset = vec2( face->glyph->bitmap_left, -face->glyph->bitmap_top );
     FT_Bitmap bitmap=face->glyph->bitmap;
     if(!bitmap.buffer) return glyph;
@@ -78,11 +88,6 @@ Glyph& Font::glyph(int size, int code) {
                     image.get(x-1,y-1).a+image.get(x ,y - 1).a+image.get(x+1,y -1).a+
                     image.get(x-1,y+0).a+image.get(x,y     ).a+image.get(x+1,y   ).a+
                     image.get(x-1,y+1).a+image.get(x,y+1).a+image.get(x+1,y+1).a ) / 8;
-    }
+    }*/
     return glyph;
 }
-
-Font defaultSans("truetype/ttf-dejavu/DejaVuSans.ttf"_);
-Font defaultBold("truetype/ttf-dejavu/DejaVuSans-Bold.ttf"_);
-Font defaultItalic("truetype/ttf-dejavu/DejaVuSans-Oblique.ttf"_);
-Font defaultBoldItalic("truetype/ttf-dejavu/DejaVuSans-BoldOblique.ttf"_);

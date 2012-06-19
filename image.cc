@@ -10,17 +10,20 @@ template struct array<byte4>;
 uvector(bgra,uint8,4)
 vector(bgra,int,4)
 
-Image::Image(byte4 *data, int width, int height, bool own) :
-    data(width*height ? allocate<byte4>(width*height) : 0), width(width), height(height), own(true) {
-    debug(clear(data,width*height,byte4(zero));)
+#define generic template<class T>
+
+generic Image<T>::Image(int width, int height) :
+    data(width*height ? allocate<T>(width*height) : 0), width(width), height(height), stride(width), own(true) {
 }
 
-Image::Image(array<byte4>&& data, uint width, uint height):data((byte4*)data.data()),width(width),height(height),own(true) {
+generic Image<T>::Image(array<T>&& data, uint width, uint height)
+    : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
     assert(data.size() >= width*height, data.size(), width, height);
     assert(data.buffer.capacity);
     data.buffer.capacity = 0; //taking ownership
 }
 
+/*
 Image resize(const Image& image, uint width, uint height) {
     if(!image) return Image(16,16);
     if(width==image.width && height==image.height) return copy(image);
@@ -76,3 +79,6 @@ Image decodeImage(const array<byte>& file) {
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
     else { warn("Unknown image format",slice(file,0,4)); return Image(); }
 }
+*/
+template struct Image<rgb565>;
+template struct Image<byte4>;

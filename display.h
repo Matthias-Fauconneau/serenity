@@ -1,8 +1,8 @@
 #pragma once
 #include "image.h"
 
-/// Framebuffer
-extern Image framebuffer;
+void openDisplay();
+extern int2 screen;
 
 /// Rectangle
 struct Rect {
@@ -24,7 +24,7 @@ enum Blend { Opaque, Alpha, Multiply, MultiplyAlpha };
 void fill(Rect rect, byte4 color, Blend blend=Opaque);
 
 /// Blit \a source to framebuffer at \a target
-void blit(int2 target, const Image& source, Blend blend=Opaque, int alpha=255);
+void blit(int2 target, const Pixmap& source, Blend blend=Opaque, int alpha=255);
 
 inline byte4 gray(int level) { return byte4(level,level,level,255); }
 const byte4 white = gray(255);

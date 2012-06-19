@@ -3,10 +3,10 @@ TARGET ?= taskbar
 BUILD ?= release
 
 CCX = clang++
-#CCX = g++ -fno-implicit-templates -mapcs
+#CCX = g++ -fno-implicit-templates
+#-mapcs
 
-FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions \
-		 -fno-rtti -fno-exceptions
+FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions -fno-rtti -fno-exceptions
 FLAGS += $(FLAGS__$(BUILD))
 FLAGS__debug := -g -DDEBUG -fno-omit-frame-pointer
 FLAGS__release := -O3 -ffast-math
@@ -30,13 +30,6 @@ ICONS_player := play pause next
 ICONS_music := music music256
 SRCS += $(ICONS:%=icons/%)
 
-LIBS_alsa = asound
-LIBS_http = ssl
-LIBS_ffmpeg = avformat avcodec
-LIBS_font = freetype
-LIBS_window = X11 Xext
-LIBS_png = z
-
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_feeds = icons/$(TARGET).png $(TARGET).desktop
@@ -48,10 +41,7 @@ all: prepare $(BUILD)/$(TARGET)
 		./dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
 
 $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
-		$(eval LIBS= $(filter %.o, $^))
-		$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
-		$(eval LIBS= $(LIBS:%=$$(%)))
-		ld $(LIBS__$(BUILD):%=-l%) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+		ld -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 
 $(BUILD)/%.d: %.cc
 		@test -e $(dir $@) || mkdir -p $(dir $@)

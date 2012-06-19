@@ -1,11 +1,12 @@
 #pragma once
+#include "core.h"
 
 /// Mathematic primitives
 
 template<class T> inline T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 
 inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
+inline int round(float f) { return f /*__builtin_roundf(f)*/; }
 inline int ceil(float f) { return __builtin_ceilf(f); }
 
 const double PI = 3.14159265358979323846;
@@ -30,13 +31,13 @@ typedef double double2 __attribute__ ((vector_size(16)));
 #define extract_d __builtin_ia32_vec_ext_v2df
 
 extern struct Zero {} zero; //dummy type to call zero-initializing constructor
-//TODO: SIMD
 template<template<typename> class V, class T, int N> struct vector : V<T> {
     static const int size = N;
-    //vector()debug(:V<T>{}){}
     vector():V<T>{}{}
     vector(Zero):V<T>{}{}
-    template<class... Args> explicit vector(Args... args):V<T>{args...}{static_assert(sizeof...(args) == N, "Invalid number of arguments");}
+    template<class... Args> explicit vector(T x, T y, Args... args):V<T>{x,y,args...}{
+        static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
+    }
     template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }
     const T& u(int i) const { return ((T*)this)[i]; }
     T& u(int i) { return ((T*)this)[i]; }
@@ -78,4 +79,4 @@ generic string str( vector<V,T,N> v);
 
 template<class T> struct xy { T x,y; };
 typedef vector<xy,int,2> int2;
-typedef vector<xy,float,2> vec2;
+//typedef vector<xy,float,2> vec2;

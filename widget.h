@@ -44,3 +44,5 @@ struct Widget {
     /// \return whether the select event should trigger a repaint
     virtual bool selectEvent() { return false; }
 };
+
+extern Widget* focus;

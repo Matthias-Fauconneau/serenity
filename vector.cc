@@ -1,4 +1,5 @@
 #include "vector.h"
+#include "string.h"
 
 #define generic template <template <typename> class V, class T, int N>
 #define vector vector<V,T,N>
