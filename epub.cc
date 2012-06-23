@@ -2,8 +2,8 @@
 #include "linux.h"
 #include "debug.h"
 #include "font.h"
-//#include "display.h"
-//#include "text.h"
+#include "display.h"
+#include "text.h"
 /*#include "zip.h"
 #include "xml.h"
 //#include "html.h"
@@ -33,14 +33,12 @@ struct EPub : Application {
 Application(EPub)*/
 
 struct Test : Application {
-   // Text text {"Hello World!"_};
+    Text text i({"Hello World!"_});
     Test(array<string>&&) {
         catchErrors();
-        Font font("truetype/ttf-dejavu/DejaVuSans.ttf"_);
-        log(font.index('H'));
-        //openDisplay();
-        //text.position = int2(500,100); text.Widget::size = text.sizeHint();
-        //text.render(int2(0,0));
+        openDisplay();
+        text.position = int2(500,100); text.Widget::size = text.sizeHint();
+        text.render(int2(0,0));
     }
 };
 Application(Test)

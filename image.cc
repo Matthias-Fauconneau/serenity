@@ -2,7 +2,6 @@
 #include "stream.h"
 #include "vector.h"
 #include "string.h"
-#include "memory.h"
 #include "array.cc"
 template struct array<byte4>;
 
@@ -11,10 +10,6 @@ uvector(bgra,uint8,4)
 vector(bgra,int,4)
 
 #define generic template<class T>
-
-generic Image<T>::Image(int width, int height) :
-    data(width*height ? allocate<T>(width*height) : 0), width(width), height(height), stride(width), own(true) {
-}
 
 generic Image<T>::Image(array<T>&& data, uint width, uint height)
     : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
@@ -80,5 +75,6 @@ Image decodeImage(const array<byte>& file) {
     else { warn("Unknown image format",slice(file,0,4)); return Image(); }
 }
 */
+template struct Image<ubyte>;
 template struct Image<rgb565>;
 template struct Image<byte4>;

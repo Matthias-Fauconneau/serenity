@@ -24,6 +24,8 @@ xml.h
 xml.cc
 display.h
 display.cc
+image.h
+image.cc
 font.h
 font.cc
 epub.cc

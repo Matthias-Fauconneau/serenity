@@ -1,5 +1,6 @@
 #pragma once
 #include "core.h"
+void unallocate_(byte* buffer, int size);
 
 namespace std {
 template<class E> class initializer_list {
@@ -62,9 +63,7 @@ template<class T> struct array {
     array(const T* begin,const T* end) : buffer(begin, uint(end-begin), 0) {}
 
     /// If the array own the data, destroys all initialized elements and frees the buffer
-    void destroy();
-    /// Inline destructor for references
-    ~array() { if(tag!=-1) destroy(); }
+    ~array() { if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate_((byte*)buffer.data,buffer.capacity*sizeof(T)); } }
 
     /// Allocates enough memory for \a capacity elements
     void reserve(uint capacity);
@@ -116,9 +115,9 @@ template<class T, class O> array<T> cast(array<O>&& array);
 
 /// Slices an array referencing elements from \a pos to \a pos + \a size
 /// \note Using move semantics, this operation is safe without refcounting the data buffer
-//generic array slice(array&& a, uint pos, uint size);
+//array slice(array&& a, uint pos, uint size);
 /// Slices an array referencing elements from \a pos to the end of the array
-//generic array slice(array&& a, uint pos);
+//array slice(array&& a, uint pos);
 
 // Copyable?
 /// Slices an array copying elements from \a pos to \a pos + \a size

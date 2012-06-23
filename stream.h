@@ -34,14 +34,21 @@ struct Stream {
     ubyte next() const { return buffer[index]; }
 
     /// Seeks stream to /a index
-    void seek(uint index) { assert(index<buffer.size()); this->index=index; }
+    void seek(uint index) { assert(index<buffer.size(),index,buffer.size()); this->index=index; }
+
+    /// Reads \a size bytes from stream
+    array<byte> read(uint size) { array<byte> t = get(size); advance(size); return t; }
+
+    /// Read until the end of stream
+    array<byte> readAll() { uint size=available(-1); return read(size); }
 
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 };
 
 #define swap32 __builtin_bswap32
-inline uint16 swap16(uint16 x) { return swap32(x)>>16; }
+inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
+#define swap16 __builtin_bswap16
 
 /// \a DataStream provides a convenient interface to parse binaries
 struct DataStream : virtual Stream {
@@ -62,23 +69,18 @@ struct DataStream : virtual Stream {
         return false;
     }
 
-    /// Reads \a size bytes from stream
-    array<byte> read(uint size) { array<byte> t = get(size); advance(size); return t; }
-
     /// Reads one raw \a T element from stream
     template<class T> const T& read() { const T& t = raw<T>(get(sizeof(T))); advance(sizeof(T)); return t; }
 
     /// Reads \a size raw \a T elements from stream
-    template<class T> array<T> read(uint size) { array<T> t = cast<T>(get(size*sizeof(T))); advance(size*sizeof(T)); return t; }
+    template<class T> array<T> read(uint size) { array<T> t; for(uint i=0;i<size;i++) t<<(T)read(); return t; }
 
     /// Read from stream until next null byte
     string readString() { string s(buffer.data()+index,(uint)0); while(next()) { s.buffer.size++; advance(1); } advance(1); return s; }
 
-    /// Read until the end of stream
-    array<byte> readAll() { uint size=available(-1); return read(size); }
-
     struct ReadOperator {
         DataStream * s;
+        // Swap here and not in read<T>() since functions that differ only in their return type cannot be overloaded
         /// Reads an int32 and if necessary, swaps from stream to host byte order
         operator uint32() { return s->bigEndian?swap32(s->read<uint32>()):s->read<uint32>(); }
         operator int32() { return operator uint32(); }
@@ -94,6 +96,11 @@ struct DataStream : virtual Stream {
 
 /// \a TextStream provides a convenient interface to parse texts
 struct TextStream : virtual Stream {
+    TextStream():Stream(){}
+    TextStream(TextStream&& o):Stream(move(o)){}
+    TextStream(array<byte>&& array) : Stream(move(array)){}
+    TextStream& operator=(TextStream&& o){buffer=move(o.buffer);index=o.index;return *this;}
+
     /// Reads \a size bytes from stream
     array<byte> read(uint size) { array<byte> t = get(size); advance(size); return t; }
 

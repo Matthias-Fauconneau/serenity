@@ -10,13 +10,13 @@ template struct array<Text::Link>;
 
 Widget* focus;
 
+// All coordinates are .8 fixed point
 struct TextLayout {
     int size;
     int wrap;
     Font* font = 0;
-    FontMetrics metrics = font->metrics(size);
-    int2 pen = int2(0,metrics.ascender);
-    struct Character { int code; int2 pos; const Glyph& glyph; };
+    int2 pen;
+    struct Character { int code; int2 pos; const Pixmap glyph; };
     typedef array<Character> Word;
     array<Word> line;
     Word word;
@@ -26,13 +26,13 @@ struct TextLayout {
     array<Line> lines;
 
     void nextLine(bool justify) {
-        if(!line) { pen.y+=metrics.height; return; }
+        if(!line) { pen.y+=size; return; }
         //justify
         float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x; //sum word length
         length += line.last().last().glyph.pixmap.width - line.last().last().glyph.advance.x; //for last word of line, use glyph bound instead of advance
         float space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0||space>64) space = font->metrics(size,' ').advance.x; //compact
+        if(space<=0||space>64) space = font->glyph(size,' ').advance.x; //compact
 
         //layout
         pen.x=0;
@@ -42,10 +42,10 @@ struct TextLayout {
             pen.x += word.last().pos.x+word.last().glyph.advance.x+space;
         }
         line.clear();
-        pen.x=0; pen.y+=metrics.height;
+        pen.x=0; pen.y+=size;
     }
 
-    TextLayout(int size, int wrap, const string& s):size(size),wrap(wrap) {
+    TextLayout(int size, int wrap, const string& s):size(size<<8),wrap(wrap<<8) {
         uint previous=' ';
         Format format=Format::Regular;
         Text::Link link;
@@ -56,7 +56,7 @@ struct TextLayout {
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
-                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font->metrics(size,' ').advance.x;
+                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font->glyph(size,' ').advance.x;
                 length += word.last().pos.x+word.last().glyph.pixmap.width; //last word
                 if(wrap && length>=wrap) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
@@ -103,7 +103,7 @@ struct TextLayout {
     int2 textSize() {
        int2 max;
        for(Character c: text) max=::max(max,int2(c.pos)+c.glyph.pixmap.size());
-       if(max.y<metrics.height) max.y=metrics.height;
+       max.y=::max(max.y, size);
        return max;
     }
 };
@@ -113,11 +113,9 @@ Array(TextLayout::Word)
 Array(TextLayout::Line)
 
 Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
-Text::~Text()=default;
 void Text::update(int wrap) {
     lines.clear();
     blits.clear();
-    //if(!text) { textSize=int2(1,defaultSans.metrics(size).height); return; }
     if(text.last()!='\n') text << '\n';
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
     for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2(round(c.pos.x),round(c.pos.y)),c.glyph.pixmap});

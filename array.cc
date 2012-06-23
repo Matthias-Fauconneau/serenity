@@ -2,12 +2,6 @@
 #include "debug.h"
 #include "memory.h"
 
-#if __WORDSIZE == 64
-typedef unsigned long size_t;
-#else
-typedef unsigned int size_t;
-#endif
-
 inline void* operator new(size_t, void* p) { return p; } //placement new
 
 #define generic template<class T>
@@ -20,13 +14,11 @@ generic array<T>::array(array<T>&& o) {
 }
 
 generic array<T>& array<T>::operator=(array<T>&& o) {
-    if(tag!=-1) destroy();
+    this->~array();
     if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(*this));
     o.tag=0;
     return *this;
 }
-
-generic void array<T>::destroy() { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); }
 
 generic array<T>::array(uint capacity) { reserve(capacity); }
 generic array<T>::array(initializer_list<T>&& list) {

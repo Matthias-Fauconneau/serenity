@@ -138,7 +138,11 @@ inline string str(const long& n) { return dec(n); }
 inline const string& str(const string& s) { return s; }
 template<class A> inline string str(const cat<A>& s) { return s; }
 template<class A> inline string str(A* const& p) { return p?utoa<16>(uint(p)):"null"_; }
-template<class T> inline string str(const array<T>& list) { string r; for(const T& e: list) r << str(e); return r; }
+template<class T> inline string str(const array<T>& a) {
+    string s="["_;
+    for(uint i=0;i<a.size();i++) { s<<str(a[i]); if(i<a.size()-1) s<<", "_;}
+    s<<"]"_; return s;
+}
 
 /// Concatenates string representation of its arguments
 /// \note directly use operator+ to avoid spaces

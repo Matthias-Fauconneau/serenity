@@ -15,7 +15,6 @@ struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(string&& text=""_, int size=16, ubyte opacity=255, int wrap=0);
     Text(Text&&)=default;
-    ~Text();
 
     void setText(string&& text) { this->text=move(text); textSize=zero; }
     void setSize(int size) { this->size=size; textSize=zero; }

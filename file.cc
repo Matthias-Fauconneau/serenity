@@ -47,7 +47,7 @@ array<byte> readFile(const string& path, int at) {
 Map mapFile(const string& path, int at) {
     int fd = openat(at, strz(path), O_RDONLY, 0);
     if(fd < 0) error("File not found"_,"'"_+path+"'"_);
-    struct stat sb; fstat(fd, &sb); assert(sb.size<2<<20,hex(sb.size),dump(sb));
+    struct stat sb; fstat(fd, &sb);
     const byte* data = (byte*)mmap(0,(size_t)sb.size,PROT_READ,MAP_PRIVATE,fd,0);
     close(fd);
     return Map(data,(int)sb.size);

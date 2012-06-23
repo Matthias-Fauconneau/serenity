@@ -11,8 +11,6 @@ FLAGS += $(FLAGS__$(BUILD))
 FLAGS__debug := -g -DDEBUG -fno-omit-frame-pointer
 FLAGS__release := -O3 -ffast-math
 FLAGS__profile := -g -mapcs -O -finstrument-functions -finstrument-functions-exclude-file-list=core,array,map,profile
-FLAGS_font = -I/usr/include/freetype2
-
 FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
 
 SRCS = $(SRCS__$(BUILD)) $(SRCS_$(TARGET))
@@ -45,7 +43,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 
 $(BUILD)/%.d: %.cc
 		@test -e $(dir $@) || mkdir -p $(dir $@)
-		$(CCX) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+		$(CCX) $(FLAGS) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(BUILD)/$(TARGET).l
