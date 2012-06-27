@@ -26,6 +26,7 @@ string demangle(TextStream& s) {
         if(s.match("O"_)) rvalue=true;
         else if(s.match("R"_)) ref=true;
         else if(s.match("K"_)) r<<"const "_;
+        else if(s.match("L"_)) r<<"static "_;
         else if(s.match("P"_)) pointer++;
         else break;
     }
@@ -42,7 +43,15 @@ string demangle(TextStream& s) {
     else if(s.match("x"_)) r<<"int64"_;
     else if(s.match("y"_)) r<<"uint64"_;
     else if(s.match("T_"_)) r<<"T"_;
-    else if(s.match("Z"_)) {
+    else if(s.match("S_"_)) r<<"S"_; else if(s.match("S0_"_)) r<<"S0"_; else if(s.match("S1_"_)) r<<"S1"_; //TODO
+    else if(s.match("I"_)) { //template
+        array<string> args;
+        while(s && !s.match("E"_)) {
+            if(s.get(1)=="Z"_) args<<demangle(s)<<"::"_<<demangle(s);
+            else args<<demangle(s);
+        }
+        r<<"<"_<<join(args,", "_)<<">"_;
+    } else if(s.match("Z"_)) {
         bool const_method =false;
         if(s.match("N"_)) {
             array<string> list;
@@ -55,20 +64,13 @@ string demangle(TextStream& s) {
                 else if(s.match("cv"_)) list << ("operator "_ + demangle(s));
                 else if((l=s.number())!=-1) {
                     list << s.read(l); //class/member
-                    if(s.match("I"_)) {
-                        array<string> args;
-                        while(s && !s.match("E"_)) {
-                            if(s.get(1)=="Z"_) args<< demangle(s)+"::"_+demangle(s);
-                            else args<<demangle(s);
-                        }
-                        list.last()<<"<"_<<join(args,", "_)<<">"_; //template
-                    }
-                }
-                else { log("N"_,r,string(s.readAll()),string(move(s.buffer))); break; }
+                    if(s.next()=='I') list.last()<< demangle(s);
+                } else { log("N"_,r,string(s.readAll()),string(move(s.buffer))); break; }
             }
             r<< join(list,"::"_);
         } else if((l=s.number())!=-1) {
             r<< s.read(l); //function
+            if(s.next()=='I') r<< demangle(s);
         }
         array<string> args;
         while(s && !s.match("E"_)) args << demangle(s);
@@ -77,14 +79,7 @@ string demangle(TextStream& s) {
     } else if(s.match("_0"_)) {
     } else if((l=s.number())!=-1) {
         r<<s.read(l); //struct
-        if(s.match("I"_)) {
-            array<string> args;
-            while(s && !s.match("E"_)) {
-                if(s.get(1)=="Z"_) args<<demangle(s)<<"::"_<<demangle(s);
-                else args<<demangle(s);
-            }
-            r<<"<"_<<join(args,", "_)<<">"_; //template
-        }
+        if(s.next()=='I') r<< demangle(s);
     } else { log("A"_,r,string(s.readAll()),string(move(s.buffer))); return r; }
     for(int i=0;i<pointer;i++) r<<"*"_;
     if(rvalue) r<<"&&"_;
@@ -93,7 +88,7 @@ string demangle(TextStream& s) {
 }
 
 Symbol findNearestLine(void* find) {
-    static Map map = mapFile("/proc/self/exe"_);
+    static Map map = mapFile("proc/self/exe"_);
     const byte* elf = map.data;
     const Ehdr& hdr = *(Ehdr*)elf;
     auto sections = array<Shdr>((Shdr*)(elf+hdr.shoff),hdr.shnum);
@@ -193,12 +188,12 @@ enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, S
 static void handler(int sig, struct siginfo*, ucontext* context) {
     if(sig == SIGSEGV) log("Segmentation violation"_);
 #if __x86_64__
-    Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]);
+    {Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
 #elif __arm__
-    Symbol s = findNearestLine((void*)context->arm_pc);
+    {Symbol s = findNearestLine((void*)context->arm_lr); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    {Symbol s = findNearestLine((void*)context->arm_pc); log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
 #endif
-    log(s.file+":"_+str(s.line)+"   \t"_+s.function);
-    exit(-1);
+    abort();
 }
 
 void catchErrors() {

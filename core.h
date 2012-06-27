@@ -36,7 +36,7 @@ template<> struct predicate<true> { typedef void* type; };
 
 /// Primitives
 typedef signed char int8;
-typedef signed char byte;
+typedef unsigned char byte;
 typedef unsigned char uint8;
 typedef unsigned char ubyte;
 typedef signed short int16;

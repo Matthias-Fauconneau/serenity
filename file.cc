@@ -64,7 +64,7 @@ void writeFile(const string& path, const array<byte>& content, int at, bool over
 
 /// File system
 
-int root = openat(-100,"/", O_RDONLY|O_DIRECTORY, 0);
+int root() { static int fd = openFolder("/"_,-100); return fd; }
 
 int openFolder(const string& path, int at) {
     int fd = openat(at, strz(path), O_RDONLY|O_DIRECTORY, 0);

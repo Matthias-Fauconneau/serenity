@@ -3,11 +3,11 @@
 #include "vector.h"
 #include "string.h"
 #include "array.cc"
-template struct array<byte4>;
+//template struct array<byte4>;
 
-#include "vector.cc"
-uvector(bgra,uint8,4)
-vector(bgra,int,4)
+//#include "vector.cc"
+//uvector(bgra,uint8,4)
+//vector(bgra,int,4)
 
 #define generic template<class T>
 
@@ -75,6 +75,3 @@ Image decodeImage(const array<byte>& file) {
     else { warn("Unknown image format",slice(file,0,4)); return Image(); }
 }
 */
-template struct Image<ubyte>;
-template struct Image<rgb565>;
-template struct Image<byte4>;

@@ -36,34 +36,28 @@ void finish() { clipStack.pop(); assert(!clipStack); currentClip=Rect(int2(0,0),
 
 /// Fill
 
-void fill(Rect rect, byte4 color, Blend blend) {
+void fill(Rect rect, rgb color) {
     rect=rect.clip(currentClip);
     for(int y= rect.min.y; y<rect.max.y; y++)
         for(int x= rect.min.x; x<rect.max.x; x++) {
-            byte4 s = color;
-            rgb& d = framebuffer(x,y);
-            int4 t = (int4)d;
-            if(blend == Opaque) d=s;
-            else if(blend==Multiply) d = byte4((int4(s)*t)/255);
-            else if(blend==Alpha) d = byte4((s.a*int4(s) + (255-s.a)*t)/255);
+            framebuffer(x,y) = color;
         }
 }
 
 /// Blit
 
-void blit(int2 target, const Pixmap& source, Blend blend, int alpha) {
+void blit(int2 target, const Image<gray>& source) {
     Rect rect = (target+Rect(source.size())).clip(currentClip);
     for(int y= rect.min.y; y<rect.max.y; y++)
         for(int x= rect.min.x; x<rect.max.x; x++) {
-            byte4 s = source(x-target.x,y-target.y);
-            rgb& d = framebuffer(x,y);
-            int4 t = (int4)d;
-            if(blend == Opaque) d=s;
-            else if(blend==Multiply) d = byte4((int4(s)*t)/255);
-            else if(blend==Alpha) d = byte4((s.a*int4(s) + (255-s.a)*t)/255);
-            else if(blend==MultiplyAlpha) {
-                int a = max(int(t.a),s.a*alpha/255);
-                if(t.a) d = byte4((int4(s)*t*255/t.a)*a/255/255);//FIXME: composite, d.a=a;
-            }
+            framebuffer(x,y) = source(x-target.x,y-target.y);
         }
 }
+/*void blit(int2 target, const Pixmap& source) {
+    Rect rect = (target+Rect(source.size())).clip(currentClip);
+    for(int y= rect.min.y; y<rect.max.y; y++)
+        for(int x= rect.min.x; x<rect.max.x; x++) {
+            framebuffer(x,y) = source(x-target.x,y-target.y);
+        }
+}*/
+

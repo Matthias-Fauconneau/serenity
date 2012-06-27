@@ -26,7 +26,7 @@ struct Stream {
     /// Returns number of bytes available, reading \a need bytes from underlying device if possible
     virtual uint available(uint /*need*/) { return buffer.size()-index; }
     /// Returns next \a size bytes from stream
-    virtual array<byte> get(uint size) const { assert(index+size<=buffer.size());  return array<byte>(buffer.data()+index,size); }
+    virtual array<byte> get(uint size) const { assert(index+size<=buffer.size(),index,size,buffer.size());  return array<byte>(buffer.data()+index,size); }
     /// Advances \a count bytes in stream
     virtual void advance(int count) { index+=count;  assert(index<=buffer.size()); }
 

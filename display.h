@@ -1,5 +1,6 @@
 #pragma once
 #include "image.h"
+#include "vector.h"
 
 void openDisplay();
 extern int2 screen;
@@ -19,13 +20,9 @@ void push(Rect clip);
 void pop();
 void finish();
 
-enum Blend { Opaque, Alpha, Multiply, MultiplyAlpha };
 /// Fill framebuffer area in \a rect with \a color
-void fill(Rect rect, byte4 color, Blend blend=Opaque);
+void fill(Rect rect, rgb color);
 
 /// Blit \a source to framebuffer at \a target
-void blit(int2 target, const Pixmap& source, Blend blend=Opaque, int alpha=255);
-
-inline byte4 gray(int level) { return byte4(level,level,level,255); }
-const byte4 white = gray(255);
-const byte4 black = gray(0);
+void blit(int2 target, const Image<gray>& source);
+//void blit(int2 target, const Pixmap& source);

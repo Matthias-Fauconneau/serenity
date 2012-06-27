@@ -10,30 +10,22 @@
 struct Glyph {
     int2 offset; // (left bearing, min.x-baseline)
     int2 advance;
-    Image<ubyte> image;
+    Image<gray> image;
 };
 
+/// Font is a truetype font render
 struct Font {
-    string name;
-
     Map keep;
-
     DataStream cmap;
+    void* loca; int16 indexToLocFormat;
+    byte* glyf; int scale, round, size;
+    Glyph cache[256]; //TODO: Unicode
 
-    void* loca;
-    int16 indexToLocFormat;
-
-    byte* glyf;
-    uint16 unitsPerEm;
-
-    typedef map<int, Glyph> GlyphCache;
-    map<int, GlyphCache> cache;
-
-    Font(string path);
-    int kerning(uint16 leftCode, uint16 rightCode);
-    /// Caches and returns glyph for \a code a \a size
-    /// \note Glyph references might become dangling on cache resize
-    const Glyph& glyph(int size, uint16 code);
+    Font(string path, int size);
+    /// Returns kerning space between \a left and \a right
+    int kerning(uint16 left, uint16 right);
+    /// Caches and returns glyph for \a code
+    Glyph glyph(uint16 code);
 private:
     uint16 index(uint16 code);
 };

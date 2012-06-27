@@ -148,6 +148,9 @@ generic int indexOf(const array& a, const T& value);
 /// Returns true if the array contains an occurrence of \a value
 generic bool contains(const array& a, const T& value);
 generic int removeOne(array& a, T v);
+generic void removeAll(array& a, T v);
+generic void appendOnce(array& a, T&& v);
+generic void appendOnce(array& a, const T& v);
 /// Replaces in \a array every occurence of \a before with \a after
 generic array replace(array&& a, const T& before, const T& after);
 

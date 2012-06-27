@@ -71,13 +71,6 @@ generic array<T>& array<T>::operator <<(array<T>&& a) { int s=size()+a.size(); r
 
 #define array array<T>
 
-/*generic array slice(array&& a, uint pos, uint size) {
-    assert(pos+size<=a.size());
-    assert(pos==0 || a.capacity() == 0); //only allow slicing of referencing arrays. TODO: custom realloc with slicing
-    return array(a.data()+pos,size);
-}
-generic array slice(array&& a, uint pos) { return slice(move(a),pos,a.size()-pos); }*/
-
 // Copyable?
 generic array slice(const array& a, uint pos, uint size) {
     assert(pos+size<=a.size());
@@ -120,6 +113,7 @@ generic bool operator !=(const array& a, const array& b) { return !(a==b); }
 generic int indexOf(const array& a, const T& value) { for(uint i=0;i<a.size();i++) { if(a[i]==value) return i; } return -1; }
 generic bool contains(const array& a, const T& value) { return indexOf(a,value)>=0; }
 generic int removeOne(array& a, T v) { int i=indexOf(a, v); if(i>=0) a.removeAt(i); return i; }
+generic void removeAll(array& a, T v) { for(uint i=0;i<a.size();i++) if(a[i]==v) a.removeAt(i), i--; }
 generic void appendOnce(array& a, T&& v) { if(!contains(a,v)) a.append(move(v)); }
 generic void appendOnce(array& a, const T& v) { if(!contains(a,v)) a.append(copy(v)); }
 generic array replace(array&& a, const T& before, const T& after) {

@@ -42,7 +42,7 @@ struct Text : Widget {
     int2 textSize=zero;
 
     // laid out glyphs to blit
-    struct Blit { int2 pos; const Pixmap& pixmap; };
+    struct Blit { int2 pos; const Image<gray>& image; };
     array<Blit> blits;
     struct Line { int2 min,max; };
     array<Line> lines;

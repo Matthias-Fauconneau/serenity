@@ -6,14 +6,10 @@ array.h
 array.cc
 string.h
 string.cc
+memory.h
 memory.cc
 debug.h
 debug.cc
-process.h
-time.h
-time.cc
-file.h
-file.cc
 stream.h
 stream.cc
 inflate.h
@@ -22,6 +18,8 @@ zip.h
 zip.cc
 xml.h
 xml.cc
+vector.h
+vector.cc
 display.h
 display.cc
 image.h
@@ -29,3 +27,4 @@ image.cc
 font.h
 font.cc
 epub.cc
+parser.files

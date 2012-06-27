@@ -24,12 +24,12 @@ void* operator new(uint size) { return allocate_(size); }
 void operator delete(void*) { /*TODO*/ }
 extern "C" void __aeabi_memset(byte* s, uint n, byte c) { clear(s,n,c); }
 #include "array.cc"
-Array_Copy_Compare_Sort_Default(int8)
-//Array_Copy_Compare_Sort_Default(uint8)
+//Array_Copy_Compare_Sort_Default(int8)
+Array_Copy_Compare_Sort_Default(uint8)
 //Array_Copy_Compare_Sort_Default(int16)
 Array_Copy_Compare_Sort_Default(uint16)
 //Array_Copy_Compare_Sort_Default(int32)
-Array_Copy_Compare_Sort_Default(uint32)
+//Array_Copy_Compare_Sort_Default(uint32)
 //Array_Copy_Compare_Sort_Default(int64)
 //Array_Copy_Compare_Sort_Default(uint64)
 //Array_Copy_Compare_Sort_Default(float)

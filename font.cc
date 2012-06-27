@@ -1,13 +1,8 @@
 #include "font.h"
-typedef int16 FWord; //FUnits design coordinates
 
-#include "array.cc"
-Array_Default(Glyph)
-Array_Default(Font::GlyphCache)
+static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 
-static int fonts() { static int fd = openFolder("/usr/share/fonts"_); return fd; }
-
-Font::Font(string name) : keep(mapFile(name,fonts())) {
+Font::Font(string name, int size) : keep(mapFile(name,fonts())), size(size) {
     DataStream s(keep);
     s.bigEndian=true;
     uint32 unused scaler=s.read();
@@ -24,11 +19,14 @@ Font::Font(string name) : keep(mapFile(name,fonts())) {
        DataStream& s = head;
        uint32 unused version=s.read(), unused revision=s.read();
        uint32 unused checksum=s.read(), unused magic=s.read();
-       uint16 unused flags=s.read(); unitsPerEm=s.read();
+       uint16 unused flags=s.read(), unitsPerEm=s.read();
        uint64 unused created=s.read(), unused modified=s.read();
-       array<FWord> unused bbox = s.read<FWord>(4);
+       //array<int16> unused bbox = s.read<int16>(4);
        uint16 unused macStyle=s.read(), unused lowestRecPPEM=s.read();
        int16 unused fontDirection = s.read(); indexToLocFormat=s.read(); int16 unused glyphDataFormat=s.read();
+       // inline function to scale from design (FUnits) to device (.8 pixel)
+       scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=8;
+       round = (1<<scale)/2; //round to nearest not down
     }
 }
 
@@ -63,16 +61,11 @@ int Font::kerning(uint16 /*leftCode*/, uint16 /*rightCode*/) {
     return 0;
 }
 
-const Glyph& Font::glyph(int size, uint16 code) {
+Glyph Font::glyph(uint16 code) {
     // Lookup glyph in cache
-    GlyphCache& glyphs = cache[size];
-    Glyph& glyph = glyphs[code]; //TODO: lookup for code in [0x20..0x80]
-    if(glyph.image || glyph.advance.x) return glyph;
-
-    // inline function to scale from design (FUnits) to device (.8 pixel)
-    int scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=8;
-    int round = (1<<scale)/2; //round to nearest not down
-    #define scale(p) ((size*(p)+round)>>scale)
+    assert(code<256);
+    Glyph& glyph = cache[code];
+    if(glyph.image || glyph.advance.x) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
 
     // map unicode to glyf outline
     int i = index(code);
@@ -82,7 +75,7 @@ const Glyph& Font::glyph(int size, uint16 code) {
     DataStream s(array<byte>(glyf +start, length),true);
 
     int16 numContours = s.read();
-    array<FWord> bbox = s.read<FWord>(4);
+    int16 xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
 
     if(numContours>0) {
         array<uint16> endPtsOfContours = s.read<uint16>(numContours);
@@ -98,28 +91,29 @@ const Glyph& Font::glyph(int size, uint16 code) {
             flagsArray[i]=flags;
         }
 
-        int16 X[nofPoints]; FWord last=-bbox[0];
+        int16 X[nofPoints]; int16 last=-xMin;
         for(int i=0;i<nofPoints;i++) { auto flags=flagsArray[i];
             if(flags.short_x) {
                 if(flags.same_sign_x) last+= (uint8)s.read();
                 else last-= (uint8)s.read();
             } else if(!flags.same_sign_x) last+= (int16)s.read();
+#define scale(p) ((size*(p)+round)>>scale)
             X[i]= scale(last);
         }
 
-        int16 Y[nofPoints]; last=-bbox[1];
+        int16 Y[nofPoints]; last=-yMin;
         for(int i=0;i<nofPoints;i++) { auto flags=flagsArray[i];
             if(flags.short_y) {
                 if(flags.same_sign_y) last+= (uint8)s.read();
                 else last-= (uint8)s.read();
             } else if(!flags.same_sign_y) last+= (int16)s.read();
-            Y[i]= scale((bbox[3]-bbox[1])-last); //flip to downward y
+            Y[i]= scale((yMax-yMin)-last); //flip to downward y
         }
 
-        int width= (scale(bbox[2]-bbox[0])>>8)+1, height= (scale(bbox[3]-bbox[1])>>8)+1;
+        int width= (scale(xMax-xMin)>>8)+1, height= (scale(yMax-yMin)>>8)+1;
         struct cover_flag{ uint8 cover; int8 flag; };
         Image<cover_flag> raster(width,height);
-        clear((byte*)raster.data,sizeof(cover_flag)*width*height);
+        for(int i=0;i<width*height; i++) raster.data[i]={0,0};
 
         for(int n=0,i=0; n<numContours; n++) {
             //rasterizing contours as polygon // TODO: quadratic
@@ -140,7 +134,7 @@ const Glyph& Font::glyph(int size, uint16 code) {
             }
         }
 
-        glyph.image= Image<ubyte>(width,height);
+        glyph.image= Image<gray>(width,height);
         for(int y=0; y<height; y++) {
             int acc=0;
             for(int x=0; x<width; x++) {
@@ -155,6 +149,6 @@ const Glyph& Font::glyph(int size, uint16 code) {
             error("compound");
         }
     }
-    glyph.offset= int2(scale(bbox[0]),scale(bbox[1]));
-    return glyph;
+    glyph.offset= int2(scale(xMin),scale(yMin));
+    return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
 }
