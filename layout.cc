@@ -1,5 +1,5 @@
 #include "layout.h"
-#include "raster.h"
+#include "display.h"
 
 #include "array.cc"
 template struct array<Widget*>;

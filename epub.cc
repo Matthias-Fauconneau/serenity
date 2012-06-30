@@ -1,8 +1,7 @@
 #include "process.h"
-#include "linux.h"
-#include "debug.h"
-#include "font.h"
-#include "display.h"
+//#include "debug.h"
+//#include "font.h"
+//#include "display.h"
 #include "text.h"
 /*#include "zip.h"
 #include "xml.h"
@@ -37,9 +36,8 @@ struct Test : Application {
     Test(array<string>&&) {
         catchErrors();
         openDisplay();
-        text.position = int2(0,0); //text.Widget::size = text.sizeHint();
+        text.position = int2(0,0); text.Widget::size = text.sizeHint();
         text.render(int2(0,0));
     }
 };
 Application(Test)
-

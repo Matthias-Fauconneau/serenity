@@ -187,11 +187,13 @@ enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, S
 
 static void handler(int sig, struct siginfo*, ucontext* context) {
     if(sig == SIGSEGV) log("Segmentation violation"_);
-#if __x86_64__
-    {Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-#elif __arm__
+#if __arm__
     {Symbol s = findNearestLine((void*)context->arm_lr); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine((void*)context->arm_pc); log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
+#elif __x86_64__
+    {Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
+#elif __i386__
+    {Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_EIP]); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
 #endif
     abort();
 }

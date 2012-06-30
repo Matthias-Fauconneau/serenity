@@ -2,20 +2,17 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
 
-CCX = clang++
-#CCX = g++ -fno-implicit-templates
-#-mapcs
+#CC = clang
+CC = g++ -fno-implicit-templates -pipe -std=c++0x
+CC += -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions -fno-rtti -fno-exceptions
+CC += $(FLAGS_$(BUILD))
+FLAGS_debug := -g -DDEBUG
+FLAGS_release := -O3 -ffast-math
+FLAGS_profile := -g -O -finstrument-functions -finstrument-functions-exclude-file-list=core,array,map,profile
 
-FLAGS ?= -pipe -std=c++11 -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions -fno-rtti -fno-exceptions
-FLAGS += $(FLAGS__$(BUILD))
-FLAGS__debug := -g -DDEBUG -fno-omit-frame-pointer
-FLAGS__release := -O3 -ffast-math
-FLAGS__profile := -g -mapcs -O -finstrument-functions -finstrument-functions-exclude-file-list=core,array,map,profile
-FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
-
-SRCS = $(SRCS__$(BUILD)) $(SRCS_$(TARGET))
-SRCS__profile += profile
-SRCS__memory += memory
+SRCS = $(SRCS_$(BUILD)) $(SRCS_$(TARGET))
+SRCS_profile += profile
+SRCS_memory += memory
 SRCS_taskbar += png inflate
 SRCS_desktop += png inflate jpeg ico
 SRCS_player += png inflate
@@ -43,14 +40,14 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 
 $(BUILD)/%.d: %.cc
 		@test -e $(dir $@) || mkdir -p $(dir $@)
-		$(CCX) $(FLAGS) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+		$(CC) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(BUILD)/$(TARGET).l
 endif
 
 $(BUILD)/%.o : %.cc
-		$(CCX) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
+		$(CC) -c -o $@ $<
 
 $(BUILD)/%.o: %.png
 		@test -e $(dir $@) || mkdir -p $(dir $@)

@@ -1,5 +1,5 @@
 #pragma once
-#include "string.h"
+//#include "string.h"
 
 struct pollfd { int fd; short events, revents; };
 enum { POLLIN = 1, POLLOUT=4, POLLHUP = 16 };

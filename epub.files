@@ -8,6 +8,8 @@ string.h
 string.cc
 memory.h
 memory.cc
+process.h
+process.cc
 debug.h
 debug.cc
 stream.h

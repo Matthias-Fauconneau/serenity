@@ -1,13 +1,11 @@
+fix dwarf debug
 Font
 // forward differenciate at each integer pixel crossing
 // - add line-pixel quad area (to bottom if going right, to left if going down, to top if going left, to right if going up)
 //   and for up/bottom horizontal crossing: flag pixel to the right (+1 if up, -1 if down)
 // - scan left-to-right, accumulate +1/-1 flags and fill non-zero
-update desktop, taskbar, player 
-EPub viewer: fix unzip, parse, display, linux framebuffer
-Text Editor, File Manager
-IMAP, Wiki, PDF, Search
-System: Onscreen Keyboard | Handwriting Recognition
-Touchbook: rotate screen, fix touchscreen, accelerometer trigger
-Build: folders, -deps.py, dep graph + stats (size,loc,time)
-IDE, Compiler (C++11,D,Clay)
+update desktop, taskbar, player
+EPub viewer: inflate, parse, display, linux framebuffer
+Text Editor, File Manager, IMAP, Wiki, PDF, Search, +HTML
+Touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen
+Build: -deps.py+make, dep graph + stats (size,loc,time), folders, IDE, Compiler (C++11~Clay~D)
