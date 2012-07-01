@@ -31,7 +31,7 @@ struct Stream {
     virtual void advance(int count) { index+=count;  assert(index<=buffer.size()); }
 
     /// Returns the next byte in stream
-    ubyte next() const { return buffer[index]; }
+    ubyte next() const { assert(index<buffer.size()); return buffer[index]; }
 
     /// Seeks stream to /a index
     void seek(uint index) { assert(index<buffer.size(),index,buffer.size()); this->index=index; }

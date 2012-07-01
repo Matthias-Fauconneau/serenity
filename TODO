@@ -1,9 +1,6 @@
-fix dwarf debug
 Font
-// forward differenciate at each integer pixel crossing
-// - add line-pixel quad area (to bottom if going right, to left if going down, to top if going left, to right if going up)
-//   and for up/bottom horizontal crossing: flag pixel to the right (+1 if up, -1 if down)
-// - scan left-to-right, accumulate +1/-1 flags and fill non-zero
+- quadratic forward differenciate at each integer pixel crossing
+- add line-pixel quad area (to bottom if going right, to left if going down, to top if going left, to right if going up)
 update desktop, taskbar, player
 EPub viewer: inflate, parse, display, linux framebuffer
 Text Editor, File Manager, IMAP, Wiki, PDF, Search, +HTML

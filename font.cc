@@ -12,6 +12,7 @@ Font::Font(string name, int size) : keep(mapFile(name,fonts())), size(size) {
         uint32 tag=s.read<uint32>(), unused checksum=s.read(), offset=s.read(), unused size=s.read();
         if(tag==raw<uint32>("head"_)) head=DataStream(s.slice(offset,size));
         if(tag==raw<uint32>("cmap"_)) cmap=DataStream(s.slice(offset,size));
+        if(tag==raw<uint32>("hmtx"_)) hmtx=(uint16*)(s.buffer.data()+offset);
         if(tag==raw<uint32>("loca"_)) loca=s.buffer.data()+offset;
         if(tag==raw<uint32>("glyf"_)) glyf=s.buffer.data()+offset;
     }
@@ -59,18 +60,21 @@ int Font::kerning(uint16 /*leftCode*/, uint16 /*rightCode*/) {
     return 0;
 }
 
+struct cover_flag{ uint8 cover; int8 flag; };
 Glyph Font::glyph(uint16 code) {
     // Lookup glyph in cache
     assert(code<256);
     Glyph& glyph = cache[code];
-    if(glyph.image || glyph.advance.x) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
+    if(glyph.image || glyph.advance) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
 
     // map unicode to glyf outline
     int i = index(code);
-    //glyph.advance = TODO: parse 'hmtx' table
+#define scale(p) ((size*(p)+round)>>scale)
+    glyph.advance = scale(hmtx[2*i])>>8;
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[i]) : 2*swap16(((uint16*)loca)[i]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[i+1]) : 2*swap16(((uint16*)loca)[i+1]) ) - start;
     DataStream s(array<byte>(glyf +start, length),true);
+    if(!s) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
 
     int16 numContours = s.read();
     int16 xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
@@ -95,7 +99,6 @@ Glyph Font::glyph(uint16 code) {
                 if(flags.same_sign_x) last+= (uint8)s.read();
                 else last-= (uint8)s.read();
             } else if(!flags.same_sign_x) last+= (int16)s.read();
-#define scale(p) ((size*(p)+round)>>scale)
             X[i]= scale(last);
         }
 
@@ -109,7 +112,6 @@ Glyph Font::glyph(uint16 code) {
         }
 
         int width= (scale(xMax-xMin)>>8)+1, height= (scale(yMax-yMin)>>8)+1;
-        struct cover_flag{ uint8 cover; int8 flag; };
         Image<cover_flag> raster(width,height);
         for(int i=0;i<width*height; i++) raster.data[i]={0,0};
 
@@ -124,7 +126,7 @@ Glyph Font::glyph(uint16 code) {
                 int dir=-1;
                 if(y1>y2) swap(x1,x2), swap(y1,y2), dir=1; //up
                 else if(y1==y2) continue;
-                int deltaX=x2-x1; uint deltaY=y2-y1;
+                int deltaX=x2-x1, deltaY=y2-y1;
                 for(int y=y1;y<=y2;y+=1<<8) { //for each horizontal crossing
                     int x = x1+(y-y1)*deltaX/deltaY;
                     raster(x>>8,y>>8).flag+=dir; //fill flag

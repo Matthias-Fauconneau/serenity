@@ -5,11 +5,9 @@
 #include "file.h"
 #include "map.h"
 
-// All coordinates are .8 fixed point
-
 struct Glyph {
     int2 offset; // (left bearing, min.x-baseline)
-    int2 advance;
+    int advance;
     Image<gray> image;
 };
 
@@ -17,6 +15,7 @@ struct Glyph {
 struct Font {
     Map keep;
     DataStream cmap;
+    uint16* hmtx;
     void* loca; int16 indexToLocFormat;
     byte* glyf; int scale, round, size;
     Glyph cache[256]; //TODO: Unicode

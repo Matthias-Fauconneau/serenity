@@ -4,28 +4,18 @@
 #include "debug.h"
 byte* allocate_(int size);
 
-//template<class T> struct bgra { T b,g,r,a; };
-//typedef vector<bgra,uint8,4> byte4;
+template<class T> struct bgra { T b,g,r,a; };
+typedef vector<bgra,uint8,4> byte4;
 //typedef vector<bgra,int,4> int4;
 
 struct gray {
     uint8 level;
     gray(uint8 level):level(level){}
-    //operator byte4() { return byte4(level,level,level,255); }
-    //operator int4() { return int4(level,level,level,255); }
+    operator byte4() const { return byte4(level,level,level,255); }
+    //operator int4() const { return int4(level,level,level,255); }
 };
 const gray white = gray(255);
 const gray black = gray(0);
-
-struct rgb565 {
-    uint16 pack;
-    rgb565():pack(0){}
-    rgb565(gray g):pack( (g.level&0b11111000)<<8 | (g.level&0b11111100)<<3 | g.level>>3 ) {}
-    rgb565(uint8 r, uint8 g, uint8 b):pack( (r&0b11111000)<<8 | (g&0b11111100)<<3 | b>>3 ) {}
-    //rgb565(byte4 c):rgb565(c.r, c.g, c.b){}
-    //operator byte4() { return byte4( (pack>>8)&0b11111000, (pack>>3)&0b11111100, pack<<3, 255); }
-    //  operator int4() { return int4( (pack>>8)&0b11111000, (pack>>3)&0b11111100, (pack<<3)&0b11111000, 255); }
-};
 
 template<class T> struct Image {
     no_copy(Image)
@@ -44,8 +34,8 @@ template<class T> struct Image {
     ~Image(){ if(data && own) { delete data; data=0; } }
     explicit operator bool() const { return data; }
 
-    T operator()(uint x, uint y) const {assert(x<width && y<height,x,y,width,height); return data[y*stride+x]; }
-    T& operator()(uint x, uint y) {assert(x<width && y<height,x,y,width,height); return data[y*stride+x]; }
+    T operator()(uint x, uint y) const {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
+    T& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
     int2 size() const { return int2(width,height); }
 };
 /// Creates a new handle to \a image data (unsafe if freed)
@@ -71,11 +61,3 @@ Image flip(Image&& image);
 /// Decodes \a file to an Image
 Image decodeImage(const array<byte>& file);
 */
-
-#define RGB565 1
-#if RGB565
-typedef rgb565 rgb;
-#else
-typedef byte4 rgb;
-#endif
-typedef Image<rgb> Pixmap; //Image in display format

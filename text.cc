@@ -28,18 +28,18 @@ struct TextLayout {
     void nextLine(bool justify) {
         if(!line) { pen.y+=size; return; }
         //justify
-        float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x; //sum word length
-        length += line.last().last().glyph.image.width - line.last().last().glyph.advance.x; //for last word of line, use glyph bound instead of advance
+        float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
+        length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
         float space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0||space>64) space = font->glyph(' ').advance.x; //compact
+        if(space<=0||space>64) space = font->glyph(' ').advance; //compact
 
         //layout
         pen.x=0;
         for(Word& word: line) {
             assert(word);
             for(Character& c: word) text << i(Character{pen+c.pos, move(c.glyph)});
-            pen.x += word.last().pos.x+word.last().glyph.advance.x+space;
+            pen.x += word.last().pos.x+word.last().glyph.advance+space;
         }
         line.clear();
         pen.x=0; pen.y+=size;
@@ -58,7 +58,7 @@ struct TextLayout {
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
-                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance.x+font->glyph(' ').advance.x;
+                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+font->glyph(' ').advance;
                 length += word.last().pos.x+word.last().glyph.image.width*256; //last word
                 if(wrap && length>=wrap) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
@@ -97,7 +97,7 @@ struct TextLayout {
             pen.x += font->kerning(previous,c);
             previous = c;
             if(glyph.image) { word << i(Character{int2(pen.x,0)+glyph.offset, move(glyph) }); glyphCount++; }
-            pen.x += glyph.advance.x;
+            pen.x += glyph.advance;
         }
     }
 };
@@ -120,7 +120,7 @@ void Text::update(int wrap) {
         for(int i=l.begin;i<l.end;i++) {
             const TextLayout::Character& c = layout.text[i];
             int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
-            if(p.y!=line.min.y) lines<<move(line), line.min=p; else line.max=p+int2(c.glyph.advance.x,0);
+            if(p.y!=line.min.y) lines<<move(line), line.min=p; else line.max=p+int2(c.glyph.advance,0);
         }
         if(line.max!=line.min) lines<<move(line);
     }
