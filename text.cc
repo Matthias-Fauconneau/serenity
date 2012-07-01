@@ -46,7 +46,7 @@ struct TextLayout {
     }
 
     TextLayout(int size, int wrap, const string& s):size(size<<8),wrap(wrap<<8) {
-        static Font defaultSans("truetype/ttf-dejavu/DejaVuSans.ttf"_, size);
+        static Font defaultSans("dejavu/DejaVuSans.ttf"_, size);
         font=&defaultSans;
         uint previous=' ';
         Format format=Format::Regular;
@@ -72,12 +72,12 @@ struct TextLayout {
                     link.end=glyphCount;
                     links << Text::Link{link.begin,link.end,move(link.identifier)};
                 }
-                auto newFormat = ::format(c);
+                Format newFormat = ::format(c);
                 if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line{underlineBegin,glyphCount};
                 format=newFormat;
-                /*static Font defaultBold("truetype/ttf-dejavu/DejaVuSans-Bold.ttf"_, size);
-                static Font defaultItalic("truetype/ttf-dejavu/DejaVuSans-Oblique.ttf"_, size);
-                static Font defaultBoldItalic("truetype/ttf-dejavu/DejaVuSans-BoldOblique.ttf"_, size);
+                /*static Font defaultBold("dejavu/DejaVuSans-Bold.ttf"_, size);
+                static Font defaultItalic("dejavu/DejaVuSans-Oblique.ttf"_, size);
+                static Font defaultBoldItalic("dejavu/DejaVuSans-BoldOblique.ttf"_, size);
                 Font* lookup[] = {&defaultSans,&defaultBold,&defaultItalic,&defaultBoldItalic};
                 font=lookup[format&(Format::Bold|Format::Italic)];*/
                 if(format&Underline) underlineBegin=glyphCount;
@@ -115,10 +115,10 @@ void Text::update(int wrap) {
     for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+128)/256,(c.pos.y+128)/256),c.glyph.image});
     for(const TextLayout::Line& l: layout.lines) {
         Line line;
-        const auto& c = layout.text[l.begin];
+        const TextLayout::Character& c = layout.text[l.begin];
         line.min=int2(c.pos-c.glyph.offset);
         for(int i=l.begin;i<l.end;i++) {
-            const auto& c = layout.text[i];
+            const TextLayout::Character& c = layout.text[i];
             int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
             if(p.y!=line.min.y) lines<<move(line), line.min=p; else line.max=p+int2(c.glyph.advance.x,0);
         }

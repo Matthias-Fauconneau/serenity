@@ -20,10 +20,8 @@ Font::Font(string name, int size) : keep(mapFile(name,fonts())), size(size) {
        uint32 unused version=s.read(), unused revision=s.read();
        uint32 unused checksum=s.read(), unused magic=s.read();
        uint16 unused flags=s.read(), unitsPerEm=s.read();
-       uint64 unused created=s.read(), unused modified=s.read();
-       //array<int16> unused bbox = s.read<int16>(4);
-       uint16 unused macStyle=s.read(), unused lowestRecPPEM=s.read();
-       int16 unused fontDirection = s.read(); indexToLocFormat=s.read(); int16 unused glyphDataFormat=s.read();
+       s.advance(8+8+4*2+2+2+2); //created, modified, bbox[4], maxStyle, lowestRec, direction
+       indexToLocFormat=s.read();
        // inline function to scale from design (FUnits) to device (.8 pixel)
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=8;
        round = (1<<scale)/2; //round to nearest not down
@@ -86,13 +84,13 @@ Glyph Font::glyph(uint16 code) {
         struct Flags { byte on_curve:1, short_x:1, short_y:1, repeat:1, same_sign_x:1, same_sign_y:1; };
         Flags flagsArray[nofPoints];
         for(int i=0;i<nofPoints;i++) {
-            Flags flags = s.read();
+            Flags flags = (Flags&)s.read<byte>();
             if(flags.repeat) { ubyte times = s.read(); for(int n=0;n<times;n++) flagsArray[i++]=flags; }
             flagsArray[i]=flags;
         }
 
         int16 X[nofPoints]; int16 last=-xMin;
-        for(int i=0;i<nofPoints;i++) { auto flags=flagsArray[i];
+        for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
             if(flags.short_x) {
                 if(flags.same_sign_x) last+= (uint8)s.read();
                 else last-= (uint8)s.read();
@@ -102,7 +100,7 @@ Glyph Font::glyph(uint16 code) {
         }
 
         int16 Y[nofPoints]; last=-yMin;
-        for(int i=0;i<nofPoints;i++) { auto flags=flagsArray[i];
+        for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
             if(flags.short_y) {
                 if(flags.same_sign_y) last+= (uint8)s.read();
                 else last-= (uint8)s.read();

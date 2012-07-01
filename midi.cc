@@ -20,7 +20,7 @@ void MidiFile::open(const string& path) { /// parse MIDI header
 }
 
 void MidiFile::read(Track& track, int time, State state) {
-    auto& s = track.stream;
+    DataStream& s = track.stream;
     if(!s) return;
     while(track.time < time) {
         uint8 type=track.type, vel=0,key=s.read();

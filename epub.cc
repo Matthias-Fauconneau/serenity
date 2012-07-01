@@ -1,7 +1,7 @@
 #include "process.h"
 //#include "debug.h"
 //#include "font.h"
-//#include "display.h"
+#include "display.h"
 #include "text.h"
 /*#include "zip.h"
 #include "xml.h"
@@ -21,8 +21,8 @@ struct EPub : Application {
         Element content = parseXML(files.at("content.opf"_));
         const Element& package = content("package"_);
         map<string, string> itemMap;
-        for(const auto& item: package("manifest"_).children) itemMap.insert(item.at("id"_), item.at("href"_));
-        array<string> items; for(const auto& itemref: package("spine"_).children) items << copy(itemMap.at(itemref.at("idref"_)));
+        for(const Element& item: package("manifest"_).children) itemMap.insert(item.at("id"_), item.at("href"_));
+        array<string> items; for(const Element& itemref: package("spine"_).children) items << copy(itemMap.at(itemref.at("idref"_)));
         for(const string& item: items) {
             log(parseHTML(files.at(item)));
             break;

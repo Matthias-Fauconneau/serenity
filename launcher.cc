@@ -47,7 +47,7 @@ List<Command> readShortcuts() {
     List<Command> shortcuts;
     if(!exists("launcher"_,config)) { warn("No launcher settings [config/launcher]"); return shortcuts; }
     for(const string& desktop: split(readFile("launcher"_,config),'\n')) {
-        auto entries = readSettings(desktop);
+        map<string,string> entries = readSettings(desktop);
         Image icon;
         for(const string& folder: iconPaths) {
             string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
@@ -70,7 +70,7 @@ Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({&search, &shortcuts})
     window.localShortcut("Leave"_).connect(&window,&Window::hide);
     window.localShortcut("Escape"_).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
-    for(auto& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
+    for(Command& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
 }
 
 void Launcher::show() { window.show(); window.setFocus(&search); }

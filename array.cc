@@ -117,7 +117,7 @@ generic void removeAll(array& a, T v) { for(uint i=0;i<a.size();i++) if(a[i]==v)
 generic void appendOnce(array& a, T&& v) { if(!contains(a,v)) a.append(move(v)); }
 generic void appendOnce(array& a, const T& v) { if(!contains(a,v)) a.append(copy(v)); }
 generic array replace(array&& a, const T& before, const T& after) {
-        for(auto& e : a) if(e==before) e=copy(after); return move(a);
+        for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 
 // Orderable?

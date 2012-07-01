@@ -92,29 +92,29 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
         bool inlineText=true; //TODO:
         e.visit([&inlineText](const Element& e)->void{if(e.name&&!contains(textElement,e.name))inlineText=false;});
         if(inlineText) text << format(Format::Underline|Format::Link) << e["href"_] << " "_;
-        for(const auto& c: e.children) layout(url, c);
+        for(const Element& c: e.children) layout(url, c);
         if(inlineText) text << format(Format::Regular);
     } else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
         flushImages();
-        for(const auto& c: e.children) layout(url, c);
+        for(const Element& c: e.children) layout(url, c);
         text<<"\n"_;
     } else if(contains(boldElement,e.name)) { //Bold
         text << format(Format::Bold);
-        for(const auto& c: e.children) layout(url, c);
+        for(const Element& c: e.children) layout(url, c);
         text << format(Format::Regular);
     } else if(e.name=="em"_||e.name=="i"_) { //Italic
         text << format(Format::Italic);
-        for(const auto& c: e.children) layout(url, c);
+        for(const Element& c: e.children) layout(url, c);
         text << format(Format::Regular);
     } else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; //wikipedia [edit]
-    } else if(contains(textElement,e.name)) { for(const auto& c: e.children) layout(url, c); // Unhandled format tags
+    } else if(contains(textElement,e.name)) { for(const Element& c: e.children) layout(url, c); // Unhandled format tags
     } else if(contains(ignoreElement,e.name)) { return; // Ignored elements
     } else if(!contains(e.name,":"_)) warn("layout: Unknown HTML tag",e.name);
 }
 void HTML::flushText() {
     string paragraph = simplify(trim(text));
     if(!paragraph) return;
-    auto textLayout = new Text(move(paragraph),16,255, 640 /*60 characters*/);
+    Text* textLayout = new Text(move(paragraph),16,255, 640 /*60 characters*/);
     textLayout->linkActivated.connect(this, &HTML::go);
     VBox::append(textLayout);
     text.clear();
@@ -126,7 +126,7 @@ void HTML::flushImages() {
         if(w*h>=images.size()) break; h++;
     }
     for(uint y=0,i=0;y<h;y++) {
-        auto list = new HList<ImageView>;
+        HList<ImageView>* list = new HList<ImageView>;
         list->reserve(w);
         for(uint x=0;x<w && i<images.size();x++,i++) {
             *list << ImageView();

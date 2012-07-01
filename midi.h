@@ -4,7 +4,7 @@
 #include "stream.h"
 #include "string.h"
 
-struct Track { int time=0; int type=0; DataBuffer stream; Track(DataBuffer&& stream):stream(move(stream)){} };
+struct Track { int time=0; int type=0; DataStream stream; Track(DataStream&& stream):stream(move(stream)){} };
 
 struct MidiFile {
     enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };

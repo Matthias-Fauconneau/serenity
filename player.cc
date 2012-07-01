@@ -40,9 +40,9 @@ struct Player : Application {
         audio.read = {&media,&AudioFile::read};
 
         folders = listFiles("/Music"_,Sort|Folders);
-        for(auto& folder : folders) albums << Text(section(folder,'/',-2,-1), 10);
+        for(string& folder : folders) albums << Text(section(folder,'/',-2,-1), 10);
 
-        for(auto&& path: arguments) {
+        for(string&& path: arguments) {
             assert(exists(path),path);
             if(isFolder(path)) playAlbum(path); else appendFile(move(path));
         }
@@ -69,7 +69,7 @@ struct Player : Application {
     void playAlbum(const string& path) {
         assert(isFolder(path));
         array<string> files = listFiles(path,Recursive|Sort|Files);
-        for(auto&& file: files) appendFile(move(file));
+        for(string&& file: files) appendFile(move(file));
         window.setSize(int2(-16,-16)); layout.update(); window.render();
     }
     void playAlbum(int index) {

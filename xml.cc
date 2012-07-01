@@ -91,19 +91,19 @@ string Element::operator[](const string& attribute) const {
 }
 
 const Element& Element::operator()(const string& name) const {
-    for(const auto& e: children) if(e.name==name) return e;
+    for(const Element& e: children) if(e.name==name) return e;
     error("children", name, "not found in", *this);
 }
 
 template struct function<void(const Element&)>;
 void Element::visit(const function<void(const Element&)>& visitor) const {
-    for(const auto& e: children) e.visit(visitor);
+    for(const Element& e: children) e.visit(visitor);
     visitor(*this);
 }
 
 template struct function<bool(const Element&)>;
 void Element::mayVisit(const function<bool(const Element&)>& visitor) const {
-    if(visitor(*this)) for(const auto& e: children) e.mayVisit(visitor);
+    if(visitor(*this)) for(const Element& e: children) e.mayVisit(visitor);
 }
 
 void Element::xpath(const string& path, const function<void(const Element &)>& visitor) const {
@@ -115,8 +115,8 @@ void Element::xpath(const string& path, const function<void(const Element &)>& v
     string first = section(path,'/');
     string next = section(path,'/',1,-1);
     array<Element> collect;
-    if(next) { for(const auto& e: children) if(e.name==first) e.xpath(next,visitor); }
-    else { for(const auto& e: children) if(e.name==first) visitor(e); }
+    if(next) { for(const Element& e: children) if(e.name==first) e.xpath(next,visitor); }
+    else { for(const Element& e: children) if(e.name==first) visitor(e); }
 }
 
 string Element::text() const { string text; visit([&text](const Element& e){ text<<e.content; }); return text; }
@@ -135,7 +135,7 @@ string Element::str(const string& prefix) const {
     if(content||children) {
         if(name||attributes) line << ">\n"_;
         if(content) { assert(!children); line << join(split(content,'\n'),"\n"_+prefix)+"\n"_; }
-        if(children) for(const auto& e: children) line << e.str(prefix+" "_);
+        if(children) for(const Element& e: children) line << e.str(prefix+" "_);
         if(name||attributes) line << prefix+"</"_+name+">\n"_;
     } else if(name||attributes) line << "/>\n"_;
     return line;

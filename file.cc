@@ -49,10 +49,11 @@ Map mapFile(const string& path, int at) {
     if(fd < 0) error("File not found"_,"'"_+path+"'"_);
     struct stat sb; fstat(fd, &sb);
     const byte* data = (byte*)mmap(0,(size_t)sb.size,PROT_READ,MAP_PRIVATE,fd,0);
+    assert(data);
     close(fd);
     return Map(data,(int)sb.size);
 }
-Map::~Map() { munmap((void*)data,size); }
+Map::~Map() { if(data) munmap((void*)data,size); }
 
 void writeFile(const string& path, const array<byte>& content, int at, bool overwrite) {
     int fd = createFile(path,at,overwrite);
@@ -99,7 +100,7 @@ array<string> listFiles(const string& folder, Flags flags, int at) {
         string path = folder+"/"_+name;
         int type = *((byte*)&entry + entry.len - 1);
         if(type==DT_DIR && flags&Recursive) {
-            if(flags&Sort) for(auto&& e: listFiles(path,flags,at)) insertSorted(list, move(e));
+            if(flags&Sort) for(string& e: listFiles(path,flags,at)) insertSorted(list, move(e));
             else list << move(listFiles(path,flags,at));
         } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
             if(flags&Sort) insertSorted(list, move(path));

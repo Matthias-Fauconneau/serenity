@@ -102,7 +102,7 @@ void Sampler::read(int16 *output, uint period) {
     timeChanged.emit(time);
     for(Layer& layer : layers) layer.active=false;
     for(uint i=0;i<active.size();i++) { Note& n = active[i];
-        auto& layer = layers[n.layer];
+        Layer& layer = layers[n.layer];
         int frame = layer.size;
         if(n.remaining < frame) { active.removeAt(i); i--; continue; } //released
         if(!layer.active) { clear(layer.buffer, 2*layer.size); layer.active = true; } //clear if first note in layer (could be avoided)

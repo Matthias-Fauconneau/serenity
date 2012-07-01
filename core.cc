@@ -1,10 +1,10 @@
+#include "core.h"
+
 void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
-extern "C" void __cxa_pure_virtual() {}
-extern "C" void __cxa_guard_acquire() {}
-extern "C" void __cxa_guard_release() {}
+//extern "C" void __cxa_pure_virtual() {}
 
-#include "core.h"
+#if __arm__
 uint udivmodsi4(uint num, uint den, bool mod) {
     assert_(den!=0);
     uint bit = 1;
@@ -18,6 +18,7 @@ uint udivmodsi4(uint num, uint den, bool mod) {
 }
 extern "C" int __aeabi_uidiv(int n, uint d) { return n>0? udivmodsi4(n,d,0) : -udivmodsi4(-n,d,0); }
 extern "C" int __umodsi3(int n, uint d) { return n>0? udivmodsi4(n,d,1) : -udivmodsi4(-n,d,1); }
+#endif
 
 #include "memory.h"
 void* operator new(uint size) { return allocate_(size); }

@@ -8,7 +8,6 @@
 struct Space : Widget {
     int2 size=int2(-1,-1);
     int2 sizeHint() { return size; }
-    void render(int2) {}
 };
 extern Space space; // same dummy instance can be reused
 

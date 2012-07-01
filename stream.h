@@ -78,20 +78,21 @@ struct DataStream : virtual Stream {
     /// Read from stream until next null byte
     string readString() { string s(buffer.data()+index,(uint)0); while(next()) { s.buffer.size++; advance(1); } advance(1); return s; }
 
+    /// Provides template overloaded specialization (for swap) and return type overloading through cast operators.
     struct ReadOperator {
         DataStream * s;
         // Swap here and not in read<T>() since functions that differ only in their return type cannot be overloaded
         /// Reads an int32 and if necessary, swaps from stream to host byte order
         operator uint32() { return s->bigEndian?swap32(s->read<uint32>()):s->read<uint32>(); }
-        operator int32() { return operator uint32(); }
+        operator int32() { return s->bigEndian?swap32(s->read<int32>()):s->read<int32>(); }
         /// Reads an int16 and if necessary, swaps from stream to host byte order
         operator uint16() { return s->bigEndian?swap16(s->read<uint16>()):s->read<uint16>(); }
-        operator int16() { return operator uint16(); }
-        /// Reads a \a T element (deduced from the destination (return type overload))
-        template<class T> operator const T&() { return s->read<T>(); }
+        operator int16() { return s->bigEndian?swap16(s->read<int16>()):s->read<int16>(); }
+        /// Reads an int8
+        operator uint8() { return s->read<uint8>(); }
+        operator int8() { return s->read<int8>(); }
     };
-    /// Returns an operator to deduce the type to read from the destination (return type overload)
-    ReadOperator read() { return {this}; }
+    ReadOperator read() { return i({this}); }
 };
 
 /// \a TextStream provides a convenient interface to parse texts

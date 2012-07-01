@@ -28,7 +28,7 @@ struct Widget {
 /// Paint
     /// Renders this widget.
     /// \a offset is the absolute position of the parent widget
-    virtual void render(int2 parent) =0;
+    virtual void render(int2 /*parent*/) {};
 
 /// Event
     /// Override \a mouseEvent to handle or forward user input

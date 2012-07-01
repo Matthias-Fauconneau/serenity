@@ -91,7 +91,7 @@ Symbol findNearestLine(void* find) {
     static Map map = mapFile("proc/self/exe"_);
     const byte* elf = map.data;
     const Ehdr& hdr = *(Ehdr*)elf;
-    auto sections = array<Shdr>((Shdr*)(elf+hdr.shoff),hdr.shnum);
+    array<Shdr> sections = array<Shdr>((Shdr*)(elf+hdr.shoff),hdr.shnum);
     const char* shstrtab = (char*)elf+sections[hdr.shstrndx].offset;
     const char* strtab = 0; DataStream symtab; DataStream debug_line;
     for(const Shdr& s: sections)  {
@@ -101,7 +101,7 @@ Symbol findNearestLine(void* find) {
     }
     Symbol symbol;
     for(DataStream& s = symtab;s.index<s.buffer.size();) {
-        const Sym& sym = s.read();
+        const Sym& sym = s.read<Sym>();
         if(find >= sym.value && find < sym.value+sym.size) {
             TextStream s(str(strtab+sym.name));
             symbol.function = s.match("_"_)&&s.next()=='Z'? demangle(s) : s.readAll();
@@ -109,8 +109,8 @@ Symbol findNearestLine(void* find) {
     }
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
         int start = s.index;
-        const struct { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; byte line_base; ubyte line_range,opcode_base; } packed&
-                cu = s.read();
+        struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; byte line_base; ubyte line_range,opcode_base; } packed;
+        const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) s.readString();
         s.advance(1);
@@ -126,7 +126,7 @@ Symbol findNearestLine(void* find) {
             uint opcode = s.next(); s.advance(1);
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
                          fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };
-            if (opcode >= cu.opcode_base) {
+            /***/ if (opcode >= cu.opcode_base) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
                 if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
@@ -137,18 +137,19 @@ Symbol findNearestLine(void* find) {
                 int len = readLEV(s);
                 if (len == 0) continue;
                 opcode = s.next(); s.advance(1);
-                enum { end_sequence = 1, set_address, define_file };
-                if(opcode == end_sequence) {
-                    if (cu.stmt) { address = 0; file_index = 1; line = 1; is_stmt = cu.stmt; }
-                } else if(opcode == set_address) {
-                    address = s.read<byte*>();
-                } else error("Unsupported");
-            } else if(opcode == op_copy) {}
-            else if(opcode == advance_pc)  {
+                enum { end_sequence = 1, set_address, define_file, set_discriminator };
+                /***/ if(opcode == end_sequence) { if (cu.stmt) { address = 0; file_index = 1; line = 1; is_stmt = cu.stmt; } }
+                else if(opcode == set_address) { address = s.read<byte*>(); }
+                else if(opcode == define_file) { readLEV(s); readLEV(s); }
+                else if(opcode == set_discriminator) { readLEV(s); }
+            }
+            else if(opcode == op_copy) {}
+            else if(opcode == advance_pc) {
                 int delta = cu.min_inst_len * readLEV(s);
                 if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 address += delta;
-            } else if(opcode == advance_line) line += readLEV(s,true);
+            }
+            else if(opcode == advance_line) line += readLEV(s,true);
             else if(opcode == set_file) file_index = readLEV(s);
             else if(opcode == set_column) readLEV(s);
             else if(opcode == negate_stmt) is_stmt = !is_stmt;
@@ -157,11 +158,13 @@ Symbol findNearestLine(void* find) {
                 int delta = ((255 - cu.opcode_base) / cu.line_range) * cu.min_inst_len;
                 if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 address += delta;
-            } else if(opcode == fixed_advance_pc) {
+            }
+            else if(opcode == fixed_advance_pc) {
                 ushort delta = s.read();
                 if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                  address += delta;
-            } else if(opcode == set_prologue_end) {}
+            }
+            else if(opcode == set_prologue_end) {}
             else if(opcode == set_epilogue_begin) {}
             else if(opcode == set_isa) readLEV(s);
             else error("Unsupported",opcode);
@@ -171,16 +174,20 @@ Symbol findNearestLine(void* find) {
 }
 
 void logTrace() {
-    {Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    //{Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    //{Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    //{Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    //{Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(0)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
 }
 
-struct ucontext { ulong flags; ucontext *link; void* ss_sp; int ss_flags; size_t ss_size; ulong trap_no,error_code,oldmask;
-    ulong arm_r0,arm_r1,arm_r2,arm_r3,arm_r4,arm_r5,arm_r6,arm_r7,arm_r8,arm_r9,arm_r10,arm_fp,arm_ip,arm_sp,arm_lr,arm_pc,arm_cpsr;
-    ulong fault_address;
+struct ucontext {
+    ulong flags; ucontext *link; void* ss_sp; int ss_flags; size_t ss_size;
+#if __arm__
+    ulong trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,pc,cpsr,fault;
+#elif __x86_64__ || __i386__
+    ulong gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,eip,cs,efl,uesp,ss;
+#endif
 };
 enum SW { IE = 1, DE = 2, ZE = 4, OE = 8, UE = 16, PE = 32 };
 enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM	};
@@ -188,12 +195,11 @@ enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, S
 static void handler(int sig, struct siginfo*, ucontext* context) {
     if(sig == SIGSEGV) log("Segmentation violation"_);
 #if __arm__
-    {Symbol s = findNearestLine((void*)context->arm_lr); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine((void*)context->arm_pc); log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
-#elif __x86_64__
-    {Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_RIP]); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
-#elif __i386__
-    {Symbol s = findNearestLine((void*)context->uc_mcontext.gregs[REG_EIP]); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
+    {Symbol s = findNearestLine((void*)context->lr); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    {Symbol s = findNearestLine((void*)context->pc); log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
+#elif __x86_64__ || __i386__
+    //TODO: return ip
+    {Symbol s = findNearestLine((void*)context->eip); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
 #endif
     abort();
 }

@@ -119,7 +119,7 @@ struct Parser : Application {
             i++;
         }}*/
 
-        for(auto& set: states) {
+        for(State& set: states) {
             if(contains(set.items, Item{rules[0], 1})) set.transitions["$"_] = 0;
             for(const Item& item: set.items) {
                 int m = indexOf(rules, item.rule);
@@ -135,7 +135,7 @@ struct Parser : Application {
 
         // display parsing table
         log("\t"_+str(terminal,"\t"_)+"        |\t"_+str(slice(nonterminal,1),"\t"_));
-        {int i=0; for(const auto& state: states) {
+        {int i=0; for(const State& state: states) {
             string s=str(i)+"\t"_;
             for(const word& key: terminal) {
                 if(state.transitions.contains(key)) {

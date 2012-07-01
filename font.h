@@ -13,7 +13,7 @@ struct Glyph {
     Image<gray> image;
 };
 
-/// Font is a truetype font render
+/// Truetype font renderer stub
 struct Font {
     Map keep;
     DataStream cmap;

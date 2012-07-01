@@ -3,8 +3,9 @@ TARGET ?= taskbar
 BUILD ?= release
 
 #CC = clang
-CC = g++ -fno-implicit-templates -pipe -std=c++0x
-CC += -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions -fno-rtti -fno-exceptions
+CC = g++ -std=c++11
+CC += -pipe -fno-implicit-templates -fno-threadsafe-statics -fno-rtti -fno-exceptions
+CC += -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG
 FLAGS_release := -O3 -ffast-math

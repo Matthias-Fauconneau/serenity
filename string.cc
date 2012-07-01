@@ -148,7 +148,7 @@ array<byte> replace(const array<byte>& s, const array<byte>& before, const array
 
 string toLower(const string& s) {
     string lower;
-    for(auto c: s) if(c>='A'&&c<='Z') lower<<'a'+c-'A'; else lower << c;
+    for(char c: s) if(c>='A'&&c<='Z') lower<<'a'+c-'A'; else lower << c;
     return lower;
 }
 
@@ -216,7 +216,7 @@ template string itoa<10>(int,int);
     return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint(m*abs(n))%m,precision);
 }*/
 
-bool isInteger(const string& s) { if(!s) return false; for(auto c: s) if(c<'0'||c>'9') return false; return true; }
+bool isInteger(const string& s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
 
 long toInteger(const string& number, int base) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);

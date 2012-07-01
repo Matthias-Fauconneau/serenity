@@ -164,7 +164,7 @@ struct TaskBar : Application, Poll {
 
 #if DBUS
     void registerStatusNotifierItem(string service) {
-        for(const auto& s: status) if(s.item.target == service) return;
+        for(const StatusNotifierItem& s: status) if(s.item.target == service) return;
 
         DBus::Object DBus = dbus("org.freedesktop.DBus/org/freedesktop/DBus"_);
         DBus.noreply("org.freedesktop.DBus.AddMatch"_,string("member='NameOwnerChanged',arg0='"_+service+"'"_));
@@ -177,7 +177,7 @@ struct TaskBar : Application, Poll {
             if(exists(path)) { icon=resize(decodeImage(readFile(path)), 16,16); break; }
         }
         if(!icon) {
-            auto icons = item.get< array<DBusIcon> >("IconPixmap"_);
+            array<DBusIcon> icons = item.get< array<DBusIcon> >("IconPixmap"_);
             assert(icons,name,"not found");
             DBusIcon dbusIcon = move(icons.first());
             icon=swap(resize(Image(cast<byte4>(move(dbusIcon.data)),dbusIcon.width,dbusIcon.height),16,16));
@@ -255,7 +255,7 @@ struct TaskBar : Application, Poll {
                 if(i<0) continue;
                 tasks.index=i;
             } else if(e.type == ConfigureRequest) {
-                auto c = (XConfigureRequestEvent&)e;
+                XConfigureRequestEvent& c = (XConfigureRequestEvent&)e;
                 id = c.window;
                 XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
                 if(c.value_mask & CWX) wa.x=c.x; if(c.value_mask & CWY) wa.y=c.y;
