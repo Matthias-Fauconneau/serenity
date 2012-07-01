@@ -3,7 +3,7 @@
 #include "stream.h"
 #include "linux.h"
 
-void write_(int fd, const array<byte>& s) { write(fd,s.data(),(ulong)s.size()); }
+void write(int fd, const array<byte>& s) { write(fd,s.data(),(ulong)s.size()); }
 void abort() { exit(-1); }
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version,entry,phoff,shoff,flags;
@@ -31,7 +31,7 @@ string demangle(TextStream& s) {
         else break;
     }
     int l;
-    if(s.match("v"_)) r<<pointer?"void"_:""_;
+    if(s.match("v"_)) { if(pointer) r<<"void"_; }
     else if(s.match("b"_)) r<<"bool"_;
     else if(s.match("c"_)) r<<"char"_;
     else if(s.match("a"_)) r<<"byte"_;
@@ -40,6 +40,8 @@ string demangle(TextStream& s) {
     else if(s.match("t"_)) r<<"ushort"_;
     else if(s.match("i"_)) r<<"int"_;
     else if(s.match("j"_)) r<<"uint"_;
+    else if(s.match("l"_)) r<<"long"_;
+    else if(s.match("m"_)) r<<"ulong"_;
     else if(s.match("x"_)) r<<"int64"_;
     else if(s.match("y"_)) r<<"uint64"_;
     else if(s.match("T_"_)) r<<"T"_;
@@ -80,7 +82,7 @@ string demangle(TextStream& s) {
     } else if((l=s.number())!=-1) {
         r<<s.read(l); //struct
         if(s && s.next()=='I') r<< demangle(s);
-    } else { log("A"_,r,string(s.readAll()),string(move(s.buffer))); return r; }
+    } else { log("A"_,r,string(s.readAll())); return r; }
     for(int i=0;i<pointer;i++) r<<"*"_;
     if(rvalue) r<<"&&"_;
     if(ref) r<<"&"_;
@@ -177,7 +179,7 @@ Symbol findNearestLine(void* find) {
 void logTrace() {
     static bool recurse; if(recurse) { log("Debugger error"); __builtin_trap(); } recurse=true;
     //{Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    //{Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(0)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
@@ -201,7 +203,8 @@ static void handler(int sig, struct siginfo*, ucontext* context) {
     {Symbol s = findNearestLine((void*)context->lr); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine((void*)context->pc); log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
 #elif __x86_64__ || __i386__
-    //TODO: return ip
+    {Symbol s = findNearestLine(*(*((void***)context->ebp)+1)); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
+    {Symbol s = findNearestLine(*((void**)context->ebp+1)); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
     {Symbol s = findNearestLine((void*)context->eip); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
 #endif
     abort();

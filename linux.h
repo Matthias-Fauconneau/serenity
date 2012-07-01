@@ -56,7 +56,7 @@
 #endif
 
 enum class sys : long {
-    exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, munmap=91, setpriority=97,
+    exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, munmap=91, setpriority=97, socketcall=102,
     getdents=141, poll=168, sigaction=174, mmap=192, fstat=197,
 #if __arm__
     openat=322, mkdirat, fstatat, unlinkat, symlinkat=331
@@ -86,9 +86,22 @@ syscall4(int, fstatat, int,fd, const char*,name, struct stat*,buf, int,flag)
 syscall3(int, unlinkat, int,fd, const char*,name, int,flag)
 syscall3(int, symlinkat, const char*,target, int,fd, const char*,name)
 
+#if __i386__
+syscall2(int, socketcall, int,call, long*,args)
+inline int socket(int domain, int type, int protocol) { long a[]={domain,type,protocol}; return socketcall(1,a); }
+inline int connect (int fd, struct sockaddr* addr, int len) { long a[]={fd,(long)addr,len}; return socketcall(3,a); }
+#else
+syscall3(int, socket, int,domain, int,type, int,protocol)
+syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
+#endif
+
 enum { O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=0200000/*040000*/ };
 enum { PROT_READ=1, PROT_WRITE };
 enum { MAP_SHARED=1, MAP_PRIVATE };
+
+enum { SOCK_STREAM=1 };
+enum { AF_UNIX=1, PF_UNIX=1 };
+struct sockaddr_un { short family=AF_UNIX; unsigned char zero=0; unsigned char path[108]; };
 
 #pragma GCC system_header
 int exit(int code) __attribute((noreturn));
