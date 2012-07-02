@@ -1,23 +1,24 @@
 #include "core.h"
 
 void*   __dso_handle = (void*) &__dso_handle;
-extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
+//extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
+extern "C" int __aeabi_atexit(void (*) (void *), void*, void*) { return 0; }
 //extern "C" void __cxa_pure_virtual() {}
 
 #if __arm__
-uint udivmodsi4(uint num, uint den, bool mod) {
+extern "C" void __aeabi_uidivmod(uint num, uint den) {
     assert_(den!=0);
     uint bit = 1;
-    uint res = 0;
+    register uint div asm("r0") = 0;
     while(den < num && bit && !(den & (1L << 31))) { den <<= 1; bit <<= 1; }
     while (bit) {
-        if(num >= den) { num -= den; res |= bit; }
+        if(num >= den) { num -= den; div |= bit; }
         else { bit >>= 1; den >>= 1; }
     }
-    return mod ? num : res;
+    register unused uint mod asm("r1") = num;
+    return; //r0=div, r1=mod
 }
-extern "C" int __aeabi_uidiv(int n, uint d) { return n>0? udivmodsi4(n,d,0) : -udivmodsi4(-n,d,0); }
-extern "C" int __umodsi3(int n, uint d) { return n>0? udivmodsi4(n,d,1) : -udivmodsi4(-n,d,1); }
+extern "C" void __aeabi_uidiv(uint num, uint den) { __aeabi_uidivmod(num,den); }
 #endif
 
 #include "memory.h"

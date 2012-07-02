@@ -125,7 +125,7 @@ Symbol findNearestLine(void* find) {
         byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;
 
         while(s.index<start+cu.size+4) {
-            int opcode = s.read<ubyte>();
+            ubyte opcode = s.read<ubyte>();
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
                          fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };
             /***/ if (opcode >= cu.opcode_base) {
@@ -158,7 +158,7 @@ Symbol findNearestLine(void* find) {
             else if(opcode == negate_stmt) is_stmt = !is_stmt;
             else if(opcode == set_basic_block) {}
             else if(opcode == const_add_pc) {
-                int delta = ((255 - cu.opcode_base) / cu.line_range) * cu.min_inst_len;
+                uint delta = ((255u - cu.opcode_base) / cu.line_range) * cu.min_inst_len;
                 if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 address += delta;
             }
@@ -177,7 +177,9 @@ Symbol findNearestLine(void* find) {
 }
 
 void logTrace() {
-    static bool recurse; if(recurse) { log("Debugger error"); __builtin_trap(); } recurse=true;
+    static bool recurse; if(recurse) {
+        log("Debugger error"); abort();
+    } recurse=true;
     //{Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     //{Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}

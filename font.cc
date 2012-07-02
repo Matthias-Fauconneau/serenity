@@ -126,9 +126,10 @@ Glyph Font::glyph(uint16 code) {
                 int dir=-1;
                 if(y1>y2) swap(x1,x2), swap(y1,y2), dir=1; //up
                 else if(y1==y2) continue;
-                int deltaX=x2-x1, deltaY=y2-y1;
+                int deltaX=x2-x1; uint deltaY=y2-y1;
+                int rcp = deltaX>0? uint(deltaX)<<16/deltaY : -uint(-deltaX)<<16/deltaY;
                 for(int y=y1;y<=y2;y+=1<<8) { //for each horizontal crossing
-                    int x = x1+(y-y1)*deltaX/deltaY;
+                    int x = x1+(((y-y1)*rcp)>>16);
                     raster(x>>8,y>>8).flag+=dir; //fill flag
                 }
             }

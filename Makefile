@@ -2,9 +2,8 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
 
-#CC = clang
-CC = g++ -std=c++11
-CC += -pipe -fno-implicit-templates -fno-threadsafe-statics -fno-rtti -fno-exceptions
+CC = g++
+CC += -pipe -std=c++11 -fno-implicit-templates -fno-threadsafe-statics -fno-rtti -fno-exceptions
 CC += -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG

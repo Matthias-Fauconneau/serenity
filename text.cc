@@ -28,9 +28,9 @@ struct TextLayout {
     void nextLine(bool justify) {
         if(!line) { pen.y+=size; return; }
         //justify
-        float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
+        int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
         length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
-        float space=0;
+        int space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
         if(space<=0||space>64) space = font->glyph(' ').advance; //compact
 
@@ -58,7 +58,7 @@ struct TextLayout {
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
-                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+font->glyph(' ').advance;
+                int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+font->glyph(' ').advance;
                 length += word.last().pos.x+word.last().glyph.image.width*256; //last word
                 if(wrap && length>=wrap) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
