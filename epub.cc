@@ -30,11 +30,12 @@ struct EPub : Application {
 Application(EPub)*/
 
 struct Test : Application {
-    Text text i({"Hello World!"_});
+    Text text i({"font.cc - serenity - Qt Creator"_});
     Test(array<string>&&) {
         catchErrors();
         openDisplay();
-        text.position = int2(0,0); text.Widget::size = text.sizeHint();
+        text.position = int2(32,16); text.Widget::size = text.sizeHint();
+        fill(text.position+Rect(text.Widget::size),gray(0xF0));
         text.render(int2(0,0));
     }
 };

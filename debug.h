@@ -15,6 +15,6 @@ void catchErrors();
 /// Aborts unconditionally without any message
 void abort() __attribute((noreturn));
 /// Aborts unconditionally and display \a message
-#define error(message...) ({ logTrace(); log(message); abort(); })
+#define error(message...) ({ trace(); log(message); abort(); })
 /// Aborts if \a expr evaluates to false and display \a message (except stack trace)
-#define assert(expr, message...) ({debug( if(!(expr)) { logTrace(); log(#expr##_, ##message); abort(); })})
+#define assert(expr, message...) ({debug( if(!(expr)) { trace(); log(#expr##_, ##message); abort(); })})

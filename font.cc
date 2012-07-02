@@ -7,10 +7,11 @@ Font::Font(string name, int size) : keep(mapFile(name,fonts())), size(size) {
     s.bigEndian=true;
     uint32 unused scaler=s.read();
     uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
-    DataStream head;
+    DataStream head, hhea;
     for(int i=0;i<numTables;i++) {
         uint32 tag=s.read<uint32>(), unused checksum=s.read(), offset=s.read(), unused size=s.read();
         if(tag==raw<uint32>("head"_)) head=DataStream(s.slice(offset,size));
+        if(tag==raw<uint32>("hhea"_)) hhea=DataStream(s.slice(offset,size));
         if(tag==raw<uint32>("cmap"_)) cmap=DataStream(s.slice(offset,size));
         if(tag==raw<uint32>("hmtx"_)) hmtx=(uint16*)(s.buffer.data()+offset);
         if(tag==raw<uint32>("loca"_)) loca=s.buffer.data()+offset;
@@ -23,10 +24,20 @@ Font::Font(string name, int size) : keep(mapFile(name,fonts())), size(size) {
        uint16 unused flags=s.read(), unitsPerEm=s.read();
        s.advance(8+8+4*2+2+2+2); //created, modified, bbox[4], maxStyle, lowestRec, direction
        indexToLocFormat=s.read();
-       // inline function to scale from design (FUnits) to device (.8 pixel)
-       scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=8;
+       // parameters for scale from design (FUnits) to device (.4 pixel)
+#define scale(p) ((size*(p)+round)>>scale)
+       scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4;
        round = (1<<scale)/2; //round to nearest not down
     }
+    /*{
+       DataStream& s = hhea;
+       uint32 unused version=s.read();
+       uint16 unused ascent=s.read(), unused descent=s.read(), unused lineGap=s.read();
+       uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();
+       s.advance(16); //caret*, 0
+       numOfLongHorMetrics=s.read();
+       log(numOfLongHorMetrics);
+    }*/
 }
 
 uint16 Font::index(uint16 code) {
@@ -69,8 +80,7 @@ Glyph Font::glyph(uint16 code) {
 
     // map unicode to glyf outline
     int i = index(code);
-#define scale(p) ((size*(p)+round)>>scale)
-    glyph.advance = scale(hmtx[2*i])>>8;
+    glyph.advance = scale(swap16(hmtx[2*i]));
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[i]) : 2*swap16(((uint16*)loca)[i]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[i+1]) : 2*swap16(((uint16*)loca)[i+1]) ) - start;
     DataStream s(array<byte>(glyf +start, length),true);
@@ -111,7 +121,7 @@ Glyph Font::glyph(uint16 code) {
             Y[i]= scale((yMax-yMin)-last); //flip to downward y
         }
 
-        int width= (scale(xMax-xMin)>>8)+1, height= (scale(yMax-yMin)>>8)+1;
+        int width= (scale(xMax-xMin)>>4)+1, height= (scale(yMax-yMin)>>4)+1;
         Image<cover_flag> raster(width,height);
         for(int i=0;i<width*height; i++) raster.data[i]={0,0};
 
@@ -128,9 +138,9 @@ Glyph Font::glyph(uint16 code) {
                 else if(y1==y2) continue;
                 int deltaX=x2-x1; uint deltaY=y2-y1;
                 int rcp = deltaX>0? uint(deltaX)<<16/deltaY : -uint(-deltaX)<<16/deltaY;
-                for(int y=y1;y<=y2;y+=1<<8) { //for each horizontal crossing
+                for(int y=y1;y<=y2;y+=1<<4) { //for each horizontal crossing
                     int x = x1+(((y-y1)*rcp)>>16);
-                    raster(x>>8,y>>8).flag+=dir; //fill flag
+                    raster(x>>4,y>>4).flag+=dir; //fill flag
                 }
             }
         }
@@ -140,7 +150,8 @@ Glyph Font::glyph(uint16 code) {
             int acc=0;
             for(int x=0; x<width; x++) {
                 acc += raster(x,y).flag;
-                glyph.image(x,y) = acc>0 ? 255 : 0;
+                //glyph.image(x,y) = acc>0 ? 255 : 0; //TODO: alpha blit
+                glyph.image(x,y) = acc>0 ? 0 : 0xF0; //TODO: alpha blit
             }
         }
     } else {
@@ -150,6 +161,6 @@ Glyph Font::glyph(uint16 code) {
             error("compound");
         }
     }
-    glyph.offset= int2(scale(xMin),scale(yMin));
+    glyph.offset += int2(scale(xMin),(size<<4)-scale(yMax));
     return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
 }

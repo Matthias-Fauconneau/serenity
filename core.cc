@@ -1,24 +1,36 @@
 #include "core.h"
 
 void*   __dso_handle = (void*) &__dso_handle;
-//extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
+extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" int __aeabi_atexit(void (*) (void *), void*, void*) { return 0; }
 //extern "C" void __cxa_pure_virtual() {}
 
 #if __arm__
-extern "C" void __aeabi_uidivmod(uint num, uint den) {
+extern "C" uint __aeabi_uidivmod(uint num, uint den) {
     assert_(den!=0);
     uint bit = 1;
-    register uint div asm("r0") = 0;
+    uint div = 0;
     while(den < num && bit && !(den & (1L << 31))) { den <<= 1; bit <<= 1; }
     while (bit) {
         if(num >= den) { num -= den; div |= bit; }
         else { bit >>= 1; den >>= 1; }
     }
-    register unused uint mod asm("r1") = num;
-    return; //r0=div, r1=mod
+    register unused uint mod asm("r1") = num; //r1=mod
+    return div; //r0=div
 }
-extern "C" void __aeabi_uidiv(uint num, uint den) { __aeabi_uidivmod(num,den); }
+extern "C" uint __aeabi_uidiv(uint num, uint den) { return __aeabi_uidivmod(num,den); }
+extern "C" uint __umodsi3(uint num, uint den) {
+    assert_(den!=0);
+    uint bit = 1;
+    uint div = 0;
+    while(den < num && bit && !(den & (1L << 31))) { den <<= 1; bit <<= 1; }
+    while (bit) {
+        if(num >= den) { num -= den; div |= bit; }
+        else { bit >>= 1; den >>= 1; }
+    }
+    return num;
+}
+
 #endif
 
 #include "memory.h"

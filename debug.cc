@@ -67,7 +67,8 @@ string demangle(TextStream& s) {
                 else if((l=s.number())!=-1) {
                     list << s.read(l); //class/member
                     if(s.next()=='I') list.last()<< demangle(s);
-                } else { log("N"_,r,string(s.readAll()),string(move(s.buffer))); break; }
+                }
+                else error("N"_,r,string(s.readAll()),string(move(s.buffer)));
             }
             r<< join(list,"::"_);
         } else if((l=s.number())!=-1) {
@@ -78,11 +79,13 @@ string demangle(TextStream& s) {
         while(s && !s.match("E"_)) args << demangle(s);
         r<< "("_ << join(args,", "_) << ")"_;
         if(const_method) r<< " const"_;
-    } else if(s.match("_0"_)) {
-    } else if((l=s.number())!=-1) {
+    }
+    else if(s.match("_0"_)) {}
+    else if((l=s.number())!=-1) {
         r<<s.read(l); //struct
         if(s && s.next()=='I') r<< demangle(s);
-    } else { log("A"_,r,string(s.readAll())); return r; }
+    }
+    else error("A"_,r,string(s.readAll()));
     for(int i=0;i<pointer;i++) r<<"*"_;
     if(rvalue) r<<"&&"_;
     if(ref) r<<"&"_;
@@ -176,12 +179,10 @@ Symbol findNearestLine(void* find) {
     return symbol;
 }
 
-void logTrace() {
-    static bool recurse; if(recurse) {
-        log("Debugger error"); abort();
-    } recurse=true;
-    //{Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    //{Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+void trace() {
+    static bool recurse; if(recurse) error("Debugger error"); recurse=true;
+    {Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(0)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}

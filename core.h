@@ -69,7 +69,7 @@ template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0
 #else
 #define debug( statements... )
 #endif
-void logTrace();
+void trace();
 int write(int fd, const void* buf, long size);
 int exit(int code) __attribute((noreturn));
-#define assert_(expr) ({ debug( if(!(expr)) logTrace(), write(1,#expr "\n",sizeof(#expr)), exit(-1); ) })
+#define assert_(expr) ({ debug( if(!(expr)) trace(), write(1,#expr "\n",sizeof(#expr)), exit(-1); ) })

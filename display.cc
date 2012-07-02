@@ -43,18 +43,16 @@ void openDisplay() {
 /// Fill
 
 void fill(Rect rect, rgb color) {
-    rect=rect.clip(currentClip);
-    for(int y= rect.min.y; y<rect.max.y; y++)
-        for(int x= rect.min.x; x<rect.max.x; x++) {
-            framebuffer(x,y) = color;
-        }
+    rect=rect.clip(currentClip); log(rect.min,rect.max);
+    for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+        framebuffer(x,y) = color;
+    }
 }
 
 /// Blit
 
 void blit(int2 target, const Image<gray>& source) {
     Rect rect = (target+Rect(source.size())).clip(currentClip);
-    log(rect.min,rect.max);
     for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
         framebuffer(x,y) = source(x-target.x,y-target.y);
     }

@@ -24,10 +24,8 @@ vector.h
 vector.cc
 display.h
 display.cc
-image.h
-image.cc
 font.h
 font.cc
+text.h
+text.cc
 epub.cc
-parser.files
-x.cc

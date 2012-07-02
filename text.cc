@@ -10,13 +10,12 @@ template struct array<Text::Link>;
 
 Widget* focus;
 
-// All coordinates are .8 fixed point
 struct TextLayout {
     int size;
     int wrap;
     Font* font = 0;
     int2 pen;
-    struct Character { int2 pos; Glyph glyph; };
+    struct Character { int2 pos;/*in .4*/ Glyph glyph; };
     typedef array<Character> Word;
     array<Word> line;
     Word word;
@@ -31,8 +30,8 @@ struct TextLayout {
         int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
         length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
         int space=0;
-        if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0||space>64) space = font->glyph(' ').advance; //compact
+        if(justify && line.size()>1) space = ((wrap<<4)-length)/(line.size()-1);
+        if(space<=0||space>64<<4) space = font->glyph(' ').advance; //compact
 
         //layout
         pen.x=0;
@@ -45,7 +44,7 @@ struct TextLayout {
         pen.x=0; pen.y+=size;
     }
 
-    TextLayout(int size, int wrap, const string& s):size(size<<8),wrap(wrap<<8) {
+    TextLayout(int size, int wrap, const string& s):size(size),wrap(wrap) {
         static Font defaultSans("dejavu/DejaVuSans.ttf"_, size);
         font=&defaultSans;
         uint previous=' ';
@@ -59,8 +58,8 @@ struct TextLayout {
                 if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
                 int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+font->glyph(' ').advance;
-                length += word.last().pos.x+word.last().glyph.image.width*256; //last word
-                if(wrap && length>=wrap) nextLine(true); //doesn't fit
+                length += word.last().pos.x+(word.last().glyph.image.width<<4); //last word
+                if(wrap && length>=(wrap<<4)) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
                 pen.x=0;
                 if(c=='\n') nextLine(false);
@@ -112,7 +111,7 @@ void Text::update(int wrap) {
     blits.clear();
     if(text.last()!='\n') text << '\n';
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
-    for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+128)/256,(c.pos.y+128)/256),c.glyph.image});
+    for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+8)>>4,(c.pos.y+8)>>4),c.glyph.image});
     for(const TextLayout::Line& l: layout.lines) {
         Line line;
         const TextLayout::Character& c = layout.text[l.begin];
