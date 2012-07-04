@@ -1,7 +1,7 @@
 #include "interface.h"
-#include "window.h"
+//#include "window.h"
 #include "font.h"
-#include "raster.h"
+#include "display.h"
 
 #include "layout.h"
 template struct item<Icon>;

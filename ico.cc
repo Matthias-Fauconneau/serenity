@@ -7,9 +7,16 @@ struct Directory { uint16 reserved, type, count; };
 struct Entry { ubyte width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
 struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
 
-Image decodeICO(const array<byte>& file) {
+Image<byte4> flip(Image<byte4>&& image) {
+    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) {
+        swap(image(x,y),image(x,h-1-y));
+    }
+    return move(image);
+}
+
+Image<byte4> decodeICO(const array<byte>& file) {
     assert(file);
-    DataBuffer s(array<byte>(file.data(),file.size()));
+    DataStream s(array<byte>(file.data(),file.size()));
 
     Directory unused directory = s.read();
     assert(directory.reserved==0);
@@ -28,15 +35,15 @@ Image decodeICO(const array<byte>& file) {
     array<byte4> palette;
     if(header.depth<=8) {
         assert(header.colorCount==0 || header.colorCount==(1u<<header.depth),header.colorCount,header.depth);
-        palette=cast<byte4>(s.read((1u<<header.depth)*4));
+        palette=s.read<byte4>(1<<header.depth);
         for(byte4& p: palette) p.a=255;
     }
 
     uint w=header.width,h=header.height/2;
     uint size = header.depth*w*h/8;
-    if(size>s.available(size)) { warn("Invalid ICO"); return Image(); }
+    if(size>s.available(size)) { warn("Invalid ICO"); return Image<byte4>(); }
 
-    Image image(w,h);
+    Image<byte4> image(w,h);
     array<byte> source = s.read(size);
     assert(source,size);
     ubyte* src=(ubyte*)source.data();

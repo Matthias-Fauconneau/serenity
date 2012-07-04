@@ -1,7 +1,5 @@
-Font
-- quadratic forward differenciate at each integer pixel crossing
-- add line-pixel quad area (to bottom if going right, to left if going down, to top if going left, to right if going up)
-update desktop, taskbar, player
+test desktop (http), taskbar (x), player (mp3)
+kerning, subpixel positioning (upsampled glyph -> subpixel blit?), hinting
 EPub viewer: inflate, parse, display, linux framebuffer
 Text Editor, File Manager, IMAP, Wiki, PDF, Search, +HTML
 Touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen

@@ -1,7 +1,7 @@
 #pragma once
 #include "time.h"
 #include "interface.h"
-#include "window.h"
+//#include "window.h"
 
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query);

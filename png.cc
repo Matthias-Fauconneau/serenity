@@ -50,8 +50,8 @@ template void filter<ia,2>(byte4* dst, const byte* raw, int width, int height, i
 template void filter<rgb,3>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 template void filter<rgba,4>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 
-Image decodePNG(const array<byte>& file) {
-    DataBuffer s(array<byte>(file.data(),file.size())); s.bigEndian=true;
+Image<byte4> decodePNG(const array<byte>& file) {
+    DataStream s(array<byte>(file.data(),file.size())); s.bigEndian=true;
     if(s.get(8)!="\x89PNG\r\n\x1A\n"_) error("Invalid PNG"_);
     s.advance(8);
     array<byte> buffer;
@@ -59,23 +59,23 @@ Image decodePNG(const array<byte>& file) {
     array<byte> palette;
     for(;;) {
         uint32 size = s.read();
-        string name = s.read(4);
+        string name = s.read<byte>(4);
         if(name == "IHDR"_) {
             width = s.read(), height = s.read();
             uint8 unused bitDepth = s.read();
-            if(bitDepth!=8){ warn("Unsupported PNG bitdepth"_,bitDepth); return Image(); }
+            if(bitDepth!=8){ warn("Unsupported PNG bitdepth"_,bitDepth); return Image<byte4>(); }
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
             interlace  = s.read();
         } else if(name == "IDAT"_) {
-            buffer << s.read(size);
+            buffer << s.read<byte>(size);
         } else if(name=="IEND"_) {
             assert(size==0);
             s.advance(4); //CRC
             break;
         } else if(name == "PLTE"_) {
-            palette = s.read(size);
+            palette = s.read<byte>(size);
         } else {
             s.advance(size);
         }
@@ -83,7 +83,7 @@ Image decodePNG(const array<byte>& file) {
         assert(s);
     }
     array<byte> data = inflate(buffer, true);
-    if(data.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
+    if(data.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image<byte4>(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
     byte* src=data.data();
@@ -111,5 +111,5 @@ Image decodePNG(const array<byte>& file) {
         rgb3* lookup = (rgb3*)palette.data();
         for(uint i=0;i<width*height;i++) image[i]=lookup[image[i].r];
     }
-    return Image(image,width,height,true);
+    return Image<byte4>(image,width,height,width,true);
 }

@@ -17,7 +17,7 @@ struct Font {
     DataStream cmap;
     uint16* hmtx;
     void* loca; uint16 indexToLocFormat, numOfLongHorMetrics;
-    byte* glyf; int scale, round, size;
+    byte* glyf; uint scale, round, size;
     Glyph cache[256]; //TODO: Unicode
 
     /// Opens font at /a path scaled to /a size pixels high

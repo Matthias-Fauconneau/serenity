@@ -73,7 +73,7 @@ struct DataStream : virtual Stream {
     template<class T> const T& read() { const T& t = raw<T>(get(sizeof(T))); advance(sizeof(T)); return t; }
 
     /// Reads \a size raw \a T elements from stream
-    template<class T> array<T> read(uint size) { array<T> t; for(uint i=0;i<size;i++) t<<(T)read(); return t; }
+    template<class T>  array<T> read(uint size) { return cast<T>(Stream::read(size*sizeof(T))); }
 
     /// Read from stream until next null byte
     string readString() { string s(buffer.data()+index,(uint)0); while(next()) { s.buffer.size++; advance(1); } advance(1); return s; }
@@ -91,8 +91,16 @@ struct DataStream : virtual Stream {
         /// Reads an int8
         operator uint8() { return s->read<uint8>(); }
         operator int8() { return s->read<int8>(); }
+        template<class T> operator const T&(){ return s->read<T>(); }
     };
     ReadOperator read() { return i({this}); }
+
+    /// Provides return type overloading for reading arrays (swap as needed)
+    struct ArrayReadOperator {
+       DataStream* s; uint size;
+       template<class T> operator array<T>() { array<T> t; for(uint i=0;i<size;i++) t<<(T)s->read(); return t; }
+   };
+   ArrayReadOperator read(uint size) { return i({this,size}); }
 };
 
 /// \a TextStream provides a convenient interface to parse texts

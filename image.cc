@@ -57,13 +57,6 @@ Image swap(Image&& image) {
     return move(image);
 }
 
-Image flip(Image&& image) {
-    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) {
-        swap(image(x,y),image(x,h-1-y));
-    }
-    return move(image);
-}
-
 weak(Image decodePNG(const array<byte>&)) { error("PNG support not linked"); }
 weak(Image decodeJPEG(const array<byte>&)) { error("JPEG support not linked"); }
 weak(Image decodeICO(const array<byte>&)) { error("ICO support not linked"); }

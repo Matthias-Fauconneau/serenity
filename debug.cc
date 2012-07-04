@@ -45,11 +45,11 @@ string demangle(TextStream& s) {
     else if(s.match("x"_)) r<<"int64"_;
     else if(s.match("y"_)) r<<"uint64"_;
     else if(s.match("T_"_)) r<<"T"_;
-    else if(s.match("S_"_)) r<<"S"_; else if(s.match("S0_"_)) r<<"S0"_; else if(s.match("S1_"_)) r<<"S1"_; //TODO
+    else if(s.match("S"_)) { r<<"S"_; s.number(); s.match("_"_); }
     else if(s.match("I"_)) { //template
         array<string> args;
         while(s && !s.match("E"_)) {
-            if(s.get(1)=="Z"_) args<<demangle(s)<<"::"_<<demangle(s);
+            if(s.get(1)=="Z"_) args<<(demangle(s)+"::"_+demangle(s));
             else args<<demangle(s);
         }
         r<<"<"_<<join(args,", "_)<<">"_;
@@ -67,7 +67,7 @@ string demangle(TextStream& s) {
                 else if((l=s.number())!=-1) {
                     list << s.read(l); //class/member
                     if(s.next()=='I') list.last()<< demangle(s);
-                }
+                } else if(s.next()=='I') list.last()<< demangle(s);
                 else error("N"_,r,string(s.readAll()),string(move(s.buffer)));
             }
             r<< join(list,"::"_);
@@ -106,7 +106,7 @@ Symbol findNearestLine(void* find) {
     }
     Symbol symbol;
     for(DataStream& s = symtab;s.index<s.buffer.size();) {
-        const Sym& sym = s.read<Sym>();
+        const Sym& sym = s.read();
         if(find >= sym.value && find < sym.value+sym.size) {
             TextStream s(str(strtab+sym.name));
             symbol.function = s.match("_"_)&&s.next()=='Z'? demangle(s) : s.readAll();
@@ -115,7 +115,7 @@ Symbol findNearestLine(void* find) {
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
         int start = s.index;
         struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; int8 line_base; ubyte line_range,opcode_base; } packed;
-        const CU& cu = s.read<CU>();
+        const CU& cu = s.read();
         s.advance(cu.opcode_base-1);
         while(s.next()) s.readString();
         s.advance(1);
@@ -128,7 +128,7 @@ Symbol findNearestLine(void* find) {
         byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;
 
         while(s.index<start+cu.size+4) {
-            ubyte opcode = s.read<ubyte>();
+            ubyte opcode = s.read();
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
                          fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };
             /***/ if (opcode >= cu.opcode_base) {
@@ -141,10 +141,10 @@ Symbol findNearestLine(void* find) {
             else if(opcode == extended_op) {
                 int size = readLEV(s);
                 if (size == 0) continue;
-                opcode = s.read<ubyte>();
+                opcode = s.read();
                 enum { end_sequence = 1, set_address, define_file, set_discriminator };
                 /***/ if(opcode == end_sequence) { if (cu.stmt) { address = 0; file_index = 1; line = 1; is_stmt = cu.stmt; } }
-                else if(opcode == set_address) { address = s.read<byte*>(); }
+                else if(opcode == set_address) { address = s.read(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
                 else { log("UNKNOWN: length",size); s.advance(size); }
@@ -180,7 +180,7 @@ Symbol findNearestLine(void* find) {
 }
 
 void trace() {
-    static bool recurse; if(recurse) error("Debugger error"); recurse=true;
+    static bool recurse; if(recurse) {log("Debugger error");return;} recurse=true;
     {Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}

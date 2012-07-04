@@ -53,7 +53,7 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     vector operator +(vector v) const;
     vector operator -(vector v) const;
     vector operator *(vector v) const;
-    //vector operator *(float s) const;
+    vector operator *(int s) const;
     vector operator /(uint s) const;
     bool operator ==(vector v) const;
     bool operator !=(vector v) const;
@@ -65,7 +65,7 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
 };
 
 #define generic template<template<typename> class V, class T, int N>
-//generic vector<V,T,N> operator *(float s, vector<V,T,N> v);
+generic vector<V,T,N> operator *(int s, vector<V,T,N> v);
 generic vector<V,T,N> abs(vector<V,T,N> v);
 generic vector<V,T,N> sign(vector<V,T,N> v);
 generic vector<V,T,N> min(vector<V,T,N> a, vector<V,T,N> b);
