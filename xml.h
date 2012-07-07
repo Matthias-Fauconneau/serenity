@@ -11,7 +11,7 @@ struct Element {
     array<Element> children;
     Element(){}
     Element(string&& content):content(move(content)){}
-    Element(TextBuffer& s, bool html=false);
+    Element(TextStream& s, bool html=false);
     explicit operator bool() { return name||content; }
     /// Returns value for \a attribute (fail if missing)
     string at(const string& attribute) const;

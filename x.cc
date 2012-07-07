@@ -4,7 +4,7 @@
 #include "stream.h"
 #include "file.h"
 
-//TODO: use Socket Stream
+//TODO: use DataStream Socket
 template<class T> inline T read(int fd) {
     T t;
     int unused size = read(fd,(byte*)&t,sizeof(T));

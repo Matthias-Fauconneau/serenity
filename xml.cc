@@ -6,7 +6,7 @@ Array(Element)
 
 static Element parse(array<byte>&& document, bool html) {
     assert(document);
-    TextBuffer s(move(document));
+    TextStream s(move(document));
     s.match("\xEF\xBB\xBF"_); //spurious BOM
     Element root;
     while(s) {
@@ -22,7 +22,7 @@ static Element parse(array<byte>&& document, bool html) {
 Element parseXML(array<byte>&& document) { return parse(move(document),false); }
 Element parseHTML(array<byte>&& document) { return parse(move(document),true); }
 
-Element::Element(TextBuffer& s, bool html) {
+Element::Element(TextStream& s, bool html) {
     uint start = s.index;
     if(s.match("!DOCTYPE"_)||s.match("!doctype"_)) { s.until(">"_); return; }
     else if(s.match("?xml"_)) { s.until("?>"_); return; }
@@ -51,8 +51,7 @@ Element::Element(TextBuffer& s, bool html) {
         s.skip();
     }
     if(html) {
-        static array<string> voidElements =
-                split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
+        static array<string> voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
         if(contains(voidElements,name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
@@ -153,7 +152,7 @@ string unescape(const string& xml) {
         for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
     string out;
-    TextBuffer s(copy(xml));
+    TextStream s(copy(xml));
     while(s) {
         out << s.until("&"_);
         if(!s) break;

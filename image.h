@@ -2,20 +2,11 @@
 #include "array.h"
 #include "vector.h"
 #include "debug.h"
-byte* allocate_(int size);
+#include "memory.h"
 
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
-//typedef vector<bgra,int,4> int4;
-
-struct gray {
-    uint8 level;
-    gray(uint8 level):level(level){}
-    operator byte4() const { return byte4(level,level,level,255); }
-    //operator int4() const { return int4(level,level,level,255); }
-};
-const gray white = gray(255);
-const gray black = gray(0);
+typedef vector<bgra,uint,4> int4;
 
 template<class T> struct Image {
     no_copy(Image)
@@ -38,26 +29,20 @@ template<class T> struct Image {
     T& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
     int2 size() const { return int2(width,height); }
 };
+
+#define generic template<class T>
+
 /// Creates a new handle to \a image data (unsafe if freed)
-template<class T> inline Image<T> share(const Image<T>& o) {
-    return Image<T>(o.data,o.width,o.height,o.stride,false);
-}
-/*inline Image copy(const Image& image) {
-    Image copy(image.width,image.height); ::copy(copy.data,image.data,image.stride*image.height); return copy;
-}
-
+generic inline Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.width,o.height,o.stride,false); }
+/// Copies the image buffer
+generic inline Image<T> copy(const Image<T>& o) {Image<T> copy(o.width,o.height); ::copy(copy.data,o.data,o.stride*o.height); return copy;}
 /// Returns a copy of the image resized to \a width x \a height
-Image resize(const Image& image, uint width, uint height);
-
+Image<byte4> resize(const Image<byte4>& image, uint width, uint height);
 /// Swaps ARGB <-> BGRA in place
-Image swap(Image&& image);
-
+Image<byte4> swap(Image<byte4>&& image);
 /// Flip the image around the horizontal axis in place
-Image flip(Image&& image);
-
-/// Convenience function to iterate all pixels of an image
-#define for_Image(image) for(int y=0,h=image.height;y<h;y++) for(int x=0,w=image.width;x<w;x++)
-
+Image<byte4> flip(Image<byte4>&& image);
 /// Decodes \a file to an Image
-Image decodeImage(const array<byte>& file);
-*/
+Image<byte4> decodeImage(const array<byte>& file);
+
+#undef generic

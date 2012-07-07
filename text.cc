@@ -137,7 +137,7 @@ void Text::render(int2 parent) {
     if(!textSize) update(wrap>=0 ? wrap : screen.y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image);
-    for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
+    for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), 0);
 }
 
 bool Text::mouseEvent(int2 position, Event event, Button) {
@@ -181,7 +181,7 @@ void TextInput::render(int2 parent) {
     if(focus==this) {
         if(cursor>text.size()) cursor=text.size();
         int x = cursor < blits.size()? blits[cursor].pos.x : cursor>0 ? blits.last().pos.x+blits.last().image.width : 0;
-        fill(parent+position+max(int2(0,0),(Widget::size-textSize)/2)+Rect(int2(x,0), int2(x+1,Widget::size.y)),gray(0));
+        fill(parent+position+max(int2(0,0),(Widget::size-textSize)/2)+Rect(int2(x,0), int2(x+1,Widget::size.y)), 0);
     }
 }
 

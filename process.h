@@ -30,7 +30,7 @@ struct Poll {
     void registerPoll(pollfd);
     /// Remove this to the process-wide event loop
     void unregisterPoll();
-    /// Wait for all poll events to be processed and call \a event again
+    /// Wait for all outstanding poll events to be processed before calling \a event again
     void wait();
     virtual ~Poll() { unregisterPoll(); }
     /// Callback on new events

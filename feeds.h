@@ -15,7 +15,7 @@ struct Entry : Item {
 
 struct Feeds : List<Entry> {
     int readConfig;
-    array<string> read;
+    Map readMap;
     signal<> contentChanged;
     Scroll<HTML>* content=0;
     Window window {0}; //keep the same window to implement \a nextItem

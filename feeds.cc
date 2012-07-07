@@ -34,7 +34,7 @@ Feeds::Feeds() {
     buttons.keyPress[BTN_EXTRA].connect(this, &Feeds::readNext);
 #endif
     readConfig = appendFile("read"_,config);
-    read = split(readFile("read"_,config),'\n');
+    readMap = mapFile("read"_,config);
     reserve(256); //realloc would invalidate delegates
     List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
     List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
@@ -46,15 +46,16 @@ Feeds::~Feeds() { close(readConfig); }
 bool Feeds::isRead(const Entry& entry) {
     const Text& text = entry.get<Text>();
     string id = text.text+entry.link;
-    return contains(read,id);
+    id=replace(id,"\n"_,""_);
+    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return true; return false; //TODO: binary search (on fixed length lines)
 }
 void Feeds::setRead(const Entry& entry) {
     const Text& text = entry.get<Text>();
     string id = text.text+entry.link;
     id=replace(id,"\n"_,""_);
-    if(contains(read,id)) return;
+    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return true; return false; //TODO: binary search (on fixed length lines)
     ::write(readConfig,string(id+"\n"_));
-    read << move(id);
+    readMap = mapFile(readConfig); //remap
 }
 void Feeds::setAllRead() {
     for(Entry& entry: *this) {

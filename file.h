@@ -1,16 +1,18 @@
 #pragma once
 #include "string.h"
 
+array<byte> read(int fd, uint capacity);
+array<byte> readUpTo(int fd, uint capacity);
+
 int root();
 
-/// Open file for reading
+/// Open file for reading, fails if not existing
 int openFile(const string& path, int at=root());
 /// Open file for writing, overwrite if existing
 int createFile(const string& path, int at=root(), bool overwrite=false);
 /// Open file for writing, append if existing
 int appendFile(const string& path, int at=root());
 
-array<byte> read(int fd, uint capacity);
 array<byte> readFile(const string& path, int at=root());
 void writeFile(const string& path, const array<byte>& content, int at=root(), bool overwrite=false);
 
@@ -20,17 +22,18 @@ struct Map {
     Map(){}
     Map(const byte* data, uint size):data(data),size(size){}
     Map(Map&& o):data(o.data),size(o.size){o.data=0,o.size=0;}
-    Map& operator=(Map&& o){data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
+    Map& operator=(Map&& o){Map::~Map();data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
     ~Map();
     /// Returns an /a array reference to the map, valid only while the map exists.
     operator array<byte>() { return array<byte>(data,size); }
 };
 
 Map mapFile(const string& path, int at=root());
+Map mapFile(int fd);
 
 int openFolder(const string& path, int at=root());
 bool exists(const string& path, int at=root());
-bool createFolder(const string& path, int at);
+void createFolder(const string& path, int at);
 bool isFolder(const string& path, int at=root());
 void symlink(const string& target,const string& name, int at=root());
 long modifiedTime(const string& path, int at=root());

@@ -40,11 +40,11 @@ template<class T> struct Scroll : ScrollArea, T {
 /// ImageView is a widget displaying a static image
 struct ImageView : Widget {
     /// Displayed image
-    Image image;
+    Image<byte4> image;
 
     ImageView(){}
     /// Create a widget displaying \a image
-    ImageView(Image&& image):image(move(image)){}
+    ImageView(Image<byte4>&& image):image(move(image)){}
 
     int2 sizeHint();
     void render(int2 parent);
@@ -55,7 +55,7 @@ typedef ImageView Icon;
 struct TriggerButton : Icon {
     //using Icon::Icon;
     TriggerButton(){}
-    TriggerButton(Image&& image):Icon(move(image)){}
+    TriggerButton(Image<byte4>&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
     bool mouseEvent(int2 position, Event event, Button button) override;
@@ -64,7 +64,7 @@ struct TriggerButton : Icon {
 /// ToggleButton is a togglable Icon
 struct ToggleButton : Widget {
     /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(const Image& enable,const Image& disable);
+    ToggleButton(const Image<byte4>& enable,const Image<byte4>& disable);
 
     /// User toggled the button
     signal<bool /*nextState*/> toggled;
@@ -76,8 +76,8 @@ struct ToggleButton : Widget {
     void render(int2 parent);
     bool mouseEvent(int2 position, Event event, Button button) override;
 
-    const Image& enableIcon;
-    const Image& disableIcon;
+    const Image<byte4>& enableIcon;
+    const Image<byte4>& disableIcon;
     static const int size = 32;
 };
 

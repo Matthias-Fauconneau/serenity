@@ -69,7 +69,13 @@ template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0
 #else
 #define debug( statements... )
 #endif
-void trace();
-int write(int fd, const void* buf, long size);
+/// Linux exit syscall
 int exit(int code) __attribute((noreturn));
-#define assert_(expr) ({ debug( if(!(expr)) trace(), write(1,#expr "\n",sizeof(#expr)), exit(-1); ) })
+/// Linux write syscall
+int write(int fd, const void* buf, long size);
+/// Aborts unconditionally without any message
+void abort() __attribute((noreturn));
+/// Log current stack trace
+void trace();
+/// Aborts if \a expr evaluates to false and display \a expr
+#define assert_(expr) ({ debug( if(!(expr)) trace(), write(1,#expr "\n",sizeof(#expr)), abort(); ) })

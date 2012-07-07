@@ -28,7 +28,7 @@ string str(Date date, string&& format="dddd, dd MMMM yyyy hh:mm"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy
-Date parse(TextBuffer& s);
+//Date parse(TextStream& s);
 
 struct Timer : Poll {
     int fd;

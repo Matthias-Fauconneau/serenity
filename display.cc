@@ -22,7 +22,7 @@ void finish() { clipStack.pop(); assert(!clipStack); currentClip=Rect(int2(0,0),
 
 /// Display
 
-Pixmap framebuffer;
+Image<rgb> framebuffer;
 int2 screen;
 
 struct VScreen { uint xres, yres, xres_virtual, yres_virtual, xoffset, yoffset, bits_per_pixel, grayscale; uint reserved[32]; };
@@ -51,9 +51,15 @@ void fill(Rect rect, rgb color) {
 
 /// Blit
 
-void blit(int2 target, const Image<gray>& source) {
+void blit(int2 target, const Image<uint8>& source) {
     Rect rect = (target+Rect(source.size())).clip(currentClip);
     for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-        framebuffer(x,y) = source(x-target.x,y-target.y);
+        framebuffer(x,y) = source(x-target.x,y-target.y); //TODO: color
+    }
+}
+void blit(int2 target, const Image<byte4>& source) {
+    Rect rect = (target+Rect(source.size())).clip(currentClip);
+    for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+        framebuffer(x,y) = source(x-target.x,y-target.y); //TODO: alpha
     }
 }

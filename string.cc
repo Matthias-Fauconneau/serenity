@@ -206,6 +206,7 @@ template<int base> string itoa(int number, int pad) {
     if(number<0) buf[--i]='-';
     return copy(string(buf+i,32-i));
 }
+template string itoa<2>(int,int);
 template string itoa<10>(int,int);
 
 /*string ftoa(float n, int precision, int base) {
@@ -221,13 +222,16 @@ bool isInteger(const string& s) { if(!s) return false; for(char c: s) if(c<'0'||
 long toInteger(const string& number, int base) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     int sign=1;
-    utf8_iterator i=number.begin();
+    const byte* i = number.begin().pointer;
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
     long value=0;
-    for(;i!=number.end();++i) {
+    for(;i!=number.end().pointer;++i) {
         if(*i==' ') break;
-        assert((*i>='0' && *i<='9')||(*i>='a'&&*i<='f'),"Invalid input '"_+number+"'"_);
-        int n = indexOf(array<byte>((byte*)"0123456789abcdef",base), (byte)*i);
+        int n;
+        if(*i>='0' && *i<='9') n = *i-'0';
+        else if(*i>='a' && *i<='f') n = *i+10-'a';
+        else if(*i>='A' && *i<='F') n = *i+10-'A';
+        else error("Invalid input '"_+number+"'"_);
         value *= base;
         value += n;
     }

@@ -16,12 +16,12 @@ int dispatchEvents(bool wait) {
     for(uint i=0;i<polls.size();i++) {
         int events = pollfds[i].revents;
         if(events) {
-            if(!(events&POLLIN)) warn("!POLLIN"_);
             if(events&POLLHUP) { warn("POLLHUP"_); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
-            polls[i]->event(pollfds[i]);
+            else if(events&(POLLIN|POLLOUT)) polls[i]->event(pollfds[i]);
+            else error(events);
         }
     }
-    for(Poll* p: queue) p->event(i({}));
+    while(queue) queue.takeFirst()->event(i({}));
     return polls.size();
 }
 
@@ -43,12 +43,6 @@ void setPriority(int priority) { setpriority(0,0,priority); }
 #include "map.h"
 #include "file.h"
 #include "stream.h"
-array<byte> readUpTo(int fd, uint capacity) {
-    array<byte> buffer(capacity);
-    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
-    buffer.setSize(size);
-    return buffer;
-}
 uint availableMemory() {
     int fd = openFile("/proc/meminfo"_);
     TextBuffer s = ::readUpTo(fd,2048);

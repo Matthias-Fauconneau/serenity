@@ -16,8 +16,6 @@ public:
 }
 using std::initializer_list;
 
-inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
-
 /// \a array is a typed and bound-checked handle to a memory buffer (using move semantics)
 /// \note array transparently store small arrays inline when possible
 /// \note #include "array.cc" to compile arrays or method definitions for custom types
@@ -106,9 +104,6 @@ template<class T> struct array {
     T* begin() { return (T*)data(); }
     T* end() { return (T*)data()+size(); }
 };
-
-/// Reinterpret cast \a array to array<T>
-template<class T, class O> array<T> cast(array<O>&& array);
 
 #define generic template<class T>
 #define array array<T>

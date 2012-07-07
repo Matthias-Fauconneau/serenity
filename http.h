@@ -4,31 +4,21 @@
 #include "signal.h"
 
 /// \a Socket is a network socket
-struct Socket : Buffer {
+struct Socket : virtual Stream {
     int fd=0;
     Socket(){}
-    Socket(Socket&& o){fd=o.fd; o.fd=0;}
+    ~Socket() { disconnect(); }
     /// Connects to \a service on \a host
-    bool connect(const string& host, const string& service);
-    ~Socket();
-    /// Socket
-    virtual array<byte> read(int size)=0;
-    virtual void write(const array<byte>& buffer)=0;
+    void connect(const string& host, const string& service);
+    void disconnect();
+    /// Reads /a size bytes from network socket
+    virtual array<byte> receive(uint size);
+    /// Writes /a buffer to network socket
+    virtual void write(const array<byte>& buffer);
     /// Stream
     uint available(uint need) override;
     array<byte> get(uint size) override;
 };
-
-typedef struct ssl_st SSL;
-struct SSLSocket : Socket {
-    ~SSLSocket();
-    SSL* ssl=0;
-    bool connect(const string& host, const string& service, bool secure=false);
-    array<byte> read(int size) override;
-    void write(const array<byte>& buffer) override;
-};
-
-struct TextSSLSocket : TextStream, SSLSocket {};
 
 /// Encodes \a input to Base64 to transfer binary data through text protocol
 string base64(const string& input);
@@ -47,29 +37,30 @@ inline bool operator ==(const URL& a, const URL& b) {
 
 typedef delegate<void(const URL&, array<byte>&&)> Handler;
 
-struct HTTP : Poll {
-    struct : TextStream, SSLSocket {} http;
+struct HTTP : Poll, virtual TextStream, virtual Socket {
     URL url;
-    Handler handler;
     array<string> headers;
     string method;
     array<string> redirect;
+    uint contentLength=0;
+    bool chunked=false;
     array<byte> content;
+    Handler handler;
 
 /// Connects to \a host and requests \a path using \a method.
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(const URL& url, Handler handler, array<string>&& headers={}, string&& method="GET"_, array<string>&& redirect={});
+    HTTP(const URL& url, Handler handler, array<string>&& headers i(={}), string&& method="GET"_);
 
+   enum { Connect, Request, Header, Data, Cache, Handle, Done } state = Connect;
     void request();
+    void header();
     void event(pollfd) override;
-
-    explicit operator bool() { return http.fd; }
 };
 
 /// Requests ressource at \a url and call \a handler when available
-/// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge
+/// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge minutes
 void getURL(const URL &url, Handler handler, int maximumAge);
 
 /// Returns path to cache file for \a url

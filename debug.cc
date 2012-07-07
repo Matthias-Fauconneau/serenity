@@ -3,7 +3,11 @@
 #include "stream.h"
 #include "linux.h"
 
-void write(int fd, const array<byte>& s) { write(fd,s.data(),(ulong)s.size()); }
+const char* errno[35] = {"OK",
+    "PERM","NOENT","SRCH","INTR","IO","NXIO","2BIG","NOEXEC","BADF","CHILD","AGAIN","NOMEM","ACCES","FAULT","NOTBLK","BUSY","EXIST",
+    "XDEV","NODEV","NOTDIR","ISDIR","INVAL","NFILE","MFILE","NOTTY","TXTBSY","FBIG","NOSPC","SPIPE","ROFS","MLINK","PIPE","DOM","RANGE"};
+
+void write(int fd, const array<byte>& s) { int r=write(fd,s.data(),s.size()); assert(r==(int)s.size(),r); }
 void abort() { exit(-1); }
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version,entry,phoff,shoff,flags;
@@ -12,9 +16,9 @@ struct Shdr { uint name,type,flags,addr,offset,size,link,info,addralign,entsize;
 struct Sym { uint	name; byte* value; uint size; ubyte info,other; uint16 shndx; };
 
 /// Reads a little endian variable size integer
-static int readLEV(Stream& s, bool sign=false) {
+static int readLEV(DataStream& s, bool sign=false) {
     int result=0; int shift=0; byte b;
-    do { b = s.next(); s.advance(1); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
+    do { b = s.read(); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
     if(sign && (shift < 32) && (b & 0x40)) result |= -1 << shift;
     return result;
 }
@@ -66,14 +70,14 @@ string demangle(TextStream& s) {
                 else if(s.match("cv"_)) list << ("operator "_ + demangle(s));
                 else if((l=s.number())!=-1) {
                     list << s.read(l); //class/member
-                    if(s.next()=='I') list.last()<< demangle(s);
-                } else if(s.next()=='I') list.last()<< demangle(s);
-                else error("N"_,r,string(s.readAll()),string(move(s.buffer)));
+                    if(s.peek()=='I') list.last()<< demangle(s);
+                } else if(s.peek()=='I') list.last()<< demangle(s);
+                else error("N"_,r,string(s.untilEnd()),string(move(s.buffer)));
             }
             r<< join(list,"::"_);
         } else if((l=s.number())!=-1) {
             r<< s.read(l); //function
-            if(s.next()=='I') r<< demangle(s);
+            if(s.peek()=='I') r<< demangle(s);
         }
         array<string> args;
         while(s && !s.match("E"_)) args << demangle(s);
@@ -83,9 +87,11 @@ string demangle(TextStream& s) {
     else if(s.match("_0"_)) {}
     else if((l=s.number())!=-1) {
         r<<s.read(l); //struct
-        if(s && s.next()=='I') r<< demangle(s);
+        if(s && s.peek()=='I') r<< demangle(s);
     }
-    else error("A"_,r,string(s.readAll()));
+    else if(s.match("F"_)) {
+        r << demangle(s);
+    } else error("A"_,r,string(s.untilEnd()));
     for(int i=0;i<pointer;i++) r<<"*"_;
     if(rvalue) r<<"&&"_;
     if(ref) r<<"&"_;
@@ -109,7 +115,7 @@ Symbol findNearestLine(void* find) {
         const Sym& sym = s.read();
         if(find >= sym.value && find < sym.value+sym.size) {
             TextStream s(str(strtab+sym.name));
-            symbol.function = s.match("_"_)&&s.next()=='Z'? demangle(s) : s.readAll();
+            symbol.function = s.match("_"_)&&s.peek()=='Z'? demangle(s) : s.untilEnd();
         }
     }
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
@@ -117,11 +123,11 @@ Symbol findNearestLine(void* find) {
         struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; int8 line_base; ubyte line_range,opcode_base; } packed;
         const CU& cu = s.read();
         s.advance(cu.opcode_base-1);
-        while(s.next()) s.readString();
+        while(s.peek()) s.untilNull();
         s.advance(1);
         array<string> files;
-        while(s.next()) {
-            files << s.readString();
+        while(s.peek()) {
+            files << s.untilNull();
             int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
         }
         s.advance(1);
@@ -181,7 +187,7 @@ Symbol findNearestLine(void* find) {
 
 void trace() {
     static bool recurse; if(recurse) {log("Debugger error");return;} recurse=true;
-    {Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    //{Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}

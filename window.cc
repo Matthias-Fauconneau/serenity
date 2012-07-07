@@ -1,5 +1,5 @@
 #include "window.h"
-#include "raster.h"
+#include "display.h"
 #include "widget.h"
 
 #include "array.cc"

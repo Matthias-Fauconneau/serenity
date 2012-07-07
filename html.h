@@ -5,9 +5,9 @@
 
 /// Asynchronously load an image
 struct ImageLoader {
-    ImageLoader(const URL& url, Image* target, delegate<void()> imageLoaded, int2 size=int2(0,0), uint maximumAge=2*60*60);
+    ImageLoader(const URL& url, Image<byte4>* target, delegate<void()> imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
     /// Reference to target to load (need to stay valid)
-    Image* target;
+    Image<byte4>* target;
     /// Trigger when target was loaded
     delegate<void()> imageLoaded;
     /// Preferred size

@@ -69,7 +69,7 @@ void Linear::update() {
     bool expanding=sharing;
     if(!expanding) sharing=count(); //if no expanding: all widgets will share the extra space
     if(width > 0 || sharing==1) { //share extra space evenly between expanding/all widgets
-        int extra = width/(sharing+!expanding); //if no expanding: keep space for margins
+        int extra = uint(width)/uint(sharing+!expanding); //if no expanding: keep space for margins
         for(uint i=0;i<count();i++) {
             sizes[i] = hints[i] + ((!expanding || sizes[i]<0)?extra:0);
         }
@@ -80,7 +80,7 @@ void Linear::update() {
             int& first = max(sizes);
             int second=first; for(int e: sizes) if(e>second && e<first) second=e;
             int delta = first-second;
-            if(delta==0 || delta>-width/sharing) delta=-width/sharing; //if no change or bigger than necessary
+            if(delta==0 || delta>int(uint(-width)/uint(sharing))) delta=uint(-width)/uint(sharing); //if no change or bigger than necessary
             first -= delta; width += delta;
         }
     }

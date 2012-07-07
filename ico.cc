@@ -1,18 +1,13 @@
 #include "image.h"
 #include "stream.h"
 
-template array<byte4> cast(array<byte>&& array);
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
+inline void align(int width, uint& offset) { offset=align(width,(uint)offset); }
 
 struct Directory { uint16 reserved, type, count; };
 struct Entry { ubyte width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
 struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
-
-Image<byte4> flip(Image<byte4>&& image) {
-    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) {
-        swap(image(x,y),image(x,h-1-y));
-    }
-    return move(image);
-}
 
 Image<byte4> decodeICO(const array<byte>& file) {
     assert(file);

@@ -3,7 +3,7 @@
 #include "string.h"
 #include "vector.h"
 
-/// Stream reader for encoded packed bits
+/// Decodes packed bitstreams
 struct BitReader : array<byte> {
     ubyte* data=0;
     uint bsize=0;

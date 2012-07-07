@@ -67,8 +67,9 @@ inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 ar
     return (type)r0; \
 }
 
-enum class sys { exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, munmap=91, setpriority=97,
-                 getdents=141, poll=168, sigaction=174, mmap=192, fstat=197, openat=322, mkdirat, fstatat, unlinkat, symlinkat=331 };
+enum class sys { exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, munmap=91, setpriority=97,
+                 socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197, clock_gettime=263, openat=322,
+                 mkdirat, unlinkat, symlinkat=331 };
 
 int exit(int code) __attribute((noreturn));
 syscall1_nr(int, exit, int,code)
@@ -80,6 +81,7 @@ syscall1(int, close, int,fd)
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
 syscall1(void*, brk, void*,new_brk)
 syscall3(int, ioctl, int,fd, long,request, void*,buf)
+syscall3(int, fcntl, int,fd, int,cmd, int,param)
 syscall2(int, munmap, void*,addr, long,len)
 syscall3(int, setpriority, int,which, int,who, int,prio)
 syscall3(int, getdents, int,fd, struct dirent*,entry, long,size)
@@ -87,12 +89,14 @@ syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
 syscall4(int, sigaction, int,sig, const void*,act, struct action*,old, int, sigsetsize)
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, fstat, int,fd, struct stat*,buf)
+syscall2(int, clock_gettime, int,type, struct timespec*,ts);
 syscall4(int, openat, int,fd, const char*,name, int,oflag, int,perms)
 syscall3(int, mkdirat, int,fd, const char*,name, int,mode)
-syscall4(int, fstatat, int,fd, const char*,name, struct stat*,buf, int,flag)
 syscall3(int, unlinkat, int,fd, const char*,name, int,flag)
 syscall3(int, symlinkat, const char*,target, int,fd, const char*,name)
+syscall3(int, socket, int,domain, int,type, int,protocol)
+syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
+enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=040000};
+enum {PROT_READ=1, PROT_WRITE};
+enum {MAP_SHARED=1, MAP_PRIVATE};
 
-enum { O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=040000 };
-enum { PROT_READ=1, PROT_WRITE };
-enum { MAP_SHARED=1, MAP_PRIVATE };

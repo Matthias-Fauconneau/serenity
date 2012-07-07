@@ -238,7 +238,7 @@ void FLAC::readFrame() {
         ::predict += predict;
         ::order += order*blockSize;
     }
-    index=align(8,index);
+    align(index,8);
     skip(16);
     for(int i=0;i<blockSize;i++) {
         int a=block[0][i], b=block[1][i];

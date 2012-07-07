@@ -7,17 +7,15 @@
 struct rgb565 {
     uint16 pack;
     rgb565():pack(0){}
-    rgb565(gray g):pack( (g.level&0b11111000)<<8 | (g.level&0b11111100)<<3 | g.level>>3 ) {}
+    rgb565(uint8 i):pack( (i&0b11111000)<<8 | (i&0b11111100)<<3 | i>>3 ) {}
     rgb565(uint8 r, uint8 g, uint8 b):pack( (r&0b11111000)<<8 | (g&0b11111100)<<3 | b>>3 ) {}
-    //rgb565(byte4 c):rgb565(c.r, c.g, c.b){}
-    //operator byte4() const { return byte4( (pack>>8)&0b11111000, (pack>>3)&0b11111100, pack<<3, 255); }
-    //operator int4() const { return int4( (pack>>8)&0b11111000, (pack>>3)&0b11111100, (pack<<3)&0b11111000, 255); }
+    rgb565(byte4 c):rgb565(c.r, c.g, c.b){}
 };
 typedef rgb565 rgb;
 #else
 typedef byte4 rgb;
 #endif
-typedef Image<rgb> Pixmap; //Image in display format
+//typedef Image<byte4> Pixmap;
 
 /// Clip
 struct Rect {
@@ -43,5 +41,5 @@ extern int2 screen;
 void fill(Rect rect, rgb color);
 
 /// Blit \a source to framebuffer at \a target
-void blit(int2 target, const Image<gray>& source);
-//void blit(int2 target, const Pixmap& source);
+void blit(int2 target, const Image<uint8>& source); //TODO: color
+void blit(int2 target, const Image<byte4>& source); //TODO: alpha

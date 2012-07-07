@@ -8,7 +8,7 @@
 struct Glyph {
     int2 offset; // (left bearing, min.y-baseline) (in .4)
     int advance; //in .4
-    Image<gray> image;
+    Image<uint8> image;
 };
 
 /// Truetype font renderer stub

@@ -12,52 +12,53 @@ enum { DT_DIR=4, DT_REG=8 };
 
 array<byte> read(int fd, uint capacity) {
     array<byte> buffer(capacity);
-    int size = read(fd,(byte*)buffer.data(),(size_t)capacity);
+    int size = check( read(fd,buffer.data(),capacity) );
     assert((uint)size==capacity,size);
+    buffer.setSize(size);
+    return buffer;
+}
+array<byte> readUpTo(int fd, uint capacity) {
+    array<byte> buffer(capacity);
+    int size = check( read(fd,buffer.data(),capacity) );
     buffer.setSize(size);
     return buffer;
 }
 
 /// File
 int openFile(const string& path, int at) {
-    int fd = openat(at, strz(path), O_RDONLY, 0);
-    if(fd < 0) error("File not found"_,"'"_+path+"'"_);
+    int fd = check( openat(at, strz(path), O_RDONLY, 0), path);
     return fd;
 }
 
 int createFile(const string& path, int at, bool overwrite) {
     if(!overwrite && exists(path,at)) error("exists",path);
-    return openat(at, strz(path),O_CREAT|O_WRONLY|O_TRUNC,0666);
+    return check( openat(at, strz(path),O_CREAT|O_WRONLY|O_TRUNC,0666), path );
 }
 
 int appendFile(const string& path, int at) {
-    return openat(at, strz(path),O_CREAT|O_WRONLY|O_APPEND,0666);
+    return check( openat(at, strz(path),O_CREAT|O_RDWR|O_APPEND,0666), path );
 }
 
 array<byte> readFile(const string& path, int at) {
-    int fd = openat(at, strz(path), O_RDONLY, 0);
-    if(fd < 0) error("File not found"_,"'"_+path+"'"_);
+    int fd = openFile(path,at);
     struct stat sb; fstat(fd, &sb);
     array<byte> file = read(fd,sb.size);
     close(fd);
-    debug( if(file.size()>1<<20) warn("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_) );
+    debug( if(file.size()>1<<16) warn("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_) );
     return file;
 }
 
-Map mapFile(const string& path, int at) {
-    int fd = openat(at, strz(path), O_RDONLY, 0);
-    if(fd < 0) error("File not found"_,"'"_+path+"'"_);
+Map mapFile(const string& path, int at) { int fd=openFile(path,at); Map map=mapFile(fd); close(fd); return map; }
+Map mapFile(int fd) {
     struct stat sb; fstat(fd, &sb);
     const byte* data = (byte*)mmap(0,(size_t)sb.size,PROT_READ,MAP_PRIVATE,fd,0);
     assert(data);
-    close(fd);
     return Map(data,(int)sb.size);
 }
 Map::~Map() { if(data) munmap((void*)data,size); }
 
 void writeFile(const string& path, const array<byte>& content, int at, bool overwrite) {
     int fd = createFile(path,at,overwrite);
-    if(fd < 0) { warn("Creation failed",path,fd,at); return; }
     uint unused wrote = write(fd,content.data(),(size_t)content.size());
     assert(wrote==content.size());
     close(fd);
@@ -68,12 +69,11 @@ void writeFile(const string& path, const array<byte>& content, int at, bool over
 int root() { static int fd = openFolder("/"_,-100); return fd; }
 
 int openFolder(const string& path, int at) {
-    int fd = openat(at, strz(path), O_RDONLY|O_DIRECTORY, 0);
-    if(fd < 0) error("Folder not found"_,"'"_+path+"'"_);
+    int fd = check( openat(at, strz(path), O_RDONLY|O_DIRECTORY, 0), path );
     return fd;
 }
 
-bool createFolder(const string& path, int at) { return mkdirat(at, strz(path), 0666)==0; }
+void createFolder(const string& path, int at) { int unused e= check( mkdirat(at, strz(path), 0666), path); }
 
 bool exists(const string& path, int at) {
     int fd = openat(at, strz(path), O_RDONLY, 0);
@@ -83,10 +83,10 @@ bool exists(const string& path, int at) {
 
 void symlink(const string& target,const string& name, int at) {
     unlinkat(at,strz(name),0);
-    if(symlinkat(strz(target),at,strz(name))<0) warn("symlink failed",name,"->",target);
+    int unused e= check(symlinkat(strz(target),at,strz(name)), name,"->",target);
 }
 
-struct stat statFile(const string& path, int at) { struct stat file; fstatat(at, strz(path), &file, 0); return file; }
+struct stat statFile(const string& path, int at) { int fd = openFile(path,at); stat file; int unused e= check( fstat(fd, &file) ); close(fd); return file; }
 enum { S_IFDIR=0040000 };
 bool isFolder(const string& path, int at) { return statFile(path,at).mode&S_IFDIR; }
 long modifiedTime(const string& path, int at) { return statFile(path,at).mtime.sec; }

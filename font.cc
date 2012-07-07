@@ -10,9 +10,9 @@ Font::Font(string name, int size) : keep(mapFile(name,fonts())), size(size) {
     DataStream head, hhea;
     for(int i=0;i<numTables;i++) {
         uint32 tag=s.read<uint32>()/*no swap*/, unused checksum=s.read(), offset=s.read(), unused size=s.read();
-        if(tag==raw<uint32>("head"_)) head=DataStream(s.slice(offset,size));
-        if(tag==raw<uint32>("hhea"_)) hhea=DataStream(s.slice(offset,size));
-        if(tag==raw<uint32>("cmap"_)) cmap=DataStream(s.slice(offset,size));
+        if(tag==raw<uint32>("head"_)) head=s.slice(offset,size);
+        if(tag==raw<uint32>("hhea"_)) hhea=s.slice(offset,size);
+        if(tag==raw<uint32>("cmap"_)) cmap=s.slice(offset,size);
         if(tag==raw<uint32>("hmtx"_)) hmtx=(uint16*)(s.buffer.data()+offset);
         if(tag==raw<uint32>("loca"_)) loca=s.buffer.data()+offset;
         if(tag==raw<uint32>("glyf"_)) glyf=s.buffer.data()+offset;
@@ -189,7 +189,7 @@ Glyph Font::glyph(uint16 code) {
             }
         }
 
-        glyph.image = Image<gray>(width/16,height/16);
+        glyph.image = Image<uint8>(width/16,height/16);
         for(int y=0; y<height/16; y++) {
             for(int x=0; x<width/16; x++) {
                 int acc=0;

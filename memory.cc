@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "core.h"
 #include "linux.h"
 
 byte* heapEnd;
@@ -9,10 +10,11 @@ void setupHeap() {
 }
 
 byte* allocate_(int size) {
-    //TODO: fill free list first
+    //TODO: allocate from free list
     byte* buffer = heapEnd;
     heapEnd += size;
-    while(heapEnd>systemEnd) systemEnd=(byte*)brk(systemEnd+0x1000);
+    if(heapEnd>systemEnd) systemEnd=(byte*)brk((void*)((ulong(heapEnd)&0xFFFFF000)+0x1000)); //round to next page
+    assert_(systemEnd>=heapEnd);
     return buffer;
 }
 byte* reallocate_(byte* buffer, int size, int need) {
@@ -22,6 +24,6 @@ byte* reallocate_(byte* buffer, int size, int need) {
     return new_buffer;
 }
 void unallocate_(byte* buffer, int size) {
-    if(buffer+size==heapEnd) heapEnd=buffer; //FIXME: free only last allocation
-    //TODO: free list
+    if(buffer+size==heapEnd) heapEnd=buffer; //FIXME: freeing only last allocation
+    //TODO: add to free list
 }

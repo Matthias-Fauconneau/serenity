@@ -3,7 +3,7 @@
 void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" int __aeabi_atexit(void (*) (void *), void*, void*) { return 0; }
-//extern "C" void __cxa_pure_virtual() {}
+extern "C" void __cxa_pure_virtual() {}
 
 #if __arm__
 extern "C" uint __aeabi_uidivmod(uint num, uint den) {
@@ -30,13 +30,13 @@ extern "C" uint __umodsi3(uint num, uint den) {
     }
     return num;
 }
-
 #endif
 
 #include "memory.h"
 void* operator new(uint size) { return allocate_(size); }
 void operator delete(void*) { /*TODO*/ }
-extern "C" void __aeabi_memset(byte* s, uint n, byte c) { clear(s,n,c); }
+extern "C" void __aeabi_memset(byte* dst, uint size, byte value) { clear(dst,size,value); }
+extern "C" void __aeabi_memcpy(byte* dst, byte* src, uint size) { copy(dst,src,size); }
 #include "array.cc"
 //Array_Copy_Compare_Sort_Default(int8)
 Array_Copy_Compare_Sort_Default(uint8)

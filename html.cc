@@ -3,13 +3,13 @@
 template struct Array<ImageView>;
 template struct HList<ImageView>;
 
-ImageLoader::ImageLoader(const URL& url, Image* target, delegate<void()> imageLoaded, int2 size, uint maximumAge)
+ImageLoader::ImageLoader(const URL& url, Image<byte4>* target, delegate<void()> imageLoaded, int2 size, uint maximumAge)
     : target(target), imageLoaded(imageLoaded), size(size) {
     getURL(url, Handler(this, &ImageLoader::load), maximumAge);
 }
 
 void ImageLoader::load(const URL&, array<byte>&& file) {
-    Image image = decodeImage(file);
+    Image<byte4> image = decodeImage(file);
     if(!image.size()) return;
     if(size) *target = resize(image,size.x,size.y);
     else *target = move(image);
@@ -17,13 +17,7 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
     delete this;
 }
 
-static const array<string> textElement = {"span"_,"p"_,"a"_,"blockquote"_,"center"_,"u"_,"hr"_,"ul"_,"li"_,"i"_,"strike"_,
-"cite"_,"em"_,"ol"_,"dt"_,"dl"_,"dd"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"code"_,"article"_,"small"_,"abbr"_,"aside"_,"th"_,"pre"_};
-static const array<string>  boldElement = {"b"_,"strong"_,"h1"_,"h2"_,"h3"_,"h4"_,"h5"_,"h6"_};
-static const array<string> ignoreElement = {"html"_,"body"_,"iframe"_,"noscript"_,"option"_,"select"_,"nav"_,"hgroup"_,"time"_,"fieldset"_,
-"footer"_,"base"_,"form"_,"script"_,"style"_,"title"_,"head"_,"meta"_,"link"_,"div"_,"header"_,"label"_,"input"_,"textarea"_,"td"_,"tt"_,"font"_,
-"tr"_,"table"_,"left"_,"area"_,"map"_,"button"_,"sup"_,"param"_,"embed"_,"object"_,"noindex"_,"optgroup"_,
-                                            "tbody"_,"tfoot"_,"thead"_,"acronym"_,"del"_,"video"_,"figure"_,"section"_,"source"_,"noembed"_,"caption"_};
+static array<string> textElement, boldElement, ignoreElement;
 
 void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 60); }
 
@@ -31,6 +25,13 @@ void HTML::load(const URL& url, array<byte>&& document) { clear(); append(url,mo
 void HTML::append(const URL& url, array<byte>&& document) {
     Element html = parseHTML(move(document));
 
+    if(!textElement) {
+        textElement = split("span p a blockquote center u hr ul li i strike cite em ol dt dl dd h1 h2 h3 h4 h5 code article small abbr aside th pre"_);
+        boldElement = split("b strong h1 h2 h3 h4 h5 h6"_);
+        ignoreElement = split("html body iframe noscript option select nav hgroup time fieldset footer base form script style title head meta link div"
+                              " header label input textarea td tt font tr table left area map button sup param embed object noindex optgroup"
+                              " tbody tfoot thead acronym del video figure section source noembed caption"_);
+    }
     const Element* best = &html; int max=0,second=0;
     //find node with most direct content
     html.visit([&url,&best,&max,&second](const Element& div){
@@ -47,7 +48,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
                 score += size?:16800;
             }
         } else if(!div.children) return;
-        div.mayVisit([&score](const Element& e){
+        div.mayVisit([&score](const Element& e)->bool{
             if(contains(textElement,e.name)||contains(boldElement,e.name)) {
                 return true; //visit children
             } else if(!e.name) {
@@ -77,39 +78,46 @@ void HTML::append(const URL& url, array<byte>&& document) {
 }
 
 void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connection to load images
-    if(e.name=="img"_) { //Images
+    /***/ if(e.name=="img"_) { //Images
        flushText();
        images << url.relative(e["src"_]);
-    } else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
+    }
+    else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
         flushText();
-        TextBuffer s(copy(e["style"_])); s.match("background-image:url("_); string src=s.until(")"_);
+        TextStream s(copy(e["style"_])); s.match("background-image:url("_); string src=s.until(")"_);
         images << url.relative(src);
-    } else if(!e.name) { //Text
+    }
+    else if(!e.name) { //Text
        flushImages();
        if(!e.name) text << e.content;
-    } else if(e.name=="a"_) { //Link
+    }
+    else if(e.name=="a"_) { //Link
         flushImages();
         bool inlineText=true; //TODO:
-        e.visit([&inlineText](const Element& e)->void{if(e.name&&!contains(textElement,e.name))inlineText=false;});
+        e.visit([&inlineText](const Element& e){if(e.name&&!contains(textElement,e.name))inlineText=false;});
         if(inlineText) text << format(Format::Underline|Format::Link) << e["href"_] << " "_;
         for(const Element& c: e.children) layout(url, c);
         if(inlineText) text << format(Format::Regular);
-    } else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
+    }
+    else if(e.name=="p"_||e.name=="br"_||e.name=="div"_) { //Paragraph
         flushImages();
         for(const Element& c: e.children) layout(url, c);
         text<<"\n"_;
-    } else if(contains(boldElement,e.name)) { //Bold
+    }
+    else if(contains(boldElement,e.name)) { //Bold
         text << format(Format::Bold);
         for(const Element& c: e.children) layout(url, c);
         text << format(Format::Regular);
-    } else if(e.name=="em"_||e.name=="i"_) { //Italic
+    }
+    else if(e.name=="em"_||e.name=="i"_) { //Italic
         text << format(Format::Italic);
         for(const Element& c: e.children) layout(url, c);
         text << format(Format::Regular);
-    } else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; //wikipedia [edit]
-    } else if(contains(textElement,e.name)) { for(const Element& c: e.children) layout(url, c); // Unhandled format tags
-    } else if(contains(ignoreElement,e.name)) { return; // Ignored elements
-    } else if(!contains(e.name,":"_)) warn("layout: Unknown HTML tag",e.name);
+    }
+    else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; }//wikipedia [edit]
+    else if(contains(textElement,e.name)) { for(const Element& c: e.children) layout(url, c); } // Unhandled format tags
+    else if(contains(ignoreElement,e.name)) { return; } // Ignored elements
+    else if(!contains(e.name,":"_)) warn("layout: Unknown HTML tag",e.name);
 }
 void HTML::flushText() {
     string paragraph = simplify(trim(text));

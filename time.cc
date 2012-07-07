@@ -1,11 +1,13 @@
 #include "time.h"
+#include "linux.h"
 #include "stream.h"
 //#include <sys/timerfd.h>
 struct timespec { ulong sec,nsec; };
 
-long realTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
-long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
-long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000+ts.tv_nsec/1000; }
+enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
+//long realTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
+long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
+//long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000+ts.tv_nsec/1000; }
 
 template<class T> inline bool inRange(T min, T x, T max) { return x>=min && x<=max; }
 void Date::invariant() {
@@ -32,27 +34,30 @@ bool operator >(const Date& a, const Date& b) {
 }
 //bool operator ==(const Date& a, const Date& b) { return a.seconds==a.year==b.year ; }
 
+static const char* days[7] = {"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
+static const char* months[12] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
 
 Date date(long time) {
-    tm t; localtime_r(&time,&t);
-    return Date{ t.tm_sec, t.tm_min, t.tm_hour, t.tm_mday, t.tm_mon, 1900+t.tm_year, (t.tm_wday+6)%7/*0=Monday*/ };
+    int seconds = time, minutes=seconds/60, hours=minutes/60+2, days=hours/24, weekDay = (days+3)%7, month=0, year=1970;
+    bool leap;
+    for(;;) { leap=((year%400)||(!(year%100)&&year%4)); int nofDays = leap?366:365; if(days>nofDays) days-=nofDays, year++; else break; }
+    const int daysPerMonth[12] = {31, leap?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    for(;days>daysPerMonth[month];month++) days-=daysPerMonth[month]; month++;
+    return Date{ seconds%60, minutes%60, hours%24, days, month, year, weekDay }; //GMT+1 and DST
 }
 
-static const string days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
-static const string months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
-
 string str(Date date, string&& format) {
-    TextBuffer s(move(format));
+    TextStream s(move(format));
     string r;
     while(s) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(" "_); }
         else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); else s.until(" "_); }
         else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); else s.until(" "_); }
-        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << days[date.weekDay]; else s.until(" "_); }
-        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << slice(days[date.weekDay],0,3); else s.until(" "_); }
+        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << str(days[date.weekDay]); else s.until(" "_); }
+        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << slice(str(days[date.weekDay]),0,3); else s.until(" "_); }
         else if(s.match("dd"_)){ if(date.day>=0) r << dec(date.day,2); else s.until(" "_); }
-        else if(s.match("MMMM"_)){ if(date.month>=0)  r << months[date.month]; else s.until(" "_); }
-        else if(s.match("MMM"_)){ if(date.month>=0)  r << slice(months[date.month],0,3); else s.until(" "_); }
+        else if(s.match("MMMM"_)){ if(date.month>=0)  r << str(months[date.month]); else s.until(" "_); }
+        else if(s.match("MMM"_)){ if(date.month>=0)  r << slice(str(months[date.month]),0,3); else s.until(" "_); }
         else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); else s.until(" "_); }
         else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(" "_); }
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
@@ -63,9 +68,9 @@ string str(Date date, string&& format) {
     return simplify(trim(r));
 }
 
-Date parse(TextBuffer& s) {
+Date parse(TextStream& s) {
     Date date;
-    for(int i=0;i<7;i++) if(s.match(days[i])) { date.weekDay=i; break; }
+    for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }
 
     s.whileAny(" ,\t"_);
     {
@@ -76,7 +81,7 @@ Date parse(TextBuffer& s) {
     }
 
     s.whileAny(" ,\t"_);
-    for(int i=0;i<12;i++) if(s.match(months[i])) date.month=i;
+    for(int i=0;i<12;i++) if(s.match(str(months[i]))) date.month=i;
 
     s.whileAny(" ,\t"_);
     {
@@ -88,6 +93,6 @@ Date parse(TextBuffer& s) {
     return date;
 }
 
-Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll({fd, POLLIN}); }
+/*Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll({fd, POLLIN}); }
 void Timer::setAbsolute(int date) { itimerspec timer{timespec{0,0},timespec{date,0}}; timerfd_settime(fd,TFD_TIMER_ABSTIME,&timer,0); }
-void Timer::event(pollfd) { expired(); }
+void Timer::event(pollfd) { expired(); }*/

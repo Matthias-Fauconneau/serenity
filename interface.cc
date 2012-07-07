@@ -1,5 +1,4 @@
 #include "interface.h"
-//#include "window.h"
 #include "font.h"
 #include "display.h"
 
@@ -58,17 +57,17 @@ int2 Slider::sizeHint() { return int2(-height,height); }
 
 void Slider::render(int2 parent) {
     if(maximum > minimum && value >= minimum && value <= maximum) {
-        int x = size.x*(value-minimum)/(maximum-minimum);
-        fill(parent+position+Rect(int2(0,0), int2(x,size.y)), gray(128));
-        fill(parent+position+Rect(int2(x,0), size), gray(192));
+        int x = size.x*uint(value-minimum)/uint(maximum-minimum);
+        fill(parent+position+Rect(int2(0,0), int2(x,size.y)), 128);
+        fill(parent+position+Rect(int2(x,0), size), 192);
     } else {
-        fill(parent+position+Rect(int2(0,0), size), gray(128));
+        fill(parent+position+Rect(int2(0,0), size), 128);
     }
 }
 
 bool Slider::mouseEvent(int2 position, Event event, Button button) {
     if((event == Motion || event==Press) && button==LeftButton) {
-        value = minimum+position.x*(maximum-minimum)/size.x;
+        value = minimum+position.x*uint(maximum-minimum)/size.x;
         valueChanged.emit(value);
         return true;
     }
@@ -82,7 +81,7 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(event != Press) return false;
     if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
     if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
-    Window::focus=this;
+    //Window::focus=this;
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<child.position+child.size) {
             if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
@@ -110,7 +109,7 @@ void HighlightSelection::render(int2 parent) {
     if(index<count()) {
         Widget& current = at(index);
         if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
-            fill(parent+position+current.position+Rect(current.size), byte4(224, 192, 128, 224));
+            fill(parent+position+current.position+Rect(current.size), rgb(224, 192, 128));
         }
     }
     Layout::render(parent);
@@ -120,17 +119,11 @@ void HighlightSelection::render(int2 parent) {
 
 void TabSelection::render(int2 parent) {
     Layout::render(parent);
-    if(index>=count()) {
-        //darken whole tabbar
-        fill(parent+position+Rect(size), gray(224), Multiply);
-        return;
-    }
+    if(index==uint(-1)) {  fill(parent+position+Rect(size), 128); return; } //no active tab
     Widget& current = at(index);
-
-    //darken inactive tabs
-    fill(parent+position+Rect(int2(current.position.x, size.y)), gray(224), Multiply);
-    if(current.position.x+current.size.x<size.x-1-int(count())) //dont darken only margin
-        fill(parent+position+Rect( int2(current.position.x+current.size.x, 0), size ), gray(224), Multiply);
+    if(index>0) fill(parent+position+Rect(int2(current.position.x, size.y)), 128); //dark inactive tabs before current
+    fill(parent+position+current.position+Rect(int2(current.size.x,size.y)), 240); //light active tab
+    if(index<count()-1) fill(parent+position+Rect(int2(current.position.x+current.size.x, 0), size), 128); //dark inactive tabs after current
 }
 
 /// ImageView
@@ -138,7 +131,7 @@ void TabSelection::render(int2 parent) {
 int2 ImageView::sizeHint() { return int2(image.width,image.height); }
 void ImageView::render(int2 parent) {
     if(!image) return;
-    blit(parent+position+(Widget::size-image.size())/2, image, Alpha);
+    blit(parent+position+(Widget::size-image.size())/2, image); //TODO: alpha
 }
 
 /// TriggerButton
@@ -150,12 +143,12 @@ bool TriggerButton::mouseEvent(int2, Event event, Button) {
 
 ///  ToggleButton
 
-ToggleButton::ToggleButton(const Image& enableIcon, const Image& disableIcon) : enableIcon(enableIcon), disableIcon(disableIcon) {}
+ToggleButton::ToggleButton(const Image<byte4>& enableIcon, const Image<byte4>& disableIcon) : enableIcon(enableIcon), disableIcon(disableIcon) {}
 int2 ToggleButton::sizeHint() { return int2(size,size); }
 void ToggleButton::render(int2 parent) {
     if(!(enabled?disableIcon:enableIcon)) return;
     int size = min(Widget::size.x,Widget::size.y);
-    blit(parent+position+(Widget::size-int2(size,size))/2, enabled?disableIcon:enableIcon, Alpha);
+    blit(parent+position+(Widget::size-int2(size,size))/2, enabled?disableIcon:enableIcon);
 }
 bool ToggleButton::mouseEvent(int2, Event event, Button button) {
     if(event==Press && button==LeftButton) { enabled = !enabled; toggled.emit(enabled); return true; }
