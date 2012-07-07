@@ -16,9 +16,8 @@ int dispatchEvents(bool wait) {
     for(uint i=0;i<polls.size();i++) {
         int events = pollfds[i].revents;
         if(events) {
-            if(events&POLLHUP) { warn("POLLHUP"_); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
-            else if(events&(POLLIN|POLLOUT)) polls[i]->event(pollfds[i]);
-            else error(events);
+            polls[i]->event(pollfds[i]);
+            if(events&POLLHUP) { polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
         }
     }
     while(queue) queue.takeFirst()->event(i({}));

@@ -32,6 +32,7 @@ template<class T> struct Image {
 
 #define generic template<class T>
 
+generic inline string str(const Image<T>& o) { return str(o.width,"x"_,o.height); }
 /// Creates a new handle to \a image data (unsafe if freed)
 generic inline Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.width,o.height,o.stride,false); }
 /// Copies the image buffer

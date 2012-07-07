@@ -143,8 +143,8 @@ private:
     jpgd_quant_t* m_quant[max_QUANT_TABLES]; // pointer to quantization tables
     int m_scan_type;                              // Gray, Yh1v1, Yh1v2, Yh2v1, Yh2v2 (CMYK111, CMYK4114 no longer supported)
     int m_comps_in_frame;                         // # of components in frame
-    int m_comp_h_samp[max_COMPONENTS];       // component's horizontal sampling factor
-    int m_comp_v_samp[max_COMPONENTS];       // component's vertical sampling factor
+    uint m_comp_h_samp[max_COMPONENTS];       // component's horizontal sampling factor
+    uint m_comp_v_samp[max_COMPONENTS];       // component's vertical sampling factor
     int m_comp_quant[max_COMPONENTS];        // component's quantization table selector
     int m_comp_ident[max_COMPONENTS];        // component's ID
     int m_comp_h_blocks[max_COMPONENTS];
@@ -157,13 +157,13 @@ private:
     int m_spectral_end;                           // spectral selection end
     int m_successive_low;                         // successive approximation low
     int m_successive_high;                        // successive approximation high
-    int m_max_mcu_x_size;                         // MCU's max. X size in pixels
-    int m_max_mcu_y_size;                         // MCU's max. Y size in pixels
+    uint m_max_mcu_x_size;                         // MCU's max. X size in pixels
+    uint m_max_mcu_y_size;                         // MCU's max. Y size in pixels
     int m_blocks_per_mcu;
     int m_max_blocks_per_row;
     int m_mcus_per_row, m_mcus_per_col;
     int m_mcu_org[max_BLOCKS_PER_MCU];
-    int m_total_lines_left;                       // total # lines left in image
+    uint m_total_lines_left;                       // total # lines left in image
     int m_mcu_lines_left;                         // total # lines left in this MCU
     int m_real_dest_bytes_per_scan_line;
     int m_dest_bytes_per_scan_line;               // rounded up
@@ -1797,7 +1797,7 @@ void jpeg_decoder::load_next_row()
 
     for (mcu_row = 0; mcu_row < m_mcus_per_row; mcu_row++)
     {
-        int block_x_mcu_ofs = 0, block_y_mcu_ofs = 0;
+        uint block_x_mcu_ofs = 0, block_y_mcu_ofs = 0;
 
         for (mcu_block = 0; mcu_block < m_blocks_per_mcu; mcu_block++)
         {
@@ -2229,7 +2229,7 @@ void jpeg_decoder::expanded_convert()
 
     for (int i = m_max_mcus_per_row; i > 0; i--)
     {
-        for (int k = 0; k < m_max_mcu_x_size; k += 8)
+        for (uint k = 0; k < m_max_mcu_x_size; k += 8)
         {
             const int Y_ofs = k * 8;
             const int Cb_ofs = Y_ofs + 64 * m_expanded_blocks_per_component;
@@ -2529,7 +2529,7 @@ void jpeg_decoder::check_huff_tables()
 void jpeg_decoder::calc_mcu_block_order()
 {
     int component_num, component_id;
-    int max_h_samp = 0, max_v_samp = 0;
+    uint max_h_samp = 0, max_v_samp = 0;
 
     for (component_id = 0; component_id < m_comps_in_frame; component_id++)
     {
@@ -2928,7 +2928,7 @@ void jpeg_decoder::decode_scan(pDecode_block_func decode_block_func)
 
         for (mcu_row = 0; mcu_row < m_mcus_per_row; mcu_row++)
         {
-            int block_x_mcu_ofs = 0, block_y_mcu_ofs = 0;
+            uint block_x_mcu_ofs = 0, block_y_mcu_ofs = 0;
 
             if ((m_restart_interval) && (m_restarts_left == 0))
                 process_restart();

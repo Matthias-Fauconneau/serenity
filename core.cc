@@ -42,7 +42,6 @@ extern "C" void __aeabi_memcpy(byte* dst, byte* src, uint size) { copy(dst,src,s
 Array_Copy_Compare_Sort_Default(uint8)
 //Array_Copy_Compare_Sort_Default(int16)
 Array_Copy_Compare_Sort_Default(uint16)
-//Array_Copy_Compare_Sort_Default(int32)
 //Array_Copy_Compare_Sort_Default(uint32)
 //Array_Copy_Compare_Sort_Default(int64)
 //Array_Copy_Compare_Sort_Default(uint64)

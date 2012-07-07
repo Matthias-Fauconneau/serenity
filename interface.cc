@@ -1,13 +1,12 @@
 #include "interface.h"
-#include "font.h"
 #include "display.h"
 
 #include "layout.h"
-template struct item<Icon>;
+/*template struct item<Icon>;
 template struct item<Text>;
 template struct item<Space>;
 template struct tuple<Icon,Text,Space>;
-template struct Tuple<Icon,Text,Space>;
+template struct Tuple<Icon,Text,Space>;*/
 
 #include "array.cc"
 template struct array<ImageView>;
@@ -93,8 +92,8 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
 }
 
 bool Selection::keyPress(Key key) {
-    if(key==Down && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
-    if(key==Up && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
+    if(key==Key::Down && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
+    if(key==Key::Up && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
     return false;
 }
 

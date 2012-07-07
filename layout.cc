@@ -41,7 +41,6 @@ int2 Linear::sizeHint() {
     return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
 }
 
-template int& max<int>(array<int>&);
 /// Sets the array size to \a size, filling with \a value
 template<class T> inline void fill(array<T>& a, const T& value, int size) {
     a.reserve(size); a.setSize(size);

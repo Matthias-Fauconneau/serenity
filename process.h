@@ -15,9 +15,11 @@ struct Application {
 
 /// Convenience macro to startup an Application with the default event loop
 void setupHeap();
+void catchErrors();
+void openDisplay();
 #define Application(App) \
 extern "C" void _start(int, int, int, int, int argc, const char* arg0, int, int, int, int, int, int, int, int, int, int, int) { \
-    setupHeap(); \
+    setupHeap(); catchErrors(); openDisplay(); \
     array<string> args; for(int i=1;i<argc;i++) args << str(*(&arg0-i)); \
     App app(move(args)); \
     while(app.running && dispatchEvents(true)) {} \

@@ -5,10 +5,12 @@
 enum Event { Motion, Press, Release, Enter, Leave };
 /// Mouse button
 enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
-/// Key code
-enum Key {
-    Escape=0xff1b, Return=0xff0d, Delete=0xffff, BackSpace=0xff08,
-    Home=0xff50, Left, Up, Right, Down, End=0xff57
+/// Key codes
+enum i(class) Key {
+    Escape=1, _1, _2, _3, _4, _5, _6, _7, _8, _9, _0, Minus, Equal, Backspace, Tab, Q, W, E, R, T, Y, U, I, O, P, LeftBrace, RightBrace, Enter, LeftCtrl,
+    A, S, D, F, G, H, J, K, L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z, X, C, V, B, N, M, Comma, Dot, Slash, RightShift, KpAsterisk, LeftAlt,
+    Space,
+    Home=102, Up, PageUp, Left, Right, End, Down, PageDown, Insert, Delete, Macro, Mute, VolumeDown, VolumeUp, Power=116, Extra=0x114
 };
 
 /// Widget is an abstract component to compose user interfaces

@@ -1,6 +1,6 @@
 #pragma once
 #include "core.h"
-extern "C" {
+
 struct Display;
 struct Visual;
 typedef ulong KeySym;
@@ -12,7 +12,8 @@ typedef uint Atom;
 typedef uint XID;
 #endif
 typedef void* GC;
-
+struct XEvent;
+#if 0
 struct XShmSegmentInfo {
     size_t shmseg;
     int shmid;
@@ -107,4 +108,9 @@ int XGetInputFocus(Display*, XID*, int*);
 int XSetInputFocus(Display*, XID, int, ulong);
 XID XGetSelectionOwner(Display*, Atom);
 int XConvertSelection(Display*, Atom, Atom, Atom, XID, ulong);
-}
+
+/*enum Key {
+    Escape=0xff1b, Return=0xff0d, Delete=0xffff, BackSpace=0xff08,
+    Home=0xff50, Left, Up, Right, Down, End=0xff57
+};*/
+#endif

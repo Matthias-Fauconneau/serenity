@@ -5,6 +5,7 @@
 #include "linux.h"
 #include "map.h"
 #include "array.cc"
+Array(URL)
 
 enum {F_SETFL=4};
 enum {PF_LOCAL=1, PF_INET};
@@ -18,7 +19,8 @@ uint32 ip(TextStream& s) {
     return (d<<24)|(c<<16)|(b<<8)|a;
 }
 
-void Socket::connect(const string& host, const string& /*service*/) {
+bool Socket::connect(const string& host, const string& /*service*/) {
+    disconnect();
     static int dnsCache = appendFile(".cache/dns"_);
     static Map dnsMap = mapFile(dnsCache);
     uint ip=0;
@@ -43,6 +45,7 @@ void Socket::connect(const string& host, const string& /*service*/) {
         }
         query << 0;
         query << raw(swap16(1)) << raw(swap16(1));
+        ::write(1,host+" "_);
         ::write(dns,query);
         DataStream s(readUpTo(dns,256), true);
         header = s.read();
@@ -54,17 +57,18 @@ void Socket::connect(const string& host, const string& /*service*/) {
             assert(type=1/*A*/); assert(class_==1/*INET*/);
             ip = s.read<uint>(); //IP (no swap)
             string entry = host+" "_+str(raw(ip),"."_)+"\n"_;
-            ::write(1,entry);
+            log(str(raw(ip),"."_));
             ::write(dnsCache,entry); // add new entry
             dnsMap = mapFile(dnsCache); //remap cache
             break;
         }
+        if(!ip) { log("unknown"); return false; }
     }
 
     fd = socket(PF_INET,SOCK_STREAM|O_NONBLOCK,0);
-    //fcntl(fd,F_SETFL,O_NONBLOCK); //allow connect timeout
     sockaddr addr = {PF_INET,swap16(80),ip}; //http
     ::connect(fd, &addr, sizeof(addr));
+    return true;
 }
 void Socket::disconnect() { if(fd) close( fd ); fd=0; }
 
@@ -150,7 +154,7 @@ string cacheFile(const URL& url) {
 
 HTTP::HTTP(const URL& url, delegate<void(const URL&, array<byte>&&)> handler, array<string>&& headers, string&& method)
     : url(str(url)), headers(move(headers)), method(move(method)), handler(handler) {
-    connect(url.host, url.scheme);
+    if(!connect(url.host, url.scheme)) { delete this; return; }
     registerPoll(i({fd, POLLIN|POLLOUT}));
 }
 void HTTP::request() {
@@ -200,10 +204,9 @@ void HTTP::header() {
             assert(!contains(url.host,'/'),url);
             assert(!contains(next.host,'/'),url,next);
             redirect << file;
-            buffer.clear(); index=0; contentLength=0; chunked=false; state=Connect;
-            if(next.host!=url.host || next.scheme!=url.scheme) url=move(next), disconnect(), connect(url.host, url.scheme);
-            else if(url.path!=next.path) url=move(next), disconnect(), connect(url.host, url.scheme), request(); //TODO: keep-alive
-            else error("recursive",url,next,value,(string&)buffer), delete this;
+            buffer.clear(); index=0; contentLength=0; chunked=false; unregisterPoll(); disconnect(); state=Connect;
+            url=move(next);
+            if(!connect(url.host, url.scheme)) delete this; else registerPoll(i({fd, POLLIN|POLLOUT}));
             return;
         } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }
@@ -211,8 +214,9 @@ void HTTP::header() {
 }
 void HTTP::event(pollfd poll) {
     assert(fd); assert(state>=Connect && state <=Handle);
+    if(poll.revents&POLLHUP) { log("Connection broken",url); state=Done; delete this; return; }
     if(state == Connect) {
-        if(!poll.revents) { close(fd); fd=0; log("Connection timeout",url); state=Done; delete this; return; }
+        if(!poll.revents) { log("Connection timeout",url); state=Done; delete this; return; }
         fcntl(fd,F_SETFL,0);
         request();
         return;

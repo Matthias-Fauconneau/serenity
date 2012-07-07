@@ -12,9 +12,9 @@ FLAGS_profile := -g -O -finstrument-functions -finstrument-functions-exclude-fil
 
 SRCS = $(SRCS_$(BUILD)) $(SRCS_$(TARGET))
 SRCS_profile += profile
-SRCS_memory += memory
-SRCS_taskbar += png inflate
+SRCS_browser += png inflate jpeg ico
 SRCS_desktop += png inflate jpeg ico
+SRCS_taskbar += png inflate
 SRCS_player += png inflate
 SRCS_music += png inflate
 

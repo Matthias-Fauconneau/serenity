@@ -22,7 +22,7 @@ typedef vector<rgb,uint8,3> rgb3;
 template<template<typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
     typedef vector<T,uint8,N> S;
     typedef vector<T,int,N> V;
-    S* prior = new S[width]; clear(prior,width,S(zero));
+    S* prior = allocate<S>(width); clear(prior,width,S(zero));
     for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; debug( if(filter>4) warn("Unknown PNG filter",filter); )
         S* src = (S*)raw;
@@ -43,7 +43,7 @@ template<template<typename> class T, int N> void filter(byte4* dst, const byte* 
             }
         }
     }
-    delete[] prior;
+    unallocate(prior,width);
 }
 template void filter<luma,1>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 template void filter<ia,2>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);

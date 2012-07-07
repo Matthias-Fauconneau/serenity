@@ -165,14 +165,17 @@ bool TextInput::mouseEvent(int2 position, Event event, Button) {
 
 bool TextInput::keyPress(Key key) {
     if(cursor>text.size()) cursor=text.size();
-    /**/ if(key==Left && cursor>0) cursor--;
-    else if(key==Right && cursor<text.size()) cursor++;
-    else if(key==Home) cursor=0;
-    else if(key==End) cursor=text.size();
-    else if(key==Delete && cursor<text.size()) { text.removeAt(cursor); update(); }
-    else if(key==BackSpace && cursor>0) { text.removeAt(--cursor); update(); }
-    else if(!(key&0xff00)) { insertAt(text, cursor++, (byte)key); update(); } //TODO: shift
-    else return false;
+    /***/ if(key==Key::Space) { if(key==Key::Left && cursor>0) cursor--; }
+    else if(key==Key::Right && cursor<text.size()) cursor++;
+    else if(key==Key::Home) cursor=0;
+    else if(key==Key::End) cursor=text.size();
+    else if(key==Key::Delete && cursor<text.size()) { text.removeAt(cursor); update(); }
+    else if(key==Key::Backspace && cursor>0) { text.removeAt(--cursor); update(); }
+    else if(key<=Key::Slash) {
+        char c="  1234567890-= \tqwertyuiop[]\n asdfghjkl;'`zxcvbnm,./"_[(int)key]; //TODO: shift
+        if(c==' ') return false;
+        insertAt(text, cursor++, (byte)key); update();
+    } else return false;
     return true;
 }
 

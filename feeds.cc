@@ -30,8 +30,8 @@ Feeds::Feeds() {
     window.localShortcut("Escape"_).connect(&window, &Window::hide);
     window.localShortcut("Right"_).connect(this, &Feeds::readNext);
 #if __arm__
-    buttons.keyPress[KEY_POWER].connect(&window, &Window::hide);
-    buttons.keyPress[BTN_EXTRA].connect(this, &Feeds::readNext);
+    buttons[Key::Power].connect(&window, &Window::hide);
+    buttons[Key::Extra].connect(this, &Feeds::readNext);
 #endif
     readConfig = appendFile("read"_,config);
     readMap = mapFile("read"_,config);

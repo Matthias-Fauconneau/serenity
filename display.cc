@@ -17,8 +17,7 @@ void push(Rect clip) {
     clipStack << currentClip;
     currentClip=currentClip.clip(clip);
 }
-void pop() { currentClip=clipStack.pop(); assert(clipStack); }
-void finish() { clipStack.pop(); assert(!clipStack); currentClip=Rect(int2(0,0),int2(0,0)); }
+void pop() { assert(clipStack); currentClip=clipStack.pop(); }
 
 /// Display
 

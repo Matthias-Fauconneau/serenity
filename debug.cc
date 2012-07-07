@@ -91,7 +91,7 @@ string demangle(TextStream& s) {
     }
     else if(s.match("F"_)) {
         r << demangle(s);
-    } else error("A"_,r,string(s.untilEnd()));
+    } else return slice(s.buffer,0,8);
     for(int i=0;i<pointer;i++) r<<"*"_;
     if(rvalue) r<<"&&"_;
     if(ref) r<<"&"_;
@@ -115,7 +115,7 @@ Symbol findNearestLine(void* find) {
         const Sym& sym = s.read();
         if(find >= sym.value && find < sym.value+sym.size) {
             TextStream s(str(strtab+sym.name));
-            symbol.function = s.match("_"_)&&s.peek()=='Z'? demangle(s) : s.untilEnd();
+            symbol.function = s.match("_"_)&&s.peek()=='Z'? (s.buffer.size()>80?"delegate"_ :demangle(s)) : s.untilEnd();
         }
     }
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
@@ -140,8 +140,8 @@ Symbol findNearestLine(void* find) {
             /***/ if (opcode >= cu.opcode_base) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 line += (opcode % cu.line_range) + cu.line_base;
+                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 address += delta;
             }
             else if(opcode == extended_op) {
@@ -187,11 +187,10 @@ Symbol findNearestLine(void* find) {
 
 void trace() {
     static bool recurse; if(recurse) {log("Debugger error");return;} recurse=true;
-    //{Symbol s = findNearestLine(__builtin_return_address(4)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(0)); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
+    {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
+    {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
+    {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
+    {Symbol s = findNearestLine(__builtin_return_address(0)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
     recurse=false;
 }
 
@@ -204,7 +203,7 @@ struct ucontext {
 #endif
 };
 enum SW { IE = 1, DE = 2, ZE = 4, OE = 8, UE = 16, PE = 32 };
-enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM	};
+enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
 
 static void handler(int sig, struct siginfo*, ucontext* context) {
     if(sig == SIGSEGV) log("Segmentation violation"_);

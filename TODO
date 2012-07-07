@@ -1,4 +1,4 @@
-update feeds, taskbar (X), player (mp3)
+update feeds (touch), taskbar (X), player (mp3)
 kerning, subpixel positioning (upsampled glyph -> subpixel blit?), hinting
 EPub viewer: inflate, parse, display, linux framebuffer
 Text Editor, File Manager, IMAP, Wiki, PDF, Search, +HTML

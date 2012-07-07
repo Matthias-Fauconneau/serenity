@@ -1,3 +1,4 @@
+#if TEST
 #include "process.h"
 #include "debug.h"
 #include "linux.h"
@@ -27,7 +28,7 @@ struct Test : Application {
     Test(array<string>&&) {
         log("Hello World!");
         catchErrors();
-        int fd = socket(PF_UNIX, SOCK_STREAM, 0);
+        int fd = socket(PF_LOCAL, SOCK_STREAM, 0);
         string path = "/tmp/.X11-unix/X0"_;
         sockaddr_un addr; copy(addr.path,path.data(),path.size());
         if(connect(fd,(sockaddr*)&addr,3+path.size())) error("Connection failed");
@@ -37,3 +38,4 @@ struct Test : Application {
     }
 };
 Application(Test)
+#endif

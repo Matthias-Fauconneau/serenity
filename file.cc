@@ -44,7 +44,7 @@ array<byte> readFile(const string& path, int at) {
     struct stat sb; fstat(fd, &sb);
     array<byte> file = read(fd,sb.size);
     close(fd);
-    debug( if(file.size()>1<<16) warn("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_) );
+    debug( if(file.size()>1<<19) { trace(); log("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_); } )
     return file;
 }
 

@@ -19,7 +19,7 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
 
 static array<string> textElement, boldElement, ignoreElement;
 
-void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 60); }
+void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 24*60); }
 
 void HTML::load(const URL& url, array<byte>&& document) { clear(); append(url,move(document)); }
 void HTML::append(const URL& url, array<byte>&& document) {
@@ -29,7 +29,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
         textElement = split("span p a blockquote center u hr ul li i strike cite em ol dt dl dd h1 h2 h3 h4 h5 code article small abbr aside th pre"_);
         boldElement = split("b strong h1 h2 h3 h4 h5 h6"_);
         ignoreElement = split("html body iframe noscript option select nav hgroup time fieldset footer base form script style title head meta link div"
-                              " header label input textarea td tt font tr table left area map button sup param embed object noindex optgroup"
+                              " header label input textarea td tt font tr table left area map button sup param embed object noindex optgroup basefont"
                               " tbody tfoot thead acronym del video figure section source noembed caption"_);
     }
     const Element* best = &html; int max=0,second=0;
@@ -41,8 +41,8 @@ void HTML::append(const URL& url, array<byte>&& document) {
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(!endsWith(src.path,".gif"_)&&(contains(src.path,"comics/"_)||contains(src.path,"comic/"_)||contains(src.path,"strip"_)||contains(src.path,"page"_)||
-                    contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_))) {
+            if(!endsWith(src.path,".gif"_)&&(contains(src.path,"comics/"_)||contains(src.path,"comic/"_)||contains(src.path,"strip"_)||
+                                             contains(src.path,"page"_)||contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
                 score += size?:16800;
