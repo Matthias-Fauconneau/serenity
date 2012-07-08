@@ -14,7 +14,7 @@ public:
     constexpr const E* end() const noexcept { return begin() + size(); }
 };
 }
-using std::initializer_list;
+template<class T> using list = std::initializer_list<T>;
 
 /// \a array is a typed and bound-checked handle to a memory buffer (using move semantics)
 /// \note array transparently store small arrays inline when possible
@@ -52,7 +52,7 @@ template<class T> struct array {
     /// Allocates a new uninitialized array for \a capacity elements
     explicit array(uint capacity);
     /// Copy elements from an initializer \a list
-    array(initializer_list<T>&& list);
+    array(list<T>&& list);
 
 //referencing constructors
     /// References \a size elements from read-only \a data pointer

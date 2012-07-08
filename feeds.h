@@ -1,15 +1,15 @@
 #pragma once
-#include "input.h"
 #include "window.h"
 #include "interface.h"
 #include "html.h"
+#include "file.h"
 
 struct Entry : Item {
     bool isHeader=false;
     string link;
     Scroll<HTML>* content=0;
     Entry(Entry&& o);
-    Entry(string&& name, string&& link, Image&& icon=Image());
+    Entry(string&& name, string&& link, Image<byte4>&& icon=Image<byte4>());
     ~Entry();
 };
 
@@ -19,9 +19,6 @@ struct Feeds : List<Entry> {
     signal<> contentChanged;
     Scroll<HTML>* content=0;
     Window window {0}; //keep the same window to implement \a nextItem
-#if __arm__
-    Input buttons {"/dev/input/event4"};
-#endif
 
     Feeds();
     ~Feeds();

@@ -18,7 +18,7 @@ struct Date {
         seconds(seconds),minutes(minutes),hours(hours),day(day),month(month),year(year),weekDay(weekDay){ invariant(); }
 };
 bool operator >(const Date& a, const Date& b);
-//bool operator ==(const Date& a, const Date& b);
+bool operator ==(const Date& a, const Date& b);
 
 /// Convert unix timestamp to a calendar date
 Date date(long time=currentTime());
@@ -28,7 +28,7 @@ string str(Date date, string&& format="dddd, dd MMMM yyyy hh:mm"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy
-//Date parse(TextStream& s);
+Date parse(TextStream& s);
 
 struct Timer : Poll {
     int fd;

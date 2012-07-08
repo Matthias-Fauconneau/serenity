@@ -18,7 +18,7 @@ struct Layout : Widget {
 /// \note It allows a layout to contain heterogenous Widget objects.
 struct Widgets : virtual Layout, array<Widget*> {
     Widgets(){}
-    Widgets(initializer_list<Widget*>&& widgets):array(move(widgets)){}
+    Widgets(list<Widget*>&& widgets):array(move(widgets)){}
     uint count() const;
     Widget& at(int i);
 };
@@ -85,21 +85,21 @@ struct Vertical : virtual Linear{
 /// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
 struct HBox : Horizontal, Widgets {
     HBox(){}
-    HBox(initializer_list<Widget*>&& widgets):Widgets(move(widgets)){}
+    HBox(list<Widget*>&& widgets):Widgets(move(widgets)){}
 };
 /// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
 struct VBox : Vertical, Widgets {
     VBox(){}
-    VBox(initializer_list<Widget*>&& widgets):Widgets(move(widgets)){}
+    VBox(list<Widget*>&& widgets):Widgets(move(widgets)){}
 };
 
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
-    HList(initializer_list<T>&& widgets):Array<T>(move(widgets)){}
+    HList(list<T>&& widgets):Array<T>(move(widgets)){}
 };
 template<class T> struct VList : Vertical, Array<T> {
     VList(){}
-    VList(initializer_list<T>&& widgets):Array<T>(move(widgets)){}
+    VList(list<T>&& widgets):Array<T>(move(widgets)){}
 };
 
 /// Layout items on an uniform \a width x \a height grid
@@ -147,12 +147,12 @@ template<class T> struct ListSelection : Array<T>, virtual Selection {
 /// List is a \a Vertical layout of selectable items (\sa ListSelection)
 template<class T> struct List : Vertical, ListSelection<T>, HighlightSelection {
     List(){}
-    List(initializer_list<T>&& items) : ListSelection<T>(move(items)){}
+    List(list<T>&& items) : ListSelection<T>(move(items)){}
 };
 /// Bar is a \a Horizontal layout of selectable items (\sa ListSelection)
 template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {
     Bar(){}
-    Bar(initializer_list<T>&& items) : ListSelection<T>(move(items)){}
+    Bar(list<T>&& items) : ListSelection<T>(move(items)){}
 };
 /// Grid is an \a UniformGrid layout of selectable items (\sa ListSelection)
 template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelection {

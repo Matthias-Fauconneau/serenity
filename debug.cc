@@ -150,7 +150,7 @@ Symbol findNearestLine(void* find) {
                 opcode = s.read();
                 enum { end_sequence = 1, set_address, define_file, set_discriminator };
                 /***/ if(opcode == end_sequence) { if (cu.stmt) { address = 0; file_index = 1; line = 1; is_stmt = cu.stmt; } }
-                else if(opcode == set_address) { address = s.read(); }
+                else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
                 else { log("UNKNOWN: length",size); s.advance(size); }
@@ -187,9 +187,11 @@ Symbol findNearestLine(void* find) {
 
 void trace() {
     static bool recurse; if(recurse) {log("Debugger error");return;} recurse=true;
+#ifndef __GNUC__
     {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
     {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
+#endif
     {Symbol s = findNearestLine(__builtin_return_address(0)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
     recurse=false;
 }

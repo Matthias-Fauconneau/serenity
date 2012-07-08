@@ -137,7 +137,7 @@ Glyph Font::glyph(uint16 code) {
         struct Flags { byte on_curve:1, short_x:1, short_y:1, repeat:1, same_sign_x:1, same_sign_y:1; };
         Flags flagsArray[nofPoints];
         for(int i=0;i<nofPoints;i++) {
-            Flags flags = s.read();
+            Flags flags = s.read<Flags>();
             if(flags.repeat) { ubyte times = s.read(); for(int n=0;n<times;n++) flagsArray[i++]=flags; }
             flagsArray[i]=flags;
         }

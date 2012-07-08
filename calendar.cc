@@ -1,5 +1,6 @@
 #include "calendar.h"
 #include "file.h"
+#include "map.h"
 
 #include "array.cc"
 Array_Copy_Compare_Sort(Date)
@@ -9,13 +10,12 @@ template struct ListSelection<Text>;
 template struct HList<Text>;
 template struct Grid<Text>;
 
-static int config = openFolder("config");
-
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query) {
+    static int config = openFolder("config"_);
     array<string> events;
     if(!exists("events"_,config)) { warn("No events settings [config/events]"); return events; }
-    TextBuffer s(readFile("events"_,config));
+    TextStream s(readFile("events"_,config));
 
     map<string, array<Date> > exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)

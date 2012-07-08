@@ -2,13 +2,14 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
 
-CC = clang
+CC = g++
 CC += -pipe -std=c++11 -fno-threadsafe-statics -fno-rtti -fno-exceptions -fno-omit-frame-pointer
 CC += -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG
 FLAGS_release := -O3 -ffast-math
-FLAGS_profile := -g -O -finstrument-functions -finstrument-functions-exclude-file-list=core,array,map,profile
+FLAGS_profile := -g -O -finstrument-functions
+#-finstrument-functions-exclude-file-list=core,array,map,profile
 
 SRCS = $(SRCS_$(BUILD)) $(SRCS_$(TARGET))
 SRCS_profile += profile

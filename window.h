@@ -53,7 +53,11 @@ struct Window : Poll {
     void event(pollfd);
 
     ///  Input Devices
-    int keyboard,mouse,buttons,touch;
+    int keyboard,mouse;
+#if __arm__
+    int buttons,touch;
+#endif
+
     /// Virtual terminal (to switch from/to X)
     int vt;
     /// Connection to taskbar

@@ -14,10 +14,10 @@ struct Browser : Application {
         assert(arguments,"Usage: browser <url>");
         window.localShortcut(Key::Escape).connect(this, &Browser::quit);
         content.contentChanged.connect(this, &Browser::render);
-        window.show();
         content.go(arguments.first());
+        window.show();
     }
-    void render() { if(window.visible) { window.widget->update(); window.render(); } }
+    void render() { window.render(); }
 };
 Application(Browser)
 

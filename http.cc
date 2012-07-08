@@ -21,7 +21,7 @@ uint32 ip(TextStream& s) {
 
 bool Socket::connect(const string& host, const string& /*service*/) {
     disconnect();
-    static int dnsCache = appendFile(".cache/dns"_);
+    static int dnsCache = appendFile("cache/dns"_);
     static Map dnsMap = mapFile(dnsCache);
     uint ip=0;
     for(TextStream s(dnsMap);s;s.until("\n"_)) { if(s.match(host)) { s.match(" "_); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
@@ -145,7 +145,7 @@ string str(const URL& url) {
 
 int cache;
 string cacheFile(const URL& url) {
-    if(!cache) cache=openFolder(".cache"_);
+    if(!cache) cache=openFolder("cache"_);
     string name = replace(url.path,"/"_,"."_);
     if(!name || name=="."_) name="index.htm"_;
     assert(!contains(url.host,'/'));

@@ -14,14 +14,14 @@ Image<byte4> decodeICO(const array<byte>& file) {
     assert(file);
     DataStream s(array<byte>(file.data(),file.size()));
 
-    Directory unused directory = s.read();
+    Directory unused directory = s.read<Directory>();
     assert(directory.reserved==0);
     assert(directory.type==1);
     assert(directory.count>=1);
-    Entry unused entry = s.read();
+    Entry unused entry = s.read<Entry>();
     s.index=entry.offset; //skip other entries
 
-    Header header = s.read();
+    Header header = s.read<Header>();
     assert(header.width==entry.width && header.height==entry.height*2);
     assert(header.headerSize==sizeof(Header));
     assert(header.planeCount==1);

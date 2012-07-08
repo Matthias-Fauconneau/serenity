@@ -21,7 +21,7 @@ generic array<T>& array<T>::operator=(array<T>&& o) {
 }
 
 generic array<T>::array(uint capacity) { reserve(capacity); }
-generic array<T>::array(initializer_list<T>&& list) {
+generic array<T>::array(list<T>&& list) {
     reserve(list.size()); setSize(list.size());
     for(uint i=0;i<list.size();i++) new (&at(i)) T(move(((T*)list.begin())[i]));
 }

@@ -2,7 +2,6 @@
 #include "linux.h"
 #include "debug.h"
 
-struct timespec { ulong sec,nsec; };
 struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
               uint64 size; uint blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
 struct dirent { long ino, off; short len; char name[]; };

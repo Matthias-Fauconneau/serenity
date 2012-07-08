@@ -103,7 +103,7 @@ struct Slider : Widget {
 #define ICON(name) \
     extern byte _binary_icons_## name ##_png_start[]; \
     extern byte _binary_icons_## name ##_png_end[]; \
-    static Image name ## Icon = decodeImage(array<byte>(_binary_icons_## name ##_png_start,_binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start))
+    static Image<byte4> name ## Icon = decodeImage(array<byte>(_binary_icons_## name ##_png_start,_binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start))
 
 
 /// Item is an icon with text

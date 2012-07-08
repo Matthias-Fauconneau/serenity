@@ -12,6 +12,9 @@ Widget* Window::focus=0;
 
 Window::Window(Widget* widget, const string& name, const Image<byte4>& icon, int2 size) : widget(widget) {
     if(!display) openDisplay();
+#if __arm__
+    buttons = open("/dev/input/event4", O_RDONLY|O_NONBLOCK, 0);
+#endif
     keyboard = open("/dev/input/event5", O_RDONLY|O_NONBLOCK, 0);
     registerPoll(i({keyboard, POLLIN})); //TODO: multiple devices
     setName(name); setIcon(icon); setSize(size);
@@ -48,10 +51,10 @@ void Window::event(pollfd poll) {
 }
 
 void Window::render() {
-    if(visible) { widget->render(int2(0,0)); }
+    if(visible) { widget->update(); widget->render(int2(0,0)); }
 }
 
-void Window::show() { visible=true; ioctl(vt, VT_ACTIVATE, (void*)6); } //switch from X
+void Window::show() { if(!visible) { visible=true; ioctl(vt, VT_ACTIVATE, (void*)6); } render(); } //switch from X
 void Window::hide() { visible=false; ioctl(vt, VT_ACTIVATE, (void*)7); } //switch to X
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;

@@ -14,7 +14,7 @@ template<class T> inline void write(int fd, const array<T>& s) {
 ICON(network);
 
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
-Entry::Entry(string&& name, string&& link, Image&& icon):Item(move(icon),move(name)),link(move(link)){}
+Entry::Entry(string&& name, string&& link, Image<byte4>&& icon):Item(move(icon),move(name)),link(move(link)){}
 Entry::~Entry() { if(content) delete content; }
 #include "array.cc"
 template struct array<Entry>;
@@ -24,15 +24,14 @@ template struct List<Entry>;
 
 template struct Scroll<HTML>;
 
-static int config = openFolder("config"_);
-
 Feeds::Feeds() {
-    window.localShortcut("Escape"_).connect(&window, &Window::hide);
-    window.localShortcut("Right"_).connect(this, &Feeds::readNext);
+    window.localShortcut(Key::Escape).connect(&window, &Window::hide);
+    window.localShortcut(Key::Right).connect(this, &Feeds::readNext);
 #if __arm__
-    buttons[Key::Power].connect(&window, &Window::hide);
-    buttons[Key::Extra].connect(this, &Feeds::readNext);
+    window.localShortcut(Key::Power).connect(&window, &Window::hide);
+    window.localShortcut(Key::Extra).connect(this, &Feeds::readNext);
 #endif
+    static int config = openFolder("config"_);
     readConfig = appendFile("read"_,config);
     readMap = mapFile("read"_,config);
     reserve(256); //realloc would invalidate delegates
@@ -47,13 +46,13 @@ bool Feeds::isRead(const Entry& entry) {
     const Text& text = entry.get<Text>();
     string id = text.text+entry.link;
     id=replace(id,"\n"_,""_);
-    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return true; return false; //TODO: binary search (on fixed length lines)
+    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return true; return false;
 }
 void Feeds::setRead(const Entry& entry) {
     const Text& text = entry.get<Text>();
     string id = text.text+entry.link;
     id=replace(id,"\n"_,""_);
-    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return true; return false; //TODO: binary search (on fixed length lines)
+    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return;
     ::write(readConfig,string(id+"\n"_));
     readMap = mapFile(readConfig); //remap
 }
@@ -146,18 +145,11 @@ void Feeds::itemPressed(int index) {
     content = entry.content; entry.content=0; //move preloaded content to window
     content->contentChanged.disconnect(&window);
     window.widget = &content->parent();
-    window.setTitle(entry.get<Text>().text);
+    window.setName(entry.get<Text>().text);
     window.setIcon(entry.get<Icon>().image);
     if(!content->url) content->go(entry.link);
-    if(window.visible) {
-        window.widget->size = window.size;
-        window.widget->update();
-        window.render();
-    } else {
-        window.setSize(int2(0,0));
-        window.show();
-    }
-    content->contentChanged.connect(&window, &Window::update);
+    window.show();
+    content->contentChanged.connect(&window, &Window::render);
 }
 
 void Feeds::readNext() {
@@ -165,7 +157,7 @@ void Feeds::readNext() {
     for(;;) {
         i++;
         if(i>=count()) {
-            execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); //FIXME: release leaked memory
+            //execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); //FIXME: fix memory leaks
             return;
         }
         if(!array::at(i).isHeader && !isRead(array::at(i))) break;

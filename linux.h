@@ -12,12 +12,6 @@
     __asm __volatile("swi\t0" : "=r" (r0) : "r" (index), "0" (r0) ); \
     return (type)r0; \
 }
-#define syscall1_nr(type,name,type0,arg0) inline type name(type0 arg0) {  \
-    register long index __asm("r7") = (long)sys::name; \
-    register long r0 __asm("r0") = (long)arg0; \
-    __asm __volatile("swi\t0" : "=r" (r0) : "r" (index), "0" (r0) ); \
-    while(*(volatile byte*)0 || 1) {}; \
-}
 #define syscall2(type,name,type0,arg0,type1,arg1) inline type name(type0 arg0, type1 arg1) {  \
     register long index __asm("r7") = (long)sys::name; \
     register long r0 __asm("r0") = (long)arg0; \
@@ -69,10 +63,8 @@ inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 ar
 
 enum class sys { exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, munmap=91, setpriority=97,
                  socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197, clock_gettime=263, openat=322,
-                 mkdirat, unlinkat, symlinkat=331 };
+                 mkdirat, unlinkat, symlinkat=331, timerfd_create=350, timerfd_settime=353 };
 
-int exit(int code) __attribute((noreturn));
-syscall1_nr(int, exit, int,code)
 syscall0(int, fork)
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
@@ -96,7 +88,13 @@ syscall3(int, unlinkat, int,fd, const char*,name, int,flag)
 syscall3(int, symlinkat, const char*,target, int,fd, const char*,name)
 syscall3(int, socket, int,domain, int,type, int,protocol)
 syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
+syscall2(int, timerfd_create, int,clock_id, int,flags);
+syscall4(int, timerfd_settime, int,ufd, int,flags, struct timespec*,utmr, struct timespec*,otmr);
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=040000};
 enum {PROT_READ=1, PROT_WRITE};
 enum {MAP_SHARED=1, MAP_PRIVATE};
+struct timespec { ulong sec,nsec; };
 
+#pragma GCC system_header
+int exit(int code) __attribute((noreturn));
+syscall1(int, exit, int,code)

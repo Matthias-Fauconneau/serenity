@@ -1,6 +1,7 @@
 #pragma once
 #include "string.h"
 
+int close(int fd);
 array<byte> read(int fd, uint capacity);
 array<byte> readUpTo(int fd, uint capacity);
 
@@ -22,7 +23,7 @@ struct Map {
     Map(){}
     Map(const byte* data, uint size):data(data),size(size){}
     Map(Map&& o):data(o.data),size(o.size){o.data=0,o.size=0;}
-    Map& operator=(Map&& o){Map::~Map();data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
+    Map& operator=(Map&& o){this->~Map();data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
     ~Map();
     /// Returns an /a array reference to the map, valid only while the map exists.
     operator array<byte>() { return array<byte>(data,size); }

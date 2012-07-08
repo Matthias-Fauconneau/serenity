@@ -1,8 +1,6 @@
 #include "time.h"
 #include "linux.h"
 #include "stream.h"
-//#include <sys/timerfd.h>
-struct timespec { ulong sec,nsec; };
 
 enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
 //long realTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
@@ -32,7 +30,8 @@ bool operator >(const Date& a, const Date& b) {
     if(a.seconds!=-1 && b.seconds!=-1) { if(a.seconds>b.seconds) return true; else if(a.seconds<b.seconds) return false; }
     return false;
 }
-//bool operator ==(const Date& a, const Date& b) { return a.seconds==a.year==b.year ; }
+bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && a.minutes==b.minutes && a.hours==b.hours
+            && a.day==b.day && a.month==b.month && a.year==b.year ; }
 
 static const char* days[7] = {"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
 static const char* months[12] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
@@ -93,6 +92,6 @@ Date parse(TextStream& s) {
     return date;
 }
 
-/*Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll({fd, POLLIN}); }
-void Timer::setAbsolute(int date) { itimerspec timer{timespec{0,0},timespec{date,0}}; timerfd_settime(fd,TFD_TIMER_ABSTIME,&timer,0); }
-void Timer::event(pollfd) { expired(); }*/
+Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll({fd, POLLIN}); }
+void Timer::setAbsolute(int date) { timespec time[2]={{0,0},{date,0}}; timerfd_settime(fd,1,time,0); }
+void Timer::event(pollfd) { expired(); }
