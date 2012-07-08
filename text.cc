@@ -129,12 +129,12 @@ void Text::update(int wrap) {
     textSize.y=max(textSize.y, size);
 }
 int2 Text::sizeHint() {
-    if(!textSize) update(wrap>=0 ? wrap : screen.y);
+    if(!textSize) update(wrap>=0 ? wrap : display.y);
     return wrap?int2(-textSize.x,textSize.y):textSize;
 }
 
 void Text::render(int2 parent) {
-    if(!textSize) update(wrap>=0 ? wrap : screen.y);
+    if(!textSize) update(wrap>=0 ? wrap : display.y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), 0);

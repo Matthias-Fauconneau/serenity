@@ -23,7 +23,7 @@ struct Desktop : Application {
      Calendar calendar;
     VBox timeBox { &clock, &calendar };
     HBox applets { &feeds, &timeBox, &shortcuts };
-    Window window{&applets,""_,Image(),int2(0,Window::screen.y-16)};
+    Window window{&applets,""_,Image(),int2(0,display.y-16)};
     Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop(array<string>&& arguments) {
         if(contains(arguments,"setAllRead"_)) feeds.setAllRead();
@@ -33,7 +33,7 @@ struct Desktop : Application {
         window.show();
         window.localShortcut("Escape"_).connect(&shutdownPopup,&Popup<Command>::toggle);
 #if __arm__
-        buttons.keyPress[KEY_POWER].connect(this,&Desktop::keyPress);
+        buttons[Key::Power].connect(this,&Desktop::keyPress);
 #endif
     }
     void keyPress() { if(window.hasFocus()) shutdownPopup.toggle(); }

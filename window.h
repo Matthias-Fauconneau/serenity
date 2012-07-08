@@ -52,9 +52,12 @@ struct Window : Poll {
     /// Event handler
     void event(pollfd);
 
-    /// Connection to window manager
-    //int fd;TODO
+    ///  Input Devices
     int keyboard,mouse,buttons,touch;
+    /// Virtual terminal (to switch from/to X)
+    int vt;
+    /// Connection to taskbar
+    //int taskbar; TODO
     /// Shortcuts triggered when \a KeySym is pressed
     map<uint16, signal<> > shortcuts;
 

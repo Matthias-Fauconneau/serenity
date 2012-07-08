@@ -35,7 +35,7 @@ void finish();
 
 /// Display
 void openDisplay();
-extern int2 screen;
+extern int2 display;
 
 /// Fill framebuffer area in \a rect with \a color
 void fill(Rect rect, rgb color);

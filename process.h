@@ -19,10 +19,12 @@ void catchErrors();
 void openDisplay();
 #define Application(App) \
 extern "C" void _start(int, int, int, int, int argc, const char* arg0, int, int, int, int, int, int, int, int, int, int, int) { \
-    setupHeap(); catchErrors(); openDisplay(); \
-    array<string> args; for(int i=1;i<argc;i++) args << str(*(&arg0-i)); \
-    App app(move(args)); \
-    while(app.running && dispatchEvents(true)) {} \
+    setupHeap(); catchErrors(); \
+    { \
+     array<string> args; for(int i=1;i<argc;i++) args << str(*(&arg0-i)); \
+     App app(move(args)); \
+     while(app.running && dispatchEvents(true)) {} \
+    } \
     exit(0); \
 }
 

@@ -68,13 +68,13 @@ struct Task : Item {
         if(button!=LeftButton) return false;
         if(event==Press) {
             if(getWindows().last()==id) { //Set maximized
-                XMoveResizeWindow(x,id, 0, 16, Window::screen.x,Window::screen.y-16);
+                XMoveResizeWindow(x,id, 0, 16, display.x,display.y-16);
                 XFlush(x);
                 return true;
             }
         }
         /*if(event==Motion) { //Set windowed
-            XMoveResizeWindow(x,id, Window::screen.x/4,16+(Window::screen.y-16)/4,Window::screen.x/2,(Window::screen.y-16)/2);
+            XMoveResizeWindow(x,id, display.x/4,16+(display.y-16)/4,display.x/2,(display.y-16)/2);
             XFlush(x);
             return true;
         }*/
@@ -265,9 +265,9 @@ struct TaskBar : Application, Poll {
                 if(!wa.override_redirect &&
                         (!type || type[0]==Atom(_NET_WM_WINDOW_TYPE_NORMAL) || type[0]==Atom(_NET_WM_WINDOW_TYPE_DESKTOP))
                         && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                    wa.width=min(Window::screen.x,wa.width); wa.height=min(Window::screen.y-16,wa.height);
-                    wa.x = (Window::screen.x - wa.width)/2;
-                    wa.y = 16+(Window::screen.y-16-wa.height)/2;
+                    wa.width=min(display.x,wa.width); wa.height=min(display.y-16,wa.height);
+                    wa.x = (display.x - wa.width)/2;
+                    wa.y = 16+(display.y-16-wa.height)/2;
                 }
                 XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
                 continue;
