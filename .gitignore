@@ -1,4 +1,5 @@
 debug
+fast
 release
 profile
 *.creator*
