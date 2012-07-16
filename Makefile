@@ -1,13 +1,14 @@
 PREFIX ?= /usr
 TARGET ?= taskbar
-BUILD ?= release
+BUILD ?= fast
 
-CC = g++
+CC = clang
 CC += -pipe -std=c++11 -fno-threadsafe-statics -fno-rtti -fno-exceptions -fno-omit-frame-pointer
 CC += -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions
+CC+= -mfpu=neon
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG
-FLAGS_release := -O3 -ffast-math
+FLAGS_fast := -g -DDEBUG -O
 FLAGS_profile := -g -O -finstrument-functions
 #-finstrument-functions-exclude-file-list=core,array,map,profile
 

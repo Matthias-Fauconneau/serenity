@@ -2,7 +2,7 @@
 
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 
-Font::Font(string name, int size) : keep(mapFile(name,fonts())), size(size) {
+Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
     DataStream s(keep);
     s.bigEndian=true;
     uint32 unused scaler=s.read();
@@ -95,7 +95,7 @@ void line(Image<int8>& raster, int2 p0, int2 p1) {
 
 void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
 #if 1
-        int2 mid = (p0 + 2*p1 + p2)/4;
+        int2 mid = (p0 + int2(2)*p1 + p2)/int2(4);
         line(raster,p0,mid);
         line(raster,mid,p2);
 #else
@@ -171,12 +171,12 @@ Glyph Font::glyph(uint16 code) {
             int2 p; //last on point
             if(flagsArray[last].on_curve) p=P[last];
             else if(flagsArray[last-1].on_curve) p=P[last-1];
-            else p=(P[last-1]+P[last])/2;
+            else p=(P[last-1]+P[last])/int2(2);
             for(int prev=last; i<=last; i++) {
                 if(flagsArray[prev].on_curve && flagsArray[i].on_curve) { line(raster, P[prev], P[i]); p=P[i]; } //on-on
                 else if(flagsArray[prev].on_curve && !flagsArray[i].on_curve) p=P[prev]; //on-off (drawn on next step (either on-off-on or on-off-off))
                 else if(!flagsArray[prev].on_curve && flagsArray[i].on_curve) { curve(raster, p, P[prev], P[i]); p=P[i]; } //off-on
-                else if(!flagsArray[prev].on_curve && !flagsArray[i].on_curve) { int2 m=(P[prev]+P[i])/2; curve(raster, p, P[prev], m); p=m; } //off-off
+                else if(!flagsArray[prev].on_curve && !flagsArray[i].on_curve) { int2 m=(P[prev]+P[i])/int2(2); curve(raster, p, P[prev], m); p=m; } //off-off
                 prev=i;
             }
         }

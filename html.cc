@@ -10,7 +10,7 @@ ImageLoader::ImageLoader(const URL& url, Image<byte4>* target, delegate<void()> 
 
 void ImageLoader::load(const URL&, array<byte>&& file) {
     Image<byte4> image = decodeImage(file);
-    if(!image.size()) return;
+    if(!image) return;
     if(size) *target = resize(image,size.x,size.y);
     else *target = move(image);
     imageLoaded();
@@ -19,7 +19,7 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
 
 static array<string> textElement, boldElement, ignoreElement;
 
-void HTML::go(const string& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 24*60); }
+void HTML::go(const ref<byte>& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 24*60); }
 
 void HTML::load(const URL& url, array<byte>&& document) { clear(); append(url,move(document)); }
 void HTML::append(const URL& url, array<byte>&& document) {
@@ -37,12 +37,12 @@ void HTML::append(const URL& url, array<byte>&& document) {
     html.visit([&url,&best,&max,&second](const Element& div){
         int score = 0;
         if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
-        else if(contains(div["class"_],"content"_)||contains(div["id"_],"content"_)) score += 400;
+        else if(find(div["class"_],"content"_)||find(div["id"_],"content"_)) score += 400;
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
-        if(div.name=="img"_ && div["src"_]) {
+        if(div.name=="img"_ && div["src"_].size) {
             URL src = url.relative(div["src"_]);
-            if(!endsWith(src.path,".gif"_)&&(contains(src.path,"comics/"_)||contains(src.path,"comic/"_)||contains(src.path,"strip"_)||
-                                             contains(src.path,"page"_)||contains(src.path,"chapter"_)||contains(src.path,"issue"_)||contains(src.path,"art/"_))) {
+            if(!endsWith(src.path,".gif"_)&&(find(src.path,"comics/"_)||find(src.path,"comic/"_)||find(src.path,"strip"_)||
+                                             find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
                 score += size?:16800;
@@ -58,7 +58,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
                 if(e.name=="img"_ && !endsWith(e["src"_],".gif"_)) score += height; //image
             } else if(e.name=="br"_) { score += 32; //line break
             } else if(contains(ignoreElement,e.name)) {
-            } else if(!contains(e.name,":"_)) warn("load: Unknown HTML tag",e.name);
+            } else if(!contains(e.name,(byte)':')) warn("load: Unknown HTML tag",e.name);
             return false;
         });
         if(score>=max) best=&div, second=max, max=score;
@@ -84,7 +84,7 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
     }
     else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
         flushText();
-        TextStream s(copy(e["style"_])); s.match("background-image:url("_); string src=s.until(")"_);
+        TextStream s = string(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(")"_);
         images << url.relative(src);
     }
     else if(!e.name) { //Text
@@ -117,13 +117,13 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
     else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; }//wikipedia [edit]
     else if(contains(textElement,e.name)) { for(const Element& c: e.children) layout(url, c); } // Unhandled format tags
     else if(contains(ignoreElement,e.name)) { return; } // Ignored elements
-    else if(!contains(e.name,":"_)) warn("layout: Unknown HTML tag",e.name);
+    else if(!contains(e.name,':')) warn("layout: Unknown HTML tag",e.name);
 }
 void HTML::flushText() {
     string paragraph = simplify(trim(text));
     if(!paragraph) return;
     Text* textLayout = new Text(move(paragraph),16,255, 640 /*60 characters*/);
-    textLayout->linkActivated.connect(this, &HTML::go);
+    textLayout->linkActivated = delegate<void(const ref<byte>&)>(this, &HTML::go);
     VBox::append(textLayout);
     text.clear();
 }

@@ -16,6 +16,7 @@
 #define packed __attribute((packed))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
+#define generic template<class T>
 
 /// Move
 template<typename T> struct remove_reference { typedef T type; };
@@ -24,7 +25,7 @@ template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
 template<class T> constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
-// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
+/// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
 template<class T> inline T copy(const T& t) { return t; }
 
 /// Predicate
@@ -61,6 +62,19 @@ template<class T> inline T max(T a, T b) { return a>b ? a : b; }
 template<class T> inline T abs(T x) { return x>=0 ? x : -x; }
 template<class A, class B> inline bool operator !=(const A& a, const B& b) { return !(a==b); }
 template<class A, class B> inline bool operator <(const A& a, const B& b) { return b>a; }
+
+/// Raw buffer zero initialization
+inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }
+/// Unsafe (ignoring constructors) raw value zero initialization
+template<class T> inline void clear(T& dst) { static_assert(sizeof(T)>8,""); clear((byte*)&dst,sizeof(T)); }
+/// Safe buffer default initialization
+template<class T> inline void clear(T* data, int size, const T& value=T()) { for(int i=0;i<size;i++) data[i]=value; }
+
+/// Raw buffer copy
+inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
+/// Unsafe (ignoring constructors) raw value copy
+template<class T> inline void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src,sizeof(T)); }
+/// Safe buffer copy
 template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
 
 /// compile \a statements in executable only if \a DEBUG flag is set
@@ -69,13 +83,8 @@ template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0
 #else
 #define debug( statements... )
 #endif
-/// Linux exit syscall
-int exit(int code) __attribute((noreturn));
-/// Linux write syscall
-int write(int fd, const void* buf, long size);
-/// Aborts unconditionally without any message
-void abort() __attribute((noreturn));
-/// Log current stack trace
-void trace();
+void trace(int skip);
+void log_(const char*);
+void abort();
 /// Aborts if \a expr evaluates to false and display \a expr
-#define assert_(expr) ({ debug( if(!(expr)) trace(), write(1,#expr "\n",sizeof(#expr)), abort(); ) })
+#define assert_(expr) ({ debug( if(!(expr)) { trace(0); log_(#expr); abort(); } ) })

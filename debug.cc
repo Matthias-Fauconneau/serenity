@@ -9,6 +9,7 @@ const char* errno[35] = {"OK",
 
 void write(int fd, const array<byte>& s) { int r=write(fd,s.data(),s.size()); assert(r==(int)s.size(),r); }
 void abort() { exit(-1); }
+void log_(const char* expr) { log(expr); }
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version,entry,phoff,shoff,flags;
               uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
@@ -27,52 +28,54 @@ string demangle(TextStream& s) {
     string r;
     bool rvalue=false,ref=false; int pointer=0;
     for(;;) {
-        if(s.match("O"_)) rvalue=true;
-        else if(s.match("R"_)) ref=true;
-        else if(s.match("K"_)) r<<"const "_;
-        else if(s.match("L"_)) r<<"static "_;
-        else if(s.match("P"_)) pointer++;
+        if(s.match('O')) rvalue=true;
+        else if(s.match('R')) ref=true;
+        else if(s.match('K')) r<<"const "_;
+        else if(s.match('L')) r<<"static "_;
+        else if(s.match('P')) pointer++;
         else break;
     }
     int l;
-    if(s.match("v"_)) { if(pointer) r<<"void"_; }
-    else if(s.match("b"_)) r<<"bool"_;
-    else if(s.match("c"_)) r<<"char"_;
-    else if(s.match("a"_)) r<<"byte"_;
-    else if(s.match("h"_)) r<<"ubyte"_;
-    else if(s.match("s"_)) r<<"short"_;
-    else if(s.match("t"_)) r<<"ushort"_;
-    else if(s.match("i"_)) r<<"int"_;
-    else if(s.match("j"_)) r<<"uint"_;
-    else if(s.match("l"_)) r<<"long"_;
-    else if(s.match("m"_)) r<<"ulong"_;
-    else if(s.match("x"_)) r<<"int64"_;
-    else if(s.match("y"_)) r<<"uint64"_;
-    else if(s.match("T_"_)) r<<"T"_;
-    else if(s.match("S"_)) { r<<"S"_; s.number(); s.match("_"_); }
-    else if(s.match("I"_)) { //template
+    if(s.match('v')) { if(pointer) r<<"void"_; }
+    else if(s.match('b')) r<<"bool"_;
+    else if(s.match('c')) r<<"char"_;
+    else if(s.match('a')) r<<"byte"_;
+    else if(s.match('h')) r<<"ubyte"_;
+    else if(s.match('s')) r<<"short"_;
+    else if(s.match('t')) r<<"ushort"_;
+    else if(s.match('i')) r<<"int"_;
+    else if(s.match('j')) r<<"uint"_;
+    else if(s.match('l')) r<<"long"_;
+    else if(s.match('m')) r<<"ulong"_;
+    else if(s.match('x')) r<<"int64"_;
+    else if(s.match('y')) r<<"uint64"_;
+    else if(s.match("T_"_)) r<<'T';
+    else if(s.match('S')) { r<<'S'; s.number(); s.match('_'); }
+    else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
+    else if(s.match('I')||s.match('J')) { //template | argument pack
         array<string> args;
-        while(s && !s.match("E"_)) {
-            if(s.get(1)=="Z"_) args<<(demangle(s)+"::"_+demangle(s));
+        while(s && !s.match('E')) {
+            if(s.peek()=='Z') args<<(demangle(s)+"::"_+demangle(s));
             else args<<demangle(s);
         }
-        r<<"<"_<<join(args,", "_)<<">"_;
-    } else if(s.match("Z"_)) {
+        r<<'<'<<join(args,", "_)<<'>';
+    } else if(s.match('Z')) {
         bool const_method =false;
-        if(s.match("N"_)) {
+        if(s.match('N')) {
             array<string> list;
-            if(s.match("K"_)) const_method=true;
-            while(s && !s.match("E"_)) {
-                if(s.match("C1"_)) list << list.first(); //constructor
-                else if(s.match("C2"_)) list << list.first(); //constructor
-                else if(s.match("ix"_)) list << "operator []"_;
-                else if(s.match("cl"_)) list << "operator ()"_;
-                else if(s.match("cv"_)) list << ("operator "_ + demangle(s));
+            if(s.match('K')) const_method=true;
+            while(s && !s.match('E')) {
+                if(s.match("C1"_)) list << copy(list.first()); //constructor
+                else if(s.match("C2"_)) list << copy(list.first()); //constructor
+                else if(s.match("ix"_)) list << string("operator []"_);
+                else if(s.match("cl"_)) list << string("operator ()"_);
+                else if(s.match("ls"_)) list << string("operator <<"_);
+                else if(s.match("cv"_)) list << string("operator "_ + demangle(s));
                 else if((l=s.number())!=-1) {
-                    list << s.read(l); //class/member
+                    list << string(s.read(l)); //class/member
                     if(s.peek()=='I') list.last()<< demangle(s);
                 } else if(s.peek()=='I') list.last()<< demangle(s);
-                else error("N"_,r,string(s.untilEnd()),string(move(s.buffer)));
+                else error('N',r,string(s.untilEnd()),string(move(s.buffer)));
             }
             r<< join(list,"::"_);
         } else if((l=s.number())!=-1) {
@@ -80,21 +83,17 @@ string demangle(TextStream& s) {
             if(s.peek()=='I') r<< demangle(s);
         }
         array<string> args;
-        while(s && !s.match("E"_)) args << demangle(s);
-        r<< "("_ << join(args,", "_) << ")"_;
+        while(s && !s.match('E')) args << demangle(s);
+        r<< '(' << join(args,", "_) << ')';
         if(const_method) r<< " const"_;
-    }
-    else if(s.match("_0"_)) {}
-    else if((l=s.number())!=-1) {
+    } else if(s.match("_0"_)) {
+    } else if((l=s.number())!=-1) {
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
-    }
-    else if(s.match("F"_)) {
-        r << demangle(s);
-    } else return slice(s.buffer,0,8);
-    for(int i=0;i<pointer;i++) r<<"*"_;
+    } else { log(s.slice(s.index,s.buffer.size()-s.index)); return string(s.untilEnd()); }
+    for(int i=0;i<pointer;i++) r<<'*';
     if(rvalue) r<<"&&"_;
-    if(ref) r<<"&"_;
+    if(ref) r<<'&';
     return r;
 }
 
@@ -115,7 +114,7 @@ Symbol findNearestLine(void* find) {
         const Sym& sym = s.read();
         if(find >= sym.value && find < sym.value+sym.size) {
             TextStream s(str(strtab+sym.name));
-            symbol.function = s.match("_"_)&&s.peek()=='Z'? (s.buffer.size()>80?"delegate"_ :demangle(s)) : s.untilEnd();
+            symbol.function = s.match('_')&&s.peek()=='Z'? (s.buffer.size()>80?string("delegate"_) :demangle(s)) : string(s.untilEnd());
         }
     }
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
@@ -185,38 +184,21 @@ Symbol findNearestLine(void* find) {
     return symbol;
 }
 
-void trace() {
+void trace(int skip) {
     static bool recurse; if(recurse) {log("Debugger error");return;} recurse=true;
-#ifndef __GNUC__
-    {Symbol s = findNearestLine(__builtin_return_address(3)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(2)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
-    {Symbol s = findNearestLine(__builtin_return_address(1)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
-#endif
-    {Symbol s = findNearestLine(__builtin_return_address(0)); log(s.file+":"_+str(s.line)+"    \t"_+s.function);}
+    void* stack[8] = {0,0,0,0,0,0,0,0};
+    stack[0] = __builtin_return_address(0);
+#define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i);
+    bra(1) bra(2) bra(3) bra(4) bra(5) bra(6) bra(7)
+    for(int i=7;i>=skip;i--) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"    \t"_+s.function); }
     recurse=false;
 }
 
-struct ucontext {
-    ulong flags; ucontext *link; void* ss_sp; int ss_flags; size_t ss_size;
-#if __arm__
-    ulong trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,pc,cpsr,fault;
-#elif __x86_64__ || __i386__
-    ulong gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,eip,cs,efl,uesp,ss;
-#endif
-};
-enum SW { IE = 1, DE = 2, ZE = 4, OE = 8, UE = 16, PE = 32 };
 enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
 
-static void handler(int sig, struct siginfo*, ucontext* context) {
+static void handler(int sig, struct siginfo*, struct ucontext*) {
     if(sig == SIGSEGV) log("Segmentation violation"_);
-#if __arm__
-    {Symbol s = findNearestLine((void*)context->lr); log(s.file+":"_+str(s.line)+"   \t"_+s.function);}
-    {Symbol s = findNearestLine((void*)context->pc); log(s.file+":"_+str(s.line)+"   \t"_+s.function); }
-#elif __x86_64__ || __i386__
-    {Symbol s = findNearestLine(*(*((void***)context->ebp)+1)); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
-    {Symbol s = findNearestLine(*((void**)context->ebp+1)); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
-    {Symbol s = findNearestLine((void*)context->eip); log(s.file+":"_+str(s.line)+"  \t"_+s.function);}
-#endif
+    trace(1);
     abort();
 }
 

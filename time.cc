@@ -37,7 +37,7 @@ static const char* days[7] = {"Monday","Tuesday","Wednesday","Thursday","Friday"
 static const char* months[12] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
 
 Date date(long time) {
-    int seconds = time, minutes=seconds/60, hours=minutes/60+2, days=hours/24, weekDay = (days+3)%7, month=0, year=1970;
+    int seconds = time, minutes=seconds/60, hours=minutes/60+2, days=hours/24+1, weekDay = (days+2)%7, month=0, year=1970;
     bool leap;
     for(;;) { leap=((year%400)||(!(year%100)&&year%4)); int nofDays = leap?366:365; if(days>nofDays) days-=nofDays, year++; else break; }
     const int daysPerMonth[12] = {31, leap?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -45,8 +45,8 @@ Date date(long time) {
     return Date{ seconds%60, minutes%60, hours%24, days, month, year, weekDay }; //GMT+1 and DST
 }
 
-string str(Date date, string&& format) {
-    TextStream s(move(format));
+string str(Date date, const ref<byte>& format) {
+    TextStream s = string(format);
     string r;
     while(s) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(" "_); }
@@ -60,7 +60,7 @@ string str(Date date, string&& format) {
         else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); else s.until(" "_); }
         else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(" "_); }
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
-        else r << s.read(1);
+        else r << s.next();
     }
     r = simplify(trim(r));
     if(endsWith(r,","_)) r.removeLast();

@@ -11,14 +11,20 @@ struct Layout : Widget {
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 position, Event event, Button button) override;
     /// Renders every child widget
-    void render(int2 parent);
+    void render(int2 parent) override;
+    /// Formats widget hierarchy
+    string str() override {
+        array<string> s;
+        for(uint i=0;i<count();i++) s<< (*(void**)&at(i)? at(i).str() : string("<invalid>"_));
+        return "Layout("_+join(s,", "_)+")"_; //TODO: RTTI
+    }
 };
 
 /// Widgets implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
 struct Widgets : virtual Layout, array<Widget*> {
     Widgets(){}
-    Widgets(list<Widget*>&& widgets):array(move(widgets)){}
+    Widgets(const ref<Widget*>& widgets):array(widgets){}
     uint count() const;
     Widget& at(int i);
 };
@@ -79,27 +85,27 @@ struct Horizontal : virtual Linear {
 };
 /// Vertical divide vertical space between contained widgets
 struct Vertical : virtual Linear{
-    int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
+    int2 xy(int2 xy) override { return {xy.y,xy.x}; }
 };
 
 /// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
 struct HBox : Horizontal, Widgets {
     HBox(){}
-    HBox(list<Widget*>&& widgets):Widgets(move(widgets)){}
+    HBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
 };
 /// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
 struct VBox : Vertical, Widgets {
     VBox(){}
-    VBox(list<Widget*>&& widgets):Widgets(move(widgets)){}
+    VBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
 };
 
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
-    HList(list<T>&& widgets):Array<T>(move(widgets)){}
+    HList(array<T>&& widgets):Array<T>(move(widgets)){}
 };
 template<class T> struct VList : Vertical, Array<T> {
     VList(){}
-    VList(list<T>&& widgets):Array<T>(move(widgets)){}
+    VList(array<T>&& widgets):Array<T>(move(widgets)){}
 };
 
 /// Layout items on an uniform \a width x \a height grid
@@ -147,12 +153,12 @@ template<class T> struct ListSelection : Array<T>, virtual Selection {
 /// List is a \a Vertical layout of selectable items (\sa ListSelection)
 template<class T> struct List : Vertical, ListSelection<T>, HighlightSelection {
     List(){}
-    List(list<T>&& items) : ListSelection<T>(move(items)){}
+    List(array<T>&& items) : ListSelection<T>(move(items)){}
 };
 /// Bar is a \a Horizontal layout of selectable items (\sa ListSelection)
 template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {
     Bar(){}
-    Bar(list<T>&& items) : ListSelection<T>(move(items)){}
+    Bar(array<T>&& items) : ListSelection<T>(move(items)){}
 };
 /// Grid is an \a UniformGrid layout of selectable items (\sa ListSelection)
 template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelection {

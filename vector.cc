@@ -1,3 +1,4 @@
+#if 0
 #include "vector.h"
 #include "string.h"
 
@@ -32,7 +33,7 @@ generic vector clip(T min, vector x, T max){ vector r; for(int i=0;i<N;i++) r[i]
 //generic float length(vector a) { return __builtin_sqrtf(dot(a,a)); }
 //generic vector normalize(vector a){ return a/length(a); }
 generic string str(vector v) {
-    string s="("_;
+    string s = string("("_);
     for(int i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; }
     return s+")"_;
 }
@@ -53,3 +54,4 @@ generic string str(vector v) {
 #define vector(V,T,N) \
     uvector(V,T,N) \
     template vector<V,T,N> abs(vector<V,T,N> v);
+#endif

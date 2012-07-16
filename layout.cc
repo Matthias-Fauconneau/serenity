@@ -8,7 +8,7 @@ template struct array<Widget*>;
 
 bool Layout::mouseEvent(int2 position, Event event, Button button) {
     for(uint i=0;i<count();i++) { Widget& child=at(i);
-        if(position >= child.position && position < child.position+child.size) {
+        if(int2(position >= child.position && position <= child.position+child.size)) {
             if(child.mouseEvent(position-child.position,event,button)) return true;
         }
     }
@@ -31,7 +31,7 @@ Widget& Widgets::at(int i) { return *array::at(i); }
 int2 Linear::sizeHint() {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
-    for(uint i=0;i<count();i++) { Widget& child=at(i);
+    for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child, str());
         int2 size=xy(child.sizeHint());
         if(size.y<0) expandingHeight=true;
         height = max(height,abs(size.y));
@@ -53,8 +53,8 @@ void Linear::update() {
     int width = size.x /*remaining space*/, sharing=0 /*expanding count*/, expandingWidth=0, height=0;
     array<int> hints; fill(hints,-1,count()); array<int> sizes; fill(sizes,-1,count());
     //allocate fixed space and convert to expanding if not enough space
-    for(uint i=0;i<count();i++) {
-        int2 sizeHint = xy(at(i).sizeHint());
+    for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child, str());
+        int2 sizeHint = xy(child.sizeHint());
         int hint = sizeHint.x; if(abs(sizeHint.y)>abs(height)) height=sizeHint.y;
         if(hint >= width) hint = -hint; //convert to expanding if not enough space
         if(hint >= 0) width -= (sizes[i]=hints[i]=hint); //allocate fixed size
@@ -113,7 +113,7 @@ void UniformGrid::update() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
 
     int2 size(Widget::size.x/w,  Widget::size.y/h);
-    int2 margin = (Widget::size - int2(w,h)*size) / 2;
+    int2 margin = (Widget::size - int2(w,h)*size) / int2(2);
     uint i=0; for(uint y=0;y<h;y++) for(uint x=0;x<w;x++,i++) { if(i>=count()) return; Widget& child=at(i);
         child.position = margin + int2(x,y)*size; child.size=size;
     }

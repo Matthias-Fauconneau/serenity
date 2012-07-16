@@ -32,8 +32,8 @@ void Sequencer::event(pollfd) {
             uint8 key = ev->data.note.note;
             int vel = ev->data.note.velocity;
             if( vel == 0 ) {
-                removeOne(pressed, key);
-                if(sustain) appendOnce(sustained, key);
+                removeAll(pressed, key);
+                if(sustain) sustained+= key;
                 else {
                     noteEvent.emit(key,0);
                     if(record) {

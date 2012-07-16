@@ -24,7 +24,7 @@ bool operator ==(const Date& a, const Date& b);
 Date date(long time=currentTime());
 
 /// Returns current date formatted using \a format string
-string str(Date date, string&& format="dddd, dd MMMM yyyy hh:mm"_);
+string str(Date date, const ref<byte>& format="dddd, dd MMMM yyyy hh:mm"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy

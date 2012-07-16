@@ -1,21 +1,21 @@
 #pragma once
-#include "string.h"
+#include "array.h"
 
-int close(int fd);
+int closeFile(int fd);
 array<byte> read(int fd, uint capacity);
 array<byte> readUpTo(int fd, uint capacity);
 
 int root();
 
 /// Open file for reading, fails if not existing
-int openFile(const string& path, int at=root());
+int openFile(const ref<byte>& path, int at=root());
 /// Open file for writing, overwrite if existing
-int createFile(const string& path, int at=root(), bool overwrite=false);
+int createFile(const ref<byte>& path, int at=root(), bool overwrite=false);
 /// Open file for writing, append if existing
-int appendFile(const string& path, int at=root());
+int appendFile(const ref<byte>& path, int at=root());
 
-array<byte> readFile(const string& path, int at=root());
-void writeFile(const string& path, const array<byte>& content, int at=root(), bool overwrite=false);
+array<byte> readFile(const ref<byte>& path, int at=root());
+void writeFile(const ref<byte>& path, const array<byte>& content, int at=root(), bool overwrite=false);
 
 struct Map {
     no_copy(Map)
@@ -29,15 +29,15 @@ struct Map {
     operator array<byte>() { return array<byte>(data,size); }
 };
 
-Map mapFile(const string& path, int at=root());
+Map mapFile(const ref<byte>& path, int at=root());
 Map mapFile(int fd);
 
-int openFolder(const string& path, int at=root());
-bool exists(const string& path, int at=root());
-void createFolder(const string& path, int at);
-bool isFolder(const string& path, int at=root());
-void symlink(const string& target,const string& name, int at=root());
-long modifiedTime(const string& path, int at=root());
+int openFolder(const ref<byte>& path, int at=root());
+bool exists(const ref<byte>& path, int at=root());
+void createFolder(const ref<byte>& path, int at);
+bool isFolder(const ref<byte>& path, int at=root());
+void symlink(const ref<byte>& target,const ref<byte>& name, int at=root());
+long modifiedTime(const ref<byte>& path, int at=root());
 enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
-array<string> listFiles(const string& folder, Flags flags, int at=root());
-string findFile(const string& folder, const string& file, int at=root());
+//array<string> listFiles(const ref<byte>& folder, Flags flags, int at=root());
+//string findFile(const ref<byte>& folder, const ref<byte>& file, int at=root());

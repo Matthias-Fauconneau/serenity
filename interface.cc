@@ -82,7 +82,7 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
     //Window::focus=this;
     for(uint i=0;i<count();i++) { Widget& child=at(i);
-        if(position>=child.position && position<child.position+child.size) {
+        if(int2(position>=child.position && position<=child.position+child.size)) {
             if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
             if(button == LeftButton) itemPressed.emit(index);
             return true;
@@ -107,7 +107,7 @@ void Selection::setActive(uint i) {
 void HighlightSelection::render(int2 parent) {
     if(index<count()) {
         Widget& current = at(index);
-        if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
+        if(int2(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4)))) {
             fill(parent+position+current.position+Rect(current.size), rgb(224, 192, 128));
         }
     }
@@ -130,7 +130,7 @@ void TabSelection::render(int2 parent) {
 int2 ImageView::sizeHint() { return int2(image.width,image.height); }
 void ImageView::render(int2 parent) {
     if(!image) return;
-    blit(parent+position+(Widget::size-image.size())/2, image); //TODO: alpha
+    blit(parent+position+(Widget::size-image.size())/int2(2), image); //TODO: alpha
 }
 
 /// TriggerButton
@@ -147,7 +147,7 @@ int2 ToggleButton::sizeHint() { return int2(size,size); }
 void ToggleButton::render(int2 parent) {
     if(!(enabled?disableIcon:enableIcon)) return;
     int size = min(Widget::size.x,Widget::size.y);
-    blit(parent+position+(Widget::size-int2(size,size))/2, enabled?disableIcon:enableIcon);
+    blit(parent+position+(Widget::size-int2(size,size))/int2(2), enabled?disableIcon:enableIcon);
 }
 bool ToggleButton::mouseEvent(int2, Event event, Button button) {
     if(event==Press && button==LeftButton) { enabled = !enabled; toggled.emit(enabled); return true; }

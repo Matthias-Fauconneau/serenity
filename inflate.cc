@@ -400,9 +400,10 @@ byte* decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
   decomp.m_state=0;
   for(;;) {
     size_t src_buf_size = src_buf_len - src_buf_ofs, dst_buf_size = out_buf_capacity - *pOut_len, new_out_buf_capacity;
-    status status = decompress(&decomp, (const uint8*)pSrc_buf + src_buf_ofs, &src_buf_size, (uint8*)buffer, buffer ? (uint8*)buffer + *pOut_len : 0, &dst_buf_size,
+    int status = decompress(&decomp, (const uint8*)pSrc_buf + src_buf_ofs, &src_buf_size, (uint8*)buffer, buffer ? (uint8*)buffer + *pOut_len : 0, &dst_buf_size,
       (flags & ~FLAG_HAS_MORE_INPUT) | FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
-    assert(status >= 0 && status != STATUS_NEEDS_MORE_INPUT, (int)status, decomp.m_state, pSrc_buf, src_buf_len, src_buf_ofs);
+    if(status<=STATUS_NEEDS_MORE_INPUT) { warn("inflate error"_,status); return 0; }
+    //assert(status > STATUS_NEEDS_MORE_INPUT, (int)status, decomp.m_state, pSrc_buf, src_buf_len, src_buf_ofs);
     src_buf_ofs += src_buf_size;
     *pOut_len += dst_buf_size;
     if (status == STATUS_DONE) break;
@@ -417,7 +418,7 @@ array<byte> inflate(const array<byte>& buffer, bool zlib) {
     size_t size;
     assert(buffer.data()); assert(buffer.size());
     byte* data = decompress_mem_to_heap(buffer.data(), buffer.size(), &size, zlib);
-    assert(data); assert(size);
+    if(!data) return array<byte>();
     return array<byte>(data,size);
 }
 #else

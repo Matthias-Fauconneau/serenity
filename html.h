@@ -22,7 +22,7 @@ struct HTML : VBox {
     signal<> contentChanged;
 
     /// Replace layout with content downloaded from \a link
-    void go(const string& link);
+    void go(const ref<byte>& link);
     /// Replace layout with existing \a document
     void load(const URL& url, array<byte>&& document);
     /// Append existing \a document to layout

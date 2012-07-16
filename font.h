@@ -21,7 +21,7 @@ struct Font {
     Glyph cache[256]; //TODO: Unicode
 
     /// Opens font at /a path scaled to /a size pixels high
-    Font(string path, int size);
+    Font(const ref<byte>& path, int size);
     /// Returns kerning space between \a left and \a right
     int kerning(uint16 left, uint16 right); //space in .4
     /// Caches and returns glyph for \a code

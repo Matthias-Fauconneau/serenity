@@ -11,7 +11,7 @@ struct Window : Poll {
     /// Creates a window for \a widget
     /// \note Windows are initially hidden, use \a show to display windows.
     /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show
-    Window(Widget* widget, const string &name=string(), const Image<byte4>& icon=Image<byte4>(), int2 size=int2(-1,-1));
+    Window(Widget* widget, const string &name=string(), const Image<byte4>& icon=Image<byte4>(), int2 size={-1,-1});
     ~Window();
     /// Renders window
     void render();
@@ -53,10 +53,10 @@ struct Window : Poll {
     void event(pollfd);
 
     ///  Input Devices
-    int keyboard,mouse;
 #if __arm__
-    int buttons,touch;
+    int touch,buttons;
 #endif
+    int keyboard,mouse;
 
     /// Virtual terminal (to switch from/to X)
     int vt;

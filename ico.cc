@@ -28,11 +28,11 @@ Image<byte4> decodeICO(const array<byte>& file) {
     assert(header.depth==4||header.depth==8||header.depth==24||header.depth==32,header.depth);
     assert(header.compression==0);
 
-    array<byte4> palette;
+    ref<byte4> palette;
     if(header.depth<=8) {
         assert(header.colorCount==0 || header.colorCount==(1u<<header.depth),header.colorCount,header.depth);
-        palette=s.read<byte4>(1<<header.depth);
-        for(byte4& p: palette) p.a=255;
+        palette = s.read<byte4>(1<<header.depth);
+        //for(byte4& p: palette) p.a=255;
     }
 
     uint w=header.width,h=header.height/2;
@@ -44,7 +44,7 @@ Image<byte4> decodeICO(const array<byte>& file) {
     assert(source,size);
     ubyte* src=(ubyte*)source.data();
     if(header.depth==32) copy((ubyte*)image.data,src,size);
-    if(header.depth==24) for(uint i=0;i<w*h;src+=3) image.data[i++] = byte4(src[0],src[1],src[2],255);
+    if(header.depth==24) for(uint i=0;i<w*h;src+=3) image.data[i++] = {src[0],src[1],src[2],255};
     if(header.depth==8) for(uint i=0;i<w*h;src++) image.data[i++] = palette[*src];
     if(header.depth==4) {
         assert(w%8==0); //TODO: pad

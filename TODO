@@ -1,6 +1,8 @@
-update feeds (touch), taskbar (X), player (mp3)
-kerning, subpixel positioning (upsampled glyph -> subpixel blit?), hinting
-EPub viewer: inflate, parse, display, linux framebuffer
-Text Editor, File Manager, IMAP, Wiki, PDF, Search, +HTML
-Touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen
-Build: -deps.py+make, dep graph + stats (size,loc,time), folders, IDE, Compiler (C++11~Clay~D)
+debug feeds
+font: kerning, subpixel position, hinting
+desktop: text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf
+touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen
+IDE: parser, build driver, debugger, git, dependency graph with (code size,build time), static analyzer, profiler, interpreter, compiler
+
+clang: cannot compile initializer lists with expression
+gcc: cannot compile non scalar ReadOperator, different _start layout, stacktrace, slow

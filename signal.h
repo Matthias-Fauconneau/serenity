@@ -19,12 +19,11 @@ template<class... Args> bool operator ==(const delegate<Args...>& a, const deleg
     return a._this==b._this && a.method==b.method;
 }
 
-template<class T> struct array;
 template<class... Args> struct signal {
     array< delegate<void()> > slots;
     void emit(Args... args) { for(delegate<void()>& slot: slots) (*(delegate<void(Args...)>*)&slot)(copy(args)...);  }
     template<class C, class B, predicate(__is_base_of(B,C))> void connect(C* _this, void (B::*method)(Args...)) {
-        slots.append( delegate<void()>(_this, (void (B::*)())method) );
+        slots<< delegate<void()>(_this, (void (B::*)())method);
     }
     void connect(signal<Args...>* signal) { connect(signal, &signal::emit); }
     operator delegate<void()>() { return delegate<void()>(this, &signal::emit); }

@@ -14,23 +14,23 @@ struct Element {
     Element(TextStream& s, bool html=false);
     explicit operator bool() { return name||content; }
     /// Returns value for \a attribute (fail if missing)
-    string at(const string& attribute) const;
+    ref<byte> at(const ref<byte>& attribute) const;
     /// Returns value for \a attribute (empty string if missing)
-    string operator[](const string& attribute) const;
+    ref<byte> operator[](const ref<byte>& attribute) const;
     /// Returns child element with tag \a name (beware of dangling reference)
-    const Element& operator()(const string& name) const;
+    const Element& operator()(const ref<byte>& name) const;
     /// Depth-first visits all descendants
     void visit(const function<void(const Element&)>& visitor) const;
     /// Depth-first visits all descendants, skip element if /a visitor returns false.
     void mayVisit(const function<bool(const Element&)>& visitor) const;
     /// Process elements with matching \a path
-    void xpath(const string& path, const function<void(const Element&)>& visitor) const;
+    void xpath(const ref<byte>& path, const function<void(const Element&)>& visitor) const;
     /// Collects text content of descendants
     string text() const;
     /// Collects text content of descendants matching path
-    string text(const string& path) const;
+    string text(const ref<byte>& path) const;
     /// Returns element as parseable string
-    string str(const string& prefix=""_) const;
+    string str(const ref<byte>& prefix=""_) const;
 };
 template<> string str(const Element& e);
 
@@ -40,4 +40,4 @@ Element parseXML(array<byte>&& document);
 Element parseHTML(array<byte>&& document);
 
 /// Unescape XML entities
-string unescape(const string& xml);
+string unescape(const ref<byte> &xml);

@@ -24,7 +24,7 @@ Image<byte4> resize(const Image<byte4>& image, uint width, uint height) {
         int scale = image.width/width;
         for(uint y=0; y<height; y++) {
             for(uint x=0; x<width; x++) {
-                int4 s=zero; //TODO: alpha blending
+                int4 s; //TODO: alpha blending
                 for(int i=0;i<scale;i++){
                     for(int j=0;j<scale;j++) {
                         s+= int4(src[i*image.width+j]);

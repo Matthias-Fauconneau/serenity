@@ -99,18 +99,18 @@ Calendar::Calendar():VBox({ &space, &date, &month, &space, &events, &space }) {
 }
 
 void Calendar::previousMonth() {
-    month.previousMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
+    month.previousMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
     events.setText(""_); VBox::update();
 }
 void Calendar::nextMonth() {
-    month.nextMonth(); date[1].setText( format(Bold)+str(month.active,"MMMM yyyy"_) );
+    month.nextMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
     events.setText(""_); VBox::update();
 }
 
 void Calendar::activeChanged(int index) {
     string text;
     Date date = month.dates[index];
-    text << string(format(Bold)+(index==month.todayIndex?"Today"_:str(date))+format(Regular)+"\n"_);
+    text << string(format(Bold)+(index==month.todayIndex?"Today"_: ::str(date))+format(Regular)+"\n"_);
     text << join(::getEvents(date),"\n"_)+"\n"_;
     if(index==month.todayIndex) {
         Date date = month.dates[index+1];
@@ -121,7 +121,7 @@ void Calendar::activeChanged(int index) {
 }
 
 void Calendar::update() {
-    date[1].setText( format(Bold)+str(::date(),"dddd, dd MMMM yyyy"_) );
+    date[1].setText( format(Bold)+::str(::date(),"dddd, dd MMMM yyyy"_) );
     month.setActive(::date());
     VBox::update();
 }

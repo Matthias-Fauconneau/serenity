@@ -52,14 +52,14 @@ template void filter<rgba,4>(byte4* dst, const byte* raw, int width, int height,
 
 Image<byte4> decodePNG(const array<byte>& file) {
     DataStream s(array<byte>(file.data(),file.size())); s.bigEndian=true;
-    if(s.get(8)!="\x89PNG\r\n\x1A\n"_) error("Invalid PNG"_);
+    assert(s.get(8)=="\x89PNG\r\n\x1A\n"_);
     s.advance(8);
     array<byte> buffer;
     uint width=0,height=0,depth=0; uint8 type=0, interlace=0;
     array<byte> palette;
     for(;;) {
         uint32 size = s.read();
-        string name = s.read<byte>(4);
+        array<byte> name = s.read(4);
         if(name == "IHDR"_) {
             width = s.read(), height = s.read();
             uint8 unused bitDepth = s.read();
@@ -69,13 +69,13 @@ Image<byte4> decodePNG(const array<byte>& file) {
             uint8 unused filter = s.read(); assert(filter==0);
             interlace  = s.read();
         } else if(name == "IDAT"_) {
-            buffer << s.read<byte>(size);
+            buffer << s.read(size);
         } else if(name=="IEND"_) {
             assert(size==0);
             s.advance(4); //CRC
             break;
         } else if(name == "PLTE"_) {
-            palette = s.read<byte>(size);
+            palette = s.read(size);
         } else {
             s.advance(size);
         }

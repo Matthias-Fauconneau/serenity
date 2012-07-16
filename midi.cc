@@ -13,7 +13,7 @@ void MidiFile::open(const string& path) { /// parse MIDI header
         string tag = s.read(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
             while(s.read<byte>()&0x80) {} //ignore first time
-            tracks.append( Track(s.read(length)) );
+            tracks<< Track(s.read(length));
         }
         s.advance(length);
     }

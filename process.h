@@ -4,30 +4,6 @@
 struct pollfd { int fd; short events, revents; };
 enum { POLLIN = 1, POLLOUT=4, POLLHUP = 16 };
 
-/// Application can be inherited to interface with the event loop
-struct Application {
-    /// Flag to exit event loop and quit application
-    bool running=true;
-    /// Set running flag to false so as to quit the application when returning to the event loop.
-    /// \note Use this method for normal termination. \a exit doesn't destruct stack allocated objects.
-    void quit() { running=false; }
-};
-
-/// Convenience macro to startup an Application with the default event loop
-void setupHeap();
-void catchErrors();
-void openDisplay();
-#define Application(App) \
-extern "C" void _start(int, int, int, int, int argc, const char* arg0, int, int, int, int, int, int, int, int, int, int, int) { \
-    setupHeap(); catchErrors(); \
-    { \
-     array<string> args; for(int i=1;i<argc;i++) args << str(*(&arg0-i)); \
-     App app(move(args)); \
-     while(app.running && dispatchEvents(true)) {} \
-    } \
-    exit(0); \
-}
-
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
     /// Add this to the process-wide event loop
@@ -43,7 +19,22 @@ struct Poll {
 
 /// Dispatches events to registered Poll objects
 /// \return count of registered Poll objects
-int dispatchEvents(bool wait);
+int dispatchEvents();
+
+/// Application can be inherited to interface with the event loop
+struct Application {
+    /// Flag to exit event loop and quit application
+    bool running=true;
+    /// Set running flag to false so as to quit the application when returning to the event loop.
+    /// \note Use this method for normal termination. \a exit doesn't destruct stack allocated objects.
+    void quit() { running=false; }
+};
+
+/// Macro to compile an executable entry point starting an Application with the default event loop
+array<string> init_(int argc, char** argv);
+void exit_(int);
+#define Application(App)  extern "C" void _start(int,int,int,int,int argc, char* arg0, int,int,int,int,int,int,int,int,int,int,int) { \
+    for(App app(init_(argc,&arg0));app.running && dispatchEvents();); exit_(0); }
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const string& path, const array<string>& args=array<string>());

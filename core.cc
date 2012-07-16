@@ -38,6 +38,3 @@ void operator delete(void*) { /*TODO*/ }
 extern "C" void __aeabi_memset(byte* dst, uint size, byte value) { clear(dst,size,value); }
 extern "C" void __aeabi_memcpy(byte* dst, byte* src, uint size) { copy(dst,src,size); }
 extern "C" void memcpy(byte* dst, byte* src, uint size) { copy(dst,src,size); }
-#include "array.cc"
-Array_Copy_Compare_Sort_Default(uint8)
-Array_Copy_Compare_Sort_Default(uint16)

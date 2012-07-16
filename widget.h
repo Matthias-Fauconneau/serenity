@@ -1,5 +1,6 @@
 #pragma once
 #include "vector.h"
+#include "string.h"
 
 /// Event type
 enum Event { Motion, Press, Release, Enter, Leave };
@@ -18,19 +19,21 @@ struct Widget {
     Widget()=default;
     Widget(Widget&&)=default;
     virtual ~Widget() {}
+/// Debug
+    virtual string str() { return string("Widget"_); } //TODO: RTTI
 /// Layout
     int2 position; /// position of the widget within its parent widget
     int2 size; /// size of the widget
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint() { return int2(0,0); }
+    virtual int2 sizeHint() { return {0,0}; }
     /// Notify objects to process \a position,\a size or derived member changes
     virtual void update() {}
 
 /// Paint
     /// Renders this widget.
     /// \a offset is the absolute position of the parent widget
-    virtual void render(int2 /*parent*/) {};
+    virtual void render(int2 /*parent*/)=0;
 
 /// Event
     /// Override \a mouseEvent to handle or forward user input

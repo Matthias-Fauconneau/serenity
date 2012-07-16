@@ -1,44 +1,49 @@
 #include "stream.h"
 #include "string.h"
 
-bool TextStream::matchAny(const array<byte>& any) {
-    if(available(1)) { byte c=get(1)[0]; for(const byte& e: any) if(c == e) { advance(1); return true; } }
+bool TextStream::matchAny(const ref<byte>& any) {
+    if(available(1)) { byte c=peek(); for(const byte& e: any) if(c == e) { advance(1); return true; } }
     return false;
 }
 
-bool TextStream::match(const string& key) {
-    if(available(key.size())>=key.size() && get(key.size()) == key) { advance(key.size()); return true; }
+bool TextStream::match(char key) {
+    if(available(1) && peek() == key) { advance(1); return true; }
     else return false;
 }
 
-void TextStream::whileAny(const array<byte>& any) { while(matchAny(any)){} }
-
-array<byte> TextStream::until(const array<byte>& key) {
-    array<byte> a;
-    while(available(key.size())>=key.size()) { if(get(key.size()) == key) { advance(key.size()); break; } a << read(1); }
-    return a;
+bool TextStream::match(const ref<byte>& key) {
+    if(available(key.size)>=key.size && get(key.size) == key) { advance(key.size); return true; }
+    else return false;
 }
 
-array<byte> TextStream::untilAny(const array<byte>& any) {
-    array<byte> a;
-    while(available(1) && !matchAny(any)) a << read(1);
-    return a;
+void TextStream::whileAny(const ref<byte>& any) { while(matchAny(any)){} }
+
+ref<byte> TextStream::until(const ref<byte>& key) {
+    int start=index, end=index;
+    while(available(key.size)>=key.size) { if(get(key.size) == key) { advance(key.size); break; } end=index; }
+    return slice(start, end);
 }
 
-string TextStream::untilEnd() { uint size=available(-1); return read(size); }
+ref<byte> TextStream::untilAny(const ref<byte>& any) {
+    int start=index, end=index;
+    while(available(1) && !matchAny(any)) end=index;
+    return slice(start,end);
+}
+
+ref<byte> TextStream::untilEnd() { uint size=available(-1); return read(size); }
 
 void TextStream::skip() { whileAny(" \t\n\r"_); }
 
-string TextStream::word() {
-    string word;
-    for(;available(1);) { byte c=get(1)[0]; if(!(c>='a'&&c<='z')) break; word<<c; advance(1); }
-    return word;
+ref<byte> TextStream::word() {
+    int start=index,end=index;
+    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z')) break; advance(1); end=index; }
+    return slice(start,end);
 }
 
-string TextStream::xmlIdentifier() {
+ref<byte> TextStream::xmlIdentifier() {
     string identifier;
     for(;available(1);) {
-        byte c=get(1)[0];
+        byte c=peek();
         if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c==':'||c=='-'||c=='_')) break;
         identifier<<c;
         advance(1);

@@ -540,6 +540,6 @@ template<typename R, typename... Args>
   function<R(Args...)>::
   operator()(Args... __args) const
   {
-    if (_M_empty()) { log("function"); exit(-1); }
+    assert_(_M_empty());
     return _M_invoker(_M_functor, forward<Args>(__args)...);
   }

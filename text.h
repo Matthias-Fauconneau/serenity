@@ -13,11 +13,11 @@ inline Format format(uint f) { assert_(f<32); return Format(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(string&& text=""_, int size=16, ubyte opacity=255, int wrap=0);
+    Text(string&& text=string(), int size=16, ubyte opacity=255, int wrap=0);
     Text(Text&&)=default;
 
-    void setText(string&& text) { this->text=move(text); textSize=zero; }
-    void setSize(int size) { this->size=size; textSize=zero; }
+    void setText(string&& text) { this->text=move(text); textSize={0,0}; }
+    void setSize(int size) { this->size=size; textSize={0,0}; }
 
     /// Displayed text
     string text;
@@ -30,7 +30,7 @@ struct Text : Widget {
     /// User clicked on this Text
     signal<> textClicked;
     /// User clicked on a \a Format::Link
-    signal<const string&> linkActivated;
+    delegate<void(const ref<byte>&)> linkActivated;
 
     int2 sizeHint();
     void update() override { update(min(wrap,Widget::size.x)); }
@@ -39,7 +39,7 @@ struct Text : Widget {
     bool mouseEvent(int2 position, Event event, Button button) override;
 
     // cache layout bounding box
-    int2 textSize=zero;
+    int2 textSize;
 
     // laid out glyphs to blit
     struct Blit { int2 pos; const Image<uint8>& image; };

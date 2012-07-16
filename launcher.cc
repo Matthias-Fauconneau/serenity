@@ -8,6 +8,10 @@
 
 #include "array.cc"
 template struct array<Command>;
+template struct Array<Command>;
+template struct ListSelection<Command>;
+template struct List<Command>;
+template struct Popup<Command>;
 
 const string iconPaths[4] = {
     "/usr/share/pixmaps/"_,

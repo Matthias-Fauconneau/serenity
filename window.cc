@@ -13,10 +13,14 @@ Widget* Window::focus=0;
 Window::Window(Widget* widget, const string& name, const Image<byte4>& icon, int2 size) : widget(widget) {
     if(!display) openDisplay();
 #if __arm__
-    buttons = open("/dev/input/event4", O_RDONLY|O_NONBLOCK, 0);
+    touch = open("/dev/input/event0", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({touch, POLLIN}));
+    buttons = open("/dev/input/event4", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({buttons, POLLIN}));
+    keyboard = open("/dev/input/event5", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({keyboard, POLLIN}));
+    mouse = open("/dev/input/event6", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({mouse, POLLIN}));
+#else
+    keyboard = open("/dev/input/event0", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({keyboard, POLLIN}));
+    mouse = open("/dev/input/event1", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({mouse, POLLIN}));
 #endif
-    keyboard = open("/dev/input/event5", O_RDONLY|O_NONBLOCK, 0);
-    registerPoll(i({keyboard, POLLIN})); //TODO: multiple devices
     setName(name); setIcon(icon); setSize(size);
     vt = open("/dev/console", O_RDWR, 0);
 }
@@ -54,7 +58,7 @@ void Window::render() {
     if(visible) { widget->update(); widget->render(int2(0,0)); }
 }
 
-void Window::show() { if(!visible) { visible=true; ioctl(vt, VT_ACTIVATE, (void*)6); } render(); } //switch from X
+void Window::show() { if(!visible) { visible=true; /*ioctl(vt, VT_ACTIVATE, (void*)6);*/ } render(); } //switch from X
 void Window::hide() { visible=false; ioctl(vt, VT_ACTIVATE, (void*)7); } //switch to X
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;
@@ -62,6 +66,7 @@ void Window::setPosition(int2 position) {
     widget->position=position;
 }
 void Window::setSize(int2 size) {
+    if(!widget) return;
     if(size.x<0||size.y<0) {
         int2 hint=widget->sizeHint(); assert(hint,hint);
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
@@ -89,4 +94,4 @@ signal<>& Window::globalShortcut(Key key) {
     return shortcuts.insert((uint16)key);
 }
 
-string Window::getSelection() { return ""_; }
+string Window::getSelection() { return string(); }

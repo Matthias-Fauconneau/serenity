@@ -6,11 +6,6 @@
 #include "interface.h"
 #include "window.h"
 
-template<class T> inline void write(int fd, const array<T>& s) {
-    uint unused wrote = write(fd,s.data(),(size_t)s.size()*sizeof(T));
-    assert(wrote==s.size());
-}
-
 ICON(network);
 
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
@@ -38,9 +33,9 @@ Feeds::Feeds() {
     List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
     List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
     array<string> feeds = split(readFile("feeds"_,config),'\n');
-    for(const string& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 60);
+    for(const ref<byte>& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 60);
 }
-Feeds::~Feeds() { close(readConfig); }
+Feeds::~Feeds() { closeFile(readConfig); }
 
 bool Feeds::isRead(const Entry& entry) {
     const Text& text = entry.get<Text>();
@@ -73,7 +68,7 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     if(words.size()>4) title=join(slice(words,0,4)," "_);
 
     string link = feed.text("rss/channel/link"_); //RSS
-    if(!link) link = feed("feed"_)("link"_)["href"_]; //Atom
+    if(!link) link = string(feed("feed"_)("link"_)["href"_]); //Atom
     if(!link) { warn("Invalid feed"_,url); return; }
 
 #if HEADER
@@ -93,14 +88,14 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     auto addItem = [this,&history,&items](const Element& e)->void{
         if(history++>=64) return; //avoid getting old unreads on feeds with big history
         if(array::size()>=32) return;
-        string text=e("title"_).text();
-        text=trim(unescape(text));
+        string text = e("title"_).text();
+        text = string(trim(unescape(text)));
 
-        string url=e("link"_).text(); //RSS
-        if(!url) url=e("link"_)["href"_]; //Atom
+        string url = e("link"_).text(); //RSS
+        if(!url) url = string(e("link"_)["href"_]); //Atom
 
         Entry entry(move(text),move(url));
-        if(!isRead(entry)) items.append(move(entry));
+        if(!isRead(entry)) items<< move(entry);
     };
     feed.xpath("feed/entry"_,addItem); //Atom
     feed.xpath("rss/channel/item"_,addItem); //RSS
@@ -108,19 +103,22 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
         append(move(items[i]));
         Entry& item = last(); //reference shouldn't move while loading
         item.content = new Scroll<HTML>;
-        item.content->go(item.link); //preload
+        //item.content->go(item.link); //preload
     }
     contentChanged.emit();
 }
 
 void Feeds::getFavicon(const URL& url, array<byte>&& document) {
     Element page = parseHTML(move(document));
-    string icon;
-    page.xpath("html/head/link"_,[&icon](const Element& e)->void{ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
+    ref<byte> icon;
+    page.xpath("html/head/link"_,
+               [&icon](const Element& e){ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
     if(!icon) icon="/favicon.ico"_;
-    if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink("../"_+cacheFile(url.relative(icon)),cacheFile(url.relative("/favicon.ico"_)),cache);
+    if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) {
+        symlink(string("../"_+cacheFile(url.relative(icon))), cacheFile(url.relative("/favicon.ico"_)),cache);
+    }
     for(Entry& entry: *this) {
-        if(contains(entry.link,url.host)) {
+        if(find(entry.link,url.host)) {
             new ImageLoader(url.relative(icon), &entry.get<Icon>().image, contentChanged, int2(16,16), 7*24*60*60);
             break; //only header
         }

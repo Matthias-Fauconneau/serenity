@@ -61,7 +61,7 @@ inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 ar
     return (type)r0; \
 }
 
-enum class sys { exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, munmap=91, setpriority=97,
+enum class sys { exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97,
                  socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197, clock_gettime=263, openat=322,
                  mkdirat, unlinkat, symlinkat=331, timerfd_create=350, timerfd_settime=353 };
 
@@ -90,6 +90,7 @@ syscall3(int, socket, int,domain, int,type, int,protocol)
 syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
 syscall2(int, timerfd_create, int,clock_id, int,flags);
 syscall4(int, timerfd_settime, int,ufd, int,flags, struct timespec*,utmr, struct timespec*,otmr);
+syscall2(int, setrlimit, int,resource, struct rlimit*,limit)
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=040000};
 enum {PROT_READ=1, PROT_WRITE};
 enum {MAP_SHARED=1, MAP_PRIVATE};

@@ -32,8 +32,8 @@ struct Calendar : VBox {
 struct Clock : Text, Timer {
     signal<> timeout;
     signal<> triggered;
-    Clock(int size=16):Text(str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
-    void expired() { text=str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout.emit(); }
+    Clock(int size=16):Text(::str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
+    void expired() { text=::str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout.emit(); }
     bool mouseEvent(int2, Event event, Button button) override {
         if(event==Press && button==LeftButton) { triggered.emit(); return true; }
         return false;

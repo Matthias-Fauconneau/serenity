@@ -17,7 +17,7 @@ struct Socket : virtual Stream {
     virtual void write(const array<byte>& buffer);
     /// Stream
     uint available(uint need) override;
-    array<byte> get(uint size) override;
+    ref<byte> get(uint size) override;
 };
 
 /// Encodes \a input to Base64 to transfer binary data through text protocol
@@ -26,7 +26,7 @@ string base64(const string& input);
 struct URL {
     string scheme,authorization,host,path,fragment;
     URL(){}
-    URL(const string& url);
+    URL(const ref<byte>& url);
     URL relative(URL&& url) const;
     explicit operator bool() { return host.size(); }
 };
@@ -51,7 +51,7 @@ struct HTTP : Poll, virtual TextStream, virtual Socket {
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(const URL& url, Handler handler, array<string>&& headers i(={}), string&& method="GET"_);
+    HTTP(const URL& url, Handler handler, array<string>&& headers i(={}), string&& method=string("GET"_));
 
    enum { Connect, Request, Header, Data, Cache, Handle, Done } state = Connect;
     void request();

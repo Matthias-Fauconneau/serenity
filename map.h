@@ -14,7 +14,7 @@ template<class K, class V> struct map {
     map()=default;
     map(map&&)=default;
     map& operator =(map&&)=default;
-
+    void reserve(int size) { return keys.reserve(size); values.reserve(size); }
     uint size() const { return keys.size(); }
     bool contains(const K& key) const { return ::contains(keys, key); }
     explicit operator bool() const { return keys.size(); }
@@ -26,17 +26,20 @@ template<class K, class V> struct map {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : forward<Vf>(value);
     }
-    V* find(const K& key) { int i = indexOf(keys, key); return i>=0 ? &values[i] : 0; }
+    V* find(const K& key) { int i = indexOf(ref<K>(keys), key); return i>=0 ? &values[i] : 0; }
     template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) {
         assert(!contains(key));
-        insertAt(values, insertSorted(keys, forward<Kf>(key)), forward<Vf>(value));
+        //insertAt(values, insertSorted(keys, forward<Kf>(key)), forward<Vf>(value));
+        keys << forward<Kf>(key); values << forward<Vf>(value);
     }
     template<perfect2(K,V)> void insertMulti(Kf&& key, Vf&& value) {
-        insertAt(values, insertSorted(keys, forward<Kf>(key)), forward<Vf>(value));
+        //insertAt(values, insertSorted(keys, forward<Kf>(key)), forward<Vf>(value));
+        keys << forward<Kf>(key); values << forward<Vf>(value);
     }
     template<perfect(K)> V& insert(Kf&& key) {
         assert(!contains(key));
-        return insertAt(values, insertSorted(keys, forward<Kf>(key)), move(V()));
+        //return insertAt(values, insertSorted(keys, forward<Kf>(key)), move(V()));
+        keys << forward<Kf>(key); values << V(); return values.last();
     }
     V& operator [](K key) { int i = indexOf(keys, key); if(i>=0) return values[i]; return insert(key); }
     void remove(const K& key) { int i=indexOf(keys, key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
@@ -67,7 +70,7 @@ template<class K, class V> inline map<K,V> copy(const map<K,V>& o) {
 }
 
 template<class K, class V> inline string str(const map<K,V>& m) {
-    string s="{"_;
-    for(int i=0;i<m.size();i++) { s<<str(m.keys[i])+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
+    string s("{"_);
+    for(uint i=0;i<m.size();i++) { s<<str(m.keys[i])+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
     return s+"}"_;
 }

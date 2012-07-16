@@ -1,11 +1,6 @@
 #include "display.h"
 #include "linux.h"
 
-/// int2
-
-#include "vector.cc"
-vector(xy,int,2)
-
 /// Clip
 
 #include "array.cc"

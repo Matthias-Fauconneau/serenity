@@ -33,9 +33,13 @@ raster.cc
 raster.h
 interface.h
 interface.cc
+layout.h
+layout.cc
 window.h
 window.cc
 html.h
 html.cc
 feeds.cc
 desktop.cc
+utf8.h
+utf8.cc
