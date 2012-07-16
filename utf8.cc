@@ -35,6 +35,15 @@ const utf8_iterator& utf8_iterator::operator--() {
     return *this;
 }
 
+string utf8(uint c) {
+    string utf8;
+    /**/  if(c<(1<<7)) utf8 << c;
+    else if(c<(1<<(7+6))) utf8 << (0b11000000|(c>>6)) << (0b10000000|(c&0b111111));
+    else if(c<(1<<(7+6+6))) utf8 << (0b11100000|(c>>12)) << (0b10000000|((c>>6)&0b111111)) << (0b10000000|(c&0b111111));
+    else error(c);
+    return utf8;
+}
+
 /*uint utf8_string::at(uint index) const {
     utf8_iterator it=begin();
     for(uint i=0;it!=end();++it,++i) if(i==index) return *it;

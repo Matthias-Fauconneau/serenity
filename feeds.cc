@@ -103,7 +103,7 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
         append(move(items[i]));
         Entry& item = last(); //reference shouldn't move while loading
         item.content = new Scroll<HTML>;
-        //item.content->go(item.link); //preload
+        //item.content->go(item.link); //preload TODO: only when idle
     }
     contentChanged.emit();
 }

@@ -128,17 +128,6 @@ string simplify(const ref<byte>& s) {
     return simple;
 }
 
-string utf8(uint c) {
-    string utf8;
-    /**/  if(c<(1<<7)) utf8 << c;
-    else if(c<(1<<(7+6))) utf8 << (0b11000000|(c>>6)) << (0b10000000|(c&0b111111));
-    else if(c<(1<<(7+6+6))) utf8 << (0b11100000|(c>>12)) << (0b10000000|((c>>6)&0b111111)) << (0b10000000|(c&0b111111));
-    else error(c);
-    return utf8;
-}
-
-/// Human-readable value representation
-
 template<int base> string utoa(uint n, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     byte buf[32]; int i=32;
@@ -150,6 +139,8 @@ template<int base> string utoa(uint n, int pad) {
     return copy(string(buf+i,32-i));
 }
 template string utoa<16>(uint,int);
+
+/// Conversions between number <-> string
 
 template<int base> string itoa(int number, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);

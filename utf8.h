@@ -12,6 +12,9 @@ struct utf8_iterator {
     const utf8_iterator& operator--();
 };
 
+/// Convert Unicode code point to UTF-8
+string utf8(uint code);
+
 /*/// \a utf8_string is an \a array of characters with specialized methods for UTF-8 string handling
 struct utf8_string : array<byte> {
     //using array<byte>::array<byte>;

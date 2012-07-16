@@ -72,9 +72,6 @@ ref<byte> trim(const ref<byte>& s);
 /// Removes duplicate whitespace
 string simplify(const ref<byte>& s);
 
-/// Convert Unicode code point to UTF-8
-string utf8(uint code);
-
 /// Converts a machine integer to its human-readable representation
 template<int base=10> string utoa(uint number, int pad=0);
 template<int base=10> string itoa(int number, int pad=0);
@@ -114,8 +111,9 @@ inline string str(const ref<byte>& s) { return string(s); }
 template<class A> inline string str(const cat<A>& s) { return s; }
 //template<class A> inline string str(A* const& p) { return p?utoa<16>(uint(p)):string("null"_); }
 template<class A> inline string str(A* const& p) { return p?str(*p):string("null"_); }
-template<class T> inline string str(const array<T>& a, const ref<byte>& sep=" "_) {
-    string s; for(uint i=0;i<a.size();i++) { s<<str(a[i]); if(i<a.size()-1) s<<sep;} return s;
+template<class T> inline string str(const array<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
+    if(!a) return string();
+    string s; if(bracket) s<<bracket[0]; for(uint i=0;i<a.size();i++) { s<<str(a[i]); if(i<a.size()-1) s<<sep;} if(bracket) s<<bracket[1]; return s;
 }
 
 /// Concatenates string representation of its arguments

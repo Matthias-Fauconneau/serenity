@@ -5,6 +5,7 @@
 #include "array.cc"
 
 static array<string> unique;
+/// word is an index in a string table allowing fast move/copy/compare
 struct word {
     int id;
     word(const string& s) { id=indexOf(unique, s); if(id<0) { id=unique.size(); unique<<copy(s); } }
@@ -20,15 +21,13 @@ struct Rule {
     array<word> tokens;
     array<word> followSet;
     int original, from, to, end; // extended grammar
-    Rule(const string& rule) : symbol(section(rule,':')) {
-        for(const string& str: split(section(rule,':',1,-1))) tokens << str;
-    }
+    Rule(const string& rule) : symbol(section(rule,':')) { for(const string& str: split(section(rule,':',1,-1))) tokens << str; }
     Rule(word symbol, int original, int from, int to):symbol(symbol),original(original),from(from),to(to){}
     word extended() const { return word(str(from)+str(symbol)+str(to)); }
     int size() const { return tokens.size(); }
     word operator []( int i ) const { return tokens[i]; }
 };
-string str(const Rule& r) { return str(r.symbol)+" -> "_+str(r.tokens)+" ("_+str(r.followSet)+")"_; }
+string str(const Rule& r) { return str(r.symbol)+" -> "_+str(r.tokens); }
 
 struct Item {
     array<Rule>& rules;
@@ -53,16 +52,17 @@ struct State {
 bool operator ==(const State& a, const State& b) { return a.items==b.items; }
 string str(const State& state) { return str(state.items); }
 
+struct Node { word name; array<Node> children; Node(word name):name(name){} };
+string str(const Node& node) { return str(node.name)+str(node.children," "_,"()"_); }
+
 static const word e = "e"_;
 
 struct Parser : Application {
-    array<Rule> rules; //aka productions
-    array<State> states; //aka item sets
+    array<Rule> rules;
+    array<State> states;
     array<word> nonterminal, terminal;
     map< word, array<word> > firstSets;
     map< word, array<word> > followSets;
-
-    //bool exists(const Item& item) { for(const State& state: states) for(const Item& other: state.items) if(item==other) return true; return false; }
 
     void computeItemSet(array<Item>& items, int index) {
         const Item& current = items[index];
@@ -72,7 +72,7 @@ struct Parser : Application {
                 if(rule.symbol == current.expected()) {
                     Item item(rules, i, 0);
                     if(!contains(items, item)) {
-                        queue << items.size(); //keep tutorial order
+                        queue << items.size();
                         items << item;
                     }
                 }
@@ -140,14 +140,11 @@ struct Parser : Application {
 
     Parser(array<string>&&) {
         /// Parses grammar
-        for(const string& rule: split((string)mapFile("serenity/lalr1.g"_),'\n')) rules << Rule(rule);
-#if 0
+        array<string> lines = split(readFile("serenity/math.g"_),'\n');
+        string text = move(lines[0]);
+        for(const string& rule: slice(lines,1)) if(!startsWith(rule,"#"_)) rules<< Rule(rule);
         for(const Rule& rule: rules) nonterminal+= rule.symbol;
         for(const Rule& rule: rules) for(word token: rule.tokens) if(!contains(nonterminal, token)) terminal+= token;
-#else
-        nonterminal <<"S"_<<"N"_<<"E"_<<"V"_;
-        terminal <<"x"_<<"="_<<"*"_;
-#endif
         terminal << "$"_;
 
         /// Computes item sets and transitions
@@ -234,25 +231,43 @@ struct Parser : Application {
         }}*/
 
         /// LR parser
-        array<word> input; for(char c: "x=*x$"_) input<< str(c);
+        array<word> input; for(char c: text) input<< str(c); input<<"$"_;
         array<int> stack; stack<< 0;
         array<int> output;
         for(int i=0;;) {
             //log("Stack: ",stack," Input: ",slice(input,0,i),"|",slice(input,i));
-            int action = states[stack.last()].transitions.at(input[i]);
-            if(action>0) { //log("shift",action);
+            if(!contains(terminal,input[i])) { log("Invalid",input[i]); return; }
+            const map<word, int>& transitions = states[stack.last()].transitions;
+            if(!transitions.contains(input[i])) { log("Expected {",transitions.keys,"} at '",slice(input,0,i),"|",slice(input,i)); return; }
+            int action = transitions.at(input[i]);
+            if(action>0) { log("shift",action,states[action].items);
                 i++;
                 stack << action;
             }
             else if(action<0) { //log("reduce",-action);
                 const Rule& rule = rules[-action];
                 output << -action;
-                //log(rule);
+                log(rule);
                 stack.shrink(stack.size() - rule.size());
                 stack<< states[stack.last()].transitions.at(rule.symbol);
             } else break;
         }
-        log(output);
+
+        /// Convert reductions to parse tree
+        array<Node> nodeStack;
+        for(int i: output) { const Rule& rule=rules[i];
+            Node node = rule.symbol;
+            array<Node> nonterminal;
+            for(word token: rule.tokens) if(!contains(terminal, token)) nonterminal << nodeStack.pop();
+            for(word token: rule.tokens) {
+                if(contains(terminal, token)) node.children<< token;
+                else node.children<<nonterminal.pop();
+            }
+            nodeStack<< move(node);
+        }
+        Node root = nodeStack.pop();
+        log(root);
+        //if(text=="x=*x"_) assert(str(root)=="N(V(x) = E(V(* E(V(x)))))"_);
     }
 };
 Application(Parser)
