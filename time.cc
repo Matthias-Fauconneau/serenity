@@ -49,16 +49,16 @@ string str(Date date, const ref<byte>& format) {
     TextStream s = string(format);
     string r;
     while(s) {
-        /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(" "_); }
-        else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); else s.until(" "_); }
-        else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); else s.until(" "_); }
-        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << str(days[date.weekDay]); else s.until(" "_); }
-        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << slice(str(days[date.weekDay]),0,3); else s.until(" "_); }
-        else if(s.match("dd"_)){ if(date.day>=0) r << dec(date.day,2); else s.until(" "_); }
-        else if(s.match("MMMM"_)){ if(date.month>=0)  r << str(months[date.month]); else s.until(" "_); }
-        else if(s.match("MMM"_)){ if(date.month>=0)  r << slice(str(months[date.month]),0,3); else s.until(" "_); }
-        else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); else s.until(" "_); }
-        else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(" "_); }
+        /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(' '); }
+        else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); else s.until(' '); }
+        else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); else s.until(' '); }
+        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << str(days[date.weekDay]); else s.until(' '); }
+        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << slice(str(days[date.weekDay]),0,3); else s.until(' '); }
+        else if(s.match("dd"_)){ if(date.day>=0) r << dec(date.day,2); else s.until(' '); }
+        else if(s.match("MMMM"_)){ if(date.month>=0)  r << str(months[date.month]); else s.until(' '); }
+        else if(s.match("MMM"_)){ if(date.month>=0)  r << slice(str(months[date.month]),0,3); else s.until(' '); }
+        else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); else s.until(' '); }
+        else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(' '); }
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
         else r << s.next();
     }

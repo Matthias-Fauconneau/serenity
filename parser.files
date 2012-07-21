@@ -16,3 +16,5 @@ process.cc
 parser.cc
 lalr.g
 math.g
+grammar.g
+parser.h

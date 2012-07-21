@@ -19,21 +19,21 @@ array<string> getEvents(Date query) {
 
     map<string, array<Date> > exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
-        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until("\n"_); exceptions.insert(move(title),array<Date>{except}); }
-        else s.until("\n"_);
+        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until('\n'); exceptions.insert(move(title),array<Date>{except}); }
+        else s.until('\n');
     }
     s.index=0;
 
     Date until; //End date for recurring events
     while(s) {
         s.skip();
-        if(s.match("#"_)) s.until("\n"_); //comment
+        if(s.match("#"_)) s.until('\n'); //comment
         else if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
-        else if(s.match("except "_)) s.until("\n"_); //already parsed
+        else if(s.match("except "_)) s.until('\n'); //already parsed
         else {
             Date date = parse(s); s.skip();
             Date end=date; if(s.match("-"_)) { end=parse(s); s.skip(); }
-            string title = s.until("\n"_);
+            string title = s.until('\n');
             if(query.day>=0) {
                 if(date.day>=0) { if(date.day!=query.day) continue; }
                 else if(query>until) continue;

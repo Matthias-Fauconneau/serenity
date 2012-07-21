@@ -37,9 +37,9 @@ map<string,string> readSettings(const string& path) {
     map<string,string> entries;
     if(!exists(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
     for(TextStream s(readFile(path));s;) {
-        if(s.matchAny("[#"_)) s.until("\n"_);
+        if(s.matchAny("[#"_)) s.until('\n');
         else {
-            string key = s.until("="_), value=s.until("\n"_);
+            string key = s.until('='), value=s.until('\n');
             entries.insertMulti(move(key),move(value));
         }
         s.whileAny("\n"_);

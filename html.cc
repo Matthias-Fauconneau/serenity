@@ -82,7 +82,7 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
     }
     else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
         flushText();
-        TextStream s = string(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(")"_);
+        TextStream s = string(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
         images << url.relative(src);
     }
     else if(!e.name) { //Text

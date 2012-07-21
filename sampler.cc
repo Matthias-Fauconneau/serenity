@@ -27,7 +27,7 @@ void Sampler::open(const string& path) {
             s.whileAny("\n\r"_);
         }
         else {
-            string key = s.until("="_);
+            string key = s.until('=');
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
                 string path = replace(value,"\\"_,"/"_);

@@ -35,13 +35,13 @@ bool Feeds::isRead(const Entry& entry) {
     const Text& text = entry.get<Text>();
     string id = text.text+entry.link;
     id=replace(id,"\n"_,""_);
-    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return true; return false;
+    for(TextStream s(readMap);s;s.until('\n')) if(s.match(id)) return true; return false;
 }
 void Feeds::setRead(const Entry& entry) {
     const Text& text = entry.get<Text>();
     string id = text.text+entry.link;
     id=replace(id,"\n"_,""_);
-    for(TextStream s(readMap);s;s.until("\n"_)) if(s.match(id)) return;
+    for(TextStream s(readMap);s;s.until('\n')) if(s.match(id)) return;
     ::write(readConfig,string(id+"\n"_));
     readMap = mapFile(readConfig); //remap
 }

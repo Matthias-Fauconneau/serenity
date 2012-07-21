@@ -1,111 +1,65 @@
+#include "parser.h"
 #include "process.h"
 #include "file.h"
-#include "map.h"
-#include "string.h"
+#include "stream.h"
 #include "array.cc"
 
-static array<string> unique;
-/// word is an index in a string table allowing fast move/copy/compare
-struct word {
-    int id;
-    word(const string& s) { id=indexOf(unique, s); if(id<0) { id=unique.size(); unique<<copy(s); } }
-    word(const ref<byte>& s):word(string(s)){}
-
-};
-bool operator ==(word a, word b) { return a.id == b.id; }
-bool operator >(word a, word b) { return a.id > b.id; }
-string str(const word& w) { return copy(unique[w.id]); }
-
-struct Rule {
-    word symbol;
-    array<word> tokens;
-    array<word> followSet;
-    int original, from, to, end; // extended grammar
-    Rule(const string& rule) : symbol(section(rule,':')) { for(const string& str: split(section(rule,':',1,-1))) tokens << str; }
-    Rule(word symbol, int original, int from, int to):symbol(symbol),original(original),from(from),to(to){}
-    word extended() const { return word(str(from)+str(symbol)+str(to)); }
-    int size() const { return tokens.size(); }
-    word operator []( int i ) const { return tokens[i]; }
-};
-string str(const Rule& r) { return str(r.extended())+" -> "_+str(r.tokens); }
-
-struct Item {
-    array<Rule>& rules;
-    int ruleIndex;
-    int dot;
-    Item(array<Rule>& rules, int ruleIndex, uint dot):rules(rules),ruleIndex(ruleIndex),dot(dot){}
-    const Rule& rule() const { return rules[ruleIndex]; }
-    int size() { return rule().size(); }
-    word operator []( int i ) { return rule()[i]; }
-    word expected() const { assert(dot<rule().size()); return rule()[dot]; }
-};
-bool operator ==(const Item& a, const Item& b) { return a.ruleIndex==b.ruleIndex && a.dot == b.dot; }
-string str(const Item& item) {
-    return str(item.rule().extended())+" -> "_+str(slice(item.rule().tokens, 0, item.dot))+"  ."_+str(slice(item.rule().tokens, item.dot));
-}
-
-struct State {
-    array<Item> items;
-    map<word, int> transitions;
-    State() { items.reserve(256); transitions.reserve(256); }
-};
-bool operator ==(const State& a, const State& b) { return a.items==b.items; }
-string str(const State& state) { return str(state.items); }
-
-struct Node { word name; array<Node> children; Node(word name):name(name){} };
-string str(const Node& node) { return str(node.name)+str(node.children," "_,"()"_); }
-
-static const word e = "e"_;
+array<string> unique;
+const ref<byte> all = "12134567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~-=\\!@#$%^&*()_+|\t\n[]{}';\":/.,?><"_;
+static const word e = "epsilon"_;
 
 struct Parser : Application {
     array<Rule> rules;
     array<State> states;
     array<word> nonterminal, terminal;
 
+    /// Computes item sets
     void computeItemSet(array<Item>& items, int index) {
-        const Item& current = items[index];
-        array<int> queue;
-        if(current.dot < current.rule().size()) {
+        if(items[index].dot < items[index].size()) {
             int i=0; for(const Rule& rule: rules) {
-                if(rule.symbol == current.expected()) {
+                if(rule.symbol == items[index].expected()) {
                     Item item(rules, i, 0);
                     if(!contains(items, item)) {
-                        queue << items.size();
                         items << item;
+                        computeItemSet(items, items.size()-1);
                     }
                 }
-            i++; }
+                i++;
+            }
         }
-        while(queue) computeItemSet(items, queue.pop());
     }
 
+    /// Computes transitions
     void computeTransitions(int current, word token) {
         State next;
         for(Item item: states[current].items) {
             if(item.dot < item.rule().size() && token == item.expected()) {
                 item.dot++;
                 next.items << item;
+                computeItemSet(next.items,next.items.size()-1);
             }
         }
         if(next.items) {
-            computeItemSet(next.items,0);
             int j = indexOf(states, next);
             if(j<0) { j=states.size(); states << move(next); }
             states[current].transitions.insert(token, j);
         }
     }
 
-    array<word> first(const word& X) {
-        array<word> firstX;
+    /// Computes first set
+    map<word, array<word> > firstSets;
+    const array<word>& first(const word& X) {
+        array<word>& firstX = firstSets[X];
+        if(firstX) return firstX;
         if(contains(terminal,X)) firstX+= X;
-        else for(const Rule& rule: rules) if(rule.extended() == X) {
+        else for(const Rule& rule: rules) if(rule.extended == X) {
             if(rule.size()==0 || (rule.size()==1 && rule[0]==e)) error("empty"), firstX+= e;
             else firstX+= first(rule.tokens);
         }
         return firstX;
     }
-    array<word> first(const array<word>& Y) {
-        array<word> firstY = first(Y[0]);
+    array<word> first(const ref<word>& Y) {
+        array<word> firstY = copy(first(Y[0]));
         if(contains(firstY,e)) {
             removeAll(firstY, e);
             firstY+= first(slice(Y,1));
@@ -115,29 +69,101 @@ struct Parser : Application {
         return firstY;
     }
 
+    /// Computes follow set
     array<word> follow(const word& X) {
         array<word> followX;
         if(X=="0S-1"_) followX+= "$"_;
         else if(contains(terminal,X)) {}
         else for(const Rule& rule: rules) {
-            int i = indexOf(rule.tokens, X);
-            if(i<0) continue;
+            uint i = indexOf(rule.tokens, X);
+            if(i==uint(-1)) continue;
             if(i+1<rule.size()) { //R → a*Xb: add First(b) to Follow(X)
-                auto firstB = first(rule[i+1]);
+                const array<word>& firstB = first(rule[i+1]);
                 followX+= firstB;
-                if(contains(firstB,e)) followX+= follow(rule.extended());
+                if(contains(firstB,e)) followX+= follow(rule.extended);
             }
-            if(rule.tokens.last()==X) followX+= follow(rule.extended()); //R → a*X: add Follow(R) to Follow(X)
+            if(rule.tokens.last()==X) followX+= follow(rule.extended); //R → a*X: add Follow(R) to Follow(X)
         }
         return followX;
     }
 
+    /// Parses rule expressions and generate rules from EBNF as needed
+    array<word> parseRuleExpression(TextStream& s) {
+        array<word> tokens;
+        for(;;) {
+            s.match(' ');
+            if(s.match('[')) { //character set
+                int start=s.index-1;
+                array<byte> set;
+                bool complement = s.match('^');
+                while(!s.match(']')) {
+                    if(s.match('-')) { byte first=set.pop(), last=s.character(); for(;first<=last;first++) set+= first; }
+                    else set+= s.character();
+                }
+                word name = s.slice(start, s.index-start); assert(name);
+                if(!contains(rules,Rule(name))) {
+                    if(complement) {
+                        array<byte> notSet = move(set);
+                        for(byte c: all) if(!contains(notSet,c)) set<< c;
+                    }
+                    for(byte c: set) {
+                        array<word> tokens; tokens<<word(str((char)c)); rules<<Rule(name,move(tokens));
+                    }
+                }
+                tokens<< name;
+            } else if(s.match('(')) { //nested rule
+                int start=s.index-1;
+                array<Rule> nested;
+                for(;;) {
+                    nested<< Rule(""_, parseRuleExpression(s));
+                    if(!s.match('|')) { if(!s.match(')')) error(""); break; }
+                }
+                word name = s.slice(start, s.index-start);
+                if(!contains(rules,Rule(name))) for(Rule& rule: nested) rules<< Rule(name,move(rule.tokens));
+                tokens<< name;
+            } else if(s.match('\'')) { //character token
+                tokens<< str(s.character());
+                if(!s.match('\'')) error("invalid character literal");
+            } else if(s.match('"')) { //keyword
+                int start=s.index-1;
+                array<word> keyword;
+                while(!s.match('"')) keyword<< str(s.character());
+                word name = s.slice(start, s.index-start);
+                Rule rule(name, move(keyword));
+                if(!contains(rules,rule)) rules<< move(rule);
+                tokens<< name;
+            } else if(s.match('+')) { //previous token may repeat T+: T | T+ T
+                word T = tokens.pop();
+                word Tp = string(str(T)+"+"_);
+                if(!contains(rules,Rule(Tp))) rules<< Rule(Tp, i(array<word>{T})) << Rule(Tp, i(array<word>{Tp, T}));
+                tokens<< Tp;
+            } else { //nonterminal
+                ref<byte> token = s.whileNo(" |)\n"_);
+                if(token) tokens<< token; //FIXME: undefined are implicitly tokens
+                if(!s.match(' ')) break;
+            }
+        }
+        assert(tokens);
+        return tokens;
+    }
 
     Parser(array<string>&&) {
         /// Parses grammar
-        array<string> lines = split(readFile("serenity/math.g"_),'\n');
-        string text = move(lines[0]);
-        for(const string& rule: slice(lines,1)) if(!startsWith(rule,"#"_)) rules<< Rule(rule);
+        TextStream s = readFile("serenity/math.g"_);
+        ref<byte> text = s.until('\n');
+        while(s) {
+            if(s.match('#')) { s.until('\n'); continue; }
+            word name = s.until(':'); assert(name);
+            if(contains(rules,Rule(name)))
+                error("duplicate",rules[indexOf(rules,Rule(name))],"and", str(name)+":"_+s.until('\n'),
+                      " \t[use choice operator | instead of multiple rules]");
+            for(;;) {
+                Rule rule(name, parseRuleExpression(s));
+                rules<< move(rule);
+                if(!s.match('|')) { if(!s.match('\n')) error(""); break; }
+            }
+        }
+        log(rules,"\n"_);
         for(const Rule& rule: rules) nonterminal+= rule.symbol;
         for(const Rule& rule: rules) for(word token: rule.tokens) if(!contains(nonterminal, token)) terminal+= token;
         terminal << "$"_;
@@ -151,33 +177,34 @@ struct Parser : Application {
             for(word token: nonterminal) computeTransitions(i,token);
         }
 
-        /*/// Display item sets and transitions
-        {int i=0; for(const State& state: states) { log("Item set",i,": ",str(state.items," | "_)); i++; }}
-        log("\t"_+str(terminal,"\t"_)+"\t|\t"_+str(slice(nonterminal,1),"\t"_));
-        {int i=0; for(const State& state: states) {
-            string s=str(i)+"\t"_;
-            for(const word& key: terminal) { if(state.transitions.contains(key)) s << str(state.transitions.at(key)); s<<'\t'; }
-            for(const word& key: nonterminal) { if(state.transitions.contains(key)) s << str(state.transitions.at(key)); s<<'\t'; }
-            log(s);
-            i++;
-        }}*/
+        if(0) { /// Display item sets
+            int i=0; for(const State& state: states) { log("Item set",i,": ",str(state.items," | "_)); i++; }
+        }
+        if(0) { /// Display transitions
+            log("\t"_+str(terminal,"\t"_)+"\t|\t"_+str(slice(nonterminal,1),"\t"_));
+            int i=0; for(const State& state: states) {
+                string s=str(i)+"\t"_;
+                for(const word& key: terminal) { if(state.transitions.contains(key)) s << str(state.transitions.at(key)); s<<'\t'; }
+                for(const word& key: nonterminal) { if(state.transitions.contains(key)) s << str(state.transitions.at(key)); s<<'\t'; }
+                log(s);
+                i++;
+            }
+        }
 
         /// Creates extended grammar
         array<Rule> extended;
         int i=0; for(const State& state: states) {
             for(const Item& item: state.items) {
                 if(item.dot==0) {
-                    word symbol = item.rule().symbol;
-                    Rule rule(symbol, item.ruleIndex, i, (symbol=="S"_?-1:state.transitions.at(symbol)));
-                    int last=i;
+                    array<word> tokens; int last=i;
                     for(word token: item.rule().tokens) {
                         int t = states[last].transitions.at(token);
-                        if(contains(terminal,token)) rule.tokens<< token;
-                        else rule.tokens<< word( str(last)+str(token)+str(t) );
+                        if(contains(terminal,token)) tokens<< token;
+                        else tokens<< word( str(last)+str(token)+str(t) );
                         last=t;
                     }
-                    rule.end = last;
-                    extended << move(rule);
+                    word symbol = item.rule().symbol;
+                    extended<< Rule(symbol, move(tokens), item.ruleIndex, last, i, (symbol=="S"_?-1:state.transitions.at(symbol)));
                 }
             }
             i++;
@@ -185,7 +212,8 @@ struct Parser : Application {
         rules = move(extended);
 
         /// Compute follow sets before merging
-        for(uint i=1; i<rules.size(); i++) { Rule& a = rules[i]; a.followSet = follow(a.extended()); }
+        //TODO: check if there are recursive rules which would fail
+        for(uint i=1; i<rules.size(); i++) { Rule& a = rules[i]; a.followSet = copy(follow(a.extended)); }
 
         /// Merges rules with same original rule and end state
         for(uint i=0; i<rules.size(); i++) { Rule& a = rules[i];
@@ -200,48 +228,55 @@ struct Parser : Application {
 
         /// Adds LALR reductions using rules final state and follow set
         {int i=0; for(Rule& rule: rules) {
-            for(word token: rule.followSet) states[rule.end].transitions.insert(token, -i);
+            for(word token: rule.followSet) {
+                if(states[rule.end].transitions.contains(token)) error("reduce/reduce conflict",token,states[-states[rule.end].transitions[token]],rule);
+                states[rule.end].transitions.insert(token, -i);
+            }
             i++;
         }}
 
         /// Accepts when we have $ on item S: x* •
         for(State& set: states) if(contains(set.items, Item(rules, 0, rules[0].size()))) set.transitions["$"_] = 0;
 
-        /// Displays parsing table
-        /*log("\t"_+str(terminal,"\t"_)+"        |\t"_+str(slice(nonterminal,1),"\t"_));
-        {int i=0; for(const State& state: states) {
-            string s=str(i)+"\t"_;
-            for(const word& key: terminal) {
-                if(state.transitions.contains(key)) {
-                    int t = state.transitions.at(key);
-                    if(t>0) s<<'s'<<str(t);
-                    if(t<0) s<<'r'<<str(-t);
-                    if(t==0) s<<"acc"_;
-                }
-                s<<'\t';
-            }
-            for(const word& key: slice(nonterminal,1)) { if(state.transitions.contains(key)){ s<<"g"_<<str(state.transitions.at(key)); } s<<'\t'; }
-            log(s);
-            i++;
-        }}*/
+        if(0) { /// Displays parsing table
+            log("\t"_+str(terminal,"\t"_)+"        |\t"_+str(slice(nonterminal,1),"\t"_));
+            {int i=0; for(const State& state: states) {
+                    string s=str(i)+"\t"_;
+                    for(const word& key: terminal) {
+                        if(state.transitions.contains(key)) {
+                            int t = state.transitions.at(key);
+                            if(t>0) s<<'s'<<str(t);
+                            if(t<0) s<<'r'<<str(-t);
+                            if(t==0) s<<"acc"_;
+                        }
+                        s<<'\t';
+                    }
+                    for(const word& key: slice(nonterminal,1)) { if(state.transitions.contains(key)){ s<<"g"_<<str(state.transitions.at(key)); } s<<'\t'; }
+                    log(s);
+                    i++;
+                }}
+        }
 
         /// LR parser
         array<word> input; for(char c: text) input<< str(c); input<<"$"_;
         array<int> stack; stack<< 0;
         array<int> output;
+        const bool verbose=0;
         for(int i=0;;) {
             if(!contains(terminal,input[i])) { log("Invalid",input[i]); return; }
             const map<word, int>& transitions = states[stack.last()].transitions;
-            if(!transitions.contains(input[i])) { log("Expected {",transitions.keys,"} at '",slice(input,0,i),"|",slice(input,i)); return; }
+            if(!transitions.contains(input[i])) { log("Expected {",transitions.keys,"} at ",slice(input,0,i),"|",slice(input,i)); return; }
             int action = transitions.at(input[i]);
-            if(action>0) { //log(input[i],"shift",action,states[action].items,"\t",stack);
-                i++;
+            if(action>0) {
+                if(verbose) log(input[i],"shift",action,states[action].items,"\t",stack);
                 stack << action;
+                i++;
             }
-            else if(action<0) { //log(input[i],"reduce", -action, rules[-action],"\t",stack);
+            else if(action<0) {
+                if(verbose) log(input[i],"reduce", -action, rules[-action],"\t",stack);
                 output << -action;
                 stack.shrink(stack.size() - rules[-action].size());
-                //log("goto",stack.last(),rules[-action].symbol,states[stack.last()].transitions.at(rules[-action].symbol));
+                if(verbose) log("goto",stack.last(),rules[-action].symbol,states[stack.last()].transitions.at(rules[-action].symbol));
                 stack<< states[stack.last()].transitions.at(rules[-action].symbol);
             } else break;
         }
@@ -260,7 +295,6 @@ struct Parser : Application {
         }
         Node root = nodeStack.pop();
         log(root);
-        //if(text=="x=*x"_) assert(str(root)=="N(V(x) = E(V(* E(V(x)))))"_);
     }
 };
 Application(Parser)

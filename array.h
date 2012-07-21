@@ -53,10 +53,13 @@ template<class T> struct array {
     /// Move assignment
     array& operator=(array&& o) { this->~array(); if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy(*this,o); o.tag=0; return *this; }
     /// Allocates a new uninitialized array for \a capacity elements
-explicit array(uint capacity) { reserve(capacity); }
-    /// References elements from an initializer \a list (unsafe if used after ~ref)
-//FIXME?: reserve(list.size()); setSize(list.size()); for(uint i=0;i<list.size();i++) new (&at(i)) T(move(((T*)list.begin())[i]));
-    explicit array(const ref<T>& ref) : i(buffer{ref.data, ref.size, 0}) {}
+    explicit array(uint capacity) { reserve(capacity); }
+    /// References elements from a reference (unsafe if used after ~ref)
+    //explicit array(const ref<T>& ref) : i(buffer{ref.data, ref.size, 0}) {}
+    /// Moves elements from a reference
+    explicit array(ref<T>&& ref);
+    /// Copies elements from a reference
+    explicit array(const ref<T>& ref);
 
 //referencing constructors
     /// References \a size elements from read-only \a data pointer
@@ -80,10 +83,8 @@ explicit array(uint capacity) { reserve(capacity); }
     operator ref<T>() const { return ref<T>(data(),size()); }
     /// Inline operators to help disambiguate type deduction
     array<T>& operator <<(T&& v);
-    //array<T>& operator <<(const T& v);
     array<T>& operator <<(array<T>&& a);
     array<T>& operator +=(T&& v);
-    //array<T>& operator +=(const T& v);
     array<T>& operator +=(array<T>&& a);
     bool operator ==(const ref<T>& r) const;
 
@@ -121,9 +122,9 @@ generic array& operator <<(array& a, array&& b);
 
 // Slice
 /// Slices a reference to elements from \a pos to \a pos + \a size
-generic ref<T> slice(ref<T> a, uint pos, uint size) { assert_(pos+size<a.size); return ref<T>(a.data+pos,size); }
+generic const ref<T> slice(const ref<T>& a, uint pos, uint size) { assert_(pos+size<=a.size); return ref<T>(a.data+pos,size); }
 /// Slices a reference to elements from to the end of the array
-generic ref<T> slice(ref<T> a, uint pos) { assert_(pos<a.size); return ref<T>(a.data+pos,a.size-pos); }
+generic const ref<T> slice(const ref<T>& a, uint pos) { assert_(pos<=a.size); return ref<T>(a.data+pos,a.size-pos); }
 
 /// Slices an array referencing elements from \a pos to \a pos + \a size
 /// \note Using move semantics, this operation is safe without refcounting the data buffer
@@ -133,9 +134,9 @@ generic ref<T> slice(ref<T> a, uint pos) { assert_(pos<a.size); return ref<T>(a.
 
 // Copyable?
 /// Slices an array copying elements from \a pos to \a pos + \a size
-generic array slice(const array& a, uint pos, uint size);
+//generic array slice(const array& a, uint pos, uint size);
 /// Slices an array copying elements from \a pos to the end of the array
-generic array slice(const array& a, uint pos);
+//generic array slice(const array& a, uint pos);
 /// Append \a v to array \a a
 generic array& operator <<(array& a, const T& v);
 /// Append array \a b to array \a a
@@ -177,16 +178,13 @@ generic int insertSorted(array& a, T&& v);
 generic int insertSorted(array& a, const T& v);
 
 /// Overloads to help implicit array to ref conversion
-//generic bool operator ==(const ref<T>& a, const array& b) { return a==ref<T>(b); }
-//generic bool operator ==(const array& a, const ref<T>& b) { return ref<T>(a)==b; }
-//generic bool operator ==(const array& a, const array& b) { return ref<T>(a)==ref<T>(b); }
 generic inline array& array::operator <<(T&& v) { return ::operator<<(*this, move(v)); }
-//generic inline array& array::operator <<(const T& v) { return ::operator<<(*this, v); }
 generic inline array& array::operator <<(array&& a) { return ::operator<<(*this, move(a)); }
 generic inline array& array::operator +=(T&& v) { return ::operator+=(*this, v); }
-//generic inline array& array::operator +=(const T& v) { return ::operator+=(*this, v); }
 generic inline array& array::operator +=(array&& a) { return ::operator+=(*this, a); }
 generic inline bool  array::operator ==(const ref<T>& r) const { return ::operator==(ref<T>(*this), r); }
+generic inline const ref<T> slice(const array& a, uint pos, uint size) { return slice(ref<T>(a),pos,size); }
+generic inline const ref<T> slice(const array& a, uint pos) { return slice(ref<T>(a),pos); }
 
 generic int indexOf(const array& a, const T& value) { return indexOf(ref<T>(a),value); }
 generic bool contains(const array& a, const T& value) { return contains(ref<T>(a),value); }

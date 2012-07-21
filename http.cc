@@ -23,7 +23,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
     static int dnsCache = appendFile("cache/dns"_);
     static Map dnsMap = mapFile(dnsCache);
     uint ip=-1;
-    for(TextStream s(dnsMap);s;s.until("\n"_)) { if(s.match(host)) { s.match(" "_); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
+    for(TextStream s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(" "_); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
     if(!ip) return false; //negative entry
     if(ip==uint(-1)) {
         static int dns;
@@ -40,7 +40,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
         struct { uint16 id=swap16(currentTime()); uint16 flags=0; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
         for(TextStream s(copy(host));s;) { //QNAME
-            string label = string(s.until("."_));
+            string label = string(s.until('.'));
             query << label.size() << label;
         }
         query << 0;
@@ -120,7 +120,7 @@ URL::URL(const ref<byte> &url) {
     host = string(section(domain,'@',-2,-1));
     if(contains<byte>(domain,'@')) authorization = base64(section(domain,'@'));
     if(!contains<byte>(host,'.')) { path=move(host); path<<"/"_; }
-    path << s.until("#"_);
+    path << s.until('#');
     fragment = string(s.untilEnd());
 }
 URL URL::relative(URL&& url) const {

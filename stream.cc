@@ -2,11 +2,6 @@
 #include "string.h"
 #include "array.cc"
 
-bool TextStream::matchAny(const ref<byte>& any) {
-    if(available(1)) { byte c=peek(); for(const byte& e: any) if(c == e) { advance(1); return true; } }
-    return false;
-}
-
 bool TextStream::match(char key) {
     if(available(1) && peek() == key) { advance(1); return true; }
     else return false;
@@ -17,8 +12,26 @@ bool TextStream::match(const ref<byte>& key) {
     else return false;
 }
 
-void TextStream::whileAny(const ref<byte>& any) { while(matchAny(any)){} }
+bool TextStream::matchAny(const ref<byte>& any) {
+    byte c=peek();
+    for(const byte& e: any) if(c == e) { advance(1); return true; }
+    return false;
+}
 
+bool TextStream::matchNo(const ref<byte>& any) {
+    byte c=peek();
+    for(const byte& e: any) if(c == e) return false;
+    advance(1); return true;
+}
+
+ref<byte> TextStream::whileAny(const ref<byte>& any) {
+    int start=index; while(available(1) && matchAny(any)){} return slice(start,index-start);
+}
+ref<byte> TextStream::whileNo(const ref<byte>& any) {
+    int start=index; while(available(1) && matchNo(any)){} return slice(start,index-start);
+}
+
+ref<byte> TextStream::until(char key) { for(int start=index;;) if(next() == key) return slice(start,index-1-start); }
 ref<byte> TextStream::until(const ref<byte>& key) {
     int start=index, end=index;
     while(available(key.size)>=key.size) { if(get(key.size) == key) { advance(key.size); break; } end=index; }
@@ -34,6 +47,12 @@ ref<byte> TextStream::untilAny(const ref<byte>& any) {
 ref<byte> TextStream::untilEnd() { uint size=available(-1); return read(size); }
 
 void TextStream::skip() { whileAny(" \t\n\r"_); }
+
+char TextStream::character() {
+    if(!match('\\')) return next();
+    if(match('n')) return '\n';
+    else error("Invalid escape character",peek());
+}
 
 ref<byte> TextStream::word() {
     int start=index,end=index;

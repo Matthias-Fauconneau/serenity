@@ -11,7 +11,7 @@ struct rlimit { ulong cur,max; };
 
 array<string> init_(int argc, char** argv) {
     setupHeap(); catchErrors();
-    //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit); //1 MB
+    rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit); //1 MB
     array<string> args; for(int i=1;i<argc;i++) args << str(*(argv-i));
     return args;
 }
@@ -59,8 +59,8 @@ uint availableMemory() {
     close(fd);
     map<string, uint> info;
     while(s) {
-        string key=s.until(":"_); s.skip();
-        uint value=toInteger(s.untilAny(" \n"_)); s.until("\n"_);
+        string key=s.until(':'); s.skip();
+        uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
         info.insert(move(key), value);
     }
     return info.at("MemFree"_)+info.at("Inactive"_);

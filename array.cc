@@ -4,6 +4,9 @@
 inline void* operator new(size_t, void* p) { return p; } //placement new
 
 #define generic template<class T>
+generic array<T>::array(ref<T>&& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(move((T&)ref[i]));}
+generic array<T>::array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
+
 #define array array<T>
 
 generic void array::reserve(uint capacity) {
@@ -50,11 +53,11 @@ generic array& operator <<(array& a, array&& b) {
 }
 
 // Copyable?
-generic array slice(const array& a, uint pos, uint size) {
+/*generic array slice(const array& a, uint pos, uint size) {
     assert(pos+size<=a.size());
     return copy(array(a.data()+pos,size));
 }
-generic array slice(const array& a, uint pos) { return slice(a,pos,a.size()-pos); }
+generic array slice(const array& a, uint pos) { return slice(a,pos,a.size()-pos); }*/
 generic array& operator <<(array& a, T const& v) { a<< copy(v); return a; }
 generic array& operator <<(array& a, const ref<T>& b) {
     int old=a.size(); a.reserve(old+b.size); a.setSize(old+b.size);

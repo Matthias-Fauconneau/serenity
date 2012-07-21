@@ -8,7 +8,7 @@ template<class T> inline ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,
 /// Casts raw memory to \a T
 template<class T> inline const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
 /// Casts between element types
-template<class T, class O> ref<T> cast(ref<O>&& o) {
+template<class T, class O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
@@ -36,7 +36,7 @@ struct Stream {
     /// Reads \a size bytes from stream
     ref<byte> read(uint size) { ref<byte> t = get(size); advance(size); return t; }
     /// Slices an array referencing this data (valid as long as this stream)
-    ref<byte> slice(int pos, int size) { return ref<byte>(buffer.data()+pos,size); }
+    ref<byte> slice(int pos, int size) { return ::slice<byte>(buffer,pos,size); }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 };
@@ -112,8 +112,16 @@ struct TextStream : virtual Stream {
     bool match(const ref<byte>& key);
     /// If stream match any of \a key, advances \a pos
     bool matchAny(const ref<byte>& any);
+    /// If stream match none of \a key, advances \a pos
+    bool matchNo(const ref<byte>& any);
+
     /// advances \a pos while stream match any of \a key
-    void whileAny(const ref<byte>& any);
+    ref<byte> whileAny(const ref<byte>& any);
+    /// advances \a pos while stream match none of \a key
+    ref<byte> whileNo(const ref<byte>& any);
+
+    /// Reads until stream match \a key
+    ref<byte> until(char key);
     /// Reads until stream match \a key
     ref<byte> until(const ref<byte> &key);
     /// Reads until stream match any character of \a key
@@ -122,6 +130,8 @@ struct TextStream : virtual Stream {
     ref<byte> untilEnd();
     /// Skips whitespaces
     void skip();
+    /// Reads one possibly escaped character
+    char character();
     /// Reads a single word
     ref<byte> word();
     /// Reads a single XML identifier

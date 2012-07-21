@@ -49,7 +49,9 @@ string demangle(TextStream& s) {
     else if(s.match('m')) r<<"ulong"_;
     else if(s.match('x')) r<<"int64"_;
     else if(s.match('y')) r<<"uint64"_;
-    else if(s.match("T_"_)) r<<'T';
+    else if(s.match('A')) { r<<"[]"_; s.number(); s.match('_'); }
+    else if(s.match('T')) { r<<'T'; s.number(); s.match('_'); }
+    else if(s.match("St"_)) r<<"std"_;
     else if(s.match('S')) { r<<'S'; s.number(); s.match('_'); }
     else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
     else if(s.match('I')||s.match('J')) { //template | argument pack
@@ -67,6 +69,9 @@ string demangle(TextStream& s) {
             while(s && !s.match('E')) {
                 if(s.match("C1"_)) list << copy(list.first()); //constructor
                 else if(s.match("C2"_)) list << copy(list.first()); //constructor
+                else if(s.match("D1"_)) list << "~"_+copy(list.first()); //destructor
+                else if(s.match("D2"_)) list << "~"_+copy(list.first()); //destructor
+                else if(s.match("eq"_)) list << string("operator =="_);
                 else if(s.match("ix"_)) list << string("operator []"_);
                 else if(s.match("cl"_)) list << string("operator ()"_);
                 else if(s.match("ls"_)) list << string("operator <<"_);
@@ -90,7 +95,7 @@ string demangle(TextStream& s) {
     } else if((l=s.number())!=-1) {
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
-    } else { log(s.slice(s.index,s.buffer.size()-s.index)); return string(s.untilEnd()); }
+    } else { error('D',r,string(s.untilEnd()),string(move(s.buffer))); }
     for(int i=0;i<pointer;i++) r<<'*';
     if(rvalue) r<<"&&"_;
     if(ref) r<<'&';
@@ -185,13 +190,13 @@ Symbol findNearestLine(void* find) {
 }
 
 void trace(int skip) {
-    static bool recurse; if(recurse) {log("Debugger error");return;} recurse=true;
-    void* stack[8] = {0,0,0,0,0,0,0,0};
+    static int recurse; if(recurse>1) {log("Debugger error"); recurse--;return;} recurse++;
+    void* stack[9] = {0,0,0,0,0,0,0,0,0};
     stack[0] = __builtin_return_address(0);
 #define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i)
-    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);
-    for(int i=7;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
-    recurse=false;
+    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);
+    for(int i=8;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
+    recurse--;
 }
 
 enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };

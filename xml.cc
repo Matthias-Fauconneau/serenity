@@ -10,9 +10,9 @@ static Element parse(array<byte>&& document, bool html) {
     Element root;
     while(s) {
         s.skip();
-        if(s.match("</"_)) warn("Unexpected","</"_+s.until(">"_)+">"_);
-        else if(s.match("<"_)) root.children << Element(s,html);
-        else warn("Unexpected '",s.until("\n"_),"'");
+        if(s.match("</"_)) warn("Unexpected","</"_+s.until('>')+">"_);
+        else if(s.match('<')) root.children << Element(s,html);
+        else warn("Unexpected '",s.until('\n'),"'");
         s.skip();
     }
     return root;
@@ -23,26 +23,26 @@ Element parseHTML(array<byte>&& document) { return parse(move(document),true); }
 
 Element::Element(TextStream& s, bool html) {
     uint start = s.index;
-    if(s.match("!DOCTYPE"_)||s.match("!doctype"_)) { s.until(">"_); return; }
+    if(s.match("!DOCTYPE"_)||s.match("!doctype"_)) { s.until('>'); return; }
     else if(s.match("?xml"_)) { s.until("?>"_); return; }
     else if(s.match("!--"_)) { s.until("-->"_); return; }
-    else if(s.match("?"_)){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
+    else if(s.match('?')){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
     else name = string(s.xmlIdentifier());
-    if(!name) { log((string)slice(s.buffer,0,s.index)); warn("expected tag name got",s.until("\n"_)); }
+    if(!name) { log((string)slice(s.buffer,0,s.index)); warn("expected tag name got",s.until('\n')); }
     if(html) name=toLower(name);
     s.skip();
-    while(!s.match(">"_)) {
+    while(!s.match('>')) {
         if(s.match("/>"_)) { s.skip(); return; }
-        else if(s.match("/"_)) s.skip(); //spurious /
-        else if(s.match("<"_)) break; //forgotten >
+        else if(s.match('/')) s.skip(); //spurious /
+        else if(s.match('<')) break; //forgotten >
         string key = string(s.xmlIdentifier()); s.skip();
-        if(!key) { log("Attribute syntax error",(string)slice(s.buffer,start,s.index-start),"^",s.until(">"_)); break; }
+        if(!key) { log("Attribute syntax error",(string)slice(s.buffer,start,s.index-start),"^",s.until('>')); break; }
         if(html) key=toLower(key);
         string value;
-        if(s.match("="_)) {
+        if(s.match('=')) {
             s.skip();
-            if(s.match("\""_)) value=string(s.until("\""_)); //FIXME: escape
-            else if(s.match("'"_)) value=string(s.until("'"_)); //FIXME: escape
+            if(s.match('"')) value=string(s.until('"')); //FIXME: escape
+            else if(s.match(''')) value=string(s.until(''')); //FIXME: escape
             else { value=string(s.untilAny(" \t\n>"_)); if(s.buffer[s.index-1]=='>') s.index--; }
             s.match("\""_); //duplicate "
         }
@@ -69,7 +69,7 @@ Element::Element(TextStream& s, bool html) {
         else if(s.match("<!--"_)) { s.until("-->"_); }
         else if(s.match("</"_)) { s.until(">"_); } //ignore
         else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
-        else if(s.match("<"_)) children << Element(s,html);
+        else if(s.match('<')) children << Element(s,html);
         else {
             string content=simplify(trim(unescape(s.until("<"_)))); s.index--;
             if(content) children << Element(move(content));
@@ -156,10 +156,10 @@ string unescape(const ref<byte>& xml) {
         if(!s) break;
 
         if(s.match("#x"_)) out << utf8(toInteger(toLower(s.until(";"_)),16));
-        else if(s.match("#"_)) out << utf8(toInteger(s.until(";"_)));
+        else if(s.match('#')) out << utf8(toInteger(s.until(";"_)));
         else {
             string key = string(s.word());
-            if(s.match(";"_)) {
+            if(s.match(';')) {
                 string* c = entities.find(key);
                 if(c) out<<*c; else warn("Unknown entity",key);
             }
