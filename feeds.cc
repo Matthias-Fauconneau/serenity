@@ -5,19 +5,13 @@
 #include "html.h"
 #include "interface.h"
 #include "window.h"
+#include "array.cc"
 
 ICON(network);
 
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
 Entry::Entry(string&& name, string&& link, Image<byte4>&& icon):Item(move(icon),move(name)),link(move(link)){}
 Entry::~Entry() { if(content) delete content; }
-#include "array.cc"
-template struct array<Entry>;
-template struct Array<Entry>;
-template struct ListSelection<Entry>;
-template struct List<Entry>;
-
-template struct Scroll<HTML>;
 
 Feeds::Feeds() {
     window.localShortcut(Key::Escape).connect(&window, &Window::hide);
@@ -100,7 +94,7 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     feed.xpath("feed/entry"_,addItem); //Atom
     feed.xpath("rss/channel/item"_,addItem); //RSS
     for(int i=items.size()-1;i>=0;i--) { //oldest first
-        append(move(items[i]));
+        *this<< move(items[i]);
         Entry& item = last(); //reference shouldn't move while loading
         item.content = new Scroll<HTML>;
         //item.content->go(item.link); //preload TODO: only when idle

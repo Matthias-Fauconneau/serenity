@@ -5,7 +5,6 @@
 #include "linux.h"
 #include "map.h"
 #include "array.cc"
-Array(URL)
 
 enum {F_SETFL=4};
 enum {PF_LOCAL=1, PF_INET};
@@ -119,8 +118,8 @@ URL::URL(const ref<byte> &url) {
     else s.match("//"_); //net_path
     auto domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
     host = string(section(domain,'@',-2,-1));
-    if(contains(domain,'@')) authorization = base64(section(domain,'@'));
-    if(!contains(host,'.')) { path=move(host); path<<"/"_; }
+    if(contains<byte>(domain,'@')) authorization = base64(section(domain,'@'));
+    if(!contains<byte>(host,'.')) { path=move(host); path<<"/"_; }
     path << s.until("#"_);
     fragment = string(s.untilEnd());
 }
@@ -135,7 +134,7 @@ URL URL::relative(URL&& url) const {
         }
     }
     if(!url.host) url.host=copy(host);
-    if(!contains(url.host,'.') || url.host=="."_) error(host,path,url.host,url.path);
+    if(!contains<byte>(url.host,'.') || url.host=="."_) error(host,path,url.host,url.path);
     if(startsWith(url.path,"."_)) url.path=slice(url.path,1);
     while(startsWith(url.path,"/"_)) url.path=slice(url.path,1);
     return move(url);
@@ -154,7 +153,7 @@ string cacheFile(const URL& url) {
     if(!cache) cache=openFolder("cache"_);
     string name = replace(url.path,"/"_,"."_);
     if(!name || name=="."_) name=string("index.htm"_);
-    assert(!contains(url.host,'/'));
+    assert(!contains<byte>(url.host,'/'));
     return url.host+"/"_+name;
 }
 
@@ -207,8 +206,8 @@ void HTTP::header() {
         else if((key=="Location"_ && (status==301||status==302)) || key=="Refresh"_) {
             if(startsWith(value,"0;URL="_)) value=::slice(value,6);
             URL next = url.relative(value);
-            assert(!contains(url.host,'/'),url);
-            assert(!contains(next.host,'/'),url,next);
+            assert(!contains<byte>(url.host,'/'),url);
+            assert(!contains<byte>(next.host,'/'),url,next);
             redirect << file;
             buffer.clear(); index=0; contentLength=0; chunked=false; unregisterPoll(); disconnect(); state=Connect;
             url=move(next);

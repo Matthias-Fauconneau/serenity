@@ -27,7 +27,7 @@ struct Rule {
     int size() const { return tokens.size(); }
     word operator []( int i ) const { return tokens[i]; }
 };
-string str(const Rule& r) { return str(r.symbol)+" -> "_+str(r.tokens); }
+string str(const Rule& r) { return str(r.extended())+" -> "_+str(r.tokens); }
 
 struct Item {
     array<Rule>& rules;
@@ -41,7 +41,7 @@ struct Item {
 };
 bool operator ==(const Item& a, const Item& b) { return a.ruleIndex==b.ruleIndex && a.dot == b.dot; }
 string str(const Item& item) {
-    return str(item.rule().symbol)+" -> "_+str(slice(item.rule().tokens, 0, item.dot))+"  ."_+str(slice(item.rule().tokens, item.dot));
+    return str(item.rule().extended())+" -> "_+str(slice(item.rule().tokens, 0, item.dot))+"  ."_+str(slice(item.rule().tokens, item.dot));
 }
 
 struct State {
@@ -61,8 +61,6 @@ struct Parser : Application {
     array<Rule> rules;
     array<State> states;
     array<word> nonterminal, terminal;
-    map< word, array<word> > firstSets;
-    map< word, array<word> > followSets;
 
     void computeItemSet(array<Item>& items, int index) {
         const Item& current = items[index];
@@ -98,15 +96,13 @@ struct Parser : Application {
     }
 
     array<word> first(const word& X) {
-        auto& firstX = firstSets[X];
-        if(!firstX) {
-            if(contains(terminal,X)) firstX+= X;
-            else for(const Rule& rule: rules) if(rule.extended() == X) {
-                if(rule.size()==0 || (rule.size()==1 && rule[0]==e)) error("empty"), firstX+= e;
-                else firstX+= first(rule.tokens);
-            }
-         }
-        return copy(firstX);
+        array<word> firstX;
+        if(contains(terminal,X)) firstX+= X;
+        else for(const Rule& rule: rules) if(rule.extended() == X) {
+            if(rule.size()==0 || (rule.size()==1 && rule[0]==e)) error("empty"), firstX+= e;
+            else firstX+= first(rule.tokens);
+        }
+        return firstX;
     }
     array<word> first(const array<word>& Y) {
         array<word> firstY = first(Y[0]);
@@ -120,21 +116,20 @@ struct Parser : Application {
     }
 
     array<word> follow(const word& X) {
-        auto& followX = followSets[X];
-        if(!followX) {
-            if(contains(terminal,X)) followX+= X;
-            else for(const Rule& rule: rules) {
-                int i = indexOf(rule.tokens, X);
-                if(i<0) continue;
-                if(rule.size()>i+1 && contains(terminal, rule[i+1])) { //R → a*Xb: add First(b) to Follow(X)
-                    auto firstB = first(rule[i+1]);
-                    followX+= firstB;
-                    if(contains(firstB,e)) followX+= follow(rule.extended());
-                }
-                if(rule.tokens.last()==X) followX+= follow(rule.extended()); //R → a*X: add Follow(R) to Follow(X)
+        array<word> followX;
+        if(X=="0S-1"_) followX+= "$"_;
+        else if(contains(terminal,X)) {}
+        else for(const Rule& rule: rules) {
+            int i = indexOf(rule.tokens, X);
+            if(i<0) continue;
+            if(i+1<rule.size()) { //R → a*Xb: add First(b) to Follow(X)
+                auto firstB = first(rule[i+1]);
+                followX+= firstB;
+                if(contains(firstB,e)) followX+= follow(rule.extended());
             }
+            if(rule.tokens.last()==X) followX+= follow(rule.extended()); //R → a*X: add Follow(R) to Follow(X)
         }
-        return copy(followX);
+        return followX;
     }
 
 
@@ -189,15 +184,15 @@ struct Parser : Application {
         }
         rules = move(extended);
 
-        /// Merges rules with same original rule and end state (lazily compute follow (and thus first) sets)
-        followSets["0S-1"_]+= "$"_;
+        /// Compute follow sets before merging
+        for(uint i=1; i<rules.size(); i++) { Rule& a = rules[i]; a.followSet = follow(a.extended()); }
+
+        /// Merges rules with same original rule and end state
         for(uint i=0; i<rules.size(); i++) { Rule& a = rules[i];
-            a.followSet = follow(a.extended());
             for(uint j=0; j<i; j++) { const Rule& b = rules[j];
                 if(a.original == b.original && a.end==b.end) {
-                    a.followSet+= follow(b.extended()); // merge follow sets
-                    //log("merge",a,b);
-                    rules.removeAt(i), i--;
+                    a.followSet+= b.followSet; // merge follow sets
+                    rules.removeAt(j), i--;
                     break;
                 }
             }
@@ -235,21 +230,19 @@ struct Parser : Application {
         array<int> stack; stack<< 0;
         array<int> output;
         for(int i=0;;) {
-            //log("Stack: ",stack," Input: ",slice(input,0,i),"|",slice(input,i));
             if(!contains(terminal,input[i])) { log("Invalid",input[i]); return; }
             const map<word, int>& transitions = states[stack.last()].transitions;
             if(!transitions.contains(input[i])) { log("Expected {",transitions.keys,"} at '",slice(input,0,i),"|",slice(input,i)); return; }
             int action = transitions.at(input[i]);
-            if(action>0) { log("shift",action,states[action].items);
+            if(action>0) { //log(input[i],"shift",action,states[action].items,"\t",stack);
                 i++;
                 stack << action;
             }
-            else if(action<0) { //log("reduce",-action);
-                const Rule& rule = rules[-action];
+            else if(action<0) { //log(input[i],"reduce", -action, rules[-action],"\t",stack);
                 output << -action;
-                log(rule);
-                stack.shrink(stack.size() - rule.size());
-                stack<< states[stack.last()].transitions.at(rule.symbol);
+                stack.shrink(stack.size() - rules[-action].size());
+                //log("goto",stack.last(),rules[-action].symbol,states[stack.last()].transitions.at(rules[-action].symbol));
+                stack<< states[stack.last()].transitions.at(rules[-action].symbol);
             } else break;
         }
 

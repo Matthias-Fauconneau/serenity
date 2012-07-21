@@ -16,7 +16,6 @@
 #define packed __attribute((packed))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
-#define generic template<class T>
 
 /// Move
 template<typename T> struct remove_reference { typedef T type; };

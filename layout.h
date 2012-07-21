@@ -85,7 +85,7 @@ struct Horizontal : virtual Linear {
 };
 /// Vertical divide vertical space between contained widgets
 struct Vertical : virtual Linear{
-    int2 xy(int2 xy) override { return {xy.y,xy.x}; }
+    int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };
 
 /// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)

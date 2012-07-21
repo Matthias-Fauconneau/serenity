@@ -1,3 +1,4 @@
+parser: debug, EBNF (|[]*+), parse (Arithmetic, URL, XML/HTML, Clay?), precedence/associativity?, MLR?, LR(k)?, GLR
 debug feeds
 font: kerning, subpixel position, hinting
 desktop: text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf

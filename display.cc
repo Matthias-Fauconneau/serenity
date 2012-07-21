@@ -1,10 +1,10 @@
 #include "display.h"
 #include "linux.h"
+#include "array.cc"
+#include "vector.cc"
+vector(xy,int,2)
 
 /// Clip
-
-#include "array.cc"
-Array_Copy(Rect)
 
 array<Rect> clipStack;
 Rect currentClip=Rect(int2(0,0));

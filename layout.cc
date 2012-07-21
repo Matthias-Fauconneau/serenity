@@ -8,7 +8,7 @@ template struct array<Widget*>;
 
 bool Layout::mouseEvent(int2 position, Event event, Button button) {
     for(uint i=0;i<count();i++) { Widget& child=at(i);
-        if(int2(position >= child.position && position <= child.position+child.size)) {
+        if(position >= child.position && position <= child.position+child.size) {
             if(child.mouseEvent(position-child.position,event,button)) return true;
         }
     }
@@ -113,7 +113,7 @@ void UniformGrid::update() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
 
     int2 size(Widget::size.x/w,  Widget::size.y/h);
-    int2 margin = (Widget::size - int2(w,h)*size) / int2(2);
+    int2 margin = (Widget::size - int2(w,h)*size) / 2;
     uint i=0; for(uint y=0;y<h;y++) for(uint x=0;x<w;x++,i++) { if(i>=count()) return; Widget& child=at(i);
         child.position = margin + int2(x,y)*size; child.size=size;
     }

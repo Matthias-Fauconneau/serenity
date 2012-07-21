@@ -44,7 +44,7 @@ Image<byte4> decodeICO(const array<byte>& file) {
     assert(source,size);
     ubyte* src=(ubyte*)source.data();
     if(header.depth==32) copy((ubyte*)image.data,src,size);
-    if(header.depth==24) for(uint i=0;i<w*h;src+=3) image.data[i++] = {src[0],src[1],src[2],255};
+    if(header.depth==24) for(uint i=0;i<w*h;src+=3) image.data[i++] = byte4(src[0],src[1],src[2],255);
     if(header.depth==8) for(uint i=0;i<w*h;src++) image.data[i++] = palette[*src];
     if(header.depth==4) {
         assert(w%8==0); //TODO: pad

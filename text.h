@@ -16,8 +16,8 @@ struct Text : Widget {
     Text(string&& text=string(), int size=16, ubyte opacity=255, int wrap=0);
     Text(Text&&)=default;
 
-    void setText(string&& text) { this->text=move(text); textSize={0,0}; }
-    void setSize(int size) { this->size=size; textSize={0,0}; }
+    void setText(string&& text) { this->text=move(text); textSize=int2(0,0); }
+    void setSize(int size) { this->size=size; textSize=int2(0,0); }
 
     /// Displayed text
     string text;

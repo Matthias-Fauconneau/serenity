@@ -26,7 +26,7 @@ struct Widget {
     int2 size; /// size of the widget
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint() { return {0,0}; }
+    virtual int2 sizeHint() { return int2(0,0); }
     /// Notify objects to process \a position,\a size or derived member changes
     virtual void update() {}
 

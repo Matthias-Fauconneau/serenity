@@ -188,9 +188,9 @@ void trace(int skip) {
     static bool recurse; if(recurse) {log("Debugger error");return;} recurse=true;
     void* stack[8] = {0,0,0,0,0,0,0,0};
     stack[0] = __builtin_return_address(0);
-#define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i);
-    bra(1) bra(2) bra(3) bra(4) bra(5) bra(6) bra(7)
-            for(int i=7;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"    \t"_+s.function); }
+#define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i)
+    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);
+    for(int i=7;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
     recurse=false;
 }
 

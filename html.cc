@@ -1,7 +1,5 @@
 #include "html.h"
-
-template struct Array<ImageView>;
-template struct HList<ImageView>;
+#include "array.cc"
 
 ImageLoader::ImageLoader(const URL& url, Image<byte4>* target, delegate<void()> imageLoaded, int2 size, uint maximumAge)
     : target(target), imageLoaded(imageLoaded), size(size) {
@@ -117,14 +115,14 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
     else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; }//wikipedia [edit]
     else if(contains(textElement,e.name)) { for(const Element& c: e.children) layout(url, c); } // Unhandled format tags
     else if(contains(ignoreElement,e.name)) { return; } // Ignored elements
-    else if(!contains(e.name,':')) warn("layout: Unknown HTML tag",e.name);
+    else if(!contains<byte>(e.name,':')) warn("layout: Unknown HTML tag",e.name);
 }
 void HTML::flushText() {
     string paragraph = simplify(trim(text));
     if(!paragraph) return;
     Text* textLayout = new Text(move(paragraph),16,255, 640 /*60 characters*/);
     textLayout->linkActivated = delegate<void(const ref<byte>&)>(this, &HTML::go);
-    VBox::append(textLayout);
+    VBox::operator<<(textLayout);
     text.clear();
 }
 void HTML::flushImages() {
@@ -140,7 +138,7 @@ void HTML::flushImages() {
             *list << ImageView();
             new ImageLoader(images[i], &(*list).last().image, contentChanged);
         }
-        VBox::append( list );
+        VBox::operator<<(list);
     }
     images.clear();
 }

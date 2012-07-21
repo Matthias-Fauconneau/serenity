@@ -1,8 +1,7 @@
 #include "xml.h"
 #include "string.h"
-
+#include "utf8.h"
 #include "array.cc"
-Array(Element)
 
 static Element parse(array<byte>&& document, bool html) {
     assert(document);

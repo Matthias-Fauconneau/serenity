@@ -1,5 +1,5 @@
-(x*x)+(x*x)
-#x*(x+x)*x
+x*(x+x)*x
+#(x*x)+(x*x)
 S: E
 E: E + T
 E: T

@@ -1,5 +1,5 @@
 #pragma once
-#include "core.h"
+#include "string.h"
 
 /// utf8_iterator is used to iterate UTF-8 encoded strings
 struct utf8_iterator {

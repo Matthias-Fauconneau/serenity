@@ -1,11 +1,11 @@
 #include "time.h"
 #include "linux.h"
 #include "stream.h"
+#include "array.cc"
 
 enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
-//long realTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
-//long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000+ts.tv_nsec/1000; }
+long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
 
 template<class T> inline bool inRange(T min, T x, T max) { return x>=min && x<=max; }
 void Date::invariant() {

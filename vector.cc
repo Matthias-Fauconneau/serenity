@@ -1,4 +1,3 @@
-#if 0
 #include "vector.h"
 #include "string.h"
 
@@ -54,4 +53,3 @@ generic string str(vector v) {
 #define vector(V,T,N) \
     uvector(V,T,N) \
     template vector<V,T,N> abs(vector<V,T,N> v);
-#endif

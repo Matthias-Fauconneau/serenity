@@ -4,8 +4,6 @@
 
 /// Returns Unix real-time in seconds
 long currentTime();
-/// Returns Unix real-time in milliseconds
-long realTime();
 /// Returns CPU timestamp in microseconds
 long cpuTime();
 

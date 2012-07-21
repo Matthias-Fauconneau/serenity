@@ -2,6 +2,7 @@
 #include "display.h"
 #include "widget.h"
 #include "linux.h"
+#include "array.cc"
 
 struct input_event { long sec,usec; uint16 type,code; int32 value; };
 enum { EV_SYN, EV_KEY, EV_REL, EV_ABS };

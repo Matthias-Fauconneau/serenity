@@ -1,9 +1,6 @@
 #include "map.h"
+#include "time.h"
 #include "array.cc"
-Array_Copy_Compare_Sort(void*)
-
-#include <time.h>
-static inline long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000+ts.tv_nsec/1000; }
 
 static bool trace = 0;
 static int untrace;

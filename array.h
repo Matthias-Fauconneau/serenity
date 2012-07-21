@@ -113,6 +113,7 @@ explicit array(uint capacity) { reserve(capacity); }
     T* end() { return (T*)data()+size(); }
 };
 
+#define generic template<class T>
 #define array array<T>
 
 generic array& operator <<(array& a, T&& v);
@@ -190,4 +191,5 @@ generic inline bool  array::operator ==(const ref<T>& r) const { return ::operat
 generic int indexOf(const array& a, const T& value) { return indexOf(ref<T>(a),value); }
 generic bool contains(const array& a, const T& value) { return contains(ref<T>(a),value); }
 
+#undef generic
 #undef array

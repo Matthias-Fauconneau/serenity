@@ -3,6 +3,7 @@
 #include "memory.h"
 inline void* operator new(size_t, void* p) { return p; } //placement new
 
+#define generic template<class T>
 #define array array<T>
 
 generic void array::reserve(uint capacity) {
