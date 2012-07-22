@@ -40,7 +40,7 @@ struct Item {
 };
 bool operator ==(const Item& a, const Item& b) { return a.ruleIndex==b.ruleIndex && a.dot == b.dot; }
 string str(const Item& item) {
-    assert(item.dot<=item.size());
+    assert(item.dot<=item.size(),item.dot,item.size(),item.rule());
     return str(item.rule().symbol)+" -> "_+str(slice(item.rule().tokens, 0, item.dot))+"  ."_+str(slice<word>(item.rule().tokens, item.dot));
 }
 

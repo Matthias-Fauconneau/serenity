@@ -1,6 +1,7 @@
 #include "file.h"
 #include "linux.h"
 #include "debug.h"
+#include "array.cc"
 
 struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
               uint64 size; uint blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
@@ -50,7 +51,7 @@ array<byte> readFile(const ref<byte>& path, int at) {
 Map mapFile(const ref<byte>& path, int at) { int fd=openFile(path,at); Map map=mapFile(fd); close(fd); return map; }
 Map mapFile(int fd) {
     struct stat sb; fstat(fd, &sb);
-    const byte* data = (byte*)mmap(0,(size_t)sb.size,PROT_READ,MAP_PRIVATE,fd,0);
+    const byte* data = (byte*)mmap(0,sb.size,PROT_READ,MAP_PRIVATE,fd,0);
     assert(data);
     return Map(data,(int)sb.size);
 }
@@ -58,7 +59,7 @@ Map::~Map() { if(data) munmap((void*)data,size); }
 
 void writeFile(const ref<byte>& path, const array<byte>& content, int at, bool overwrite) {
     int fd = createFile(path,at,overwrite);
-    uint unused wrote = write(fd,content.data(),(size_t)content.size());
+    uint unused wrote = write(fd,content.data(),content.size());
     assert(wrote==content.size());
     close(fd);
 }

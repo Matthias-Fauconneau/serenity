@@ -18,12 +18,13 @@ byte* allocate_(int size) {
     return buffer;
 }
 byte* reallocate_(byte* buffer, int size, int need) {
-    if(buffer+size==heapEnd) { allocate_(need-size); return buffer; }
+    //if(buffer+size==heapEnd) { allocate_(need-size); return buffer; }
     byte* new_buffer = (byte*)allocate_(need);
     copy(new_buffer, (byte*)buffer, size);
+    unallocate_(buffer,size);
     return new_buffer;
 }
-void unallocate_(byte* buffer, int size) {
-    if(buffer+size==heapEnd) heapEnd=buffer; //FIXME: freeing only last allocation
+void unallocate_(byte* unused buffer, int unused size) {
+    //if(buffer+size==heapEnd) heapEnd=buffer; //FIXME: freeing only last allocation
     //TODO: add to free list
 }

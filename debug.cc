@@ -2,6 +2,7 @@
 #include "file.h"
 #include "stream.h"
 #include "linux.h"
+#include "array.cc"
 
 const char* errno[35] = {"OK",
     "PERM","NOENT","SRCH","INTR","IO","NXIO","2BIG","NOEXEC","BADF","CHILD","AGAIN","NOMEM","ACCES","FAULT","NOTBLK","BUSY","EXIST",
@@ -50,6 +51,7 @@ string demangle(TextStream& s) {
     else if(s.match('x')) r<<"int64"_;
     else if(s.match('y')) r<<"uint64"_;
     else if(s.match('A')) { r<<"[]"_; s.number(); s.match('_'); }
+    else if(s.match("Tv"_)) { r<<"thunk "_; s.number(); s.match('_'); if(s.match("n"_)) { s.number(); s.match('_'); r<<demangle(s); } }
     else if(s.match('T')) { r<<'T'; s.number(); s.match('_'); }
     else if(s.match("St"_)) r<<"std"_;
     else if(s.match('S')) { r<<'S'; s.number(); s.match('_'); }
@@ -62,36 +64,34 @@ string demangle(TextStream& s) {
         }
         r<<'<'<<join(args,", "_)<<'>';
     } else if(s.match('Z')) {
-        bool const_method =false;
-        if(s.match('N')) {
-            array<string> list;
-            if(s.match('K')) const_method=true;
-            while(s && !s.match('E')) {
-                if(s.match("C1"_)) list << copy(list.first()); //constructor
-                else if(s.match("C2"_)) list << copy(list.first()); //constructor
-                else if(s.match("D1"_)) list << "~"_+copy(list.first()); //destructor
-                else if(s.match("D2"_)) list << "~"_+copy(list.first()); //destructor
-                else if(s.match("eq"_)) list << string("operator =="_);
-                else if(s.match("ix"_)) list << string("operator []"_);
-                else if(s.match("cl"_)) list << string("operator ()"_);
-                else if(s.match("ls"_)) list << string("operator <<"_);
-                else if(s.match("cv"_)) list << string("operator "_ + demangle(s));
-                else if((l=s.number())!=-1) {
-                    list << string(s.read(l)); //class/member
-                    if(s.peek()=='I') list.last()<< demangle(s);
-                } else if(s.peek()=='I') list.last()<< demangle(s);
-                else error('N',r,string(s.untilEnd()),string(move(s.buffer)));
-            }
-            r<< join(list,"::"_);
-        } else if((l=s.number())!=-1) {
-            r<< s.read(l); //function
-            if(s.peek()=='I') r<< demangle(s);
-        }
+        r<< demangle(s);
         array<string> args;
         while(s && !s.match('E')) args << demangle(s);
         r<< '(' << join(args,", "_) << ')';
-        if(const_method) r<< " const"_;
     } else if(s.match("_0"_)) {
+    } else if(s.match('N')) {
+        array<string> list;
+        bool const_method =false;
+        if(s.match('K')) const_method=true;
+        while(s && !s.match('E')) {
+            if(s.match("C1"_)) list << copy(list.first()); //constructor
+            else if(s.match("C2"_)) list << copy(list.first()); //constructor
+            else if(s.match("D1"_)) list << "~"_+copy(list.first()); //destructor
+            else if(s.match("D2"_)) list << "~"_+copy(list.first()); //destructor
+            else if(s.match("eq"_)) list << string("operator =="_);
+            else if(s.match("ix"_)) list << string("operator []"_);
+            else if(s.match("cl"_)) list << string("operator ()"_);
+            else if(s.match("ls"_)) list << string("operator <<"_);
+            else if(s.match("cv"_)) list << string("operator "_ + demangle(s));
+            else if(s.match("St"_)) list << string("std"_);
+            else if((l=s.number())!=-1) {
+                list << string(s.read(l)); //class/member
+                if(s.peek()=='I') list.last()<< demangle(s);
+            } else if(s.peek()=='I') list.last()<< demangle(s);
+            else error('N',r,string(s.untilEnd()),string(move(s.buffer)));
+        }
+        r<< join(list,"::"_);
+        if(const_method) r<< " const"_;
     } else if((l=s.number())!=-1) {
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);

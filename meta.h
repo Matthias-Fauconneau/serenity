@@ -11,7 +11,6 @@ template<typename T> struct is_lvalue_reference<T&> : public true_type { };
 template<typename> struct is_rvalue_reference : public false_type { };
 template<typename T> struct is_rvalue_reference<T&&> : public true_type { };
 #define is_lvalue_reference(T) is_lvalue_reference<T>::value
-
 template<class T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
 template<class T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
 
@@ -62,7 +61,7 @@ template<typename T> struct is_member_pointer
         : public integral_constant<bool, (is_member_pointer_helper<typename remove_const<T>::type>::value)> {};
 
 template<typename> struct is_array : public false_type {};
-template<typename T, size_t Size> struct is_array<T[Size]> : public true_type {};
+template<typename T, uint Size> struct is_array<T[Size]> : public true_type {};
 template<typename T> struct is_array<T[]> : public true_type {};
 template<typename From, typename To, bool = or_<is_void<From>, is_function<To>, is_array<To> >::value>
 struct is_convertible_helper { static constexpr bool value = is_void<To>::value; };

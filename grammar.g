@@ -1,4 +1,4 @@
-S: Input Rule*
+Grammar: Input Rule*
 Input: [^\n] \n
 Rule: Id : E*  \n
 E: Id | Token | '(' E ')' |  E '|' E | E '*' | E '+' | E '?'

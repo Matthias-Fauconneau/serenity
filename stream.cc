@@ -31,17 +31,31 @@ ref<byte> TextStream::whileNo(const ref<byte>& any) {
     int start=index; while(available(1) && matchNo(any)){} return slice(start,index-start);
 }
 
-ref<byte> TextStream::until(char key) { for(int start=index;;) if(next() == key) return slice(start,index-1-start); }
+ref<byte> TextStream::until(char key) {
+    int start=index, end=index;
+    for(;;advance(1)) {
+        if(!available(1)) { end=index; break; }
+        if(peek() == key) { end=index; advance(1); break; }
+    }
+    return slice(start, end-start);
+}
+
 ref<byte> TextStream::until(const ref<byte>& key) {
     int start=index, end=index;
-    while(available(key.size)>=key.size) { if(get(key.size) == key) { advance(key.size); break; } end=index; }
-    return slice(start, end);
+    for(;;advance(1)) {
+        if(available(key.size)<key.size) { end=index; break; }
+         if(get(key.size) == key) { end=index; advance(key.size); break; }
+    }
+    return slice(start, end-start);
 }
 
 ref<byte> TextStream::untilAny(const ref<byte>& any) {
     int start=index, end=index;
-    while(available(1) && !matchAny(any)) end=index;
-    return slice(start,end);
+    for(;;advance(1)) {
+        if(!available(1)) { end=index; break; }
+        if(matchAny(any)) { end=index-1; break; }
+    }
+    return slice(start,end-start);
 }
 
 ref<byte> TextStream::untilEnd() { uint size=available(-1); return read(size); }
@@ -55,28 +69,27 @@ char TextStream::character() {
 }
 
 ref<byte> TextStream::word() {
-    int start=index,end=index;
-    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z')) break; advance(1); end=index; }
-    return slice(start,end);
+    int start=index;
+    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z')) break; advance(1); }
+    return slice(start,index-start);
 }
 
 ref<byte> TextStream::xmlIdentifier() {
-    string identifier;
+    int start=index;
     for(;available(1);) {
         byte c=peek();
         if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c==':'||c=='-'||c=='_')) break;
-        identifier<<c;
         advance(1);
     }
-    return identifier;
+    return slice(start,index-start);
 }
 
 int TextStream::number(int base) {
-    string number;
+    uint start=index;
     for(;available(1);) {
         byte c=peek();
-        if((c>='0'&&c<='9')||(base==16&&((c>='a'&&c<='f')||(c>='A'&&c<='F')))) number<<c, advance(1); else break;
+        if((c>='0'&&c<='9')||(base==16&&((c>='a'&&c<='f')||(c>='A'&&c<='F')))) advance(1); else break;
     }
-    if(!number) return -1;
-    return toInteger(number, base);
+    if(start==index) return -1;
+    return toInteger(slice(start,index-start), base);
 }

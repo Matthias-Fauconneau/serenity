@@ -1,7 +1,6 @@
 #include "array.h"
 #include "debug.h"
 #include "memory.h"
-inline void* operator new(size_t, void* p) { return p; } //placement new
 
 #define generic template<class T>
 generic array<T>::array(ref<T>&& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(move((T&)ref[i]));}

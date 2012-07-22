@@ -5,22 +5,22 @@ void unallocate_(byte* buffer, int size);
 namespace std {
 template<class T> struct initializer_list {
     const T*  data;
-    size_t size;
-    constexpr initializer_list() : data(0), size(0) {}
-    constexpr initializer_list(const T* data, size_t size) : data(data), size(size) {}
+    uint size;
+    //constexpr initializer_list() : data(0), size(0) {}
+    constexpr initializer_list(const T* data, uint size) : data(data), size(size) {}
     constexpr const T* begin() const { return data; }
     constexpr const T* end() const { return data+size; }
     const T& operator [](uint i) const { assert_(i<size); return data[i]; }
     explicit operator bool() const { return size; }
 };
 }
-/// \a ref is a const typed bounded memory reference
-template<class T> using ref = std::initializer_list<T>; //for operations
+/// \a ref is a const typed bounded memory reference (i.e fat pointer)
+template<class T> using ref = std::initializer_list<T>;
 
 /// \a array is a typed bounded [growable] memory reference (static, stack, heap, mmap...)
 /// \note array use move semantics to avoid reference counting when managing heap reference
 /// \note array transparently store small arrays inline (<=15bytes)
-/// \note #include "array.cc" to compile arrays or method definitions for custom types
+/// \note This header only defines basic const container methods, #include "array.cc" to define advanced methods
 template<class T> struct array {
     int8 tag = -1; //0: empty, >0: inline, -1 = not owned (reference), -2 = owned (heap)
     struct {

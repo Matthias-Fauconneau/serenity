@@ -96,7 +96,7 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     for(int i=items.size()-1;i>=0;i--) { //oldest first
         *this<< move(items[i]);
         Entry& item = last(); //reference shouldn't move while loading
-        item.content = new Scroll<HTML>;
+        item.content = &alloc< Scroll<HTML> >();
         //item.content->go(item.link); //preload TODO: only when idle
     }
     contentChanged.emit();
@@ -104,7 +104,7 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
 
 void Feeds::getFavicon(const URL& url, array<byte>&& document) {
     Element page = parseHTML(move(document));
-    ref<byte> icon;
+    ref<byte> icon=""_;
     page.xpath("html/head/link"_,
                [&icon](const Element& e){ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
     if(!icon) icon="/favicon.ico"_;
@@ -113,7 +113,7 @@ void Feeds::getFavicon(const URL& url, array<byte>&& document) {
     }
     for(Entry& entry: *this) {
         if(find(entry.link,url.host)) {
-            new ImageLoader(url.relative(icon), &entry.get<Icon>().image, contentChanged, int2(16,16), 7*24*60*60);
+            alloc<ImageLoader>(url.relative(icon), &entry.get<Icon>().image, contentChanged, int2(16,16), 7*24*60*60);
             break; //only header
         }
     }
@@ -133,7 +133,7 @@ void Feeds::activeChanged(int index) {
 void Feeds::itemPressed(int index) {
     Entry& entry = array::at(index);
     if(content) delete content; //release read items
-    if(!entry.content) entry.content = new Scroll<HTML>;
+    if(!entry.content) entry.content = &alloc< Scroll<HTML> >();
     content = entry.content; entry.content=0; //move preloaded content to window
     content->contentChanged.disconnect(&window);
     window.widget = &content->parent();

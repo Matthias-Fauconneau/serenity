@@ -120,9 +120,9 @@ void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connecti
 void HTML::flushText() {
     string paragraph = simplify(trim(text));
     if(!paragraph) return;
-    Text* textLayout = new Text(move(paragraph),16,255, 640 /*60 characters*/);
-    textLayout->linkActivated = delegate<void(const ref<byte>&)>(this, &HTML::go);
-    VBox::operator<<(textLayout);
+    Text& textLayout = alloc<Text>(move(paragraph),16,255, 640 /*60 characters*/);
+    textLayout.linkActivated = delegate<void(const ref<byte>&)>(this, &HTML::go);
+    VBox::operator<<(&textLayout);
     text.clear();
 }
 void HTML::flushImages() {
@@ -132,13 +132,13 @@ void HTML::flushImages() {
         if(w*h>=images.size()) break; h++;
     }
     for(uint y=0,i=0;y<h;y++) {
-        HList<ImageView>* list = new HList<ImageView>;
-        list->reserve(w);
+        HList<ImageView>& list = alloc< HList<ImageView> >();
+        list.reserve(w);
         for(uint x=0;x<w && i<images.size();x++,i++) {
-            *list << ImageView();
-            new ImageLoader(images[i], &(*list).last().image, contentChanged);
+            list << ImageView();
+            alloc<ImageLoader>(images[i], &list.last().image, contentChanged);
         }
-        VBox::operator<<(list);
+        VBox::operator<<(&list);
     }
     images.clear();
 }

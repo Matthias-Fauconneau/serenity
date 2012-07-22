@@ -5,6 +5,7 @@
 //#include "calendar.h"
 #include "feeds.h"
 //#include "popup.h"
+#include "array.cc"
 
 ICON(shutdown);
 

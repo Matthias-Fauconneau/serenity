@@ -33,7 +33,8 @@ extern "C" uint __umodsi3(uint num, uint den) {
 #endif
 
 #include "memory.h"
-void* operator new(uint size) { return allocate_(size); }
+#include "debug.h"
+//void* operator new(uint size) { trace(); log(size); return allocate_(size); }
 void operator delete(void*) { /*TODO*/ }
 extern "C" void __aeabi_memset(byte* dst, uint size, byte value) { clear(dst,size,value); }
 extern "C" void __aeabi_memcpy(byte* dst, byte* src, uint size) { copy(dst,src,size); }

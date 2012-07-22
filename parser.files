@@ -13,8 +13,8 @@ string.h
 string.cc
 process.h
 process.cc
+parser.h
 parser.cc
-lalr.g
 math.g
 grammar.g
-parser.h
+url.g

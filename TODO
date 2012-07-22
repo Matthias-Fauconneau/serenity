@@ -1,9 +1,9 @@
-parser: EBNF (|[]*+), parse (Arithmetic, URL, XML/HTML, Clay?), precedence/associativity?, MLR?, LR(k)?, GLR, DFA
+parser: parse (Arithmetic, URL, XML/HTML, D/C++/Clay?), precedence/associativity?, MLR?, LR(k)?, GLR, DFA
 debug feeds
 font: kerning, subpixel position, hinting
 desktop: text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen
-IDE: parser, build driver, debugger, git, dependency graph with (code size,build time), static analyzer, profiler, interpreter, compiler
+IDE: parser, build driver, dependency graph with (code size,build time), git, debugger, static analyzer, profiler, gc?, interpreter, compiler
 
 clang: cannot compile initializer lists with expression
 gcc: cannot compile non scalar ReadOperator, different _start layout, stacktrace, slow

@@ -116,10 +116,10 @@ URL::URL(const ref<byte> &url) {
     TextStream s = string(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
-    auto domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
+    ref<byte> domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
     host = string(section(domain,'@',-2,-1));
-    if(contains<byte>(domain,'@')) authorization = base64(section(domain,'@'));
-    if(!contains<byte>(host,'.')) { path=move(host); path<<"/"_; }
+    if(contains(domain,byte('@'))) authorization = base64(section(domain,'@'));
+    if(!contains(host,byte('.'))) { path=move(host); path<<"/"_; }
     path << s.until('#');
     fragment = string(s.untilEnd());
 }
@@ -135,8 +135,8 @@ URL URL::relative(URL&& url) const {
     }
     if(!url.host) url.host=copy(host);
     if(!contains<byte>(url.host,'.') || url.host=="."_) error(host,path,url.host,url.path);
-    if(startsWith(url.path,"."_)) url.path=slice(url.path,1);
-    while(startsWith(url.path,"/"_)) url.path=slice(url.path,1);
+    if(startsWith(url.path,"."_)) url.path=string(slice(url.path,1));
+    while(startsWith(url.path,"/"_)) url.path=string(slice(url.path,1));
     return move(url);
 }
 string str(const URL& url) {
@@ -279,5 +279,5 @@ void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, i
         }
         headers<< "If-Modified-Since: "_+str(date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
-    new HTTP(url,handler,move(headers));
+    alloc<HTTP>(url,handler,move(headers));
 }

@@ -48,11 +48,6 @@ typedef unsigned int uint;
 typedef unsigned long ulong;
 typedef signed long long int64;
 typedef unsigned long long uint64;
-#if __WORDSIZE == 64
-typedef unsigned long size_t;
-#else
-typedef unsigned int size_t;
-#endif
 
 /// Basic operations
 template<class T> inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }

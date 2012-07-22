@@ -31,6 +31,7 @@ font.h
 font.cc
 raster.cc
 raster.h
+widget.h
 interface.h
 interface.cc
 layout.h

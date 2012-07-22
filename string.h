@@ -23,7 +23,7 @@ template<class A> inline cat< cat<A> > operator +(const cat<A>& a, const ref<byt
 inline cat< ref<byte> > operator +(const ref<byte>& a, const ref<byte>& b) { return i({a,b}); }
 
 /// Constructs string literals
-inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return ref<byte>((byte*)data,size); }
+inline constexpr ref<byte> operator "" _(const char* data, uint size) { return ref<byte>((byte*)data,size); }
 
 /// Lexically compare strings
 bool operator >(const ref<byte>& a, const ref<byte>& b);
@@ -59,7 +59,7 @@ ref<byte> section(const ref<byte>& str, byte separator, int start=0, int end=1, 
 array<string> split(const ref<byte>& str, byte separator=' ');
 
 /// Joins \a list into a single string with each element separated by \a separator
-string join(const array<string>& list, const ref<byte>& separator);
+string join(const ref<string>& list, const ref<byte>& separator);
 
 /// Replaces every occurrence of the string \a before with the string \a after
 array<byte> replace(const ref<byte>& s, const ref<byte>& before, const ref<byte>& after);

@@ -42,7 +42,7 @@ Element::Element(TextStream& s, bool html) {
         if(s.match('=')) {
             s.skip();
             if(s.match('"')) value=string(s.until('"')); //FIXME: escape
-            else if(s.match(''')) value=string(s.until(''')); //FIXME: escape
+            else if(s.match('\'')) value=string(s.until('\'')); //FIXME: escape
             else { value=string(s.untilAny(" \t\n>"_)); if(s.buffer[s.index-1]=='>') s.index--; }
             s.match("\""_); //duplicate "
         }
@@ -63,7 +63,7 @@ Element::Element(TextStream& s, bool html) {
         //if(s.available(4)<4) { warn("Expecting","</"_+name+">"_,"got EOF"); return; } //warn unclosed tag
         if(s.available(4)<4) {  return; } //ignore unclosed tag
         if(s.match("<![CDATA["_)) {
-            string content=simplify(unescape(s.until("]]>"_)));
+            string content=string(s.until("]]>"_));
             if(content) children << Element(move(content));
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
@@ -92,13 +92,11 @@ const Element& Element::operator()(const ref<byte>& name) const {
     error("children", name, "not found in", *this);
 }
 
-template struct function<void(const Element&)>;
 void Element::visit(const function<void(const Element&)>& visitor) const {
     for(const Element& e: children) e.visit(visitor);
     visitor(*this);
 }
 
-template struct function<bool(const Element&)>;
 void Element::mayVisit(const function<bool(const Element&)>& visitor) const {
     if(visitor(*this)) for(const Element& e: children) e.mayVisit(visitor);
 }

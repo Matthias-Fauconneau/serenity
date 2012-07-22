@@ -88,9 +88,9 @@ array<string> split(const ref<byte>& str, byte sep) {
     return list;
 }
 
-string join(const array<string>& list, const ref<byte>& separator) {
+string join(const ref<string>& list, const ref<byte>& separator) {
     string str;
-    for(uint i=0;i<list.size();i++) { str<<list[i]; if(i<list.size()-1) str<<separator; }
+    for(uint i=0;i<list.size;i++) { str<< list[i]; if(i<list.size-1) str<<separator; }
     return str;
 }
 
