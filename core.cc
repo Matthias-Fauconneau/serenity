@@ -18,7 +18,11 @@ extern "C" uint __aeabi_uidivmod(uint num, uint den) {
     register unused uint mod asm("r1") = num; //r1=mod
     return div; //r0=div
 }
-extern "C" uint __aeabi_uidiv(uint num, uint den) { return __aeabi_uidivmod(num,den); }
+extern "C" int __aeabi_uidiv(int num, uint den) {
+    if(den==2) return num>>1;
+    if(num<0) return -__aeabi_uidivmod(-num,den);
+    return __aeabi_uidivmod(num,den);
+}
 extern "C" uint __umodsi3(uint num, uint den) {
     assert_(den!=0);
     uint bit = 1;
@@ -33,8 +37,6 @@ extern "C" uint __umodsi3(uint num, uint den) {
 #endif
 
 #include "memory.h"
-#include "debug.h"
-//void* operator new(uint size) { trace(); log(size); return allocate_(size); }
 void operator delete(void*) { /*TODO*/ }
 extern "C" void __aeabi_memset(byte* dst, uint size, byte value) { clear(dst,size,value); }
 extern "C" void __aeabi_memcpy(byte* dst, byte* src, uint size) { copy(dst,src,size); }

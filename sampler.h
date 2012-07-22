@@ -9,7 +9,7 @@
 /// \note as static_array use static inheritance (to avoid code duplication), it cannot extend \a array small inline space.
 ///          \a array inline space will be wasted and \a array methods will use the \a array::buffer reference
 template<class T, int N> struct static_array : array<T> {
-    static_array(static_array&&)=delete; static_array operator=(static_array&&)=delete; //TODO
+    no_copy(static_array)
     static_array() { array<T>::tag=-2; array<T>::buffer=typename array<T>::Buffer((T*)buffer,0,N); }
     ubyte buffer[N*sizeof(T)];
 };

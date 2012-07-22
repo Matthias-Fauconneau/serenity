@@ -105,7 +105,7 @@ Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channel
     clear(mem,channelCount*memSize,0.f);
 }
 Resampler::operator bool() const { return kernel; }
-Resampler::~Resampler() { delete[] mem; mem=0; delete[] kernel; kernel=0; }
+Resampler::~Resampler() { unallocate(mem); mem=0; unallocate(kernel); kernel=0; }
 
 void Resampler::filter(const float* source, int *sourceSize, float* target, int *targetSize, bool mix) {
     int ilen=0, olen=0;

@@ -36,7 +36,7 @@ string demangle(TextStream& s, bool function=true) {
         else if(s.match('P')) pointer++;
         else break;
     }
-    int l;
+    uint l;
     if(s.match('v')) { if(pointer) r<<"void"_; }
     else if(s.match("C1"_)) r<< "this"_;
     else if(s.match("C2"_)) r<< "this"_;
@@ -90,7 +90,7 @@ string demangle(TextStream& s, bool function=true) {
         }
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
-    } else if((l=s.number())!=-1) {
+    } else if((l=uint(s.number()))!=uint(-1)) {
         assert(l<=s.available(l),l,r,string(s.untilEnd()),string(move(s.buffer)));
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
@@ -115,7 +115,7 @@ Symbol findNearestLine(void* find) {
     }
     Symbol symbol;
     for(DataStream& s = symtab;s.index<s.buffer.size();) {
-        const Sym& sym = s.read();
+        const Sym& sym = s.read<Sym>();
         if(find >= sym.value && find < sym.value+sym.size) {
             TextStream s(str(strtab+sym.name));
             symbol.function = s.match('_')&&s.peek()=='Z'? (s.buffer.size()>80?string("delegate"_) :demangle(s)) : string(s.untilEnd());
@@ -124,7 +124,7 @@ Symbol findNearestLine(void* find) {
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
         int start = s.index;
         struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; int8 line_base; ubyte line_range,opcode_base; } packed;
-        const CU& cu = s.read();
+        const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.peek()) s.untilNull();
         s.advance(1);

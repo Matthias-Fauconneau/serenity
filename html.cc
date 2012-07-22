@@ -12,7 +12,7 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
     if(size) *target = resize(image,size.x,size.y);
     else *target = move(image);
     imageLoaded();
-    delete this;
+    free(this);
 }
 
 static array<string> textElement, boldElement, ignoreElement;
@@ -144,6 +144,6 @@ void HTML::flushImages() {
 }
 
 void HTML::clear() {
-    for(Widget* w: *this) delete w;
+    for(Widget* w: *this) free(w);
     VBox::clear();
 }

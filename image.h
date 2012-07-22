@@ -22,7 +22,7 @@ template<class T> struct Image {
     Image(int width, int height) : data((T*)allocate_(sizeof(T)*width*height)), width(width), height(height), stride(width), own(true) {}
     Image(array<T>&& data, uint width, uint height);
 
-    ~Image(){ if(data && own) { delete data; data=0; } }
+    ~Image(){ if(data && own) { unallocate(data,sizeof(T)*width*height); data=0; } }
     explicit operator bool() const { return data; }
 
     T operator()(uint x, uint y) const {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }

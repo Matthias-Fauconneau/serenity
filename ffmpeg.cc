@@ -52,7 +52,7 @@ void AudioFile::read(int16* output, uint outputSize) {
                 output[i] = clip(-32768,int(input[i]*32768),32767); //copy/convert input buffer to output
             inputSize -= size; input += size*audioInput.channels; //update input buffer
             outputSize -= size; output += size*audioOutput.channels; //update output buffer
-            if(!inputSize && buffer) { delete[] buffer; buffer=0; } //free consumed buffer
+            if(!inputSize && buffer) { unallocate(buffer); buffer=0; } //free consumed buffer
             if(!outputSize) return; //output filled
         }
 
@@ -84,7 +84,7 @@ void AudioFile::read(int16* output, uint outputSize) {
             int in = inputSize, out = size;
             resampler.filter(input,&in,buffer,&out,false);
             assert(in == (int)inputSize,in,inputSize,out,size);
-            if(audio->sample_fmt != AV_SAMPLE_FMT_FLT) delete[] input;
+            if(audio->sample_fmt != AV_SAMPLE_FMT_FLT) unallocate(input);
             input = buffer; inputSize = out;
         }
     }

@@ -37,7 +37,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
             int unused e= check( ::connect(dns, &addr, sizeof(addr)) );
         }
         array<byte> query;
-        struct { uint16 id=swap16(currentTime()); uint16 flags=0; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
+        struct Header { uint16 id=swap16(currentTime()); uint16 flags=0; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
         for(TextStream s(copy(host));s;) { //QNAME
             string label = string(s.until('.'));
@@ -48,7 +48,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
         ::write(1,host+" "_);
         ::write(dns,query);
         DataStream s(readUpTo(dns,256), true);
-        header = s.read();
+        header = s.read<Header>();
         for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
         for(int i=0;i<swap16(header.an);i++) {
             for(ubyte n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } //skip name
@@ -159,7 +159,7 @@ string cacheFile(const URL& url) {
 
 HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, array<string>&& headers, string&& method)
     : url(str(url)), headers(move(headers)), method(move(method)), handler(handler) {
-    if(!connect(url.host, url.scheme)) { delete this; return; }
+    if(!connect(url.host, url.scheme)) { free(this); return; }
     registerPoll(i({fd, POLLIN|POLLOUT}));
 }
 void HTTP::request() {
@@ -173,7 +173,7 @@ void HTTP::header() {
     assert(state==Request);
     state=Header;
     // Status
-    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer, index); warn("No HTTP",url); state=Done; delete this; return; }
+    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer, index); warn("No HTTP",url); state=Done; free(this); return; }
     int status = toInteger(until(" "_));
     until("\r\n"_);
     if(status==200||status==301||status==302) {}
@@ -187,10 +187,10 @@ void HTTP::header() {
         return;
     } else if(status==404||status==408) {
         warn(status==404?"Not Found"_:"Request timeout"_,url);
-        state=Done; delete this; return;
+        state=Done; free(this); return;
     } else {
         log(until("\r\n\r\n"_)); warn("Unhandled status",status,"from",url);
-        state=Done; delete this; return;
+        state=Done; free(this); return;
     }
 
     // Headers
@@ -200,7 +200,7 @@ void HTTP::header() {
         ref<byte> value=until("\r\n"_);
         if(key=="Content-Length"_) {
             contentLength=toInteger(value);
-            if(contentLength==0) { state=Done; delete this; return; }
+            if(contentLength==0) { state=Done; free(this); return; }
         }
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
         else if((key=="Location"_ && (status==301||status==302)) || key=="Refresh"_) {
@@ -211,7 +211,7 @@ void HTTP::header() {
             redirect << file;
             buffer.clear(); index=0; contentLength=0; chunked=false; unregisterPoll(); disconnect(); state=Connect;
             url=move(next);
-            if(!connect(url.host, url.scheme)) delete this; else registerPoll(i({fd, POLLIN|POLLOUT}));
+            if(!connect(url.host, url.scheme)) free(this); else registerPoll(i({fd, POLLIN|POLLOUT}));
             return;
         } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }
@@ -219,9 +219,9 @@ void HTTP::header() {
 }
 void HTTP::event(pollfd poll) {
     assert(fd); assert(state>=Connect && state <=Handle);
-    if(poll.revents&POLLHUP) { log("Connection broken",url); state=Done; delete this; return; }
+    if(poll.revents&POLLHUP) { log("Connection broken",url); state=Done; free(this); return; }
     if(state == Connect) {
-        if(!poll.revents) { log("Connection timeout",url); state=Done; delete this; return; }
+        if(!poll.revents) { log("Connection timeout",url); state=Done; free(this); return; }
         fcntl(fd,F_SETFL,0);
         request();
         return;
@@ -245,7 +245,7 @@ void HTTP::event(pollfd poll) {
         }
     }
     if(state == Cache) {
-        if(!content) { log("Missing content",(string&)buffer); delete this; return; }
+        if(!content) { log("Missing content",(string&)buffer); free(this); return; }
         log("Downloaded",url,content.size()/1024,"KB");
 
         redirect << cacheFile(url);
@@ -258,7 +258,7 @@ void HTTP::event(pollfd poll) {
     if(state==Handle) {
         handler(url,move(content));
         state=Done;
-        delete this;
+        free(this);
         return;
     }
 }

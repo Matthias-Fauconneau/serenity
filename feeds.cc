@@ -11,7 +11,7 @@ ICON(network);
 
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
 Entry::Entry(string&& name, string&& link, Image<byte4>&& icon):Item(move(icon),move(name)),link(move(link)){}
-Entry::~Entry() { if(content) delete content; }
+Entry::~Entry() { if(content) free(content); }
 
 Feeds::Feeds() {
     window.localShortcut(Key::Escape).connect(&window, &Window::hide);
@@ -132,7 +132,7 @@ void Feeds::activeChanged(int index) {
 
 void Feeds::itemPressed(int index) {
     Entry& entry = array::at(index);
-    if(content) delete content; //release read items
+    if(content) free(content); //free read items
     if(!entry.content) entry.content = &alloc< Scroll<HTML> >();
     content = entry.content; entry.content=0; //move preloaded content to window
     //content->contentChanged.disconnect(&window);

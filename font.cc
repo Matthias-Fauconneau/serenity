@@ -26,7 +26,7 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
        s.advance(8+8+4*2+2+2+2); //created, modified, bbox[4], maxStyle, lowestRec, direction
        indexToLocFormat=s.read();
        // parameters for scale from design (FUnits) to device (.4 pixel)
-#define scale(p) ((size*(p)+round)>>scale)
+#define scale(p) ((size*int64(p)+round)>>scale)
 #define unscale(p) (((p)<<scale)/size)
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4;
        round = (1<<scale)/2; //round to nearest not down
@@ -95,12 +95,13 @@ void line(Image<int8>& raster, int2 p0, int2 p1) {
 }
 
 void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
-#if 1
-        int2 mid = (p0 + 2*p1 + p2)/4;
-        line(raster,p0,mid);
-        line(raster,mid,p2);
+#if 0
+    int2 mid = (p0 + 2*p1 + p2)/4;
+    line(raster,p0,mid);
+    line(raster,mid,p2);
 #else
-    const int N=2;
+    const int N=3;
+    int2 a = p0;
     for(int t=1;t<=N;t++) {
         int2 b = ((N-t)*(N-t)*p0 + 2*(N-t)*t*p1 + t*t*p2)/(N*N);
         line(raster,a,b);
@@ -111,8 +112,7 @@ void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
 
 Glyph Font::glyph(uint16 code) {
     // Lookup glyph in cache
-    assert(code<256);
-    Glyph& glyph = cache[code];
+    Glyph& glyph = code<256 ? cacheASCII[code] : cacheUnicode[code];
     if(glyph.image || glyph.advance) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
 
     // map unicode to glyf outline
@@ -120,15 +120,15 @@ Glyph Font::glyph(uint16 code) {
     glyph.advance = scale(swap16(hmtx[2*i]));
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[i]) : 2*swap16(((uint16*)loca)[i]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[i+1]) : 2*swap16(((uint16*)loca)[i+1]) ) - start;
-    DataStream s(array<byte>(glyf +start, length),true);
+    DataStream s(array<byte>(glyf +start, length), true);
     if(!s) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
 
     int16 numContours = s.read();
     int16 xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
-    xMin = scale(xMin); xMin=(xMin/16)*16; xMin=unscale(xMin); //round down to pixel
+    xMin = scale(xMin); if(xMin>0) xMin=(xMin/16)*16; else if(-xMax%16) xMax-=16-(-xMax%16); xMin=unscale(xMin); //round down to pixel
     //yMin = scale(yMin); yMin=(yMin/16)*16; yMin=unscale(yMin); //round down to pixel
-    xMax = scale(xMax); if(xMax%16) xMax+=16-xMax%16; xMax=unscale(xMax); //round up to pixel
-    yMax = scale(yMax); if(yMax%16) yMax+=16-yMax%16; yMax=unscale(yMax); //round up to pixel
+    xMax = scale(xMax); if(xMax<0) xMax=(xMax/16)*16; else /*if(xMax%16)*/ xMax+=16-xMax%16; xMax=unscale(xMax); //round up to pixel
+    yMax = scale(yMax); if(yMax<0) yMax=(yMax/16)*16; else if(yMax%16) yMax+=16-yMax%16; yMax=unscale(yMax); //round up to pixel
     if(numContours>0) {
         array<uint16> endPtsOfContours = s.read(numContours);
         int nofPoints = endPtsOfContours[numContours-1]+1;
@@ -143,15 +143,16 @@ Glyph Font::glyph(uint16 code) {
             flagsArray[i]=flags;
         }
 
-        int P_[2*nofPoints]; int2* P=(int2*)&P_;
+        int P_[2*nofPoints]; int2* P=(int2*)P_;
         {
             int16 last=-xMin;
             for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
                 if(flags.short_x) {
-                    if(flags.same_sign_x) last+= (uint8)s.read();
-                    else last-= (uint8)s.read();
+                    uint8 delta=s.read();
+                    if(flags.same_sign_x) last+=delta; else last-= delta;
                 } else if(!flags.same_sign_x) last+= (int16)s.read();
                 P[i].x= scale(last);
+                assert(P[i].x<32768);
             }
             last=-yMax;
             for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
@@ -175,7 +176,7 @@ Glyph Font::glyph(uint16 code) {
             else p=(P[last-1]+P[last])/2;
             for(int prev=last; i<=last; i++) {
                 if(flagsArray[prev].on_curve && flagsArray[i].on_curve) { line(raster, P[prev], P[i]); p=P[i]; } //on-on
-                else if(flagsArray[prev].on_curve && !flagsArray[i].on_curve) p=P[prev]; //on-off (drawn on next step (either on-off-on or on-off-off))
+                else if(flagsArray[prev].on_curve && !flagsArray[i].on_curve) { p=P[prev]; } //on-off (drawn on next step (either on-off-on or on-off-off))
                 else if(!flagsArray[prev].on_curve && flagsArray[i].on_curve) { curve(raster, p, P[prev], P[i]); p=P[i]; } //off-on
                 else if(!flagsArray[prev].on_curve && !flagsArray[i].on_curve) { int2 m=(P[prev]+P[i])/2; curve(raster, p, P[prev], m); p=m; } //off-off
                 prev=i;
