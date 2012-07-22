@@ -35,7 +35,7 @@ inline bool operator ==(const URL& a, const URL& b) {
     return a.scheme==b.scheme&&a.authorization==b.authorization&&a.host==b.host&&a.path==b.path&&a.fragment==b.fragment;
 }
 
-typedef delegate<void(const URL&, array<byte>&&)> Handler;
+typedef function<void(const URL&, array<byte>&&)> Handler;
 
 struct HTTP : Poll, virtual TextStream, virtual Socket {
     URL url;

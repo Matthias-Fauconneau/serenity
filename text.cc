@@ -17,7 +17,7 @@ struct TextLayout {
     Word word;
     array<Character> text;
     array<Text::Link> links;
-    struct Line { int begin,end; };
+    struct Line { uint begin,end; };
     array<Line> lines;
 
     void nextLine(bool justify) {
@@ -107,7 +107,7 @@ void Text::update(int wrap) {
         Line line;
         const TextLayout::Character& c = layout.text[l.begin];
         line.min = c.pos-c.glyph.offset;
-        for(int i=l.begin;i<l.end;i++) {
+        for(uint i=l.begin;i<l.end;i++) {
             const TextLayout::Character& c = layout.text[i];
             int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
             if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.glyph.advance,0);
@@ -139,7 +139,7 @@ bool Text::mouseEvent(int2 position, Event event, Button) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated(link.identifier); return true; }
         }
     }
-    if(textClicked.slots) { textClicked.emit(); return true; }
+    if(textClicked.slots) { textClicked(); return true; }
     return false;
 }
 

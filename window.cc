@@ -50,7 +50,7 @@ void Window::event(pollfd poll) {
     if(poll.fd==keyboard) while(read(keyboard, &e, sizeof(e)) > 0) {
         if(e.type == EV_KEY) {
             signal<>* shortcut = shortcuts.find(e.code);
-            if(shortcut) shortcut->emit();
+            if(shortcut) (*shortcut)();
         }
     }
 }

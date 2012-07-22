@@ -1,23 +1,6 @@
 #pragma once
 #include "core.h"
 
-/// Forward
-template<typename T, T v> struct integral_constant { static constexpr T value = v; typedef integral_constant<T, v> type; };
-template<typename T, T v> constexpr T integral_constant<T, v>::value;
-typedef integral_constant<bool, true> true_type;
-typedef integral_constant<bool, false> false_type;
-template<typename> struct is_lvalue_reference : public false_type { };
-template<typename T> struct is_lvalue_reference<T&> : public true_type { };
-template<typename> struct is_rvalue_reference : public false_type { };
-template<typename T> struct is_rvalue_reference<T&&> : public true_type { };
-#define is_lvalue_reference(T) is_lvalue_reference<T>::value
-template<class T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
-template<class T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
-
-#define can_forward(T) is_convertible(remove_reference(T), remove_reference(T##f))
-#define perfect(T) class T##f, predicate(can_forward(T))
-#define perfect2(T,U) class T##f, class U##f, predicate(can_forward(T)), predicate1(can_forward(U))
-
 /// Traits
 template<bool Cond, typename Iftrue, typename Iffalse> struct conditional { typedef Iftrue type; };
 template<typename Iftrue, typename Iffalse> struct conditional<false, Iftrue, Iffalse> { typedef Iffalse type; };
@@ -66,6 +49,8 @@ template<typename T> struct is_array<T[]> : public true_type {};
 template<typename From, typename To, bool = or_<is_void<From>, is_function<To>, is_array<To> >::value>
 struct is_convertible_helper { static constexpr bool value = is_void<To>::value; };
 struct sfinae_types { typedef char one; typedef struct { char arr[2]; } two; };
+template<typename> struct is_rvalue_reference : public false_type { };
+template<typename T> struct is_rvalue_reference<T&&> : public true_type { };
 template<typename T> struct is_reference : public or_<is_lvalue_reference<T>, is_rvalue_reference<T> >::type {};
 template<typename T, bool = and_<not_<is_reference<T>>, not_<is_void<T> > >::value> struct add_rvalue_reference_helper
   { typedef T type; };
@@ -80,4 +65,9 @@ public:
     static constexpr bool value = sizeof(test<From, To>(0)) == 1;
 };
 template<typename F, typename T> struct is_convertible : public integral_constant<bool, is_convertible_helper<F, T>::value> {};
+
+/// Perfect forwarding
 #define is_convertible(F, T) is_convertible<F, T>::value
+#define can_forward(T) is_convertible(remove_reference(T), remove_reference(T##f))
+#define perfect(T) class T##f, predicate(can_forward(T))
+#define perfect2(T,U) class T##f, class U##f, predicate(can_forward(T)), predicate1(can_forward(U))

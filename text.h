@@ -30,7 +30,7 @@ struct Text : Widget {
     /// User clicked on this Text
     signal<> textClicked;
     /// User clicked on a \a Format::Link
-    delegate<void(const ref<byte>&)> linkActivated;
+    signal<const ref<byte>&> linkActivated;
 
     int2 sizeHint();
     void update() override { update(min(wrap,Widget::size.x)); }

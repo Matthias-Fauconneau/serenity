@@ -1,7 +1,7 @@
 #include "html.h"
 #include "array.cc"
 
-ImageLoader::ImageLoader(const URL& url, Image<byte4>* target, delegate<void()> imageLoaded, int2 size, uint maximumAge)
+ImageLoader::ImageLoader(const URL& url, Image<byte4>* target, function<void()> imageLoaded, int2 size, uint maximumAge)
     : target(target), imageLoaded(imageLoaded), size(size) {
     getURL(url, Handler(this, &ImageLoader::load), maximumAge);
 }
@@ -72,7 +72,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
 
     //log("HTML\n"_+str(content));
     warn(url,max,second,count());
-    contentChanged.emit();
+    contentChanged();
 }
 
 void HTML::layout(const URL& url, const Element &e) { //TODO: keep same connection to load images
@@ -121,7 +121,7 @@ void HTML::flushText() {
     string paragraph = simplify(trim(text));
     if(!paragraph) return;
     Text& textLayout = alloc<Text>(move(paragraph),16,255, 640 /*60 characters*/);
-    textLayout.linkActivated = delegate<void(const ref<byte>&)>(this, &HTML::go);
+    textLayout.linkActivated.connect(this, &HTML::go);
     VBox::operator<<(&textLayout);
     text.clear();
 }

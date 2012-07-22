@@ -27,6 +27,18 @@ template<class T> constexpr remove_reference(T)&& move(T&& t) { return (remove_r
 /// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
 template<class T> inline T copy(const T& t) { return t; }
 
+/// Forward
+template<typename T, T v> struct integral_constant { static constexpr T value = v; typedef integral_constant<T, v> type; };
+template<typename T, T v> constexpr T integral_constant<T, v>::value;
+typedef integral_constant<bool, true> true_type;
+typedef integral_constant<bool, false> false_type;
+template<typename> struct is_lvalue_reference : public false_type { };
+template<typename T> struct is_lvalue_reference<T&> : public true_type { };
+#define is_lvalue_reference(T) is_lvalue_reference<T>::value
+
+template<class T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
+template<class T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
+
 /// Predicate
 extern void* enabler;
 template<bool> struct predicate {};

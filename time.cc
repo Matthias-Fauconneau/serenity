@@ -93,5 +93,5 @@ Date parse(TextStream& s) {
 }
 
 Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll({fd, POLLIN}); }
-void Timer::setAbsolute(int date) { timespec time[2]={{0,0},{date,0}}; timerfd_settime(fd,1,time,0); }
+void Timer::setAbsolute(uint date) { timespec time[2]={{0,0},{date,0}}; timerfd_settime(fd,1,time,0); }
 void Timer::event(pollfd) { expired(); }

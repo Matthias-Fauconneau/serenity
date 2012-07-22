@@ -9,7 +9,7 @@
 enum {F_SETFL=4};
 enum {PF_LOCAL=1, PF_INET};
 enum {SOCK_STREAM=1, SOCK_DGRAM};
-struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
+struct sockaddr { short family; ushort port; uint ip; /*int pad[2];*/ };
 
 /// Socket
 
@@ -32,7 +32,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
             assert(dns>0,dns);
             TextStream s = readFile("etc/resolv.conf"_);
             s.until("nameserver "_);
-            int a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
+            uint a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
             sockaddr addr = {PF_INET, swap16(53), (d<<24)|(c<<16)|(b<<8)|a};
             int unused e= check( ::connect(dns, &addr, sizeof(addr)) );
         }
@@ -157,7 +157,7 @@ string cacheFile(const URL& url) {
     return url.host+"/"_+name;
 }
 
-HTTP::HTTP(const URL& url, delegate<void(const URL&, array<byte>&&)> handler, array<string>&& headers, string&& method)
+HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, array<string>&& headers, string&& method)
     : url(str(url)), headers(move(headers)), method(move(method)), handler(handler) {
     if(!connect(url.host, url.scheme)) { delete this; return; }
     registerPoll(i({fd, POLLIN|POLLOUT}));
@@ -263,7 +263,7 @@ void HTTP::event(pollfd poll) {
     }
 }
 
-void getURL(const URL &url, delegate<void(const URL&, array<byte>&&)> handler, int maximumAge) {
+void getURL(const URL &url, function<void(const URL&, array<byte>&&)> handler, int maximumAge) {
     string file = cacheFile(url);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;

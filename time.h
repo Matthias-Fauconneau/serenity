@@ -31,7 +31,7 @@ Date parse(TextStream& s);
 struct Timer : Poll {
     int fd;
     Timer();
-    void setAbsolute(int date);
+    void setAbsolute(uint date);
     virtual void expired() =0;
     void event(pollfd);
 };

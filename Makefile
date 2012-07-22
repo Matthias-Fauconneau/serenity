@@ -4,7 +4,7 @@ BUILD ?= fast
 
 CC = clang
 CC += -pipe -std=c++11 -fno-threadsafe-statics -fno-rtti -fno-exceptions -fno-omit-frame-pointer
-CC += -Wall -Wextra -Wno-narrowing -Wno-missing-field-initializers -Wno-pmf-conversions
+CC += -Wall -Wextra -Wno-missing-field-initializers
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG
 FLAGS_fast := -g -DDEBUG -O

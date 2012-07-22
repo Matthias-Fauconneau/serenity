@@ -99,7 +99,7 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
         item.content = &alloc< Scroll<HTML> >();
         //item.content->go(item.link); //preload TODO: only when idle
     }
-    contentChanged.emit();
+    contentChanged();
 }
 
 void Feeds::getFavicon(const URL& url, array<byte>&& document) {
@@ -127,7 +127,7 @@ void Feeds::activeChanged(int index) {
         setRead(entry);
         text.setSize(12);
     }
-    contentChanged.emit();
+    contentChanged();
 }
 
 void Feeds::itemPressed(int index) {
@@ -135,7 +135,8 @@ void Feeds::itemPressed(int index) {
     if(content) delete content; //release read items
     if(!entry.content) entry.content = &alloc< Scroll<HTML> >();
     content = entry.content; entry.content=0; //move preloaded content to window
-    content->contentChanged.disconnect(&window);
+    //content->contentChanged.disconnect(&window);
+    content->contentChanged.slots.clear();
     window.widget = &content->parent();
     window.setName(entry.get<Text>().text);
     window.setIcon(entry.get<Icon>().image);

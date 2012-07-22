@@ -59,7 +59,7 @@ void Slider::render(int2 parent) {
 bool Slider::mouseEvent(int2 position, Event event, Button button) {
     if((event == Motion || event==Press) && button==LeftButton) {
         value = minimum+position.x*uint(maximum-minimum)/size.x;
-        valueChanged.emit(value);
+        valueChanged(value);
         return true;
     }
     return false;
@@ -70,13 +70,13 @@ bool Slider::mouseEvent(int2 position, Event event, Button button) {
 bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(Layout::mouseEvent(position,event,button)) return true;
     if(event != Press) return false;
-    if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
-    if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
+    if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
+    if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
     //Window::focus=this;
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<=child.position+child.size) {
-            if(index!=i) { index=i; at(index).selectEvent(); activeChanged.emit(index); }
-            if(button == LeftButton) itemPressed.emit(index);
+            if(index!=i) { index=i; at(index).selectEvent(); activeChanged(index); }
+            if(button == LeftButton) itemPressed(index);
             return true;
         }
     }
@@ -84,14 +84,14 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
 }
 
 bool Selection::keyPress(Key key) {
-    if(key==Key::Down && index<count()-1) { index++; at(index).selectEvent(); activeChanged.emit(index); return true; }
-    if(key==Key::Up && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged.emit(index); return true; }
+    if(key==Key::Down && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
+    if(key==Key::Up && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
     return false;
 }
 
 void Selection::setActive(uint i) {
     assert(i==uint(-1) || i<count());
-    if(index!=i) { index=i; if(index!=uint(-1)) { at(index).selectEvent(); activeChanged.emit(index); } }
+    if(index!=i) { index=i; if(index!=uint(-1)) { at(index).selectEvent(); activeChanged(index); } }
 }
 
 /// HighlightSelection
@@ -128,7 +128,7 @@ void ImageView::render(int2 parent) {
 /// TriggerButton
 
 bool TriggerButton::mouseEvent(int2, Event event, Button) {
-    if(event==Press) { triggered.emit(); return true; }
+    if(event==Press) { triggered(); return true; }
     return false;
 }
 
@@ -142,6 +142,6 @@ void ToggleButton::render(int2 parent) {
     blit(parent+position+(Widget::size-int2(size,size))/2, enabled?disableIcon:enableIcon);
 }
 bool ToggleButton::mouseEvent(int2, Event event, Button button) {
-    if(event==Press && button==LeftButton) { enabled = !enabled; toggled.emit(enabled); return true; }
+    if(event==Press && button==LeftButton) { enabled = !enabled; toggled(enabled); return true; }
     return false;
 }
