@@ -25,14 +25,14 @@ static int readLEV(DataStream& s, bool sign=false) {
     return result;
 }
 
-string demangle(TextStream& s) {
+string demangle(TextStream& s, bool function=true) {
     string r;
     bool rvalue=false,ref=false; int pointer=0;
     for(;;) {
         if(s.match('O')) rvalue=true;
         else if(s.match('R')) ref=true;
         else if(s.match('K')) r<<"const "_;
-        else if(s.match('L')) r<<"static "_;
+        else if(function && s.match('L')) r<<"static "_;
         else if(s.match('P')) pointer++;
         else break;
     }
@@ -66,11 +66,12 @@ string demangle(TextStream& s) {
     else if(s.match("St"_)) r<<"std"_;
     else if(s.match('S')) { r<<'S'; s.number(); s.match('_'); }
     else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
+    else if(s.match("Li"_)) r<<s.number();
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<string> args;
         while(s && !s.match('E')) {
             if(s.peek()=='Z') args<<(demangle(s)+"::"_+demangle(s));
-            else args<<demangle(s);
+            else args<<demangle(s,false);
         }
         r<<'<'<<join(args,", "_)<<'>';
     } else if(s.match('Z')) {
@@ -90,6 +91,7 @@ string demangle(TextStream& s) {
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
     } else if((l=s.number())!=-1) {
+        assert(l<=s.available(l),l,r,string(s.untilEnd()),string(move(s.buffer)));
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
     } else { error('D',r,string(s.untilEnd()),string(move(s.buffer))); }
@@ -188,11 +190,11 @@ Symbol findNearestLine(void* find) {
 
 void trace(int skip) {
     static int recurse; if(recurse>1) {log("Debugger error"); recurse--;return;} recurse++;
-    void* stack[9] = {0,0,0,0,0,0,0,0,0};
+    void* stack[10] = {};
     stack[0] = __builtin_return_address(0);
 #define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i)
-    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);
-    for(int i=8;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
+    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);
+    for(int i=9;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
     recurse--;
 }
 

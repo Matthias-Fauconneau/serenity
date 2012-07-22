@@ -16,7 +16,7 @@ struct Layout : Widget {
     string str() override {
         array<string> s;
         for(uint i=0;i<count();i++) s<< (*(void**)&at(i)? at(i).str() : string("<invalid>"_));
-        return "Layout("_+join(s,", "_)+")"_; //TODO: RTTI
+        return "("_+join(s,", "_)+")"_; //TODO: RTTI
     }
 };
 
@@ -38,29 +38,31 @@ template<class T> struct Array : virtual Layout, array<T> {
     Widget& at(int i) { return array<T>::at(i); }
 };
 
-template<class T> struct item : T { //item instanciate a class and append the instance to the offset table
-    void registerInstance(int* list) { int* first=list; while(*first) first++; *first=(byte*)this-(byte*)list; }
-    item(int* list) { registerInstance(list); }
-    item(T&& t, int* list) : T(move(t)) { registerInstance(list); }
+/// item is an helper to instanciate a class and append the instance to the tuple offset table
+template<class B, class T> struct item : T { //FIXME: static register
+    void registerInstance(byte* object, ubyte* list, int& i) { int d=(byte*)(B*)this-object; assert(d>=0&&d<256,d); list[i++]=d; }
+    item(byte* object, ubyte* list, int& i) { registerInstance(object,list,i); }
+    item(T&& t, byte* object, ubyte* list, int& i) : T(move(t)) { registerInstance(object,list,i); }
 };
 /// \a tuple with static indexing by type and dynamic indexing using an offset table
-template<class... T> struct tuple  : item<T>... {
-    int offsets[sizeof...(T)] = {};
-    tuple() : item<T>(offsets)... {}
-    tuple(T&&... t) : item<T>(move(t),offsets)... {}
+template<class B, class... T> struct tuple  : item<B,T>... {
+    static ubyte offsets[sizeof...(T)];
+    tuple(int i=0) : item<B,T>((byte*)this, offsets,i)... {}
+    tuple(int i,T&&... t) : item<B,T>(move(t), (byte*)this, offsets,i)... {}
     int size() const { return sizeof...(T); }
     template<class A> A& get() { return static_cast<A&>(*this); }
     template<class A> const A& get() const { return static_cast<const A&>(*this); }
-    void* at(int i) { return (void*)((byte*)offsets+offsets[i]); }
+    B& at(int i) { return *(B*)((byte*)this+offsets[i]); }
 };
+template<class B, class... T> ubyte tuple<B,T...>::offsets[sizeof...(T)];
 
 /// Tuple implements Layout storage using static inheritance
 /// \note It allows a layout to directly contain heterogenous Widgets without managing heap pointers.
 template<class... T> struct Tuple : virtual Layout {
-    tuple<T...> items; //inheriting tuple confuse compiler with multiple Widgets base
+    tuple<Widget,T...> items;
     Tuple() : items() {}
-    Tuple(T&& ___ t) : items(move(t)___) {}
-    Widget& at(int i) { return *(Widget*)items.at(i); }
+    Tuple(T&& ___ t) : items(0,move(t)___) {}
+    Widget& at(int i) { return items.at(i); }
     uint count() const { return items.size(); }
     template<class A> A& get() { return items.template get<A>(); }
     template<class A> const A& get() const { return items.template get<A>(); }
@@ -82,30 +84,36 @@ struct Linear: virtual Layout {
 /// Horizontal divide horizontal space between contained widgets
 struct Horizontal : virtual Linear {
     int2 xy(int2 xy) override { return xy; }
+    string str() override { return "Horizontal"_+Layout::str(); }
 };
 /// Vertical divide vertical space between contained widgets
 struct Vertical : virtual Linear{
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
+    string str() override { return "Vertical"_+Layout::str(); }
 };
 
 /// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
 struct HBox : Horizontal, Widgets {
     HBox(){}
     HBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
+    string str() override { return "HBox"_+Layout::str(); }
 };
 /// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
 struct VBox : Vertical, Widgets {
     VBox(){}
     VBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
+    string str() override { return "VBox"_+Layout::str(); }
 };
 
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
     HList(array<T>&& widgets):Array<T>(move(widgets)){}
+    string str() override { return "HList"_+Layout::str(); }
 };
 template<class T> struct VList : Vertical, Array<T> {
     VList(){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
+    string str() override { return "VListl"_+Layout::str(); }
 };
 
 /// Layout items on an uniform \a width x \a height grid

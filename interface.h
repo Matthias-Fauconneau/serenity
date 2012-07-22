@@ -111,6 +111,7 @@ struct Slider : Widget {
 struct Item : Horizontal, Tuple<Icon,Text,Space> {
     Item():Tuple(){}
     Item(Icon&& icon, Text&& text):Tuple(move(icon),move(text),Space()){}
+    string str() override { return "Item"_+Layout::str(); }
 };
 
 /// TabBar is a \a Bar containing \a Item elements
