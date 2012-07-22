@@ -38,6 +38,15 @@ string demangle(TextStream& s) {
     }
     int l;
     if(s.match('v')) { if(pointer) r<<"void"_; }
+    else if(s.match("C1"_)) r<< "this"_;
+    else if(s.match("C2"_)) r<< "this"_;
+    else if(s.match("D1"_)) r<< "~this"_;
+    else if(s.match("D2"_)) r<< "~this"_;
+    else if(s.match("eq"_)) r<<"operator =="_;
+    else if(s.match("ix"_)) r<<"operator []"_;
+    else if(s.match("cl"_)) r<<"operator ()"_;
+    else if(s.match("ls"_)) r<<"operator <<"_;
+    else if(s.match("cv"_)) r<<"operator "_ + demangle(s);
     else if(s.match('b')) r<<"bool"_;
     else if(s.match('c')) r<<"char"_;
     else if(s.match('a')) r<<"byte"_;
@@ -51,6 +60,7 @@ string demangle(TextStream& s) {
     else if(s.match('x')) r<<"int64"_;
     else if(s.match('y')) r<<"uint64"_;
     else if(s.match('A')) { r<<"[]"_; s.number(); s.match('_'); }
+    else if(s.match('M')) { r<<demangle(s)<<"::"_<<demangle(s); }
     else if(s.match("Tv"_)) { r<<"thunk "_; s.number(); s.match('_'); if(s.match("n"_)) { s.number(); s.match('_'); r<<demangle(s); } }
     else if(s.match('T')) { r<<'T'; s.number(); s.match('_'); }
     else if(s.match("St"_)) r<<"std"_;
@@ -74,21 +84,8 @@ string demangle(TextStream& s) {
         bool const_method =false;
         if(s.match('K')) const_method=true;
         while(s && !s.match('E')) {
-            if(s.match("C1"_)) list << copy(list.first()); //constructor
-            else if(s.match("C2"_)) list << copy(list.first()); //constructor
-            else if(s.match("D1"_)) list << "~"_+copy(list.first()); //destructor
-            else if(s.match("D2"_)) list << "~"_+copy(list.first()); //destructor
-            else if(s.match("eq"_)) list << string("operator =="_);
-            else if(s.match("ix"_)) list << string("operator []"_);
-            else if(s.match("cl"_)) list << string("operator ()"_);
-            else if(s.match("ls"_)) list << string("operator <<"_);
-            else if(s.match("cv"_)) list << string("operator "_ + demangle(s));
-            else if(s.match("St"_)) list << string("std"_);
-            else if((l=s.number())!=-1) {
-                list << string(s.read(l)); //class/member
-                if(s.peek()=='I') list.last()<< demangle(s);
-            } else if(s.peek()=='I') list.last()<< demangle(s);
-            else error('N',r,string(s.untilEnd()),string(move(s.buffer)));
+            list<< demangle(s);
+            if(s.peek()=='I'||s.peek()=='J') list.last()<< demangle(s);
         }
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;

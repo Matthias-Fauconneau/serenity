@@ -9,7 +9,7 @@
 enum {F_SETFL=4};
 enum {PF_LOCAL=1, PF_INET};
 enum {SOCK_STREAM=1, SOCK_DGRAM};
-struct sockaddr { short family; ushort port; uint ip; /*int pad[2];*/ };
+struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
 
 /// Socket
 

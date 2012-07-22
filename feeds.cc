@@ -27,7 +27,7 @@ Feeds::Feeds() {
     List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
     List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
     array<string> feeds = split(readFile("feeds"_,config),'\n');
-    for(const ref<byte>& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 60);
+    for(const ref<byte>& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 12*60);
 }
 Feeds::~Feeds() { closeFile(readConfig); }
 

@@ -20,12 +20,3 @@ struct Browser : Application {
     void render() { window.render(); }
 };
 Application(Browser)
-
-/*#include "http.h"
-struct Test : Application {
-    void handler(const URL&, array<byte>&& data){ log(data.size()); }
-    Test(array<string>&&) {
-        getURL("google.com"_, Handler(this, &Test::handler), 60);
-    }
-};
-Application(Test)*/
