@@ -36,7 +36,7 @@ CString strz(const ref<byte> &s) {
     copy(cstr.data,(char*)s.data,s.size); cstr.data[s.size]=0;
     return cstr;
 }
-string str(const char* s) { if(!s) return string("null"_); int i=0; while(s[i]) i++; return string((byte*)s,i); }
+ref<byte> str(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return ref<byte>((byte*)s,i); }
 
 ref<byte> section(const ref<byte>& s, byte separator, int start, int end, bool includeSeparator) {
     if(!s) return ""_;

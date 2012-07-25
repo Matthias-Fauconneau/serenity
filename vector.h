@@ -36,7 +36,7 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     static const int size = N;
     vector():V<T>{}{}
     vector(Zero):V<T>{}{}
-    template<class... Args> explicit vector(T x, T y, Args... args):V<T>{x,y,args...}{
+    template<class... Args> explicit vector(T x, T y, Args... args):V<T>{x,y,T(args)...}{
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }

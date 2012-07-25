@@ -28,7 +28,7 @@ Image<byte4> decodeICO(const array<byte>& file) {
     assert(header.depth==4||header.depth==8||header.depth==24||header.depth==32,header.depth);
     assert(header.compression==0);
 
-    ref<byte4> palette;
+    ref<byte4> palette=ref<byte4>(0,0);
     if(header.depth<=8) {
         assert(header.colorCount==0 || header.colorCount==(1u<<header.depth),header.colorCount,header.depth);
         palette = s.read<byte4>(1<<header.depth);

@@ -98,15 +98,6 @@ struct Slider : Widget {
     static const int height = 32;
 };
 
-/// Declare a small .png icon embedded in the binary, decoded on startup and accessible at runtime as an Image
-/// \note an icon with the same name must be linked by the build system
-///       'ld -r -b binary -o name.o name.png' can be used to embed a file in the binary
-#define ICON(name) \
-    extern byte _binary_icons_## name ##_png_start[]; \
-    extern byte _binary_icons_## name ##_png_end[]; \
-    static Image<byte4> name ## Icon = decodeImage(array<byte>(_binary_icons_## name ##_png_start,_binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start))
-
-
 /// Item is an icon with text
 struct Item : Horizontal, Tuple<Icon,Text,Space> {
     Item():Tuple(){}

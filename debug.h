@@ -5,10 +5,10 @@
 void catchErrors();
 
 /// Writes /a data to /a fd
-void write(int fd, const array<byte>& data);
+void write(int fd, const ref<byte>& data);
 
 /// Logs to standard output using str(...) serialization
-template<class ___ Args> inline void log(const Args& ___ args) { write(1,str(args ___)+"\n"_); }
+template<class ___ Args> inline void log(const Args& ___ args) { write(1,string(str(args ___)+"\n"_)); }
 #define warn log
 
 /// Logs \a expr name and value

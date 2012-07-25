@@ -94,6 +94,10 @@ syscall2(int, setrlimit, int,resource, struct rlimit*,limit)
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=040000};
 enum {PROT_READ=1, PROT_WRITE};
 enum {MAP_SHARED=1, MAP_PRIVATE};
+enum {F_SETFL=4};
+enum {PF_LOCAL=1, PF_INET};
+enum {SOCK_STREAM=1, SOCK_DGRAM};
+struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
 struct timespec { ulong sec,nsec; };
 
 #pragma GCC system_header

@@ -7,7 +7,7 @@
 //#include "popup.h"
 #include "array.cc"
 
-ICON(shutdown);
+//ICON(shutdown)
 
 struct Desktop : Application {
     Feeds feeds;
@@ -16,18 +16,17 @@ struct Desktop : Application {
      //Calendar calendar;
     //VBox timeBox { &clock, &calendar };
     HBox applets; //{ &feeds /*, &timeBox *//*, &shortcuts*/ };
-    Window window{&applets,string(),Image<byte4>(),int2(0,display.y-16)};
+    Window window{&applets,int2(0,display.y-16)};
     //Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop(array<string>&& /*arguments*/) {
-        applets << &feeds;
+        applets << &feeds; //clang doesn't support expression in initializer_list
         //if(contains(arguments,"setAllRead"_)) feeds.setAllRead();
         feeds.contentChanged.connect(&window,&Window::render);
         //clock.timeout.connect(&window, &Window::render);
-        //window.setType(Atom(_NET_WM_WINDOW_TYPE_DESKTOP));
-        //window.localShortcut(Key::Escape).connect(&shutdownPopup,&Popup<Command>::toggle);
-        window.localShortcut(Key::Power).connect(this,&Desktop::keyPress);
+        //window.localShortcut(Key::Escape).connect(&shutdownPopup,&Window::toggle);
+        //window.localShortcut(Key::Power).connect(&shutdownPopup,&Window::toggle);
+        window.localShortcut(Key::Escape).connect(&window,&Window::hide);
         window.show();
     }
-    void keyPress() { if(window.hasFocus()) /*shutdownPopup.toggle();*/{} }
 };
 Application(Desktop)

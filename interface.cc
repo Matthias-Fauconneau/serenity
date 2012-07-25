@@ -3,6 +3,7 @@
 #include "layout.h"
 #include "array.cc"
 
+Widget* focus;
 Space space;
 
 /// ScrollArea
@@ -72,7 +73,7 @@ bool Selection::mouseEvent(int2 position, Event event, Button button) {
     if(event != Press) return false;
     if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
     if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
-    //Window::focus=this;
+    focus=this;
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<=child.position+child.size) {
             if(index!=i) { index=i; at(index).selectEvent(); activeChanged(index); }

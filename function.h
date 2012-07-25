@@ -1,6 +1,5 @@
 #pragma once
 #include "core.h"
-#include "debug.h"
 
 /// functor abstract interface
 template<class R, class... Args> struct functor;
@@ -23,13 +22,13 @@ template<class O, class R, class... Args> struct method<O, R(Args...)> : functor
 
 template<class R, class... Args> struct function;
 template<class R, class... Args> struct function<R(Args...)> {
-    uint any[4]; //store any functor on stack
+    uint any[5]; //store any functor on stack
     template<class F> function(F f) {
         assert_(sizeof(lambda<F,R(Args...)>)<=sizeof(any));
         new (any) lambda<F,R(Args...)>(move(f));
     }
     template<class O> function(O* object, void (O::*pmf)(Args...)) {
-        assert(sizeof(method<O,R(Args...)>)<=sizeof(any), sizeof(method<O,R(Args...)>), sizeof(any));
+        assert_(sizeof(method<O,R(Args...)>)<=sizeof(any));
         new (any) method<O,R(Args...)>(object, pmf);
     }
     R operator()(Args... args) const { return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }

@@ -24,6 +24,7 @@ template<class T> struct Image {
 
     ~Image(){ if(data && own) { unallocate(data,sizeof(T)*width*height); data=0; } }
     explicit operator bool() const { return data; }
+    explicit operator ref<byte4>() { assert(width==stride); return ref<byte4>(data,width*height); }
 
     T operator()(uint x, uint y) const {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
     T& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
@@ -47,3 +48,15 @@ Image<byte4> flip(Image<byte4>&& image);
 Image<byte4> decodeImage(const array<byte>& file);
 
 #undef generic
+
+/// Declare a small .png icon embedded in the binary, accessible at runtime as an Image (lazily decoded)
+/// \note an icon with the same name must be linked by the build system
+///       'ld -r -b binary -o name.o name.png' can be used to embed a file in the binary
+#define ICON(name) \
+    extern byte _binary_icons_## name ##_png_start[]; \
+    extern byte _binary_icons_## name ##_png_end[]; \
+    static const Image<byte4>& name ## Icon() { \
+      static Image<byte4> icon = decodeImage(array<byte>(_binary_icons_## name ##_png_start, \
+                                                                                               _binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start)); \
+      return icon; \
+    }

@@ -8,8 +8,10 @@ enum { POLLIN = 1, POLLOUT=4, POLLHUP = 16 };
 struct Poll {
     /// Add this to the process-wide event loop
     void registerPoll(pollfd);
-    /// Remove this to the process-wide event loop
+    /// Remove this from the process-wide event loop
     void unregisterPoll();
+    /// Remove an fd from the process-wide event loop
+    static void unregisterPoll(int fd);
     /// Wait for all outstanding poll events to be processed before calling \a event again
     void wait();
     virtual ~Poll() { unregisterPoll(); }
@@ -31,7 +33,7 @@ struct Application {
 };
 
 /// Macro to compile an executable entry point starting an Application with the default event loop
-array<string> init_(int argc, char** argv);
+array< ref<byte> > init_(int argc, char** argv);
 void exit_(int);
 #define Application(App)  extern "C" void _start(int,int,int,int,int argc, char* arg0, int,int,int,int,int,int,int,int,int,int,int) { \
     for(App app(init_(argc,&arg0));app.running && dispatchEvents();); exit_(0); }

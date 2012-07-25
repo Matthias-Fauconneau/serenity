@@ -2,14 +2,11 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= fast
 
-CC = clang
-CC += -pipe -std=c++11 -fno-threadsafe-statics -fno-rtti -fno-exceptions -fno-omit-frame-pointer
-CC += -Wall -Wextra -Wno-missing-field-initializers
+CC = clang -pipe -std=c++11 -fno-threadsafe-statics -fno-rtti -fno-exceptions -fno-omit-frame-pointer -Wall -Wextra -Wno-missing-field-initializers
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG
 FLAGS_fast := -g -DDEBUG -O
 FLAGS_profile := -g -O -finstrument-functions
-#-finstrument-functions-exclude-file-list=core,array,map,profile
 
 SRCS = $(SRCS_$(BUILD)) $(SRCS_$(TARGET))
 SRCS_profile += profile
@@ -20,10 +17,11 @@ SRCS_player += png inflate
 SRCS_music += png inflate
 
 ICONS = $(ICONS_$(TARGET))
-ICONS_taskbar := button
-ICONS_desktop := shutdown network
-ICONS_player := play pause next
-ICONS_music := music music256
+ICONS_browser := cursor
+ICONS_taskbar := cursor button
+ICONS_desktop := cursor shutdown
+ICONS_player := cursor play pause next
+ICONS_music := cursor music
 SRCS += $(ICONS:%=icons/%)
 
 INSTALL = $(INSTALL_$(TARGET))

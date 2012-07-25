@@ -54,6 +54,8 @@ void blit(int2 target, const Image<uint8>& source) {
 void blit(int2 target, const Image<byte4>& source) {
     Rect rect = (target+Rect(source.size())).clip(currentClip);
     for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-        framebuffer(x,y) = source(x-target.x,y-target.y); //TODO: alpha
+        byte4 s = source(x-target.x,y-target.y);
+        auto& d = framebuffer(x,y);
+        d = byte4((int4(d)*(255-s.a) + int4(s)*s.a)/255); //TODO: lookup /255
     }
 }

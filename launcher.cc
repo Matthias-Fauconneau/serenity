@@ -5,13 +5,7 @@
 #include "window.h"
 #include "interface.h"
 #include "file.h"
-
 #include "array.cc"
-template struct array<Command>;
-template struct Array<Command>;
-template struct ListSelection<Command>;
-template struct List<Command>;
-template struct Popup<Command>;
 
 const string iconPaths[4] = {
     "/usr/share/pixmaps/"_,
@@ -22,14 +16,14 @@ const string iconPaths[4] = {
 
 bool Search::keyPress(Key key) {
     if(key == Key::Enter) {
-        execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text});
-        text.clear(); update(); triggered.emit(); return true;
+        //execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text}); TODO: serenity browser
+        text.clear(); update(); triggered(); return true;
     }
     else return TextInput::keyPress(key);
 }
 
 bool Command::mouseEvent(int2, Event event, Button button) {
-    if(event == Press && button == LeftButton) { execute(path,args); triggered.emit(); return true; }
+    if(event == Press && button == LeftButton) { execute(path,args); triggered(); return true; }
     return false;
 }
 
@@ -63,19 +57,15 @@ List<Command> readShortcuts() {
         if(!exists(path)) { warn("Executable not found",path); continue; }
         array<string> arguments = slice(split(entries["Exec"_],' '),1);
         for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
-        for(uint i=0;i<arguments.size();) if(contains(arguments[i],'%')) arguments.removeAt(i); else i++;
+        for(uint i=0;i<arguments.size();) if(contains(arguments[i],byte('%'))) arguments.removeAt(i); else i++;
         shortcuts << Command(move(icon),move(entries["Name"_]),move(path),move(arguments));
     }
     return shortcuts;
 }
 
 Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({&search, &shortcuts})), window(&menu,""_,Image<byte4>(),int2(-3,-3)) {
-    //window.setType(Atom(NET_WM_WINDOW_TYPE_DROPDOWN_MENU));
-    //window.setOverrideRedirect(true);
-    //window.localShortcut("Leave"_).connect(&window,&Window::hide);
+    //window.hideOnLeave = true;
     window.localShortcut(Key::Escape).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(Command& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
 }
-
-void Launcher::show() { window.show(); window.setFocus(&search); }

@@ -5,18 +5,18 @@
 #include "html.h"
 #include "window.h"
 #include "interface.h"
+#include "array.cc"
 
 struct Browser : Application {
     Scroll<HTML> content;
-    Window window{&content.parent(),"Browser"_,Image<byte4>(),int2(0,0)};
+    Window window = Window(&content.parent(),int2(0,0));
 
-    Browser(array<string>&& arguments) {
+    Browser(array< ref<byte> >&& arguments) {
         assert(arguments,"Usage: browser <url>");
-        window.localShortcut(Key::Escape).connect(this, &Browser::quit);
-        content.contentChanged.connect(this, &Browser::render);
+        window.localShortcut(Key::Escape).connect(this, &Application::quit);
+        content.contentChanged.connect(&window, &Window::render);
         content.go(arguments.first());
         window.show();
     }
-    void render() { window.render(); }
 };
 Application(Browser)

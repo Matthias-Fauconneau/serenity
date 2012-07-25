@@ -8,8 +8,8 @@ const char* errno[35] = {"OK",
     "PERM","NOENT","SRCH","INTR","IO","NXIO","2BIG","NOEXEC","BADF","CHILD","AGAIN","NOMEM","ACCES","FAULT","NOTBLK","BUSY","EXIST",
     "XDEV","NODEV","NOTDIR","ISDIR","INVAL","NFILE","MFILE","NOTTY","TXTBSY","FBIG","NOSPC","SPIPE","ROFS","MLINK","PIPE","DOM","RANGE"};
 
-void write(int fd, const array<byte>& s) { int r=write(fd,s.data(),s.size()); assert(r==(int)s.size(),r); }
-void abort() { exit(-1); }
+void write(int fd, const ref<byte>& s) { int r=write(fd,s.data,s.size); assert(r==(int)s.size,r); }
+void abort() { ioctl(open("/dev/console", O_RDWR, 0), 0x5606, (void*)7); exit(-1); }
 void log_(const char* expr) { log(expr); }
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version,entry,phoff,shoff,flags;
@@ -46,7 +46,12 @@ string demangle(TextStream& s, bool function=true) {
     else if(s.match("ix"_)) r<<"operator []"_;
     else if(s.match("cl"_)) r<<"operator ()"_;
     else if(s.match("ls"_)) r<<"operator <<"_;
+    else if(s.match("rs"_)) r<<"operator >>"_;
     else if(s.match("cv"_)) r<<"operator "_ + demangle(s);
+    else if(s.match("pl"_)) r<<"operator +"_;
+    else if(s.match("mi"_)) r<<"operator -"_;
+    else if(s.match("ml"_)) r<<"operator *"_;
+    else if(s.match("dv"_)) r<<"operator /"_;
     else if(s.match('b')) r<<"bool"_;
     else if(s.match('c')) r<<"char"_;
     else if(s.match('a')) r<<"byte"_;

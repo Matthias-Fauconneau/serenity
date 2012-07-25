@@ -6,11 +6,6 @@
 #include "map.h"
 #include "array.cc"
 
-enum {F_SETFL=4};
-enum {PF_LOCAL=1, PF_INET};
-enum {SOCK_STREAM=1, SOCK_DGRAM};
-struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
-
 /// Socket
 
 uint32 ip(TextStream& s) {
@@ -45,7 +40,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
         }
         query << 0;
         query << raw(swap16(1)) << raw(swap16(1));
-        ::write(1,host+" "_);
+        ::write(1,string(host+" "_));
         ::write(dns,query);
         DataStream s(readUpTo(dns,256), true);
         header = s.read<Header>();
@@ -64,7 +59,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
         }
         if(!ip) {
             log("unknown");
-            ::write(dnsCache,host+" 0.0.0.0\n"_); // add negative entry
+            ::write(dnsCache,string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = mapFile(dnsCache); //remap cache
             return false;
         }
@@ -218,7 +213,7 @@ void HTTP::header() {
     state = Data;
 }
 void HTTP::event(pollfd poll) {
-    assert(fd); assert(state>=Connect && state <=Handle);
+    assert(fd); assert(state>=Connect && state <=Done, int(state));
     if(poll.revents&POLLHUP) { log("Connection broken",url); state=Done; free(this); return; }
     if(state == Connect) {
         if(!poll.revents) { log("Connection timeout",url); state=Done; free(this); return; }

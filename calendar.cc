@@ -1,14 +1,7 @@
 #include "calendar.h"
 #include "file.h"
 #include "map.h"
-
 #include "array.cc"
-Array_Copy_Compare_Sort(Date)
-Array(array<Date>)
-template struct Array<Text>;
-template struct ListSelection<Text>;
-template struct HList<Text>;
-template struct Grid<Text>;
 
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query) {
@@ -50,7 +43,7 @@ array<string> getEvents(Date query) {
             if(query.minutes>=0 && date.minutes!=query.minutes) continue;
             if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
             if(exceptions.contains(title)) for(Date date: exceptions.at(title)) if(date.day==query.day && date.month==query.month) goto skip;
-            insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?"-"_+str(end,"hh:mm"_):""_)+": "_+title));
+            insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?string("-"_+str(end,"hh:mm"_)):string())+": "_+title));
             skip:;
         }
     }
@@ -63,7 +56,7 @@ void Month::setActive(Date active) {
     static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
     const int nofDays[12] = { 31, !(active.year%4)&&(active.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     for(int i=0;i<7;i++) {
-        append(copy(days[i]));
+        *this<< copy(days[i]);
         dates << Date(-1,-1,-1,-1,-1,-1,i);
     }
     int first = (35+active.weekDay+1-active.day)%7;
@@ -71,18 +64,18 @@ void Month::setActive(Date active) {
         int previousMonth = (active.month+11)%12;
         int day = nofDays[previousMonth]-first+i+1;
         dates << Date(count()%7, day, previousMonth);
-        append(Text(format(Italic)+dec(day,2)));
+        *this<< Text(format(Italic)+dec(day,2));
     }
     Date today=::date();
     for(int i=1;i<=nofDays[active.month];i++) { //current month
         bool isToday = today.month==active.month && i==today.day;
         if(isToday) todayIndex=count();
         dates << Date(count()%7, i, active.month);
-        append(string((isToday?format(Bold):""_)+dec(i,2))); //current day
+        *this<< string((isToday?format(Bold):string())+dec(i,2)); //current day
     }
     for(int i=1;count()<7*8;i++) { //next month
         dates << Date(count()%7, i, (active.month+1)%12);
-        append(Text(format(Italic)+dec(i,2)));
+        *this<< Text(format(Italic)+dec(i,2));
     }
     Selection::setActive(todayIndex);
     update();
@@ -110,7 +103,7 @@ void Calendar::nextMonth() {
 void Calendar::activeChanged(int index) {
     string text;
     Date date = month.dates[index];
-    text << string(format(Bold)+(index==month.todayIndex?"Today"_: ::str(date))+format(Regular)+"\n"_);
+    text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date))+format(Regular)+"\n"_);
     text << join(::getEvents(date),"\n"_)+"\n"_;
     if(index==month.todayIndex) {
         Date date = month.dates[index+1];
@@ -126,4 +119,4 @@ void Calendar::update() {
     VBox::update();
 }
 
-void Calendar::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm.emit(); }
+void Calendar::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm(); }

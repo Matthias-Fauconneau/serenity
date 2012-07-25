@@ -57,9 +57,9 @@ template<class T> struct array {
     /// References elements from a reference (unsafe if used after ~ref)
     //explicit array(const ref<T>& ref) : i(buffer{ref.data, ref.size, 0}) {}
     /// Moves elements from a reference
-    explicit array(ref<T>&& ref);
+    array(ref<T>&& ref);
     /// Copies elements from a reference
-    explicit array(const ref<T>& ref);
+    array(const ref<T>& ref);
 
 //referencing constructors
     /// References \a size elements from read-only \a data pointer

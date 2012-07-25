@@ -1,7 +1,6 @@
-parser: parse (Arithmetic, URL, XML/HTML, D/C++/Clay?), precedence/associativity?, MLR?, LR(k)?, GLR, DFA
-debug feeds
+apps: feeds, WM, taskbar
 font: kerning, subpixel position, hinting
-desktop: text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf
+apps: text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf, inflate, jpeg
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen
 IDE: parser, build driver, dependency graph with (code size,build time), git, debugger, static analyzer, profiler, gc?, interpreter, compiler
 

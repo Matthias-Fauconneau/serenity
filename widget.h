@@ -5,7 +5,8 @@
 /// Event type
 enum Event { Motion, Press, Release, Enter, Leave };
 /// Mouse button
-enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
+enum Button { None, LeftButton=0x110, RightButton, MiddleButton, WheelDown=0x150, WheelUp };
+
 /// Key codes
 enum i(class) Key {
     Escape=1, _1, _2, _3, _4, _5, _6, _7, _8, _9, _0, Minus, Equal, Backspace, Tab, Q, W, E, R, T, Y, U, I, O, P, LeftBrace, RightBrace, Enter, LeftCtrl,
@@ -45,7 +46,7 @@ struct Widget {
     /// \return whether the key press should trigger a repaint
     virtual bool keyPress(Key) { return false; }
     /// Override \a selectEvent to handle or forward user input
-    /// \note \a selectEvent is called by \a Selection
+    /// \note \a selectEvent is called by \a Selection when user changes selection (using press, wheel or arrows)
     /// \return whether the select event should trigger a repaint
     virtual bool selectEvent() { return false; }
 };

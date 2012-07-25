@@ -4,8 +4,6 @@
 #include "utf8.h"
 #include "array.cc"
 
-Widget* focus;
-
 struct TextLayout {
     int size;
     int wrap;

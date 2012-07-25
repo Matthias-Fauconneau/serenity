@@ -7,8 +7,6 @@
 #include "window.h"
 #include "array.cc"
 
-ICON(network);
-
 Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
 Entry::Entry(string&& name, string&& link, Image<byte4>&& icon):Item(move(icon),move(name)),link(move(link)){}
 Entry::~Entry() { if(content) free(content); }
@@ -135,11 +133,10 @@ void Feeds::itemPressed(int index) {
     if(content) free(content); //free read items
     if(!entry.content) entry.content = &alloc< Scroll<HTML> >();
     content = entry.content; entry.content=0; //move preloaded content to window
-    //content->contentChanged.disconnect(&window);
     content->contentChanged.slots.clear();
     window.widget = &content->parent();
-    window.setName(entry.get<Text>().text);
-    window.setIcon(entry.get<Icon>().image);
+    //window.setTitle(copy(entry.get<Text>().text));
+    //window.setIcon(copy(entry.get<Icon>().image));
     if(!content->url) content->go(entry.link);
     window.show();
     content->contentChanged.connect(&window, &Window::render);

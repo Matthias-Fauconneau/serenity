@@ -9,16 +9,18 @@ void catchErrors(); //debug.cc
 enum { RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS };
 struct rlimit { ulong cur,max; };
 
-array<string> init_(int argc, char** argv) {
+array< ref<byte> > init_(int argc, char** argv) {
     setupHeap(); catchErrors();
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit); //1 MB
-    array<string> args; for(int i=1;i<argc;i++) args << str(*(argv-i));
+    array< ref<byte> > args; for(int i=1;i<argc;i++) args << str(*(argv-i));
     return args;
 }
 void exit_(int code) { exit(code); }
 
 void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
-void Poll::unregisterPoll() { int i=removeOne(polls, this); if(i>=0) pollfds.removeAt(i); }
+void Poll::unregisterPoll() { for(int i;(i=removeOne(polls, this))>=0;) pollfds.removeAt(i); }
+bool operator ==(pollfd a, pollfd b) { return a.fd==b.fd; }
+void Poll::unregisterPoll(int fd) { int i=removeOne(pollfds, pollfd{fd}); if(i>=0) polls.removeAt(i); }
 static array<Poll*> queue;
 void Poll::wait() { queue << this; }
 
@@ -29,7 +31,7 @@ int dispatchEvents() {
         int events = pollfds[i].revents;
         if(events) {
             polls[i]->event(pollfds[i]);
-            if(events&POLLHUP) { polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
+            if(events&POLLHUP) { log("POLLHUP"); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
         }
     }
     while(queue) queue.takeFirst()->event(i({}));

@@ -10,12 +10,13 @@ struct rgb565 {
     rgb565(uint8 i):pack( (i&0b11111000)<<8 | (i&0b11111100)<<3 | i>>3 ) {}
     rgb565(uint8 r, uint8 g, uint8 b):pack( (r&0b11111000)<<8 | (g&0b11111100)<<3 | b>>3 ) {}
     rgb565(byte4 c):rgb565(c.r, c.g, c.b){}
+    operator byte4() { return byte4(pack>>8,(pack>>3)&0b11111100,(pack&0b11111)<<3,255); }
+    operator   int4() { return    int4(pack>>8,(pack>>3)&0b11111100,(pack&0b11111)<<3,255); }
 };
 typedef rgb565 rgb;
 #else
 typedef byte4 rgb;
 #endif
-//typedef Image<byte4> Pixmap;
 
 /// Clip
 struct Rect {
@@ -24,6 +25,7 @@ struct Rect {
     Rect(int2 min, int2 max):min(min),max(max){}
     /// Intersect this clip with \a clip
     Rect clip(Rect clip) { return Rect(::max(min,clip.min),::min(max,clip.max)); }
+    bool contains(int2 p) { return p>=min && p<max; }
 };
 inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 

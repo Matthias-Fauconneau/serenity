@@ -3,7 +3,7 @@
 void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" int __aeabi_atexit(void (*) (void *), void*, void*) { return 0; }
-extern "C" void __cxa_pure_virtual() {}
+extern "C" void __cxa_pure_virtual() { trace(0); log_("pure virtual"); abort(); }
 
 #if __arm__
 extern "C" uint __aeabi_uidivmod(uint num, uint den) {

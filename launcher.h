@@ -24,7 +24,5 @@ struct Launcher {
     List<Command> shortcuts;
     VBox menu;
     Window window;
-
     Launcher();
-    void show();
 };

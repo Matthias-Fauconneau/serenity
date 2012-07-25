@@ -93,7 +93,7 @@ long toInteger(const ref<byte>& str, int base=10 );
 template<class A> string str(const A&) { static_assert(sizeof(A) & 0,"No string representation defined for type"); return string(); }
 
 /// Returns a bounded reference to the null-terminated string pointer
-string str(const char* s);
+ref<byte> str(const char* s);
 
 inline string str(const bool& b) { return string(b?"true"_:"false"_); }
 inline string str(const char& c) { return copy(string((byte*)&c,1)); }

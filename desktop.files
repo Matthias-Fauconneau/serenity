@@ -36,6 +36,8 @@ interface.h
 interface.cc
 layout.h
 layout.cc
+display.h
+display.cc
 window.h
 window.cc
 html.h

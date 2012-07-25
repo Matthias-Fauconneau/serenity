@@ -40,7 +40,7 @@ template<class T> struct Array : virtual Layout, array<T> {
 
 /// item is an helper to instanciate a class and append the instance to the tuple offset table
 template<class B, class T> struct item : T { //FIXME: static register
-    void registerInstance(byte* object, ubyte* list, int& i) { int d=(byte*)(B*)this-object; assert(d>=0&&d<256,d); list[i++]=d; }
+    void registerInstance(byte* object, ubyte* list, int& i) { int d=(byte*)(B*)this-object; assert_(d>=0&&d<256); list[i++]=d; }
     item(byte* object, ubyte* list, int& i) { registerInstance(object,list,i); }
     item(T&& t, byte* object, ubyte* list, int& i) : T(move(t)) { registerInstance(object,list,i); }
 };
@@ -107,7 +107,7 @@ struct VBox : Vertical, Widgets {
 
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
-    HList(array<T>&& widgets):Array<T>(move(widgets)){}
+    HList(ref<T>&& widgets):Array<T>(move(widgets)){}
     string str() override { return "HList"_+Layout::str(); }
 };
 template<class T> struct VList : Vertical, Array<T> {
