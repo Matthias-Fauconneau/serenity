@@ -202,24 +202,3 @@ void trace(int skip) {
     for(int i=9;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
     recurse--;
 }
-
-enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
-
-static void handler(int sig, struct siginfo*, struct ucontext*) {
-    if(sig == SIGSEGV) log("Segmentation violation"_);
-    trace(1);
-    abort();
-}
-
-void catchErrors() {
-    struct {
-        void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
-        enum { SA_SIGINFO=4 } flags = SA_SIGINFO;
-        void (*restorer) (void) = 0;
-        uint mask[2] = {0,0};
-    } sa;
-    sigaction(SIGABRT, &sa, 0, 8);
-    sigaction(SIGSEGV, &sa, 0, 8);
-    sigaction(SIGTERM, &sa, 0, 8);
-    sigaction(SIGPIPE, &sa, 0, 8);
-}

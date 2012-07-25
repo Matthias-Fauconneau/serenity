@@ -1,22 +1,34 @@
 #include "process.h"
 #include "linux.h"
 #include "array.cc"
-static array<Poll*> polls;
-static array<pollfd> pollfds;
 
-void setupHeap(); //memory.cc
-void catchErrors(); //debug.cc
 enum { RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS };
 struct rlimit { ulong cur,max; };
 
-array< ref<byte> > init_(int argc, char** argv) {
-    setupHeap(); catchErrors();
+void setupHeap(); //memory.cc
+
+static void handler(int, struct siginfo*, struct ucontext*) { trace(1); abort(); }
+
+void init_() {
+    extern byte *heapEnd, *systemEnd;
+    systemEnd = heapEnd = (byte*)brk(0);
+    enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
+    struct {
+        void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
+        enum { SA_SIGINFO=4 } flags = SA_SIGINFO;
+        void (*restorer) (void) = 0;
+        uint mask[2] = {0,0};
+    } sa;
+    sigaction(SIGABRT, &sa, 0, 8);
+    sigaction(SIGSEGV, &sa, 0, 8);
+    sigaction(SIGTERM, &sa, 0, 8);
+    sigaction(SIGPIPE, &sa, 0, 8);
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit); //1 MB
-    array< ref<byte> > args; for(int i=1;i<argc;i++) args << str(*(argv-i));
-    return args;
 }
 void exit_(int code) { exit(code); }
 
+static array<Poll*> polls;
+static array<pollfd> pollfds;
 void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
 void Poll::unregisterPoll() { for(int i;(i=removeOne(polls, this))>=0;) pollfds.removeAt(i); }
 bool operator ==(pollfd a, pollfd b) { return a.fd==b.fd; }

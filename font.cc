@@ -47,8 +47,9 @@ uint16 Font::index(uint16 code) {
     for(int i=0;i<numTables;i++) {
         uint16 unused platformID=s.read(), unused platformSpecificID=s.read(); uint32 offset=s.read();
         uint index=s.index; s.seek(offset);
-        uint16 format = s.read(), unused size=s.read(), unused language=s.read();
+        uint16 format = s.read();
         if(format==4) {
+            uint16 unused size=s.read(), unused language=s.read();
             uint16 segCount=s.read(), unused searchRange=s.read(),unused entrySelector=s.read(), unused rangeShift=s.read();
             segCount /= 2;
             array<uint16> endCode = s.read(segCount); //TODO: read<T[N]>
@@ -61,7 +62,15 @@ uint16 Font::index(uint16 code) {
                 if(idRangeOffset[i]) return *( &idRangeOffset[i] + idRangeOffset[i] / 2 + (code - startCode[i]) );
                 else return idDelta[i] + code;
             }
-        } else error("Unsupported");
+        } else if(format==12) {
+            uint16 unused subformat = s.read();
+            uint32 unused size=s.read(), unused language=s.read();
+            uint32 groupCount=s.read();
+            for(uint i=0;i<groupCount;i++) {
+                uint32 first=s.read(), last=s.read(), firstIndex=s.read();
+                if(code>=first && code<=last) return firstIndex+code-first;
+            }
+        } else error("Unsupported"_,format,code);
         s.index=index;
     }
     error("Not Found");
@@ -110,25 +119,25 @@ void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
 #endif
 }
 
-Glyph Font::glyph(uint16 code) {
-    // Lookup glyph in cache
-    Glyph& glyph = code<256 ? cacheASCII[code] : cacheUnicode[code];
-    if(glyph.image || glyph.advance) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
-
-    // map unicode to glyf outline
-    int i = index(code);
-    glyph.advance = scale(swap16(hmtx[2*i]));
-    int start = ( indexToLocFormat? swap32(((uint32*)loca)[i]) : 2*swap16(((uint16*)loca)[i]) );
-    int length = ( indexToLocFormat? swap32(((uint32*)loca)[i+1]) : 2*swap16(((uint16*)loca)[i+1]) ) - start;
+void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {;
+    int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
+    int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
     DataStream s(array<byte>(glyf +start, length), true);
-    if(!s) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
+    if(!s) return;
 
     int16 numContours = s.read();
-    int16 xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
-    xMin = scale(xMin); if(xMin>0) xMin=(xMin/16)*16; else if(-xMax%16) xMax-=16-(-xMax%16); xMin=unscale(xMin); //round down to pixel
-    //yMin = scale(yMin); yMin=(yMin/16)*16; yMin=unscale(yMin); //round down to pixel
-    xMax = scale(xMax); if(xMax<0) xMax=(xMax/16)*16; else /*if(xMax%16)*/ xMax+=16-xMax%16; xMax=unscale(xMax); //round up to pixel
-    yMax = scale(yMax); if(yMax<0) yMax=(yMax/16)*16; else if(yMax%16) yMax+=16-yMax%16; yMax=unscale(yMax); //round up to pixel
+    if(!raster) {
+        xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
+        xMin = scale(xMin); if(xMin>0) xMin=(xMin/16)*16; else if(-xMax%16) xMax-=16-(-xMax%16); xMin=unscale(xMin); //round down to pixel
+        //yMin = scale(yMin); yMin=(yMin/16)*16; yMin=unscale(yMin); //round down to pixel
+        xMax = scale(xMax); if(xMax<0) xMax=(xMax/16)*16; else /*if(xMax%16)*/ xMax+=16-xMax%16; xMax=unscale(xMax); //round up to pixel
+        yMax = scale(yMax); if(yMax<0) yMax=(yMax/16)*16; else if(yMax%16) yMax+=16-yMax%16; yMax=unscale(yMax); //round up to pixel
+
+        int width=scale(xMax-xMin), height=scale(yMax-yMin);
+        raster = Image<int8>(width+1,height+1);
+        for(int i=0;i<width*height; i++) raster.data[i]=0;
+    } else s.advance(4*2);
+
     if(numContours>0) {
         array<uint16> endPtsOfContours = s.read(numContours);
         int nofPoints = endPtsOfContours[numContours-1]+1;
@@ -164,10 +173,6 @@ Glyph Font::glyph(uint16 code) {
             }
         }
 
-        int width=scale(xMax-xMin), height=scale(yMax-yMin);
-        Image<int8> raster(width+1,height+1);
-        for(int i=0;i<width*height; i++) raster.data[i]=0;
-
         for(int n=0,i=0; n<numContours; n++) {
             int last= endPtsOfContours[n];
             int2 p; //last on point
@@ -182,28 +187,56 @@ Glyph Font::glyph(uint16 code) {
                 prev=i;
             }
         }
-        Image<int8> bitmap(width,height);
-        for(int y=0; y<height; y++) {
-            int acc=0;
-            for(int x=0; x<width; x++) {
-                acc += raster(x,y);
-                bitmap(x,y) = acc>0; //TODO: alpha blit
-            }
-        }
-
-        glyph.image = Image<uint8>(width/16,height/16);
-        for(int y=0; y<height/16; y++) {
-            for(int x=0; x<width/16; x++) {
-                int acc=0;
-                for(int j=0; j<16; j++) for(int i=0; i<16; i++) acc += bitmap(x*16+i,y*16+j);
-                glyph.image(x,y) = acc? 256-acc : 255; //TODO: alpha blit
-            }
-        }
     } else {
         numContours = -numContours;
         for(int i=0;i<numContours;i++) {
-            uint16 unused flags = s.read(), unused glyphIndex=s.read();
-            error("compound");
+            struct Flags{ uint16 instructions:1, metrics:1, overlap:1, pad:5, word:1, offset:1, round:1, uniform:1, zero:1, more:1, scale:1, affine:1; };
+            Flags unused flags = s.read<Flags>();
+            uint16 glyphIndex=s.read();
+            int dx,dy;
+            /**/ if(flags.word && flags.offset) dx=(int16)s.read(), dy=(int16)s.read();
+            else if(!flags.word && flags.offset) dx=(int8)s.read(), dy=(int8)s.read();
+            else if(flags.word && !flags.offset) dx=(uint16)s.read(), dy=(uint16)s.read();
+            else if(!flags.word && !flags.offset) dx=(uint8)s.read(), dy=(uint8)s.read();
+            uint16 xx=16384,xy=0,yx=0,yy=16384; //signed 1.14
+            if(flags.uniform) xx=yy = s.read();
+            else if (flags.scale) xx=s.read(), yy=s.read();
+            else if (flags.affine) xx=s.read(), xy=s.read(), yx=s.read(), yy=s.read();
+            render(raster,glyphIndex,xMin,xMax,yMin,yMax,xx,xy,yx,yy,dx,dy);
+        }
+    }
+}
+
+Glyph Font::glyph(uint16 code) {
+    // Lookup glyph in cache
+    Glyph& glyph = code<256 ? cacheASCII[code] : cacheUnicode[code];
+    if(glyph.image || glyph.advance) return Glyph i({glyph.offset,glyph.advance,share(glyph.image)});
+
+    // map unicode to glyf outline
+    int index = Font::index(code);
+    glyph.advance = scale(swap16(hmtx[2*index]));
+    Image<int8> raster; int16 xMin,xMax,yMin,yMax;
+    render(raster,index,xMin,xMax,yMin,yMax,16384,0,0,16384,0,0);
+    if(!raster) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
+    int width=raster.width,height=raster.height;
+
+    /// Rasterizes edge flags
+    Image<int8> bitmap(width,height);
+    for(int y=0; y<height; y++) {
+        int acc=0;
+        for(int x=0; x<width; x++) {
+            acc += raster(x,y);
+            bitmap(x,y) = acc>0; //TODO: alpha blit
+        }
+    }
+
+    /// Resolves supersampling
+    glyph.image = Image<uint8>(width/16,height/16);
+    for(int y=0; y<height/16; y++) {
+        for(int x=0; x<width/16; x++) {
+            int acc=0;
+            for(int j=0; j<16; j++) for(int i=0; i<16; i++) acc += bitmap(x*16+i,y*16+j);
+            glyph.image(x,y) = acc? 256-acc : 255; //TODO: alpha blitnt16)
         }
     }
     glyph.offset = int2(scale(xMin),(size<<4)-scale(yMax));

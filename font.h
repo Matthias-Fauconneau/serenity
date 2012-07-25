@@ -29,4 +29,5 @@ struct Font {
     Glyph glyph(uint16 code);
 private:
     uint16 index(uint16 code);
+    void render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 };
