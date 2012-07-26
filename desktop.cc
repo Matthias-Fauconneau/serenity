@@ -18,7 +18,7 @@ struct Desktop : Application {
     HBox applets; //{ &feeds /*, &timeBox *//*, &shortcuts*/ };
     Window window{&applets,int2(0,display.y-16)};
     //Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
-    Desktop(array<string>&& /*arguments*/) {
+    Desktop() {
         applets << &feeds; //clang doesn't support expression in initializer_list
         //if(contains(arguments,"setAllRead"_)) feeds.setAllRead();
         feeds.contentChanged.connect(&window,&Window::render);

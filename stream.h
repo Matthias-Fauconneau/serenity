@@ -134,8 +134,8 @@ struct TextStream : virtual Stream {
     char character();
     /// Reads a single word
     ref<byte> word();
-    /// Reads a single XML identifier
-    ref<byte> xmlIdentifier();
+    /// Reads a single identifier [a-zA-Z0-9_-:]*
+    ref<byte> identifier();
     /// Reads a single number
     int number(int base=10);
 };

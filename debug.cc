@@ -72,6 +72,7 @@ string demangle(TextStream& s, bool function=true) {
     else if(s.match('S')) { r<<'S'; s.number(); s.match('_'); }
     else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
     else if(s.match("Li"_)) r<<s.number();
+    else if(s.match('L')) r<<"extern "_<<demangle(s);
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<string> args;
         while(s && !s.match('E')) {

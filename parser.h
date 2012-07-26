@@ -30,9 +30,9 @@ bool operator==(const Rule& a, const Rule& b) { return a.symbol==b.symbol; }
 
 struct Item {
     array<Rule>& rules;
-    int ruleIndex;
+    uint ruleIndex;
     uint dot;
-    Item(array<Rule>& rules, int ruleIndex, uint dot):rules(rules),ruleIndex(ruleIndex),dot(dot){ assert(dot<=size()); }
+    Item(array<Rule>& rules, uint ruleIndex, uint dot):rules(rules),ruleIndex(ruleIndex),dot(dot){ assert(dot<=size()); }
     const Rule& rule() const { return rules[ruleIndex]; }
     uint size() const { return rule().size(); }
     word operator []( int i ) { return rule()[i]; }
@@ -40,6 +40,7 @@ struct Item {
 };
 bool operator ==(const Item& a, const Item& b) { return a.ruleIndex==b.ruleIndex && a.dot == b.dot; }
 string str(const Item& item) {
+    assert(item.ruleIndex<item.rules.size(),item.ruleIndex,item.rules.size());
     assert(item.dot<=item.size(),item.dot,item.size(),item.rule());
     return str(item.rule().symbol)+" -> "_+str(slice(item.rule().tokens, 0, item.dot))+"  ."_+str(slice<word>(item.rule().tokens, item.dot));
 }
@@ -49,7 +50,11 @@ struct State {
     map<word, int> transitions;
 };
 bool operator ==(const State& a, const State& b) { return a.items==b.items; }
-string str(const State& state) { return str(state.items); }
+string str(const State& state) { return " "_+str(state.items,"\n+"_); }
 
 struct Node { word name; array<Node> children; Node(word name):name(name){} };
-string str(const Node& node) { return node.children.size()==1 ? str(node.children[0]) : str(node.name)+str(node.children," "_,"()"_); }
+string str(const Node& node) {
+    if(node.children.size()==1) return str(node.children[0]);
+    if(node.children.size()==2 && node.children[0].name==node.name) return str(node.children[0])+str(node.children[1]);
+    return str(node.name)+str(node.children," "_,"()"_);
+}

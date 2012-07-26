@@ -1,14 +1,10 @@
 http://mail.google.com/inbox?q=test#a
-#: (scheme ':')?
-URL: [ht]+ ':'
-#: (scheme ':')? "//"? (authorization '@')? host? path ('?' query)? ('#' hash)?
-#scheme: id
-#authorization: id
-#host: id ('.' id)+
-#path: id ("/" id)*
-#query: id
-#hash: id
-#id: [ht]+
-#id: [htpmailgocnbxqes]+
-#id: [a-z]+
-#id: [a-zA-Z0-9]+
+URL: (scheme ':')? "//"? host path? ('?' query)? ('#' hash)?
+#(authorization '@')? needs unlimited lookahead to disambiguate from host
+scheme: id
+authorization: id
+host: id ('.' id)+
+path: ('/' id)+
+query: id
+hash: id
+id: [a-zA-Z0-9"'!$&*_\-+=|,]+

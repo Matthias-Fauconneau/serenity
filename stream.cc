@@ -64,7 +64,9 @@ void TextStream::skip() { whileAny(" \t\n\r"_); }
 
 char TextStream::character() {
     if(!match('\\')) return next();
-    if(match('n')) return '\n';
+    /***/ if(match('n')) return '\n';
+    else if(match('"')) return '"';
+    else if(match('\'')) return '\'';
     else error("Invalid escape character",peek());
 }
 
@@ -74,7 +76,7 @@ ref<byte> TextStream::word() {
     return slice(start,index-start);
 }
 
-ref<byte> TextStream::xmlIdentifier() {
+ref<byte> TextStream::identifier() {
     int start=index;
     for(;available(1);) {
         byte c=peek();

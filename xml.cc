@@ -27,7 +27,7 @@ Element::Element(TextStream& s, bool html) {
     else if(s.match("?xml"_)) { s.until("?>"_); return; }
     else if(s.match("!--"_)) { s.until("-->"_); return; }
     else if(s.match('?')){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
-    else name = string(s.xmlIdentifier());
+    else name = string(s.identifier());
     if(!name) { log((string)slice(s.buffer,0,s.index)); warn("expected tag name got",s.until('\n')); }
     if(html) name=toLower(name);
     s.skip();
@@ -35,7 +35,7 @@ Element::Element(TextStream& s, bool html) {
         if(s.match("/>"_)) { s.skip(); return; }
         else if(s.match('/')) s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
-        string key = string(s.xmlIdentifier()); s.skip();
+        string key = string(s.identifier()); s.skip();
         if(!key) { log("Attribute syntax error",(string)slice(s.buffer,start,s.index-start),"^",s.until('>')); break; }
         if(html) key=toLower(key);
         string value;
