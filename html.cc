@@ -1,16 +1,16 @@
 #include "html.h"
 #include "array.cc"
 
-ImageLoader::ImageLoader(const URL& url, Image<byte4>* target, function<void()> imageLoaded, int2 size, uint maximumAge)
-    : target(target), imageLoaded(imageLoaded), size(size) {
+ImageLoader::ImageLoader(const URL& url, Image<rgb>* target, signal<>&& imageLoaded, int2 size, uint maximumAge)
+    : target(target), imageLoaded(move(imageLoaded)), size(size) {
     getURL(url, Handler(this, &ImageLoader::load), maximumAge);
 }
 
 void ImageLoader::load(const URL&, array<byte>&& file) {
     Image<byte4> image = decodeImage(file);
     if(!image) return;
-    if(size) *target = resize(image,size.x,size.y);
-    else *target = move(image);
+    if(size) image = resize(image,size.x,size.y);
+    *target = convert<rgb>(image);
     imageLoaded();
     free(this);
 }
@@ -34,12 +34,12 @@ void HTML::append(const URL& url, array<byte>&& document) {
     //find node with most direct content
     html.visit([&url,&best,&max,&second](const Element& div){
         int score = 0;
-        if(div["class"_]=="content"_||div["id"_]=="content"_) score += 900;
+        if(div["class"_]=="content"_||div["id"_]=="content"_) score += 500;
         else if(find(div["class"_],"content"_)||find(div["id"_],"content"_)) score += 400;
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
-        if(div.name=="img"_ && div["src"_].size) {
+        if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(!endsWith(src.path,".gif"_)&&(find(src.path,"comics/"_)||find(src.path,"comic/"_)||find(src.path,"strip"_)||
+            if(!endsWith(src.path,".gif"_)&&(find(src.path,"comics"_)||find(src.path,"comic"_)||find(src.path,"strip"_)||
                                              find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
@@ -136,7 +136,7 @@ void HTML::flushImages() {
         list.reserve(w);
         for(uint x=0;x<w && i<images.size();x++,i++) {
             list << ImageView();
-            alloc<ImageLoader>(images[i], &list.last().image, contentChanged);
+            alloc<ImageLoader>(images[i], &list.last().image, copy(contentChanged));
         }
         VBox::operator<<(&list);
     }

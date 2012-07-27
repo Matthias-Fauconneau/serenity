@@ -13,7 +13,7 @@ byte* allocate_(int size) {
     //TODO: allocate from free list
     byte* buffer = heapEnd;
     heapEnd += size;
-    if(heapEnd>systemEnd) systemEnd=(byte*)brk((void*)((ulong(heapEnd)&0xFFFFF000)+0x1000)); //round to next page
+    if(heapEnd>systemEnd) systemEnd=(byte*)brk((void*)((ptr(heapEnd)&0xFFFFF000)+0x1000)); //round to next page
     assert_(systemEnd>=heapEnd);
     return buffer;
 }

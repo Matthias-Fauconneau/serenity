@@ -40,4 +40,4 @@ Element parseXML(array<byte>&& document);
 Element parseHTML(array<byte>&& document);
 
 /// Unescape XML entities
-string unescape(const ref<byte> &xml);
+string unescape(const ref<byte>& xml);

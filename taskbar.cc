@@ -21,7 +21,7 @@ struct TaskBar : Application, Poll {
 
     signal<int> tasksChanged;
 
-      TriggerButton start;
+      TriggerKey start;
        Launcher launcher;
       Bar<Task> tasks;
       Clock clock;
@@ -35,7 +35,7 @@ struct TaskBar : Application, Poll {
         registerPoll(pollfd i({wm,POLLIN}));
 
         start.image = resize(buttonIcon, 16,16);
-        start.triggered.connect(this,&TaskBar::startButton);
+        start.triggered.connect(this,&TaskBar::startKey);
         tasks.expanding=true;
         clock.timeout.connect(&window, &Window::render);
         clock.timeout.connect(&calendar, &Calendar::checkAlarm);
@@ -53,7 +53,7 @@ struct TaskBar : Application, Poll {
         }
     }
 
-    void startButton() {
+    void startKey() {
         if(!launcher.window.shown) { launcher.show(); return; }
         // show desktop
         tasks.setActive(-1); raise(0);

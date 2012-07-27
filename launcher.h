@@ -14,7 +14,7 @@ struct Command : Item {
     signal<> triggered;
     string path; array<string> args;
     Command(Icon&& icon, Text&& text, string&& path, array<string>&& args):Item(move(icon),move(text)),path(move(path)),args(move(args)){}
-    bool mouseEvent(int2, Event event, Button) override;
+    bool mouseEvent(int2, Event event, Key) override;
 };
 
 List<Command> readShortcuts();

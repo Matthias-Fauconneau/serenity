@@ -1,6 +1,6 @@
 #pragma once
 #include "process.h"
-#include "signal.h"
+#include "function.h"
 #include "image.h"
 #include "map.h"
 #include "widget.h"
@@ -8,10 +8,10 @@
 /// Window binds \a widget to display and input
 struct Window : Poll {
     no_copy(Window)
+
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values (0: screen.size, -x: widget.sizeHint + margin=-x-1), widget.sizeHint will be called from \a show
     Window(Widget* widget, int2 size=int2(-1,-1), string&& name=string(), Image<byte4>&& icon=Image<byte4>());
-    Window(Window&& window)=default; //allow = Window() initialization
     ~Window();
 
     /// Shows window. Connects to (i.e registerPoll) 'WM' local broadcast port and emits a new top level (id=0) window
@@ -28,6 +28,8 @@ struct Window : Poll {
     /// Emit current state
     void emit(bool emitTitle=false, bool emitIcon=false);
 
+    /// Displays \a widget
+    void setWidget(Widget* widget);
     /// Moves window to \a position
     void setPosition(int2 position);
     /// Resizes window to \a size
@@ -73,7 +75,7 @@ struct Window : Poll {
         uint length; /// length of this message in bytes
         //uint id; /// also Z-ordering (0=bottom). A new window use -1 and is implicitly assigned the minimum available id
         uint id; /// also Z-ordering (0=top). A new window use 0 and shift all other windows
-        int2 cursor; /// cursor position according to this window (the top containing one is right)
+        int2 cursor; /// cursor position according to this window (the top containing one is right) //FIXME: would loose drags
         int2 position;
         int2 size; /// 0: hide
         /// size>32: uint8 titleLength; char[titleLength] title; /// ""= system tray icon
@@ -83,6 +85,8 @@ struct Window : Poll {
     array<window> windows;
     /// last known cursor position
     int2 cursor;
+    /// last pressed key/button
+    Key pressed;
 
     ///  Input Devices
     int touch=0,buttons=0,keyboard=0,mouse=0;

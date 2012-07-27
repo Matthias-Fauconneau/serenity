@@ -1,6 +1,7 @@
 // Public domain, Rich Geldreich <richgel99@gmail.com>
 #include "memory.h"
 #include "debug.h"
+#include "array.cc"
 
 typedef unsigned char mz_uint8;
 typedef signed short mz_int16;
@@ -473,10 +474,9 @@ byte* decompress_mem_to_heap(const void *pSrc_buf, uint src_buf_len, uint *pOut_
   return buffer;
 }
 
-array<byte> inflate(const array<byte>& buffer, bool zlib) {
+array<byte> inflate(const ref<byte>& buffer, bool zlib) {
     uint size;
-    assert(buffer.data()); assert(buffer.size());
-    byte* data = decompress_mem_to_heap(buffer.data(), buffer.size(), &size, zlib);
+    byte* data = decompress_mem_to_heap(buffer.data, buffer.size, &size, zlib);
     if(!data) return array<byte>();
     return array<byte>(data,size);
 }

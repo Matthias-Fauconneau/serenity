@@ -36,7 +36,7 @@ struct Stream {
     /// Reads \a size bytes from stream
     ref<byte> read(uint size) { ref<byte> t = get(size); advance(size); return t; }
     /// Slices an array referencing this data (valid as long as this stream)
-    ref<byte> slice(int pos, int size) { return ::slice<byte>(buffer,pos,size); }
+    ref<byte> slice(int pos, int size) { return ::slice(buffer,pos,size); }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 };
@@ -47,15 +47,15 @@ inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
 
 /// \a DataStream provides a convenient interface to parse binaries
 struct DataStream : virtual Stream {
-    bool bigEndian = false;
+    bool isBigEndian = false;
 
     DataStream():Stream(){}
-    DataStream(DataStream&& o):Stream(move(o)),bigEndian(o.bigEndian){}
-    DataStream(array<byte>&& array, bool bigEndian=false) : Stream(move(array)), bigEndian(bigEndian) {}
-    DataStream& operator=(DataStream&& o){buffer=move(o.buffer);index=o.index;bigEndian=o.bigEndian;return *this;}
+    DataStream(DataStream&& o):Stream(move(o)),isBigEndian(o.isBigEndian){}
+    DataStream(array<byte>&& array, bool isBigEndian=false) : Stream(move(array)), isBigEndian(isBigEndian) {}
+    DataStream& operator=(DataStream&& o){buffer=move(o.buffer);index=o.index;isBigEndian=o.isBigEndian;return *this;}
 
-    /// Slices a stream referencing this data (valid as long as this stream)
-    DataStream slice(int pos, int size) { return DataStream(array<byte>(buffer.data()+pos,size),bigEndian); }
+    /// Slices a stream referencing this data
+    DataStream slice(int pos, int size) { return DataStream(array<byte>(buffer.data()+pos,size),isBigEndian); } //TODO: escape analysis
     /// Seeks stream to /a index
     void seek(uint index) { assert(index<buffer.size(),index,buffer.size()); this->index=index; }
     /// Seeks last match for \a key.
@@ -79,11 +79,11 @@ struct DataStream : virtual Stream {
         DataStream * s;
         // Swap here and not in read<T>() since functions that differ only in their return type cannot be overloaded
         /// Reads an int32 and if necessary, swaps from stream to host byte order
-        operator uint32() { return s->bigEndian?swap32(s->read<uint32>()):s->read<uint32>(); }
-        operator int32() { return s->bigEndian?swap32(s->read<int32>()):s->read<int32>(); }
+        operator uint32() { return s->isBigEndian?swap32(s->read<uint32>()):s->read<uint32>(); }
+        operator int32() { return s->isBigEndian?swap32(s->read<int32>()):s->read<int32>(); }
         /// Reads an int16 and if necessary, swaps from stream to host byte order
-        operator uint16() { return s->bigEndian?swap16(s->read<uint16>()):s->read<uint16>(); }
-        operator int16() { return s->bigEndian?swap16(s->read<int16>()):s->read<int16>(); }
+        operator uint16() { return s->isBigEndian?swap16(s->read<uint16>()):s->read<uint16>(); }
+        operator int16() { return s->isBigEndian?swap16(s->read<int16>()):s->read<int16>(); }
         /// Reads an int8
         operator uint8() { return s->read<uint8>(); }
         operator int8() { return s->read<int8>(); }
@@ -123,7 +123,7 @@ struct TextStream : virtual Stream {
     /// Reads until stream match \a key
     ref<byte> until(char key);
     /// Reads until stream match \a key
-    ref<byte> until(const ref<byte> &key);
+    ref<byte> until(const ref<byte>& key);
     /// Reads until stream match any character of \a key
     ref<byte> untilAny(const ref<byte>& any);
     /// Reads until the end of stream
@@ -131,7 +131,7 @@ struct TextStream : virtual Stream {
     /// Skips whitespaces
     void skip();
     /// Reads one possibly escaped character
-    char character();
+    byte character();
     /// Reads a single word
     ref<byte> word();
     /// Reads a single identifier [a-zA-Z0-9_-:]*

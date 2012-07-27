@@ -6,6 +6,7 @@
 #define _
 #define ___
 #define i( ignore... )
+template<class T> struct ref;
 #else
 #define ___ ...
 #define i( ignore... ) ignore
@@ -57,7 +58,7 @@ typedef unsigned short ushort;
 typedef signed int int32;
 typedef unsigned int uint32;
 typedef unsigned int uint;
-typedef unsigned long ulong;
+typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 

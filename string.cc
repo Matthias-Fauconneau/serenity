@@ -4,7 +4,7 @@
 
 /// string operations
 
-bool startsWith(const ref<byte> &s, const ref<byte> &a) { return a.size<=s.size && ref<byte>(s.data,a.size)==a; }
+bool startsWith(const ref<byte>& s, const ref<byte>& a) { return a.size<=s.size && ref<byte>(s.data,a.size)==a; }
 bool find(const ref<byte>& s, const ref<byte>& a) {
     if(a.size>s.size) return false;
     for(uint i=0;i<=s.size-a.size;i++) {
@@ -25,7 +25,7 @@ bool operator >(const ref<byte>& a, const ref<byte>& b) {
 }
 
 bool CString::busy = 0; //flag for multiple strz usage in a statement
-CString strz(const ref<byte> &s) {
+CString strz(const ref<byte>& s) {
     CString cstr;
     //optimization to avoid copy, valid so long the referenced string doesn't change
     //if(s.capacity()>s.size) { ((byte*)s.data)[s.size]=0; cstr.tag=0; cstr.data=(char*)s.data; return cstr; }
@@ -81,7 +81,7 @@ array<string> split(const ref<byte>& str, byte sep) {
         auto e = b;
         while(e!=end && *e!=sep) ++e;
         if(b==end) break;
-        list << copy(string(b,e));
+        list << string(ref<byte>(b,e));
         if(e==end) break;
         b = ++e;
     }
@@ -167,7 +167,7 @@ template string itoa<10>(int,int);
 
 bool isInteger(const ref<byte>& s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
 
-long toInteger(const ref<byte> &number, int base) {
+long toInteger(const ref<byte>& number, int base) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
     int sign=1;
     const byte* i = number.begin();

@@ -1,5 +1,5 @@
 #pragma once
-typedef unsigned char byte;
+#include "core.h"
 
 byte* allocate_(int size);
 byte* reallocate_(byte* buffer, int size, int need);

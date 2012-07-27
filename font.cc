@@ -4,8 +4,7 @@
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 
 Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
-    DataStream s(keep);
-    s.bigEndian=true;
+    DataStream s(keep, true);
     uint32 unused scaler=s.read();
     uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
     DataStream head, hhea;
@@ -119,7 +118,8 @@ void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
 #endif
 }
 
-void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {;
+//void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {
+void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int, int, int, int, int, int) {
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
     DataStream s(array<byte>(glyf +start, length), true);

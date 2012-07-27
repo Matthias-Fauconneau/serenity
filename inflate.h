@@ -1,4 +1,4 @@
 #pragma once
 #include "array.h"
 
-array<byte> inflate(const array<byte>& buffer, bool zlib);
+array<byte> inflate(const ref<byte>& buffer, bool zlib);

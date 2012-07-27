@@ -1,18 +1,9 @@
 #pragma once
-#include "signal.h"
+#include "function.h"
 #include "string.h"
 #include "file.h"
 #include "resample.h"
 #include "flac.h"
-
-/// \a static_array is an \a array with preallocated inline space
-/// \note as static_array use static inheritance (to avoid code duplication), it cannot extend \a array small inline space.
-///          \a array inline space will be wasted and \a array methods will use the \a array::buffer reference
-template<class T, int N> struct static_array : array<T> {
-    no_copy(static_array)
-    static_array() { array<T>::tag=-2; array<T>::buffer=typename array<T>::Buffer((T*)buffer,0,N); }
-    ubyte buffer[N*sizeof(T)];
-};
 
 struct Sample {
     Map data; //Sample Definition

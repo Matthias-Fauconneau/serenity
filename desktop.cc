@@ -11,22 +11,32 @@
 
 struct Desktop : Application {
     Feeds feeds;
+    Scroll<HTML> page;
     //List<Command> shortcuts;// = readShortcuts();
      //Clock clock { 128 };
      //Calendar calendar;
     //VBox timeBox { &clock, &calendar };
     HBox applets; //{ &feeds /*, &timeBox *//*, &shortcuts*/ };
-    Window window{&applets,int2(0,display.y-16)};
+    Window window = i({&applets,int2(0,::display().y-16)});
     //Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop() {
         applets << &feeds; //clang doesn't support expression in initializer_list
-        //if(contains(arguments,"setAllRead"_)) feeds.setAllRead();
-        feeds.contentChanged.connect(&window,&Window::render);
         //clock.timeout.connect(&window, &Window::render);
+        feeds.listChanged.connect(&window,&Window::render);
+        feeds.pageChanged.connect(this,&Desktop::showPage);
+        window.localShortcut(Key::Right).connect(&feeds, &Feeds::readNext);
+        window.localShortcut(Key::Extra).connect(&feeds, &Feeds::readNext);
+        //window.localShortcut(Key::Escape).connect(&window, &Window::hide); //back to desktop
+        //window.localShortcut(Key::Power).connect(&window, &Window::hide); //back to desktop
         //window.localShortcut(Key::Escape).connect(&shutdownPopup,&Window::toggle);
         //window.localShortcut(Key::Power).connect(&shutdownPopup,&Window::toggle);
-        window.localShortcut(Key::Escape).connect(&window,&Window::hide);
+        window.localShortcut(Key::Escape).connect(&window,&Window::hide); //DEBUG: quit desktop (return to X)
         window.show();
+    }
+    void showPage(const ref<byte>& link) {
+        window.setWidget( &page.parent() );
+        page.contentChanged.connect(&window, &Window::render);
+        page.go(link);
     }
 };
 Application(Desktop)

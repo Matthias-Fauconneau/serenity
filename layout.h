@@ -1,6 +1,6 @@
 #pragma once
 #include "widget.h"
-#include "signal.h"
+#include "function.h"
 
 /// Layout is a proxy Widget containing multiple widgets.
 struct Layout : Widget {
@@ -9,15 +9,9 @@ struct Layout : Widget {
     virtual Widget& at(int) =0;
 
     /// Forwards event to intersecting child widgets until accepted
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
     /// Renders every child widget
     void render(int2 parent) override;
-    /// Formats widget hierarchy
-    string str() override {
-        array<string> s;
-        for(uint i=0;i<count();i++) s<< (*(void**)&at(i)? at(i).str() : string("<invalid>"_));
-        return "("_+join(s,", "_)+")"_; //TODO: RTTI
-    }
 };
 
 /// Widgets implements Layout storage using array<Widget*> (i.e by reference)
@@ -84,36 +78,30 @@ struct Linear: virtual Layout {
 /// Horizontal divide horizontal space between contained widgets
 struct Horizontal : virtual Linear {
     int2 xy(int2 xy) override { return xy; }
-    string str() override { return "Horizontal"_+Layout::str(); }
 };
 /// Vertical divide vertical space between contained widgets
 struct Vertical : virtual Linear{
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
-    string str() override { return "Vertical"_+Layout::str(); }
 };
 
 /// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
 struct HBox : Horizontal, Widgets {
     HBox(){}
     HBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
-    string str() override { return "HBox"_+Layout::str(); }
 };
 /// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
 struct VBox : Vertical, Widgets {
     VBox(){}
     VBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
-    string str() override { return "VBox"_+Layout::str(); }
 };
 
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
     HList(ref<T>&& widgets):Array<T>(move(widgets)){}
-    string str() override { return "HList"_+Layout::str(); }
 };
 template<class T> struct VList : Vertical, Array<T> {
     VList(){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
-    string str() override { return "VListl"_+Layout::str(); }
 };
 
 /// Layout items on an uniform \a width x \a height grid
@@ -136,7 +124,7 @@ struct Selection : virtual Layout {
     /// User clicked on an item.
     signal<int /*index*/> itemPressed;
 
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
     bool keyPress(Key key) override;
 };
 

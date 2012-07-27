@@ -2,6 +2,7 @@
 #include "stream.h"
 #include "inflate.h"
 #include "memory.h"
+#include "array.cc"
 
 template<class T> struct rgba { T r,g,b,a; operator byte4()const{return byte4{b,g,r,a};} };
 template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r,255};} };
@@ -50,8 +51,8 @@ template void filter<ia,2>(byte4* dst, const byte* raw, int width, int height, i
 template void filter<rgb,3>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 template void filter<rgba,4>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 
-Image<byte4> decodePNG(const array<byte>& file) {
-    DataStream s(array<byte>(file.data(),file.size())); s.bigEndian=true;
+Image<byte4> decodePNG(const ref<byte>& file) {
+    DataStream s(array<byte>(file.data,file.size), true);
     assert(s.get(8)=="\x89PNG\r\n\x1A\n"_);
     s.advance(8);
     array<byte> buffer;
@@ -111,5 +112,5 @@ Image<byte4> decodePNG(const array<byte>& file) {
         rgb3* lookup = (rgb3*)palette.data();
         for(uint i=0;i<width*height;i++) image[i]=lookup[image[i].r];
     }
-    return Image<byte4>(image,width,height,width,true);
+    return Image<byte4>(image,width,height,width,true,depth==4);
 }

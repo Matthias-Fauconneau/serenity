@@ -123,7 +123,7 @@ Symbol findNearestLine(void* find) {
     for(DataStream& s = symtab;s.index<s.buffer.size();) {
         const Sym& sym = s.read<Sym>();
         if(find >= sym.value && find < sym.value+sym.size) {
-            TextStream s(str(strtab+sym.name));
+            TextStream s(array<byte>(str(strtab+sym.name)));
             symbol.function = s.match('_')&&s.peek()=='Z'? (s.buffer.size()>80?string("delegate"_) :demangle(s)) : string(s.untilEnd());
         }
     }

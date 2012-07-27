@@ -1,8 +1,5 @@
-apps: feeds, WM, taskbar
-font: kerning, subpixel position, hinting
-apps: text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf, inflate, jpeg
+apps: feeds, desktop, text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf, inflate, jpeg
+font: compound glyph transform, kerning, subpixel position, hinting
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen
+parser: attributes (L+S), scoped symbols
 IDE: parser, build driver, dependency graph with (code size,build time), git, debugger, static analyzer, profiler, gc?, interpreter, compiler
-
-clang: cannot compile initializer lists with expression
-gcc: cannot compile non scalar ReadOperator, different _start layout, stacktrace, slow

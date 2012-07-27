@@ -73,7 +73,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
 void Socket::disconnect() { if(fd) close( fd ); fd=0; }
 
 array<byte> Socket::receive(uint size) { return readUpTo(fd,size); }
-void Socket::write(const array<byte>& buffer) { ::write(fd,buffer); }
+void Socket::write(const ref<byte>& buffer) { ::write(fd,buffer); }
 
 uint Socket::available(uint need) {
     if(need==uint(-1)) buffer<<this->receive(4096);
@@ -106,7 +106,7 @@ string base64(const ref<byte>& input) {
 
 /// URL
 
-URL::URL(const ref<byte> &url) {
+URL::URL(const ref<byte>& url) {
     if(!url) { warn("Empty url"); return; }
     TextStream s = string(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
@@ -154,6 +154,7 @@ string cacheFile(const URL& url) {
 
 HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, array<string>&& headers, string&& method)
     : url(str(url)), headers(move(headers)), method(move(method)), handler(handler) {
+    debug( log("request",url); )
     if(!connect(url.host, url.scheme)) { free(this); return; }
     registerPoll(i({fd, POLLIN|POLLOUT}));
 }
@@ -161,10 +162,10 @@ void HTTP::request() {
     state=Request;
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;
-    write( request+"\r\n"_ );
+    write( string(request+"\r\n"_) );
 }
 void HTTP::header() {
-    string file = cacheFile(url); //TODO: fd (mtime?)
+    string file = cacheFile(url);
     assert(state==Request);
     state=Header;
     // Status

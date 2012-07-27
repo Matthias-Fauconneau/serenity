@@ -5,6 +5,9 @@
 #define generic template<class T>
 generic array<T>::array(ref<T>&& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(move((T&)ref[i]));}
 generic array<T>::array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
+generic array<T>::~array(){
+    if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate_((byte*)buffer.data,buffer.capacity*sizeof(T)); }
+}
 
 #define array array<T>
 
@@ -46,38 +49,30 @@ generic T array::takeFirst() { return take(0); }
 generic T array::takeLast() { return take(size()-1); }
 generic T array::pop() { return takeLast(); }
 
-generic array& operator <<(array& a, T&& v) { int s=a.size()+1; a.reserve(s); new (a.end()) T(move(v)); a.setSize(s); return a; }
-generic array& operator <<(array& a, array&& b) {
-    int s=a.size()+b.size(); a.reserve(s); copy((byte*)a.end(),(byte*)b.data(),b.size()*sizeof(T)); a.setSize(s); return a;
+generic array& array::operator <<(T&& v) { int s=size()+1; reserve(s); new (end()) T(move(v)); setSize(s); return *this; }
+generic array& array::operator <<(array&& b) {
+    int s=size()+b.size(); reserve(s); copy((byte*)end(),(byte*)b.data(),b.size()*sizeof(T)); setSize(s); return *this;
 }
 
+generic array& array::operator +=(T&& v) { if(!contains(*this, v)) *this<< move(v); return *this; }
+generic array& array::operator +=(const T& v) { if(!contains(*this, v)) *this<< copy(v); return *this; }
+generic array& array::operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
+generic array& array::operator +=(const ref<T>& o) { for(const T& v: o) *this+= copy(v); return *this; }
+
 // Copyable?
-/*generic array slice(const array& a, uint pos, uint size) {
-    assert(pos+size<=a.size());
-    return copy(array(a.data()+pos,size));
-}
-generic array slice(const array& a, uint pos) { return slice(a,pos,a.size()-pos); }*/
 generic array& operator <<(array& a, T const& v) { a<< copy(v); return a; }
 generic array& operator <<(array& a, const ref<T>& b) {
     int old=a.size(); a.reserve(old+b.size); a.setSize(old+b.size);
     for(uint i=0;i<b.size;i++) new (&a.at(old+i)) T(copy(b[i]));
     return a;
 }
-generic array copy(const array& a) { array r(a.size()); r.setSize(a.size()); for(uint i=0;i<a.size();i++) new (&r.at(i)) T(copy(a[i])); return  r; }
-
 generic T& insertAt(array& a, int index, T&& v) {
     a.reserve(a.size()+1); a.setSize(a.size()+1);
     for(int i=a.size()-2;i>=index;i--) copy(a.at(i+1),a.at(i));
     new (&a.at(index)) T(move(v));
     return a.at(index);
 }
-
-generic T& insertAt(array& a, int index, const T& v) {
-    a.reserve(a.size()+1); a.setSize(a.size()+1);
-    for(int i=a.size()-2;i>=index;i--) copy(a.at(i+1),a.at(i));
-    new (&a.at(index)) T(copy(v));
-    return a.at(index);
-}
+generic T& insertAt(array& a, int index, const T& v) { return a.insertAt(a,index,copy(v)); }
 
 // DefaultConstructible?
 generic void grow(array& a, uint size) { uint old=a.size(); assert(size>old); a.reserve(size); a.setSize(size); for(uint i=old;i<size;i++) new (&a.at(i)) T(); }
@@ -93,15 +88,12 @@ generic int indexOf(const ref<T>& a, const T& value) { for(uint i=0;i<a.size;i++
 generic bool contains(const ref<T>& a, const T& value) { return indexOf(a,value)>=0; }
 generic int removeOne(array& a, T v) { int i=indexOf(a, v); if(i>=0) a.removeAt(i); return i; }
 generic void removeAll(array& a, T v) { for(uint i=0;i<a.size();i++) if(a[i]==v) a.removeAt(i), i--; }
-generic array& operator +=(array& a, const T& v) { if(!contains(a,v)) a<< copy(v); return a; }
-generic array& operator +=(array& a, const array& o) { for(const T& v: o) a+= v; return a; }
-
 generic array replace(array&& a, const T& before, const T& after) {
         for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 
 // Orderable?
-generic const T& min(const array& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
+generic T& min (array& a) { T* min=&a.first(); for(T& e: a) if(e<*min) min=&e; return *min; }
 generic T& max(array& a) { T* max=&a.first(); for(T& e: a) if(e>*max) max=&e; return *max; }
 generic int insertSorted(array& a, T&& v) { uint i=0; for(;i<a.size();i++) if(a[i] > v) break; insertAt(a, i,move(v)); return i; }
 generic int insertSorted(array& a, const T& v) { return insertSorted(a,copy(v)); }

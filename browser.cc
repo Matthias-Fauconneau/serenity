@@ -8,13 +8,13 @@
 #include "array.cc"
 
 struct Browser : Application {
-    Scroll<HTML> content;
+    Scroll<HTML> page;
     Window window = Window(&content.parent(),int2(0,0));
 
     Browser() {
         window.localShortcut(Key::Escape).connect(this, &Application::quit);
-        content.contentChanged.connect(&window, &Window::render);
-        content.go("http://thedreamercomic.com/blog.php/page-3-fighting-cocks-tavern/"_);
+        page.contentChanged.connect(&window, &Window::render);
+        page.go("http://thedreamercomic.com/blog.php/page-3-fighting-cocks-tavern/"_);
         window.show();
     }
 };

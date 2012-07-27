@@ -1,6 +1,7 @@
 #pragma once
-#include "signal.h"
+#include "function.h"
 #include "image.h"
+#include "display.h"
 #include "layout.h"
 #include "text.h"
 
@@ -25,7 +26,7 @@ struct ScrollArea : Widget {
 
     int2 sizeHint() { return widget().sizeHint(); }
     void update() override;
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
     void render(int2 parent) { return widget().render(parent+position); }
 };
 
@@ -41,31 +42,32 @@ template<class T> struct Scroll : ScrollArea, T {
 /// ImageView is a widget displaying a static image
 struct ImageView : Widget {
     /// Displayed image
-    Image<byte4> image;
+    Image<rgb> image;
 
     ImageView(){}
     /// Create a widget displaying \a image
-    ImageView(Image<byte4>&& image):image(move(image)){}
+    ImageView(Image<rgb>&& image):image(move(image)){}
+    ImageView(const Image<byte4>& image):image(convert<rgb>(image)){}
 
     int2 sizeHint();
     void render(int2 parent);
 };
 typedef ImageView Icon;
 
-/// TriggerButton is a clickable Icon
-struct TriggerButton : Icon {
+/// TriggerKey is a clickable Icon
+struct TriggerKey : Icon {
     //using Icon::Icon;
-    TriggerButton(){}
-    TriggerButton(Image<byte4>&& image):Icon(move(image)){}
+    TriggerKey(){}
+    TriggerKey(Image<byte4>&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
 };
 
-/// ToggleButton is a togglable Icon
-struct ToggleButton : Widget {
+/// ToggleKey is a togglable Icon
+struct ToggleKey : Widget {
     /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(const Image<byte4>& enable,const Image<byte4>& disable);
+    ToggleKey(const Image<byte4>& enable,const Image<byte4>& disable);
 
     /// User toggled the button
     signal<bool /*nextState*/> toggled;
@@ -75,7 +77,7 @@ struct ToggleButton : Widget {
 
     int2 sizeHint();
     void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
 
     const Image<byte4>& enableIcon;
     const Image<byte4>& disableIcon;
@@ -93,7 +95,7 @@ struct Slider : Widget {
 
     int2 sizeHint();
     void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
 
     static const int height = 32;
 };
@@ -102,7 +104,6 @@ struct Slider : Widget {
 struct Item : Horizontal, Tuple<Icon,Text,Space> {
     Item():Tuple(){}
     Item(Icon&& icon, Text&& text):Tuple(move(icon),move(text),Space()){}
-    string str() override { return "Item"_+Layout::str(); }
 };
 
 /// TabBar is a \a Bar containing \a Item elements

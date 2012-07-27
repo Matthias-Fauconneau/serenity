@@ -1,5 +1,5 @@
 #include "string.h"
-#include "signal.h"
+#include "function.h"
 #include "resample.h"
 
 struct AudioFormat { int frequency, channels; };

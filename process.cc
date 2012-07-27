@@ -2,9 +2,6 @@
 #include "linux.h"
 #include "array.cc"
 
-enum { RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS };
-struct rlimit { ulong cur,max; };
-
 void setupHeap(); //memory.cc
 
 static void handler(int, struct siginfo*, struct ucontext*) { trace(1); abort(); }
@@ -34,7 +31,7 @@ void Poll::unregisterPoll() { for(int i;(i=removeOne(polls, this))>=0;) pollfds.
 bool operator ==(pollfd a, pollfd b) { return a.fd==b.fd; }
 void Poll::unregisterPoll(int fd) { int i=removeOne(pollfds, pollfd{fd}); if(i>=0) polls.removeAt(i); }
 static array<Poll*> queue;
-void Poll::wait() { queue << this; }
+void Poll::wait() { queue+= this; }
 
 int dispatchEvents() {
     if(!polls) return 0;

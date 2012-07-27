@@ -116,7 +116,7 @@ void Element::xpath(const ref<byte>& path, const function<void(const Element &)>
 
 string Element::text() const { string text; visit([&text](const Element& e){ text<<e.content; }); return text; }
 
-string Element::text(const ref<byte> &path) const {
+string Element::text(const ref<byte>& path) const {
     string text;
     xpath(path,[&text](const Element& e){ text<<e.text(); });
     return text;

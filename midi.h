@@ -1,6 +1,5 @@
 #pragma once
-//#include "map.h"
-#include "signal.h"
+#include "function.h"
 #include "stream.h"
 #include "string.h"
 

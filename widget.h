@@ -3,16 +3,13 @@
 #include "string.h"
 
 /// Event type
-enum Event { Motion, Press, Release, Enter, Leave };
-/// Mouse button
-enum Button { None, LeftButton=0x110, RightButton, MiddleButton, WheelDown=0x150, WheelUp };
-
+enum Event { Motion, Press, Release };
 /// Key codes
 enum i(class) Key {
-    Escape=1, _1, _2, _3, _4, _5, _6, _7, _8, _9, _0, Minus, Equal, Backspace, Tab, Q, W, E, R, T, Y, U, I, O, P, LeftBrace, RightBrace, Enter, LeftCtrl,
-    A, S, D, F, G, H, J, K, L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z, X, C, V, B, N, M, Comma, Dot, Slash, RightShift, KpAsterisk, LeftAlt,
-    Space,
-    Home=102, Up, PageUp, Left, Right, End, Down, PageDown, Insert, Delete, Macro, Mute, VolumeDown, VolumeUp, Power=116, Extra=0x114
+    None, Escape, _1,_2,_3,_4,_5,_6,_7,_8,_9,_0, Minus, Equal, Backspace, Tab, Q,W,E,R,T,Y,U,I,O,P, LeftBrace, RightBrace, Enter, LeftCtrl,
+    A,S,D,F,G,H,J,K,L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z,X,C,V,B,N,M, Comma, Dot, Slash, RightShift, KpAsterisk, LeftAlt,
+    Space, Home=102, Up, PageUp, LeftArrow, RightArrow, End, Down, PageDown, Insert, Delete, Macro, Mute, VolumeDown, VolumeUp,
+    Power=116, Left=0x110, Right, Middle, Side, Extra, WheelDown=0x150, WheelUp
 };
 
 /// Widget is an abstract component to compose user interfaces
@@ -20,8 +17,6 @@ struct Widget {
     Widget()=default;
     Widget(Widget&&)=default;
     virtual ~Widget() {}
-/// Debug
-    virtual string str() { return string("Widget"_); } //TODO: RTTI
 /// Layout
     int2 position; /// position of the widget within its parent widget
     int2 size; /// size of the widget
@@ -40,7 +35,7 @@ struct Widget {
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root \a Window::widget
     /// \return whether the mouse event should trigger a repaint
-    virtual bool mouseEvent(int2 /*position*/, Event /*event*/, Button /*button*/) { return false; }
+    virtual bool mouseEvent(int2 /*position*/, Event /*event*/, Key /*button*/) { return false; }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current \a Window::focus
     /// \return whether the key press should trigger a repaint

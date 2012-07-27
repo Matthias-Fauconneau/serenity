@@ -62,7 +62,7 @@ ref<byte> TextStream::untilEnd() { uint size=available(-1); return read(size); }
 
 void TextStream::skip() { whileAny(" \t\n\r"_); }
 
-char TextStream::character() {
+byte TextStream::character() {
     if(!match('\\')) return next();
     /***/ if(match('n')) return '\n';
     else if(match('"')) return '"';

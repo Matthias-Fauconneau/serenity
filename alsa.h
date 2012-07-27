@@ -1,5 +1,5 @@
 #include "process.h"
-#include "signal.h"
+#include "function.h"
 
 typedef struct _snd_pcm snd_pcm_t;
 typedef unsigned long snd_pcm_uframes_t;

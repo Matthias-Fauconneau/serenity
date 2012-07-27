@@ -118,18 +118,18 @@ void Text::update(int wrap) {
     textSize.y=max(textSize.y, size);
 }
 int2 Text::sizeHint() {
-    if(!textSize) update(wrap>=0 ? wrap : display.y);
+    if(!textSize) update(wrap>=0 ? wrap : display().y);
     return wrap?int2(-textSize.x,textSize.y):textSize;
 }
 
 void Text::render(int2 parent) {
-    if(!textSize) update(wrap>=0 ? wrap : display.y);
+    if(!textSize) update(wrap>=0 ? wrap : display().y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), 0);
 }
 
-bool Text::mouseEvent(int2 position, Event event, Button) {
+bool Text::mouseEvent(int2 position, Event event, Key) {
     if(event!=Press) return false;
     position -= max(int2(0,0),(Widget::size-textSize)/2);
     for(uint i=0;i<blits.size();i++) { const Blit& b=blits[i];
@@ -143,12 +143,12 @@ bool Text::mouseEvent(int2 position, Event event, Button) {
 
 /// TextInput
 
-bool TextInput::mouseEvent(int2 position, Event event, Button) {
+bool TextInput::mouseEvent(int2 position, Event event, Key) {
     if(event!=Press) return false;
     focus=this;
     int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
     for(cursor=0;cursor<blits.size() && x>blits[cursor].pos.x+(int)blits[cursor].image.width/2;cursor++) {}
-    //if(button==MiddleButton) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); update(); }
+    //if(button==MiddleKey) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); update(); }
     return true;
 }
 

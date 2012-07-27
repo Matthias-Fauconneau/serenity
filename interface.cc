@@ -18,19 +18,19 @@ void ScrollArea::update() {
     widget().update();
 }
 
-bool ScrollArea::mouseEvent(int2 cursor, Event event, Button button) {
-    if(event==Press && (button==WheelDown || button==WheelUp) && size.y<abs(widget().sizeHint().y)) {
+bool ScrollArea::mouseEvent(int2 cursor, Event event, Key button) {
+    if(event==Press && (button==Key::WheelDown || button==Key::WheelUp) && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
-        position.y += button==WheelUp?-32:32;
+        position.y += button==Key::WheelUp?-32:32;
         position.y = max(size.y-abs(widget().sizeHint().y),min(0,position.y));
         return true;
     }
     if(widget().mouseEvent(cursor-widget().position,event,button)) return true;
     static int dragStart=0, flickStart=0;
-    if(event==Press && button==LeftButton) {
+    if(event==Press && button==Key::Left) {
         dragStart=cursor.y, flickStart=widget().position.y;
     }
-    if(event==Motion && button==LeftButton && size.y<abs(widget().sizeHint().y)) {
+    if(event==Motion && button==Key::Left && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
         position.y = flickStart+cursor.y-dragStart;
         position.y = max(size.y-abs(widget().sizeHint().y),min(0,position.y));
@@ -57,8 +57,8 @@ void Slider::render(int2 parent) {
     }
 }
 
-bool Slider::mouseEvent(int2 position, Event event, Button button) {
-    if((event == Motion || event==Press) && button==LeftButton) {
+bool Slider::mouseEvent(int2 position, Event event, Key button) {
+    if((event == Motion || event==Press) && button==Key::Left) {
         value = minimum+position.x*uint(maximum-minimum)/size.x;
         valueChanged(value);
         return true;
@@ -68,16 +68,16 @@ bool Slider::mouseEvent(int2 position, Event event, Button button) {
 
 /// Selection
 
-bool Selection::mouseEvent(int2 position, Event event, Button button) {
+bool Selection::mouseEvent(int2 position, Event event, Key button) {
     if(Layout::mouseEvent(position,event,button)) return true;
     if(event != Press) return false;
-    if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
-    if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
+    if(button == Key::WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
+    if(button == Key::WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
     focus=this;
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<=child.position+child.size) {
             if(index!=i) { index=i; at(index).selectEvent(); activeChanged(index); }
-            if(button == LeftButton) itemPressed(index);
+            if(button == Key::Left) itemPressed(index);
             return true;
         }
     }
@@ -126,23 +126,23 @@ void ImageView::render(int2 parent) {
     blit(parent+position+(Widget::size-image.size())/2, image); //TODO: alpha
 }
 
-/// TriggerButton
+/// TriggerKey
 
-bool TriggerButton::mouseEvent(int2, Event event, Button) {
+bool TriggerKey::mouseEvent(int2, Event event, Key) {
     if(event==Press) { triggered(); return true; }
     return false;
 }
 
-///  ToggleButton
+///  ToggleKey
 
-ToggleButton::ToggleButton(const Image<byte4>& enableIcon, const Image<byte4>& disableIcon) : enableIcon(enableIcon), disableIcon(disableIcon) {}
-int2 ToggleButton::sizeHint() { return int2(size,size); }
-void ToggleButton::render(int2 parent) {
+ToggleKey::ToggleKey(const Image<byte4>& enableIcon, const Image<byte4>& disableIcon) : enableIcon(enableIcon), disableIcon(disableIcon) {}
+int2 ToggleKey::sizeHint() { return int2(size,size); }
+void ToggleKey::render(int2 parent) {
     if(!(enabled?disableIcon:enableIcon)) return;
     int size = min(Widget::size.x,Widget::size.y);
     blit(parent+position+(Widget::size-int2(size,size))/2, enabled?disableIcon:enableIcon);
 }
-bool ToggleButton::mouseEvent(int2, Event event, Button button) {
-    if(event==Press && button==LeftButton) { enabled = !enabled; toggled(enabled); return true; }
+bool ToggleKey::mouseEvent(int2, Event event, Key button) {
+    if(event==Press && button==Key::Left) { enabled = !enabled; toggled(enabled); return true; }
     return false;
 }

@@ -7,18 +7,14 @@
 struct Entry : Item {
     bool isHeader=false;
     string link;
-    Scroll<HTML>* content=0;
-    Entry(Entry&& o);
-    Entry(string&& name, string&& link, Image<byte4>&& icon=Image<byte4>());
-    ~Entry();
+    Entry(string&& name, string&& link, Image<byte4>&& icon=Image<byte4>()):Item(move(icon),move(name)),link(move(link)){}
 };
 
 struct Feeds : List<Entry> {
     int readConfig;
     Map readMap;
-    signal<> contentChanged;
-    Scroll<HTML>* content=0;
-    Window window {0}; //keep the same window to implement \a nextItem
+    signal<> listChanged;
+    signal< const ref<byte>& > pageChanged;
 
     Feeds();
     ~Feeds();

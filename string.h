@@ -1,6 +1,7 @@
 #pragma once
 #include "array.h"
 
+/// string is an array of bytes (not using char to
 typedef array<byte> string;
 
 /// Expression template to hold recursive concatenation operations
@@ -83,7 +84,7 @@ inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
 /// Converts a floating point number to its human-readable representation
 //string ftoa(float number, int precision, int base=10);
 
-bool isInteger(const ref<byte> &s);
+bool isInteger(const ref<byte>& s);
 /// Parses an integer value
 long toInteger(const ref<byte>& str, int base=10 );
 /// Parses a decimal value
@@ -95,22 +96,20 @@ template<class A> string str(const A&) { static_assert(sizeof(A) & 0,"No string 
 /// Returns a bounded reference to the null-terminated string pointer
 ref<byte> str(const char* s);
 
-inline string str(const bool& b) { return string(b?"true"_:"false"_); }
-inline string str(const char& c) { return copy(string((byte*)&c,1)); }
+inline ref<byte> str(const bool& b) { return b?"true"_:"false"_; }
+inline ref<byte> str(const char& c) { return ref<byte>((byte*)&c,1); }
 inline string str(const uint8& n) { return dec(n); }
 inline string str(const int8& n) { return dec(n); }
 inline string str(const uint16& n) { return dec(n); }
 inline string str(const int16& n) { return dec(n); }
 inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
-inline string str(const ulong& n) { return dec(n); }
-inline string str(const long& n) { return dec(n); }
 //inline string str(const float& n) { return ftoa(n,2); }
 inline const string& str(const string& s) { return s; }
-inline string str(const ref<byte>& s) { return string(s); }
+//inline string str(const ref<byte>& s) { return string(s); }
 template<class A> inline string str(const cat<A>& s) { return s; }
 //template<class A> inline string str(A* const& p) { return p?utoa<16>(uint(p)):string("null"_); }
-template<class A> inline string str(A* const& p) { return p?str(*p):string("null"_); }
+//template<class A> inline string str(A* const& p) { return p?str(*p):string("null"_); }
 template<class T> inline string str(const ref<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
     if(!a) return string();
     string s; if(bracket) s<<bracket[0]; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<sep;} if(bracket) s<<bracket[1]; return s;

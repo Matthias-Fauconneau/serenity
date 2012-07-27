@@ -10,15 +10,14 @@ struct Directory { uint16 reserved, type, count; };
 struct Entry { ubyte width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
 struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
 
-Image<byte4> decodeICO(const array<byte>& file) {
-    assert(file);
-    DataStream s(array<byte>(file.data(),file.size()));
+Image<byte4> decodeICO(const ref<byte>& file) {
+    DataStream s(array<byte>(file.data,file.size));
 
     Directory unused directory = s.read<Directory>();
     assert(directory.reserved==0);
     assert(directory.type==1);
     assert(directory.count>=1);
-    Entry unused entry = s.read<Entry>();
+    Entry entry = s.read<Entry>();
     s.index=entry.offset; //skip other entries
 
     Header header = s.read<Header>();
@@ -28,11 +27,10 @@ Image<byte4> decodeICO(const array<byte>& file) {
     assert(header.depth==4||header.depth==8||header.depth==24||header.depth==32,header.depth);
     assert(header.compression==0);
 
-    ref<byte4> palette=ref<byte4>(0,0);
+    ref<byte4> palette = ref<byte4>(0,0u);
     if(header.depth<=8) {
         assert(header.colorCount==0 || header.colorCount==(1u<<header.depth),header.colorCount,header.depth);
         palette = s.read<byte4>(1<<header.depth);
-        //for(byte4& p: palette) p.a=255;
     }
 
     uint w=header.width,h=header.height/2;

@@ -57,10 +57,10 @@ Map mapFile(int fd) {
 }
 Map::~Map() { if(data) munmap((void*)data,size); }
 
-void writeFile(const ref<byte>& path, const array<byte>& content, int at, bool overwrite) {
+void writeFile(const ref<byte>& path, const ref<byte>& content, int at, bool overwrite) {
     int fd = createFile(path,at,overwrite);
-    uint unused wrote = write(fd,content.data(),content.size());
-    assert(wrote==content.size());
+    uint unused wrote = write(fd,content.data,content.size);
+    assert(wrote==content.size);
     close(fd);
 }
 

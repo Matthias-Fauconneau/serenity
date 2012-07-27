@@ -4,20 +4,9 @@
 #include "xml.h"
 #include "html.h"
 #include "interface.h"
-#include "window.h"
 #include "array.cc"
 
-Entry::Entry(Entry&& o) : Item(move(o)) { link=move(o.link); content=o.content; o.content=0; isHeader=o.isHeader; }
-Entry::Entry(string&& name, string&& link, Image<byte4>&& icon):Item(move(icon),move(name)),link(move(link)){}
-Entry::~Entry() { if(content) free(content); }
-
 Feeds::Feeds() {
-    window.localShortcut(Key::Escape).connect(&window, &Window::hide);
-    window.localShortcut(Key::Right).connect(this, &Feeds::readNext);
-#if __arm__
-    window.localShortcut(Key::Power).connect(&window, &Window::hide);
-    window.localShortcut(Key::Extra).connect(this, &Feeds::readNext);
-#endif
     static int config = openFolder("config"_);
     readConfig = appendFile("read"_,config);
     readMap = mapFile("read"_,config);
@@ -93,11 +82,9 @@ void Feeds::loadFeed(const URL& url, array<byte>&& document) {
     feed.xpath("rss/channel/item"_,addItem); //RSS
     for(int i=items.size()-1;i>=0;i--) { //oldest first
         *this<< move(items[i]);
-        Entry& item = last(); //reference shouldn't move while loading
-        item.content = &alloc< Scroll<HTML> >();
-        //item.content->go(item.link); //preload TODO: only when idle
+        //getURL(URL(last().link)); //preload
     }
-    contentChanged();
+    listChanged();
 }
 
 void Feeds::getFavicon(const URL& url, array<byte>&& document) {
@@ -111,7 +98,7 @@ void Feeds::getFavicon(const URL& url, array<byte>&& document) {
     }
     for(Entry& entry: *this) {
         if(find(entry.link,url.host)) {
-            alloc<ImageLoader>(url.relative(icon), &entry.get<Icon>().image, contentChanged, int2(16,16), 7*24*60*60);
+            alloc<ImageLoader>(url.relative(icon), &entry.get<Icon>().image, listChanged, int2(16,16), 7*24*60*60);
             break; //only header
         }
     }
@@ -122,34 +109,18 @@ void Feeds::activeChanged(int index) {
     if(entry.isHeader) return;
     if(!isRead(entry)) {
         Text& text = entry.get<Text>();
-        setRead(entry);
+        //setRead(entry);
         text.setSize(12);
     }
-    contentChanged();
 }
 
-void Feeds::itemPressed(int index) {
-    Entry& entry = array::at(index);
-    if(content) free(content); //free read items
-    if(!entry.content) entry.content = &alloc< Scroll<HTML> >();
-    content = entry.content; entry.content=0; //move preloaded content to window
-    content->contentChanged.slots.clear();
-    window.widget = &content->parent();
-    //window.setTitle(copy(entry.get<Text>().text));
-    //window.setIcon(copy(entry.get<Icon>().image));
-    if(!content->url) content->go(entry.link);
-    window.show();
-    content->contentChanged.connect(&window, &Window::render);
-}
+void Feeds::itemPressed(int index) { pageChanged( array::at(index).link ); }
 
 void Feeds::readNext() {
     uint i=index;
-    for(;;) {
+    for(;;) { //next unread item
         i++;
-        if(i>=count()) {
-            //execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); //FIXME: fix memory leaks
-            return;
-        }
+        if(i==count()) { /*execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); FIXME: fix memory leaks*/ return; }
         if(!array::at(i).isHeader && !isRead(array::at(i))) break;
     }
     setActive(i);

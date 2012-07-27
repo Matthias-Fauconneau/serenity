@@ -1,7 +1,7 @@
 #pragma once
 #include "stream.h"
 #include "process.h"
-#include "signal.h"
+#include "function.h"
 
 /// \a Socket is a network socket
 struct Socket : virtual Stream {
@@ -14,7 +14,7 @@ struct Socket : virtual Stream {
     /// Reads /a size bytes from network socket
     virtual array<byte> receive(uint size);
     /// Writes /a buffer to network socket
-    virtual void write(const array<byte>& buffer);
+    virtual void write(const ref<byte>& buffer);
     /// Stream
     uint available(uint need) override;
     ref<byte> get(uint size) override;
@@ -61,7 +61,7 @@ struct HTTP : Poll, virtual TextStream, virtual Socket {
 
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge minutes
-void getURL(const URL &url, Handler handler, int maximumAge);
+void getURL(const URL &url, Handler handler=[](const URL&, array<byte>&&){}, int maximumAge=24*60);
 
 /// Returns path to cache file for \a url
 string cacheFile(const URL& url);

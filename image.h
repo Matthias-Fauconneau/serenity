@@ -9,16 +9,17 @@ typedef vector<bgra,uint8,4> byte4;
 typedef vector<bgra,uint,4> int4;
 
 template<class T> struct Image {
-    no_copy(Image)
-
     T* data=0;
     uint width=0, height=0, stride=0;
-    bool own=false;
+    bool own=false, alpha=false;
 
-    Image(){}
+    no_copy(Image)
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own) { o.data=0; }
     Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; stride=o.stride; o.data=0; return *this; }
-    Image(T* data, int width, int height, int stride, bool own):data(data),width(width),height(height),stride(stride),own(own){}
+
+    Image(){}
+    Image(T* data, int width, int height, int stride, bool own, bool alpha) :
+        data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
     Image(int width, int height) : data((T*)allocate_(sizeof(T)*width*height)), width(width), height(height), stride(width), own(true) {}
     Image(array<T>&& data, uint width, uint height);
 
@@ -35,9 +36,15 @@ template<class T> struct Image {
 
 generic inline string str(const Image<T>& o) { return str(o.width,"x"_,o.height); }
 /// Creates a new handle to \a image data (unsafe if freed)
-generic inline Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.width,o.height,o.stride,false); }
+generic inline Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.width,o.height,o.stride,false,o.alpha); }
 /// Copies the image buffer
 generic inline Image<T> copy(const Image<T>& o) {Image<T> copy(o.width,o.height); ::copy(copy.data,o.data,o.stride*o.height); return copy;}
+/// Convert between image formats
+template<class D, class S> inline Image<D> convert(const Image<S>& s) {
+    Image<D> copy(s.width,s.height);
+    for(uint x=0;x<s.width;x++) for(uint y=0;y<s.height;y++) copy(x,y)=s(x,y);
+    return copy;
+}
 /// Returns a copy of the image resized to \a width x \a height
 Image<byte4> resize(const Image<byte4>& image, uint width, uint height);
 /// Swaps ARGB <-> BGRA in place
@@ -45,7 +52,7 @@ Image<byte4> swap(Image<byte4>&& image);
 /// Flip the image around the horizontal axis in place
 Image<byte4> flip(Image<byte4>&& image);
 /// Decodes \a file to an Image
-Image<byte4> decodeImage(const array<byte>& file);
+Image<byte4> decodeImage(const ref<byte>& file);
 
 #undef generic
 

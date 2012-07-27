@@ -47,11 +47,11 @@ struct XConfigureRequestEvent { int type; ulong serial; bool send_event; Display
 struct XPropertyEvent { int type; ulong serial; bool send_event; Display *display; XID window; Atom atom; };
 
 enum { TrueColor=4 };
-enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, Expose=12, VisibilityNotify=15,
+enum { KeyPress=2, KeyRelease, KeyPress, KeyRelease, MotionNotify, EnterNotify, LeaveNotify, Expose=12, VisibilityNotify=15,
        CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest,
        PropertyNotify=28, ClientMessage=33 };
-enum { Button1Mask=1<<8, AnyModifier=1<<15 };
-enum { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3,
+enum { Key1Mask=1<<8, AnyModifier=1<<15 };
+enum { KeyPressMask=1<<0, KeyReleaseMask=1<<1, KeyPressMask=1<<2, KeyReleaseMask=1<<3,
        EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15,
        StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, PropertyChangeMask=1<<22 };
 enum { CWBackPixel=1<<1, CWBorderPixel=1<<3, CWOverrideRedirect=1<<9, CWEventMask=1<<11, CWColormap=1<<13, CWCursor=1<<14 };
@@ -95,7 +95,7 @@ KeySym XkbKeycodeToKeysym(Display*, uint, int, int);
 KeySym XStringToKeysym(const char*);
 ubyte XKeysymToKeycode(Display*, KeySym);
 int XGrabKey(Display*, int, uint, XID, bool, int, int);
-int XGrabButton(Display*, uint, uint, XID, int, uint, int, int, XID, XID);
+int XGrabKey(Display*, uint, uint, XID, int, uint, int, int, XID, XID);
 
 int XMapWindow(Display*, XID);
 int XUnmapWindow(Display*, XID);

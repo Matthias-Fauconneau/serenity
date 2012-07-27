@@ -15,12 +15,12 @@ struct Player : Application {
     AudioFile media;
     AudioOutput audio;
 
-       ToggleButton playButton = ToggleButton(move(playIcon),move(pauseIcon));
-       TriggerButton nextButton = TriggerButton(move(nextIcon));
+       ToggleKey playKey = ToggleKey(move(playIcon),move(pauseIcon));
+       TriggerKey nextKey = TriggerKey(move(nextIcon));
        Text elapsed {"00:00"_};
        Slider slider;
        Text remaining {"00:00"_};
-      HBox toolbar {&playButton, &nextButton, &elapsed, &slider, &remaining};
+      HBox toolbar {&playKey, &nextKey, &elapsed, &slider, &remaining};
        Scroll<TextList> albums;
        Scroll<TextList> titles;
       HBox main { &albums.parent(), &titles.parent() };
@@ -30,8 +30,8 @@ struct Player : Application {
     Player(array<string>&& arguments) {
         window.globalShortcut("XF86AudioPlay"_).connect(this, &Player::togglePlay);
         window.localShortcut("Escape"_).connect(this, &Player::quit);
-        playButton.toggled.connect(this, &Player::setPlaying);
-        nextButton.triggered.connect(this, &Player::next);
+        playKey.toggled.connect(this, &Player::setPlaying);
+        nextKey.triggered.connect(this, &Player::next);
         slider.valueChanged.connect(this, &Player::seek);
         media.timeChanged.connect(this, &Player::update);
         albums.activeChanged.connect(this, &Player::playAlbum);
@@ -85,14 +85,14 @@ struct Player : Application {
         writeFile("/Music/.last"_,files[index],CWD,true);
     }
     void next() {
-        if(!playButton.enabled) setPlaying(true);
+        if(!playKey.enabled) setPlaying(true);
         if(titles.index+1<titles.count()) play(++titles.index);
         else window.setTitle(albums.active().text);
         titles.ensureVisible(titles.active());
     }
-    void togglePlay() { setPlaying(!playButton.enabled); }
+    void togglePlay() { setPlaying(!playKey.enabled); }
     void setPlaying(bool play) {
-        playButton.enabled=play;
+        playKey.enabled=play;
         if(play) { audio.start(); window.setIcon(playIcon); }
         else { audio.stop(); window.setIcon(pauseIcon); }
     }

@@ -141,7 +141,7 @@ void FLAC::readFrame() {
         int* end = out;
         double buffer1[blockSize]; double* context = buffer1;
         double buffer2[blockSize+1]; double* odd = buffer2+1;
-        if(ulong(context)%16) odd=buffer1, context=buffer2+1;
+        if(ptr(context)%16) odd=buffer1, context=buffer2+1;
 
         int rawSampleSize = sampleSize;
         if(channel == 0) { if(channels==RightSide) rawSampleSize++; }

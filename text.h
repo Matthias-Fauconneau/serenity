@@ -1,6 +1,6 @@
 #pragma once
 #include "widget.h"
-#include "signal.h"
+#include "function.h"
 #include "image.h"
 
 /// Rich text format control code encoded in 00-1F range
@@ -36,7 +36,7 @@ struct Text : Widget {
     void update() override { update(min(wrap,Widget::size.x)); }
     void update(int wrap);
     void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
 
     // cache layout bounding box
     int2 textSize;
@@ -57,7 +57,7 @@ struct Text : Widget {
 struct TextInput : Text {
     uint cursor=0;
 
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 position, Event event, Key button) override;
     bool keyPress(Key key) override;
     void render(int2 parent);
 };

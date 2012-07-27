@@ -1,6 +1,6 @@
 #pragma once
 #include "process.h"
-#include "signal.h"
+#include "function.h"
 
 typedef struct _snd_seq snd_seq_t;
 struct Sequencer : Poll {

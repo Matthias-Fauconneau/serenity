@@ -6,7 +6,7 @@ template struct array<Widget*>;
 
 /// Layout
 
-bool Layout::mouseEvent(int2 position, Event event, Button button) {
+bool Layout::mouseEvent(int2 position, Event event, Key button) {
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position >= child.position && position <= child.position+child.size) {
             if(child.mouseEvent(position-child.position,event,button)) return true;
@@ -31,7 +31,7 @@ Widget& Widgets::at(int i) { return *array::at(i); }
 int2 Linear::sizeHint() {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
-    for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child, str());
+    for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child);
         int2 size=xy(child.sizeHint());
         if(size.y<0) expandingHeight=true;
         height = max(height,abs(size.y));
@@ -53,7 +53,7 @@ void Linear::update() {
     int width = size.x /*remaining space*/, sharing=0 /*expanding count*/, expandingWidth=0, height=0;
     array<int> hints; fill(hints,-1,count()); array<int> sizes; fill(sizes,-1,count());
     //allocate fixed space and convert to expanding if not enough space
-    for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child, str());
+    for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child);
         int2 sizeHint = xy(child.sizeHint());
         int hint = sizeHint.x; if(abs(sizeHint.y)>abs(height)) height=sizeHint.y;
         if(hint >= width) hint = -hint; //convert to expanding if not enough space

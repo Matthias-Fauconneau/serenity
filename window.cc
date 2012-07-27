@@ -9,10 +9,11 @@
 struct input_event { long sec,usec; uint16 type,code; int32 value; };
 enum { EV_SYN, EV_KEY, EV_REL, EV_ABS };
 enum { VT_ACTIVATE = 0x5606 };
+
 ICON(cursor);
 
 Window::Window(Widget* widget, int2 size, string&& title, Image<byte4>&& icon) : widget(widget), title(move(title)), icon(move(icon)) {
-    if(!display) openDisplay();
+    display();
 #if __arm__
     touch = open("/dev/input/event0", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({touch, POLLIN}));
     buttons = open("/dev/input/event4", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({buttons, POLLIN}));
@@ -31,6 +32,7 @@ Window::Window(Widget* widget, int2 size, string&& title, Image<byte4>&& icon) :
 }
 Window::~Window() { hide(); close(wm); close(touch); close(buttons); close(keyboard); close(mouse); close(vt); }
 void Window::event(pollfd poll) {
+    if(poll.fd==0) { render(); return; }
     if(poll.fd==wm) for(window w;read(wm, &w, sizeof(w)) > 0;) {
         if(w.length>sizeof(window)) read(wm, w.length-sizeof(window));
         log(w.id);
@@ -62,19 +64,24 @@ void Window::event(pollfd poll) {
             cursor[i] = widget->size[i]*(v-min[i])/uint(max[i]-min[i]);
          }
          if(e.type==EV_SYN) {
-             update();
-             render(); //TODO: HW cursor | SW repair
+             //update();
+             //TODO: press: edge trigger on cursor.z
+             if(active==id) patchCursor(cursor,cursorIcon());
          }
     }
     if(poll.fd==mouse) for(input_event e;read(mouse, &e, sizeof(e)) > 0;) {
-        if(e.type==EV_REL) { int i = e.code; assert(i<2); cursor[i]+=e.value; cursor[i]=clip(0,cursor[i],display[i]); } //TODO: acceleration
+        if(e.type==EV_REL) { int i = e.code; assert(i<2); cursor[i]+=e.value; cursor[i]=clip(0,cursor[i],display()[i]); } //TODO: acceleration
         if(e.type==EV_SYN) {
-            update();
-            render(); //TODO: HW cursor | SW repair
+            //update();
+            if(widget->mouseEvent(cursor,Motion, pressed)) wait();
+            else if(active==id) patchCursor(cursor,cursorIcon());
         }
         if(e.type == EV_KEY) {
             assert(widget);
-            widget->mouseEvent(cursor,Press,(Button)e.code);
+            if(e.value) {
+                if(widget->mouseEvent(cursor,Press, pressed = (Key)e.code)) wait();
+                //else TODO: cursor press/touch feedback
+            } else pressed=Key::None;
         }
     }
     if(poll.fd==keyboard) for(input_event e;read(keyboard, &e, sizeof(e)) > 0;) {
@@ -128,44 +135,52 @@ void Window::emit(bool emitTitle, bool emitIcon) {
 
 void Window::render() {
     assert(shown);
+    widget->update();
     widget->render(int2(0,0));
-    if(active==id) blit(cursor,cursorIcon());
+    if(active==id) patchCursor(cursor,cursorIcon(),false);
 }
 
 void Window::show() {
     if(shown) return; shown=true;
     registerPoll(i({wm, POLLIN}));
-    widget->size = display;
+    widget->size = display();
     widget->update();
     emit();
-    //ioctl(vt, VT_ACTIVATE, (void*)6); //switch from X
+    ioctl(vt, VT_ACTIVATE, (void*)6); //switch from X
     update();
     render();
 }
 void Window::hide() {
     if(!shown) return; shown=false;
     unregisterPoll(wm);
-    id=-2;
     widget->size=int2(0,0);
     emit();
-    //ioctl(vt, VT_ACTIVATE, (void*)7); //switch to X (TODO: only if all hidden)
+    update();
+    id=0;
+    ioctl(vt, VT_ACTIVATE, (void*)7); //switch to X (TODO: only if all hidden)
+}
+
+void Window::setWidget(Widget* widget) {
+    widget->position=this->widget->position;
+    widget->size=this->widget->size;
+    this->widget=widget;
 }
 
 void Window::setPosition(int2 position) {
-    if(position.x<0) position.x=display.x+position.x;
-    if(position.y<0) position.y=display.y+position.y;
+    if(position.x<0) position.x=display().x+position.x;
+    if(position.y<0) position.y=display().y+position.y;
     widget->position=position;
     emit();
 }
 void Window::setSize(int2 size) {
     if(!widget) return;
     if(size.x<0||size.y<0) {
-        int2 hint=widget->sizeHint(); assert(hint,hint);
+        int2 hint=widget->sizeHint();
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
-    if(size.x==0) size.x=display.x;
-    if(size.y==0) size.y=display.y-16;
+    if(size.x==0) size.x=display().x;
+    if(size.y==0) size.y=display().y-16;
     assert(size);
     widget->size=size;
     widget->update();

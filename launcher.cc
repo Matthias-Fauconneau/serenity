@@ -22,8 +22,8 @@ bool Search::keyPress(Key key) {
     else return TextInput::keyPress(key);
 }
 
-bool Command::mouseEvent(int2, Event event, Button button) {
-    if(event == Press && button == LeftButton) { execute(path,args); triggered(); return true; }
+bool Command::mouseEvent(int2, Event event, Key button) {
+    if(event == Press && button == LeftKey) { execute(path,args); triggered(); return true; }
     return false;
 }
 

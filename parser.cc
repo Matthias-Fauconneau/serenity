@@ -27,7 +27,7 @@ struct Parser : Application {
                 bool complement = s.match('^');
                 while(!s.match(']')) {
                     if(s.match('-')) { byte first=set.pop(), last=s.character(); for(;first<=last;first++) set+= first; }
-                    else if(s.match("\\-"_)) set+= '-';
+                    else if(s.match("\\-"_)) set+= byte('-');
                     else set+= s.character();
                 }
                 word name = s.slice(start, s.index-start); assert(name);
@@ -154,7 +154,7 @@ struct Parser : Application {
             for(uint i=0;i<rule.size();i++) {
                 if(rule[i]!=X) continue;
                 if(i+1<rule.size()) { //R → a*Xbc*: add First(b) to Follow(X)
-                    const array<word>& firstB = first(rule[i+1]);
+                    array<word> firstB = first(rule[i+1]);
                     followX+= firstB;
                     if(contains(firstB,e)) followX+= follow(rule.extended);
                 } else { //R → a*X: add Follow(R) to Follow(X)
@@ -183,7 +183,7 @@ struct Parser : Application {
                 if(!s.match('|')) { if(!s.match('\n')) error(""); break; }
             }
         }
-        insertAt(rules,0,Rule(""_,array<word>{firstRule}));
+        insertAt(rules,0,Rule(""_,i(array<word>{firstRule})));
         //log(rules,"\n"_);
         for(const Rule& rule: rules) nonterminal+= rule.symbol;
         for(word use: used) if(!isNonTerminal(use)) error("Undefined rule for",use);
