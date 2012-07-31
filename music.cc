@@ -31,9 +31,9 @@ struct Music : Application {
     Icon widget {move(music256Icon)};
 #endif
     Window window{&widget,"Music"_,move(musicIcon)};
-    ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_,CWD,true); }
+    ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
     Music(array<string>&& arguments) {
-        writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_,CWD,true);
+        writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         string instrument;
         window.localShortcut("Escape"_).connect(this,&Application::quit);
         for(string&& path : arguments) {

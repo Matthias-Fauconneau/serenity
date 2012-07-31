@@ -42,12 +42,12 @@ template<class T> struct Scroll : ScrollArea, T {
 /// ImageView is a widget displaying a static image
 struct ImageView : Widget {
     /// Displayed image
-    Image<rgb> image;
+    Image<pixel> image;
 
     ImageView(){}
     /// Create a widget displaying \a image
-    ImageView(Image<rgb>&& image):image(move(image)){}
-    ImageView(const Image<byte4>& image):image(convert<rgb>(image)){}
+    ImageView(Image<pixel>&& image):image(move(image)){}
+    ImageView(const Image<byte4>& image):image(convert<pixel>(image)){}
 
     int2 sizeHint();
     void render(int2 parent);

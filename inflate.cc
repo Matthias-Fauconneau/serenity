@@ -1,7 +1,6 @@
 // Public domain, Rich Geldreich <richgel99@gmail.com>
 #include "memory.h"
 #include "debug.h"
-#include "array.cc"
 
 typedef unsigned char mz_uint8;
 typedef signed short mz_int16;

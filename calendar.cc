@@ -10,9 +10,9 @@ array<string> getEvents(Date query) {
     if(!exists("events"_,config)) { warn("No events settings [config/events]"); return events; }
     TextStream s(readFile("events"_,config));
 
-    map<string, array<Date> > exceptions; //Exceptions for recurring events
+    map<string, array<Date>> exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
-        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until('\n'); exceptions.insert(move(title),array<Date>{except}); }
+        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until('\n'); exceptions.insert(move(title),array<Date>i({except})); }
         else s.until('\n');
     }
     s.index=0;

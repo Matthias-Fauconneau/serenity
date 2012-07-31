@@ -45,7 +45,7 @@ List<Command> readShortcuts() {
     List<Command> shortcuts;
     static int config = openFolder("config"_);
     if(!exists("launcher"_,config)) { warn("No launcher settings [config/launcher]"); return shortcuts; }
-    for(const string& desktop: split(readFile("launcher"_,config),'\n')) {
+    for(const ref<byte>& desktop: split(readFile("launcher"_,config),'\n')) {
         map<string,string> entries = readSettings(desktop);
         Image<byte4> icon;
         for(const string& folder: iconPaths) {
@@ -55,7 +55,7 @@ List<Command> readShortcuts() {
         string path = section(entries["Exec"_],' ');
         if(!exists(path)) path="/usr/bin/"_+path;
         if(!exists(path)) { warn("Executable not found",path); continue; }
-        array<string> arguments = slice(split(entries["Exec"_],' '),1);
+        array<string> arguments = section(entries["Exec"_],' ',1,-1);
         for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
         for(uint i=0;i<arguments.size();) if(contains(arguments[i],byte('%'))) arguments.removeAt(i); else i++;
         shortcuts << Command(move(icon),move(entries["Name"_]),move(path),move(arguments));

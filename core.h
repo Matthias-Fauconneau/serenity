@@ -17,6 +17,7 @@ template<class T> struct ref;
 #define packed __attribute((packed))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
+inline void* operator new(unsigned int, void* p) { return p; } //placement new
 
 /// Move
 template<typename T> struct remove_reference { typedef T type; };
@@ -90,8 +91,8 @@ template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0
 #else
 #define debug( statements... )
 #endif
-void trace(int skip);
+void trace(int skip, uint size);
 void log_(const char*);
 void abort();
 /// Aborts if \a expr evaluates to false and display \a expr
-#define assert_(expr) ({ debug( if(!(expr)) { trace(0); log_(#expr); abort(); } ) })
+#define assert_(expr) ({ debug( if(!(expr)) { trace(0,-1); log_(#expr); abort(); } ) })

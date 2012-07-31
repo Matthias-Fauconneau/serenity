@@ -64,6 +64,7 @@ struct Window : Poll {
     bool globalShortcuts = false;
 
     /// Socket to system local cooperative window management broadcast port
+#if WM
     int wm=0;
     /// id of this window (default to new top level window)
     //uint id=-2;
@@ -83,6 +84,11 @@ struct Window : Poll {
     };
     /// state of all windows for input/clip/cursor handling.
     array<window> windows;
+    /// Whether this window manages the cursor
+    bool isActive() { return active==id; }
+#else
+    bool isActive() { return true; }
+#endif
     /// last known cursor position
     int2 cursor;
     /// last pressed key/button

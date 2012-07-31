@@ -22,14 +22,15 @@ void init_() {
     sigaction(SIGPIPE, &sa, 0, 8);
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit); //1 MB
 }
-void exit_(int code) { exit(code); }
+void exit_(int code) { exit(code); } //TODO: check leaks
 
 static array<Poll*> polls;
 static array<pollfd> pollfds;
 void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
-void Poll::unregisterPoll() { for(int i;(i=removeOne(polls, this))>=0;) pollfds.removeAt(i); }
+static Poll* lastUnregistered; //for correct looping
+void Poll::unregisterPoll() { for(int i;(i=removeOne(polls, this))>=0;) pollfds.removeAt(i); lastUnregistered=this; }
 bool operator ==(pollfd a, pollfd b) { return a.fd==b.fd; }
-void Poll::unregisterPoll(int fd) { int i=removeOne(pollfds, pollfd{fd}); if(i>=0) polls.removeAt(i); }
+void Poll::unregisterPoll(int fd) { int i=removeOne(pollfds, pollfd i({fd})); if(i>=0) polls.removeAt(i); }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
 
@@ -39,8 +40,10 @@ int dispatchEvents() {
     for(uint i=0;i<polls.size();i++) {
         int events = pollfds[i].revents;
         if(events) {
+            lastUnregistered=0;
             polls[i]->event(pollfds[i]);
-            if(events&POLLHUP) { log("POLLHUP"); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
+            if(i==polls.size() || polls[i]==lastUnregistered) i--;
+            else if(events&POLLHUP) { log("POLLHUP"); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
         }
     }
     while(queue) queue.takeFirst()->event(i({}));
@@ -48,11 +51,11 @@ int dispatchEvents() {
 }
 
 void execute(const string& path, const array<string>& args) {
-    array<CString> args0(1+args.size());
+    array<stringz> args0(1+args.size());
     args0 << strz(path);
     for(uint i=0;i<args.size();i++) args0 << strz(args[i]);
     const char* argv[args0.size()+1];
-    for(uint i=0;i<args0.size();i++) argv[i]=args0[i].data;
+    for(uint i=0;i<args0.size();i++) argv[i]=args0[i];
     argv[args0.size()]=0;
     int pid = fork();
     if(pid==0) if(!execve(strz(path),argv,0)) exit(-1);

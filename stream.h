@@ -20,12 +20,17 @@ struct Stream {
 
     Stream(){}
     Stream(Stream&& o):buffer(move(o.buffer)),index(o.index){}
+    /// Creates a Stream interface to an \a array
     Stream(array<byte>&& array) : buffer(move(array)) {}
+    /// Creates a Stream interface to a \a reference
+    Stream(const ref<byte>& reference) : buffer(reference.data,reference.size) {} //TODO: escape analysis
 //interface (default to buffer source)
     /// Returns number of bytes available, reading \a need bytes from underlying device if possible
     virtual uint available(uint /*need*/) { return buffer.size()-index; }
     /// Returns next \a size bytes from stream
-    virtual ref<byte> get(uint size) { assert(index+size<=buffer.size(),index,size,buffer.size());  return ref<byte>(buffer.data()+index,size); }
+    virtual ref<byte> get(uint size) {
+        assert(index+size<=buffer.size(),index,size,buffer.size());  return ref<byte>(buffer.data()+index,size); //TODO: escape analysis
+    }
     /// Advances \a count bytes in stream
     virtual void advance(int count) { index+=count;  assert(index<=buffer.size()); }
 //Stream helpers
@@ -51,7 +56,10 @@ struct DataStream : virtual Stream {
 
     DataStream():Stream(){}
     DataStream(DataStream&& o):Stream(move(o)),isBigEndian(o.isBigEndian){}
+    /// Creates a DataStream interface to an \a array
     DataStream(array<byte>&& array, bool isBigEndian=false) : Stream(move(array)), isBigEndian(isBigEndian) {}
+    /// Creates a DataStream interface to a \a reference
+    DataStream(const ref<byte>& reference, bool isBigEndian=false) : Stream(reference), isBigEndian(isBigEndian) {}
     DataStream& operator=(DataStream&& o){buffer=move(o.buffer);index=o.index;isBigEndian=o.isBigEndian;return *this;}
 
     /// Slices a stream referencing this data
@@ -59,14 +67,10 @@ struct DataStream : virtual Stream {
     /// Seeks stream to /a index
     void seek(uint index) { assert(index<buffer.size(),index,buffer.size()); this->index=index; }
     /// Seeks last match for \a key.
-    bool seekLast(const ref<byte>& key) {
-        get(-1); //try to completely read source
-        for(index=buffer.size()-key.size;index>0;index--) { if(get(key.size) == key) return true; }
-        return false;
-    }
+    bool seekLast(const ref<byte>& key);
 
     /// Reads from stream until next null byte
-    array<byte> untilNull() { array<byte> s(buffer.data()+index,(uint)0); while(peek()) { s.buffer.size++; advance(1); } advance(1); return s; }
+    ref<byte> untilNull();
 
     /// Reads one raw \a T element from stream
     template<class T> const T& read() { const T& t = raw<T>(Stream::read(sizeof(T))); return t; }
@@ -97,13 +101,19 @@ struct DataStream : virtual Stream {
        template<class T> operator array<T>() { array<T> t; for(uint i=0;i<size;i++) t<<(T)s->read(); return t; }
    };
    ArrayReadOperator read(uint size) { return i({this,size}); }
+
+   /// Reads \a size \a T elements from stream (swap as needed)
+   template<class T>  void read(T buffer[], uint size) { for(uint i=0;i<size;i++) buffer[i]=(T)read(); }
 };
 
 /// \a TextStream provides a convenient interface to parse texts
 struct TextStream : virtual Stream {
     TextStream():Stream(){}
     TextStream(TextStream&& o):Stream(move(o)){}
+    /// Creates a Stream interface to an \a array
     TextStream(array<byte>&& array) : Stream(move(array)){}
+    /// Creates a Stream interface to a \a reference
+    TextStream(const ref<byte>& reference) : Stream(reference){}
     TextStream& operator=(TextStream&& o){buffer=move(o.buffer);index=o.index;return *this;}
 
     /// If stream match \a key, advances \a pos by \a key size
@@ -130,12 +140,12 @@ struct TextStream : virtual Stream {
     ref<byte> untilEnd();
     /// Skips whitespaces
     void skip();
-    /// Reads one possibly escaped character
-    byte character();
     /// Reads a single word
     ref<byte> word();
     /// Reads a single identifier [a-zA-Z0-9_-:]*
     ref<byte> identifier();
     /// Reads a single number
     int number(int base=10);
+    /// Reads one possibly escaped character
+    char character();
 };

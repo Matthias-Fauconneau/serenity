@@ -2,11 +2,13 @@
 #include "string.h"
 
 struct pollfd { int fd; short events, revents; };
-enum { POLLIN = 1, POLLOUT=4, POLLHUP = 16 };
 
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
+    no_copy(Poll)
+    Poll(){}
     /// Add this to the process-wide event loop
+    /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
     void registerPoll(pollfd);
     /// Remove this from the process-wide event loop
     void unregisterPoll();

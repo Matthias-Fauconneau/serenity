@@ -2,6 +2,14 @@
 #include "string.h"
 #include "array.cc"
 
+ref<byte> DataStream::untilNull() { uint start=index; while(available(1) && next()){} return Stream::slice(start,index-1-start); }
+
+bool DataStream::seekLast(const ref<byte>& key) {
+    get(-1); //try to completely read source
+    for(index=buffer.size()-key.size;index>0;index--) { if(get(key.size) == key) return true; }
+    return false;
+}
+
 bool TextStream::match(char key) {
     if(available(1) && peek() == key) { advance(1); return true; }
     else return false;
@@ -62,14 +70,6 @@ ref<byte> TextStream::untilEnd() { uint size=available(-1); return read(size); }
 
 void TextStream::skip() { whileAny(" \t\n\r"_); }
 
-byte TextStream::character() {
-    if(!match('\\')) return next();
-    /***/ if(match('n')) return '\n';
-    else if(match('"')) return '"';
-    else if(match('\'')) return '\'';
-    else error("Invalid escape character",peek());
-}
-
 ref<byte> TextStream::word() {
     int start=index;
     for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z')) break; advance(1); }
@@ -94,4 +94,13 @@ int TextStream::number(int base) {
     }
     if(start==index) return -1;
     return toInteger(slice(start,index-start), base);
+}
+
+char TextStream::character() {
+    if(!match('\\')) return next();
+    /***/ if(match('n')) return '\n';
+    else if(match('"')) return '"';
+    else if(match('\'')) return '\'';
+    else if(match('\\')) return '\\';
+    else error("Invalid escape character"_,(char)peek());
 }

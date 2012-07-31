@@ -7,6 +7,11 @@
 
 #define generic template<class T>
 
+generic Image<T>::Image(int width, int height) : data(allocate<T>(height*width)), width(width), height(height), stride(width), own(true) {
+    assert(width); assert(height);
+}
+generic Image<T>::~Image(){ if(data && own) { unallocate(data,height*stride); } }
+
 generic Image<T>::Image(array<T>&& data, uint width, uint height)
     : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
     assert(data.size() >= width*height, data.size(), width, height);
@@ -59,9 +64,9 @@ Image<byte4> flip(Image<byte4>&& image) {
     return move(image);
 }
 
-weak(Image<byte4> decodePNG(const ref<byte>&)) { error("PNG support not linked"); }
-weak(Image<byte4> decodeJPEG(const ref<byte>&)) { error("JPEG support not linked"); }
-weak(Image<byte4> decodeICO(const ref<byte>&)) { error("ICO support not linked"); }
+weak(Image<byte4> decodePNG(const ref<byte>&)) { error("PNG support not linked"_); }
+weak(Image<byte4> decodeJPEG(const ref<byte>&)) { error("JPEG support not linked"_); }
+weak(Image<byte4> decodeICO(const ref<byte>&)) { error("ICO support not linked"_); }
 
 Image<byte4> decodeImage(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
@@ -70,3 +75,7 @@ Image<byte4> decodeImage(const ref<byte>& file) {
     else { warn("Unknown image format",(string)slice(file,0,4)); return Image<byte4>(); }
 }
 
+template struct Image<int8>;
+template struct Image<uint8>;
+template struct Image<pixel>;
+template struct Image<byte4>;

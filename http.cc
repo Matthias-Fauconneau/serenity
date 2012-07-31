@@ -4,6 +4,7 @@
 #include "process.h"
 #include "linux.h"
 #include "map.h"
+#include "memory.h"
 #include "array.cc"
 
 /// Socket
@@ -25,7 +26,7 @@ bool Socket::connect(const string& host, const string& /*service*/) {
         if(!dns) {
             dns = socket(PF_INET,SOCK_DGRAM,0);
             assert(dns>0,dns);
-            TextStream s = readFile("etc/resolv.conf"_);
+            TextStream s(readFile("etc/resolv.conf"_));
             s.until("nameserver "_);
             uint a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
             sockaddr addr = {PF_INET, swap16(53), (d<<24)|(c<<16)|(b<<8)|a};
@@ -34,9 +35,9 @@ bool Socket::connect(const string& host, const string& /*service*/) {
         array<byte> query;
         struct Header { uint16 id=swap16(currentTime()); uint16 flags=0; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
-        for(TextStream s(copy(host));s;) { //QNAME
-            string label = string(s.until('.'));
-            query << label.size() << label;
+        for(TextStream s(host);s;) { //QNAME
+            ref<byte> label = s.until('.');
+            query << label.size << label;
         }
         query << 0;
         query << raw(swap16(1)) << raw(swap16(1));
@@ -107,8 +108,8 @@ string base64(const ref<byte>& input) {
 /// URL
 
 URL::URL(const ref<byte>& url) {
-    if(!url) { warn("Empty url"); return; }
-    TextStream s = string(url);
+    if(!url) { trace(); warn("Empty URL"); return; }
+    TextStream s(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
     ref<byte> domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
@@ -152,9 +153,9 @@ string cacheFile(const URL& url) {
     return url.host+"/"_+name;
 }
 
-HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, array<string>&& headers, string&& method)
-    : url(str(url)), headers(move(headers)), method(move(method)), handler(handler) {
-    debug( log("request",url); )
+HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, array<string>&& headers, const ref<byte>& method)
+    : url(str(url)), headers(move(headers)), method(method), handler(handler) {
+    debug( log("Request",url); )
     if(!connect(url.host, url.scheme)) { free(this); return; }
     registerPoll(i({fd, POLLIN|POLLOUT}));
 }
@@ -177,7 +178,7 @@ void HTTP::header() {
         assert(exists(file,cache));
         content = readFile(file,cache);
         assert(content);
-        writeFile(file,content,cache,true); //TODO: touch instead of rewriting
+        writeFile(file,content,cache); //TODO: touch instead of rewriting
         debug( log("Not Modified",url); )
         state = Handle;
         return;
@@ -247,7 +248,7 @@ void HTTP::event(pollfd poll) {
         redirect << cacheFile(url);
         for(const string& file: redirect) {
             if(!exists(section(file,'/'),cache)) createFolder(section(file,'/'),cache);
-            writeFile(file,content,cache,true);
+            writeFile(file,content,cache);
         }
         state=Handle; //wait(); return;  //Cache other outstanding requests before handling this one (i.e cache them even if this handler exits/crash)
     }

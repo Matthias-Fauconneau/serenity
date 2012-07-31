@@ -10,7 +10,7 @@ void AudioFile::open(const string& path) {
     if(file) close(); else { av_register_all(); /*av_log_set_level(AV_LOG_ERROR);*/ }
 
     audioPTS=0;
-    if(avformat_open_input(&file, strz(path).data(), 0, 0)) { file=0; return; }
+    if(avformat_open_input(&file, strz(path), 0, 0)) { file=0; return; }
     avformat_find_stream_info(file, 0);
     if(file->duration <= 0) { close(); return; }
     for(uint i=0; i<file->nb_streams; i++) {
@@ -52,7 +52,7 @@ void AudioFile::read(int16* output, uint outputSize) {
                 output[i] = clip(-32768,int(input[i]*32768),32767); //copy/convert input buffer to output
             inputSize -= size; input += size*audioInput.channels; //update input buffer
             outputSize -= size; output += size*audioOutput.channels; //update output buffer
-            if(!inputSize && buffer) { unallocate(buffer); buffer=0; } //free consumed buffer
+            if(!inputSize && buffer) unallocate(buffer); //free consumed buffer
             if(!outputSize) return; //output filled
         }
 

@@ -29,13 +29,13 @@ png.cc
 jpeg.cc
 font.h
 font.cc
-raster.cc
-raster.h
 widget.h
 interface.h
 interface.cc
 layout.h
 layout.cc
+text.h
+text.cc
 display.h
 display.cc
 window.h

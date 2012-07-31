@@ -8,8 +8,8 @@ struct TextLayout {
     int size;
     int wrap;
     Font* font = 0;
-    int2 pen;
-    struct Character { int2 pos;/*in .4*/ Glyph glyph; };
+    int2 pen; //.4
+    struct Character { int2 pos;/*.4*/ Glyph glyph; };
     typedef array<Character> Word;
     array<Word> line;
     Word word;
@@ -19,7 +19,7 @@ struct TextLayout {
     array<Line> lines;
 
     void nextLine(bool justify) {
-        if(!line) { pen.y+=size; return; }
+        if(!line) { pen.y+=size<<4; return; }
         //justify
         int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
         length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
@@ -35,7 +35,7 @@ struct TextLayout {
             pen.x += word.last().pos.x+word.last().glyph.advance+space;
         }
         line.clear();
-        pen.x=0; pen.y+=size;
+        pen.x=0; pen.y+=size<<4;
     }
 
     TextLayout(int size, int wrap, const ref<byte>& s):size(size),wrap(wrap) {
@@ -100,7 +100,7 @@ void Text::update(int wrap) {
     blits.clear();
     if(text.last()!='\n') text << '\n';
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
-    for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+8)>>4,(c.pos.y+8)>>4),c.glyph.image});
+    for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+8)>>4,(c.pos.y+8)>>4),share(c.glyph.image)});
     for(const TextLayout::Line& l: layout.lines) {
         Line line;
         const TextLayout::Character& c = layout.text[l.begin];
@@ -125,6 +125,7 @@ int2 Text::sizeHint() {
 void Text::render(int2 parent) {
     if(!textSize) update(wrap>=0 ? wrap : display().y);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
+    fill(offset+Rect(textSize), 255);
     for(const Blit& b: blits) blit(offset+b.pos, b.image);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), 0);
 }

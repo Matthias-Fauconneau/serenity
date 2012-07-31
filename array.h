@@ -5,15 +5,13 @@
 
 namespace std {
 template<class T> struct initializer_list {
-    no_copy(initializer_list)
     const T* data;
     uint size;
+    constexpr initializer_list() : data(0), size(0) {}
     /// References \a size elements from read-only \a data pointer
     constexpr initializer_list(const T* data, uint size) : data(data), size(size) {}
     /// References elements sliced from \a begin to \a end
     constexpr initializer_list(const T* begin,const T* end) : data(begin), size(uint(end-begin)) {}
-    constexpr initializer_list(initializer_list&& o):data(o.data),size(o.size){}
-    initializer_list& operator =(initializer_list&& o){data=o.data;size=o.size; return *this;}
     constexpr const T* begin() const { return data; }
     constexpr const T* end() const { return data+size; }
     const T& operator [](uint i) const { assert_(i<size); return data[i]; }
@@ -39,7 +37,7 @@ generic bool contains(const ref<T>& a, const T& value);
 
 /// \a array is a typed bounded mutable growable memory reference (heap/stack/static/mmap)
 /// \note array use move semantics to avoid reference counting when managing heap reference
-/// \note array transparently store small arrays inline (<=15bytes)
+/// \note array transparently store small arrays inline (<=31bytes)
 /// \note array transparently detach when trying to modify a foreign (i.e not owned heap) reference
 /// \note This header only defines basic container methods, #include "array.cc" to define advanced methods
 template<class T> struct array {
@@ -49,6 +47,7 @@ template<class T> struct array {
         uint size;
         uint capacity;
     } buffer = {0,0,0};
+    //int pad[4]; // (4+4)*4=32 Pads to fill half a cache line (31 inline bytes)
     /// Number of elements fitting inline
     static constexpr uint32 inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
     /// Data pointer valid while the array is not reallocated (resize or inline array move)
@@ -80,9 +79,12 @@ template<class T> struct array {
     explicit array(const ref<T>& ref);
     /// References \a size elements from read-only \a data pointer
     array(const T* data, uint size) : i(buffer{data, size, 0}) {} //TODO: escape analysis
+    /// Initializes array with a writable buffer of \a capacity elements
+    array(const T* data, uint size, uint capacity) : tag(-2), i(buffer{data, size, capacity}) {} //TODO: escape analysis
 
     /// If the array own the data, destroys all initialized elements and frees the buffer
-    ~array();
+    void unallocate();
+    ~array() { if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(); } }
 
     /// Allocates enough memory for \a capacity elements
     void reserve(uint capacity);
@@ -134,9 +136,6 @@ template<class T> struct array {
 
 #define array array<T>
 
-generic array& operator <<(array& a, T&& e);
-generic array& operator <<(array& a, array&& b);
-
 /// Slices a reference to elements from \a pos to \a pos + \a size
 generic ref<T> slice(const array& a, uint pos, uint size) { return slice(ref<T>(a),pos,size); }
 /// Slices a reference to elements from to the end of the array
@@ -150,9 +149,9 @@ generic array& operator <<(array& a, const ref<T>& b);
 generic array& operator <<(array& a, const array& b) { return a<<ref<T>(b); }
 /// Copies all elements in a new array
 generic array copy(const array& a) { return array((ref<T>)a); }
-/// Inserts /a e into /a a at /a index
-generic T& insertAt(array& a, int index, T&& e);
-generic T& insertAt(array& a, int index, const T& e);
+/// Inserts /a element at /a index
+generic T& insertAt(array& a, int index, T&& element);
+generic T& insertAt(array& a, int index, const T& element);
 
 // DefaultConstructible?
 /// Allocates memory for \a size elements and initializes added elements with their default constructor
@@ -183,6 +182,6 @@ generic int insertSorted(array& a, const T& e);
 /// \note static_array use static inheritance, instead of using \a array inline space, to avoid full instantiation for each N
 template<class T, int N> struct static_array : array<T> {
     no_copy(static_array)
-    static_array() { array<T>::tag=-2; array<T>::buffer=typename array<T>::Buffer((T*)buffer,0,N); }
+    constexpr static_array():array<T>((T*)buffer,0,N){}
     ubyte buffer[N*sizeof(T)];
 };

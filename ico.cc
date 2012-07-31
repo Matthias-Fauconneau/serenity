@@ -1,6 +1,5 @@
 #include "image.h"
 #include "stream.h"
-#include "array.cc"
 
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }

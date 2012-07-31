@@ -5,9 +5,8 @@
 //#include "calendar.h"
 #include "feeds.h"
 //#include "popup.h"
-#include "array.cc"
-
 //ICON(shutdown)
+#include "array.cc"
 
 struct Desktop : Application {
     Feeds feeds;
@@ -24,13 +23,13 @@ struct Desktop : Application {
         //clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&Desktop::showPage);
-        window.localShortcut(Key::Right).connect(&feeds, &Feeds::readNext);
+        window.localShortcut(Key::RightArrow).connect(&feeds, &Feeds::readNext);
         window.localShortcut(Key::Extra).connect(&feeds, &Feeds::readNext);
         //window.localShortcut(Key::Escape).connect(&window, &Window::hide); //back to desktop
         //window.localShortcut(Key::Power).connect(&window, &Window::hide); //back to desktop
         //window.localShortcut(Key::Escape).connect(&shutdownPopup,&Window::toggle);
         //window.localShortcut(Key::Power).connect(&shutdownPopup,&Window::toggle);
-        window.localShortcut(Key::Escape).connect(&window,&Window::hide); //DEBUG: quit desktop (return to X)
+        window.localShortcut(Key::Escape).connect(this,&Application::quit); //DEBUG
         window.show();
     }
     void showPage(const ref<byte>& link) {

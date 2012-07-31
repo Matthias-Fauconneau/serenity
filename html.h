@@ -3,13 +3,13 @@
 #include "xml.h"
 #include "interface.h"
 
-/// Asynchronously load an image
-struct ImageLoader {
-    ImageLoader(const URL& url, Image<rgb>* target, signal<>&& imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
+/// Asynchronously load an image, sending a signal if the image was not cached
+struct ImageLoader : signal<> {
+    ImageLoader(const URL& url, Image<pixel>* target, signal<>* imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
     /// Reference to target to load (need to stay valid)
-    Image<rgb>* target;
-    /// Trigger when target was loaded
-    signal<> imageLoaded;
+    Image<pixel>* target;
+    /// Reference to a signal to trigger on load if the image was not cached.
+    signal<>* imageLoaded=0;
     /// Preferred size
     int2 size;
     void load(const URL&, array<byte>&&);

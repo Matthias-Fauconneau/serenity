@@ -3,11 +3,6 @@
 #include "debug.h"
 #include "array.cc"
 
-struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
-              uint64 size; uint blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
-struct dirent { long ino, off; short len; char name[]; };
-enum { DT_DIR=4, DT_REG=8 };
-
 /// Input/Output
 
 array<byte> read(int fd, uint capacity) {
@@ -31,7 +26,7 @@ int openFile(const ref<byte>& path, int at) {
 }
 
 int createFile(const ref<byte>& path, int at, bool overwrite) {
-    if(!overwrite && exists(path,at)) error("exists",path);
+    if(!overwrite && exists(path,at)) error("exists"_,path);
     return check( openat(at, strz(path),O_CREAT|O_WRONLY|O_TRUNC,0666), path );
 }
 
@@ -98,7 +93,7 @@ long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtim
     assert(fd, "Folder not found"_, folder);
     array<string> list;
     int i=0; for(dirent entry; getdents(fd,&entry,sizeof(entry))>0;i++) { if(i<2) continue;
-        string name = strz(entry.name);
+        string name = str(entry.name);
         string path = folder+"/"_+name;
         int type = *((byte*)&entry + entry.len - 1);
         if(type==DT_DIR && flags&Recursive) {
@@ -117,7 +112,7 @@ string findFile(const ref<byte>& folder, const ref<byte>& file, int at) {
     int fd = openFolder(folder,at);
     assert(fd, "Folder not found"_, folder);
     int i=0; for(dirent entry; getdents(fd,&entry,sizeof(entry))>0;i++) { if(i<2) continue;
-        string name = strz(entry.name);
+        string name = str(entry.name);
         int type = *((byte*)&entry + entry.len - 1);
         if(type==DT_DIR) { string path=findFile(name,file,fd); if(path) return folder+"/"_+path; }
         else if(type==DT_REG && file==name) return folder+"/"_+name;

@@ -101,7 +101,7 @@ void HighlightSelection::render(int2 parent) {
     if(index<count()) {
         Widget& current = at(index);
         if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
-            fill(parent+position+current.position+Rect(current.size), rgb(224, 192, 128));
+            fill(parent+position+current.position+Rect(current.size), pixel(224, 192, 128));
         }
     }
     Layout::render(parent);

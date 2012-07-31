@@ -82,7 +82,7 @@ struct Player : Application {
         media.open(files[index]);
         audio.start();
         setPlaying(true);
-        writeFile("/Music/.last"_,files[index],CWD,true);
+        writeFile("/Music/.last"_,files[index]);
     }
     void next() {
         if(!playKey.enabled) setPlaying(true);

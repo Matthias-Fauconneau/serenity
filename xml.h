@@ -3,12 +3,13 @@
 #include "map.h"
 #include "stream.h"
 #include "function.h"
+#include "memory.h"
 
 /// XML element
 struct Element {
     string name, content;
     map< string, string > attributes;
-    array<Element> children;
+    array< unique<Element> > children;
     Element(){}
     Element(string&& content):content(move(content)){}
     Element(TextStream& s, bool html=false);
@@ -32,7 +33,7 @@ struct Element {
     /// Returns element as parseable string
     string str(const ref<byte>& prefix=""_) const;
 };
-template<> string str(const Element& e);
+string str(const Element& e);
 
 /// Parse an XML document as a tree of \a Element
 Element parseXML(array<byte>&& document);

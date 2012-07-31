@@ -4,8 +4,9 @@
 #include "stream.h"
 #include "array.cc"
 
-array<string> unique;
-const ref<byte> all = "12134567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~-=\\!@#$%^&*()_+|\t\n[]{}';\":/.,?><"_;
+static_array<string,32> pool;
+//const ref<byte> all = "12134567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~-=\\!@#$%^&*()_+|\t\n[]{}';\":/.,?><"_;
+const ref<byte> all = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"_;
 
 struct Parser : Application {
     const word e = "epsilon"_;
@@ -20,7 +21,7 @@ struct Parser : Application {
     array<word> parseRuleExpression(TextStream& s) {
         array<word> tokens;
         for(;;) {
-            s.match(' ');
+            while(s.available(1) && s.match(' ')) {}
             if(s.match('[')) { //character set
                 int start=s.index-1;
                 array<byte> set;
@@ -83,6 +84,7 @@ struct Parser : Application {
                 word token = s.identifier();
                 if(token) { tokens<< token; used+=token; }
                 if(s.peek()=='|'||s.peek()==')'||s.peek()=='\n') break;
+                assert(token,(char)s.peek());
             }
         }
         return tokens;
@@ -167,7 +169,9 @@ struct Parser : Application {
 
     Parser() {
         /// Parses grammar
-        TextStream s = readFile("serenity/url.g"_);
+        TextStream s(readFile("serenity/math.g"_));
+        //TextStream s(readFile("serenity/url.g"_));
+        //TextStream s(readFile("serenity/grammar.g"_));
         while(s.match('#')) s.until('\n');
         ref<byte> text = s.until('\n');
         word firstRule=""_;

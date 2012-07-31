@@ -46,7 +46,7 @@ Date date(long time) {
 }
 
 string str(Date date, const ref<byte>& format) {
-    TextStream s = string(format);
+    TextStream s(format);
     string r;
     while(s) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(' '); }

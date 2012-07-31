@@ -1083,7 +1083,7 @@ void jpeg_decoder::free_all_blocks()
     for (mem_block *b = m_pMem_blocks; b; )
     {
         mem_block *n = b->m_pNext;
-        //unallocate(b); FIXME
+        unallocate(b, sizeof(mem_block)+b->m_size);
         b = n;
     }
     m_pMem_blocks =  0;
@@ -3221,5 +3221,5 @@ Image<byte4> decodeJPEG(const ref<byte>& file) {
     int width, height, depth;
     jpeg_decoder_mem_stream mem_stream((uint8*)file.data, file.size);
     byte4* data = (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4);
-    return Image<byte4>(data,width,height,width,true);
+    return Image<byte4>(data,width,height,width,true,false);
 }

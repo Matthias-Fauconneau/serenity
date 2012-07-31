@@ -51,15 +51,15 @@ uint16 Font::index(uint16 code) {
             uint16 unused size=s.read(), unused language=s.read();
             uint16 segCount=s.read(), unused searchRange=s.read(),unused entrySelector=s.read(), unused rangeShift=s.read();
             segCount /= 2;
-            array<uint16> endCode = s.read(segCount); //TODO: read<T[N]>
+            ref<uint16> endCode = s.read<uint16>(segCount);
             s.advance(2); //pad
-            array<uint16> startCode = s.read(segCount);
-            array<uint16> idDelta = s.read(segCount);
-            array<uint16> idRangeOffset = s.read(segCount);
-            int i=0; while(endCode[i] < code) i++;
-            if(startCode[i]<=code) {
-                if(idRangeOffset[i]) return *( &idRangeOffset[i] + idRangeOffset[i] / 2 + (code - startCode[i]) );
-                else return idDelta[i] + code;
+            ref<uint16> startCode = s.read<uint16>(segCount);
+            ref<uint16> idDelta = s.read<uint16>(segCount);
+            ref<uint16> idRangeOffset = s.read<uint16>(segCount);
+            int i=0; while(swap16(endCode[i]) < code) i++;
+            if(swap16(startCode[i])<=code) {
+                if(swap16(idRangeOffset[i])) return *( &idRangeOffset[i] + swap16(idRangeOffset[i]) / 2 + (code - swap16(startCode[i])) );
+                else return swap16(idDelta[i]) + code;
             }
         } else if(format==12) {
             uint16 unused subformat = s.read();
@@ -72,7 +72,7 @@ uint16 Font::index(uint16 code) {
         } else error("Unsupported"_,format,code);
         s.index=index;
     }
-    error("Not Found");
+    error("Not Found"_);
 }
 
 int Font::kerning(uint16 /*leftCode*/, uint16 /*rightCode*/) {
@@ -122,7 +122,7 @@ void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
 void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int, int, int, int, int, int) {
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
-    DataStream s(array<byte>(glyf +start, length), true);
+    DataStream s(ref<byte>(glyf +start, length), true);
     if(!s) return;
 
     int16 numContours = s.read();
@@ -139,10 +139,10 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
     } else s.advance(4*2);
 
     if(numContours>0) {
-        array<uint16> endPtsOfContours = s.read(numContours);
-        int nofPoints = endPtsOfContours[numContours-1]+1;
+        ref<uint16> endPtsOfContours = s.read<uint16>(numContours);
+        int nofPoints = swap16(endPtsOfContours[numContours-1])+1;
 
-        uint16 instructionLength = s.read(); array<uint8> unused instructions = s.read(instructionLength);
+        uint16 instructionLength = s.read(); ref<uint8> unused instructions = s.read<uint8>(instructionLength);
 
         struct Flags { byte on_curve:1, short_x:1, short_y:1, repeat:1, same_sign_x:1, same_sign_y:1; };
         Flags flagsArray[nofPoints];
@@ -174,7 +174,7 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
         }
 
         for(int n=0,i=0; n<numContours; n++) {
-            int last= endPtsOfContours[n];
+            int last= swap16(endPtsOfContours[n]);
             int2 p; //last on point
             if(flagsArray[last].on_curve) p=P[last];
             else if(flagsArray[last-1].on_curve) p=P[last-1];
@@ -221,7 +221,8 @@ Glyph Font::glyph(uint16 code) {
     int width=raster.width,height=raster.height;
 
     /// Rasterizes edge flags
-    Image<int8> bitmap(width,height);
+    int8 buffer[width*height];
+    Image<int8> bitmap(buffer,width,height,width,false,false);
     for(int y=0; y<height; y++) {
         int acc=0;
         for(int x=0; x<width; x++) {

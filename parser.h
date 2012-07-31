@@ -1,17 +1,18 @@
 #pragma once
 #include "map.h"
 #include "string.h"
+#include "memory.h"
 
 /// word is an index in a string table allowing fast move/copy/compare
-extern array<string> unique;
+extern static_array<string,32> pool;
 struct word {
     int id;
-    word(const string& s) { id=indexOf(unique, s); if(id<0) { id=unique.size(); unique<<copy(s); } }
+    word(const string& s) { id=indexOf(pool, s); if(id<0) { id=pool.size(); pool<<copy(s); } }
     word(const ref<byte>& s):word(string(s)){}
-    explicit operator bool() const { return unique[id].size(); }
+    explicit operator bool() const { return pool[id].size(); }
 };
 bool operator ==(word a, word b) { return a.id == b.id; }
-const string& str(const word& w) { return unique[w.id]; }
+const string& str(const word& w) { return pool[w.id]; }
 
 struct Rule {
     const word symbol;
@@ -52,9 +53,9 @@ struct State {
 bool operator ==(const State& a, const State& b) { return a.items==b.items; }
 string str(const State& state) { return " "_+str(state.items,"\n+"_); }
 
-struct Node { word name; array<Node> children; Node(word name):name(name){} };
+struct Node { word name; array<unique<Node> > children; Node(word name):name(name){} };
 string str(const Node& node) {
     if(node.children.size()==1) return str(node.children[0]);
-    if(node.children.size()==2 && node.children[0].name==node.name) return str(node.children[0])+str(node.children[1]);
+    if(node.children.size()==2 && node.children[0]->name==node.name) return str(node.children[0])+str(node.children[1]);
     return str(node.name)+str(node.children," "_,"()"_);
 }

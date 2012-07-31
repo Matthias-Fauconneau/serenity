@@ -10,11 +10,9 @@ Feeds::Feeds() {
     static int config = openFolder("config"_);
     readConfig = appendFile("read"_,config);
     readMap = mapFile("read"_,config);
-    reserve(256); //realloc would invalidate delegates
     List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
     List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
-    array<string> feeds = split(readFile("feeds"_,config),'\n');
-    for(const ref<byte>& url: feeds) getURL(url, Handler(this, &Feeds::loadFeed), 12*60);
+    for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 24*60);
 }
 Feeds::~Feeds() { closeFile(readConfig); }
 
@@ -38,21 +36,19 @@ void Feeds::setAllRead() {
     }
 }
 
-void Feeds::loadFeed(const URL& url, array<byte>&& document) {
+void Feeds::loadFeed(const URL&, array<byte>&& document) {
     Element feed = parseXML(move(document));
-
+#if HEADER
     //Header
     string title = feed.text("rss/channel/title"_); //RSS
     if(!title) title = feed("feed"_)("title"_).text(); //Atom
     if(!title) { warn("Invalid feed"_,url); return; }
-    array<string> words = split(title,' ');
-    if(words.size()>4) title=join(slice(words,0,4)," "_);
+    //title.shrink(section(title,' ',0,4).size);
 
     string link = feed.text("rss/channel/link"_); //RSS
     if(!link) link = string(feed("feed"_)("link"_)["href"_]); //Atom
     if(!link) { warn("Invalid feed"_,url); return; }
 
-#if HEADER
     Entry header(move(title),copy(link));
     header.isHeader=true;
     append( move(header) );
@@ -98,7 +94,7 @@ void Feeds::getFavicon(const URL& url, array<byte>&& document) {
     }
     for(Entry& entry: *this) {
         if(find(entry.link,url.host)) {
-            alloc<ImageLoader>(url.relative(icon), &entry.get<Icon>().image, listChanged, int2(16,16), 7*24*60*60);
+            alloc<ImageLoader>(url.relative(icon), &entry.get<Icon>().image, &listChanged, int2(16,16), 7*24*60*60);
             break; //only header
         }
     }

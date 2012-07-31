@@ -2,7 +2,6 @@
 #include "file.h"
 #include "stream.h"
 #include "linux.h"
-#include "array.cc"
 
 const char* errno[35] = {"OK",
     "PERM","NOENT","SRCH","INTR","IO","NXIO","2BIG","NOEXEC","BADF","CHILD","AGAIN","NOMEM","ACCES","FAULT","NOTBLK","BUSY","EXIST",
@@ -97,10 +96,10 @@ string demangle(TextStream& s, bool function=true) {
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
     } else if((l=uint(s.number()))!=uint(-1)) {
-        assert(l<=s.available(l),l,r,string(s.untilEnd()),string(move(s.buffer)));
+        assert(l<=s.available(l),l,r,s.untilEnd(),move(s.buffer));
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
-    } else { error('D',r,string(s.untilEnd()),string(move(s.buffer))); }
+    } else { error("D"_,r,s.untilEnd(),move(s.buffer)); }
     for(int i=0;i<pointer;i++) r<<'*';
     if(rvalue) r<<"&&"_;
     if(ref) r<<'&';
@@ -111,19 +110,18 @@ Symbol findNearestLine(void* find) {
     static Map map = mapFile("proc/self/exe"_);
     const byte* elf = map.data;
     const Ehdr& hdr = *(Ehdr*)elf;
-    array<Shdr> sections = array<Shdr>((Shdr*)(elf+hdr.shoff),hdr.shnum);
+    ref<Shdr> sections = ref<Shdr>((Shdr*)(elf+hdr.shoff),hdr.shnum);
     const char* shstrtab = (char*)elf+sections[hdr.shstrndx].offset;
-    const char* strtab = 0; DataStream symtab; DataStream debug_line;
+    const char* strtab = 0; ref<Sym> symtab; DataStream debug_line;
     for(const Shdr& s: sections)  {
-        if(str(shstrtab+s.name)==".debug_line"_) debug_line=array<byte>(elf+s.offset,s.size);
-        else if(str(shstrtab+s.name)==".symtab"_) symtab=array<byte>(elf+s.offset,s.size);
+        if(str(shstrtab+s.name)==".debug_line"_) debug_line=ref<byte>(elf+s.offset,s.size);
         else if(str(shstrtab+s.name)==".strtab"_) strtab=(const char*)elf+s.offset;
+        else if(str(shstrtab+s.name)==".symtab"_) symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
-    for(DataStream& s = symtab;s.index<s.buffer.size();) {
-        const Sym& sym = s.read<Sym>();
+    for(const Sym& sym: symtab) {
         if(find >= sym.value && find < sym.value+sym.size) {
-            TextStream s(array<byte>(str(strtab+sym.name)));
+            TextStream s(str(strtab+sym.name));
             symbol.function = s.match('_')&&s.peek()=='Z'? (s.buffer.size()>80?string("delegate"_) :demangle(s)) : string(s.untilEnd());
         }
     }
@@ -132,9 +130,8 @@ Symbol findNearestLine(void* find) {
         struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; int8 line_base; ubyte line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
-        while(s.peek()) s.untilNull();
-        s.advance(1);
-        array<string> files;
+        while(s.next()) s.untilNull();
+        array<ref<byte>> files;
         while(s.peek()) {
             files << s.untilNull();
             int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
@@ -162,7 +159,7 @@ Symbol findNearestLine(void* find) {
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
-                else { log("UNKNOWN: length",size); s.advance(size); }
+                else { warn("unknown opcode"_,opcode); s.advance(size); }
             }
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {
@@ -188,18 +185,19 @@ Symbol findNearestLine(void* find) {
             else if(opcode == set_prologue_end) {}
             else if(opcode == set_epilogue_begin) {}
             else if(opcode == set_isa) readLEV(s);
-            else error("Unsupported",opcode);
+            else error("Unsupported"_,opcode);
         }
     }
     return symbol;
 }
 
-void trace(int skip) {
-    static int recurse; if(recurse>1) {log("Debugger error"); recurse--;return;} recurse++;
+int recurse;
+void trace(int skip, uint size) {
+    if(recurse>1) {write(0,"Debugger error\n"_); void**p=0;*p=0; } recurse++;
     void* stack[10] = {};
     stack[0] = __builtin_return_address(0);
 #define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i)
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);
-    for(int i=9;i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
+    for(int i=min(9u,skip+size-1);i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
     recurse--;
 }

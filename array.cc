@@ -5,10 +5,11 @@
 #define generic template<class T>
 generic array<T>::array(ref<T>&& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(move((T&)ref[i]));}
 generic array<T>::array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
-generic array<T>::~array(){
-    if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate_((byte*)buffer.data,buffer.capacity*sizeof(T)); }
+extern int recurse;
+generic void array<T>::unallocate(){
+    //if(!recurse){recurse++;trace(3,2); log("~array",buffer.capacity,sizeof(T)); recurse--;}
+    unallocate_((byte*)buffer.data,buffer.capacity*sizeof(T));
 }
-
 #define array array<T>
 
 generic void array::reserve(uint capacity) {
@@ -32,7 +33,7 @@ generic void array::reserve(uint capacity) {
 }
 
 generic void array::shrink(uint size) {
-    assert(size<this->size());
+    assert(size<=this->size());
     if(tag!=-1) for(uint i=size;i<this->size();i++) at(i).~T();
     setSize(size);
 }

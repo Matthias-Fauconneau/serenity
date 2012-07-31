@@ -15,7 +15,7 @@ int createFile(const ref<byte>& path, int at=root(), bool overwrite=false);
 int appendFile(const ref<byte>& path, int at=root());
 
 array<byte> readFile(const ref<byte>& path, int at=root());
-void writeFile(const ref<byte>& path, const ref<byte>& content, int at=root(), bool overwrite=false);
+void writeFile(const ref<byte>& path, const ref<byte>& content, int at=root(), bool overwrite=true);
 
 struct Map {
     no_copy(Map)
@@ -27,7 +27,6 @@ struct Map {
     ~Map();
     /// Returns a reference to the map, valid only while the map exists.
     operator ref<byte>() { return ref<byte>(data,size); } //TODO: escape analysis
-    operator array<byte>() { return array<byte>(data,size); } //TODO: escape analysis
 };
 
 Map mapFile(const ref<byte>& path, int at=root());

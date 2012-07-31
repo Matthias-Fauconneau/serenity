@@ -64,7 +64,25 @@ inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 ar
 enum class sys { exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97,
                  socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197, clock_gettime=263, openat=322,
                  mkdirat, unlinkat, symlinkat=331, timerfd_create=350, timerfd_settime=353 };
-
+;
+typedef unsigned short ushort;
+typedef unsigned int uint;
+typedef unsigned long ulong;
+struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
+struct timespec { ulong sec,nsec; };
+struct rlimit { ulong cur,max; };
+struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
+              uint64 size; uint blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
+struct dirent { long ino, off; short len; char name[]; };
+enum {POLLIN = 1, POLLOUT=4, POLLHUP = 16};
+enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=040000};
+enum {PROT_READ=1, PROT_WRITE};
+enum {MAP_SHARED=1, MAP_PRIVATE};
+enum {DT_DIR=4, DT_REG=8 };
+enum {F_SETFL=4};
+enum {PF_LOCAL=1, PF_INET};
+enum {SOCK_STREAM=1, SOCK_DGRAM};
+enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS };
 syscall0(int, fork)
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
@@ -76,34 +94,21 @@ syscall3(int, ioctl, int,fd, long,request, void*,buf)
 syscall3(int, fcntl, int,fd, int,cmd, int,param)
 syscall2(int, munmap, void*,addr, long,len)
 syscall3(int, setpriority, int,which, int,who, int,prio)
-syscall3(int, getdents, int,fd, struct dirent*,entry, long,size)
+syscall3(int, getdents, int,fd, dirent*,entry, long,size)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
-syscall4(int, sigaction, int,sig, const void*,act, struct action*,old, int, sigsetsize)
+syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
-syscall2(int, fstat, int,fd, struct stat*,buf)
-syscall2(int, clock_gettime, int,type, struct timespec*,ts);
+syscall2(int, fstat, int,fd, stat*,buf)
+syscall2(int, clock_gettime, int,type, timespec*,ts)
 syscall4(int, openat, int,fd, const char*,name, int,oflag, int,perms)
 syscall3(int, mkdirat, int,fd, const char*,name, int,mode)
 syscall3(int, unlinkat, int,fd, const char*,name, int,flag)
 syscall3(int, symlinkat, const char*,target, int,fd, const char*,name)
 syscall3(int, socket, int,domain, int,type, int,protocol)
-syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
+syscall3(int, connect, int,fd, sockaddr*,addr, int,len)
 syscall2(int, timerfd_create, int,clock_id, int,flags)
-syscall4(int, timerfd_settime, int,ufd, int,flags, struct timespec*,utmr, struct timespec*,otmr)
-syscall2(int, setrlimit, int,resource, struct rlimit*,limit)
-typedef unsigned short ushort;
-typedef unsigned int uint;
-typedef unsigned long ulong;
-enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000, O_DIRECTORY=040000};
-enum {PROT_READ=1, PROT_WRITE};
-enum {MAP_SHARED=1, MAP_PRIVATE};
-enum {F_SETFL=4};
-enum {PF_LOCAL=1, PF_INET};
-enum {SOCK_STREAM=1, SOCK_DGRAM};
-struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
-struct timespec { ulong sec,nsec; };
-enum { RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS };
-struct rlimit { ulong cur,max; };
+syscall4(int, timerfd_settime, int,ufd, int,flags, timespec*,utmr, timespec*,otmr)
+syscall2(int, setrlimit, int,resource, rlimit*,limit)
 
 #pragma GCC system_header
 int exit(int code) __attribute((noreturn));

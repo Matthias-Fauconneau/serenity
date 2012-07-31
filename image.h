@@ -2,11 +2,27 @@
 #include "array.h"
 #include "vector.h"
 #include "debug.h"
-#include "memory.h"
 
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 typedef vector<bgra,uint,4> int4;
+
+#define RGB565 1
+#if RGB565
+struct rgb565 {
+    uint16 pack;
+    rgb565():pack(0){}
+    rgb565(uint8 i):pack( (i&0b11111000)<<8 | (i&0b11111100)<<3 | i>>3 ) {}
+    rgb565(uint8 b, uint8 g, uint8 r):pack( (r&0b11111000)<<8 | (g&0b11111100)<<3 | b>>3 ) {}
+    rgb565(byte4 c):rgb565(c.b, c.g, c.r){}
+    operator byte4() { return byte4((pack&0b11111)<<3,(pack>>3)&0b11111100,pack>>8,255); }
+    operator   int4() { return     int4((pack&0b11111)<<3,(pack>>3)&0b11111100,pack>>8,255); }
+};
+/// pixel is native display format
+typedef rgb565 pixel;
+#else
+typedef byte4 pixel;
+#endif
 
 template<class T> struct Image {
     T* data=0;
@@ -20,12 +36,12 @@ template<class T> struct Image {
     Image(){}
     Image(T* data, int width, int height, int stride, bool own, bool alpha) :
         data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
-    Image(int width, int height) : data((T*)allocate_(sizeof(T)*width*height)), width(width), height(height), stride(width), own(true) {}
+    Image(int width, int height);
     Image(array<T>&& data, uint width, uint height);
 
-    ~Image(){ if(data && own) { unallocate(data,sizeof(T)*width*height); data=0; } }
+    ~Image();
     explicit operator bool() const { return data; }
-    explicit operator ref<byte4>() { assert(width==stride); return ref<byte4>(data,width*height); }
+    explicit operator ref<T>() { assert(width==stride); return ref<T>(data,height*stride); }
 
     T operator()(uint x, uint y) const {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
     T& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
@@ -41,6 +57,7 @@ generic inline Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.widt
 generic inline Image<T> copy(const Image<T>& o) {Image<T> copy(o.width,o.height); ::copy(copy.data,o.data,o.stride*o.height); return copy;}
 /// Convert between image formats
 template<class D, class S> inline Image<D> convert(const Image<S>& s) {
+    if(!s) return Image<D>();
     Image<D> copy(s.width,s.height);
     for(uint x=0;x<s.width;x++) for(uint y=0;y<s.height;y++) copy(x,y)=s(x,y);
     return copy;

@@ -25,14 +25,28 @@ Window::Window(Widget* widget, int2 size, string&& title, Image<byte4>&& icon) :
 #endif
     setSize(size);
     vt = open("/dev/console", O_RDWR, 0);
+#if WM
     wm = socket(PF_INET,SOCK_DGRAM,0);
     //int one=1; setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void *)&one, sizeof(one));
     sockaddr addr = {PF_INET,'W'|('M'<<8),127u|(255<<8)|(255<<16)|(255<<24)};
     int unused e = check( connect(wm,&addr,sizeof(addr)) );
+#else
+    registerPoll(i({keyboard, POLLIN}));
+    registerPoll(i({mouse, POLLIN}));
+    cursor=display()/2;
+#endif
 }
-Window::~Window() { hide(); close(wm); close(touch); close(buttons); close(keyboard); close(mouse); close(vt); }
+
+Window::~Window() {
+    hide();
+    close(touch); close(buttons); close(keyboard); close(mouse); close(vt);
+#if WM
+    close(wm);
+#endif
+}
 void Window::event(pollfd poll) {
     if(poll.fd==0) { render(); return; }
+#if WM
     if(poll.fd==wm) for(window w;read(wm, &w, sizeof(w)) > 0;) {
         if(w.length>sizeof(window)) read(wm, w.length-sizeof(window));
         log(w.id);
@@ -50,6 +64,7 @@ void Window::event(pollfd poll) {
         if(w.id>=windows.size()) resize(windows,w.id);
         update();
     }
+#endif
     if(poll.fd==touch) for(input_event e;read(touch, &e, sizeof(e)) > 0;) {
          if (e.type == EV_ABS) {
             int i = e.code;
@@ -66,7 +81,7 @@ void Window::event(pollfd poll) {
          if(e.type==EV_SYN) {
              //update();
              //TODO: press: edge trigger on cursor.z
-             if(active==id) patchCursor(cursor,cursorIcon());
+             if(isActive()) patchCursor(cursor,cursorIcon());
          }
     }
     if(poll.fd==mouse) for(input_event e;read(mouse, &e, sizeof(e)) > 0;) {
@@ -74,7 +89,7 @@ void Window::event(pollfd poll) {
         if(e.type==EV_SYN) {
             //update();
             if(widget->mouseEvent(cursor,Motion, pressed)) wait();
-            else if(active==id) patchCursor(cursor,cursorIcon());
+            else if(isActive()) patchCursor(cursor,cursorIcon());
         }
         if(e.type == EV_KEY) {
             assert(widget);
@@ -85,7 +100,13 @@ void Window::event(pollfd poll) {
         }
     }
     if(poll.fd==keyboard) for(input_event e;read(keyboard, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_KEY) {
+        if(e.type == EV_KEY && e.value) {
+            signal<>* shortcut = shortcuts.find(e.code);
+            if(shortcut) (*shortcut)();
+        }
+    }
+    if(poll.fd==buttons) for(input_event e;read(buttons, &e, sizeof(e)) > 0;) {
+        if(e.type == EV_KEY && e.value) {
             signal<>* shortcut = shortcuts.find(e.code);
             if(shortcut) (*shortcut)();
         }
@@ -93,6 +114,7 @@ void Window::event(pollfd poll) {
 }
 
 void Window::update() {
+#if WM
     uint active=-1;
     if(!windows) { assert(id==0); resize(windows,1); }
     windows[id] = window i({sizeof(window),id,cursor,widget->position,widget->size});
@@ -118,8 +140,10 @@ void Window::update() {
     }
     this->active=active;
     //TODO: compute visibility
+#endif
 }
-void Window::emit(bool emitTitle, bool emitIcon) {
+void Window::emit(bool unused emitTitle, bool unused emitIcon) {
+#if WM
     if(!shown) return;
     window w i({sizeof(window),id,widget->position,widget->size,cursor});
     if(w.id==uint(-1)) { w.id=windows.size(); windows<<w; }
@@ -131,32 +155,38 @@ void Window::emit(bool emitTitle, bool emitIcon) {
         w.length += state.size();
         write(wm,array<byte>(raw(w)+state));
     } else write(wm,raw(w));
+#endif
 }
 
 void Window::render() {
     assert(shown);
     widget->update();
     widget->render(int2(0,0));
-    if(active==id) patchCursor(cursor,cursorIcon(),false);
+    if(isActive()) patchCursor(cursor,cursorIcon(),false);
 }
 
 void Window::show() {
     if(shown) return; shown=true;
+#if WM
     registerPoll(i({wm, POLLIN}));
+#endif
     widget->size = display();
     widget->update();
     emit();
     ioctl(vt, VT_ACTIVATE, (void*)6); //switch from X
+    writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
     update();
     render();
 }
 void Window::hide() {
     if(!shown) return; shown=false;
-    unregisterPoll(wm);
     widget->size=int2(0,0);
     emit();
     update();
+#if WM
+    unregisterPoll(wm);
     id=0;
+#endif
     ioctl(vt, VT_ACTIVATE, (void*)7); //switch to X (TODO: only if all hidden)
 }
 
@@ -184,7 +214,7 @@ void Window::setSize(int2 size) {
     assert(size);
     widget->size=size;
     widget->update();
-    if(int(id)>=0) emit();
+    emit();
 }
 void Window::setTitle(string&& title) { this->title=move(title); emit(true); }
 void Window::setIcon(Image<byte4>&& icon) { this->icon=move(icon); emit(true,true); }

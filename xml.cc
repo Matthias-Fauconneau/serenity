@@ -11,7 +11,7 @@ static Element parse(array<byte>&& document, bool html) {
     while(s) {
         s.skip();
         if(s.match("</"_)) warn("Unexpected","</"_+s.until('>')+">"_);
-        else if(s.match('<')) root.children << Element(s,html);
+        else if(s.match('<')) root.children << unique<Element>(s,html);
         else warn("Unexpected '",s.until('\n'),"'");
         s.skip();
     }
@@ -36,7 +36,7 @@ Element::Element(TextStream& s, bool html) {
         else if(s.match('/')) s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
         string key = string(s.identifier()); s.skip();
-        if(!key) { log("Attribute syntax error",(string)slice(s.buffer,start,s.index-start),"^",s.until('>')); break; }
+        if(!key) { log("Attribute syntax error"_,slice(s.buffer,start,s.index-start),"|"_,s.until('>')); break; }
         if(html) key=toLower(key);
         string value;
         if(s.match('=')) {
@@ -50,16 +50,18 @@ Element::Element(TextStream& s, bool html) {
         s.skip();
     }
     if(html) {
-        static array<string> voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
-        if(contains(voidElements,name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
+        static array< ref<byte> > voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
+        if(contains(voidElements,ref<byte>(name))) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
-            content=simplify(unescape(s.until(string("</"_+name+">"_))));
+            //content=simplify(unescape(s.until(string("</"_+name+">"_))));
+            content=unescape(s.until(string("</"_+name+">"_)));
+            removeAll(content,byte('\n'));
             s.skip();
             return;
         }
     }
-    while(!s.match(string("</"_+name+">"_))) {
+    for(;;) {
         //if(s.available(4)<4) { warn("Expecting","</"_+name+">"_,"got EOF"); return; } //warn unclosed tag
         if(s.available(4)<4) {  return; } //ignore unclosed tag
         if(s.match("<![CDATA["_)) {
@@ -67,7 +69,7 @@ Element::Element(TextStream& s, bool html) {
             if(content) children << Element(move(content));
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
-        else if(s.match("</"_)) { s.until(">"_); } //ignore
+        else if(s.match("</"_)) { if(name==s.until(">"_)) break; } //ignore
         else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
         else if(s.match('<')) children << Element(s,html);
         else {
@@ -89,7 +91,7 @@ ref<byte> Element::operator[](const ref<byte>& attribute) const {
 
 const Element& Element::operator()(const ref<byte>& name) const {
     for(const Element& e: children) if(e.name==name) return e;
-    error("children", name, "not found in", *this);
+    error("children"_, name, "not found in"_, *this);
 }
 
 void Element::visit(const function<void(const Element&)>& visitor) const {
@@ -129,26 +131,27 @@ string Element::str(const ref<byte>& prefix) const {
     for(const_pair<string,string> attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
     if(content||children) {
         if(name||attributes) line << ">\n"_;
-        if(content) { assert(!children); line << join(split(content,'\n'),string("\n"_+prefix))+"\n"_; }
+        if(content) { assert(!children); line << ::str(split(content,'\n'),string("\n"_+prefix))+"\n"_; }
         if(children) for(const Element& e: children) line << e.str(string(prefix+" "_));
         if(name||attributes) line << prefix+"</"_+name+">\n"_;
     } else if(name||attributes) line << "/>\n"_;
     return line;
 }
-template<> string str(const Element& e) { return e.str(); }
+string str(const Element& e) { return e.str(); }
 
 string unescape(const ref<byte>& xml) {
-    static map<string, string> entities;
+    static map< ref<byte>, ref<byte> > entities;
     if(!entities) {
-        array<string> kv = split(
+        array< ref<byte> > kv = split(
 "quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — "
 "euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull • "
 "agrave à acirc â egrave è ocirc ô ecirc ê szlig ß"_,' ');
         assert(kv.size()%2==0,kv.size());
+        entities.reserve(kv.size()/2);
         for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
     string out;
-    TextStream s = string(xml);
+    TextStream s(xml);
     while(s) {
         out << s.until("&"_);
         if(!s) break;
@@ -156,9 +159,9 @@ string unescape(const ref<byte>& xml) {
         if(s.match("#x"_)) out << utf8(toInteger(toLower(s.until(";"_)),16));
         else if(s.match('#')) out << utf8(toInteger(s.until(";"_)));
         else {
-            string key = string(s.word());
+            ref<byte> key = s.word();
             if(s.match(';')) {
-                string* c = entities.find(key);
+                ref<byte>* c = entities.find(key);
                 if(c) out<<*c; else warn("Unknown entity",key);
             }
             else out<<"&"_; //unescaped &
