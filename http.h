@@ -9,7 +9,7 @@ struct Socket : virtual Stream {
     Socket(){}
     ~Socket() { disconnect(); }
     /// Connects to \a service on \a host
-    bool connect(const string& host, const string& service);
+    bool connect(const ref<byte>& host, const ref<byte>& service);
     void disconnect();
     /// Reads /a size bytes from network socket
     virtual array<byte> receive(uint size);

@@ -1,6 +1,4 @@
-typeid
-dependency graph with (code size,build time), detect useless #includes / globally unused symbols
-limit header sizes. remove useless array.cc. (string -> array.h, string.h for operations)?, forward declaration headers
+FIXME: image link, dreamer comic, progressive image
 apps: feeds, desktop, text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf, inflate, jpeg
 font: compound glyph transform, kerning, subpixel position, hinting
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen, hardware cursor, fast scroll

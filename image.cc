@@ -7,7 +7,7 @@
 
 #define generic template<class T>
 
-generic Image<T>::Image(int width, int height) : data(allocate<T>(height*width)), width(width), height(height), stride(width), own(true) {
+generic Image<T>::Image(int width, int height, int stride) : data(allocate<T>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true) {
     assert(width); assert(height);
 }
 generic Image<T>::~Image(){ if(data && own) { unallocate(data,height*stride); } }

@@ -67,28 +67,28 @@ void Window::event(pollfd poll) {
 #endif
     if(poll.fd==touch) for(input_event e;read(touch, &e, sizeof(e)) > 0;) {
          if (e.type == EV_ABS) {
-            int i = e.code;
+             int i = e.code; if(i>2) i=2;
             int v = e.value;
-#if CALIBRATE
-            const int M=1<<10; static int min[3]={M,M,M}, max[3]={-M,-M,-M}; // calibrate without a priori
-#else
-            static int min[3]={337,-80,352}, max[3]={506,63,486}; // touchbook calibration
-#endif
-            if(v<=min[i]) min[i]=v-1;
-            if(v>=max[i]) max[i]=v+1;
-            cursor[i] = widget->size[i]*(v-min[i])/uint(max[i]-min[i]);
+            static int min[3]={130,210,-1}, max[3]={3920,3790,490}; // touchbook calibration
+            if(v<min[i]) min[i]=v; else if(v>max[i]) max[i]=v;
+            if(i<2) cursor[i] = widget->size[i]*(max[i]-v)/uint(max[i]-min[i]);
+            else if(v>0) {
+                if(widget->mouseEvent(cursor,Press, pressed = Key::Left)) wait();//repaint once
+                //else TODO: cursor press/touch feedback
+            } else pressed=Key::None;
          }
          if(e.type==EV_SYN) {
              //update();
              //TODO: press: edge trigger on cursor.z
-             if(isActive()) patchCursor(cursor,cursorIcon());
+             if(widget->mouseEvent(cursor,Motion, pressed)) wait();//repaint once
+             else if(isActive()) patchCursor(cursor,cursorIcon());
          }
     }
     if(poll.fd==mouse) for(input_event e;read(mouse, &e, sizeof(e)) > 0;) {
         if(e.type==EV_REL) { int i = e.code; assert(i<2); cursor[i]+=e.value; cursor[i]=clip(0,cursor[i],display()[i]); } //TODO: acceleration
         if(e.type==EV_SYN) {
             //update();
-            if(widget->mouseEvent(cursor,Motion, pressed)) wait();
+            if(widget->mouseEvent(cursor,Motion, pressed)) wait();//repaint once
             else if(isActive()) patchCursor(cursor,cursorIcon());
         }
         if(e.type == EV_KEY) {
@@ -162,6 +162,7 @@ void Window::render() {
     assert(shown);
     widget->update();
     widget->render(int2(0,0));
+    swapBuffers();
     if(isActive()) patchCursor(cursor,cursorIcon(),false);
 }
 

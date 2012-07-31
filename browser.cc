@@ -5,15 +5,16 @@
 #include "html.h"
 #include "window.h"
 #include "interface.h"
+#include "array.cc"
 
 struct Browser : Application {
     Scroll<HTML> page;
-    Window window = Window(&content.parent(),int2(0,0));
+    Window window i({&page.parent(),int2(0,0)});
 
     Browser() {
         window.localShortcut(Key::Escape).connect(this, &Application::quit);
         page.contentChanged.connect(&window, &Window::render);
-        page.go("http://thedreamercomic.com/blog.php/page-3-fighting-cocks-tavern/"_);
+        page.go("http://www.thedreamercomic.com/issues/issue_15/05_Issue_15.jpg"_);
         window.show();
     }
 };

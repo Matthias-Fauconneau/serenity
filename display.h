@@ -7,8 +7,6 @@ struct Rect {
     int2 min,max;
     explicit Rect(int2 max):min{0,0},max(max){}
     Rect(int2 min, int2 max):min(min),max(max){}
-    /// Intersect this clip with \a clip
-    Rect clip(Rect clip) { return Rect(::max(min,clip.min),::min(max,clip.max)); }
     bool contains(int2 p) { return p>=min && p<max; }
     explicit operator bool() { return (max-min)>int2(0,0); }
 };
@@ -23,6 +21,9 @@ void finish();
 
 /// Returns display size (and on first call mmap framebuffer)
 int2 display();
+
+/// Swap buffers
+void swapBuffers();
 
 /// Fill framebuffer area in \a rect with \a color
 void fill(Rect rect, pixel color);

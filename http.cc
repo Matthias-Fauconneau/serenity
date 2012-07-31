@@ -10,17 +10,17 @@
 /// Socket
 
 uint32 ip(TextStream& s) {
-    int a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
+    int a=s.number(), b=(s.match('.'),s.number()), c=(s.match('.'),s.number()), d=(s.match('.'),s.number());
     return (d<<24)|(c<<16)|(b<<8)|a;
 }
 
-bool Socket::connect(const string& host, const string& /*service*/) {
+bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
     disconnect();
     static int dnsCache = appendFile("cache/dns"_);
     static Map dnsMap = mapFile(dnsCache);
     uint ip=-1;
     for(TextStream s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(" "_); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
-    if(!ip) return false; //negative entry
+    if(!ip) ip=-1;//return false; //negative entry
     if(ip==uint(-1)) {
         static int dns;
         if(!dns) {
@@ -33,23 +33,22 @@ bool Socket::connect(const string& host, const string& /*service*/) {
             int unused e= check( ::connect(dns, &addr, sizeof(addr)) );
         }
         array<byte> query;
-        struct Header { uint16 id=swap16(currentTime()); uint16 flags=0; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
+        struct Header { uint16 id=swap16(currentTime()); uint16 flags=1; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
         for(TextStream s(host);s;) { //QNAME
             ref<byte> label = s.until('.');
             query << label.size << label;
         }
-        query << 0;
-        query << raw(swap16(1)) << raw(swap16(1));
-        ::write(1,string(host+" "_));
+        query << 0 << 0 << 1 << 0 << 1;
         ::write(dns,query);
-        DataStream s(readUpTo(dns,256), true);
+        ::write(1,string("query "_+host+" "_));
+        DataStream s(readUpTo(dns,4096), true);
         header = s.read<Header>();
         for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
         for(int i=0;i<swap16(header.an);i++) {
             for(ubyte n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } //skip name
             uint16 type=s.read(), class_=s.read(); uint32 unused ttl=s.read(); uint16 unused size=s.read();
-            if(type!=1) { s.advance(size); continue; }
+            if(type!=1) { s.advance(size); log("type",type); continue; }
             assert(type=1/*A*/); assert(class_==1/*INET*/);
             ip = s.read<uint>(); //IP (no swap)
             string entry = host+" "_+str(raw(ip),"."_)+"\n"_;
@@ -58,8 +57,8 @@ bool Socket::connect(const string& host, const string& /*service*/) {
             dnsMap = mapFile(dnsCache); //remap cache
             break;
         }
-        if(!ip) {
-            log("unknown");
+        if(ip==uint(-1)) {
+            log("unknown",swap16(header.qd),swap16(header.an));
             ::write(dnsCache,string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = mapFile(dnsCache); //remap cache
             return false;
@@ -216,7 +215,7 @@ void HTTP::header() {
 }
 void HTTP::event(pollfd poll) {
     assert(fd); assert(state>=Connect && state <=Done, int(state));
-    if(poll.revents&POLLHUP) { log("Connection broken",url); state=Done; free(this); return; }
+    if(poll.revents&POLLHUP) { log("Connection broken",poll.revents&POLLIN,url); state=Done; free(this); return; }
     if(state == Connect) {
         if(!poll.revents) { log("Connection timeout",url); state=Done; free(this); return; }
         fcntl(fd,F_SETFL,0);
@@ -231,9 +230,10 @@ void HTTP::event(pollfd poll) {
         }
     }
     if(state == Data) {
+        debug( log("Receive",url,content.size(),contentLength); )
         if(contentLength) {
             content << receive(contentLength-content.size());
-            if(content.size()==contentLength) state=Cache;
+            if(content.size()>=contentLength) state=Cache;
         }
         else if(chunked) {
             int contentLength = number(16); match("\r\n"_);

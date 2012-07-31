@@ -36,7 +36,7 @@ template<class T> struct Image {
     Image(){}
     Image(T* data, int width, int height, int stride, bool own, bool alpha) :
         data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
-    Image(int width, int height);
+    Image(int width, int height, int stride=0);
     Image(array<T>&& data, uint width, uint height);
 
     ~Image();
