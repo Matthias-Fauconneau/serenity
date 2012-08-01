@@ -114,6 +114,7 @@ void Feeds::itemPressed(int index) { pageChanged( array::at(index).link ); }
 
 void Feeds::readNext() {
     uint i=index;
+    setRead(active());
     for(;;) { //next unread item
         i++;
         if(i==count()) { /*execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); FIXME: fix memory leaks*/ return; }

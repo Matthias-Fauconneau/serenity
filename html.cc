@@ -42,11 +42,10 @@ void HTML::append(const URL& url, array<byte>&& document) {
         else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(!endsWith(src.path,".gif"_)&&(find(src.path,"comics"_)||find(src.path,"strip"_)||
+            if(!endsWith(src.path,".gif"_)&&!startsWith(src.path,"ad/"_)&&(find(src.path,"comic"_)||find(src.path,"comics"_)||find(src.path,"strip"_)||
                                              find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
-                log("image",size);
                 score += size?:16800;
             }
         } else if(!div.children) return false;
@@ -57,8 +56,8 @@ void HTML::append(const URL& url, array<byte>&& document) {
             } else if(!e.name) {
                 score += e.content.size(); //raw text
             } else if(e.name=="img"_||e.name=="iframe"_) {
-                int height = isInteger(e["height"_]) ? toInteger(e["height"_]) : 1;
-                if(e.name=="img"_ && !endsWith(e["src"_],".gif"_)) score += height; //image
+                //int height = isInteger(e["height"_]) ? toInteger(e["height"_]) : 1;
+                //if(e.name=="img"_ && !endsWith(e["src"_],".gif"_)) score += height; //image
             } else if(e.name=="br"_) { score += 30; //line break
             } else if(contains(ignoreElement,ref<byte>(e.name))) {
             } else if(!contains(e.name,(byte)':')) warn("load: Unknown HTML tag",e.name);
@@ -70,7 +69,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
     });
     while(best->name=="a"_ && best->children.size()==1) best=&best->children.first();
     const Element& content = *best;
-    log("HTML\n"_+str(content));
+    write(1,str(content));
     log(url,max,second);
     //convert HTML to text + images
     layout(url, content);

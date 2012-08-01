@@ -47,8 +47,8 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
         for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
         for(int i=0;i<swap16(header.an);i++) {
             for(ubyte n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } //skip name
-            uint16 type=s.read(), class_=s.read(); uint32 unused ttl=s.read(); uint16 unused size=s.read();
-            if(type!=1) { s.advance(size); log("type",type); continue; }
+            uint16 type=s.read(), unused class_=s.read(); uint32 unused ttl=s.read(); uint16 unused size=s.read();
+            if(type!=1) { s.advance(size); continue; }
             assert(type=1/*A*/); assert(class_==1/*INET*/);
             ip = s.read<uint>(); //IP (no swap)
             string entry = host+" "_+str(raw(ip),"."_)+"\n"_;
@@ -58,7 +58,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
             break;
         }
         if(ip==uint(-1)) {
-            log("unknown",swap16(header.qd),swap16(header.an));
+            log("unknown");
             ::write(dnsCache,string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = mapFile(dnsCache); //remap cache
             return false;
@@ -115,12 +115,13 @@ URL::URL(const ref<byte>& url) {
     host = string(section(domain,'@',-2,-1));
     if(contains(domain,byte('@'))) authorization = base64(section(domain,'@'));
     if(!contains(host,byte('.'))) { path=move(host); path<<"/"_; }
+    else if(host=="."_) host.clear();
     path << s.until('#');
     fragment = string(s.untilEnd());
 }
 URL URL::relative(URL&& url) const {
-    if(url.scheme) { assert(url.host); return move(url); } //already complete URL
-    if(url.host && url.path) { url.scheme=copy(scheme); return move(url); } //missing only scheme
+    if(url.scheme) { assert(url.host.size()>1); return move(url); } //already complete URL
+    if(url.host && url.path) { assert(url.host.size()>1); url.scheme=copy(scheme); return move(url); } //missing only scheme
     if(url.host) { //relative path URLs could be misparsed into host field if first path element contains dots
         swap(url.path,url.host);
         if(url.host) {
@@ -230,7 +231,6 @@ void HTTP::event(pollfd poll) {
         }
     }
     if(state == Data) {
-        debug( log("Receive",url,content.size(),contentLength); )
         if(contentLength) {
             content << receive(contentLength-content.size());
             if(content.size()>=contentLength) state=Cache;

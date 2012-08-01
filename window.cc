@@ -177,6 +177,7 @@ void Window::show() {
     ioctl(vt, VT_ACTIVATE, (void*)6); //switch from X
     writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
     update();
+    fill(Rect(display()),0);
     render();
 }
 void Window::hide() {
