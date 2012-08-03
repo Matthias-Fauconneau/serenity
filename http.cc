@@ -161,7 +161,7 @@ HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, ar
 }
 void HTTP::request() {
     state=Request;
-    string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"_; //TODO: Accept-Encoding: gzip,deflate
+    string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;
     write( string(request+"\r\n"_) );
 }

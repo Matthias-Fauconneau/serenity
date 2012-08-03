@@ -17,7 +17,7 @@ struct Month : Grid<Text> {
 };
 
 struct Calendar : VBox {
-    HList<Text> date = {string( "<"_), string(""_), string(">"_)};
+    HList<Text> date { array<Text>{string( "<"_), string(""_), string(">"_)}};
     Month month;
     Text events;
     signal<> eventAlarm;
@@ -34,8 +34,8 @@ struct Clock : Text, Timer {
     signal<> triggered;
     Clock(int size=16):Text(::str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
     void expired() { text=::str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout(); }
-    bool mouseEvent(int2, Event event, Key button) override {
-        if(event==Press && button==LeftKey) { triggered(); return true; }
+    bool mouseEvent(int2, Event event, Key) override {
+        if(event==Press) { triggered(); return true; }
         return false;
     }
 };

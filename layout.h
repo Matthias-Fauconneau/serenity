@@ -97,7 +97,7 @@ struct VBox : Vertical, Widgets {
 
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
-    HList(ref<T>&& widgets):Array<T>(move(widgets)){}
+    HList(array<T>&& widgets):Array<T>(move(widgets)){}
 };
 template<class T> struct VList : Vertical, Array<T> {
     VList(){}

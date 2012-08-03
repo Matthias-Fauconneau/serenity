@@ -63,7 +63,7 @@ void Feeds::loadFeed(const URL&, array<byte>&& document) {
 #endif
     array<Entry> items; int history=0;
     auto addItem = [this,&history,&items](const Element& e)->void{
-        if(history++>=64) return; //avoid getting old unreads on feeds with big history
+        if(history++>=32) return; //avoid getting old unreads on feeds with big history
         if(array::size()>=32) return;
         string text = e("title"_).text();
         text = string(trim(unescape(text)));
@@ -78,7 +78,6 @@ void Feeds::loadFeed(const URL&, array<byte>&& document) {
     feed.xpath("rss/channel/item"_,addItem); //RSS
     for(int i=items.size()-1;i>=0;i--) { //oldest first
         *this<< move(items[i]);
-        //getURL(URL(last().link)); //preload
     }
     listChanged();
 }
@@ -122,4 +121,5 @@ void Feeds::readNext() {
     }
     setActive(i);
     itemPressed(i);
+    if(i+1<count()) getURL(URL(array::at(i+1).link)); //preload next
 }

@@ -12,7 +12,7 @@ array<string> getEvents(Date query) {
 
     map<string, array<Date>> exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
-        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=s.until('\n'); exceptions.insert(move(title),array<Date>i({except})); }
+        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=string(s.until('\n')); exceptions.insert(move(title),array<Date>i({except})); }
         else s.until('\n');
     }
     s.index=0;
@@ -26,7 +26,7 @@ array<string> getEvents(Date query) {
         else {
             Date date = parse(s); s.skip();
             Date end=date; if(s.match("-"_)) { end=parse(s); s.skip(); }
-            string title = s.until('\n');
+            string title = string(s.until('\n'));
             if(query.day>=0) {
                 if(date.day>=0) { if(date.day!=query.day) continue; }
                 else if(query>until) continue;
@@ -53,10 +53,10 @@ array<string> getEvents(Date query) {
 void Month::setActive(Date active) {
     clear(); dates.clear();
     todayIndex=-1; this->active=active;
-    static const string days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
+    static const ref<byte> days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
     const int nofDays[12] = { 31, !(active.year%4)&&(active.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     for(int i=0;i<7;i++) {
-        *this<< copy(days[i]);
+        *this<< string(days[i]);
         dates << Date(-1,-1,-1,-1,-1,-1,i);
     }
     int first = (35+active.weekDay+1-active.day)%7;
@@ -85,7 +85,9 @@ void Month::previousMonth() { active.month--; if(active.month<0) active.year--, 
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
 
-Calendar::Calendar():VBox({ &space, &date, &month, &space, &events, &space }) {
+//Calendar::Calendar():VBox(array<Widget*>{ &space(), &date, &month, &space(), &events, &space() }) {
+Calendar::Calendar():VBox(array<Widget*>{ /*&date, &month, &events*/ }) {
+    *this << &date << &month << &events;
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::activeChanged);
@@ -93,11 +95,11 @@ Calendar::Calendar():VBox({ &space, &date, &month, &space, &events, &space }) {
 
 void Calendar::previousMonth() {
     month.previousMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
-    events.setText(""_); VBox::update();
+    events.setText(string()); VBox::update();
 }
 void Calendar::nextMonth() {
     month.nextMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
-    events.setText(""_); VBox::update();
+    events.setText(string()); VBox::update();
 }
 
 void Calendar::activeChanged(int index) {

@@ -174,7 +174,7 @@ void Window::show() {
     widget->size = display();
     widget->update();
     emit();
-    ioctl(vt, VT_ACTIVATE, (void*)6); //switch from X
+    ioctl(vt, VT_ACTIVATE, (void*)8); //switch from X
     writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
     update();
     fill(Rect(display()),0);

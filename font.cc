@@ -30,14 +30,6 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4;
        round = (1<<scale)/2; //round to nearest not down
     }
-    /*{
-       DataStream& s = hhea;
-       uint32 unused version=s.read();
-       uint16 unused ascent=s.read(), unused descent=s.read(), unused lineGap=s.read();
-       uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();
-       s.advance(16); //caret*, 0
-       numOfLongHorMetrics=s.read();
-    }*/
 }
 
 uint16 Font::index(uint16 code) {

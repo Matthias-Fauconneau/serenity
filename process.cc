@@ -4,7 +4,7 @@
 
 void setupHeap(); //memory.cc
 
-static void handler(int, struct siginfo*, struct ucontext*) { trace(1); abort(); }
+static void handler(int, struct siginfo*, struct ucontext*) { trace(0); abort(); }
 
 void init_() {
     extern byte *heapEnd, *systemEnd;
@@ -20,7 +20,7 @@ void init_() {
     sigaction(SIGSEGV, &sa, 0, 8);
     sigaction(SIGTERM, &sa, 0, 8);
     sigaction(SIGPIPE, &sa, 0, 8);
-    rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit); //1 MB
+    rlimit limit = {1<<21,1<<21}; setrlimit(RLIMIT_STACK,&limit); //1 MB
 }
 void exit_(int code) { exit(code); } //TODO: check leaks
 

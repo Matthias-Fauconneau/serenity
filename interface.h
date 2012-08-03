@@ -9,9 +9,9 @@
 struct Space : Widget {
     int2 size=int2(-1,-1);
     int2 sizeHint() { return size; }
-    void render(int2) {};
+    void render(int2) {}
 };
-extern Space space; // same dummy instance can be reused
+Space& space(); // same dummy instance can be reused
 
 /// Scroll is a proxy Widget containing a widget in a scrollable area.
 //TODO: flick, scroll indicator, scrollbar

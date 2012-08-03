@@ -2,7 +2,7 @@
 #include "window.h"
 #include "display.h"
 //#include "launcher.h"
-//#include "calendar.h"
+#include "calendar.h"
 #include "feeds.h"
 //#include "popup.h"
 //ICON(shutdown)
@@ -12,14 +12,14 @@ struct Desktop : Application {
     Feeds feeds;
     Scroll<HTML> page;
     //List<Command> shortcuts;// = readShortcuts();
-     //Clock clock { 128 };
-     //Calendar calendar;
-    //VBox timeBox { &clock, &calendar };
-    HBox applets; //{ &feeds /*, &timeBox *//*, &shortcuts*/ };
+    Clock clock { 64 };
+    Calendar calendar;
+    VBox timeBox {array<Widget*>{ &clock, &calendar }};
+    HBox applets{array<Widget*>{ &feeds , &timeBox /*, &shortcuts*/ }};
     Window window = i({&applets,int2(0,::display().y-16)});
     //Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop() {
-        applets << &feeds; //clang doesn't support expression in initializer_list
+        //applets << &feeds << &timeBox; //clang doesn't support expression in initializer_list
         //clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&Desktop::showPage);

@@ -39,14 +39,14 @@ void HTML::append(const URL& url, array<byte>&& document) {
         if(find(div["class"_],"comment"_)) return false;
         if(div["class"_]=="content"_||div["id"_]=="content"_) score += 600;
         else if(find(div["class"_],"content"_)||find(div["id"_],"content"_)) score += 400;
-        else if(startsWith(div["style"_],"background-image:url("_)) score += 16384;
+        else if(startsWith(div["style"_],"background-image:url("_)) score += 100000;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(!endsWith(src.path,".gif"_)&&!startsWith(src.path,"ad/"_)&&(find(src.path,"comic"_)||find(src.path,"comics"_)||find(src.path,"strip"_)||
+            if(!endsWith(src.path,".gif"_)&&!startsWith(src.path,"ad/"_)&&!find(src.path,"comment"_)&&(find(src.path,"comic"_)||find(src.path,"comics"_)||find(src.path,"strip"_)||
                                              find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
-                score += size?:16800;
+                score += size?:140000;
             }
         } else if(!div.children) return false;
         div.mayVisit([&score](const Element& e)->bool{
@@ -81,7 +81,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
 
 void HTML::layout(const URL& url, const Element &e) {
     if(find(e["class"_],"comment"_)) return;
-    /***/ if(e.name=="img"_) { //Images
+    /***/ if(e.name=="img"_ &&!endsWith(e["src"_],".gif"_)) { //Images
        flushText();
        images << url.relative(e["src"_]);
     }

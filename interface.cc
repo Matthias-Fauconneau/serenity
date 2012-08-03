@@ -4,7 +4,7 @@
 #include "array.cc"
 
 Widget* focus;
-Space space;
+Space& space() { static Space space; return space; }
 
 /// ScrollArea
 

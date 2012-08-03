@@ -39,8 +39,9 @@ struct TextLayout {
     }
 
     TextLayout(int size, int wrap, const ref<byte>& s):size(size),wrap(wrap) {
-        static Font defaultSans("dejavu/DejaVuSans.ttf"_, size);
-        font=&defaultSans;
+        static map<int,Font> defaultSans;
+        if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
+        font=&defaultSans.at(size);
         uint previous=' ';
         Format format=Format::Regular;
         Text::Link link;
@@ -98,7 +99,7 @@ Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)),
 void Text::update(int wrap) {
     lines.clear();
     blits.clear();
-    if(text.last()!='\n') text << '\n';
+    if(!text || text.last()!='\n') text << '\n';
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
     for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+8)>>4,(c.pos.y+8)>>4),share(c.glyph.image)});
     for(const TextLayout::Line& l: layout.lines) {

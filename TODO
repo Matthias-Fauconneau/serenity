@@ -1,6 +1,6 @@
-FIXME: image link, progressive image
-apps: feeds, desktop, text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf, inflate, jpeg
+apps: desktop, text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf, inflate, jpeg
 font: compound glyph transform, kerning, subpixel position, hinting
+browser: page download indicator, progressive image
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen, hardware cursor, fast scroll
 parser: attributes (L+S), scoped symbols
 IDE: parser, build driver (+frepo), git, debugger, static analyzer, profiler, gc?, interpreter, compiler
