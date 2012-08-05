@@ -58,8 +58,7 @@ inline const string& str(const string& s) { return s; }
 /// Converts integers
 template<int base=10> string utoa(uint number, int pad=0);
 template<int base=10> string itoa(int number, int pad=0);
-inline string bin(int n, int pad=0) { return itoa<2>(n,pad); }
-inline string oct(int n, int pad=0) { return itoa<8>(n,pad); }
+inline string bin(uint n, int pad=0) { return utoa<2>(n,pad); }
 inline string dec(int n, int pad=0) { return itoa<10>(n,pad); }
 inline string str(const uint8& n) { return dec(n); }
 inline string str(const int8& n) { return dec(n); }

@@ -152,6 +152,7 @@ template<int base> string utoa(uint n, int pad) {
     while(32-i<pad) buf[--i] = '0';
     return string(ref<byte>(buf+i,32-i));
 }
+template string utoa<2>(uint,int);
 template string utoa<16>(uint,int);
 
 /// Integer conversions
@@ -168,5 +169,4 @@ template<int base> string itoa(int number, int pad) {
     if(number<0) buf[--i]='-';
     return string(ref<byte>(buf+i,32-i));
 }
-template string itoa<2>(int,int);
 template string itoa<10>(int,int);

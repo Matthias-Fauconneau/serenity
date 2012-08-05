@@ -8,8 +8,8 @@ array<string> getEvents(Date query) {
     static int config = openFolder("config"_);
     array<string> events;
     if(!exists("events"_,config)) { warn("No events settings [config/events]"); return events; }
-    TextStream s(readFile("events"_,config));
 
+    TextStream s = readFile("events"_,config);
     map<string, array<Date>> exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
         if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=string(s.until('\n')); exceptions.insert(move(title),array<Date>i({except})); }
@@ -84,10 +84,7 @@ void Month::setActive(Date active) {
 void Month::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-
-//Calendar::Calendar():VBox(array<Widget*>{ &space(), &date, &month, &space(), &events, &space() }) {
-Calendar::Calendar():VBox(array<Widget*>{ /*&date, &month, &events*/ }) {
-    *this << &date << &month << &events;
+Calendar::Calendar() {*this<< ref<Widget*>{ &date, &month, &events };
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::showEvents);

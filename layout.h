@@ -87,12 +87,12 @@ struct Vertical : virtual Linear{
 /// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
 struct HBox : Horizontal, Widgets {
     HBox(){}
-    HBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
+    HBox(const ref<Widget*>& widgets):Widgets(widgets){}
 };
 /// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
 struct VBox : Vertical, Widgets {
     VBox(){}
-    VBox(array<Widget*>&& widgets):Widgets(move(widgets)){}
+    VBox(const ref<Widget*>& widgets):Widgets(widgets){}
 };
 
 template<class T> struct HList : Horizontal, Array<T> {

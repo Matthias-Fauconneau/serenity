@@ -4,7 +4,7 @@
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 
 Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
-    DataStream s(keep, true);
+    DataStream s = DataStream::byReference(keep, true);
     uint32 unused scaler=s.read();
     uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
     DataStream head, hhea;
@@ -114,7 +114,7 @@ void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
 void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int, int, int, int, int, int) {
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
-    DataStream s(ref<byte>(glyf +start, length), true);
+    DataStream s=DataStream::byReference(ref<byte>(glyf +start, length), true);
     if(!s) return;
 
     int16 numContours = s.read();

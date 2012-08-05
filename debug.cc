@@ -116,14 +116,14 @@ Symbol findNearestLine(void* find) {
     const char* shstrtab = (char*)elf+sections[hdr.shstrndx].offset;
     const char* strtab = 0; ref<Sym> symtab; DataStream debug_line;
     for(const Shdr& s: sections)  {
-        if(str(shstrtab+s.name)==".debug_line"_) debug_line=ref<byte>(elf+s.offset,s.size);
+        if(str(shstrtab+s.name)==".debug_line"_) debug_line=DataStream::byReference(ref<byte>(elf+s.offset,s.size));
         else if(str(shstrtab+s.name)==".strtab"_) strtab=(const char*)elf+s.offset;
         else if(str(shstrtab+s.name)==".symtab"_) symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
     for(const Sym& sym: symtab) {
         if(find >= sym.value && find < sym.value+sym.size) {
-            TextStream s(str(strtab+sym.name));
+            TextStream s = TextStream::byReference(str(strtab+sym.name));
             symbol.function = s.match('_')&&s.peek()=='Z'? (s.buffer.size()>80?string("delegate"_) :demangle(s)) : string(s.untilEnd());
         }
     }
@@ -149,7 +149,7 @@ Symbol findNearestLine(void* find) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
                 line += (opcode % cu.line_range) + cu.line_base;
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(/*find>=address &&*/ find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 address += delta;
             }
             else if(opcode == extended_op) {
@@ -166,7 +166,7 @@ Symbol findNearestLine(void* find) {
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {
                 int delta = cu.min_inst_len * readLEV(s);
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(/*find>=address &&*/ find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 address += delta;
             }
             else if(opcode == advance_line) line += readLEV(s,true);
@@ -176,12 +176,12 @@ Symbol findNearestLine(void* find) {
             else if(opcode == set_basic_block) {}
             else if(opcode == const_add_pc) {
                 uint delta = ((255u - cu.opcode_base) / cu.line_range) * cu.min_inst_len;
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(/*find>=address &&*/ find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                 address += delta;
             }
             else if(opcode == fixed_advance_pc) {
                 ushort delta = s.read();
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(/*find>=address &&*/ find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                  address += delta;
             }
             else if(opcode == set_prologue_end) {}
@@ -200,6 +200,9 @@ void trace(int skip, uint size) {
     stack[0] = __builtin_return_address(0);
 #define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i)
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);
-    for(int i=min(9u,skip+size-1);i>=skip;i--) if(stack[i]) { Symbol s = findNearestLine(stack[i]); log(s.file+":"_+str(s.line)+"     \t"_+s.function); }
+    for(int i=min(9u,skip+size-1);i>=skip;i--) if(stack[i]) {
+        Symbol s = findNearestLine(stack[i]);
+        if(s.file) log(ptr(stack[i]),s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr(stack[i]));
+    }
     recurse--;
 }

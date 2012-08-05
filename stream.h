@@ -23,7 +23,7 @@ struct Stream {
     /// Creates a Stream interface to an \a array
     Stream(array<byte>&& array) : buffer(move(array)) {}
     /// Creates a Stream interface to a \a reference
-    Stream(const ref<byte>& reference) : buffer(reference.data,reference.size) {} //TODO: escape analysis
+    //explicit Stream(const ref<byte>& reference) : buffer(reference.data,reference.size) {} //TODO: escape analysis
 //interface (default to buffer source)
     /// Returns number of bytes available, reading \a need bytes from underlying device if possible
     virtual uint available(uint /*need*/) { return buffer.size()-index; }
@@ -59,7 +59,9 @@ struct DataStream : virtual Stream {
     /// Creates a DataStream interface to an \a array
     DataStream(array<byte>&& array, bool isBigEndian=false) : Stream(move(array)), isBigEndian(isBigEndian) {}
     /// Creates a DataStream interface to a \a reference
-    DataStream(const ref<byte>& reference, bool isBigEndian=false) : Stream(reference), isBigEndian(isBigEndian) {}
+    static DataStream byReference(const ref<byte>& reference, bool isBigEndian=false){
+        DataStream s; s.isBigEndian=isBigEndian; s.buffer=array<byte>(reference.data,reference.size); return s;
+    }
     DataStream& operator=(DataStream&& o){buffer=move(o.buffer);index=o.index;isBigEndian=o.isBigEndian;return *this;}
 
     /// Slices a stream referencing this data
@@ -113,7 +115,7 @@ struct TextStream : virtual Stream {
     /// Creates a Stream interface to an \a array
     TextStream(array<byte>&& array) : Stream(move(array)){}
     /// Creates a Stream interface to a \a reference
-    TextStream(const ref<byte>& reference) : Stream(reference){}
+    static TextStream byReference(const ref<byte>& reference){TextStream s; s.buffer=array<byte>(reference.data,reference.size); return s;}
     TextStream& operator=(TextStream&& o){buffer=move(o.buffer);index=o.index;return *this;}
 
     /// If stream match \a key, advances \a pos by \a key size

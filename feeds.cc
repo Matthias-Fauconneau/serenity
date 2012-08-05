@@ -17,7 +17,7 @@ Feeds::Feeds() : config(openFolder("config"_)), readConfig(appendFile("read"_,co
 bool Feeds::isRead(const ref<byte>& title, const ref<byte>& link) {
     assert(!contains(title,byte('\n')),title);
     assert(!contains(link,byte('\n')),link);
-    for(TextStream s(readMap);s;s.until('\n')) { //feed+date (instead of title+link) would be less readable and fail on feed relocation
+    for(TextStream s=TextStream::byReference(readMap);s;s.until('\n')) { //feed+date (instead of title+link) would be less readable and fail on feed relocation
         if(s.match(title) && s.match(' ') && s.match(link)) return true;
     }
     return false;

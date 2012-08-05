@@ -1,8 +1,6 @@
 #include "layout.h"
 #include "display.h"
-
 #include "array.cc"
-template struct array<Widget*>;
 
 /// Layout
 

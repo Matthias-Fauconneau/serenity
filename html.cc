@@ -88,7 +88,7 @@ void HTML::layout(const URL& url, const Element &e) {
     }
     else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
         flushText();
-        TextStream s(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
+        TextStream s=TextStream::byReference(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
         images << url.relative(src);
     }
     else if(!e.name) { //Text

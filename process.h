@@ -57,10 +57,3 @@ struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
 /// Return available memory in kB
 uint availableMemory();
 #endif
-
-/// Log the corresponding assembly the first time \a statements is executed
-void disasm(array<ubyte> code);
-#define disasm( statements ) { \
-    begin: statements; end: \
-    static bool once=false; if(!once) disasm(array<ubyte>((ubyte*)&&begin,(ubyte*)&&end)), once=true; \
-}

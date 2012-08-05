@@ -19,7 +19,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
     static File dnsCache = appendFile("cache/dns"_);
     static Map dnsMap = mapFile(dnsCache);
     uint ip=-1;
-    for(TextStream s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
+    for(TextStream s=TextStream::byReference(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
     if(!ip) ip=-1;//return false; //negative entry
     if(ip==uint(-1)) {
         static int dns;
@@ -35,7 +35,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
         array<byte> query;
         struct Header { uint16 id=swap16(currentTime()); uint16 flags=1; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
-        for(TextStream s(host);s;) { //QNAME
+        for(TextStream s=TextStream::byReference(host);s;) { //QNAME
             ref<byte> label = s.until('.');
             query << label.size << label;
         }
@@ -108,7 +108,7 @@ string base64(const ref<byte>& input) {
 
 URL::URL(const ref<byte>& url) {
     if(!url) { trace(); warn("Empty URL"); return; }
-    TextStream s(url);
+    TextStream s=TextStream::byReference(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
     ref<byte> domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
