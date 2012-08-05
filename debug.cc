@@ -111,6 +111,7 @@ Symbol findNearestLine(void* find) {
     static Map map = mapFile("proc/self/exe"_);
     const byte* elf = map.data;
     const Ehdr& hdr = *(Ehdr*)elf;
+
     ref<Shdr> sections = ref<Shdr>((Shdr*)(elf+hdr.shoff),hdr.shnum);
     const char* shstrtab = (char*)elf+sections[hdr.shstrndx].offset;
     const char* strtab = 0; ref<Sym> symtab; DataStream debug_line;

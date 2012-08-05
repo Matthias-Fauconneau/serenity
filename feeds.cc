@@ -6,79 +6,46 @@
 #include "interface.h"
 #include "array.cc"
 
-Feeds::Feeds() {
-    static int config = openFolder("config"_);
-    readConfig = appendFile("read"_,config);
-    readMap = mapFile("read"_,config);
-    List<Entry>::activeChanged.connect(this,&Feeds::activeChanged);
-    List<Entry>::itemPressed.connect(this,&Feeds::itemPressed);
+ICON(network)
+
+Feeds::Feeds() : config(openFolder("config"_)), readConfig(appendFile("read"_,config)), readMap(mapFile("read"_,config)) {
+    List<Entry>::activeChanged.connect(this,&Feeds::setRead);
+    List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
     for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 24*60);
 }
-Feeds::~Feeds() { closeFile(readConfig); }
 
-bool Feeds::isRead(const Entry& entry) {
-    const Text& text = entry.get<Text>();
-    string id = text.text+entry.link;
-    id=replace(id,"\n"_,""_);
-    for(TextStream s(readMap);s;s.until('\n')) if(s.match(id)) return true; return false;
-}
-void Feeds::setRead(const Entry& entry) {
-    const Text& text = entry.get<Text>();
-    string id = text.text+entry.link;
-    id=replace(id,"\n"_,""_);
-    for(TextStream s(readMap);s;s.until('\n')) if(s.match(id)) return;
-    ::write(readConfig,string(id+"\n"_));
-    readMap = mapFile(readConfig); //remap
-}
-void Feeds::setAllRead() {
-    for(Entry& entry: *this) {
-        setRead(entry);
+bool Feeds::isRead(const ref<byte>& title, const ref<byte>& link) {
+    assert(!contains(title,byte('\n')),title);
+    assert(!contains(link,byte('\n')),link);
+    for(TextStream s(readMap);s;s.until('\n')) { //feed+date (instead of title+link) would be less readable and fail on feed relocation
+        if(s.match(title) && s.match(' ') && s.match(link)) return true;
     }
+    return false;
 }
+bool Feeds::isRead(const Entry& entry) { return isRead(entry.get<Text>().text, entry.link); }
 
 void Feeds::loadFeed(const URL&, array<byte>&& document) {
-    Element feed = parseXML(move(document));
-#if HEADER
-    //Header
-    string title = feed.text("rss/channel/title"_); //RSS
-    if(!title) title = feed("feed"_)("title"_).text(); //Atom
-    if(!title) { warn("Invalid feed"_,url); return; }
-    //title.shrink(section(title,' ',0,4).size);
-
-    string link = feed.text("rss/channel/link"_); //RSS
-    if(!link) link = string(feed("feed"_)("link"_)["href"_]); //Atom
-    if(!link) { warn("Invalid feed"_,url); return; }
-
-    Entry header(move(title),copy(link));
-    header.isHeader=true;
-    append( move(header) );
-
+    Element feed = parseXML(document);
+    string link = feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]); //Atom
     string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
     if(exists(favicon,cache)) {
-        last().get<Icon>().image = resize(decodeImage(readFile(favicon,cache)),16,16);
+        favicons.insert(link) = resize(decodeImage(readFile(favicon,cache)),16,16);
     } else {
-        last().get<Icon>().image = resize(networkIcon,16,16);
-        getURL(link, Handler(this, &Feeds::getFavicon), 7*24*60);
+        favicons.insert(link) = resize(networkIcon(),16,16);
+        getURL(URL(link), Handler(this, &Feeds::getFavicon), 7*24*60);
     }
-#endif
-    array<Entry> items; int history=0;
-    auto addItem = [this,&history,&items](const Element& e)->void{
+    array<Entry> entries; int history=0;
+    auto addEntry = [this,&history,&entries](const Element& e)->void{
         if(history++>=32) return; //avoid getting old unreads on feeds with big history
-        if(array::size()>=32) return;
-        string text = e("title"_).text();
-        text = string(trim(unescape(text)));
-
-        string url = e("link"_).text(); //RSS
-        if(!url) url = string(e("link"_)["href"_]); //Atom
-
-        Entry entry(move(text),move(url));
-        if(!isRead(entry)) items<< move(entry);
+        if(array::size()+entries.size()>=30) return;
+        string title = e("title"_).text(); //RSS&Atom
+        string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS
+        assert(!contains(title,byte('\n')),e);
+        if(!isRead(title, url)) entries<< Entry(move(title),move(url));
     };
-    feed.xpath("feed/entry"_,addItem); //Atom
-    feed.xpath("rss/channel/item"_,addItem); //RSS
-    for(int i=items.size()-1;i>=0;i--) { //oldest first
-        *this<< move(items[i]);
-    }
+    feed.xpath("feed/entry"_,addEntry); //Atom
+    feed.xpath("rss/channel/item"_,addEntry); //RSS
+    for(int i=entries.size()-1;i>=0;i--) *this<< move(entries[i]); //oldest first
     listChanged();
 }
 
@@ -99,27 +66,29 @@ void Feeds::getFavicon(const URL& url, array<byte>&& document) {
     }
 }
 
-void Feeds::activeChanged(int index) {
+void Feeds::setRead(uint index) {
     Entry& entry = array::at(index);
-    if(entry.isHeader) return;
-    if(!isRead(entry)) {
-        Text& text = entry.get<Text>();
-        //setRead(entry);
-        text.setSize(12);
-    }
+    if(isRead(entry)) return;
+    ::write(readConfig,string(entry.get<Text>().text+" "_+entry.link+"\n"_));
+    readMap = mapFile(readConfig); //remap
+    entry.get<Text>().setSize(12);
 }
 
-void Feeds::itemPressed(int index) { pageChanged( array::at(index).link ); }
+void Feeds::readEntry(uint index) {
+    pageChanged( array::at(index).link );
+    if(index+1<count()) getURL(URL(array::at(index+1).link)); //preload next entry (TODO: preload images)
+}
 
 void Feeds::readNext() {
-    uint i=index;
-    setRead(active());
-    for(;;) { //next unread item
-        i++;
-        if(i==count()) { /*execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); FIXME: fix memory leaks*/ return; }
-        if(!array::at(i).isHeader && !isRead(array::at(i))) break;
+    setRead(index);
+    for(uint i=index+1;i<count();i++) { //next unread item
+        if(!isRead(array::at(i))) {
+            setActive(i);
+            itemPressed(i);
+            return;
+        }
     }
-    setActive(i);
-    itemPressed(i);
-    if(i+1<count()) getURL(URL(array::at(i+1).link)); //preload next
+    //execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); FIXME: implement free, fix memory leaks
+    //clear(); for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 24*60); //reload
+    pageChanged(""_); //return to desktop
 }

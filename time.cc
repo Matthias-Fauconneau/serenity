@@ -62,9 +62,9 @@ string str(Date date, const ref<byte>& format) {
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
         else r << s.next();
     }
-    r = simplify(trim(r));
-    if(endsWith(r,","_)) r.removeLast();
-    return simplify(trim(r));
+    if(endsWith(r,","_)) r.removeLast(); //prevent dangling comma when last valid part is week day
+    //return simplify(move(r));
+    return r;
 }
 
 Date parse(TextStream& s) {

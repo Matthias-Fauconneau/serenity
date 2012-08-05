@@ -128,6 +128,7 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
         int width=scale(xMax-xMin), height=scale(yMax-yMin);
         raster = Image<int8>(width+1,height+1);
         for(int i=0;i<width*height; i++) raster.data[i]=0;
+        assert(raster);
     } else s.advance(4*2);
 
     if(numContours>0) {
@@ -202,14 +203,14 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
 Glyph Font::glyph(uint16 code) {
     // Lookup glyph in cache
     Glyph& glyph = code<256 ? cacheASCII[code] : cacheUnicode[code];
-    if(glyph.image || glyph.advance) return Glyph i({glyph.offset,glyph.advance,share(glyph.image)});
+    if(glyph.image || glyph.advance) return Glyph(glyph);
 
     // map unicode to glyf outline
     int index = Font::index(code);
     glyph.advance = scale(swap16(hmtx[2*index]));
     Image<int8> raster; int16 xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,16384,0,0,16384,0,0);
-    if(!raster) return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
+    if(!raster) return Glyph(glyph);
     int width=raster.width,height=raster.height;
 
     /// Rasterizes edge flags
@@ -233,5 +234,5 @@ Glyph Font::glyph(uint16 code) {
         }
     }
     glyph.offset = int2(scale(xMin),(size<<4)-scale(yMax));
-    return Glyph{glyph.offset,glyph.advance,share(glyph.image)};
+    return Glyph(glyph);
 }

@@ -78,7 +78,7 @@ Sequencer::~Sequencer() {
     }
     track << 0x00 << 0xFF << 0x2F << 0x00; //EndOfTrack
 
-    int fd = createFile(record);
+    File fd = createFile(record);
     struct { char name[4]={'M','T','h','d'}; int32 size=swap32(6); int16 format=swap16(0);
         int16 trackCount=swap16(1); int16 timeDivision=swap16(500); } packed MThd;
     write(fd,raw(MThd));

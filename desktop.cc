@@ -9,33 +9,37 @@
 #include "array.cc"
 
 struct Desktop : Application {
+    Text status;
     Feeds feeds;
     Scroll<HTML> page;
     //List<Command> shortcuts;// = readShortcuts();
-    Clock clock { 64 };
-    Calendar calendar;
-    VBox timeBox {array<Widget*>{ &clock, &calendar }};
-    HBox applets{array<Widget*>{ &feeds , &timeBox /*, &shortcuts*/ }};
+    //Clock clock { 64 };
+    //Calendar calendar;
+    //VBox timeBox {array<Widget*>{ &clock, &calendar }};
+    HBox applets{array<Widget*>{ &feeds/*, &timeBox*//*, &shortcuts*/ }};
     Window window = i({&applets,int2(0,::display().y-16)});
-    //Popup<Command> shutdownPopup { Command(move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
+    //Command shutdown {move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop() {
-        //applets << &feeds << &timeBox; //clang doesn't support expression in initializer_list
         //clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&Desktop::showPage);
         window.localShortcut(Key::RightArrow).connect(&feeds, &Feeds::readNext);
         window.localShortcut(Key::Extra).connect(&feeds, &Feeds::readNext);
-        //window.localShortcut(Key::Escape).connect(&window, &Window::hide); //back to desktop
-        //window.localShortcut(Key::Power).connect(&window, &Window::hide); //back to desktop
-        //window.localShortcut(Key::Escape).connect(&shutdownPopup,&Window::toggle);
-        //window.localShortcut(Key::Power).connect(&shutdownPopup,&Window::toggle);
+        window.localShortcut(Key::Power).connect(this, &Desktop::showDesktop);
+        //window.localShortcut(Key::Escape).connect(this, &Desktop::showDesktop);
         window.localShortcut(Key::Escape).connect(this,&Application::quit); //DEBUG
         window.show();
     }
+    void showDesktop() {
+        if(window.widget != &applets) window.setWidget(&applets);
+        //else window.setWidget(&shutdown);
+    }
     void showPage(const ref<byte>& link) {
+        if(!link) { showDesktop(); return; }
         window.setWidget( &page.parent() );
         page.contentChanged.connect(&window, &Window::render);
         page.go(link);
+        status.setText("Loading "_+link); status.render(int2(0,0));
     }
 };
 Application(Desktop)

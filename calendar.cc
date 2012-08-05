@@ -90,7 +90,7 @@ Calendar::Calendar():VBox(array<Widget*>{ /*&date, &month, &events*/ }) {
     *this << &date << &month << &events;
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
-    month.activeChanged.connect(this,&Calendar::activeChanged);
+    month.activeChanged.connect(this,&Calendar::showEvents);
 }
 
 void Calendar::previousMonth() {
@@ -102,7 +102,7 @@ void Calendar::nextMonth() {
     events.setText(string()); VBox::update();
 }
 
-void Calendar::activeChanged(int index) {
+void Calendar::showEvents(uint index) {
     string text;
     Date date = month.dates[index];
     text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date))+format(Regular)+"\n"_);

@@ -38,7 +38,7 @@ struct TextLayout {
         pen.x=0; pen.y+=size<<4;
     }
 
-    TextLayout(int size, int wrap, const ref<byte>& s):size(size),wrap(wrap) {
+    TextLayout(int size, int wrap, const ref<byte>& text):size(size),wrap(wrap) {
         static map<int,Font> defaultSans;
         if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
         font=&defaultSans.at(size);
@@ -47,7 +47,7 @@ struct TextLayout {
         Text::Link link;
         uint underlineBegin=0;
         uint glyphCount=0;
-        for(utf8_iterator it=s.begin();it!=s.end();++it) {
+        for(utf8_iterator it=text.begin();it!=text.end();++it) {
             uint c = *it;
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 if(c==' ') previous = c;
@@ -77,7 +77,7 @@ struct TextLayout {
                 if(format&Link) {
                     for(;;) {
                         ++it;
-                        assert(it!=s.end(),s);
+                        assert(it!=text.end(),text);
                         uint c = *it;
                         if(c == ' ') break;
                         link.identifier << utf8(c);
@@ -90,7 +90,18 @@ struct TextLayout {
             pen.x += font->kerning(previous,c);
             previous = c;
             if(glyph.image) { word << i(Character{int2(pen.x,0)+glyph.offset, move(glyph) }); glyphCount++; }
+            else error("Missing image",c);
             pen.x += glyph.advance;
+        }
+        if(!text || text[text.size-1]!='\n') {
+            if(word) {
+                int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+font->glyph(' ').advance;
+                length += word.last().pos.x+(word.last().glyph.image.width<<4); //last word
+                if(wrap && length>=(wrap<<4)) nextLine(true); //doesn't fit
+                line << move(word); //add to current line (or first of new line)
+                pen.x=0;
+            }
+            nextLine(false);
         }
     }
 };
@@ -99,7 +110,6 @@ Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)),
 void Text::update(int wrap) {
     lines.clear();
     blits.clear();
-    if(!text || text.last()!='\n') text << '\n';
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
     for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+8)>>4,(c.pos.y+8)>>4),share(c.glyph.image)});
     for(const TextLayout::Line& l: layout.lines) {

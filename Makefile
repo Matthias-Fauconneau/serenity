@@ -19,7 +19,7 @@ SRCS_music += png inflate
 ICONS = $(ICONS_$(TARGET))
 ICONS_browser := cursor
 ICONS_taskbar := cursor button
-ICONS_desktop := cursor shutdown
+ICONS_desktop := cursor shutdown network
 ICONS_player := cursor play pause next
 ICONS_music := cursor music
 SRCS += $(ICONS:%=icons/%)

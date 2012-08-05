@@ -1,9 +1,10 @@
-#if TEST
 #include "process.h"
 #include "debug.h"
 #include "linux.h"
 #include "stream.h"
 #include "file.h"
+
+struct sockaddr_un { ushort family=PF_LOCAL; byte path[108]; };
 
 //TODO: use DataStream Socket
 template<class T> inline T read(int fd) {
@@ -25,17 +26,15 @@ struct ConnectionSetup {
 };
 
 struct Test : Application {
-    Test(array<string>&&) {
-        log("Hello World!");
-        catchErrors();
+    Test() {
+        log("Hello World!"_);
         int fd = socket(PF_LOCAL, SOCK_STREAM, 0);
-        string path = "/tmp/.X11-unix/X0"_;
-        sockaddr_un addr; copy(addr.path,path.data(),path.size());
-        if(connect(fd,(sockaddr*)&addr,3+path.size())) error("Connection failed");
-        write(fd, "\x6c\x00\x0b\x00\x00\x00\x12\x00\x10\x00\x00\x00"_+slice(readFile("root/.Xauthority"_),18,18+2+16));
+        ref<byte> path = "/tmp/.X11-unix/X0"_;
+        sockaddr_un addr; copy(addr.path,path.data,path.size);
+        if(connect(fd,(sockaddr*)&addr,3+path.size)) error("Connection failed"_);
+        write(fd, string("\x6c\x00\x0b\x00\x00\x00\x12\x00\x10\x00\x00\x00"_+slice(readFile("root/.Xauthority"_),18,18+2+16)));
         auto c = read<ConnectionSetup>(fd);
         log(c.vendor,read(fd,c.vendor));
     }
 };
 Application(Test)
-#endif

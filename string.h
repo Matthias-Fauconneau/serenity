@@ -48,7 +48,7 @@ string replace(const ref<byte>& s, const ref<byte>& before, const ref<byte>& aft
 /// Lowers case
 string toLower(const ref<byte>& s);
 /// Removes duplicate whitespace
-string simplify(const ref<byte>& s);
+string simplify(string&& s);
 /// Copies the reference and appends null byte
 struct stringz : string { operator const char*(){return (char*)data();}};
 stringz strz(const ref<byte>& s);

@@ -22,7 +22,7 @@ void HTML::go(const ref<byte>& url) { this->url=url; getURL(url, Handler(this, &
 
 void HTML::load(const URL& url, array<byte>&& document) { clear(); append(url,move(document)); }
 void HTML::append(const URL& url, array<byte>&& document) {
-    Element html = parseHTML(move(document));
+    Element html = parseHTML(document);
 
     if(!textElement)
         textElement = split("span p a blockquote center u hr ul li i strike cite em ol dt dl dd h1 h2 h3 h4 h5 code article small abbr aside th pre"_);
@@ -31,7 +31,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
     if(!ignoreElement)
         ignoreElement = split("html body iframe noscript option select nav hgroup time fieldset footer base form script style title head meta link div"
                               " header label input textarea td tt font tr table left area map button sup param embed object noindex optgroup basefont"
-                              " tbody tfoot thead acronym del video figure section source noembed caption"_);
+                              " tbody tfoot thead acronym del video figure section source noembed caption tag"_);
     const Element* best = &html; int max=0,second=0;
     //find node with most direct content
     html.mayVisit([&url,&best,&max,&second](const Element& div)->bool{
@@ -42,8 +42,9 @@ void HTML::append(const URL& url, array<byte>&& document) {
         else if(startsWith(div["style"_],"background-image:url("_)) score += 100000;
         if(div.name=="img"_ && div["src"_]) {
             URL src = url.relative(div["src"_]);
-            if(!endsWith(src.path,".gif"_)&&!startsWith(src.path,"ad/"_)&&!find(src.path,"comment"_)&&(find(src.path,"comic"_)||find(src.path,"comics"_)||find(src.path,"strip"_)||
-                                             find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
+            if(!endsWith(src.path,".gif"_) && !startsWith(src.path,"ad/"_) && !find(src.path,"comment"_) &&
+                    (find(src.path,"comic"_)||find(src.path,"comics"_)||find(src.path,"strip"_)||find(div["alt"_],"Page"_)||find(div["title"_],"Page"_)||
+                     find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(div["width"_])&&isInteger(div["height"_])) size = toInteger(div["width"_])*toInteger(div["height"_]);
                 score += size?:140000;
@@ -54,7 +55,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
             if(contains(textElement,ref<byte>(e.name))||contains(boldElement,ref<byte>(e.name))) {
                 return true; //visit children
             } else if(!e.name) {
-                score += e.content.size(); //raw text
+                score += e.content.size; //raw text
             } else if(e.name=="img"_||e.name=="iframe"_) {
                 //int height = isInteger(e["height"_]) ? toInteger(e["height"_]) : 1;
                 //if(e.name=="img"_ && !endsWith(e["src"_],".gif"_)) score += height; //image
@@ -120,15 +121,14 @@ void HTML::layout(const URL& url, const Element &e) {
     else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; }//wikipedia [edit]
     else if(contains(textElement,ref<byte>(e.name))) { for(const Element& c: e.children) layout(url, c); } // Unhandled format tags
     else if(contains(ignoreElement,ref<byte>(e.name))) { return; } // Ignored elements
-    else if(!contains<byte>(e.name,':')) warn("layout: Unknown HTML tag",e.name);
+    else if(!contains<byte>(e.name,':')) warn("layout: Unknown element '"_+e.name+"'"_);
 }
 void HTML::flushText() {
-    string paragraph = simplify(trim(text));
+    string paragraph = move(text); //simplify(move(text));
     if(!paragraph) return;
     Text& textLayout = alloc<Text>(move(paragraph), 16, 255, 640 /*60 characters*/);
     textLayout.linkActivated.connect(this, &HTML::go);
     VBox::operator<<(&textLayout);
-    text.clear();
 }
 void HTML::flushImages() {
     if(!images) return;

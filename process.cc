@@ -24,6 +24,7 @@ void init_() {
 }
 void exit_(int code) { exit(code); } //TODO: check leaks
 
+//FIXME: parallel arrays is bad for realloc TODO: put pollfd in Poll, and use stack array for poll(pollfd[])
 static array<Poll*> polls;
 static array<pollfd> pollfds;
 void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
@@ -68,8 +69,7 @@ void setPriority(int priority) { setpriority(0,0,priority); }
 #include "file.h"
 #include "stream.h"
 uint availableMemory() {
-    int fd = openFile("/proc/meminfo"_);
-    TextBuffer s = ::readUpTo(fd,2048);
+    TextBuffer s = ::readUpTo(openFile("/proc/meminfo"_),2048);
     close(fd);
     map<string, uint> info;
     while(s) {

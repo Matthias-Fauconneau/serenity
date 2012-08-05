@@ -125,12 +125,16 @@ struct TextStream : virtual Stream {
     /// If stream match none of \a key, advances \a pos
     bool matchNo(const ref<byte>& any);
 
+    /// advances \a pos while stream doesn't match \a key
+    /// \sa until
+    ref<byte> whileNot(char key);
     /// advances \a pos while stream match any of \a key
-    ref<byte> whileAny(const ref<byte>& any);
+    ref<byte> whileAny(const ref<byte>& key);
     /// advances \a pos while stream match none of \a key
-    ref<byte> whileNo(const ref<byte>& any);
+    ref<byte> whileNo(const ref<byte>& key);
 
     /// Reads until stream match \a key
+    /// \sa whileNot
     ref<byte> until(char key);
     /// Reads until stream match \a key
     ref<byte> until(const ref<byte>& key);

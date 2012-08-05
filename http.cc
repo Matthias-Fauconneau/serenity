@@ -16,10 +16,10 @@ uint32 ip(TextStream& s) {
 
 bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
     disconnect();
-    static int dnsCache = appendFile("cache/dns"_);
+    static File dnsCache = appendFile("cache/dns"_);
     static Map dnsMap = mapFile(dnsCache);
     uint ip=-1;
-    for(TextStream s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(" "_); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
+    for(TextStream s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
     if(!ip) ip=-1;//return false; //negative entry
     if(ip==uint(-1)) {
         static int dns;
@@ -250,7 +250,7 @@ void HTTP::event(pollfd poll) {
             if(!exists(section(file,'/'),cache)) createFolder(section(file,'/'),cache);
             writeFile(file,content,cache);
         }
-        state=Handle; //wait(); return;  //Cache other outstanding requests before handling this one (i.e cache them even if this handler exits/crash)
+        state=Handle; //wait(); return;  //Cache other outstanding requests before handling this one
     }
     if(state==Handle) {
         handler(url,move(content));

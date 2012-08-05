@@ -7,8 +7,11 @@
 
 struct Glyph {
     int2 offset; // (left bearing, min.y-baseline) (in .4)
-    int advance; //in .4
+    int advance=0; //in .4
     Image<uint8> image;
+    Glyph(){};
+    Glyph(Glyph&& o)=default;
+    explicit Glyph(const Glyph& o):offset(o.offset),advance(o.advance),image(share(o.image)){}
 };
 
 /// Truetype font renderer stub

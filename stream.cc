@@ -32,6 +32,14 @@ bool TextStream::matchNo(const ref<byte>& any) {
     advance(1); return true;
 }
 
+ref<byte> TextStream::whileNot(char key) {
+    int start=index, end=index;
+    for(;;advance(1)) {
+        if(!available(1)) { end=index; break; }
+        if(peek() == key) { end=index; break; }
+    }
+    return slice(start, end-start);
+}
 ref<byte> TextStream::whileAny(const ref<byte>& any) {
     int start=index; while(available(1) && matchAny(any)){} return slice(start,index-start);
 }

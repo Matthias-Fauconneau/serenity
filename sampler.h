@@ -19,7 +19,7 @@ struct Sampler {
     static_array<Sample,88*16> samples;
     static_array<Note,128> active; //8MB
     struct Layer { float* buffer; uint size; bool active=false; Resampler resampler; } layers[3];
-    int record=0;
+    File record=0;
     int16* pcm = 0; int time = 0;
     signal<int> timeChanged;
     operator bool() const { return samples.size(); }

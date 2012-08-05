@@ -1,4 +1,4 @@
-apps: desktop, text editor, file manager, mp3 player, taskbar, mail, irc, wiki, search, html, pdf, inflate, jpeg
+apps: taskbar, desktop, text editor, file manager, mp3 player, mail, irc, wiki, search, html, pdf, inflate, jpeg
 font: compound glyph transform, kerning, subpixel position, hinting
 browser: page download indicator, progressive image
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen, hardware cursor, fast scroll

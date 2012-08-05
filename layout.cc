@@ -17,6 +17,7 @@ bool Layout::mouseEvent(int2 position, Event event, Key button) {
 
 void Layout::render(int2 parent) {
     push(Rect(parent+position,parent+position+size));
+    if(size.x*size.y<1<<18) fill(Rect(parent+position,parent+position+size),255); //TODO: clear between children
     for(uint i=0;i<count();i++) at(i).render(parent+position);
     pop();
 }

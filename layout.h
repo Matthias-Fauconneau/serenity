@@ -116,13 +116,13 @@ struct UniformGrid : virtual Layout {
 /// Selection implements selection of active widget/item for a \a Layout
 struct Selection : virtual Layout {
     /// User changed active index.
-    signal<int /*index*/> activeChanged;
+    signal<uint /*index*/> activeChanged;
     /// Active index
     uint index = -1;
     /// Set active index and emit activeChanged
     void setActive(uint index);
     /// User clicked on an item.
-    signal<int /*index*/> itemPressed;
+    signal<uint /*index*/> itemPressed;
 
     bool mouseEvent(int2 position, Event event, Key button) override;
     bool keyPress(Key key) override;

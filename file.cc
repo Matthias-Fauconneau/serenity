@@ -20,40 +20,41 @@ array<byte> readUpTo(int fd, uint capacity) {
 }
 
 /// File
-int openFile(const ref<byte>& path, int at) {
-    int fd = check( openat(at, strz(path), O_RDONLY, 0), path);
-    return fd;
+
+File::~File() { if(fd>0) close(fd); }
+
+File openFile(const ref<byte>& path, int at) {
+    return File( check( openat(at, strz(path), O_RDONLY, 0), path) );
 }
 
-int createFile(const ref<byte>& path, int at, bool overwrite) {
+File createFile(const ref<byte>& path, int at, bool overwrite) {
     if(!overwrite && exists(path,at)) error("exists"_,path);
-    return check( openat(at, strz(path),O_CREAT|O_WRONLY|O_TRUNC,0666), path );
+    return File( check( openat(at, strz(path),O_CREAT|O_WRONLY|O_TRUNC,0666), path ) );
 }
 
-int appendFile(const ref<byte>& path, int at) {
-    return check( openat(at, strz(path),O_CREAT|O_RDWR|O_APPEND,0666), path );
+File appendFile(const ref<byte>& path, int at) {
+    return File( check( openat(at, strz(path),O_CREAT|O_RDWR|O_APPEND,0666), path ) );
 }
 
 array<byte> readFile(const ref<byte>& path, int at) {
-    int fd = openFile(path,at);
+    File fd = openFile(path,at);
     struct stat sb; fstat(fd, &sb);
     array<byte> file = read(fd,sb.size);
-    close(fd);
     debug( if(file.size()>1<<19) { trace(); log("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_); } )
     return file;
 }
 
-Map mapFile(const ref<byte>& path, int at) { int fd=openFile(path,at); Map map=mapFile(fd); close(fd); return map; }
+Map mapFile(const ref<byte>& path, int at) { File fd=openFile(path,at); Map map=mapFile(fd); return map; }
 Map mapFile(int fd) {
     struct stat sb; fstat(fd, &sb);
-    const byte* data = (byte*)mmap(0,sb.size,PROT_READ,MAP_PRIVATE,fd,0);
+    const byte* data = (byte*)check( (int)mmap(0,sb.size,PROT_READ,MAP_PRIVATE,fd,0) );
     assert(data);
     return Map(data,(int)sb.size);
 }
 Map::~Map() { if(data) munmap((void*)data,size); }
 
 void writeFile(const ref<byte>& path, const ref<byte>& content, int at, bool overwrite) {
-    int fd = createFile(path,at,overwrite);
+    File fd = createFile(path,at,overwrite);
     uint unused wrote = write(fd,content.data,content.size);
     assert(wrote==content.size);
     close(fd);
@@ -83,7 +84,7 @@ void symlink(const ref<byte>& target,const ref<byte>& name, int at) {
     int unused e= check(symlinkat(strz(target),at,strz(name)), name,"->",target);
 }
 
-struct stat statFile(const ref<byte>& path, int at) { int fd = openFile(path,at); stat file; int unused e= check( fstat(fd, &file) ); close(fd); return file; }
+struct stat statFile(const ref<byte>& path, int at) { File fd = openFile(path,at); stat file; int unused e= check( fstat(fd, &file) ); return file; }
 enum { S_IFDIR=0040000 };
 bool isFolder(const ref<byte>& path, int at) { return statFile(path,at).mode&S_IFDIR; }
 long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtime.sec; }

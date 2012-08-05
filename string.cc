@@ -60,10 +60,10 @@ ref<byte> section(const ref<byte>& s, byte separator, int start, int end, bool i
 }
 
 ref<byte> trim(const ref<byte>& s) {
-    int i=0,end=s.size;
-    for(;i<end;i++) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
-    for(;end>i;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
-    return slice(s, i, end-i);
+    int begin=0,end=s.size;
+    for(;begin<end;begin++) { byte c=s[begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
+    for(;end>begin;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
+    return slice(s, begin, end-begin);
 }
 
 bool isInteger(const ref<byte>& s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
@@ -126,16 +126,18 @@ string toLower(const ref<byte>& s) {
     return lower;
 }
 
-string simplify(const ref<byte>& s) {
-    string simple;
-    for(int i=0,end=s.size;i<end;) { //trim duplicate
+//use O(N) removeAt instead of copying to avoid reallocation on simple strings, also this allow inplace reallocation
+string simplify(string&& s) {
+    uint i=0;
+    while(i<s.size()) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading //TODO: no copy
+    for(;i<s.size();) {
         byte c=s[i];
-        if(c=='\r') { i++; continue; }
-        simple << c;
+        if(c=='\r') { s.removeAt(i); continue; } //Removes any \r
         i++;
-        if(c==' '||c=='\t'||c=='\n') for(;i<end;i++) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; }
+        if(c==' '||c=='\t'||c=='\n') while(i<s.size()) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //Simplify whitespace
     }
-    return simple;
+    for(i--;i>0;i--) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim trailing
+    return move(s);
 }
 
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return r; }

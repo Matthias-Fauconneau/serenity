@@ -1,18 +1,27 @@
 #pragma once
 #include "array.h"
 
-int closeFile(int fd);
 array<byte> read(int fd, uint capacity);
 array<byte> readUpTo(int fd, uint capacity);
 
 int root();
 
+/// File is a file descriptor which close itself in the destructor
+struct File {
+    no_copy(File)
+    int fd;
+    explicit File(int fd=0):fd(fd){};
+    File(File&& o) { fd=o.fd; o.fd=0; }
+    ~File();
+    operator int() { return fd; }
+};
+
 /// Open file for reading, fails if not existing
-int openFile(const ref<byte>& path, int at=root());
+File openFile(const ref<byte>& path, int at=root());
 /// Open file for writing, overwrite if existing
-int createFile(const ref<byte>& path, int at=root(), bool overwrite=false);
+File createFile(const ref<byte>& path, int at=root(), bool overwrite=false);
 /// Open file for writing, append if existing
-int appendFile(const ref<byte>& path, int at=root());
+File appendFile(const ref<byte>& path, int at=root());
 
 array<byte> readFile(const ref<byte>& path, int at=root());
 void writeFile(const ref<byte>& path, const ref<byte>& content, int at=root(), bool overwrite=true);
