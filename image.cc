@@ -3,7 +3,6 @@
 #include "vector.h"
 #include "string.h"
 #include "array.cc"
-#include "vector.cc"
 
 #define generic template<class T>
 
@@ -51,12 +50,6 @@ Image<byte4> resize(const Image<byte4>& image, uint width, uint height) {
     return target;
 }
 
-Image<byte4> swap(Image<byte4>&& image) {
-    uint32* p = (uint32*)image.data;
-    for(uint i=0;i<image.width*image.height;i++) p[i] = swap32(p[i]);
-    return move(image);
-}
-
 Image<byte4> flip(Image<byte4>&& image) {
     for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) {
         swap(image(x,y),image(x,h-1-y));
@@ -64,15 +57,26 @@ Image<byte4> flip(Image<byte4>&& image) {
     return move(image);
 }
 
+template<> inline Image<pixel> convert<pixel,byte4>(const Image<byte4>& source) {
+    if(!s) return Image<pixel>();
+    Image<pixel> copy(source.width,source.height);
+    for(uint x=0;x<source.width;x++) for(uint y=0;y<source.height;y++) {
+        int4 s=source(x,y);
+        copy(x,y)=pixel((s*s.a+int4(255,255,255,255)*(255-s.a))/255);
+    }
+    return copy;
+}
+
 weak(Image<byte4> decodePNG(const ref<byte>&)) { error("PNG support not linked"_); }
 weak(Image<byte4> decodeJPEG(const ref<byte>&)) { error("JPEG support not linked"_); }
 weak(Image<byte4> decodeICO(const ref<byte>&)) { error("ICO support not linked"_); }
 
+string hex(const ref<byte>& data) { string s; for(byte b: data) s<<hex(b)<<' '; return s; }
 Image<byte4> decodeImage(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
-    else { warn("Unknown image format",str(slice(file,0,4)," "_)); return Image<byte4>(); }
+    else { warn("Unknown image format"_,hex(slice(file,0,4))); return Image<byte4>(); }
 }
 
 template struct Image<int8>;

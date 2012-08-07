@@ -13,7 +13,7 @@ struct Desktop : Application {
     Feeds feeds;
     Scroll<HTML> page;
     //List<Command> shortcuts;// = readShortcuts();
-    Clock clock { 64 };
+    Clock clock { 32 };
     Calendar calendar;
     VBox timeBox { &clock, &calendar };
     HBox applets{ &feeds, &timeBox/*, &shortcuts*/ };
@@ -30,7 +30,7 @@ struct Desktop : Application {
         window.show();
     }
     void showDesktop() {
-        if(window.widget != &applets) window.setWidget(&applets);
+        if(window.widget != &applets) { window.setWidget(&applets); window.update(); window.render(); }
         //else window.setWidget(&shutdown);
         else quit(); //DEBUG
     }

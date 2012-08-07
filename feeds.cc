@@ -11,7 +11,7 @@ ICON(network)
 Feeds::Feeds() : config(openFolder("config"_)), readConfig(appendFile("read"_,config)), readMap(mapFile("read"_,config)) {
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
-    for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 24*60);
+    for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 12*60);
 }
 
 bool Feeds::isRead(const ref<byte>& title, const ref<byte>& link) {
@@ -34,14 +34,16 @@ void Feeds::loadFeed(const URL&, array<byte>&& document) {
         favicons.insert(link) = resize(networkIcon(),16,16);
         getURL(URL(link), Handler(this, &Feeds::getFavicon), 7*24*60);
     }
-    array<Entry> entries; int history=0;
-    auto addEntry = [this,&history,&entries](const Element& e)->void{
-        if(history++>=32) return; //avoid getting old unreads on feeds with big history
+    array<Entry> entries; int count=0;
+    auto addEntry = [this,&link,&count,&entries](const Element& e)->void{
+        if(count>=32) return; //avoid getting old unreads on feeds with big history
         if(array::size()+entries.size()>=30) return;
         string title = e("title"_).text(); //RSS&Atom
         string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS
         assert(!contains(title,byte('\n')),e);
-        if(!isRead(title, url)) entries<< Entry(move(title),move(url));
+        if(count==0) entries<< Entry(Text(move(title),12),move(url),share(favicons.at(link))); //display at least one entry per feed
+        else if(!isRead(title, url)) entries<< Entry(move(title),move(url),share(favicons.at(link)));
+        count++;
     };
     feed.xpath("feed/entry"_,addEntry); //Atom
     feed.xpath("rss/channel/item"_,addEntry); //RSS
@@ -76,11 +78,11 @@ void Feeds::setRead(uint index) {
 
 void Feeds::readEntry(uint index) {
     pageChanged( array::at(index).link );
-    if(index+1<count()) getURL(URL(array::at(index+1).link)); //preload next entry (TODO: preload images)
+    if(index+1<count()) getURL(URL(array::at(index+1).link)); //preload next entry (TODO: preload image)
 }
 
 void Feeds::readNext() {
-    setRead(index);
+    if(index!=uint(-1)) setRead(index);
     for(uint i=index+1;i<count();i++) { //next unread item
         if(!isRead(array::at(i))) {
             setActive(i);

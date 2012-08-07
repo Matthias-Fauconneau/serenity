@@ -4,7 +4,6 @@
 #include "array.cc"
 
 Widget* focus;
-Space& space() { static Space space; return space; }
 
 /// ScrollArea
 
@@ -102,6 +101,7 @@ void HighlightSelection::render(int2 parent) {
         Widget& current = at(index);
         if(position+current.position>=int2(-4,-4) && current.position+current.size<=(size+int2(4,4))) {
             fill(parent+position+current.position+Rect(current.size), pixel(224, 192, 128));
+            //FIXME: fast text rendering doesn't coverage blend anymore, change text background color
         }
     }
     Layout::render(parent);
@@ -119,7 +119,6 @@ void TabSelection::render(int2 parent) {
 }
 
 /// ImageView
-
 int2 ImageView::sizeHint() { return int2(image.width,image.height); }
 void ImageView::render(int2 parent) {
     if(!image) return;

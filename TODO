@@ -1,5 +1,5 @@
 apps: taskbar, desktop, text editor, file manager, mp3 player, mail, irc, wiki, search, html, pdf, inflate, jpeg
-font: compound glyph transform, kerning, subpixel position, hinting
+font: fix streaks, kerning, subpixel position, hinting, compound glyph transform
 browser: page download indicator, progressive image
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen, hardware cursor, fast scroll
 parser: attributes (L+S), scoped symbols

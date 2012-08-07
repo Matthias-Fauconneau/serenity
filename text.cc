@@ -126,7 +126,7 @@ void Text::update(int wrap) {
     links = move(layout.links);
     textSize=int2(0,0);
     for(const Blit& c: blits) textSize=max(textSize,int2(c.pos)+c.image.size());
-    textSize.y=max(textSize.y, size);
+    textSize.y=max(textSize.y, size+4);
 }
 int2 Text::sizeHint() {
     if(!textSize) update(wrap>=0 ? wrap : display().y);
@@ -135,10 +135,19 @@ int2 Text::sizeHint() {
 
 void Text::render(int2 parent) {
     if(!textSize) update(wrap>=0 ? wrap : display().y);
+    array<Rect> rects; rects<< parent+position+Rect(Widget::size);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
-    fill(offset+Rect(textSize), 255);
-    for(const Blit& b: blits) blit(offset+b.pos, b.image);
-    for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), 0);
+    for(const Blit& b: blits) {
+        Rect rect = offset+b.pos+Rect(b.image.size());
+        blit(offset+b.pos, b.image);
+        remove(rects, rect);
+    }
+    for(const Line& l: lines) {
+        Rect rect = offset+Rect(l.min+int2(0,1),l.max+int2(0,2));
+        fill(rect, 0);
+        remove(rects, rect);
+    }
+    for(Rect rect: rects) fill(rect,255);
 }
 
 bool Text::mouseEvent(int2 position, Event event, Key) {

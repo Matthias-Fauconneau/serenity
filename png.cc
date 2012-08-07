@@ -9,15 +9,6 @@ template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r
 template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a};}};
 template<class T> struct luma { T i; operator byte4()const{return byte4{i,i,i,255};}};
 
-#include "vector.cc"
-uvector(rgba,uint8,4)
-vector(rgba,int,4)
-uvector(rgb,uint8,3)
-vector(rgb,int,3)
-uvector(ia,uint8,2)
-vector(ia,int,2)
-uvector(luma,uint8,1)
-vector(luma,int,1)
 typedef vector<rgb,uint8,3> rgb3;
 
 template<template<typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {

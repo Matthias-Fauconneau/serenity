@@ -62,10 +62,10 @@ template<class D, class S> inline Image<D> convert(const Image<S>& s) {
     for(uint x=0;x<s.width;x++) for(uint y=0;y<s.height;y++) copy(x,y)=s(x,y);
     return copy;
 }
+/// template specialization to convert alpha to opaque white background
+template<> inline Image<pixel> convert<pixel,byte4>(const Image<byte4>& source);
 /// Returns a copy of the image resized to \a width x \a height
 Image<byte4> resize(const Image<byte4>& image, uint width, uint height);
-/// Swaps ARGB <-> BGRA in place
-Image<byte4> swap(Image<byte4>&& image);
 /// Flip the image around the horizontal axis in place
 Image<byte4> flip(Image<byte4>&& image);
 /// Decodes \a file to an Image

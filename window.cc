@@ -161,8 +161,8 @@ void Window::emit(bool unused emitTitle, bool unused emitIcon) {
 void Window::render() {
     assert(shown);
     widget->update();
+    //fill(Rect(display()),0);
     widget->render(int2(0,0));
-    swapBuffers();
     if(isActive()) patchCursor(cursor,cursorIcon(),false);
 }
 
@@ -177,7 +177,6 @@ void Window::show() {
     ioctl(vt, VT_ACTIVATE, (void*)8); //switch from X
     writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
     update();
-    fill(Rect(display()),0);
     render();
 }
 void Window::hide() {

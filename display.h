@@ -13,7 +13,9 @@ struct Rect {
 inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,b.max)); }
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
+inline bool operator ==(Rect a, Rect b) { return a.min==b.min && a.max==b.max; }
 inline string str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
+void remove(array<Rect>& rects, Rect neg);
 
 void push(Rect clip);
 void pop();
@@ -22,8 +24,7 @@ void finish();
 /// Returns display size (and on first call mmap framebuffer)
 int2 display();
 
-/// Swap buffers
-void swapBuffers();
+extern Image<pixel> framebuffer;
 
 /// Fill framebuffer area in \a rect with \a color
 void fill(Rect rect, pixel color);

@@ -26,7 +26,6 @@ struct ARM {
 };
 static_assert(sizeof(ARM)==4,"invalid bitfield");
 string disasm(ulong ptr) { return string(*(ARM*)ptr); }
-//string disasm(ulong ptr) { uint s=swap32(*(uint*)ptr); return string(*(ARM*)&s); }
 
 enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
 struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
@@ -42,9 +41,7 @@ struct ucontext {
 static void handler(int signo, siginfo* info, ucontext* ctx) {
     trace(1);
 #if __arm__
-    {Symbol s = findNearestLine((void*)ctx->lr); if(s.file)log(s.file+":"_+str(s.line)+"     \t"_+s.function);else log(ptr(ctx->lr),disasm(ctx->lr));}
-    {Symbol s = findNearestLine((void*)ctx->ip); if(s.file)log(s.file+":"_+str(s.line)+"     \t"_+s.function);else log(ptr(ctx->ip),disasm(ctx->ip));}
-    {Symbol s = findNearestLine((void*)ctx->pc); log(ptr(ctx->pc), s.file+":"_+str(s.line)+"     \t"_+s.function,disasm(ctx->pc),ctx->r1);}
+    {Symbol s = findNearestLine((void*)ctx->pc);  log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
 #elif __x86_64__ || __i386__
     {Symbol s = findNearestLine((void*)ctx->eip); log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
 #endif

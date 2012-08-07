@@ -67,6 +67,7 @@ typedef unsigned long long uint64;
 template<class T> inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 template<class T> inline T min(T a, T b) { return a<b ? a : b; }
 template<class T> inline T max(T a, T b) { return a>b ? a : b; }
+template<class T> inline T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 template<class T> inline T abs(T x) { return x>=0 ? x : -x; }
 template<class A, class B> inline bool operator !=(const A& a, const B& b) { return !(a==b); }
 template<class A, class B> inline bool operator <(const A& a, const B& b) { return b>a; }
