@@ -1,5 +1,5 @@
 #include "core.h"
-#include "array.cc"
+
 
 void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }

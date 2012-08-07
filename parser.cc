@@ -2,7 +2,7 @@
 #include "process.h"
 #include "file.h"
 #include "stream.h"
-#include "array.cc"
+
 
 static_array<string,32> pool;
 //const ref<byte> all = "12134567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~-=\\!@#$%^&*()_+|\t\n[]{}';\":/.,?><"_;

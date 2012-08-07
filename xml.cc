@@ -1,7 +1,7 @@
 #include "xml.h"
 #include "string.h"
 #include "utf8.h"
-#include "array.cc"
+
 
 static Element parse(const ref<byte>& document, bool html) {
     assert(document);
@@ -28,7 +28,7 @@ Element::Element(TextStream& s, bool html) {
     else if(s.match("!--"_)) { s.until("-->"_); return; }
     else if(s.match('?')){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
     else name = string(s.identifier()); //TODO: reference
-    if(!name) { log(slice(s.buffer,0,s.index)); warn("expected tag name got",s.until('\n')); }
+    if(!name) { log(s.slice(0,s.index)); warn("expected tag name got",s.until('\n')); }
     if(html) name=toLower(name);
     s.skip();
     while(!s.match('>')) {
@@ -36,7 +36,7 @@ Element::Element(TextStream& s, bool html) {
         else if(s.match('/')) s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
         string key = string(s.identifier());/*TODO:reference*/ s.skip();
-        if(!key) { log("Attribute syntax error"_,slice(s.buffer,start,s.index-start),"|"_,s.until('>')); break; }
+        if(!key) { log("Attribute syntax error"_,s.slice(start,s.index-start),"|"_,s.until('>')); break; }
         if(html) key=toLower(key);
         ref<byte> value;
         if(s.match('=')) {
@@ -51,7 +51,7 @@ Element::Element(TextStream& s, bool html) {
     }
     if(html) {
         static array< ref<byte> > voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
-        if(contains(voidElements,ref<byte>(name))) return; //HTML tags which are implicity void (i.e not explicitly closed)
+        if(voidElements.contains(name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
             //content=simplify(unescape(s.until(string("</"_+name+">"_))));
@@ -109,7 +109,7 @@ void Element::mayVisit(const function<bool(const Element&)>& visitor) const {
 void Element::xpath(const ref<byte>& path, const function<void(const Element &)>& visitor) const {
     assert(path);
     if(startsWith(path,"//"_)) {
-        ref<byte> next = slice(path,2);
+        ref<byte> next = path.slice(2);
         visit([&next,&visitor](const Element& e)->void{ e.xpath(next,visitor); });
     }
     ref<byte> first = section(path,'/');

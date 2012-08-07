@@ -1,7 +1,6 @@
 #include "time.h"
 #include "linux.h"
 #include "stream.h"
-#include "array.cc"
 
 enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
@@ -33,8 +32,8 @@ bool operator >(const Date& a, const Date& b) {
 bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && a.minutes==b.minutes && a.hours==b.hours
             && a.day==b.day && a.month==b.month && a.year==b.year ; }
 
-static const char* days[7] = {"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
-static const char* months[12] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
+static const ref<byte> days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
+static const ref<byte> months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
 
 Date date(long time) {
     int seconds = time, minutes=seconds/60, hours=minutes/60+2, days=hours/24+1, weekDay = (days+2)%7, month=0, year=1970;
@@ -52,11 +51,11 @@ string str(Date date, const ref<byte>& format) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(' '); }
         else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); else s.until(' '); }
         else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); else s.until(' '); }
-        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << str(days[date.weekDay]); else s.until(' '); }
-        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << slice(str(days[date.weekDay]),0,3); else s.until(' '); }
+        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << days[date.weekDay]; else s.until(' '); }
+        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << days[date.weekDay].slice(0,3); else s.until(' '); }
         else if(s.match("dd"_)){ if(date.day>=0) r << dec(date.day,2); else s.until(' '); }
-        else if(s.match("MMMM"_)){ if(date.month>=0)  r << str(months[date.month]); else s.until(' '); }
-        else if(s.match("MMM"_)){ if(date.month>=0)  r << slice(str(months[date.month]),0,3); else s.until(' '); }
+        else if(s.match("MMMM"_)){ if(date.month>=0)  r << months[date.month]; else s.until(' '); }
+        else if(s.match("MMM"_)){ if(date.month>=0)  r << months[date.month].slice(0,3); else s.until(' '); }
         else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); else s.until(' '); }
         else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(' '); }
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME

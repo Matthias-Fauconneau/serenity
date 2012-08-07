@@ -4,7 +4,7 @@
 #include "xml.h"
 #include "html.h"
 #include "interface.h"
-#include "array.cc"
+
 
 ICON(network)
 
@@ -15,8 +15,7 @@ Feeds::Feeds() : config(openFolder("config"_)), readConfig(appendFile("read"_,co
 }
 
 bool Feeds::isRead(const ref<byte>& title, const ref<byte>& link) {
-    assert(!contains(title,byte('\n')),title);
-    assert(!contains(link,byte('\n')),link);
+    assert(!title.contains('\n') && !link.contains('\n'));
     for(TextStream s=TextStream::byReference(readMap);s;s.until('\n')) { //feed+date (instead of title+link) would be less readable and fail on feed relocation
         if(s.match(title) && s.match(' ') && s.match(link)) return true;
     }
@@ -29,9 +28,9 @@ void Feeds::loadFeed(const URL&, array<byte>&& document) {
     string link = feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]); //Atom
     string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
     if(exists(favicon,cache)) {
-        favicons.insert(link) = resize(decodeImage(readFile(favicon,cache)),16,16);
+        favicons.insert(link) = ::resize(decodeImage(readFile(favicon,cache)),16,16);
     } else {
-        favicons.insert(link) = resize(networkIcon(),16,16);
+        favicons.insert(link) = ::resize(networkIcon(),16,16);
         getURL(URL(link), Handler(this, &Feeds::getFavicon), 7*24*60);
     }
     array<Entry> entries; int count=0;
@@ -40,7 +39,6 @@ void Feeds::loadFeed(const URL&, array<byte>&& document) {
         if(array::size()+entries.size()>=30) return;
         string title = e("title"_).text(); //RSS&Atom
         string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS
-        assert(!contains(title,byte('\n')),e);
         if(count==0) entries<< Entry(Text(move(title),12),move(url),share(favicons.at(link))); //display at least one entry per feed
         else if(!isRead(title, url)) entries<< Entry(move(title),move(url),share(favicons.at(link)));
         count++;

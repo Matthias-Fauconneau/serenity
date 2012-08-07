@@ -1,7 +1,6 @@
 #include "calendar.h"
 #include "file.h"
 #include "map.h"
-#include "array.cc"
 
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query) {
@@ -43,7 +42,7 @@ array<string> getEvents(Date query) {
             if(query.minutes>=0 && date.minutes!=query.minutes) continue;
             if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
             if(exceptions.contains(title)) for(Date date: exceptions.at(title)) if(date.day==query.day && date.month==query.month) goto skip;
-            insertSorted(events, string(str(date,"hh:mm"_)+(date!=end?string("-"_+str(end,"hh:mm"_)):string())+": "_+title));
+            events.insertSorted(string(str(date,"hh:mm"_)+(date!=end?string("-"_+str(end,"hh:mm"_)):string())+": "_+title));
             skip:;
         }
     }

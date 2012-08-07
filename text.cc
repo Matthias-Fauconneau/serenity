@@ -2,7 +2,6 @@
 #include "display.h"
 #include "font.h"
 #include "utf8.h"
-#include "array.cc"
 
 struct TextLayout {
     int size;
@@ -184,7 +183,7 @@ bool TextInput::keyPress(Key key) {
     else if(key<=Key::Slash) {
         char c="  1234567890-= \tqwertyuiop[]\n asdfghjkl;'`zxcvbnm,./"_[(int)key]; //TODO: shift
         if(c==' ') return false;
-        insertAt(text, cursor++, (byte)key); update();
+        text.insertAt(cursor++, (byte)key); update();
     } else return false;
     return true;
 }

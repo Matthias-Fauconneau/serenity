@@ -5,7 +5,7 @@
 #include "window.h"
 #include "interface.h"
 #include "file.h"
-#include "array.cc"
+
 
 const string iconPaths[4] = {
     "/usr/share/pixmaps/"_,

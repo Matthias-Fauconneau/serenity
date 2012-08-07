@@ -11,22 +11,19 @@ template<class K, class V> struct map {
     array<K> keys;
     array<V> values;
 
-    map()=default;
-    map(map&&)=default;
-    map& operator =(map&&)=default;
     void reserve(int size) { return keys.reserve(size); values.reserve(size); }
     uint size() const { return keys.size(); }
-    bool contains(const K& key) const { return ::contains(keys, key); }
+    bool contains(const K& key) const { return keys.contains(key); }
     explicit operator bool() const { return keys.size(); }
     void clear() { keys.clear(); values.clear(); }
 
-    const V& at(const K& key) const { int i = indexOf(keys,key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"); return values[i];}
-    V& at(const K& key) { int i = indexOf(keys, key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"); return values[i];}
+    const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"); return values[i];}
+    V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"); return values[i];}
     template<perfect(V)> Vf value(const K& key, Vf&& value) {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : forward<Vf>(value);
     }
-    V* find(const K& key) { int i = indexOf(ref<K>(keys), key); return i>=0 ? &values[i] : 0; }
+    V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
     template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {'"_+str(keys,"', '"_)+"'}"_);
         //insertAt(values, insertSorted(keys, forward<Kf>(key)), forward<Vf>(value));
@@ -41,8 +38,8 @@ template<class K, class V> struct map {
         //return insertAt(values, insertSorted(keys, forward<Kf>(key)), move(V()));
         keys << forward<Kf>(key); values << V(); return values.last();
     }
-    V& operator [](K key) { int i = indexOf(keys, key); if(i>=0) return values[i]; return insert(key); }
-    void remove(const K& key) { int i=indexOf(keys, key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
+    V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
+    void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
         const K* k; const V* v;

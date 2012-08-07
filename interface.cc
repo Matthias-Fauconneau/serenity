@@ -1,7 +1,6 @@
 #include "interface.h"
 #include "display.h"
 #include "layout.h"
-#include "array.cc"
 
 Widget* focus;
 

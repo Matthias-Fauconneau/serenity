@@ -1,6 +1,6 @@
 #include "display.h"
 #include "linux.h"
-#include "array.cc"
+
 
 /// Clip
 

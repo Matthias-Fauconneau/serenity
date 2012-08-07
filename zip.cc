@@ -1,7 +1,7 @@
 #include "zip.h"
 #include "inflate.h"
 
-#include "array.cc"
+
 Array(ZipFile)
 
 struct LocalHeader {

@@ -5,7 +5,6 @@
 #include "linux.h"
 #include "map.h"
 #include "memory.h"
-#include "array.cc"
 
 /// Socket
 
@@ -113,8 +112,8 @@ URL::URL(const ref<byte>& url) {
     else s.match("//"_); //net_path
     ref<byte> domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
     host = string(section(domain,'@',-2,-1));
-    if(contains(domain,byte('@'))) authorization = base64(section(domain,'@'));
-    if(!contains(host,byte('.'))) { path=move(host); path<<"/"_; }
+    if(domain.contains('@')) authorization = base64(section(domain,'@'));
+    if(!host.contains('.')) { path=move(host); path<<"/"_; }
     else if(host=="."_) host.clear();
     path << s.until('#');
     fragment = string(s.untilEnd());
@@ -130,9 +129,9 @@ URL URL::relative(URL&& url) const {
         }
     }
     if(!url.host) url.host=copy(host);
-    if(!contains<byte>(url.host,'.') || url.host=="."_) error(host,path,url.host,url.path);
-    if(startsWith(url.path,"."_)) url.path=string(slice(url.path,1));
-    while(startsWith(url.path,"/"_)) url.path=string(slice(url.path,1));
+    if(!url.host.contains('.') || url.host=="."_) error(host,path,url.host,url.path);
+    if(startsWith(url.path,"."_)) url.path.removeAt(0);
+    while(startsWith(url.path,"/"_)) url.path.removeAt(0);
     return move(url);
 }
 string str(const URL& url) {
@@ -149,7 +148,7 @@ string cacheFile(const URL& url) {
     if(!cache) cache=openFolder("cache"_);
     string name = replace(url.path,"/"_,"."_);
     if(!name || name=="."_) name=string("index.htm"_);
-    assert(!contains<byte>(url.host,'/'));
+    assert(!url.host.contains('/'));
     return url.host+"/"_+name;
 }
 
@@ -201,10 +200,9 @@ void HTTP::header() {
         }
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
         else if((key=="Location"_ && (status==301||status==302)) || key=="Refresh"_) {
-            if(startsWith(value,"0;URL="_)) value=::slice(value,6);
+            if(startsWith(value,"0;URL="_)) value=value.slice(6);
             URL next = url.relative(value);
-            assert(!contains<byte>(url.host,'/'),url);
-            assert(!contains<byte>(next.host,'/'),url,next);
+            assert(!url.host.contains('/') && !next.host.contains('/'),url,next);
             redirect << file;
             buffer.clear(); index=0; contentLength=0; chunked=false; unregisterPoll(); disconnect(); state=Connect;
             url=move(next);

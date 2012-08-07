@@ -1,7 +1,7 @@
 #include "file.h"
 #include "linux.h"
 #include "debug.h"
-#include "array.cc"
+
 
 /// Input/Output
 

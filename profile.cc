@@ -1,6 +1,6 @@
 #include "map.h"
 #include "time.h"
-#include "array.cc"
+
 
 static bool trace = 0;
 static int untrace;

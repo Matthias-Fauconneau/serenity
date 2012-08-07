@@ -1,6 +1,5 @@
 #include "layout.h"
 #include "display.h"
-#include "array.cc"
 
 /// Layout
 
@@ -80,7 +79,7 @@ void Linear::update() {
     } else { //reduce biggest widgets first until all fit
         for(uint i=0;i<count();i++) if(sizes[i]<0) sizes[i]=hints[i]; //allocate all widgets
         while(width<-sharing) {
-            int& first = max(sizes);
+            int first = sizes[sizes.max()];
             int second=first; for(int e: sizes) if(e>second && e<first) second=e;
             int delta = first-second;
             if(delta==0 || delta>int(uint(-width)/uint(sharing))) delta=uint(-width)/uint(sharing); //if no change or bigger than necessary

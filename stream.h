@@ -41,7 +41,7 @@ struct Stream {
     /// Reads \a size bytes from stream
     ref<byte> read(uint size) { ref<byte> t = get(size); advance(size); return t; }
     /// Slices an array referencing this data (valid as long as this stream)
-    ref<byte> slice(int pos, int size) { return ::slice(buffer,pos,size); }
+    ref<byte> slice(int pos, int size) { return buffer.slice(pos,size); }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 };

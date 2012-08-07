@@ -15,7 +15,6 @@ byte* allocate_(uint size) {
     byte* buffer = heapEnd;
     heapEnd += size;
     if(heapEnd>systemEnd) systemEnd=(byte*)brk((void*)((ptr(heapEnd)&0xFFFFF000)+0x1000)); //round to next page
-    debug( if(systemEnd<heapEnd) { write(0,"Out of memory\n"_); log(size); log(ptr(heapEnd)); log(ptr(systemEnd)); } )
     return buffer;
 }
 byte* reallocate_(byte* buffer, int size, int need) {

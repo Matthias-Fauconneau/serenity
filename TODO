@@ -1,6 +1,6 @@
 apps: taskbar, desktop, text editor, file manager, mp3 player, mail, irc, wiki, search, html, pdf, inflate, jpeg
 font: fix streaks, kerning, subpixel position, hinting, compound glyph transform
-browser: page download indicator, progressive image
+browser: preload image, progressive image, status
 touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen, hardware cursor, fast scroll
 parser: attributes (L+S), scoped symbols
-IDE: parser, build driver (+frepo), git, debugger, static analyzer, profiler, gc?, interpreter, compiler
+dev: parser, build driver (+frepo), interpreter, compiler, static analyzer, IDE(highlight, navigation, completion, git, debugger, profiler)

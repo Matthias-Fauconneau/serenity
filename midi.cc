@@ -1,7 +1,7 @@
 #include "midi.h"
 #include "file.h"
 
-#include "array.cc"
+
 template class array<Track>;
 
 void MidiFile::open(const string& path) { /// parse MIDI header

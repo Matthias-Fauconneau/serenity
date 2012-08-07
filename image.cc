@@ -2,11 +2,11 @@
 #include "stream.h"
 #include "vector.h"
 #include "string.h"
-#include "array.cc"
 
 #define generic template<class T>
 
-generic Image<T>::Image(int width, int height, int stride) : data(allocate<T>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true) {
+generic Image<T>::Image(int width, int height, bool alpha, int stride) : data(allocate<T>(height*(stride?:width))), width(width), height(height),
+    stride(stride?:width), own(true), alpha(alpha) {
     assert(width); assert(height);
 }
 generic Image<T>::~Image(){ if(data && own) { unallocate(data,height*stride); } }
@@ -21,7 +21,7 @@ generic Image<T>::Image(array<T>&& data, uint width, uint height)
 Image<byte4> resize(const Image<byte4>& image, uint width, uint height) {
     if(!image) return Image<byte4>();
     if(width==image.width && height==image.height) return copy(image);
-    Image<byte4> target(width,height);
+    Image<byte4> target(width,height,image.alpha);
     const byte4* src = image.data;
     byte4* dst = target.data;
     if(image.width/width==image.height/height && !(image.width%width) && !(image.height%height)) { //integer box
@@ -57,12 +57,14 @@ Image<byte4> flip(Image<byte4>&& image) {
     return move(image);
 }
 
-template<> inline Image<pixel> convert<pixel,byte4>(const Image<byte4>& source) {
-    if(!s) return Image<pixel>();
+template<> Image<pixel> convert<pixel,byte4>(const Image<byte4>& source) {
+    if(!source) return Image<pixel>();
     Image<pixel> copy(source.width,source.height);
     for(uint x=0;x<source.width;x++) for(uint y=0;y<source.height;y++) {
-        int4 s=source(x,y);
-        copy(x,y)=pixel((s*s.a+int4(255,255,255,255)*(255-s.a))/255);
+        if(source.alpha) {
+            int4 s=int4(source(x,y));
+            copy(x,y)=pixel((s*s.a+int4(255,255,255,255)*(255-s.a))/255);
+        } else copy(x,y)=source(x,y);
     }
     return copy;
 }
@@ -76,7 +78,7 @@ Image<byte4> decodeImage(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
-    else { warn("Unknown image format"_,hex(slice(file,0,4))); return Image<byte4>(); }
+    else { warn("Unknown image format"_,hex(file.slice(0,4))); return Image<byte4>(); }
 }
 
 template struct Image<int8>;

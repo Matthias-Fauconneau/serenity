@@ -6,7 +6,7 @@
 #include "launcher.h"
 #include "calendar.h"
 #include "popup.h"
-#include "array.cc"
+
 
 struct Task : Item {
     uint id;

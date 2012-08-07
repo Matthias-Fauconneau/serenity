@@ -1,5 +1,4 @@
 #include "font.h"
-#include "array.cc"
 
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 

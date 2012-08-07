@@ -1,12 +1,10 @@
 #include "process.h"
 #include "window.h"
 #include "display.h"
-//#include "launcher.h"
 #include "calendar.h"
 #include "feeds.h"
-//#include "popup.h"
+//#include "launcher.h"
 //ICON(shutdown)
-#include "array.cc"
 
 struct Desktop : Application {
     Text status;

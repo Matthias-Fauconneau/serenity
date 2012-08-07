@@ -1,5 +1,5 @@
 #include "string.h"
-#include "array.cc"
+#include "debug.h"
 
 /// ref<byte>
 
@@ -63,7 +63,7 @@ ref<byte> trim(const ref<byte>& s) {
     int begin=0,end=s.size;
     for(;begin<end;begin++) { byte c=s[begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
     for(;end>begin;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
-    return slice(s, begin, end-begin);
+    return s.slice(begin, end-begin);
 }
 
 bool isInteger(const ref<byte>& s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }

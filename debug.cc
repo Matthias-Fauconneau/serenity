@@ -2,7 +2,6 @@
 #include "file.h"
 #include "stream.h"
 #include "linux.h"
-#include "array.cc"
 
 const char* errno[35] = {"OK",
     "PERM","NOENT","SRCH","INTR","IO","NXIO","2BIG","NOEXEC","BADF","CHILD","AGAIN","NOMEM","ACCES","FAULT","NOTBLK","BUSY","EXIST",

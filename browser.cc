@@ -5,7 +5,6 @@
 #include "html.h"
 #include "window.h"
 #include "interface.h"
-#include "array.cc"
 
 struct Browser : Application {
     Scroll<HTML> page;

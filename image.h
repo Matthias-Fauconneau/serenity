@@ -15,6 +15,7 @@ struct rgb565 {
     rgb565(uint8 i):pack( (i&0b11111000)<<8 | (i&0b11111100)<<3 | i>>3 ) {}
     rgb565(uint8 b, uint8 g, uint8 r):pack( (r&0b11111000)<<8 | (g&0b11111100)<<3 | b>>3 ) {}
     rgb565(byte4 c):rgb565(c.b, c.g, c.r){}
+    rgb565(int4 c):rgb565(c.b, c.g, c.r){}
     operator byte4() { return byte4((pack&0b11111)<<3,(pack>>3)&0b11111100,pack>>8,255); }
     operator   int4() { return     int4((pack&0b11111)<<3,(pack>>3)&0b11111100,pack>>8,255); }
 };
@@ -30,13 +31,14 @@ template<class T> struct Image {
     bool own=false, alpha=false;
 
     no_copy(Image)
-    Image(Image&& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own) { o.data=0; }
-    Image& operator =(Image&& o) { this->~Image(); data=o.data; width=o.width; height=o.height; stride=o.stride; o.data=0; return *this; }
+    Image(Image&& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
+    Image& operator =(Image&& o) {  this->~Image(); data=o.data; o.data=0;
+        width=o.width; height=o.height; stride=o.stride;  own=o.own; alpha=o.alpha; return *this; }
 
     Image(){}
     Image(T* data, int width, int height, int stride, bool own, bool alpha) :
         data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
-    Image(int width, int height, int stride=0);
+    Image(int width, int height, bool alpha=false, int stride=0);
     Image(array<T>&& data, uint width, uint height);
 
     ~Image();
@@ -54,7 +56,7 @@ generic inline string str(const Image<T>& o) { return str(o.width,"x"_,o.height)
 /// Creates a new handle to \a image data (unsafe if freed)
 generic inline Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.width,o.height,o.stride,false,o.alpha); }
 /// Copies the image buffer
-generic inline Image<T> copy(const Image<T>& o) {Image<T> copy(o.width,o.height); ::copy(copy.data,o.data,o.stride*o.height); return copy;}
+generic inline Image<T> copy(const Image<T>& o) {Image<T> copy(o.width,o.height,o.alpha); ::copy(copy.data,o.data,o.stride*o.height); return copy;}
 /// Convert between image formats
 template<class D, class S> inline Image<D> convert(const Image<S>& s) {
     if(!s) return Image<D>();
@@ -63,7 +65,7 @@ template<class D, class S> inline Image<D> convert(const Image<S>& s) {
     return copy;
 }
 /// template specialization to convert alpha to opaque white background
-template<> inline Image<pixel> convert<pixel,byte4>(const Image<byte4>& source);
+template<> Image<pixel> convert<pixel,byte4>(const Image<byte4>& source);
 /// Returns a copy of the image resized to \a width x \a height
 Image<byte4> resize(const Image<byte4>& image, uint width, uint height);
 /// Flip the image around the horizontal axis in place

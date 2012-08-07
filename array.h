@@ -1,7 +1,6 @@
 #pragma once
 #include "core.h"
-
-#define generic template<class T>
+#include "memory.h"
 
 namespace std {
 template<class T> struct initializer_list {
@@ -16,30 +15,30 @@ template<class T> struct initializer_list {
     constexpr const T* end() const { return data+size; }
     const T& operator [](uint i) const { assert_(i<size); return data[i]; }
     explicit operator bool() const { return size; }
+    /// Compares all elements
+    bool operator ==(const initializer_list<T>& o) const {
+        if(size != o.size) return false;
+        for(uint i=0;i<size;i++) if(!(data[i]==o.data[i])) return false;
+        return true;
+    }
+    /// Slices a reference to elements from \a pos to \a pos + \a size
+    initializer_list<T> slice(uint pos, uint size) const { assert_(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
+    /// Slices a reference to elements from to the end of the reference
+    initializer_list<T> slice(uint pos) const { assert_(pos<=size); return initializer_list<T>(data+pos,size-pos); }
+    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
+    int indexOf(const T& value) const { for(uint i=0;i<size;i++) { if(data[i]==value) return i; } return -1; }
+    /// Returns true if the array contains an occurrence of \a value
+    bool contains(const T& value) const { return indexOf(value)>=0; }
 };
 }
 /// \a ref is a const typed bounded memory reference (i.e fat pointer)
 /// \note As \a data is not owned, ref should never be stored, only used as argument.
 i( template<class T> using ref = std::initializer_list<T>; )
 
-/// Slices a reference to elements from \a pos to \a pos + \a size
-generic ref<T> slice(const ref<T>& a, uint pos, uint size) { assert_(pos+size<=a.size); return ref<T>(a.data+pos,size); }
-/// Slices a reference to elements from to the end of the reference
-generic ref<T> slice(const ref<T>& a, uint pos) { assert_(pos<=a.size); return ref<T>(a.data+pos,a.size-pos); }
-
-//Comparable?
-/// Compares all elements
-generic bool operator ==(const ref<T>& a, const ref<T>& b);
-/// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-generic int indexOf(const ref<T>& a, const T& value);
-/// Returns true if the array contains an occurrence of \a value
-generic bool contains(const ref<T>& a, const T& value);
-
 /// \a array is a typed bounded mutable growable memory reference (heap/stack/static/mmap)
 /// \note array use move semantics to avoid reference counting when managing heap reference
 /// \note array transparently store small arrays inline (<=31bytes)
 /// \note array transparently detach when trying to modify a foreign (i.e not owned heap) reference
-/// \note This header only defines basic container methods, #include "array.cc" to define advanced methods
 template<class T> struct array {
     int8 tag = -1; //0: empty, >0: inline, -1 = not owned (reference), -2 = owned (heap)
     struct {
@@ -74,37 +73,58 @@ template<class T> struct array {
     /// Allocates a new uninitialized array for \a capacity elements
     explicit array(uint capacity) { reserve(capacity); }
     /// Moves elements from a reference
-    explicit array(ref<T>&& ref);
+    explicit array(ref<T>&& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(move((T&)ref[i]));}
     /// Copies elements from a reference
-    explicit array(const ref<T>& ref);
+    explicit array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
     /// References \a size elements from read-only \a data pointer
     array(const T* data, uint size) : i(buffer{data, size, 0}) {} //TODO: escape analysis
     /// Initializes array with a writable buffer of \a capacity elements
-    array(const T* data, uint size, uint capacity) : tag(-2), i(buffer{data, size, capacity}) {} //TODO: escape analysis
+    array(const T* data, uint size, uint capacity) : tag(-2) i(, buffer{data, size, capacity}) {} //TODO: escape analysis
 
     /// If the array own the data, destroys all initialized elements and frees the buffer
-    void unallocate();
-    ~array() { if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(); } }
+    ~array() { if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); } }
 
     /// Allocates enough memory for \a capacity elements
-    void reserve(uint capacity);
+    void reserve(uint capacity) {
+        if(capacity <= this->capacity()) return;
+        if(tag==-2 && buffer.capacity) {
+            buffer.data=reallocate<T>(buffer.data,buffer.capacity,capacity);
+            buffer.capacity=capacity;
+        } else if(capacity <= inline_capacity()) {
+            if(tag<0) {
+                 tag=buffer.size;
+                 copy((byte*)(&tag+1),(byte*)buffer.data,buffer.size*sizeof(T));
+            }
+        } else {
+            T* heap=allocate<T>(capacity);
+            copy((byte*)heap,(byte*)data(),size()*sizeof(T));
+            buffer.data=heap;
+            if(tag>=0) buffer.size=tag;
+            tag=-2;
+            buffer.capacity=capacity;
+        }
+    }
+
     /// Sets the array size to \a size and destroys removed elements
-    void shrink(uint size);
+    void shrink(uint size) {
+        assert_(size<=this->size());
+        if(tag!=-1) for(uint i=size;i<this->size();i++) at(i).~T();
+        setSize(size);
+    }
     /// Sets the array size to 0, destroying any contained elements
-    void clear();
+    void clear() { if(size()) shrink(0); }
+    void grow(uint size) { uint old=this->size(); assert_(size>old); reserve(size); setSize(size); for(uint i=old;i<size;i++) new (&at(i)) T(); }
+    void resize(uint size) { if(size<this->size()) shrink(size); else if(size>this->size()) grow(size); }
+
+    /// Slices a reference to elements from \a pos to \a pos + \a size
+    ref<T> slice(uint pos, uint size) { return ref<T>(*this).slice(pos,size); }
+    /// Slices a reference to elements from to the end of the array
+    ref<T> slice(uint pos) { return ref<T>(*this).slice(pos); }
 
     /// Returns true if not empty
     explicit operator bool() const { return size(); }
     /// Returns a reference to the elements contained in this array
     operator ref<T>() const { return ref<T>(data(),size()); } //TODO: escape analysis
-    /// Appends \a e to array
-    array& operator <<(T&& e);
-    array& operator <<(array<T>&& a);
-    /// Appends only if no matching element is already contained
-    array& operator +=(T&& v);
-    array& operator +=(array&& b);
-    array& operator +=(const T& v);
-    array& operator +=(const ref<T>& o);
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 
@@ -119,13 +139,50 @@ template<class T> struct array {
     const T& last() const { return at(size()-1); }
     T& last() { return at(size()-1); }
 
-    /// Remove elements
-    void removeAt(uint i);
-    void removeLast();
-    T take(int i);
-    T takeFirst();
-    T takeLast();
-    T pop();
+    /// Finds elements
+    int indexOf(const T& value) const { return ref<T>(*this).indexOf(value); }
+    bool contains(const T& value) const { return ref<T>(*this).contains(value); }
+    uint min() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)<at(best)) best=i; return best; }
+    uint max() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)>at(best)) best=i; return best; }
+
+    /// Appends elements
+    array& operator <<(T&& e) { int s=size()+1; reserve(s); new (end()) T(move(e)); setSize(s); return *this; }
+    array& operator <<(array<T>&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s);
+                                       return *this; }
+    array& operator <<(const T& v) { *this<< copy(v); return *this; }
+    array& operator <<(const ref<T>& a) {
+        int old=size(); reserve(old+a.size); setSize(old+a.size); for(uint i=0;i<a.size;i++) new (&at(old+i)) T(copy(a[i]));
+        return *this;
+    }
+    /// Appends once (if not already contained)
+    array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
+    array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
+    array& operator +=(const T& v) { if(!contains(v)) *this<< copy(v); return *this; }
+    array& operator +=(const ref<T>& o) { for(const T& v: o) *this+= copy(v); return *this; }
+
+    /// Inserts elements
+    T& insertAt(int index, T&& e) {
+        reserve(size()+1); setSize(size()+1);
+        for(int i=size()-2;i>=index;i--) copy(at(i+1),at(i));
+        new (&at(index)) T(move(e));
+        return at(index);
+    }
+    T& insertAt(int index, const T& v) { return insertAt(index,copy(v)); }
+    int insertSorted(T&& e) { uint i=0; for(;i<size();i++) if(at(i) > e) break; insertAt(i,move(e)); return i; }
+    int insertSorted(const T& v) { return insertSorted(copy(v)); }
+
+    /// Removes elements
+    void removeAt(uint i) { at(i).~T(); for(;i<size()-1;i++) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); setSize(size()-1); }
+    void removeFirst() { removeAt(0); }
+    void removeLast() { removeAt((size()-1)); }
+    T take(int i) { T value = move(at(i)); removeAt(i); return value; }
+    T takeFirst() { return take(0); }
+    T takeLast() { return take(size()-1); }
+    T pop() { return takeLast(); }
+    /// Removes one matching element and returns an index to its successor
+    int removeOne(const T& v) { int i=indexOf(v); if(i>=0) removeAt(i); return i; }
+    /// Removes all matching elements
+    void removeAll(const T& v) { for(uint i=0;i<size();i++) if(at(i)==v) { removeAt(i); i--; } }
 
     /// Iterators
     const T* begin() const { return data(); }
@@ -134,49 +191,13 @@ template<class T> struct array {
     T* end() { return (T*)data()+size(); }
 };
 
-#define array array<T>
-
-/// Slices a reference to elements from \a pos to \a pos + \a size
-generic ref<T> slice(const array& a, uint pos, uint size) { return slice(ref<T>(a),pos,size); }
-/// Slices a reference to elements from to the end of the array
-generic ref<T> slice(const array& a, uint pos) { return slice(ref<T>(a),pos); }
-
-// Copyable?
-/// Appends \a e to array \a a
-generic array& operator <<(array& a, const T& e);
-/// Appends array \a b to array \a a
-generic array& operator <<(array& a, const ref<T>& b);
-generic array& operator <<(array& a, const array& b) { return a<<ref<T>(b); }
 /// Copies all elements in a new array
-generic array copy(const array& a) { return array((ref<T>)a); }
-/// Inserts /a element at /a index
-generic T& insertAt(array& a, int index, T&& element);
-generic T& insertAt(array& a, int index, const T& element);
+template<class T> array<T> copy(const array<T>& a) { return array<T>((ref<T>)a); }
 
-// DefaultConstructible?
-/// Allocates memory for \a size elements and initializes added elements with their default constructor
-generic void grow(array& a, uint size);
-/// Sets the array size to \a size, destroying or initializing elements as needed
-generic void resize(array& a, uint size);
-
-// Comparable?
-generic int indexOf(const array& a, const T& value) { return indexOf(ref<T>(a),value); }
-generic bool contains(const array& a, const T& value) { return contains(ref<T>(a),value); }
-/// Removes one matching element and returns an index to its successor
-generic int removeOne(array& a, T e);
-/// Removes all matching elements
-generic void removeAll(array& a, T e);
 /// Replaces in \a array every occurence of \a before with \a after
-generic array replace(array&& a, const T& before, const T& after);
-
-// Orderable?
-generic T& min(array& a);
-generic T& max(array& a);
-generic int insertSorted(array& a, T&& e);
-generic int insertSorted(array& a, const T& e);
-
-#undef generic
-#undef array
+template<class T> array<T> replace(array<T>&& a, const T& before, const T& after) {
+    for(T& e : a) if(e==before) e=copy(after); return move(a);
+}
 
 /// \a static_array is an \a array with preallocated inline space
 /// \note static_array use static inheritance, instead of using \a array inline space, to avoid full instantiation for each N

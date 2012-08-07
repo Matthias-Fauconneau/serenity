@@ -1,5 +1,4 @@
 #include "html.h"
-#include "array.cc"
 
 ImageLoader::ImageLoader(const URL& url, Image<pixel>* target, signal<>* imageLoaded, int2 size, uint maximumAge)
     : target(target), size(size) {
@@ -52,7 +51,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
         } else if(!div.children) return false;
         div.mayVisit([&score](const Element& e)->bool{
             if(find(e["class"_],"comment"_)) return false;
-            if(contains(textElement,ref<byte>(e.name))||contains(boldElement,ref<byte>(e.name))) {
+            if(textElement.contains(e.name)||boldElement.contains(e.name)) {
                 return true; //visit children
             } else if(!e.name) {
                 score += e.content.size; //raw text
@@ -60,8 +59,8 @@ void HTML::append(const URL& url, array<byte>&& document) {
                 //int height = isInteger(e["height"_]) ? toInteger(e["height"_]) : 1;
                 //if(e.name=="img"_ && !endsWith(e["src"_],".gif"_)) score += height; //image
             } else if(e.name=="br"_) { score += 30; //line break
-            } else if(contains(ignoreElement,ref<byte>(e.name))) {
-            } else if(!contains(e.name,(byte)':')) warn("load: Unknown HTML tag",e.name);
+            } else if(ignoreElement.contains(e.name)) {
+            } else if(!e.name.contains(':')) warn("load: Unknown HTML tag",e.name);
             return false;
         });
         if(score>=max) best=&div, second=max, max=score;
@@ -98,7 +97,7 @@ void HTML::layout(const URL& url, const Element &e) {
     else if(e.name=="a"_) { //Link
         flushImages();
         bool inlineText=true; //TODO:
-        e.visit([&inlineText](const Element& e){if(e.name&&!contains(textElement,ref<byte>(e.name))) inlineText=false;});
+        e.visit([&inlineText](const Element& e){if(e.name&&!textElement.contains(e.name)) inlineText=false;});
         if(inlineText) text << format(Format::Underline|Format::Link) << e["href"_] << " "_;
         for(const Element& c: e.children) layout(url, c);
         if(inlineText) text << format(Format::Regular);
@@ -108,7 +107,7 @@ void HTML::layout(const URL& url, const Element &e) {
         for(const Element& c: e.children) layout(url, c);
         text<<"\n"_;
     }
-    else if(contains(boldElement,ref<byte>(e.name))) { //Bold
+    else if(boldElement.contains(e.name)) { //Bold
         text << format(Format::Bold);
         for(const Element& c: e.children) layout(url, c);
         text << format(Format::Regular);
@@ -119,9 +118,9 @@ void HTML::layout(const URL& url, const Element &e) {
         text << format(Format::Regular);
     }
     else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; }//wikipedia [edit]
-    else if(contains(textElement,ref<byte>(e.name))) { for(const Element& c: e.children) layout(url, c); } // Unhandled format tags
-    else if(contains(ignoreElement,ref<byte>(e.name))) { return; } // Ignored elements
-    else if(!contains<byte>(e.name,':')) warn("layout: Unknown element '"_+e.name+"'"_);
+    else if(textElement.contains(e.name)) { for(const Element& c: e.children) layout(url, c); } // Unhandled format tags
+    else if(ignoreElement.contains(e.name)) { return; } // Ignored elements
+    else if(!e.name.contains(':')) warn("layout: Unknown element '"_+e.name+"'"_);
 }
 void HTML::flushText() {
     string paragraph = move(text); //simplify(move(text));

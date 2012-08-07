@@ -1,6 +1,5 @@
 #include "stream.h"
 #include "string.h"
-#include "array.cc"
 
 ref<byte> DataStream::untilNull() { uint start=index; while(available(1) && next()){} return Stream::slice(start,index-1-start); }
 
