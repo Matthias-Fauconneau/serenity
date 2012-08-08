@@ -19,7 +19,7 @@ struct Desktop : Application {
     //Command shutdown {move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop() {
         clock.timeout.connect(&window, &Window::render);
-        feeds.listChanged.connect(&window,&Window::render);
+        feeds.listChanged.connect(&window,&Window::update);
         feeds.pageChanged.connect(this,&Desktop::showPage);
         window.localShortcut(Key::RightArrow).connect(&feeds, &Feeds::readNext);
         window.localShortcut(Key::Extra).connect(&feeds, &Feeds::readNext);
@@ -35,7 +35,7 @@ struct Desktop : Application {
     void showPage(const ref<byte>& link) {
         if(!link) { showDesktop(); return; }
         window.setWidget( &page.parent() );
-        page.contentChanged.connect(&window, &Window::render);
+        page.contentChanged.connect(&window, &Window::update);
         page.go(link);
         status.setText("Loading "_+link); status.render(int2(0,0));
     }

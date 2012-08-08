@@ -103,15 +103,13 @@ void patchCursor(int2 position, const Image<byte4>& cursor, bool repair) {
         static Image<pixel> newPatch(cursor.width,cursor.height);
         for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
             pixel p = framebuffer(x,y);
-            {uint dx=x-lastPosition.x, dy=y-lastPosition.y;
-            if(dx<patch.width && dy<patch.height) p=patch(dx,dy);}
-            {uint dx=x-position.x, dy=y-position.y;
-            if(dx<patch.width&&dy<patch.width) {
+            if(repair) {uint dx=x-lastPosition.x, dy=y-lastPosition.y; if(dx<patch.width && dy<patch.height) p=patch(dx,dy);}
+            {uint dx=x-position.x, dy=y-position.y; if(dx<patch.width&&dy<patch.width) {
                 newPatch(dx,dy) = p;
                 byte4 s = cursor(dx,dy);
                 p = byte4(div255(int4(p)*(255-s.a) + int4(s)*s.a));
             }}
-            if(repair) framebuffer(x,y) = p;
+            framebuffer(x,y) = p;
         }
         swap(patch,newPatch);
     } else {

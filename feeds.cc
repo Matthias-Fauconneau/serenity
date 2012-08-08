@@ -39,8 +39,8 @@ void Feeds::loadFeed(const URL&, array<byte>&& document) {
         if(array::size()+entries.size()>=30) return;
         string title = e("title"_).text(); //RSS&Atom
         string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS
-        if(count==0) entries<< Entry(Text(move(title),12),move(url),share(favicons.at(link))); //display at least one entry per feed
-        else if(!isRead(title, url)) entries<< Entry(move(title),move(url),share(favicons.at(link)));
+        if(!isRead(title, url)) entries<< Entry(move(title),move(url),share(favicons.at(link)));
+        else if(count==0) entries<< Entry(Text(move(title),12),move(url),share(favicons.at(link))); //display at least one entry per feed
         count++;
     };
     feed.xpath("feed/entry"_,addEntry); //Atom
@@ -88,7 +88,6 @@ void Feeds::readNext() {
             return;
         }
     }
-    //execute("/bin/sh"_,{"-c"_,"killall desktop; desktop&"_}); FIXME: implement free, fix memory leaks
-    //clear(); for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 24*60); //reload
+    clear(); favicons.clear(); for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 24*60); //reload
     pageChanged(""_); //return to desktop
 }

@@ -88,8 +88,7 @@ struct TextLayout {
             Glyph glyph = font->glyph(c);
             pen.x += font->kerning(previous,c);
             previous = c;
-            if(glyph.image) { word << i(Character{int2(pen.x,0)+glyph.offset, move(glyph) }); glyphCount++; }
-            else error("Missing image",c);
+            if(glyph.image) word << i(Character{int2(pen.x,0)+glyph.offset, move(glyph) }); glyphCount++;
             pen.x += glyph.advance;
         }
         if(!text || text[text.size-1]!='\n') {

@@ -14,8 +14,7 @@ enum i(class) Key {
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
-    Widget()=default;
-    Widget(Widget&&)=default;
+    Widget(){}Widget(Widget&&)i(=default);
     virtual ~Widget() {}
 /// Layout
     int2 position; /// position of the widget within its parent widget
@@ -23,7 +22,7 @@ struct Widget {
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint() { return int2(0,0); }
-    /// Notify objects to process \a position,\a size or derived member changes
+    /// Notify widgets to update any cache invalidated by \a position,\a size or property changes
     virtual void update() {}
 
 /// Paint

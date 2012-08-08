@@ -5,7 +5,7 @@
 /// Clip
 struct Rect {
     int2 min,max;
-    explicit Rect(int2 max):min{0,0},max(max){}
+    explicit Rect(int2 max):min(0,0),max(max){}
     Rect(int2 min, int2 max):min(min),max(max){}
     bool contains(int2 p) { return p>=min && p<max; }
     explicit operator bool() { return (max-min)>int2(0,0); }
@@ -35,4 +35,4 @@ void blit(int2 target, const Image<pixel>& source);
 void blit(int2 target, const Image<byte4>& source);
 
 /// Fast software cursor
-void patchCursor(int2 position, const Image<byte4>& cursor, bool repair=true);
+void patchCursor(int2 position, const Image<byte4>& cursor, bool repair);

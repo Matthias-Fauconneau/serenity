@@ -21,7 +21,8 @@ struct Window : Poll {
     /// Toggle visibility (e.g for popup menus)
     void toggle() { if(shown) hide(); else show(); }
 
-    /// Updates active and visible states. Emits cursor if leaving. Called on window state changes and cursor moves
+    ///// Updates active and visible states. Emits cursor if leaving. Called on window state changes and cursor moves
+    /// Update widgets tree and repaints this window
     void update();
     /// Repaints this window
     void render();

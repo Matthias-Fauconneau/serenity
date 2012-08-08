@@ -61,7 +61,7 @@ void Window::event(pollfd poll) {
             }
         }
         if(w.id>=windows.size()) resize(windows,w.id);
-        update();
+        //update();
     }
 #endif
     if(poll.fd==touch) for(input_event e;read(touch, &e, sizeof(e)) > 0;) {
@@ -80,7 +80,7 @@ void Window::event(pollfd poll) {
              //update();
              //TODO: press: edge trigger on cursor.z
              if(widget->mouseEvent(cursor,Motion, pressed)) wait();//repaint once
-             else if(isActive()) patchCursor(cursor,cursorIcon());
+             else if(isActive()) patchCursor(cursor,cursorIcon(),true);
          }
     }
     if(poll.fd==mouse) for(input_event e;read(mouse, &e, sizeof(e)) > 0;) {
@@ -88,7 +88,7 @@ void Window::event(pollfd poll) {
         if(e.type==EV_SYN) {
             //update();
             if(widget->mouseEvent(cursor,Motion, pressed)) wait();//repaint once
-            else if(isActive()) patchCursor(cursor,cursorIcon());
+            else if(isActive()) patchCursor(cursor,cursorIcon(),true);
         }
         if(e.type == EV_KEY) {
             assert(widget);
@@ -112,8 +112,8 @@ void Window::event(pollfd poll) {
     }
 }
 
-void Window::update() {
 #if WM
+void Window::wmUpdate() {
     uint active=-1;
     if(!windows) { assert(id==0); resize(windows,1); }
     windows[id] = window i({sizeof(window),id,cursor,widget->position,widget->size});
@@ -139,8 +139,9 @@ void Window::update() {
     }
     this->active=active;
     //TODO: compute visibility
-#endif
 }
+#endif
+
 void Window::emit(bool unused emitTitle, bool unused emitIcon) {
 #if WM
     if(!shown) return;
@@ -157,10 +158,12 @@ void Window::emit(bool unused emitTitle, bool unused emitIcon) {
 #endif
 }
 
+void Window::update() {
+        widget->update();
+        render();
+}
 void Window::render() {
     assert(shown);
-    widget->update();
-    //fill(Rect(display()),0);
     widget->render(int2(0,0));
     if(isActive()) patchCursor(cursor,cursorIcon(),false);
 }
@@ -175,14 +178,14 @@ void Window::show() {
     emit();
     ioctl(vt, VT_ACTIVATE, (void*)8); //switch from X
     writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
-    update();
+    //update();
     render();
 }
 void Window::hide() {
     if(!shown) return; shown=false;
     widget->size=int2(0,0);
     emit();
-    update();
+    //update();
 #if WM
     unregisterPoll(wm);
     id=0;
@@ -194,6 +197,7 @@ void Window::setWidget(Widget* widget) {
     widget->position=this->widget->position;
     widget->size=this->widget->size;
     this->widget=widget;
+    widget->update();
 }
 
 void Window::setPosition(int2 position) {

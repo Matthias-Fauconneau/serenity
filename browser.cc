@@ -12,7 +12,7 @@ struct Browser : Application {
 
     Browser() {
         window.localShortcut(Key::Escape).connect(this, &Application::quit);
-        page.contentChanged.connect(&window, &Window::render);
+        page.contentChanged.connect(&window, &Window::update);
         page.go("http://www.thedreamercomic.com/issues/issue_15/05_Issue_15.jpg"_);
         window.show();
     }
