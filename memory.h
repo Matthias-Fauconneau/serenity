@@ -5,12 +5,12 @@ byte* allocate_(uint size);
 byte* reallocate_(byte* buffer, int size, int need);
 void unallocate_(byte* buffer, int size);
 
-template<class T> inline T* allocate(int size) { return (T*)allocate_(size*sizeof(T)); }
-template<class T> inline T* reallocate(const T* buffer, int size, int need) { return (T*)reallocate_((byte*)buffer, size*sizeof(T), need*sizeof(T)); }
-template<class T> inline void unallocate(T*& buffer, int size) { unallocate_((byte*)buffer,size*sizeof(T)); buffer=0; }
+template<class T> T* allocate(int size) { return (T*)allocate_(size*sizeof(T)); }
+template<class T> T* reallocate(const T* buffer, int size, int need) { return (T*)reallocate_((byte*)buffer, size*sizeof(T), need*sizeof(T)); }
+template<class T> void unallocate(T*& buffer, int size) { unallocate_((byte*)buffer,size*sizeof(T)); buffer=0; }
 
-template<class T, class... Args> inline T& alloc(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)...); return *t; }
-template<class T> inline void free(T* t) { t->~T(); unallocate(t,1); }
+template<class T, class... Args> T& alloc(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)...); return *t; }
+template<class T> void free(T* t) { t->~T(); unallocate(t,1); }
 
 /// Unique reference to an heap allocated value
 template<class T> struct unique {

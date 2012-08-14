@@ -21,7 +21,7 @@ void Layout::render(int2 parent) {
         remove(rects, parent+position+at(i).position+Rect(at(i).size));
     }
     pop();
-    for(Rect rect: rects) fill(rect,255);
+    for(Rect rect: rects) fill(rect);
 }
 
 /// Widgets
@@ -45,7 +45,7 @@ int2 Linear::sizeHint() {
 }
 
 /// Sets the array size to \a size, filling with \a value
-template<class T> inline void fill(array<T>& a, const T& value, int size) {
+template<class T> void fill(array<T>& a, const T& value, int size) {
     a.reserve(size); a.setSize(size);
     for(int i=0;i<size;i++) new (&a[i]) T(copy(value));
 }
@@ -109,7 +109,7 @@ int2 UniformGrid::sizeHint() {
         int2 size=at(i).sizeHint();
         max = ::max(max,size);
     }
-    return int2(-w,-h)*max; //always expanding
+    return int2(w,h)*max; //fixed size
 }
 
 void UniformGrid::update() {

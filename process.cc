@@ -22,7 +22,7 @@ static void handler(int signo, siginfo* info, ucontext* ctx) {
 #elif __x86_64__ || __i386__
     {Symbol s = findNearestLine((void*)ctx->eip); log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
 #endif
-    if(signo==SIGSEGV) log("Segmentation fault",ptr(info->fault.addr));
+    if(signo==SIGSEGV) log("Segmentation fault at 0x"_+str(ptr(info->fault.addr)));
     abort();
 }
 

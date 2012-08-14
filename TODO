@@ -1,6 +1,6 @@
-apps: taskbar, desktop, text editor, file manager, mp3 player, mail, irc, wiki, search, html, pdf, inflate, jpeg
+apps: desktop, taskbar, mp3 player, text editor, file manager, imap, pdf, wiki, search, irc
 font: fix streaks, kerning, subpixel position, hinting, compound glyph transform
-feeds: left: previous entry, preload image, progressive image, status
-touchbook: onscreen keyboard | handwriting recognition, fix touchscreen, accelerometer trigger, rotate screen, hardware cursor, fast scroll
+feeds: left: previous entry, preload image, progressive image, status, own inflate, own jpeg, better html
+touchbook: X shared memory, hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait
 parser: attributes (L+S), scoped symbols
 dev: parser, build driver (+frepo), interpreter, compiler, static analyzer, IDE(highlight, navigation, completion, git, debugger, profiler)

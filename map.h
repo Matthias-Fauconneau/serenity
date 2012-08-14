@@ -62,11 +62,11 @@ template<class K, class V> struct map {
     iterator end() { return iterator((K*)keys.end(),(V*)values.end()); }
 };
 
-template<class K, class V> inline map<K,V> copy(const map<K,V>& o) {
+template<class K, class V> map<K,V> copy(const map<K,V>& o) {
     map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
-template<class K, class V> inline string str(const map<K,V>& m) {
+template<class K, class V> string str(const map<K,V>& m) {
     string s("{"_);
     for(uint i=0;i<m.size();i++) { s<<str(m.keys[i])+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
     return s+"}"_;

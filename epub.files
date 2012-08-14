@@ -3,7 +3,6 @@ core.h
 core.cc
 linux.h
 array.h
-array.cc
 string.h
 string.cc
 memory.h
@@ -21,7 +20,6 @@ zip.cc
 xml.h
 xml.cc
 vector.h
-vector.cc
 display.h
 display.cc
 font.h

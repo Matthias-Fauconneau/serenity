@@ -1,9 +1,7 @@
 Makefile
 core.h
 array.h
-array.cc
 vector.h
-vector.cc
 string.h
 string.cc
 process.h

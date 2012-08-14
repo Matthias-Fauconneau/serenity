@@ -1,12 +1,10 @@
 #pragma once
 #include "string.h"
 
-extern struct Zero {} zero; //dummy type to call zero-initializing constructor //TODO: fix missing initializers
 template<template<typename> class V, class T, int N> struct vector : V<T> {
-    static const int size = N;
-    vector():i(V<T>{}){}
-    vector(Zero):i(V<T>{}){}
-    template<class... Args> explicit vector(T x, T y, Args... args):i(V<T>{x,y,T(args)...}){
+    constexpr vector():i(V<T>{}){}
+    explicit vector(T t){ for(int i=0;i<N;i++) u(i)=t; }
+    template<class... Args> explicit constexpr vector(T a, T b, Args... args):i(V<T>{a,b,T(args)...}){
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }

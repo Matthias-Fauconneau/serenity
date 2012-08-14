@@ -1,229 +1,154 @@
 #include "window.h"
+#include "x.h"
 #include "display.h"
 #include "widget.h"
 #include "file.h"
 #include "stream.h"
 #include "linux.h"
 
-struct input_event { long sec,usec; uint16 type,code; int32 value; };
-enum { EV_SYN, EV_KEY, EV_REL, EV_ABS };
-enum { VT_ACTIVATE = 0x5606 };
-
-ICON(cursor);
-
-Window::Window(Widget* widget, int2 size, string&& title, Image<byte4>&& icon) : widget(widget), title(move(title)), icon(move(icon)) {
-    display();
-#if __arm__
-    touch = open("/dev/input/event0", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({touch, POLLIN}));
-    buttons = open("/dev/input/event4", O_RDONLY|O_NONBLOCK, 0); registerPoll(i({buttons, POLLIN}));
-    keyboard = open("/dev/input/event5", O_RDONLY|O_NONBLOCK, 0);
-    mouse = open("/dev/input/event6", O_RDONLY|O_NONBLOCK, 0);
-#else
-    keyboard = open("/dev/input/event0", O_RDONLY|O_NONBLOCK, 0);
-    mouse = open("/dev/input/event1", O_RDONLY|O_NONBLOCK, 0);
-#endif
-    setSize(size);
-    vt = open("/dev/console", O_RDWR, 0);
-#if WM
-    wm = socket(PF_INET,SOCK_DGRAM,0);
-    //int one=1; setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void *)&one, sizeof(one));
-    sockaddr addr = {PF_INET,'W'|('M'<<8),127u|(255<<8)|(255<<16)|(255<<24)};
-    int unused e = check( connect(wm,&addr,sizeof(addr)) );
-#else
-    registerPoll(i({keyboard, POLLIN}));
-    registerPoll(i({mouse, POLLIN}));
-    cursor=display()/2;
-#endif
+/// Reads a raw value from \a fd
+template<class T> T read(int fd) {
+    T t;
+    int unused size = read(fd,(byte*)&t,sizeof(T));
+    assert(size==sizeof(T),size,sizeof(T));
+    return t;
+}
+/// Reads \a size raw values from \a fd
+template<class T> array<T> read(int fd, uint capacity) {
+    array<T> buffer(capacity);
+    int unused size = check( read(fd,(byte*)buffer.data(),sizeof(T)*capacity) );
+    assert((uint)size==capacity*sizeof(T),size,sizeof(T));
+    buffer.setSize(capacity);
+    return buffer;
 }
 
-Window::~Window() {
-    hide();
-    close(touch); close(buttons); close(keyboard); close(mouse); close(vt);
-#if WM
-    close(wm);
-#endif
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<byte4>& icon) : widget(widget),
+    x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
+    // Setups X connection
+    ref<byte> path = "/tmp/.X11-unix/X0"_;
+    sockaddr_un addr; copy(addr.path,path.data,path.size);
+    int e=connect(x,(sockaddr*)&addr,2+path.size); if(e) error("No X server",errno[-e],ref<byte>(addr.path,path.size));
+    {ConnectionSetup r; write(x, string(raw(r)+readFile("root/.Xauthority"_).slice(18,align(4,r.nameSize)+r.dataSize)));}
+    uint visual=0;
+    {ConnectionSetupReply r=read<ConnectionSetupReply>(x); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
+        read(x,align(4,r.vendorLength));
+        read<Format>(x,r.numFormats);
+        for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>(x);
+            for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>(x);
+                for(VisualType visualType: read<VisualType>(x,depth.numVisualTypes)) {
+                    if(!visual && depth.depth==32) { display=int2(screen.width,screen.height); root = screen.root; visual=visualType.id; }
+                }
+            }
+        }
+        id=r.ridBase;
+    }
+    assert(visual);
+    {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; write(x,string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(); log("MIT-SHM",r.present,r.major,r.firstEvent,r.firstError); }
+
+    // Creates X window
+    if(size.x<=0) size.x=display.x+size.x;
+    if(size.y<=0) size.y=display.y+size.y;
+    widget->size=size;
+    {CreateColormap r; r.colormap=id+2; r.window=root; r.visual=visual; write(x,raw(r));}
+    {CreateWindow r; r.id=id; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+2;
+        r.backgroundPixel=r.borderPixel=0xF0F0F0F0;
+        r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
+    {ChangeProperty r; r.id=id; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
+    r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
+    {CreateGC r; r.context=gc=id+1; r.window=id; write(x,raw(r));}
+    setTitle(title);
+    setIcon(icon);
+    registerPoll(i({x,POLLIN}));
 }
+
 void Window::event(pollfd poll) {
-    if(poll.fd==0) { render(); return; }
-#if WM
-    if(poll.fd==wm) for(window w;read(wm, &w, sizeof(w)) > 0;) {
-        if(w.length>sizeof(window)) read(wm, w.length-sizeof(window));
-        log(w.id);
-        //if(w.id==uint(-1)) { w.id=windows.size(); windows<<w; } //FIXME: broadcast loop?
-        //if(w.id>=windows.size()) resize(windows,w.id+1);
-        if(w.id==id) { // A window took this id (FIXME: broadcast loop?)
-            id++; windows<<windows.last(); // Take next one (will cascade until last id (so that a new window receives all others))
-            emit(true,true); //Remap title and icon to new id
-        }
-        if(!w.size) { // A window is hiding
-            if(w.id==id-1) { // Fill hole which would break cascade
+    if(poll.fd==0) render();
+    if(poll.fd==x) { uint8 type = read<uint8>(x); readEvent(type); }
+}
 
-            }
-        }
-        if(w.id>=windows.size()) resize(windows,w.id);
-        //update();
-    }
-#endif
-    if(poll.fd==touch) for(input_event e;read(touch, &e, sizeof(e)) > 0;) {
-         if (e.type == EV_ABS) {
-             int i = e.code; if(i>2) i=2;
-            int v = e.value;
-            static int min[3]={130,210,-1}, max[3]={3920,3790,490}; // touchbook calibration
-            if(v<min[i]) min[i]=v; else if(v>max[i]) max[i]=v;
-            if(i<2) cursor[i] = widget->size[i]*(max[i]-v)/uint(max[i]-min[i]);
-            else if(v>0) {
-                if(widget->mouseEvent(cursor,Press, pressed = Key::Left)) wait();//repaint once
-                //else TODO: cursor press/touch feedback
-            } else pressed=Key::None;
-         }
-         if(e.type==EV_SYN) {
-             //update();
-             //TODO: press: edge trigger on cursor.z
-             if(widget->mouseEvent(cursor,Motion, pressed)) wait();//repaint once
-             else if(isActive()) patchCursor(cursor,cursorIcon(),true);
-         }
-    }
-    if(poll.fd==mouse) for(input_event e;read(mouse, &e, sizeof(e)) > 0;) {
-        if(e.type==EV_REL) { int i = e.code; assert(i<2); cursor[i]+=e.value; cursor[i]=clip(0,cursor[i],display()[i]); } //TODO: acceleration
-        if(e.type==EV_SYN) {
-            //update();
-            if(widget->mouseEvent(cursor,Motion, pressed)) wait();//repaint once
-            else if(isActive()) patchCursor(cursor,cursorIcon(),true);
-        }
-        if(e.type == EV_KEY) {
-            assert(widget);
-            if(e.value) {
-                if(widget->mouseEvent(cursor,Press, pressed = (Key)e.code)) wait();
-                //else TODO: cursor press/touch feedback
-            } else pressed=Key::None;
-        }
-    }
-    if(poll.fd==keyboard) for(input_event e;read(keyboard, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_KEY && e.value) {
-            signal<>* shortcut = shortcuts.find(e.code);
-            if(shortcut) (*shortcut)();
-        }
-    }
-    if(poll.fd==buttons) for(input_event e;read(buttons, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_KEY && e.value) {
-            signal<>* shortcut = shortcuts.find(e.code);
-            if(shortcut) (*shortcut)();
-        }
+void Window::readEvent(uint8 type) {
+    /***/ if(type==0) { XError e=read<XError>(x); error("Error",xerror[e.code],"seq:",e.seq,"id",e.id,"request",xrequest[e.major],"minor",e.minor);
+    } else if(type==1) { error("Unexpected reply");
+    } else { XEvent unused e=read<XEvent>(x); type&=0b01111111; //msb set if sent by SendEvent
+        if(type==Motion) {
+            if(widget->mouseEvent(int2(e.x,e.y), Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
+        } else if(type==ButtonPress) {
+            if(widget->mouseEvent(int2(e.x,e.y), ButtonPress, (Key)e.key)) wait();
+        } else if(type==KeyPress) {
+            uint key = KeySym(e.key);
+            signal<>* shortcut = localShortcuts.find(key);
+            if(shortcut) (*shortcut)(); //local window shortcut
+            else if(focus) if( focus->keyPress((Key)key) ) wait(); //normal keyPress event
+        } else if(type==Enter || type==Leave) {
+            signal<>* shortcut = localShortcuts.find(Leave);
+            if(shortcut) (*shortcut)(); //local window shortcut
+            if( widget->mouseEvent(int2(e.x,e.y), (Event)type, (e.state&Button1Mask)?LeftButton:None) ) wait();
+        } else if(type==Expose) { if(!e.expose.count && e.expose.w>1 && e.expose.h>1) wait();
+        } else if(type==MapNotify) { mapped=true;
+        } else if(type==UnmapNotify) { mapped=false;
+        } else if(type==ReparentNotify) {
+        } else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(widget->size!=size) { widget->size=size; widget->update(); }
+        } else if(type==ClientMessage) {
+            signal<>* shortcut = localShortcuts.find(Escape);
+            if(shortcut) (*shortcut)(); //local window shortcut
+            else widget->keyPress(Escape);
+        } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
     }
 }
 
-#if WM
-void Window::wmUpdate() {
-    uint active=-1;
-    if(!windows) { assert(id==0); resize(windows,1); }
-    windows[id] = window i({sizeof(window),id,cursor,widget->position,widget->size});
-    //for(int i=windows.size()-1;i>=0;i--) { const window& w=windows[i];
-    for(const window& w: windows) {
-        if((w.position+Rect(w.size)).contains(w.cursor)) { active=w.id; break; }
+template<class T> T Window::readReply() { for(;;) { uint8 type = read<uint8>(x); if(type==1) return read<T>(x); else readEvent(type); } }
+uint Window::Atom(const ref<byte>& name) {
+    {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; write(x,string(raw(r)+name+pad(4,r.length)));}
+    {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
+}
+uint Window::KeySym(uint8 code) {
+    {GetKeyboardMapping r; r.keycode=code; write(x,raw(r));}
+    {GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>();
+        array<uint> keysyms = read<uint>(x,r.numKeySymsPerKeyCode);
+        return keysyms.first();
     }
-    if(this->active!=id && active==id) {
-        registerPoll(i({keyboard, POLLIN}));
-        registerPoll(i({mouse, POLLIN}));
-        if(this->active<windows.size()) cursor=windows[this->active].cursor; //use cursor from last active
-        else cursor=widget->position+widget->size/2; //root window startup with cursor in middle
-    }
-    if(this->active==id && active!=id) {
-            if(!globalShortcuts) {
-                if(buttons) unregisterPoll(buttons);
-                unregisterPoll(keyboard);
-            }
-            if(touch) unregisterPoll(touch);
-            unregisterPoll(mouse);
-            if(hideOnLeave) hide();
-            else emit(); //update cursor for new active before leaving
-    }
-    this->active=active;
-    //TODO: compute visibility
-}
-#endif
-
-void Window::emit(bool unused emitTitle, bool unused emitIcon) {
-#if WM
-    if(!shown) return;
-    window w i({sizeof(window),id,widget->position,widget->size,cursor});
-    if(w.id==uint(-1)) { w.id=windows.size(); windows<<w; }
-    if(w.id==uint(-2)) w.id=-1; // take top level id
-    if(emitTitle) {
-        array<byte> state;
-        state << (uint8)title.size() << title;
-        if(emitIcon) state << (uint8)icon.width << (uint8)icon.height << cast<byte>(ref<byte4>(icon));
-        w.length += state.size();
-        write(wm,array<byte>(raw(w)+state));
-    } else write(wm,raw(w));
-#endif
-}
-
-void Window::update() {
-        widget->update();
-        render();
-}
-void Window::render() {
-    assert(shown);
-    widget->render(int2(0,0));
-    if(isActive()) patchCursor(cursor,cursorIcon(),false);
-}
-
-void Window::show() {
-    if(shown) return; shown=true;
-#if WM
-    registerPoll(i({wm, POLLIN}));
-#endif
-    widget->size = display();
-    widget->update();
-    emit();
-    ioctl(vt, VT_ACTIVATE, (void*)8); //switch from X
-    writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
-    //update();
-    render();
-}
-void Window::hide() {
-    if(!shown) return; shown=false;
-    widget->size=int2(0,0);
-    emit();
-    //update();
-#if WM
-    unregisterPoll(wm);
-    id=0;
-#endif
-    ioctl(vt, VT_ACTIVATE, (void*)7); //switch to X (TODO: only if all hidden)
 }
 
 void Window::setWidget(Widget* widget) {
-    widget->position=this->widget->position;
     widget->size=this->widget->size;
     this->widget=widget;
     widget->update();
 }
 
 void Window::setPosition(int2 position) {
-    if(position.x<0) position.x=display().x+position.x;
-    if(position.y<0) position.y=display().y+position.y;
-    widget->position=position;
-    emit();
+    if(position.x<0) position.x=display.x+position.x;
+    if(position.y<0) position.y=display.y+position.y;
+    {ConfigureWindow r; r.id=id; r.mask=1+2; r.x=position.x, r.y=position.y; write(x,raw(r));}
 }
 void Window::setSize(int2 size) {
-    if(!widget) return;
-    if(size.x<0||size.y<0) {
-        int2 hint=widget->sizeHint();
-        if(size.x<0) size.x=max(abs(hint.x),-size.x);
-        if(size.y<0) size.y=max(abs(hint.y),-size.y);
-    }
-    if(size.x==0) size.x=display().x;
-    if(size.y==0) size.y=display().y-16;
-    assert(size);
-    widget->size=size;
-    widget->update();
-    emit();
+    if(size.x<=0) size.x=display.x+size.x;
+    if(size.y<=0) size.y=display.y+size.y;
+    {ConfigureWindow r; r.id=id; r.mask=4+8; r.x=size.x, r.y=size.y; write(x,raw(r));}
 }
-void Window::setTitle(string&& title) { this->title=move(title); emit(true); }
-void Window::setIcon(Image<byte4>&& icon) { this->icon=move(icon); emit(true,true); }
+void Window::setTitle(const ref<byte>& title) {
+    ChangeProperty r; r.id=id; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
+    r.length=title.size; r.size+=align(4, r.length)/4; write(x,string(raw(r)+title+pad(4,title.size)));
+}
+void Window::setIcon(const Image<byte4>& icon) {
+    ChangeProperty r; r.id=id; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
+    r.length=2+icon.width*icon.height; r.size+=r.length; write(x,string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
+}
 
-signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
-signal<>& Window::globalShortcut(Key key) { globalShortcuts=true; return shortcuts.insert((uint16)key); }
+void Window::show() { if(mapped) return; {MapWindow r; r.id=id; write(x,raw(r));}}
+void Window::hide() { if(!mapped) return;{UnmapWindow r; r.id=id; write(x,raw(r));}}
+
+void Window::update() { widget->update(); render(); }
+void Window::render() {
+    assert(mapped);
+    //TODO: shared memory pixmap
+    framebuffer=Image<pixel>(widget->size.x,widget->size.y);
+    widget->render(int2(0,0));
+    {PutImage r; r.window=id; r.context=gc; r.w=framebuffer.width; r.h=framebuffer.height; r.size+=r.w*r.h;
+        write(x,raw(r)); write(x,(ref<byte>)framebuffer); }
+}
+
+signal<>& Window::localShortcut(Key key) { return localShortcuts.insert((uint16)key); }
+signal<>& Window::globalShortcut(Key key) { return globalShortcuts.insert((uint16)key); }
 
 string Window::getSelection() { return string(); }

@@ -33,7 +33,7 @@ struct Text : Widget {
     signal<const ref<byte>&> linkActivated;
 
     int2 sizeHint();
-    void update() override { update(min(wrap,Widget::size.x)); }
+    void update() override { if(!textSize || textSize > Widget::size) update(min(wrap,Widget::size.x)); }
     void update(int wrap);
     void render(int2 parent);
     bool mouseEvent(int2 position, Event event, Key button) override;

@@ -2,7 +2,7 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= fast
 
-CC = clang -pipe -std=c++11 -fno-threadsafe-statics -fno-exceptions -fno-omit-frame-pointer -Wall -Wextra -Wno-missing-field-initializers
+CC = clang -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-omit-frame-pointer -Wall -Wextra -Wno-missing-field-initializers -march=native
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG -fno-rtti
 FLAGS_fast := -g -DDEBUG -O -fno-rtti

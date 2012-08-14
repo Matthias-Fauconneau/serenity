@@ -1,10 +1,6 @@
 #include "image.h"
 #include "stream.h"
 
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(int width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
-inline void align(int width, uint& offset) { offset=align(width,(uint)offset); }
-
 struct Directory { uint16 reserved, type, count; };
 struct Entry { ubyte width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
 struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
@@ -49,8 +45,8 @@ Image<byte4> decodeICO(const ref<byte>& file) {
         for(uint i=0;i<w*h;src++){ image.data[i++] = palette[(*src)>>4]; image.data[i++] = palette[(*src)&0xF]; }
     }
     if(header.depth!=32) {
-        ref<byte> mask = s.read<byte>(8*align(w/8,4)*h/8); //1-bit transparency
-        assert(mask.size==8*align(w/8,4)*h/8);
+        ref<byte> mask = s.read<byte>(8*align(4,w/8)*h/8); //1-bit transparency
+        assert(mask.size==8*align(4,w/8)*h/8);
         ubyte* src=(ubyte*)mask.data;
         assert(w%8==0); //TODO: pad
         for(uint i=0,y=0;y<h;y++) {

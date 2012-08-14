@@ -3,10 +3,15 @@
 #include "string.h"
 #include "debug.h"
 
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
+/// Returns padding zeroes to append in order to align an array of \a size bytes to \a width
+inline ref<byte> pad(uint width, uint size) { static byte zero[4]={}; assert(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }
+
 /// References raw memory representation of \a t
-template<class T> inline ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
+template<class T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 /// Casts raw memory to \a T
-template<class T> inline const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
+template<class T> const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
 /// Casts between element types
 template<class T, class O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
@@ -93,6 +98,7 @@ struct DataStream : virtual Stream {
         /// Reads an int8
         operator uint8() { return s->read<uint8>(); }
         operator int8() { return s->read<int8>(); }
+        operator byte() { return s->read<byte>(); }
         //template<class T> operator const T&(){ return s->read<T>(); }
     };
     ReadOperator read() { return i({this}); }

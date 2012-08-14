@@ -143,7 +143,7 @@ template<class T> struct ListSelection : Array<T>, virtual Selection {
     ListSelection(){}
     ListSelection(array<T>&& items) : Array<T>(move(items)){}
     /// Return active item (last selection)
-    inline T& active() { return array<T>::at(this->index); }
+    T& active() { return array<T>::at(this->index); }
 };
 
 /// List is a \a Vertical layout of selectable items (\sa ListSelection)

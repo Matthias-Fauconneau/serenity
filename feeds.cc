@@ -8,7 +8,7 @@
 
 ICON(network)
 
-Feeds::Feeds() : config(openFolder("config"_)), readConfig(appendFile("read"_,config)), readMap(mapFile("read"_,config)) {
+Feeds::Feeds() : config(openFolder("config"_)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
     for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 12*60);
@@ -25,7 +25,8 @@ bool Feeds::isRead(const Entry& entry) { return isRead(entry.get<Text>().text, e
 
 void Feeds::loadFeed(const URL&, array<byte>&& document) {
     Element feed = parseXML(document);
-    string link = feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]); //Atom
+    //string link = feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]); //RSS ?: Atom //fails for GCC
+    string link = feed.text("rss/channel/link"_); if(!link) link = string(feed("feed"_)("link"_)["href"_]);
     string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
     if(exists(favicon,cache)) {
         favicons.insert(link) = ::resize(decodeImage(readFile(favicon,cache)),16,16);
@@ -38,7 +39,8 @@ void Feeds::loadFeed(const URL&, array<byte>&& document) {
         if(count>=32) return; //avoid getting old unreads on feeds with big history
         if(array::size()+entries.size()>=30) return;
         string title = e("title"_).text(); //RSS&Atom
-        string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS
+        //string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS //fails for GCC
+        string url = unescape(e("link"_)["href"_]); if(!url) url = e("link"_).text(); //Atom ?: RSS
         if(!isRead(title, url)) entries<< Entry(move(title),move(url),share(favicons.at(link)));
         else if(count==0) entries<< Entry(Text(move(title),12),move(url),share(favicons.at(link))); //display at least one entry per feed
         count++;
@@ -80,7 +82,7 @@ void Feeds::readEntry(uint index) {
 }
 
 void Feeds::readNext() {
-    if(index!=uint(-1)) setRead(index);
+    if(index<count()) setRead(index);
     for(uint i=index+1;i<count();i++) { //next unread item
         if(!isRead(array::at(i))) {
             setActive(i);

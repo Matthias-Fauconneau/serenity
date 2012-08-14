@@ -67,14 +67,15 @@ inline string str(const int16& n) { return dec(n); }
 inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
 inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
+inline string hex(const ref<byte>& data) { string s; for(byte b: data) s<<hex(b)<<' '; return s; }
 inline string str(const ptr& n) { return hex(n); }
 
 /// Converts arrays
-template<class T> inline string str(const ref<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
+template<class T> string str(const ref<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
     if(!a) return string();
     string s; if(bracket) s<<bracket[0]; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<sep;} if(bracket) s<<bracket[1]; return s;
 }
-template<class T> inline string str(const array<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
+template<class T> string str(const array<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
     return str(ref<T>(a),sep,bracket);
 }
 
@@ -97,7 +98,7 @@ template<class A> struct cat<A, ref<byte> > {
     void copy(byte*& data) const { a.copy(data); ::copy(data,b.data,b.size); data+=b.size; }
     operator array<byte>()  const{ array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
 };
-template<class Aa, class Ab> inline cat< cat<Aa, Ab>, ref<byte> > operator +(const cat<Aa, Ab>& a, const ref<byte>& b) { return i({a,b}); }
+template<class Aa, class Ab> cat< cat<Aa, Ab>, ref<byte> > operator +(const cat<Aa, Ab>& a, const ref<byte>& b) { return i({a,b}); }
 /// Specialization to concatenate two strings
 template<> struct cat< ref<byte>, ref<byte> > {
     const ref<byte>& a;
@@ -109,7 +110,7 @@ template<> struct cat< ref<byte>, ref<byte> > {
 inline cat< ref<byte>, ref<byte> > operator +(const ref<byte>& a, const ref<byte>& b) { return i({a,b}); }
 
 /// Forwards concatenation
-template<class A, class B> inline const cat<A,B>& str(const cat<A,B>& s) { return s; }
+template<class A, class B> const cat<A,B>& str(const cat<A,B>& s) { return s; }
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
-template<class A, class ___ Args> inline string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }
+template<class A, class ___ Args> string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }

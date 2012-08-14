@@ -11,7 +11,7 @@ struct Browser : Application {
     Window window i({&page.parent(),int2(0,0)});
 
     Browser() {
-        window.localShortcut(Key::Escape).connect(this, &Application::quit);
+        window.localShortcut(Escape).connect(this, &Application::quit);
         page.contentChanged.connect(&window, &Window::update);
         page.go("http://www.thedreamercomic.com/issues/issue_15/05_Issue_15.jpg"_);
         window.show();

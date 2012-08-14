@@ -54,6 +54,7 @@ void Sampler::open(const string& path) {
         l.buffer = new float[2*l.size];
         if(l.size!=period) new (&l.resampler) Resampler(2, l.size, period);
     }
+    close(folder);
 }
 
 void Sampler::lock() {

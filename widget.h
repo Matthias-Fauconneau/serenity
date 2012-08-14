@@ -3,13 +3,15 @@
 #include "string.h"
 
 /// Event type
-enum Event { Motion, Press, Release };
-/// Key codes
-enum i(class) Key {
-    None, Escape, _1,_2,_3,_4,_5,_6,_7,_8,_9,_0, Minus, Equal, Backspace, Tab, Q,W,E,R,T,Y,U,I,O,P, LeftBrace, RightBrace, Enter, LeftCtrl,
-    A,S,D,F,G,H,J,K,L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z,X,C,V,B,N,M, Comma, Dot, Slash, RightShift, KpAsterisk, LeftAlt,
-    Space, Home=102, Up, PageUp, LeftArrow, RightArrow, End, Down, PageDown, Insert, Delete, Macro, Mute, VolumeDown, VolumeUp,
-    Power=116, Left=0x110, Right, Middle, Side, Extra, WheelDown=0x150, WheelUp
+enum Event { Error, Reply, KeyPress, KeyRelease, ButtonPress, ButtonRelease, Motion, Enter, Leave, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage };
+/// Button/Key codes
+//#include <X11/X.h>
+//#include <X11/keysym.h>
+enum Key {
+    None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp,
+    Escape=0xff1b, Return=0xff0d, Delete=0xffff, BackSpace=0xff08,
+    Home=0xff50, Left, Up, Right, Down, End=0xff57
+    //TODO: Touchbook buttons Extra,Power (XInput)
 };
 
 /// Widget is an abstract component to compose user interfaces

@@ -67,11 +67,18 @@ struct TextLayout {
                 Format newFormat = ::format(c);
                 if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line i({underlineBegin,glyphCount});
                 format=newFormat;
-                /*static Font defaultBold("dejavu/DejaVuSans-Bold.ttf"_, size);
-                static Font defaultItalic("dejavu/DejaVuSans-Oblique.ttf"_, size);
-                static Font defaultBoldItalic("dejavu/DejaVuSans-BoldOblique.ttf"_, size);
-                Font* lookup[] = {&defaultSans,&defaultBold,&defaultItalic,&defaultBoldItalic};
-                font=lookup[format&(Format::Bold|Format::Italic)];*/
+                if(format&Format::Bold) {
+                    static map<int,Font> defaultBold;
+                    if(!defaultBold.contains(size)) defaultBold.insert(size,Font("dejavu/DejaVuSans-Bold.ttf"_, size));
+                    font = &defaultBold.at(size);
+                } else if(format&Format::Italic) {
+                    static map<int,Font> defaultItalic;
+                    if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font("dejavu/DejaVuSans-Oblique.ttf"_, size));
+                    font = &defaultItalic.at(size);
+                } else {
+                    if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
+                    font = &defaultSans.at(size);
+                }
                 if(format&Underline) underlineBegin=glyphCount;
                 if(format&Link) {
                     for(;;) {
@@ -127,12 +134,13 @@ void Text::update(int wrap) {
     textSize.y=max(textSize.y, size+4);
 }
 int2 Text::sizeHint() {
-    if(!textSize) update(wrap>=0 ? wrap : display().y);
+    if(!textSize) update(wrap);
     return wrap?int2(-textSize.x,textSize.y):textSize;
 }
 
 void Text::render(int2 parent) {
-    if(!textSize) update(wrap>=0 ? wrap : display().y);
+    if(!textSize) update(wrap);
+#if ACCURATE_BACKGROUND_FILL
     array<Rect> rects; rects<< parent+position+Rect(Widget::size);
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) {
@@ -142,14 +150,20 @@ void Text::render(int2 parent) {
     }
     for(const Line& l: lines) {
         Rect rect = offset+Rect(l.min+int2(0,1),l.max+int2(0,2));
-        fill(rect, 0);
+        fill(rect, black);
         remove(rects, rect);
     }
-    for(Rect rect: rects) fill(rect,255);
+    for(Rect rect: rects) fill(rect);
+#else //accurate fill optimization would probably reduce performance for text rendering
+    fill(parent+position+Rect(Widget::size));
+    int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
+    for(const Blit& b: blits) blit(offset+b.pos, b.image);
+    for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
+#endif
 }
 
 bool Text::mouseEvent(int2 position, Event event, Key) {
-    if(event!=Press) return false;
+    if(event!=ButtonPress) return false;
     position -= max(int2(0,0),(Widget::size-textSize)/2);
     for(uint i=0;i<blits.size();i++) { const Blit& b=blits[i];
         if(position>=b.pos && position<=b.pos+b.image.size()) {
@@ -163,7 +177,7 @@ bool Text::mouseEvent(int2 position, Event event, Key) {
 /// TextInput
 
 bool TextInput::mouseEvent(int2 position, Event event, Key) {
-    if(event!=Press) return false;
+    if(event!=ButtonPress) return false;
     focus=this;
     int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
     for(cursor=0;cursor<blits.size() && x>blits[cursor].pos.x+(int)blits[cursor].image.width/2;cursor++) {}
@@ -173,15 +187,13 @@ bool TextInput::mouseEvent(int2 position, Event event, Key) {
 
 bool TextInput::keyPress(Key key) {
     if(cursor>text.size()) cursor=text.size();
-    /***/ if(key==Key::Space) { if(key==Key::Left && cursor>0) cursor--; }
-    else if(key==Key::Right && cursor<text.size()) cursor++;
-    else if(key==Key::Home) cursor=0;
-    else if(key==Key::End) cursor=text.size();
-    else if(key==Key::Delete && cursor<text.size()) { text.removeAt(cursor); update(); }
-    else if(key==Key::Backspace && cursor>0) { text.removeAt(--cursor); update(); }
-    else if(key<=Key::Slash) {
-        char c="  1234567890-= \tqwertyuiop[]\n asdfghjkl;'`zxcvbnm,./"_[(int)key]; //TODO: shift
-        if(c==' ') return false;
+    /***/ if(key==Left && cursor>0) cursor--;
+    else if(key==Right && cursor<text.size()) cursor++;
+    else if(key==Home) cursor=0;
+    else if(key==End) cursor=text.size();
+    else if(key==Delete && cursor<text.size()) { text.removeAt(cursor); update(); }
+    else if(key==BackSpace && cursor>0) { text.removeAt(--cursor); update(); }
+    else if(key>=' ' && key<=0xFF) { //TODO: UTF8
         text.insertAt(cursor++, (byte)key); update();
     } else return false;
     return true;
@@ -192,7 +204,7 @@ void TextInput::render(int2 parent) {
     if(focus==this) {
         if(cursor>text.size()) cursor=text.size();
         int x = cursor < blits.size()? blits[cursor].pos.x : cursor>0 ? blits.last().pos.x+blits.last().image.width : 0;
-        fill(parent+position+max(int2(0,0), (Widget::size-textSize)/2)+Rect(int2(x,0), int2(x+1,Widget::size.y)), 0);
+        fill(parent+position+max(int2(0,0), (Widget::size-textSize)/2)+Rect(int2(x,0), int2(x+1,Widget::size.y)), black);
     }
 }
 

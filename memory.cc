@@ -2,13 +2,8 @@
 #include "core.h"
 #include "linux.h"
 
-byte* heapStart;
 byte* heapEnd;
 byte* systemEnd;
-
-void setupHeap() {
-    systemEnd = heapEnd = heapStart = (byte*)brk(0);
-}
 
 byte* allocate_(uint size) {
     //TODO: allocate from free list

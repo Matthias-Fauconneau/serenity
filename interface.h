@@ -2,13 +2,14 @@
 #include "function.h"
 #include "image.h"
 #include "display.h"
+#include "widget.h"
 #include "layout.h"
 #include "text.h"
 
 /// Space is a proxy Widget to add space as needed
 struct Space : Widget {
     int2 sizeHint() { return int2(-1,-1); }
-    void render(int2 parent) { fill(parent+position+Rect(size),255); }
+    void render(int2 parent) { fill(parent+position+Rect(size)); }
 };
 
 /// Scroll is a proxy Widget containing a widget in a scrollable area.
@@ -52,20 +53,20 @@ struct ImageView : Widget {
 };
 typedef ImageView Icon;
 
-/// TriggerKey is a clickable Icon
-struct TriggerKey : Icon {
+/// TriggerButton is a clickable Icon
+struct TriggerButton : Icon {
     //using Icon::Icon;
-    TriggerKey(){}
-    TriggerKey(Image<byte4>&& image):Icon(move(image)){}
+    TriggerButton(){}
+    TriggerButton(Image<byte4>&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
     bool mouseEvent(int2 position, Event event, Key button) override;
 };
 
-/// ToggleKey is a togglable Icon
-struct ToggleKey : Widget {
+/// ToggleButton is a togglable Icon
+struct ToggleButton : Widget {
     /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleKey(const Image<byte4>& enable,const Image<byte4>& disable);
+    ToggleButton(const Image<byte4>& enable,const Image<byte4>& disable);
 
     /// User toggled the button
     signal<bool /*nextState*/> toggled;

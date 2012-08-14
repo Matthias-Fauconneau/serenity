@@ -27,7 +27,7 @@ template<typename T> struct remove_reference<T&&> { typedef T type; };
 template<class T> constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 #define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
 /// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
-template<class T> inline T copy(const T& t) { return t; }
+template<class T> T copy(const T& t) { return t; }
 
 /// Forward
 template<typename T, T v> struct integral_constant { static constexpr T value = v; typedef integral_constant<T, v> type; };
@@ -50,7 +50,7 @@ template<> struct predicate<true> { typedef void* type; };
 
 /// Primitives
 typedef signed char int8;
-typedef unsigned char byte;
+typedef char byte;
 typedef unsigned char uint8;
 typedef unsigned char ubyte;
 typedef signed short int16;
@@ -63,29 +63,6 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 
-/// Basic operations
-template<class T> inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
-template<class T> inline T min(T a, T b) { return a<b ? a : b; }
-template<class T> inline T max(T a, T b) { return a>b ? a : b; }
-template<class T> inline T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
-template<class T> inline T abs(T x) { return x>=0 ? x : -x; }
-template<class A, class B> inline bool operator !=(const A& a, const B& b) { return !(a==b); }
-template<class A, class B> inline bool operator <(const A& a, const B& b) { return b>a; }
-
-/// Raw buffer zero initialization
-inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }
-/// Unsafe (ignoring constructors) raw value zero initialization
-template<class T> inline void clear(T& dst) { static_assert(sizeof(T)>8,""); clear((byte*)&dst,sizeof(T)); }
-/// Safe buffer default initialization
-template<class T> inline void clear(T* data, int size, const T& value=T()) { for(int i=0;i<size;i++) data[i]=value; }
-
-/// Raw buffer copy
-inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
-/// Unsafe (ignoring constructors) raw value copy
-template<class T> inline void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src,sizeof(T)); }
-/// Safe buffer copy
-template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
-
 /// compile \a statements in executable only if \a DEBUG flag is set
 #ifdef DEBUG
 #define debug( statements... ) statements
@@ -94,6 +71,63 @@ template<class T> inline void copy(T* dst,const T* src, int count) { for(int i=0
 #endif
 void trace(int skip, uint size);
 void log_(const char*);
-void abort();
+void abort() __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and display \a expr
 #define assert_(expr) ({ debug( if(!(expr)) { trace(0,-1); log_(#expr); abort(); } ) })
+
+/// initializer_list
+namespace std {
+template<class T> struct initializer_list {
+    const T* data;
+    uint size;
+    constexpr initializer_list() : data(0), size(0) {}
+    /// References \a size elements from read-only \a data pointer
+    constexpr initializer_list(const T* data, uint size) : data(data), size(size) {}
+    /// References elements sliced from \a begin to \a end
+    constexpr initializer_list(const T* begin,const T* end) : data(begin), size(uint(end-begin)) {}
+    constexpr const T* begin() const { return data; }
+    constexpr const T* end() const { return data+size; }
+    const T& operator [](uint i) const { assert_(i<size); return data[i]; }
+    explicit operator bool() const { return size; }
+    /// Compares all elements
+    bool operator ==(const initializer_list<T>& o) const {
+        if(size != o.size) return false;
+        for(uint i=0;i<size;i++) if(!(data[i]==o.data[i])) return false;
+        return true;
+    }
+    /// Slices a reference to elements from \a pos to \a pos + \a size
+    initializer_list<T> slice(uint pos, uint size) const { assert_(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
+    /// Slices a reference to elements from to the end of the reference
+    initializer_list<T> slice(uint pos) const { assert_(pos<=size); return initializer_list<T>(data+pos,size-pos); }
+    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
+    int indexOf(const T& value) const { for(uint i=0;i<size;i++) { if(data[i]==value) return i; } return -1; }
+    /// Returns true if the array contains an occurrence of \a value
+    bool contains(const T& value) const { return indexOf(value)>=0; }
+};
+}
+/// \a ref is a const typed bounded memory reference (i.e fat pointer)
+/// \note As \a data is not owned, ref should be used carefully (only as argument, never as field)
+i( template<class T> using ref = std::initializer_list<T>; )
+
+/// Basic operations
+template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+template<class T> T min(T a, T b) { return a<b ? a : b; }
+template<class T> T max(T a, T b) { return a>b ? a : b; }
+template<class T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
+template<class T> T abs(T x) { return x>=0 ? x : -x; }
+template<class A, class B> bool operator !=(const A& a, const B& b) { return !(a==b); }
+template<class A, class B> bool operator <(const A& a, const B& b) { return b>a; }
+
+/// Raw buffer zero initialization
+inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }
+/// Unsafe (ignoring constructors) raw value zero initialization
+template<class T> void clear(T& dst) { static_assert(sizeof(T)>8,""); clear((byte*)&dst,sizeof(T)); }
+/// Safe buffer default initialization
+template<class T> void clear(T* data, int size, const T& value=T()) { for(int i=0;i<size;i++) data[i]=value; }
+
+/// Raw buffer copy
+inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
+/// Unsafe (ignoring constructors) raw value copy
+template<class T> void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src,sizeof(T)); }
+/// Safe buffer copy
+template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }

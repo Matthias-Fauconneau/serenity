@@ -2,39 +2,6 @@
 #include "core.h"
 #include "memory.h"
 
-namespace std {
-template<class T> struct initializer_list {
-    const T* data;
-    uint size;
-    constexpr initializer_list() : data(0), size(0) {}
-    /// References \a size elements from read-only \a data pointer
-    constexpr initializer_list(const T* data, uint size) : data(data), size(size) {}
-    /// References elements sliced from \a begin to \a end
-    constexpr initializer_list(const T* begin,const T* end) : data(begin), size(uint(end-begin)) {}
-    constexpr const T* begin() const { return data; }
-    constexpr const T* end() const { return data+size; }
-    const T& operator [](uint i) const { assert_(i<size); return data[i]; }
-    explicit operator bool() const { return size; }
-    /// Compares all elements
-    bool operator ==(const initializer_list<T>& o) const {
-        if(size != o.size) return false;
-        for(uint i=0;i<size;i++) if(!(data[i]==o.data[i])) return false;
-        return true;
-    }
-    /// Slices a reference to elements from \a pos to \a pos + \a size
-    initializer_list<T> slice(uint pos, uint size) const { assert_(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
-    /// Slices a reference to elements from to the end of the reference
-    initializer_list<T> slice(uint pos) const { assert_(pos<=size); return initializer_list<T>(data+pos,size-pos); }
-    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    int indexOf(const T& value) const { for(uint i=0;i<size;i++) { if(data[i]==value) return i; } return -1; }
-    /// Returns true if the array contains an occurrence of \a value
-    bool contains(const T& value) const { return indexOf(value)>=0; }
-};
-}
-/// \a ref is a const typed bounded memory reference (i.e fat pointer)
-/// \note As \a data is not owned, ref should never be stored, only used as argument.
-i( template<class T> using ref = std::initializer_list<T>; )
-
 /// \a array is a typed bounded mutable growable memory reference (heap/stack/static/mmap)
 /// \note array use move semantics to avoid reference counting when managing heap reference
 /// \note array transparently store small arrays inline (<=31bytes)

@@ -15,7 +15,7 @@ const string iconPaths[4] = {
 };
 
 bool Search::keyPress(Key key) {
-    if(key == Key::Enter) {
+    if(key == Enter) {
         //execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text}); TODO: serenity browser
         text.clear(); update(); triggered(); return true;
     }
@@ -65,7 +65,7 @@ List<Command> readShortcuts() {
 
 Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({&search, &shortcuts})), window(&menu,""_,Image<byte4>(),int2(-3,-3)) {
     //window.hideOnLeave = true;
-    window.localShortcut(Key::Escape).connect(&window,&Window::hide);
+    window.localShortcut(Escape).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(Command& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);
 }

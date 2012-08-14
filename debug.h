@@ -8,7 +8,7 @@ void catchErrors();
 void write(int fd, const ref<byte>& data);
 
 /// Logs to standard output using str(...) serialization
-template<class ___ Args> inline void log(const Args& ___ args) { write(1,string(str(args ___)+"\n"_)); }
+template<class ___ Args> void log(const Args& ___ args) { write(1,string(str(args ___)+"\n"_)); }
 #define warn log
 
 /// Logs \a expr name and value
@@ -29,4 +29,7 @@ void abort() __attribute((noreturn));
 /// Aborts if \a expr is negative and display corresponding error code
 #define check(expr, message...) ({ int e=expr; debug( if(e<0) error(#expr##_, errno[-e], ##message); ) e; })
 /// Linux error code names
-extern const char* errno[];
+constexpr ref<byte> errno[] = {"OK"_,
+                                 "PERM"_,"NOENT"_,"SRCH"_,"INTR"_,"IO"_,"NXIO"_,"2BIG"_,"NOEXEC"_,"BADF"_,"CHILD"_,"AGAIN"_,"NOMEM"_,"ACCES"_,"FAULT"_,
+                                 "NOTBLK"_,"BUSY"_,"EXIST"_,"XDEV"_,"NODEV"_,"NOTDIR"_,"ISDIR"_,"INVAL"_,"NFILE"_,"MFILE"_,"NOTTY"_,"TXTBSY"_,"FBIG"_,
+                                 "NOSPC"_,"SPIPE"_,"ROFS"_,"MLINK"_,"PIPE"_,"DOM"_,"RANGE"_};

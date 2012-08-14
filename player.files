@@ -2,7 +2,6 @@ Makefile
 core.h
 core.cc
 array.h
-array.cc
 signal.h
 map.h
 string.h

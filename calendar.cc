@@ -6,13 +6,15 @@
 array<string> getEvents(Date query) {
     static int config = openFolder("config"_);
     array<string> events;
-    if(!exists("events"_,config)) { warn("No events settings [config/events]"); return events; }
+    if(!exists("events"_,config)) { /*warn("No events settings [config/events]");*/ return events; }
 
     TextStream s = readFile("events"_,config);
     map<string, array<Date>> exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
-        if(s.match("except "_)) { Date except=parse(s); s.skip(); string title=string(s.until('\n')); exceptions.insert(move(title),array<Date>i({except})); }
-        else s.until('\n');
+        if(s.match("except "_)) {
+            Date except=parse(s); s.skip(); string title=string(s.until('\n'));
+            exceptions.insert(move(title),array<Date>i({except}));
+        } else s.until('\n');
     }
     s.index=0;
 
@@ -83,19 +85,20 @@ void Month::setActive(Date active) {
 void Month::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-Calendar::Calendar() {*this<< ref<Widget*>{ &date, &month, &events };
+Calendar::Calendar() {i(*this<< ref<Widget*>{ &date, &month, &events };)
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::showEvents);
+    date[1].setText( format(Bold)+::str(::date(),"dddd, dd MMMM yyyy"_) ); month.setActive(::date());
 }
 
 void Calendar::previousMonth() {
     month.previousMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
-    events.setText(string()); VBox::update();
+    events.setText(string()); update();
 }
 void Calendar::nextMonth() {
     month.nextMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
-    events.setText(string()); VBox::update();
+    events.setText(string()); update();
 }
 
 void Calendar::showEvents(uint index) {
@@ -108,12 +111,11 @@ void Calendar::showEvents(uint index) {
         text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
         text << join(::getEvents(date),"\n"_);
     }
-    events.setText(move(text));
+    events.setText(move(text)); update();
 }
 
 void Calendar::update() {
-    date[1].setText( format(Bold)+::str(::date(),"dddd, dd MMMM yyyy"_) );
-    month.setActive(::date());
+    events.update(); events.textSize=::max(events.textSize,int2(256,256));
     VBox::update();
 }
 

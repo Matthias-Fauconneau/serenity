@@ -71,7 +71,7 @@ void FLAC::open(array<byte>&& data) {
     };
 }
 
-template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* context, double* odd, int* out, int* end, int shift) {
+template<int unroll> void unroll_predictor(uint order, double* predictor, double* context, double* odd, int* out, int* end, int shift) {
     assert(order<=2*unroll,order,unroll);
     //ensure enough warmup before using unrolled version
     for(uint i=order;i<2*unroll;i++) { //actually executed once (only for odd order) if specializing for every even order

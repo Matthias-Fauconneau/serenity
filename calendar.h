@@ -1,7 +1,6 @@
 #pragma once
 #include "time.h"
 #include "interface.h"
-//#include "window.h"
 
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query);
@@ -39,10 +38,10 @@ struct Calendar : VBox {
 struct Clock : Text, Timer {
     signal<> timeout;
     signal<> triggered;
-    Clock(int size=16):Text(::str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
+    Clock(int size):Text(::str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
     void expired() { text=::str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout(); }
     bool mouseEvent(int2, Event event, Key) override {
-        if(event==Press) { triggered(); return true; }
+        if(event==ButtonPress) { triggered(); return true; }
         return false;
     }
 };

@@ -7,7 +7,6 @@ debug.cc
 memory.h
 memory.cc
 array.h
-array.cc
 map.h
 string.h
 string.cc

@@ -14,17 +14,17 @@ typedef vector<rgb,uint8,3> rgb3;
 template<template<typename> class T, int N> void filter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
     typedef vector<T,uint8,N> S;
     typedef vector<T,int,N> V;
-    byte buffer[width*sizeof(S)]; S* prior = (S*)buffer; clear(prior,width,S(zero));
+    byte buffer[width*sizeof(S)]; S* prior = (S*)buffer; clear(prior,width,S(0));
     for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; debug( if(filter>4) warn("Unknown PNG filter",filter); )
         S* src = (S*)raw;
-        S a=zero;
+        S a(0);
         if(filter==0) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]=      src[i];
         if(filter==1) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]= a= a+src[i];
         if(filter==2) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]=      prior[i]+src[i];
         if(filter==3) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]= a= S((V(prior[i])+V(a))/2)+src[i];
         if(filter==4) {
-            V b=zero;
+            V b(0);
             for(int i=0;i<width;i++) {
                 V c = b;
                 b = V(prior[i]);

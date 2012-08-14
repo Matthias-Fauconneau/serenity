@@ -1,111 +1,49 @@
-#pragma once
 #include "core.h"
 
-struct Display;
-struct Visual;
-typedef unsigned long KeySym;
-typedef unsigned long Atom;
-typedef unsigned long XID;
-typedef void* GC;
-struct XEvent;
-#if 0
-struct XShmSegmentInfo {
-    size_t shmseg;
-    int shmid;
-    char *shmaddr;
-    int readOnly;
-};
-int shmdt(const void* addr);
-int shmget(int key, size_t size, int flag);
-void* shmat(int id, const void* addr, int flag);
-
-struct Display { void* private1[2]; int fd;int private2[3]; void* private3; XID private4[3]; int private5; void* private6;
-    int private7[5]; void* private8; int private9[2]; void* private10[2]; int private11; ulong private12[2]; void* private13[4];
-    uint private14; void* private15[3]; int private16[2]; struct Screen* screens; };
-struct Screen { void* private1; Display* display; XID root; int width, height; };
-struct XVisualInfo { Visual* visual; ulong id; int screen,depth,c_class; ulong private1[3]; int private2[2]; };
-struct XImage { int width, height, private1[2]; char *data; int private2[5]; int stride; int private3; ulong private4[3];
-                void* private5[2]; int (*destroy_image)(XImage*); };
-struct XWindowAttributes { int x, y, width, height, border, depth; Visual *visual; XID root; int private1[4]; ulong private2[2];
-bool private3; XID private4; bool private5; int map_state; long private6[3]; bool override_redirect; Screen* screen; };
-struct XSetWindowAttributes {  ulong bg_pixmap, bg_pixel, border_pixmap, border_pixel; int unused1[3]; ulong unused2[2];
-                               bool unused3; long event_mask; long unused4; bool override_redirect; XID colormap, cursor; };
+/// X Protocol
+struct XError { uint8 code; uint16 seq; uint32 id; uint16 minor; int8 major; int8 pad[21]; } packed;
 union XEvent {
-    struct { int type; ulong serial; bool send_event; Display *display; XID window;
-             XID root,subwindow; ulong time; int x, y, x_root, y_root; uint state, code; };
-    long pad[24];
-};
-struct XClientMessageEvent { int type; ulong serial; bool send_event; Display *display; XID window;
-                             Atom message_type; int format; long data[5]; };
-struct XConfigureRequestEvent { int type; ulong serial; bool send_event; Display *display; XID parent, window;
-                                int x, y, width, height, border_width; XID above; int detail; ulong value_mask; };
-struct XPropertyEvent { int type; ulong serial; bool send_event; Display *display; XID window; Atom atom; };
-
-enum { TrueColor=4 };
-enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, Expose=12, VisibilityNotify=15,
-       CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest,
-       PropertyNotify=28, ClientMessage=33 };
-enum { Button1Mask=1<<8, AnyModifier=1<<15 };
+    struct { uint8 key; uint16 seq; uint32 time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed;
+    struct { uint8 pad; uint16 seq; uint32 window; uint16 x,y,w,h,count; } packed expose; //Expose
+    struct { uint8 pad; uint16 seq; uint32 event,window,above; int16 x,y,w,h,border; } packed configure; //Configure
+    byte pad[31]; } packed;
+i(static_assert(sizeof(XEvent)==31,"");)
+struct ConnectionSetup { byte bom=0x6C, pad=0; int16 major=11,minor=0; int16 nameSize=18, dataSize=16, pad2=0; };
+struct ConnectionSetupReply { int8 status,reason; int16 major,minor,additionnal; int32 release, ridBase, ridMask, motionBufferSize; int16 vendorLength, maxRequestSize; int8 numScreens, numFormats, imageByteOrder, bitmapBitOrder, bitmapScanlineUnit, bitmapScanlinePad, minKeyCode, maxKeyCode; int32 pad2; };
+struct Format { uint8 depth, bitsPerPixel, scanlinePad; int32 pad; };
+struct Screen { int32 root, colormap, white, black, inputMask; int16 width, height, widthMM, heightMM, minMaps, maxMaps; int32 visual;
+                int8 backingStores, saveUnders, depth, numDepths; };
+struct Depth { int8 depth; int16 numVisualTypes; uint32 pad; };
+struct VisualType { uint32 id; uint8 class_, bpp; int16 colormapEntries; uint32 red,green,blue,pad; }; i(static_assert(sizeof(VisualType)==24,"");)
+struct CreateWindow { int8 req=1, depth=32; uint16 size=12; uint32 id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1;
+                      uint32 visual=0, mask=0x280A/*0x2800*/, backgroundPixel, borderPixel, eventMask, colormap; };
+struct ChangeWindowAttribute { int8 req=2; uint16 size; uint32 window, mask; };
+struct GetWindowAttributes { int8 req=3; uint16 size; uint32 window; };
+struct GetWindowAttributesReply { int8 backingStore; uint16 seq; uint32 replySize, visual; int16 class_; int8 bit,win; uint32 planes, pixel; int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; int colormap, allEventMask, yourEventMask; int16 nopropagate, pad; };
+struct DestroyWindow { int8 req=4; uint16 size=2; uint32 id; };
+struct MapWindow { int8 req=8; uint16 size=2; uint32 id;};
+struct UnmapWindow { int8 req=10; uint16 size=2; uint32 id;};
+struct ConfigureWindow { int8 req=12; uint16 size=5; uint32 id; uint16 mask,pad; uint32 x,y; };
+struct InternAtom { int8 req=16,exists=1; uint16 size=2; int16 length, pad; };
+struct InternAtomReply { byte pad1; uint16 seq; uint32 length,atom; byte pad2[20]; } packed;
+struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint32 id,property,type; uint8 format; uint32 length; };
+struct CreateGC { int8 req=55,pad; uint16 size=4; uint32 context=0,window,mask=0; };
+struct CopyArea { int8 req=62,pad; uint16 size=7; uint32 src,dst,gc; int16 srcX,srcY,dstX,dstY,w,h; };
+struct PutImage { int8 req=72,format=2; uint16 size=6; uint32 window,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad; };
+struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint32 colormap,window,visual; };
+struct QueryExtension { int8 req=98,pad; uint16 size=2, length, pad2; };
+struct QueryExtensionReply { int8 pad; uint16 seq; uint32 length; uint8 present,major,firstEvent,firstError; byte pad2[20]; } packed;
+struct GetKeyboardMapping { int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad; };
+struct GetKeyboardMappingReply { uint8 numKeySymsPerKeyCode; uint16 seq; uint32 length; byte pad[24]; } packed;
+constexpr ref<byte> xerror[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
+                                  "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
+constexpr ref<byte> xrequest[] = {"0"_,"CreateWindow"_,"ChangeWindowAttributes"_,"GetWindowAttributes"_,"DestroyWindow"_,"DestroySubwindows"_,"ChangeSaveSet"_,"ReparentWindow"_,"MapWindow"_,"MapSubwindows"_,"UnmapWindow"_,"UnmapSubwindows"_,"ConfigureWindow"_,"CirculateWindow"_,"GetGeometry"_,"QueryTree"_,"InternAtom"_,"GetAtomName"_,"ChangeProperty"_,"DeleteProperty"_,"GetProperty"_,"ListProperties"_,"SetSelectionOwner"_,"GetSelectionOwner"_,"ConvertSelection"_,"SendEvents"_,"GrabPointer"_,"UngrabPointer"_,"GrabButton"_,"UngrabButton"_,"ChangeActivePointerGrab"_,"GrabKeyboard"_,"UngrabKeyboard"_,"GrabKey"_,"UngrabKey"_,"AllowEvents"_,"GrabServer"_,"UngrabServer"_,"QueryPointer"_,"GetMotionEvents"_,"TranslateCoordinates"_,"WarpPointer"_,"SetInputFocus"_,"GetInputFocus"_,"QueryKeymap"_,"OpenFont"_,"CloseFont"_,"QueryFont"_,"QueryTextElements"_,"ListFonts"_,"ListFontsWithInfo"_,"SetFontPath"_,"GetFontPath"_,"CreatePixmap"_,"FreePixmap"_,"CreateGC"_,"ChangeGC"_,"CopyGC"_,"SetDashes"_,"SetClipRectangles"_,"FreeGC"_,"ClearArea"_,"CopyArea"_,"CopyPlane"_,"PolyPoint"_,"PolyLine"_,"PolySegment"_,"PolyRectange"_,"PolyArc"_,"FillPoly"_,"PolyFillRectangle"_,"PolyFillArc"_,"PutImage"_};
+constexpr ref<byte> xevent[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"ButtonPress"_,"ButtonRelease"_,"MotionNotify"_,"EnterNotify"_,
+                                "LeaveNotify"_,"FocusIn"_,"FocusOut"_,"KeymapNotify"_,"Expose"_,"GraphicsExpose"_,"NoExpose"_,"VisibilityNotify"_,
+                                "CreateNotify"_,"DestroyNotify"_,"UnmapNotify"_,"MapNotify"_,"MapRequest"_,"ReparentNotify"_,"ConfigureNotify"_,
+                                "ConfigureRequest"_,"GravityNotify"_,"ResizeRequest"_,"CirculateNotify"_,"CirculateRequest"_,"PropertyNotify"_,
+                                "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_};
 enum { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3,
        EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15,
        StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, PropertyChangeMask=1<<22 };
-enum { CWBackPixel=1<<1, CWBorderPixel=1<<3, CWOverrideRedirect=1<<9, CWEventMask=1<<11, CWColormap=1<<13, CWCursor=1<<14 };
-enum { IsViewable=2 };
-enum { CWX=1<<0, CWY=1<<1, CWWidth=1<<2, CWHeight=1<<3 };
-
-Display* XOpenDisplay(const char*);
-int XFree(void*);
-int XConnectionNumber(Display*);
-int XSelectInput(Display*, XID, long);
-int XPending(Display*);
-int XNextEvent(Display*, XEvent*);
-int XFlush(Display*);
-int XSync(Display*, bool);
-int XSendEvent(Display*, XID, bool, long, XEvent*);
-int XAllowEvents(Display*, int, ulong);
-
-struct XErrorEvent { int type; Display* display; XID id; ulong serial; ubyte error_code; };
-typedef int (*XErrorHandler) (Display*, XErrorEvent*);
-int XGetErrorText(Display*, int, char*, int);
-XErrorHandler XSetErrorHandler(XErrorHandler);
-
-XID XCreateWindow(Display*, XID, int, int, uint, uint, uint, int, uint, Visual*, ulong, XSetWindowAttributes*);
-GC XCreateGC(Display*, XID, ulong, void*);
-XID XCreateColormap(Display*, XID, Visual*, int);
-XID XCreateFontCursor(Display*, uint);
-int XMatchVisualInfo(Display*, int, int, int, XVisualInfo*);
-
-XImage *XShmCreateImage(Display*, Visual*, uint, int, char*, XShmSegmentInfo*, uint, uint);
-bool XShmAttach(Display*, XShmSegmentInfo*);
-bool XShmDetach(Display*, XShmSegmentInfo*);
-bool XShmPutImage(Display*, XID, GC, XImage*, int, int, int, int, uint, uint, bool);
-
-int XGetWindowProperty(Display*, XID, Atom, long, long, bool, Atom, Atom*, int*, ulong*, ulong*, ubyte**);
-int XChangeProperty(Display*, XID, Atom, Atom, int, int, const ubyte*, int);
-int XGetWindowAttributes(Display*, XID, XWindowAttributes*);
-int XChangeWindowAttributes(Display*, XID, ulong, XSetWindowAttributes*);
-int XQueryTree(Display*, XID, XID*, XID*, XID**, uint*);
-
-KeySym XkbKeycodeToKeysym(Display*, uint, int, int);
-KeySym XStringToKeysym(const char*);
-ubyte XKeysymToKeycode(Display*, KeySym);
-int XGrabKey(Display*, int, uint, XID, bool, int, int);
-int XGrabButton(Display*, uint, uint, XID, int, uint, int, int, XID, XID);
-
-int XMapWindow(Display*, XID);
-int XUnmapWindow(Display*, XID);
-int XRaiseWindow(Display*, XID);
-int XMoveWindow(Display*, XID, int, int);
-int XResizeWindow(Display*, XID, uint, uint);
-int XMoveResizeWindow(Display*, XID, int, int, uint, uint);
-
-int XGetInputFocus(Display*, XID*, int*);
-int XSetInputFocus(Display*, XID, int, ulong);
-XID XGetSelectionOwner(Display*, Atom);
-int XConvertSelection(Display*, Atom, Atom, Atom, XID, ulong);
-
-/*enum Key {
-    Escape=0xff1b, Return=0xff0d, Delete=0xffff, BackSpace=0xff08,
-    Home=0xff50, Left, Up, Right, Down, End=0xff57
-};*/
-#endif
+enum { Button1Mask=1<<8, AnyModifier=1<<15 };

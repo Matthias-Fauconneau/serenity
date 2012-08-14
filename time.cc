@@ -6,7 +6,7 @@ enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
 long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
 
-template<class T> inline bool inRange(T min, T x, T max) { return x>=min && x<=max; }
+template<class T> bool inRange(T min, T x, T max) { return x>=min && x<=max; }
 void Date::invariant() {
     //Hour
     if(seconds>=0) { assert(inRange(0, seconds, 59)); assert(minutes>=0); }

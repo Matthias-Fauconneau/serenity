@@ -4,27 +4,27 @@
 #include "calendar.h"
 #include "feeds.h"
 //#include "launcher.h"
-//ICON(shutdown)
+ICON(shutdown)
 
 struct Desktop : Application {
     Text status;
     Feeds feeds;
     Scroll<HTML> page;
     //List<Command> shortcuts;// = readShortcuts();
-    Clock clock { 32 };
+    Clock clock = i({ 64 });
     Calendar calendar;
-    VBox timeBox { &clock, &calendar };
-    HBox applets{ &feeds, &timeBox/*, &shortcuts*/ };
-    Window window = i({&applets,int2(0,::display().y-16)});
-    //Command shutdown {move(shutdownIcon),"Shutdown"_,"/sbin/poweroff"_,{}) };
+    VBox timeBox = i({ &clock, &calendar });
+    HBox applets ;//= i({ &feeds, &timeBox/*, &shortcuts*/ });
+    Window window = i({&applets,int2(256,255)/*int2(0,-16)*/,string("Desktop"_),shutdownIcon()});
+    //Command shutdown {share(shutdownIcon()),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop() {
         clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::update);
         feeds.pageChanged.connect(this,&Desktop::showPage);
-        window.localShortcut(Key::RightArrow).connect(&feeds, &Feeds::readNext);
-        window.localShortcut(Key::Extra).connect(&feeds, &Feeds::readNext);
-        window.localShortcut(Key::Power).connect(this, &Desktop::showDesktop);
-        window.localShortcut(Key::Escape).connect(this, &Desktop::showDesktop);
+        window.localShortcut(Right).connect(&feeds, &Feeds::readNext);
+        //window.localShortcut(Extra).connect(&feeds, &Feeds::readNext);
+        //window.localShortcut(Power).connect(this, &Desktop::showDesktop);
+        window.localShortcut(Escape).connect(this, &Desktop::showDesktop);
         window.show();
     }
     void showDesktop() {

@@ -2,7 +2,6 @@
 #include "linux.h"
 #include "debug.h"
 
-
 /// Input/Output
 
 array<byte> read(int fd, uint capacity) {
@@ -23,68 +22,58 @@ array<byte> readUpTo(int fd, uint capacity) {
 
 File::~File() { if(fd>0) close(fd); }
 
-File openFile(const ref<byte>& path, int at) {
-    return File( check( openat(at, strz(path), O_RDONLY, 0), path) );
+bool exists(const ref<byte>& file, int at) { return File( openat(at, strz(file), O_RDONLY, 0) ).fd > 0; }
+
+File openFile(const ref<byte>& file, int at) {
+    return File( check( openat(at, strz(file), O_RDONLY, 0), file) );
+}
+File createFile(const ref<byte>& file, int at, bool overwrite) {
+    assert(overwrite || !exists(file,at), file);
+    return File( check( openat(at, strz(file),O_CREAT|O_WRONLY|O_TRUNC,0666), file ) );
+}
+File appendFile(const ref<byte>& file, int at) {
+    return File( check( openat(at, strz(file),O_CREAT|O_RDWR|O_APPEND,0666), file ) );
 }
 
-File createFile(const ref<byte>& path, int at, bool overwrite) {
-    if(!overwrite && exists(path,at)) error("exists"_,path);
-    return File( check( openat(at, strz(path),O_CREAT|O_WRONLY|O_TRUNC,0666), path ) );
-}
-
-File appendFile(const ref<byte>& path, int at) {
-    return File( check( openat(at, strz(path),O_CREAT|O_RDWR|O_APPEND,0666), path ) );
-}
-
-array<byte> readFile(const ref<byte>& path, int at) {
-    File fd = openFile(path,at);
+array<byte> readFile(const ref<byte>& file, int at) {
+    File fd = openFile(file,at);
     struct stat sb; fstat(fd, &sb);
-    array<byte> file = read(fd,sb.size);
-    debug( if(file.size()>1<<20) { trace(); log("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_); } )
-    return file;
+    array<byte> content = read(fd,sb.size);
+    debug( if(content.size()>1<<20) { trace(); log("use mapFile to avoid copying "_+dec(content.size()>>10)+"KB"_); } )
+    return content;
 }
 
-Map mapFile(const ref<byte>& path, int at) { File fd=openFile(path,at); Map map=mapFile(fd); return map; }
+void writeFile(const ref<byte>& file, const ref<byte>& content, int at, bool overwrite) {
+    File fd = createFile(file,at,overwrite);
+    uint unused wrote = write(fd,content.data,content.size);
+    assert(wrote==content.size);
+}
+
+Map mapFile(const ref<byte>& file, int at) { File fd=openFile(file,at); Map map=mapFile(fd); return map; }
 Map mapFile(int fd) {
     struct stat sb; fstat(fd, &sb);
-    const byte* data = (byte*)check( (int)mmap(0,sb.size,PROT_READ,MAP_PRIVATE,fd,0) );
+    if(sb.size==0) return Map(0,0);
+    const byte* data = (byte*)mmap(0,sb.size,PROT_READ,MAP_PRIVATE,fd,0);
     assert(data);
     return Map(data,(int)sb.size);
 }
 Map::~Map() { if(data) munmap((void*)data,size); }
 
-void writeFile(const ref<byte>& path, const ref<byte>& content, int at, bool overwrite) {
-    File fd = createFile(path,at,overwrite);
-    uint unused wrote = write(fd,content.data,content.size);
-    assert(wrote==content.size);
-    close(fd);
-}
-
-int closeFile(int fd) { return close(fd); }
-
 /// File system
 
 int root() { static int fd = openFolder("/"_,-100); return fd; }
 
-int openFolder(const ref<byte>& path, int at) {
-    int fd = check( openat(at, strz(path), O_RDONLY|O_DIRECTORY, 0), path );
-    return fd;
-}
+int openFolder(const ref<byte>& folder, int at) { return check( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder ); }
 
-void createFolder(const ref<byte>& path, int at) { int unused e= check( mkdirat(at, strz(path), 0666), path); }
-
-bool exists(const ref<byte>& path, int at) {
-    int fd = openat(at, strz(path), O_RDONLY, 0);
-    if(fd >= 0) { close(fd); return true; }
-    return false;
-}
+void createFolder(const ref<byte>& folder, int at) { int unused e= check( mkdirat(at, strz(folder), 0666), folder); }
 
 void symlink(const ref<byte>& target,const ref<byte>& name, int at) {
+    assert(target!=name);
     unlinkat(at,strz(name),0);
     int unused e= check(symlinkat(strz(target),at,strz(name)), name,"->",target);
 }
 
-struct stat statFile(const ref<byte>& path, int at) { File fd = openFile(path,at); stat file; int unused e= check( fstat(fd, &file) ); return file; }
+stat statFile(const ref<byte>& path, int at) { File fd = openFile(path,at); stat file; int unused e= check( fstat(fd, &file) ); return file; }
 enum { S_IFDIR=0040000 };
 bool isFolder(const ref<byte>& path, int at) { return statFile(path,at).mode&S_IFDIR; }
 long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtime.sec; }

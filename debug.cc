@@ -3,10 +3,6 @@
 #include "stream.h"
 #include "linux.h"
 
-const char* errno[35] = {"OK",
-    "PERM","NOENT","SRCH","INTR","IO","NXIO","2BIG","NOEXEC","BADF","CHILD","AGAIN","NOMEM","ACCES","FAULT","NOTBLK","BUSY","EXIST",
-    "XDEV","NODEV","NOTDIR","ISDIR","INVAL","NFILE","MFILE","NOTTY","TXTBSY","FBIG","NOSPC","SPIPE","ROFS","MLINK","PIPE","DOM","RANGE"};
-
 void write(int fd, const ref<byte>& s) { int unused r=write(fd,s.data,s.size); assert(r==(int)s.size,r); }
 void abort() { ioctl(open("/dev/console", O_RDWR, 0), 0x5606, (void*)7); exit(-1); }
 void log_(const char* expr) { log(expr); }
@@ -18,7 +14,7 @@ struct Sym { uint	name; byte* value; uint size; ubyte info,other; uint16 shndx; 
 
 /// Reads a little endian variable size integer
 static int readLEV(DataStream& s, bool sign=false) {
-    int result=0; int shift=0; byte b;
+    int result=0; int shift=0; uint8 b;
     do { b = s.read(); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
     if(sign && (shift < 32) && (b & 0x40)) result |= -1 << shift;
     return result;
@@ -194,14 +190,14 @@ Symbol findNearestLine(void* find) {
 
 int recurse;
 void trace(int skip, uint size) {
-    if(recurse>1) {write(0,"Debugger error\n"_); void**p=0;*p=0; } recurse++;
-    void* stack[10] = {};
+    if(recurse>1) {write(1,"Debugger error\n"_); void**p=0;*p=0; } recurse++;
+    void* stack[16]; clear(stack);
     stack[0] = __builtin_return_address(0);
-#define bra(i) if(stack[i-1]) stack[i] = __builtin_return_address(i)
-    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);
-    for(int i=min(9u,skip+size-1);i>=skip;i--) if(stack[i]) {
+    #define bra(i) if(ptr(stack[i-1])>0x8000000 && ptr(stack[i-1])<0xc0000000) stack[i] = __builtin_return_address(i)
+    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);
+    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x8000000 && ptr(stack[i])<0xc0000000) {
         Symbol s = findNearestLine(stack[i]);
-        if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr(stack[i]));
+        if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log("0x"_+str(ptr(stack[i])));
     }
     recurse--;
 }
