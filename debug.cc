@@ -193,9 +193,9 @@ void trace(int skip, uint size) {
     if(recurse>1) {write(1,"Debugger error\n"_); void**p=0;*p=0; } recurse++;
     void* stack[16]; clear(stack);
     stack[0] = __builtin_return_address(0);
-    #define bra(i) if(ptr(stack[i-1])>0x8000000 && ptr(stack[i-1])<0xc0000000) stack[i] = __builtin_return_address(i)
+    #define bra(i) if(ptr(stack[i-1])>0x8000000 && ptr(stack[i-1])<0x10000000) stack[i] = __builtin_return_address(i)
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);
-    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x8000000 && ptr(stack[i])<0xc0000000) {
+    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x8000000 && ptr(stack[i])<0x10000000) {
         Symbol s = findNearestLine(stack[i]);
         if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log("0x"_+str(ptr(stack[i])));
     }

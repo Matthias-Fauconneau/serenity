@@ -1,7 +1,6 @@
 #pragma once
 #include "string.h"
-
-struct pollfd { int fd; short events, revents; };
+struct pollfd;
 
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
@@ -9,7 +8,7 @@ struct Poll {
     Poll(){}
     /// Add this to the process-wide event loop
     /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
-    void registerPoll(pollfd);
+    void registerPoll(const pollfd&);
     /// Remove this from the process-wide event loop
     void unregisterPoll();
     /// Remove an fd from the process-wide event loop
@@ -18,7 +17,7 @@ struct Poll {
     void wait();
     virtual ~Poll() { unregisterPoll(); }
     /// Callback on new events
-    virtual void event(pollfd) =0;
+    virtual void event(const pollfd&) =0;
 };
 
 /// Dispatches events to registered Poll objects
@@ -37,7 +36,11 @@ struct Application {
 /// Macro to compile an executable entry point starting an Application with the default event loop
 void init_();
 void exit_(int);
-#define Application(App)  extern "C" void _start() { init_(); for(App app;app.running && dispatchEvents();); exit_(0); }
+#if STANDALONE
+#define Application(App) extern "C" void _start() { init_(); for(App app;app.running && dispatchEvents();); exit_(0); }
+#else
+#define Application(App) int main() { init_(); for(App app;app.running && dispatchEvents();); return 0; }
+#endif
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const string& path, const array<string>& args=array<string>());

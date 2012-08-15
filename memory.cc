@@ -2,8 +2,10 @@
 #include "core.h"
 #include "linux.h"
 
+#if STANDALONE
 byte* heapEnd;
 byte* systemEnd;
+void setupHeap() { systemEnd = heapEnd = (byte*)brk(0); }
 
 byte* allocate_(uint size) {
     //TODO: allocate from free list
@@ -20,8 +22,17 @@ byte* reallocate_(byte* buffer, int size, int need) {
     unallocate_(buffer,size);
     return new_buffer;
 }
-void unallocate_(byte* unused buffer, int unused size) {
+void unallocate_(byte* buffer, int size) {
     //FIXME: freeing only last allocation
     if(buffer+size==heapEnd) { heapEnd=buffer; /*systemEnd=(byte*)brk(heapEnd);*/ }
     //TODO: add to free list
 }
+#else
+void setupHeap() {}
+extern "C" byte* malloc(ulong size);
+extern "C" byte* realloc(void* buffer, ulong size);
+extern "C" void free(byte* buffer);
+byte* allocate_(uint size) { return malloc(size); }
+byte* reallocate_(byte* buffer, int unused size, int need) { return realloc(buffer,need); }
+void unallocate_(byte* buffer, int unused size) { return free(buffer); }
+#endif

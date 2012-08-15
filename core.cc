@@ -1,6 +1,6 @@
 #include "core.h"
 
-void*   __dso_handle = (void*) &__dso_handle;
+//void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" int __aeabi_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" void __cxa_pure_virtual() { trace(0,-1); log_("pure virtual"); abort(); }

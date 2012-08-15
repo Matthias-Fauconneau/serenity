@@ -69,11 +69,13 @@ enum class sys : long {
 #endif
 };
 
-typedef unsigned short ushort;
+typedef unsigned short uint16;
 typedef unsigned int uint;
 typedef unsigned long ulong;
-struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
-struct sockaddr_un { ushort family=1; byte path[108]; };
+typedef unsigned long long uint64;
+struct pollfd { int fd; short events, revents; };
+struct sockaddr { uint16 family; uint16 port; uint ip; int pad[2]; };
+struct sockaddr_un { uint16 family=1; char path[108]; };
 struct timespec { long sec,nsec; };
 struct rlimit { ulong cur,max; };
 struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
@@ -81,8 +83,8 @@ struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid
 struct dirent { long ino, off; short len; char name[246]; };
 struct ipc_perm { int key; uint uid,gid,cuid,cgid; uint16 mode,pad1,seq,pad2; ulong pad3[2]; };
 struct shmid_ds { ipc_perm perm; ulong size; ulong atime,pad1,dtime,pad2,ctime,pad3; int cpid,lpid; ulong count,pad4,pad5; };
-enum {POLLIN = 1, POLLOUT=4, POLLHUP = 16};
 
+enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32};
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000,
 #if __arm__
       O_DIRECTORY=040000
@@ -91,7 +93,7 @@ enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O
   #endif
     };
 enum {PROT_READ=1, PROT_WRITE};
-enum {MAP_SHARED=1, MAP_PRIVATE};
+enum {MAP_FILE, MAP_SHARED, MAP_PRIVATE};
 enum {DT_DIR=4, DT_REG=8 };
 enum {F_SETFL=4};
 enum {PF_LOCAL=1, PF_INET};

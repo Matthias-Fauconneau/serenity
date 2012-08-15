@@ -1,6 +1,6 @@
 #include "process.h"
 #include "file.h"
-#include "ffmpeg.h"
+#include "mpg123.h"
 #include "alsa.h"
 #include "interface.h"
 #include "layout.h"

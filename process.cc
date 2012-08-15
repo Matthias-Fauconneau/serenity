@@ -2,8 +2,6 @@
 #include "linux.h"
 #include "debug.h"
 
-void setupHeap(); //memory.cc
-
 enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
 struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
 struct ucontext {
@@ -27,8 +25,7 @@ static void handler(int signo, siginfo* info, ucontext* ctx) {
 }
 
 void init_() {
-    extern byte *heapEnd, *systemEnd;
-    systemEnd = heapEnd = (byte*)brk(0);
+    extern void setupHeap(); setupHeap(); //memory.cc
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
         enum { SA_SIGINFO=4 } flags = SA_SIGINFO;
@@ -46,7 +43,7 @@ void exit_(int code) { exit(code); } //TODO: check leaks
 //FIXME: parallel arrays is bad for realloc TODO: put pollfd in Poll, and use stack array for poll(pollfd[])
 static array<Poll*> polls;
 static array<pollfd> pollfds;
-void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
+void Poll::registerPoll(const pollfd& fd) { polls << this; pollfds << fd; }
 static Poll* lastUnregistered; //for correct looping
 void Poll::unregisterPoll() { for(int i;(i=polls.removeOne(this))>=0;) pollfds.removeAt(i); lastUnregistered=this; }
 bool operator ==(pollfd a, pollfd b) { return a.fd==b.fd; }

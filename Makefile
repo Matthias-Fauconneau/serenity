@@ -24,6 +24,9 @@ ICONS_player := cursor play pause next
 ICONS_music := cursor music
 SRCS += $(ICONS:%=icons/%)
 
+LIBS_mpg123 = mpg123
+LIBS_ffmpeg = avformat avcodec
+
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_feeds = icons/$(TARGET).png $(TARGET).desktop
@@ -35,7 +38,10 @@ all: prepare $(BUILD)/$(TARGET)
 	@./dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
 
 $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
-	@ld -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	$(eval LIBS= $(filter %.o, $^))
+	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
+	$(eval LIBS= $(LIBS:%=$$(%)))
+	@clang $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
 
 $(BUILD)/%.d: %.cc

@@ -14,7 +14,7 @@ struct Window : Poll {
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image<byte4>& icon=Image<byte4>());
 
     /// Event handler
-    void event(pollfd);
+    void event(const pollfd&);
     /// Reads one X event
     void readEvent(uint8 type);
     /// Reads an X reply while checking pending errors and processing queued events

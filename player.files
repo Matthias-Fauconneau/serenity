@@ -21,10 +21,14 @@ window.cc
 interface.h
 interface.cc
 
+mpg123.cc
 ffmpeg.cc
 ffmpeg.h
+asound.cc
+asound.h
 alsa.cc
 alsa.h
 resample.cc
 resample.h
 player.cc
+mpg123.h

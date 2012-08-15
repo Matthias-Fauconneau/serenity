@@ -59,7 +59,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     registerPoll(__(x,POLLIN));
 }
 
-void Window::event(pollfd poll) {
+void Window::event(const pollfd& poll) {
     if(poll.fd==0) render();
     if(poll.fd==x) { uint8 type = read<uint8>(x); readEvent(type); }
 }
