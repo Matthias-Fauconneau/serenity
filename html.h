@@ -5,9 +5,9 @@
 
 /// Asynchronously load an image, sending a signal if the image was not cached
 struct ImageLoader : signal<> {
-    ImageLoader(const URL& url, Image<pixel>* target, signal<>* imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
+    ImageLoader(const URL& url, Image<byte4>* target, signal<>* imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
     /// Reference to target to load (need to stay valid)
-    Image<pixel>* target;
+    Image<byte4>* target;
     /// Reference to a signal to trigger on load if the image was not cached.
     signal<>* imageLoaded=0;
     /// Preferred size

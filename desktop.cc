@@ -14,8 +14,8 @@ struct Desktop : Application {
     Clock clock = i({ 64 });
     Calendar calendar;
     VBox timeBox = i({ &clock, &calendar });
-    HBox applets ;//= i({ &feeds, &timeBox/*, &shortcuts*/ });
-    Window window = i({&applets,int2(256,255)/*int2(0,-16)*/,string("Desktop"_),shutdownIcon()});
+    HBox applets = i({ &feeds, &timeBox/*, &shortcuts*/ });
+    Window window = i({&applets,int2(1024,600)/*int2(0,-16)*/,string("Desktop"_),shutdownIcon()});
     //Command shutdown {share(shutdownIcon()),"Shutdown"_,"/sbin/poweroff"_,{}) };
     Desktop() {
         clock.timeout.connect(&window, &Window::render);

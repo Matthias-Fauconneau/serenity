@@ -43,20 +43,22 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
         id=r.ridBase;
     }
     assert(visual);
-    {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; write(x,string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
+
+    /*{QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; write(x,string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
     {QueryExtensionReply r=readReply<QueryExtensionReply>(); log("MIT-SHM",r.present,r.major,r.firstEvent,r.firstError); }
+    {Shm::QueryVersion r; write(x, raw(r));}
+    {Shm::QueryVersionReply r=readReply<Shm::QueryVersionReply>(); log(r.sharedPixmaps,r.major,r.minor,r.uid,r.gid,r.format);}*/
 
     // Creates X window
     if(size.x<=0) size.x=display.x+size.x;
     if(size.y<=0) size.y=display.y+size.y;
     widget->size=size;
-    {CreateColormap r; r.colormap=id+2; r.window=root; r.visual=visual; write(x,raw(r));}
-    {CreateWindow r; r.id=id; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+2;
-        r.backgroundPixel=r.borderPixel=0xF0F0F0F0;
-        r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
-    {ChangeProperty r; r.id=id; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
+    {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; write(x,raw(r));}
+    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
+        r.backgroundPixel=r.borderPixel=0xF0F0F0F0; r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
+    {ChangeProperty r; r.id=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
     r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
-    {CreateGC r; r.context=gc=id+1; r.window=id; write(x,raw(r));}
+    {CreateGC r; r.context=id+GContext; r.window=id+XWindow; write(x,raw(r));}
     setTitle(title);
     setIcon(icon);
     registerPoll(i({x,POLLIN}));
@@ -68,7 +70,9 @@ void Window::event(pollfd poll) {
 }
 
 void Window::readEvent(uint8 type) {
-    /***/ if(type==0) { XError e=read<XError>(x); error("Error",xerror[e.code],"seq:",e.seq,"id",e.id,"request",xrequest[e.major],"minor",e.minor);
+    /***/ if(type==0) { XError e=read<XError>(x);
+        error("Error",e.code<sizeof(xerror)/sizeof(*xerror)?xerror[e.code]:dec(e.code),"seq:",e.seq,"id",e.id,"request",
+              e.major<sizeof(xrequest)/sizeof(*xrequest)?xrequest[e.major]:dec(e.major),"minor",e.minor);
     } else if(type==1) { error("Unexpected reply");
     } else { XEvent unused e=read<XEvent>(x); type&=0b01111111; //msb set if sent by SendEvent
         if(type==Motion) {
@@ -85,8 +89,8 @@ void Window::readEvent(uint8 type) {
             if(shortcut) (*shortcut)(); //local window shortcut
             if( widget->mouseEvent(int2(e.x,e.y), (Event)type, (e.state&Button1Mask)?LeftButton:None) ) wait();
         } else if(type==Expose) { if(!e.expose.count && e.expose.w>1 && e.expose.h>1) wait();
-        } else if(type==MapNotify) { mapped=true;
         } else if(type==UnmapNotify) { mapped=false;
+        } else if(type==MapNotify) { mapped=true;
         } else if(type==ReparentNotify) {
         } else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(widget->size!=size) { widget->size=size; widget->update(); }
         } else if(type==ClientMessage) {
@@ -119,19 +123,19 @@ void Window::setWidget(Widget* widget) {
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;
     if(position.y<0) position.y=display.y+position.y;
-    {ConfigureWindow r; r.id=id; r.mask=1+2; r.x=position.x, r.y=position.y; write(x,raw(r));}
+    {ConfigureWindow r; r.id=id+XWindow; r.mask=1+2; r.x=position.x, r.y=position.y; write(x,raw(r));}
 }
 void Window::setSize(int2 size) {
     if(size.x<=0) size.x=display.x+size.x;
     if(size.y<=0) size.y=display.y+size.y;
-    {ConfigureWindow r; r.id=id; r.mask=4+8; r.x=size.x, r.y=size.y; write(x,raw(r));}
+    {ConfigureWindow r; r.id=id+XWindow; r.mask=4+8; r.x=size.x, r.y=size.y; write(x,raw(r));}
 }
 void Window::setTitle(const ref<byte>& title) {
-    ChangeProperty r; r.id=id; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
+    ChangeProperty r; r.id=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
     r.length=title.size; r.size+=align(4, r.length)/4; write(x,string(raw(r)+title+pad(4,title.size)));
 }
 void Window::setIcon(const Image<byte4>& icon) {
-    ChangeProperty r; r.id=id; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
+    ChangeProperty r; r.id=id+XWindow; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
     r.length=2+icon.width*icon.height; r.size+=r.length; write(x,string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }
 
@@ -140,12 +144,26 @@ void Window::hide() { if(!mapped) return;{UnmapWindow r; r.id=id; write(x,raw(r)
 
 void Window::update() { widget->update(); render(); }
 void Window::render() {
-    assert(mapped);
-    //TODO: shared memory pixmap
-    framebuffer=Image<pixel>(widget->size.x,widget->size.y);
+    assert(mapped); assert(widget->size);
+    if(buffer.width != (uint)widget->size.x || buffer.height != (uint)widget->size.y) {
+        if(shm) {
+            {Shm::Detach r; r.seg=id+Segment; write(x, raw(r));}
+            shmdt(buffer.data);
+            shmctl(shm, IPC_RMID, 0);
+        }
+        buffer.stride=buffer.width= widget->size.x, buffer.height = widget->size.y;
+        shm = check( shmget(IPC_NEW, sizeof(pixel)*buffer.width*buffer.height , IPC_CREAT | 0777) );
+        buffer.data = (pixel*)shmat(shm, 0, 0); assert(buffer.data);
+        {Shm::Attach r; r.seg=id+Segment; r.shm=shm; write(x,raw(r));}
+    }
+    framebuffer = share(buffer);
+    currentClip=Rect(framebuffer.size());
     widget->render(int2(0,0));
-    {PutImage r; r.window=id; r.context=gc; r.w=framebuffer.width; r.h=framebuffer.height; r.size+=r.w*r.h;
-        write(x,raw(r)); write(x,(ref<byte>)framebuffer); }
+    assert(!clipStack);
+    {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+        r.totalWidth=r.width=buffer.width; r.totalHeight=r.height=buffer.height; write(x,raw(r)); }
+    /*{PutImage r; r.window=id; r.context=id+GContext; r.w=framebuffer.width; r.h=framebuffer.height; r.size+=r.w*r.h;
+        write(x,raw(r)); write(x,(ref<byte>)framebuffer); }*/
 }
 
 signal<>& Window::localShortcut(Key key) { return localShortcuts.insert((uint16)key); }

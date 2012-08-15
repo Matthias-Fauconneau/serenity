@@ -35,18 +35,6 @@ Image<byte4> resize(const Image<byte4>& image, uint width, uint height) {
     return target;
 }
 
-template<> Image<pixel> convert<pixel,byte4>(const Image<byte4>& source) {
-    if(!source) return Image<pixel>();
-    Image<pixel> copy(source.width,source.height);
-    for(uint x=0;x<source.width;x++) for(uint y=0;y<source.height;y++) {
-        if(source.alpha) {
-            int4 s=int4(source(x,y));
-            copy(x,y)=pixel((s*s.a+int4(255,255,255,255)*(255-s.a))/255);
-        } else copy(x,y)=source(x,y);
-    }
-    return copy;
-}
-
 weak(Image<byte4> decodePNG(const ref<byte>&)) { error("PNG support not linked"_); }
 weak(Image<byte4> decodeJPEG(const ref<byte>&)) { error("JPEG support not linked"_); }
 weak(Image<byte4> decodeICO(const ref<byte>&)) { error("ICO support not linked"_); }

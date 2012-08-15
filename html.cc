@@ -1,6 +1,6 @@
 #include "html.h"
 
-ImageLoader::ImageLoader(const URL& url, Image<pixel>* target, signal<>* imageLoaded, int2 size, uint maximumAge)
+ImageLoader::ImageLoader(const URL& url, Image<byte4>* target, signal<>* imageLoaded, int2 size, uint maximumAge)
     : target(target), size(size) {
     getURL(url, Handler(this, &ImageLoader::load), maximumAge);
     this->imageLoaded=imageLoaded;
@@ -10,7 +10,7 @@ void ImageLoader::load(const URL&, array<byte>&& file) {
     Image<byte4> image = decodeImage(file);
     if(!image) return;
     if(size) image = resize(image,size.x,size.y);
-    *target = convert<pixel>(image);
+    *target = move(image);
     if(imageLoaded) (*imageLoaded)();
     free(this);
 }

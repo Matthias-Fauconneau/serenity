@@ -40,6 +40,7 @@ template<class T> struct Image {
         data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
     Image(int width, int height, bool alpha=false, int stride=0)
         : data(allocate<T>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true), alpha(alpha) {
+        debug( clear((byte*)data,height*stride*sizeof(T)); )
         assert(width); assert(height);
     }
     Image(array<T>&& data, uint width, uint height) : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
@@ -64,14 +65,6 @@ generic string str(const Image<T>& o) { return str(o.width,"x"_,o.height); }
 generic Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.width,o.height,o.stride,false,o.alpha); }
 /// Copies the image buffer
 generic Image<T> copy(const Image<T>& o) {Image<T> copy(o.width,o.height,o.alpha); ::copy(copy.data,o.data,o.stride*o.height); return copy;}
-/// Convert between image formats
-template<class D, class S> Image<D> convert(const Image<S>& image) {
-    if(!image) return Image<D>(); Image<D> copy(image.width,image.height);
-    for(uint x=0;x<image.width;x++) for(uint y=0;y<image.height;y++) copy(x,y)=image(x,y);
-    return copy;
-}
-/// template specialization to convert alpha to opaque white background
-template<> Image<pixel> convert<pixel,byte4>(const Image<byte4>& source);
 /// Returns a copy of the image resized to \a width x \a height
 Image<byte4> resize(const Image<byte4>& image, uint width, uint height);
 /// Flip the image around the horizontal axis in place

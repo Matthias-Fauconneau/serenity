@@ -1,5 +1,5 @@
 apps: desktop, taskbar, mp3 player, text editor, file manager, imap, pdf, wiki, search, irc
-font: fix streaks, kerning, subpixel position, hinting, compound glyph transform
+font: fix streaks, hinting, kerning, compound glyph transform, subpixel rendering, subpixel position
 feeds: left: previous entry, preload image, progressive image, status, own inflate, own jpeg, better html
 touchbook: X shared memory, hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait
 parser: attributes (L+S), scoped symbols

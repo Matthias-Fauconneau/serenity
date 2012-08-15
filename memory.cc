@@ -9,7 +9,8 @@ byte* allocate_(uint size) {
     //TODO: allocate from free list
     byte* buffer = heapEnd;
     heapEnd += size;
-    if(heapEnd>systemEnd) systemEnd=(byte*)brk((void*)((ptr(heapEnd)&0xFFFFF000)+0x1000)); //round to next page
+    //if(heapEnd>systemEnd) systemEnd=(byte*)brk((void*)((ptr(heapEnd)&0xFFFFF000)+0x1000)); //round to next page
+    if(heapEnd>systemEnd) systemEnd=(byte*)brk((void*)((ptr(heapEnd)&0xFFFF0000)+0x10000)); //round to next 16 page
     return buffer;
 }
 byte* reallocate_(byte* buffer, int size, int need) {
@@ -21,6 +22,6 @@ byte* reallocate_(byte* buffer, int size, int need) {
 }
 void unallocate_(byte* unused buffer, int unused size) {
     //FIXME: freeing only last allocation
-    if(buffer+size==heapEnd) { heapEnd=buffer; systemEnd=(byte*)brk(heapEnd); }
+    if(buffer+size==heapEnd) { heapEnd=buffer; /*systemEnd=(byte*)brk(heapEnd);*/ }
     //TODO: add to free list
 }

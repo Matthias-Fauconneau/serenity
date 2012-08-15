@@ -65,14 +65,18 @@ struct Window : Poll {
 
     /// Socket to system local X display server
     const int x; /// \note Each window opens its own socket to simplify code (i.e no same process optimization)
-    /// X Window ID
-    uint id;
-    /// Root Window ID
-    uint root;
-    /// Graphic context
-    uint gc;
     /// Display size
     int2 display;
+    /// Root window
+    uint root;
+    /// This window base resource id
+    uint id;
+    /// Associated window resource (relative to \a id)
+    enum { XWindow, GContext, Colormap, Segment };
+    /// Posix shared memory
+    int shm;
+    /// Shared window back buffer
+    Image<byte4> buffer;
 
     /// Shortcuts triggered when a key is pressed
     map<uint16, signal<> > localShortcuts;
