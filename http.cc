@@ -156,7 +156,7 @@ HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, ar
     : url(str(url)), headers(move(headers)), method(method), handler(handler) {
     debug( log("Request",url); )
     if(!connect(url.host, url.scheme)) { free(this); return; }
-    registerPoll(i({fd, POLLIN|POLLOUT}));
+    registerPoll(__(fd, POLLIN|POLLOUT));
 }
 void HTTP::request() {
     state=Request;
@@ -206,7 +206,7 @@ void HTTP::header() {
             redirect << file;
             buffer.clear(); index=0; contentLength=0; chunked=false; unregisterPoll(); disconnect(); state=Connect;
             url=move(next);
-            if(!connect(url.host, url.scheme)) free(this); else registerPoll(i({fd, POLLIN|POLLOUT}));
+            if(!connect(url.host, url.scheme)) free(this); else registerPoll(__(fd, POLLIN|POLLOUT));
             return;
         } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }

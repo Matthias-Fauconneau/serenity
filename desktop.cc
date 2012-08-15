@@ -1,6 +1,5 @@
 #include "process.h"
 #include "window.h"
-#include "display.h"
 #include "calendar.h"
 #include "feeds.h"
 //#include "launcher.h"
@@ -11,12 +10,12 @@ struct Desktop : Application {
     Feeds feeds;
     Scroll<HTML> page;
     //List<Command> shortcuts;// = readShortcuts();
-    Clock clock = i({ 64 });
+    Clock clock __( 64 );
     Calendar calendar;
-    VBox timeBox = i({ &clock, &calendar });
-    HBox applets = i({ &feeds, &timeBox/*, &shortcuts*/ });
-    Window window = i({&applets,int2(1024,600)/*int2(0,-16)*/,string("Desktop"_),shutdownIcon()});
-    //Command shutdown {share(shutdownIcon()),"Shutdown"_,"/sbin/poweroff"_,{}) };
+    VBox timeBox __( &clock, &calendar );
+    HBox applets __( &feeds, &timeBox/*, &shortcuts*/ );
+    Window window __(&applets,int2(1024,600)/*int2(0,-16)*/,string("Desktop"_),shutdownIcon());
+    //Command shutdown __(share(shutdownIcon()),"Shutdown"_,"/sbin/poweroff"_,{});
     Desktop() {
         clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::update);

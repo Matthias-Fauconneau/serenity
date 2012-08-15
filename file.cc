@@ -78,35 +78,22 @@ enum { S_IFDIR=0040000 };
 bool isFolder(const ref<byte>& path, int at) { return statFile(path,at).mode&S_IFDIR; }
 long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtime.sec; }
 
-/*array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
+array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
     int fd = openFolder(folder,at);
     assert(fd, "Folder not found"_, folder);
     array<string> list;
     int i=0; for(dirent entry; getdents(fd,&entry,sizeof(entry))>0;i++) { if(i<2) continue;
-        string name = str(entry.name);
+        string name = string(entry.name,entry.len - 12);
         string path = folder+"/"_+name;
         int type = *((byte*)&entry + entry.len - 1);
         if(type==DT_DIR && flags&Recursive) {
-            if(flags&Sort) for(string& e: listFiles(path,flags,at)) insertSorted(list, move(e));
+            if(flags&Sort) for(string& e: listFiles(path,flags,at)) list.insertSorted(move(e));
             else list << move(listFiles(path,flags,at));
         } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
-            if(flags&Sort) insertSorted(list, move(path));
+            if(flags&Sort) list.insertSorted(move(path));
             else list << move(path);
         }
     }
     close(fd);
     return list;
 }
-
-string findFile(const ref<byte>& folder, const ref<byte>& file, int at) {
-    int fd = openFolder(folder,at);
-    assert(fd, "Folder not found"_, folder);
-    int i=0; for(dirent entry; getdents(fd,&entry,sizeof(entry))>0;i++) { if(i<2) continue;
-        string name = str(entry.name);
-        int type = *((byte*)&entry + entry.len - 1);
-        if(type==DT_DIR) { string path=findFile(name,file,fd); if(path) return folder+"/"_+path; }
-        else if(type==DT_REG && file==name) return folder+"/"_+name;
-    }
-    close(fd);
-    return ""_;
-}*/

@@ -32,8 +32,11 @@ template<class T> struct Image {
 
     no_copy(Image)
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
+    //Image(const Image& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), alpha(o.alpha) { assert(o.own==false); }
     Image& operator =(Image&& o) {  this->~Image(); data=o.data; o.data=0;
         width=o.width; height=o.height; stride=o.stride;  own=o.own; alpha=o.alpha; return *this; }
+    /*Image& operator =(const Image& o) {  this->~Image(); data=o.data; assert(o.own==false);
+        width=o.width; height=o.height; stride=o.stride;  own=o.own; alpha=o.alpha; return *this; }*/
 
     Image(){}
     Image(T* data, int width, int height, int stride, bool own, bool alpha) :

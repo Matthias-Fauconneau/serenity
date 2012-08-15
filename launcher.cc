@@ -63,7 +63,7 @@ List<Command> readShortcuts() {
     return shortcuts;
 }
 
-Launcher::Launcher() : shortcuts(readShortcuts()), menu(i({&search, &shortcuts})), window(&menu,""_,Image<byte4>(),int2(-3,-3)) {
+Launcher::Launcher() : shortcuts(readShortcuts()), menu(__(&search, &shortcuts)), window(&menu,""_,Image<byte4>(),int2(-3,-3)) {
     //window.hideOnLeave = true;
     window.localShortcut(Escape).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);

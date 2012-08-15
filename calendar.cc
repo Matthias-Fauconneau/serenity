@@ -13,7 +13,7 @@ array<string> getEvents(Date query) {
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
         if(s.match("except "_)) {
             Date except=parse(s); s.skip(); string title=string(s.until('\n'));
-            exceptions.insert(move(title),array<Date>i({except}));
+            exceptions.insert(move(title),array<Date>_(except));
         } else s.until('\n');
     }
     s.index=0;
@@ -85,7 +85,7 @@ void Month::setActive(Date active) {
 void Month::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-Calendar::Calendar() {i(*this<< ref<Widget*>{ &date, &month, &events };)
+Calendar::Calendar() { *this<< ref<Widget*>_(&date, &month, &events);
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::showEvents);

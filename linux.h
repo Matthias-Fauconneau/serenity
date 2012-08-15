@@ -74,14 +74,15 @@ typedef unsigned int uint;
 typedef unsigned long ulong;
 struct sockaddr { short family; ushort port; uint ip; int pad[2]; };
 struct sockaddr_un { ushort family=1; byte path[108]; };
-struct timespec { ulong sec,nsec; };
+struct timespec { long sec,nsec; };
 struct rlimit { ulong cur,max; };
 struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
               uint64 size; uint blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
-struct dirent { long ino, off; short len; char name[]; };
+struct dirent { long ino, off; short len; char name[246]; };
 struct ipc_perm { int key; uint uid,gid,cuid,cgid; uint16 mode,pad1,seq,pad2; ulong pad3[2]; };
 struct shmid_ds { ipc_perm perm; ulong size; ulong atime,pad1,dtime,pad2,ctime,pad3; int cpid,lpid; ulong count,pad4,pad5; };
 enum {POLLIN = 1, POLLOUT=4, POLLHUP = 16};
+
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000,
 #if __arm__
       O_DIRECTORY=040000
@@ -97,6 +98,8 @@ enum {PF_LOCAL=1, PF_INET};
 enum {SOCK_STREAM=1, SOCK_DGRAM};
 enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS };
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
+enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
+
 int exit(int code) __attribute((noreturn));
 syscall1(int, exit, int,code)
 syscall0(int, fork)

@@ -101,7 +101,7 @@ struct Slider : Widget {
 /// Item is an icon with text
 struct Item : Horizontal, Tuple<Icon,Text,Space> {
     Item():Tuple(){}
-    Item(Icon&& icon, Text&& text):Tuple(move(icon),move(text),Space()){}
+    Item(Image<byte4>&& icon, Text&& text):Tuple(move(icon),move(text),Space()){}
 };
 
 /// TabBar is a \a Bar containing \a Item elements

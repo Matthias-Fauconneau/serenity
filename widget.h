@@ -16,7 +16,8 @@ enum Key {
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
-    Widget(){}Widget(Widget&&)i(=default);
+    Widget(){}
+    Widget(Widget&& o):position(o.position),size(o.size){}
     virtual ~Widget() {}
 /// Layout
     int2 position; /// position of the widget within its parent widget

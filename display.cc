@@ -29,7 +29,8 @@ void fill(Rect rect, pixel color) { //TODO: blend
 void blit(int2 target, const Image<uint8>& source, bool unused invert) { //TODO: blend, invert
     Rect rect = (target+Rect(source.size())) & currentClip;
     for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-        framebuffer(x,y) = pixel(source(x-target.x,y-target.y));
+        uint8 value = source(x-target.x,y-target.y);
+        framebuffer(x,y) = pixel(value,value,value,255);
     }
 }
 #if __arm__

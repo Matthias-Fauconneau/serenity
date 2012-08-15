@@ -51,7 +51,7 @@ struct HTTP : Poll, virtual TextStream, virtual Socket {
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(const URL& url, Handler handler, array<string>&& headers i(={}), const ref<byte>& method="GET"_);
+    HTTP(const URL& url, Handler handler, array<string>&& headers =__(), const ref<byte>& method="GET"_);
 
    enum { Connect, Request, Header, Data, Cache, Handle, Done } state = Connect;
     void request();

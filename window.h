@@ -85,6 +85,6 @@ struct Window : Poll {
 
 /// Popup instantiates a widget in a small popup window
 template<class T> struct Popup : T {
-    Window window i({this,int2(300,300)});
+    Window window __(this, int2(300,300));
     Popup(T&& t=T()) : T(move(t)) { window.hideOnLeave=true; }
 };

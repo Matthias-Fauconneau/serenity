@@ -13,7 +13,7 @@ int imm(ubyte*& c, int size) {
 
 enum Reg { rAX,rCX,rDX,rBX,rSP,rBP,rSI,rDI,r8,r9,r10,r11,r12,r13,r14,r15 };
 string gpr(int r, int size) {
-    static ref< ref<byte>> gprs i({"ax"_,"cx"_,"dx"_,"bx"_,"sp"_,"bp"_,"si"_,"di"_,"r8"_,"r9"_,"r10"_,"r11"_,"r12"_,"r13"_,"r14"_,"r15"_});
+    static ref< ref<byte>> gprs __("ax"_,"cx"_,"dx"_,"bx"_,"sp"_,"bp"_,"si"_,"di"_,"r8"_,"r9"_,"r10"_,"r11"_,"r12"_,"r13"_,"r14"_,"r15"_);
     /**/  if(size==0) { if(r<4) return string(gprs[r][0])+"l"_; else return gprs[r]+"l"_; }
     else if(size==1) { if(r<8) return copy(gprs[r]); else return gprs[r]+"w"_; }
     else if(size==2) { if(r<8) return "e"_+gprs[r]; else return gprs[r]+"d"_; }
@@ -24,9 +24,9 @@ string xmm(int r, int) { return "xmm"_+str(r); }
 string reg(int r, int size, int sse) { return sse ? xmm(r,size) : gpr(r,size); }
 
 enum Op { add, or, adc, sbb, and, sub, not, cmp };
-static ref< ref<byte> > ops i({"add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_});
-static ref< ref<byte> > ccs i({ "o"_,"no"_,"c"_,"nc"_,"e"_,"ne"_,"na"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_ });
-static ref< ref<byte> > shs i({"rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_});
+static ref< ref<byte> > ops __("add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_);
+static ref< ref<byte> > ccs __( "o"_,"no"_,"c"_,"nc"_,"e"_,"ne"_,"na"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_ );
+static ref< ref<byte> > shs __("rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_);
 
 int modrm(ubyte rex, int size, ubyte*& c, string& s, int sse=0) {
     s<<'[';

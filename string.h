@@ -1,10 +1,8 @@
 #pragma once
 #include "array.h"
 
+// Enforces exact match for overload resolution
 template<class T> void str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); }
-
-/// Returns reference to string literals
-inline constexpr ref<byte> operator "" _(const char* data, uint size) { return ref<byte>((byte*)data,size); }
 
 /// Lexically compare strings
 bool operator >(const ref<byte>& a, const ref<byte>& b);
@@ -37,9 +35,6 @@ ref<byte> str(const char* s); //TODO: escape analysis
 inline ref<byte> str(const bool& b) { return b?"true"_:"false"_; }
 /// Returns a reference to the character
 inline ref<byte> str(const char& c) { return ref<byte>((byte*)&c,1); }
-
-/// string is an array of unsigned bytes (char is either signed/unsigned and would instanciate an incompatible template)
-typedef array<byte> string;
 
 /// Joins \a list into a single string with each element separated by \a separator
 string join(const ref<string>& list, const ref<byte>& separator);
@@ -87,9 +82,8 @@ template<class A, class B> struct cat {
     void copy(byte*& data) const { a.copy(data); b.copy(data); }
     operator array<byte>()  const{ array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
 };
-template<class Aa, class Ab, class Ba, class Bb> cat< cat<Aa, Ab>, cat<Ba, Bb> > operator +(const cat<Aa, Ab>& a, const cat<Ba, Bb>& b) {
-    return i({a,b});
-}
+template<class Aa, class Ab, class Ba, class Bb> cat< cat<Aa, Ab>, cat<Ba, Bb> >
+operator +(const cat<Aa, Ab>& a, const cat<Ba, Bb>& b) { return __(a,b); }
 /// Specialization to append a string
 template<class A> struct cat<A, ref<byte> > {
     const A& a;
@@ -98,7 +92,7 @@ template<class A> struct cat<A, ref<byte> > {
     void copy(byte*& data) const { a.copy(data); ::copy(data,b.data,b.size); data+=b.size; }
     operator array<byte>()  const{ array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
 };
-template<class Aa, class Ab> cat< cat<Aa, Ab>, ref<byte> > operator +(const cat<Aa, Ab>& a, const ref<byte>& b) { return i({a,b}); }
+template<class Aa, class Ab> cat< cat<Aa, Ab>, ref<byte> > operator +(const cat<Aa, Ab>& a, const ref<byte>& b) { return __(a,b); }
 /// Specialization to concatenate two strings
 template<> struct cat< ref<byte>, ref<byte> > {
     const ref<byte>& a;
@@ -107,7 +101,7 @@ template<> struct cat< ref<byte>, ref<byte> > {
     void copy(byte*& data) const { ::copy(data,a.data,a.size); data+=a.size; ::copy(data,b.data,b.size); data+=b.size; }
     operator array<byte>() const { array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
 };
-inline cat< ref<byte>, ref<byte> > operator +(const ref<byte>& a, const ref<byte>& b) { return i({a,b}); }
+inline cat< ref<byte>, ref<byte> > operator +(const ref<byte>& a, const ref<byte>& b) { return __(a,b); }
 
 /// Forwards concatenation
 template<class A, class B> const cat<A,B>& str(const cat<A,B>& s) { return s; }

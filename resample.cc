@@ -29,13 +29,34 @@
 #include "resample.h"
 #include "string.h"
 
+template<class T> T sq(const T& x) { return x*x; }
+template<class T> T cb(const T& x) { return x*x*x; }
+
+/// Floating point primitives
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
+
+const float PI = 3.14159265358979323846;
+inline float sin(float t) { return __builtin_sinf(t); }
+inline float sqrt(float f) { return __builtin_sqrtf(f); }
+inline float atan(float f) { return __builtin_atanf(f); }
+
+/// SIMD
+typedef float float4 __attribute__ ((vector_size(16)));
+typedef double double2 __attribute__ ((vector_size(16)));
+float4 alignedLoad(const float *p) { return *(float4*)p; }
+float4 unalignedLoad(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
+#define shuffle __builtin_shufflevector
+#define moveHighToLow(a,b) shuffle(a, b, 6, 7, 2, 3);
+
 //TODO: store FIR of order 48 in registers
 static inline float inner_product_single(const float* kernel, const float* signal, int len) {
     float4 sum = {0,0,0,0};
-    for(int i=0;i<len;i+=4) sum += loada_ps(kernel+i) * loadu_ps(signal+i); //TODO: align
-    sum += movehl_ps(sum, sum);
-    sum += shuffle_ps(sum, sum, 0x55);
-    return extract_s(sum, 0);
+    for(int i=0;i<len;i+=4) sum += alignedLoad(kernel+i) * unalignedLoad(signal+i); //TODO: align signal
+    sum += moveHighToLow(sum, sum);
+    sum += shuffle(sum, sum, 1,1,5,5); //== shuffle_ps 0x55 ?
+    return sum[0];
 }
 
 const int filterSize = 256;
@@ -89,7 +110,7 @@ Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channel
         N = filterSize;
     }
 
-    kernel = new float[N*targetRate];
+    kernel = allocate<float>(N*targetRate);
     for(int i=0;i<targetRate;i++) {
         for (int j=0;j<N;j++) {
             kernel[i*N+j] = sinc(cutoff, (j-N/2+1)-float(i)/targetRate, N);
@@ -101,11 +122,11 @@ Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channel
 
     const int bufferSize=160;
     memSize = N-1+bufferSize;
-    mem = new float[channelCount*memSize];
+    mem = allocate<float>(channelCount*memSize);
     clear(mem,channelCount*memSize,0.f);
 }
 Resampler::operator bool() const { return kernel; }
-Resampler::~Resampler() { unallocate(mem); mem=0; unallocate(kernel); kernel=0; }
+Resampler::~Resampler() { unallocate(mem,channelCount*memSize); mem=0; unallocate(kernel,N*targetRate); kernel=0; }
 
 void Resampler::filter(const float* source, int *sourceSize, float* target, int *targetSize, bool mix) {
     int ilen=0, olen=0;

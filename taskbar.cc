@@ -26,13 +26,13 @@ struct TaskBar : Application, Poll {
       Bar<Task> tasks;
       Clock clock;
        Popup<Calendar> calendar;
-       HBox panel i({&start, &tasks, &clock });
-      Window window{&panel,int2(0,-1)};
+       HBox panel __(&start, &tasks, &clock);
+      Window window __(&panel, int2(0,-1));
       //TODO: read title,icon from window
 
     TaskBar(array<string>&&) {
         //wm = socket
-        registerPoll(pollfd i({wm,POLLIN}));
+        registerPoll(pollfd __(wm,POLLIN));
 
         start.image = resize(buttonIcon, 16,16);
         start.triggered.connect(this,&TaskBar::startKey);

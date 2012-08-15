@@ -30,7 +30,7 @@ struct TextLayout {
         pen.x=0;
         for(Word& word: line) {
             assert(word);
-            for(Character& c: word) text << i(Character{pen+c.pos, move(c.glyph)});
+            for(Character& c: word) text << Character __(pen+c.pos, c.glyph);
             pen.x += word.last().pos.x+word.last().glyph.advance+space;
         }
         line.clear();
@@ -62,10 +62,10 @@ struct TextLayout {
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(format&Format::Link) {
                     link.end=glyphCount;
-                    links << Text::Link i({link.begin,link.end,move(link.identifier)});
+                    links << Text::Link __(link.begin,link.end,move(link.identifier));
                 }
                 Format newFormat = ::format(c);
-                if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line i({underlineBegin,glyphCount});
+                if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line __(underlineBegin,glyphCount);
                 format=newFormat;
                 if(format&Format::Bold) {
                     static map<int,Font> defaultBold;
@@ -95,7 +95,7 @@ struct TextLayout {
             Glyph glyph = font->glyph(c);
             pen.x += font->kerning(previous,c);
             previous = c;
-            if(glyph.image) word << i(Character{int2(pen.x,0)+glyph.offset, move(glyph) }); glyphCount++;
+            if(glyph.image) word << Character __(int2(pen.x,0)+glyph.offset, move(glyph)); glyphCount++;
             pen.x += glyph.advance;
         }
         if(!text || text[text.size-1]!='\n') {
@@ -116,7 +116,7 @@ void Text::update(int wrap) {
     lines.clear();
     blits.clear();
     TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
-    for(const TextLayout::Character& c: layout.text) blits << i(Blit{int2((c.pos.x+8)>>4,(c.pos.y+8)>>4),share(c.glyph.image)});
+    for(const TextLayout::Character& c: layout.text) blits << Blit __(int2((c.pos.x+8)>>4, (c.pos.y+8)>>4), share(c.glyph.image));
     for(const TextLayout::Line& l: layout.lines) {
         Line line;
         const TextLayout::Character& c = layout.text[l.begin];

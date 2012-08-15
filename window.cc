@@ -44,15 +44,10 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     }
     assert(visual);
 
-    /*{QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; write(x,string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(); log("MIT-SHM",r.present,r.major,r.firstEvent,r.firstError); }
-    {Shm::QueryVersion r; write(x, raw(r));}
-    {Shm::QueryVersionReply r=readReply<Shm::QueryVersionReply>(); log(r.sharedPixmaps,r.major,r.minor,r.uid,r.gid,r.format);}*/
-
     // Creates X window
     if(size.x<=0) size.x=display.x+size.x;
     if(size.y<=0) size.y=display.y+size.y;
-    widget->size=size;
+    widget->size=size; widget->update();
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; write(x,raw(r));}
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.backgroundPixel=r.borderPixel=0xF0F0F0F0; r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
@@ -61,7 +56,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; write(x,raw(r));}
     setTitle(title);
     setIcon(icon);
-    registerPoll(i({x,POLLIN}));
+    registerPoll(__(x,POLLIN));
 }
 
 void Window::event(pollfd poll) {
@@ -162,8 +157,6 @@ void Window::render() {
     assert(!clipStack);
     {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
         r.totalWidth=r.width=buffer.width; r.totalHeight=r.height=buffer.height; write(x,raw(r)); }
-    /*{PutImage r; r.window=id; r.context=id+GContext; r.w=framebuffer.width; r.h=framebuffer.height; r.size+=r.w*r.h;
-        write(x,raw(r)); write(x,(ref<byte>)framebuffer); }*/
 }
 
 signal<>& Window::localShortcut(Key key) { return localShortcuts.insert((uint16)key); }

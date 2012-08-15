@@ -50,7 +50,7 @@ void Poll::registerPoll(pollfd fd) { polls << this; pollfds << fd; }
 static Poll* lastUnregistered; //for correct looping
 void Poll::unregisterPoll() { for(int i;(i=polls.removeOne(this))>=0;) pollfds.removeAt(i); lastUnregistered=this; }
 bool operator ==(pollfd a, pollfd b) { return a.fd==b.fd; }
-void Poll::unregisterPoll(int fd) { int i=pollfds.removeOne(pollfd i({fd})); if(i>=0) polls.removeAt(i); }
+void Poll::unregisterPoll(int fd) { int i=pollfds.removeOne(__(fd)); if(i>=0) polls.removeAt(i); }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
 
@@ -66,7 +66,7 @@ int dispatchEvents() {
             else if(events&POLLHUP) { log("POLLHUP"); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
         }
     }
-    while(queue) queue.takeFirst()->event(i({}));
+    while(queue) queue.takeFirst()->event(__());
     return polls.size();
 }
 

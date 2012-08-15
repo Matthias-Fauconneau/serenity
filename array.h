@@ -8,10 +8,11 @@
 /// \note array transparently detach when trying to modify a foreign (i.e not owned heap) reference
 template<class T> struct array {
     int8 tag = -1; //0: empty, >0: inline, -1 = not owned (reference), -2 = owned (heap)
-    struct {
+    struct Buffer {
         const T* data;
         uint size;
         uint capacity;
+        Buffer(const T* data, uint size, uint capacity):data(data),size(size),capacity(capacity){}
     } buffer = {0,0,0};
     //int pad[4]; // (4+4)*4=32 Pads to fill half a cache line (31 inline bytes)
     /// Number of elements fitting inline
@@ -44,9 +45,9 @@ template<class T> struct array {
     /// Copies elements from a reference
     explicit array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
     /// References \a size elements from read-only \a data pointer
-    array(const T* data, uint size) : i(buffer{data, size, 0}) {} //TODO: escape analysis
+    array(const T* data, uint size) : buffer(data, size, 0) {} //TODO: escape analysis
     /// Initializes array with a writable buffer of \a capacity elements
-    array(const T* data, uint size, uint capacity) : tag(-2) i(, buffer{data, size, capacity}) {} //TODO: escape analysis
+    array(const T* data, uint size, uint capacity) : tag(-2), buffer(data, size, capacity) {} //TODO: escape analysis
 
     /// If the array own the data, destroys all initialized elements and frees the buffer
     ~array() { if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); } }
@@ -173,3 +174,6 @@ template<class T, int N> struct static_array : array<T> {
     constexpr static_array():array<T>((T*)buffer,0,N){}
     ubyte buffer[N*sizeof(T)];
 };
+
+/// string is an array of unsigned bytes (char is either signed/unsigned and would instanciate an incompatible template)
+typedef array<byte> string;

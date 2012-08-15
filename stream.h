@@ -101,14 +101,14 @@ struct DataStream : virtual Stream {
         operator byte() { return s->read<byte>(); }
         //template<class T> operator const T&(){ return s->read<T>(); }
     };
-    ReadOperator read() { return i({this}); }
+    ReadOperator read() { return __(this); }
 
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {
        DataStream* s; uint size;
        template<class T> operator array<T>() { array<T> t; for(uint i=0;i<size;i++) t<<(T)s->read(); return t; }
    };
-   ArrayReadOperator read(uint size) { return i({this,size}); }
+   ArrayReadOperator read(uint size) { return __(this,size); }
 
    /// Reads \a size \a T elements from stream (swap as needed)
    template<class T>  void read(T buffer[], uint size) { for(uint i=0;i<size;i++) buffer[i]=(T)read(); }

@@ -16,10 +16,8 @@ void symlink(const ref<byte>& target,const ref<byte>& name, int at=root());
 /// Returns the last modified time for \a path
 long modifiedTime(const ref<byte>& path, int at=root());
 
-//enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
-//array<string> listFiles(const ref<byte>& folder, Flags flags, int at=root());
-//string findFile(const ref<byte>& folder, const ref<byte>& file, int at=root());
-
+enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
+array<string> listFiles(const ref<byte>& folder, Flags flags, int at=root());
 
 /// File is a file descriptor which close itself in the destructor
 struct File {

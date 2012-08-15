@@ -1,5 +1,8 @@
 #include "alsa.h"
+#include "linux.h"
+#include "debug.h"
 
+#define timespec timespec_
 #include <sys/types.h>
 #include <alsa/global.h>
 struct snd_input_t;
@@ -9,7 +12,7 @@ struct snd_output_t;
 #include <alsa/timer.h>
 #include <alsa/control.h>
 
-AudioOutput::AudioOutput(bool realtime) {
+AudioOutput::AudioOutput(function<void(int16* output, uint size)> read, bool realtime) : read(read) {
     snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK|SND_PCM_NO_SOFTVOL);
     byte alloca_hw[snd_pcm_hw_params_sizeof()];
     snd_pcm_hw_params_t* hw=(snd_pcm_hw_params_t*)alloca_hw; snd_pcm_hw_params_any(pcm,hw);
@@ -32,7 +35,6 @@ AudioOutput::AudioOutput(bool realtime) {
 void AudioOutput::start() { if(running) return; pollfd p; snd_pcm_poll_descriptors(pcm,&p,1); registerPoll(p); running=true; }
 void AudioOutput::stop() { if(!running) return; unregisterPoll(); snd_pcm_drain(pcm); running=false; }
 void AudioOutput::event(pollfd p) {
-    assert(read.method);
     unsigned short revents;
     snd_pcm_poll_descriptors_revents(pcm, &p, 1, &revents);
     if(!(revents & POLLOUT)) return;

@@ -45,7 +45,7 @@ template<class K, class V> struct map {
         const K* k; const V* v;
         const_iterator(const K* k, const V* v) : k(k), v(v) {}
         bool operator!=(const const_iterator& o) const { return k != o.k; }
-        const_pair<K,V> operator* () const { return i({*k,*v}); }
+        const_pair<K,V> operator* () const { return __(*k,*v); }
         const const_iterator& operator++ () { k++; v++; return *this; }
     };
     const_iterator begin() const { return const_iterator(keys.begin(),values.begin()); }
@@ -55,7 +55,7 @@ template<class K, class V> struct map {
         K* k; V* v;
         iterator(K* k, V* v) : k(k), v(v) {}
         bool operator!=(const iterator& o) const { return k != o.k; }
-        pair<K,V> operator* () const { return i({*k,*v}); }
+        pair<K,V> operator* () const { return __(*k,*v); }
         const iterator& operator++ () { k++; v++; return *this; }
     };
     iterator begin() { return iterator((K*)keys.begin(),(V*)values.begin()); }

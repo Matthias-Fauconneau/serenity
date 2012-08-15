@@ -2,9 +2,9 @@
 #include "string.h"
 
 template<template<typename> class V, class T, int N> struct vector : V<T> {
-    constexpr vector():i(V<T>{}){}
+    constexpr vector():____(V<T>{}){}
     explicit vector(T t){ for(int i=0;i<N;i++) u(i)=t; }
-    template<class... Args> explicit constexpr vector(T a, T b, Args... args):i(V<T>{a,b,T(args)...}){
+    template<class... Args> explicit constexpr vector(T a, T b, Args... args):____(V<T>{a,b,T(args)...}){
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     template<class T2> explicit vector(const vector<V,T2,N>& o) { for(int i=0;i<N;i++) u(i)=(T)o[i]; }

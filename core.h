@@ -1,17 +1,5 @@
 #pragma once
 
-/// Missing C++11 IDE support workarounds
-#ifndef __GXX_EXPERIMENTAL_CXX0X__
-#define override
-#define _
-#define ___
-#define i( ignore... )
-template<class T> struct ref;
-#else
-#define ___ ...
-#define i( ignore... ) ignore
-#endif
-
 /// Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
@@ -25,7 +13,7 @@ template<typename T> struct remove_reference<T&> { typedef T type; };
 template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
 template<class T> constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
-#define no_copy(o) o(o&)=delete; o& operator=(const o&)=delete;
+#define no_copy(o) o(const o&)=delete; o& operator=(const o&)=delete;
 /// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
 template<class T> T copy(const T& t) { return t; }
 
@@ -105,9 +93,25 @@ template<class T> struct initializer_list {
     bool contains(const T& value) const { return indexOf(value)>=0; }
 };
 }
+
+/// Missing C++11 IDE support workarounds
+#ifndef __GXX_EXPERIMENTAL_CXX0X__
+#define override
+template<class T> struct ref;
+#define _
+#define __( args... )
+#define ___
+#define ____( ignore... )
+#else
 /// \a ref is a const typed bounded memory reference (i.e fat pointer)
 /// \note As \a data is not owned, ref should be used carefully (only as argument, never as field)
-i( template<class T> using ref = std::initializer_list<T>; )
+template<class T> using ref = std::initializer_list<T>;
+/// Returns reference to string literals
+inline constexpr ref<byte> operator "" _(const char* data, uint size) { return ref<byte>((byte*)data,size); }
+#define __( args... ) { args }
+#define ___ ...
+#define ____( ignore... ) ignore
+#endif
 
 /// Basic operations
 template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }

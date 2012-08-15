@@ -7,7 +7,9 @@ struct AudioFormat { int frequency, channels; };
 struct AudioFile {
     AudioFormat audioInput,audioOutput;
     Resampler resampler;
-    float* buffer=0; float* input=0; int inputSize=0;
+    float* buffer=0; int bufferSize=0;
+    float* input=0; int inputBufferSize=0;
+    int inputSize=0;
 
     void open(const string& path);
     void close();
