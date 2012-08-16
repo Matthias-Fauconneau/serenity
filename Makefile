@@ -2,11 +2,12 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= fast
 
-CC = clang -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-omit-frame-pointer -Wall -Wextra -Wno-missing-field-initializers -march=native
+CC = clang -pipe -std=c++11  -march=native -funsigned-char -fno-threadsafe-statics -fno-omit-frame-pointer -fno-exceptions -fno-rtti \
+-Wall -Wextra -Wno-missing-field-initializers
 CC += $(FLAGS_$(BUILD))
-FLAGS_debug := -g -DDEBUG -fno-rtti
-FLAGS_fast := -g -DDEBUG -O -fno-rtti
-FLAGS_profile := -g -O -fno-rtti -finstrument-functions
+FLAGS_debug := -g -DDEBUG
+FLAGS_fast := -g -DDEBUG -O
+FLAGS_profile := -g -O -finstrument-functions
 
 SRCS = $(SRCS_$(BUILD)) $(SRCS_$(TARGET))
 SRCS_profile += profile

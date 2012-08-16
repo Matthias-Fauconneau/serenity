@@ -6,24 +6,7 @@
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 typedef vector<bgra,uint,4> int4;
-
-#define RGB565 __arm__
-#if RGB565
-struct rgb565 {
-    uint16 pack;
-    constexpr rgb565():pack(0){}
-    constexpr rgb565(uint8 i):pack( (i&0b11111000)<<8 | (i&0b11111100)<<3 | i>>3 ) {}
-    constexpr rgb565(uint8 b, uint8 g, uint8 r, uint8 unused a):pack((r&0b11111000)<<8|(g&0b11111100)<<3|b>>3){}
-    constexpr rgb565(byte4 c):rgb565(c.b, c.g, c.r){}
-    constexpr rgb565(int4 c):rgb565(c.b, c.g, c.r){}
-    operator byte4() const { return byte4((pack&0b11111)<<3,(pack>>3)&0b11111100,pack>>8,255); }
-    operator    int4() const { return     int4((pack&0b11111)<<3,(pack>>3)&0b11111100,pack>>8,255); }
-};
-/// pixel is native display format
-typedef rgb565 pixel;
-#else
 typedef byte4 pixel;
-#endif
 
 template<class T> struct Image {
     T* data=0;

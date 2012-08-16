@@ -81,17 +81,21 @@ long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtim
 array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
     int fd = openFolder(folder,at);
     assert(fd, "Folder not found"_, folder);
-    array<string> list;
-    int i=0; for(dirent entry; getdents(fd,&entry,sizeof(entry))>0;i++) { if(i<2) continue;
-        string name = string(entry.name,entry.len - 12);
-        string path = folder+"/"_+name;
-        int type = *((byte*)&entry + entry.len - 1);
-        if(type==DT_DIR && flags&Recursive) {
-            if(flags&Sort) for(string& e: listFiles(path,flags,at)) list.insertSorted(move(e));
-            else list << move(listFiles(path,flags,at));
-        } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
-            if(flags&Sort) list.insertSorted(move(path));
-            else list << move(path);
+    array<string> list; byte buffer[256];
+    for(int size;(size=check(getdents(fd,&buffer,sizeof(buffer))))>0;) {
+        for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
+            ref<byte> name = str(entry.name);
+            if(name=="."_||name==".."_) continue;
+            int type = *((byte*)&entry + entry.len - 1);
+            if(type==DT_DIR && flags&Recursive) {
+                array<string> files = listFiles(name,flags,fd);
+                if(flags&Sort) for(string& e: files) list.insertSorted(move(e));
+                else list << move(files);
+            } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
+                string path = folder+"/"_+name;
+                if(flags&Sort) list.insertSorted(move(path));
+                else list << move(path);
+            }
         }
     }
     close(fd);

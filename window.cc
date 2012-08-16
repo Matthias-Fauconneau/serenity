@@ -47,7 +47,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     // Creates X window
     if(size.x<=0) size.x=display.x+size.x;
     if(size.y<=0) size.y=display.y+size.y;
-    widget->size=size; widget->update();
+    widget->size=size;
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; write(x,raw(r));}
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.backgroundPixel=r.borderPixel=0xF0F0F0F0; r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
@@ -87,7 +87,7 @@ void Window::readEvent(uint8 type) {
         } else if(type==UnmapNotify) { mapped=false;
         } else if(type==MapNotify) { mapped=true;
         } else if(type==ReparentNotify) {
-        } else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(widget->size!=size) { widget->size=size; widget->update(); }
+        } else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(widget->size!=size) { widget->size=size; needUpdate=true; }
         } else if(type==ClientMessage) {
             signal<>* shortcut = localShortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
@@ -109,11 +109,7 @@ uint Window::KeySym(uint8 code) {
     }
 }
 
-void Window::setWidget(Widget* widget) {
-    widget->size=this->widget->size;
-    this->widget=widget;
-    widget->update();
-}
+void Window::setWidget(Widget* widget) { widget->size=this->widget->size; this->widget=widget; needUpdate=true; }
 
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;
@@ -137,9 +133,10 @@ void Window::setIcon(const Image<byte4>& icon) {
 void Window::show() { if(mapped) return; {MapWindow r; r.id=id; write(x,raw(r));}}
 void Window::hide() { if(!mapped) return;{UnmapWindow r; r.id=id; write(x,raw(r));}}
 
-void Window::update() { widget->update(); render(); }
+void Window::update() { needUpdate=true; render(); }
 void Window::render() {
     assert(mapped); assert(widget->size);
+    if(needUpdate) { widget->update(); needUpdate=false; }
     if(buffer.width != (uint)widget->size.x || buffer.height != (uint)widget->size.y) {
         if(shm) {
             {Shm::Detach r; r.seg=id+Segment; write(x, raw(r));}

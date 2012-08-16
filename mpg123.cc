@@ -3,8 +3,8 @@
 #include <mpg123.h>
 
 void AudioFile::open(const ref<byte>& path) {
-    if(file) close(); else { static int unused once=mpg123_init(); }
-
+    static int unused once=mpg123_init();
+    close();
 	file = mpg123_new(0,0);
 	mpg123_param(file, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.);
 	if(mpg123_open(file,strz(path))) { file=0; return; }
@@ -18,11 +18,12 @@ void AudioFile::open(const ref<byte>& path) {
 		new (&resampler) Resampler(audioInput.channels, audioInput.frequency, audioOutput.frequency);
 	}
 }
-void AudioFile::close() { mpg123_close(file); mpg123_delete(file); file=0; }
+void AudioFile::close() { if(file) { mpg123_close(file); mpg123_delete(file); file=0; } }
 int AudioFile::position() { return (int)mpg123_tell(file)/audioInput.frequency; }
 int AudioFile::duration() { return (int)mpg123_length(file)/audioInput.frequency; }
 void AudioFile::seek( int time ) { mpg123_seek_frame(file,mpg123_timeframe(file,time),0); }
 void AudioFile::read(int16* output, uint outputSize) {
+    log(ptr(output));
 	if(file) timeChanged(position(),duration());
 	if(!file) { clear(output,outputSize*2); return; }
 	for(;;) {
@@ -43,7 +44,7 @@ void AudioFile::read(int16* output, uint outputSize) {
 			clear(output,outputSize*2);
 			return;
 		}
-		inputSize /= audioInput.channels*4;
+        inputSize /= audioInput.channels*sizeof(float);
 		assert(inputSize);
 
 		if(resampler) {

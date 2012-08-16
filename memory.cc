@@ -30,9 +30,13 @@ void unallocate_(byte* buffer, int size) {
 #else
 void setupHeap() {}
 extern "C" byte* malloc(ulong size);
+extern "C" int posix_memalign(byte** buffer, ulong alignment, ulong size);
 extern "C" byte* realloc(void* buffer, ulong size);
 extern "C" void free(byte* buffer);
-byte* allocate_(uint size) { return malloc(size); }
+byte* allocate_(uint size) {
+    //return malloc(size); //aligned to 8-byte
+    byte* buffer; assert_(!posix_memalign(&buffer,16,size)); return buffer;
+}
 byte* reallocate_(byte* buffer, int unused size, int need) { return realloc(buffer,need); }
-void unallocate_(byte* buffer, int unused size) { return free(buffer); }
+void unallocate_(byte* unused buffer, int unused size) { /*free(buffer);*/ }
 #endif

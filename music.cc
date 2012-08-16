@@ -3,7 +3,7 @@
 
 #include "sequencer.h"
 #include "sampler.h"
-#include "alsa.h"
+#include "asound.h"
 #include "midi.h"
 
 #ifdef PDF

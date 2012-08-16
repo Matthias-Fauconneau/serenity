@@ -80,7 +80,7 @@ struct timespec { long sec,nsec; };
 struct rlimit { ulong cur,max; };
 struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
               uint64 size; uint blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
-struct dirent { long ino, off; short len; char name[246]; };
+struct dirent { long ino, off; short len; char name[]; };
 struct ipc_perm { int key; uint uid,gid,cuid,cgid; uint16 mode,pad1,seq,pad2; ulong pad3[2]; };
 struct shmid_ds { ipc_perm perm; ulong size; ulong atime,pad1,dtime,pad2,ctime,pad3; int cpid,lpid; ulong count,pad4,pad5; };
 
@@ -115,10 +115,10 @@ syscall3(int, ioctl, int,fd, long,request, void*,buf)
 syscall3(int, fcntl, int,fd, int,cmd, int,param)
 syscall2(int, munmap, void*,addr, long,len)
 syscall3(int, setpriority, int,which, int,who, int,prio)
-syscall3(int, getdents, int,fd, dirent*,entry, long,size)
+syscall3(int, getdents, int,fd, void*,entry, long,size)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
-syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
+syscall6(long, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, fstat, int,fd, stat*,buf)
 syscall2(int, clock_gettime, int,type, timespec*,ts)
 syscall4(int, openat, int,fd, const char*,name, int,oflag, int,perms)

@@ -21,5 +21,5 @@ struct AudioFile {
     void read(int16* output, uint size);
     signal<int,int> timeChanged;
 
-    struct mpg123_handle_struct* file;
+    struct mpg123_handle_struct* file = 0;
 };

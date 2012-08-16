@@ -62,19 +62,21 @@ struct Window : Poll {
     bool mapped = false;
     /// Whether this window should close on leave (e.g for dropdown menus)
     bool hideOnLeave = false;
+    /// Whether \a Widget::update should be called before next \a render
+    bool needUpdate = true;
 
     /// Socket to system local X display server
     const int x; /// \note Each window opens its own socket to simplify code (i.e no same process optimization)
     /// Display size
     int2 display;
     /// Root window
-    uint root;
+    uint root = 0;
     /// This window base resource id
-    uint id;
+    uint id = 0;
     /// Associated window resource (relative to \a id)
     enum { XWindow, GContext, Colormap, Segment };
     /// Posix shared memory
-    int shm;
+    int shm = 0;
     /// Shared window back buffer
     Image<byte4> buffer;
 

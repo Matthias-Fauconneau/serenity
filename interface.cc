@@ -137,7 +137,8 @@ bool TriggerButton::mouseEvent(int2, Event event, Key) {
 
 ///  ToggleButton
 
-ToggleButton::ToggleButton(const Image<byte4>& enableIcon, const Image<byte4>& disableIcon) : enableIcon(enableIcon), disableIcon(disableIcon) {}
+ToggleButton::ToggleButton(Image<byte4>&& enableIcon, Image<byte4>&& disableIcon)
+    : enableIcon(move(enableIcon)), disableIcon(move(disableIcon)) {}
 int2 ToggleButton::sizeHint() { return int2(size,size); }
 void ToggleButton::render(int2 parent) {
     if(!(enabled?disableIcon:enableIcon)) return;

@@ -8,6 +8,8 @@ string.h
 string.cc
 process.h
 process.cc
+debug.h
+debug.cc
 file.h
 file.cc
 
@@ -26,8 +28,6 @@ ffmpeg.cc
 ffmpeg.h
 asound.cc
 asound.h
-alsa.cc
-alsa.h
 resample.cc
 resample.h
 player.cc

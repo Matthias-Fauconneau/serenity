@@ -146,7 +146,7 @@ void Sampler::read(int16 *output, uint period) {
     if(anyActive) {
         float* in = layers[1].buffer;
         for(uint i=0;i<period*2;i++) { int o=int(in[i])>>9; if(o<=-32768 || o>=32768) warn("clip"); output[i] = clip(-32767,o,32767);}
-    } else clear(output,period*2); //no active note -> play silence (TODO: pause alsa)
+    } else clear(output,period*2); //no active note -> play silence (TODO: pcm_stop)
     if(record) write(record,output,period*2*sizeof(int16));
     time+=period;
 }

@@ -65,7 +65,7 @@ struct TriggerButton : Icon {
 /// ToggleButton is a togglable Icon
 struct ToggleButton : Widget {
     /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(const Image<byte4>& enable,const Image<byte4>& disable);
+    ToggleButton(Image<byte4>&& enable, Image<byte4>&& disable);
 
     /// User toggled the button
     signal<bool /*nextState*/> toggled;
@@ -77,8 +77,8 @@ struct ToggleButton : Widget {
     void render(int2 parent);
     bool mouseEvent(int2 position, Event event, Key button) override;
 
-    const Image<byte4>& enableIcon;
-    const Image<byte4>& disableIcon;
+    Image<byte4> enableIcon;
+    Image<byte4> disableIcon;
     static const int size = 32;
 };
 

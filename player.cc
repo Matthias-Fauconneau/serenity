@@ -1,7 +1,7 @@
 #include "process.h"
 #include "file.h"
 #include "mpg123.h"
-#include "alsa.h"
+#include "asound.h"
 #include "interface.h"
 #include "layout.h"
 #include "window.h"
@@ -40,7 +40,8 @@ struct Player : Application {
         titles.activeChanged.connect(this, &Player::playTitle);
         media.audioOutput= __(audio.frequency,audio.channels);
 
-        folders = listFiles("/Music"_,Sort|Folders);
+        folders = listFiles("Music"_,Sort|Folders);
+        assert(folders);
         for(string& folder : folders) albums << Text(string(section(folder,'/',-2,-1)), 10);
 
         /*for(string&& path: arguments) {
@@ -86,6 +87,7 @@ struct Player : Application {
         writeFile("/Music/.last"_,files[index]);
     }
     void next() {
+        if(!titles.count()) return;
         if(!playButton.enabled) setPlaying(true);
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else window.setTitle(albums.active().text);

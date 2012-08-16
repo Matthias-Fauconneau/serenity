@@ -3,6 +3,7 @@
 /// Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
+#define nodebug __attribute((always_inline, nodebug))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
 inline void* operator new(unsigned int, void* p) { return p; } //placement new

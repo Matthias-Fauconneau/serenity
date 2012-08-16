@@ -27,7 +27,7 @@
    POSSIBILITY OF SUCH DAMAGE.
 */
 #include "resample.h"
-#include "string.h"
+#include "memory.h"
 
 template<class T> T sq(const T& x) { return x*x; }
 template<class T> T cb(const T& x) { return x*x*x; }
@@ -45,13 +45,14 @@ inline float atan(float f) { return __builtin_atanf(f); }
 /// SIMD
 typedef float float4 __attribute__ ((vector_size(16)));
 typedef double double2 __attribute__ ((vector_size(16)));
-float4 alignedLoad(const float *p) { return *(float4*)p; }
-float4 unalignedLoad(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
+float4 nodebug alignedLoad(const float *p) { return *(float4*)p; }
+float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
 #define shuffle __builtin_shufflevector
 #define moveHighToLow(a,b) shuffle(a, b, 6, 7, 2, 3);
 
 //TODO: store FIR of order 48 in registers
-static inline float inner_product_single(const float* kernel, const float* signal, int len) {
+inline float inner_product_single(const float* kernel, const float* signal, int len) {
+    assert_(kernel); assert_(signal); assert_(ptr(kernel)%16==0);
     float4 sum = {0,0,0,0};
     for(int i=0;i<len;i+=4) sum += alignedLoad(kernel+i) * unalignedLoad(signal+i); //TODO: align signal
     sum += moveHighToLow(sum, sum);
@@ -126,9 +127,10 @@ Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channel
     clear(mem,channelCount*memSize,0.f);
 }
 Resampler::operator bool() const { return kernel; }
-Resampler::~Resampler() { unallocate(mem,channelCount*memSize); mem=0; unallocate(kernel,N*targetRate); kernel=0; }
+Resampler::~Resampler() { unallocate(mem,channelCount*memSize); unallocate(kernel,N*targetRate); }
 
 void Resampler::filter(const float* source, int *sourceSize, float* target, int *targetSize, bool mix) {
+    assert_(kernel); assert_(mem); assert_(source); assert_(target);
     int ilen=0, olen=0;
     for (int channel=0;channel<channelCount;channel++) {
         const float* in = source+channel;

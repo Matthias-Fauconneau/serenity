@@ -16,8 +16,8 @@ signal.cc
 time.h
 time.cc
 
-alsa.cc
-alsa.h
+asound.cc
+asound.h
 resample.cc
 sequencer.cc
 sequencer.h

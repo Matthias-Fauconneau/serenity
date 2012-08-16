@@ -13,14 +13,15 @@ struct ucontext {
 #endif
 };
 
-static void handler(int signo, siginfo* info, ucontext* ctx) {
+static void handler(int sig, siginfo* info, ucontext* ctx) {
+    if(sig==SIGABRT) log("Abort");
     trace(1);
 #if __arm__
     {Symbol s = findNearestLine((void*)ctx->pc);  log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
 #elif __x86_64__ || __i386__
     {Symbol s = findNearestLine((void*)ctx->eip); log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
 #endif
-    if(signo==SIGSEGV) log("Segmentation fault at 0x"_+str(ptr(info->fault.addr)));
+    if(sig==SIGSEGV) log("Segmentation fault at 0x"_+str(ptr(info->fault.addr)));
     abort();
 }
 

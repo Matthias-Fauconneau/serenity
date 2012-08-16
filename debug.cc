@@ -47,16 +47,17 @@ string demangle(TextStream& s, bool function=true) {
     else if(s.match("mi"_)) r<<"operator -"_;
     else if(s.match("ml"_)) r<<"operator *"_;
     else if(s.match("dv"_)) r<<"operator /"_;
+    else if(s.match('a')) r<<"byte"_;
     else if(s.match('b')) r<<"bool"_;
     else if(s.match('c')) r<<"char"_;
-    else if(s.match('a')) r<<"byte"_;
+    else if(s.match('f')) r<<"float"_;
     else if(s.match('h')) r<<"ubyte"_;
-    else if(s.match('s')) r<<"short"_;
-    else if(s.match('t')) r<<"ushort"_;
     else if(s.match('i')) r<<"int"_;
     else if(s.match('j')) r<<"uint"_;
     else if(s.match('l')) r<<"long"_;
     else if(s.match('m')) r<<"ulong"_;
+    else if(s.match('s')) r<<"short"_;
+    else if(s.match('t')) r<<"ushort"_;
     else if(s.match('x')) r<<"int64"_;
     else if(s.match('y')) r<<"uint64"_;
     else if(s.match('A')) { r<<"[]"_; s.number(); s.match('_'); }
@@ -193,9 +194,9 @@ void trace(int skip, uint size) {
     if(recurse>1) {write(1,"Debugger error\n"_); void**p=0;*p=0; } recurse++;
     void* stack[16]; clear(stack);
     stack[0] = __builtin_return_address(0);
-    #define bra(i) if(ptr(stack[i-1])>0x8000000 && ptr(stack[i-1])<0x10000000) stack[i] = __builtin_return_address(i)
+    #define bra(i) if(ptr(stack[i-1])>0x8000000 && ptr(stack[i-1])<0xb0000000) stack[i] = __builtin_return_address(i)
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);
-    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x8000000 && ptr(stack[i])<0x10000000) {
+    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x8000000 && ptr(stack[i])<0xb0000000) {
         Symbol s = findNearestLine(stack[i]);
         if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log("0x"_+str(ptr(stack[i])));
     }
