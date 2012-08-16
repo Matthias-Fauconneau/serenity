@@ -50,8 +50,10 @@ struct Control { ulong swPointer, availableMinimum; };
 #define IOCTL_START IO('A', 0x42)
 #define IOCTL_DRAIN IO('A', 0x44)
 
-AudioOutput::AudioOutput(function<void(int16* output, uint size)> read, bool realtime) : read(read) {
-    fd = check( open("/dev/snd/pcmC0D0p", O_RDWR, 0) );
+void AudioOutput::start(bool realtime) {
+    if(fd) return;
+    fd = open("/dev/snd/pcmC0D0p", O_RDWR|O_NONBLOCK, 0);
+    if(fd<0) { warn("Busy audio output"); fd=0; return; }
 
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
@@ -78,16 +80,18 @@ AudioOutput::AudioOutput(function<void(int16* output, uint size)> read, bool rea
 
     status = (Status*)mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset);
     control = (Control*)mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset);
+    registerPoll(__(fd,POLLOUT|POLLERR |POLLNVAL));
+    ioctl(fd, IOCTL_PREPARE, 0);
 }
-AudioOutput::~AudioOutput(){
-    munmap(status, 0x1000);
-    munmap(control, 0x1000);
-    check_(ioctl(fd, IOCTL_DRAIN,0));
-    munmap(buffer, bufferSize * channels * 2);
-    close(fd);
+void AudioOutput::stop() {
+    if(!fd) return;
+    unregisterPoll();
+    if(status->state == Running) ioctl(fd, IOCTL_DRAIN,0);
+    munmap(status, 0x1000); status=0;
+    munmap(control, 0x1000); control=0;
+    munmap(buffer, bufferSize * channels * 2); buffer=0; bufferSize=0;
+    close(fd); fd=0;
 }
-void AudioOutput::start() { if(running) return; registerPoll(__(fd,POLLOUT|POLLERR |POLLNVAL)); ioctl(fd, IOCTL_PREPARE, 0); }
-void AudioOutput::stop() { if(!running) return; unregisterPoll(); check_(ioctl(fd, IOCTL_DRAIN,0)); running=false; }
 void AudioOutput::event(const pollfd&) {
     if(status->state == XRun) { warn("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
     int available = status->hwPointer + bufferSize - control->swPointer;
@@ -97,5 +101,5 @@ void AudioOutput::event(const pollfd&) {
     assert(frames>=periodSize);
     read(buffer+offset*channels,(int)frames); //+offset*2?
     control->swPointer += frames;
-    if(status->state == Prepared) { check_(ioctl(fd, IOCTL_START, 0)); running=true; }
+    if(status->state == Prepared) { check_(ioctl(fd, IOCTL_START, 0)); }
 }

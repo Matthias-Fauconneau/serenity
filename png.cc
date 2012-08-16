@@ -3,11 +3,10 @@
 #include "inflate.h"
 #include "memory.h"
 
-
-template<class T> struct rgba { T r,g,b,a; operator byte4()const{return byte4{b,g,r,a};} };
-template<class T> struct rgb { T r,g,b; operator byte4()const{return byte4{b,g,r,255};} };
-template<class T> struct ia { T i,a; operator byte4()const{return byte4{i,i,i,a};}};
-template<class T> struct luma { T i; operator byte4()const{return byte4{i,i,i,255};}};
+template<class T> struct rgba { T r,g,b,a; operator byte4() const { return byte4 __(b,g,r,a); } };
+template<class T> struct rgb { T r,g,b; operator byte4() const { return byte4 __(b,g,r,255); } };
+template<class T> struct ia { T i,a; operator byte4() const {return byte4 __(i,i,i,a); } };
+template<class T> struct luma { T i; operator byte4() const {return byte4 __(i,i,i,255); } };
 
 typedef vector<rgb,uint8,3> rgb3;
 
