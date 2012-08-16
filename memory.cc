@@ -38,5 +38,5 @@ byte* allocate_(uint size) {
     byte* buffer; assert_(!posix_memalign(&buffer,16,size)); return buffer;
 }
 byte* reallocate_(byte* buffer, int unused size, int need) { return realloc(buffer,need); }
-void unallocate_(byte* unused buffer, int unused size) { /*free(buffer);*/ }
+void unallocate_(byte* unused buffer, int unused size) { free(buffer); }
 #endif

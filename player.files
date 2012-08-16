@@ -22,6 +22,8 @@ window.h
 window.cc
 interface.h
 interface.cc
+layout.h
+layout.cc
 
 mpg123.cc
 ffmpeg.cc

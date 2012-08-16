@@ -51,13 +51,13 @@ enum { Button1Mask=1<<8, AnyModifier=1<<15 };
 namespace Shm {
 //Error 0: BadSeg
 //Event 0: Completion { byte pad; uint16 seq; uint drawable; int16 minor; int8 major; uint seg,offset,pad[3]; };
-enum { EXT=130 };
+enum { Completion=65, EXT=130 };
 struct QueryVersion { int8 ext=EXT, req=0; uint16 size=1; };
 struct QueryVersionReply { int8 sharedPixmaps; uint16 seq; uint length; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
 struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]; };
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
 struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalWidth, totalHeight, srcX=0, srcY=0, width, height,
-                  dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=0,bpad=32; uint seg,offset=0; };
+                  dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
 struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x,y,w,h; uint mask; uint8 format; uint seg,offset; };
 struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual,size,pad[4]; };
 struct CreatePixmap { int8 ext=EXT, req=5; uint16 size=7; uint pixmap,drawable; uint16 w,h; uint8 depth; uint seg,offset; };

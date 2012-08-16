@@ -19,13 +19,13 @@ struct Player : Application {
 
     ToggleButton playButton __(share(playIcon()), share(pauseIcon()));
     TriggerButton nextButton __(share(nextIcon()));
-    Text elapsed __(string("00:00"_));
+    Text elapsed __(string(" 00:00 "_));
     Slider slider;
-    Text remaining __(string("00:00"_));
+    Text remaining __(string(" 00:00 "_));
     HBox toolbar __(&playButton, &nextButton, &elapsed, &slider, &remaining);
     Scroll< List<Text> > albums;
     Scroll< List<Text> > titles;
-    HBox main __( &albums.parent(), &titles.parent() );
+    HBox main __( &albums.area(), &titles.area() );
     VBox layout __( &toolbar, &main );
     Window window __(&layout, int2(512,512), "Player"_, pauseIcon());
 
@@ -38,7 +38,7 @@ struct Player : Application {
         media.timeChanged.connect(this, &Player::update);
         albums.activeChanged.connect(this, &Player::playAlbum);
         titles.activeChanged.connect(this, &Player::playTitle);
-        media.audioOutput= __(audio.frequency,audio.channels);
+        media.audioOutput= __(audio.rate,audio.channels);
 
         folders = listFiles("Music"_,Sort|Folders);
         assert(folders);
@@ -58,7 +58,6 @@ struct Player : Application {
         }
         if(files) next();
         window.show();
-        setPriority(-20);
     }
     void appendFile(string&& path) {
         string title = string(section(section(path,'/',-2,-1),'.',0,-2));
@@ -102,9 +101,9 @@ struct Player : Application {
     void stop() {
         setPlaying(false);
         media.close();
-        elapsed.text=string("00:00"_);
+        elapsed.setText(string(" 00:00 "_));
         slider.value = -1;
-        remaining.text=string("00:00"_);
+        remaining.setText(string(" 00:00 "_));
         titles.index=-1;
     }
     void seek(int position) { media.seek(position); }
@@ -112,9 +111,9 @@ struct Player : Application {
         if(position == duration) next();
         if(!window.mapped || slider.value == position) return;
         slider.value = position; slider.maximum=duration;
-        elapsed.text=dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2);
-        remaining.text=dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2);
-        toolbar.update(); window.render();
+        elapsed.setText(dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2));
+        remaining.setText(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2));
+        window.render();
     }
 };
 Application(Player)

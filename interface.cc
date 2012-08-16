@@ -8,9 +8,9 @@ Widget* focus;
 
 void ScrollArea::update() {
     int2 hint = abs(widget().sizeHint());
-    if(size.x > hint.x) widget().position.x = (size.x-hint.x)/2;
+    if(size.x > hint.x) hint.x=size.x; //widget().position.x = (size.x-hint.x)/2;
     else widget().position.x = min(0, max(size.x-hint.x, widget().position.x));
-    if(size.y > hint.y) widget().position.y = (size.y-hint.y)/2;
+    if(size.y > hint.y) hint.y=size.y; //widget().position.y = (size.y-hint.y)/2;
     else widget().position.y = min(0, max(size.y-hint.y, widget().position.y));
     widget().size = int2(hint.x,hint.y);
     widget().update();
@@ -118,14 +118,19 @@ void TabSelection::render(int2 parent) {
 }
 
 /// ImageView
-int2 ImageView::sizeHint() { return int2(image.width,image.height); }
+int2 ImageView::sizeHint() { return image.size(); }
 void ImageView::render(int2 parent) {
     if(!image) return;
-    array<Rect> rects; rects<< parent+position+Rect(Widget::size);
     int2 pos = parent+position+(Widget::size-image.size())/2;
-    blit(pos, image);
-    remove(rects,pos+Rect(image.size()));
-    for(Rect r: rects) fill(r);
+    if(image.alpha) {
+        fill(parent+position+Rect(Widget::size));
+        blit(pos, image);
+    } else {
+        array<Rect> rects; rects<< parent+position+Rect(Widget::size);
+        blit(pos, image);
+        remove(rects,pos+Rect(image.size()));
+        for(Rect r: rects) fill(r);
+    }
 }
 
 /// TriggerButton
@@ -136,14 +141,20 @@ bool TriggerButton::mouseEvent(int2, Event event, Key) {
 }
 
 ///  ToggleButton
-
-ToggleButton::ToggleButton(Image<byte4>&& enableIcon, Image<byte4>&& disableIcon)
-    : enableIcon(move(enableIcon)), disableIcon(move(disableIcon)) {}
-int2 ToggleButton::sizeHint() { return int2(size,size); }
+int2 ToggleButton::sizeHint() { return (enabled?disableIcon:enableIcon).size(); }
 void ToggleButton::render(int2 parent) {
-    if(!(enabled?disableIcon:enableIcon)) return;
-    int size = min(Widget::size.x,Widget::size.y);
-    blit(parent+position+(Widget::size-int2(size,size))/2, enabled?disableIcon:enableIcon);
+    Image<byte4>& image = enabled?disableIcon:enableIcon;
+    if(!image) return;
+    int2 pos = parent+position+(Widget::size-image.size())/2;
+    if(image.alpha) {
+        fill(parent+position+Rect(Widget::size));
+        blit(pos, image);
+    } else {
+        array<Rect> rects; rects<< parent+position+Rect(Widget::size);
+        blit(pos, image);
+        remove(rects,pos+Rect(image.size()));
+        for(Rect r: rects) fill(r);
+    }
 }
 bool ToggleButton::mouseEvent(int2, Event event, Key button) {
     if(event==ButtonPress && button==Left) { enabled = !enabled; toggled(enabled); return true; }

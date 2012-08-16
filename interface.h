@@ -15,7 +15,7 @@ struct Space : Widget {
 /// Scroll is a proxy Widget containing a widget in a scrollable area.
 //TODO: flick, scroll indicator, scrollbar
 struct ScrollArea : Widget {
-    /// Override \a widget to return the proxied widget
+    /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() =0;
     /// Ensures \a target is visible inside the region of the viewport
     /// \note Assumes \a target is a direct child of the proxied \a widget
@@ -29,13 +29,13 @@ struct ScrollArea : Widget {
     void render(int2 parent) { return widget().render(parent+position); }
 };
 
-/// Scroll<T> implement a scrollable \a T by proxying it through \a ScrollArea
+/// Scroll<T> implements a scrollable \a T by proxying it through \a ScrollArea
 /// It allows an object to act both as the content (T) and the container (ScrollArea)
 /// \note \a ScrollArea and \a T will be instancied as separate Widget (non-virtual multiple inheritance)
 template<class T> struct Scroll : ScrollArea, T {
     Widget& widget() override { return (T&)*this; }
-    /// Return a reference to \a ScrollArea::Widget. e.g used when adding this widget to a layout
-    Widget& parent() { return (ScrollArea&)*this; }
+    /// Returns a reference to \a ScrollArea::Widget. e.g used when adding this widget to a layout
+    Widget& area() { return (ScrollArea&)*this; }
 };
 
 /// ImageView is a widget displaying a static image
@@ -44,7 +44,7 @@ struct ImageView : Widget {
     Image<byte4> image;
 
     ImageView(){}
-    /// Create a widget displaying \a image
+    /// Creates a widget displaying \a image
     ImageView(Image<byte4>&& image):image(move(image)){}
 
     int2 sizeHint();
@@ -54,7 +54,6 @@ typedef ImageView Icon;
 
 /// TriggerButton is a clickable Icon
 struct TriggerButton : Icon {
-    //using Icon::Icon;
     TriggerButton(){}
     TriggerButton(Image<byte4>&& image):Icon(move(image)){}
     /// User clicked on the button
@@ -64,11 +63,11 @@ struct TriggerButton : Icon {
 
 /// ToggleButton is a togglable Icon
 struct ToggleButton : Widget {
-    /// Create a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(Image<byte4>&& enable, Image<byte4>&& disable);
+    /// Creates a toggle button showing \a enable icon when disabled or \a disable icon when enabled
+    ToggleButton(Image<byte4>&& enable, Image<byte4>&& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
-    signal<bool /*nextState*/> toggled;
+    signal<bool /*state*/> toggled;
 
     /// Current button state
     bool enabled = false;
@@ -79,7 +78,6 @@ struct ToggleButton : Widget {
 
     Image<byte4> enableIcon;
     Image<byte4> disableIcon;
-    static const int size = 32;
 };
 
 /// Slider is a Widget to show or control a bounded value

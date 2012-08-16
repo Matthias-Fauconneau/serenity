@@ -15,25 +15,20 @@ template<class T> struct Image {
 
     no_copy(Image)
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
-    //Image(const Image& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), alpha(o.alpha) { assert(o.own==false); }
     Image& operator =(Image&& o) {  this->~Image(); data=o.data; o.data=0;
         width=o.width; height=o.height; stride=o.stride;  own=o.own; alpha=o.alpha; return *this; }
-    /*Image& operator =(const Image& o) {  this->~Image(); data=o.data; assert(o.own==false);
-        width=o.width; height=o.height; stride=o.stride;  own=o.own; alpha=o.alpha; return *this; }*/
 
     Image(){}
     Image(T* data, int width, int height, int stride, bool own, bool alpha) :
         data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
     Image(int width, int height, bool alpha=false, int stride=0)
         : data(allocate<T>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true), alpha(alpha) {
-        debug( clear((byte*)data,height*stride*sizeof(T)); )
-        assert(width); assert(height);
+        debug( clear((byte*)data,height*stride*sizeof(T)); ) assert(width); assert(height);
     }
-    Image(array<T>&& data, uint width, uint height) : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
-        assert(data.size() >= width*height, data.size(), width, height);
-        assert(data.buffer.capacity);
+    /*Image(array<T>&& data, uint width, uint height) : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
+        assert(data.size() >= width*height, data.size(), width, height); assert(data.buffer.capacity);
         data.buffer.capacity = 0; //taking ownership
-    }
+    }*/
 
     ~Image(){ if(data && own) { unallocate(data,height*stride); } }
     explicit operator bool() const { return data; }

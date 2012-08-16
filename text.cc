@@ -3,19 +3,18 @@
 #include "font.h"
 #include "utf8.h"
 
+/// Layouts formatted text with wrapping, justification and links
 struct TextLayout {
     int size;
     int wrap;
-    Font* font = 0;
+    int spaceAdvance;
     int2 pen; //.4
     struct Character { int2 pos;/*.4*/ Glyph glyph; };
     typedef array<Character> Word;
     array<Word> line;
-    Word word;
     array<Character> text;
     array<Text::Link> links;
-    struct Line { uint begin,end; };
-    array<Line> lines;
+    array<Text::Line> lines;
 
     void nextLine(bool justify) {
         if(!line) { pen.y+=size<<4; return; }
@@ -24,7 +23,7 @@ struct TextLayout {
         length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
         int space=0;
         if(justify && line.size()>1) space = ((wrap<<4)-length)/(line.size()-1);
-        if(space<=0||space>64<<4) space = font->glyph(' ').advance; //compact
+        if(space<=0||space>64<<4) space = spaceAdvance; //compact
 
         //layout
         pen.x=0;
@@ -37,21 +36,23 @@ struct TextLayout {
         pen.x=0; pen.y+=size<<4;
     }
 
-    TextLayout(int size, int wrap, const ref<byte>& text):size(size),wrap(wrap) {
+    TextLayout(const ref<byte>& text, int size, int wrap):size(size),wrap(wrap) {
         static map<int,Font> defaultSans;
         if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
-        font=&defaultSans.at(size);
+        Font* font = &defaultSans.at(size);
+        spaceAdvance = font->glyph(' ').advance;
         uint previous=' ';
         Format format=Format::Regular;
         Text::Link link;
         uint underlineBegin=0;
         uint glyphCount=0;
+        Word word;
         for(utf8_iterator it=text.begin();it!=text.end();++it) {
             uint c = *it;
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 if(c==' ') previous = c;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
-                int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+font->glyph(' ').advance;
+                int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+spaceAdvance;
                 length += word.last().pos.x+(word.last().glyph.image.width<<4); //last word
                 if(wrap && length>=(wrap<<4)) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
@@ -65,7 +66,16 @@ struct TextLayout {
                     links << Text::Link __(link.begin,link.end,move(link.identifier));
                 }
                 Format newFormat = ::format(c);
-                if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line __(underlineBegin,glyphCount);
+                if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) {
+                    const Character& c = this->text[underlineBegin];
+                    Text::Line line __(.min = c.pos-c.glyph.offset);
+                    for(uint i=underlineBegin;i<glyphCount;i++) {
+                        const Character& c = this->text[i];
+                        int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
+                        if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.glyph.advance,0);
+                    }
+                    if(line.max != line.min) lines<< move(line);
+                }
                 format=newFormat;
                 if(format&Format::Bold) {
                     static map<int,Font> defaultBold;
@@ -111,27 +121,12 @@ struct TextLayout {
     }
 };
 
-Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap), textSize{0,0} {}
+Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap), textSize(0,0) {}
 void Text::update(int wrap) {
-    lines.clear();
-    blits.clear();
-    TextLayout layout(size, wrap>=0 ? wrap : Widget::size.x+wrap, text);
-    for(const TextLayout::Character& c: layout.text) blits << Blit __(int2((c.pos.x+8)>>4, (c.pos.y+8)>>4), share(c.glyph.image));
-    for(const TextLayout::Line& l: layout.lines) {
-        Line line;
-        const TextLayout::Character& c = layout.text[l.begin];
-        line.min = c.pos-c.glyph.offset;
-        for(uint i=l.begin;i<l.end;i++) {
-            const TextLayout::Character& c = layout.text[i];
-            int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
-            if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.glyph.advance,0);
-        }
-        if(line.max != line.min) lines<< move(line);
-    }
-    links = move(layout.links);
-    textSize=int2(0,0);
-    for(const Blit& c: blits) textSize=max(textSize,int2(c.pos)+c.image.size());
-    textSize.y=max(textSize.y, size+4);
+    TextLayout layout(text, size, wrap>=0 ? wrap : Widget::size.x+wrap);
+    blits.clear(); for(const TextLayout::Character& c: layout.text) blits << Blit __(int2((c.pos.x+8)>>4, (c.pos.y+8)>>4), share(c.glyph.image));
+    lines = move(layout.lines); links = move(layout.links);
+    textSize=int2(0,0); for(const Blit& c: blits) textSize=max(textSize,int2(c.pos)+c.image.size()); textSize.y=max(textSize.y, size+4);
 }
 int2 Text::sizeHint() {
     if(!textSize) update(wrap);
@@ -140,26 +135,10 @@ int2 Text::sizeHint() {
 
 void Text::render(int2 parent) {
     if(!textSize) update(wrap);
-#if ACCURATE_BACKGROUND_FILL
-    array<Rect> rects; rects<< parent+position+Rect(Widget::size);
-    int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
-    for(const Blit& b: blits) {
-        Rect rect = offset+b.pos+Rect(b.image.size());
-        blit(offset+b.pos, b.image);
-        remove(rects, rect);
-    }
-    for(const Line& l: lines) {
-        Rect rect = offset+Rect(l.min+int2(0,1),l.max+int2(0,2));
-        fill(rect, black);
-        remove(rects, rect);
-    }
-    for(Rect rect: rects) fill(rect);
-#else //accurate fill optimization would probably reduce performance for text rendering
     fill(parent+position+Rect(Widget::size));
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
-#endif
 }
 
 bool Text::mouseEvent(int2 position, Event event, Key) {
@@ -170,7 +149,7 @@ bool Text::mouseEvent(int2 position, Event event, Key) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated(link.identifier); return true; }
         }
     }
-    if(textClicked.slots) { textClicked(); return true; }
+    if(textClicked) { textClicked(); return true; }
     return false;
 }
 

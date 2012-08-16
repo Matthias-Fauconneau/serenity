@@ -64,7 +64,7 @@ inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
 inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
 inline string hex(const ref<byte>& data) { string s; for(byte b: data) s<<hex(b)<<' '; return s; }
-inline string str(const ptr& n) { return hex(n); }
+inline string str(const ptr& n) { string s("0x"_); s<<hex(n); return s; }
 
 /// Converts arrays
 template<class T> string str(const ref<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {

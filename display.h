@@ -31,8 +31,8 @@ extern Image<pixel> framebuffer;
 constexpr byte4 black __(0, 0, 0, 255);
 constexpr byte4 gray __(128, 128, 128, 255);
 constexpr byte4 lightGray __(192, 192, 192, 255);
+constexpr byte4 backgroundColor __(240, 240, 240, 240);
 constexpr byte4 white __(255, 255, 255, 255);
-constexpr byte4 backgroundColor __(255, 255, 255, 255);
 constexpr byte4 selectionColor __(224, 192, 128, 255);
 
 /// Fills framebuffer pixels inside \a rect with \a color

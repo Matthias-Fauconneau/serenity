@@ -92,6 +92,7 @@ void Window::readEvent(uint8 type) {
             signal<>* shortcut = localShortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
+        } else if(type==Shm::Completion) { if(state==Wait) render(); else state=Idle;
         } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
     }
 }
@@ -136,6 +137,7 @@ void Window::hide() { if(!mapped) return;{UnmapWindow r; r.id=id; write(x,raw(r)
 void Window::update() { needUpdate=true; render(); }
 void Window::render() {
     assert(mapped); assert(widget->size);
+    if(state==Server) { state=Wait; return; }
     if(needUpdate) { widget->update(); needUpdate=false; }
     if(buffer.width != (uint)widget->size.x || buffer.height != (uint)widget->size.y) {
         if(shm) {
@@ -150,10 +152,12 @@ void Window::render() {
     }
     framebuffer = share(buffer);
     currentClip=Rect(framebuffer.size());
+    //TODO: wait for any previous completion
     widget->render(int2(0,0));
     assert(!clipStack);
     {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
         r.totalWidth=r.width=buffer.width; r.totalHeight=r.height=buffer.height; write(x,raw(r)); }
+    state=Server;
 }
 
 signal<>& Window::localShortcut(Key key) { return localShortcuts.insert((uint16)key); }

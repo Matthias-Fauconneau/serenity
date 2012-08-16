@@ -33,7 +33,7 @@ struct Desktop : Application {
     }
     void showPage(const ref<byte>& link) {
         if(!link) { showDesktop(); return; }
-        window.setWidget( &page.parent() );
+        window.setWidget( &page.area() );
         page.contentChanged.connect(&window, &Window::update);
         page.go(link);
         status.setText("Loading "_+link); status.render(int2(0,0));

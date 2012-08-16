@@ -35,10 +35,11 @@ template<class R, class... Args> struct function<R(Args...)> {
 };
 
 template<class... Args> struct signal {
-    array< function<void(Args...)>> slots;
-    void operator()(Args... args) const { for(const auto& slot: slots) slot(args...); }
-    template<class F> void connect(F f) { slots<< f; }
+    array< function<void(Args...)> > delegates;
+    void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args ___); }
+    template<class F> void connect(F f) { delegates<< f; }
     template<class C, class B, predicate(__is_base_of(B,C))>
-    void connect(C* object, void (B::*pmf)(Args...)) { slots<< function<void(Args...)>(static_cast<B*>(object),pmf); }
+    void connect(C* object, void (B::*pmf)(Args...)) { delegates<< function<void(Args...)>(static_cast<B*>(object),pmf); }
+    explicit operator bool() { return delegates.size(); }
 };
-template<class... Args> signal<Args...> copy(const signal<Args...>& b) { signal<Args...> a; a.slots=copy(b.slots); return a; }
+template<class... Args> signal<Args...> copy(const signal<Args...>& b) { signal<Args...> a; a.delegates=copy(b.delegates); return a; }

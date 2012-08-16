@@ -1,7 +1,6 @@
 #include "map.h"
 #include "time.h"
 
-
 static bool trace = 0;
 static int untrace;
 struct Profile {
@@ -29,7 +28,7 @@ struct Profile {
             profile[function] += time;
         }
     }
-} profile;
+};
 
 extern "C" void __cyg_profile_func_enter(void* function, void*) { if(trace) { trace=0; profile.trace(function); trace=1; }}
 extern "C" void __cyg_profile_func_exit(void*, void*) { if(trace) { trace=0; profile.trace(0); trace=1; } else untrace++;}

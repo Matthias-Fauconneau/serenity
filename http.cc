@@ -29,7 +29,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
             s.until("nameserver "_);
             uint a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
             sockaddr addr = {PF_INET, swap16(53), (d<<24)|(c<<16)|(b<<8)|a};
-            int unused e= check( ::connect(dns, &addr, sizeof(addr)) );
+            check_( ::connect(dns, &addr, sizeof(addr)) );
         }
         array<byte> query;
         struct Header { uint16 id=swap16(currentTime()); uint16 flags=1; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;

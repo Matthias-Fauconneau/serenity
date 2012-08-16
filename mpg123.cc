@@ -10,7 +10,7 @@ void AudioFile::open(const ref<byte>& path) {
 	if(mpg123_open(file,strz(path))) { file=0; return; }
 	long rate; int channels, encoding;
 	mpg123_getformat(file,&rate,&channels,&encoding);
-    audioInput = __( (int)rate, channels );
+    audioInput = __( (uint)rate, (uint)channels );
 	assert(audioInput.channels == audioOutput.channels);
 	timeChanged(position(),duration());
 
@@ -23,13 +23,12 @@ int AudioFile::position() { return (int)mpg123_tell(file)/audioInput.frequency; 
 int AudioFile::duration() { return (int)mpg123_length(file)/audioInput.frequency; }
 void AudioFile::seek( int time ) { mpg123_seek_frame(file,mpg123_timeframe(file,time),0); }
 void AudioFile::read(int16* output, uint outputSize) {
-    log(ptr(output));
 	if(file) timeChanged(position(),duration());
 	if(!file) { clear(output,outputSize*2); return; }
 	for(;;) {
 		if(inputSize>0) {
-			int size = min((uint)inputSize,outputSize);
-			for(int i=0;i<size*audioOutput.channels;i++)
+			uint size = min((uint)inputSize,outputSize);
+			for(uint i=0;i<size*audioOutput.channels;i++)
                 output[i] = clip(-32768,int(input[i]*32768),32767); //copy/convert input buffer to output
 			inputSize -= size; input += size*audioInput.channels; //update input buffer
 			outputSize -= size; output += size*audioOutput.channels; //update output buffer

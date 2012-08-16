@@ -102,5 +102,5 @@ Image<byte4> decodePNG(const ref<byte>& file) {
         rgb3* lookup = (rgb3*)palette.data();
         for(uint i=0;i<width*height;i++) image[i]=lookup[image[i].r];
     }
-    return Image<byte4>(image,width,height,width,true,depth==4);
+    return Image<byte4>(image,width,height,width,true,depth==2||depth==4);
 }

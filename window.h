@@ -79,6 +79,8 @@ struct Window : Poll {
     int shm = 0;
     /// Shared window back buffer
     Image<byte4> buffer;
+    /// Shared window buffer state
+    enum { Idle, Server, Wait } state;
 
     /// Shortcuts triggered when a key is pressed
     map<uint16, signal<> > localShortcuts;

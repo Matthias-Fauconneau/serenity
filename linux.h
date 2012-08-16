@@ -19,7 +19,8 @@
 #error Unsupported architecture
 #endif
 
-#define r(reg,arg) volatile register long reg asm(#reg) = (long)arg;
+#define str(s) #s
+#define r(reg,arg) volatile register long reg asm(str(reg)) = (long)arg;
 #define syscall(type, name, args ...) \
     volatile register long n asm(rN) = (long)sys::name; \
     volatile register long r asm(rR); \
@@ -39,7 +40,7 @@
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) syscall(type, name, "r"(r0), "r"(r1), "r"(r2))}
 #define syscall4(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3) \
     inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3) \
-{r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) syscall(type, name, "r"(r0), "r"(r1), "r"(r2))}
+{r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3))}
 #define syscall5(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4) \
     inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4))}
@@ -82,7 +83,7 @@ enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O
       O_DIRECTORY=0200000
   #endif
     };
-enum {PROT_READ=1, PROT_WRITE};
+enum {PROT_READ=1, PROT_WRITE=2};
 enum {MAP_FILE, MAP_SHARED, MAP_PRIVATE};
 enum {DT_DIR=4, DT_REG=8 };
 enum {F_SETFL=4};
@@ -108,7 +109,7 @@ syscall3(int, setpriority, int,which, int,who, int,prio)
 syscall3(int, getdents, int,fd, void*,entry, long,size)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
-syscall6(long, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
+syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, fstat, int,fd, stat*,buf)
 syscall2(int, clock_gettime, int,type, timespec*,ts)
 syscall4(int, openat, int,fd, const char*,name, int,oflag, int,perms)
@@ -134,6 +135,7 @@ inline int shmdt(const void* ptr) { return ipc(22,0,0,0,ptr,0); }
 inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,0); }
 inline int shmctl(int id, int cmd, struct shmid_ds* buf) { return ipc(24,id,cmd,0,buf,0); }
 
+#undef str
 #undef r
 #undef rN
 #undef rR

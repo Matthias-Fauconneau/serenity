@@ -8,7 +8,7 @@
 
 struct Browser : Application {
     Scroll<HTML> page;
-    Window window _(&page.parent(),int2(0,0));
+    Window window _(&page.area(),int2(0,0));
 
     Browser() {
         window.localShortcut(Escape).connect(this, &Application::quit);

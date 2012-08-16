@@ -3,7 +3,7 @@
 #include "function.h"
 #include "resample.h"
 
-struct AudioFormat { int frequency, channels; };
+struct AudioFormat { uint frequency, channels; };
 
 struct AudioFile {
     AudioFormat audioInput,audioOutput;

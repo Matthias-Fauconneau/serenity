@@ -65,15 +65,15 @@ int root() { static int fd = openFolder("/"_,-100); return fd; }
 
 int openFolder(const ref<byte>& folder, int at) { return check( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder ); }
 
-void createFolder(const ref<byte>& folder, int at) { int unused e= check( mkdirat(at, strz(folder), 0666), folder); }
+void createFolder(const ref<byte>& folder, int at) { check_(mkdirat(at, strz(folder), 0666), folder); }
 
 void symlink(const ref<byte>& target,const ref<byte>& name, int at) {
     assert(target!=name);
     unlinkat(at,strz(name),0);
-    int unused e= check(symlinkat(strz(target),at,strz(name)), name,"->",target);
+    check_(symlinkat(strz(target),at,strz(name)), name,"->",target);
 }
 
-stat statFile(const ref<byte>& path, int at) { File fd = openFile(path,at); stat file; int unused e= check( fstat(fd, &file) ); return file; }
+stat statFile(const ref<byte>& path, int at) { File fd = openFile(path,at); stat file; check_( fstat(fd, &file) ); return file; }
 enum { S_IFDIR=0040000 };
 bool isFolder(const ref<byte>& path, int at) { return statFile(path,at).mode&S_IFDIR; }
 long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtime.sec; }
@@ -81,7 +81,7 @@ long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtim
 array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
     int fd = openFolder(folder,at);
     assert(fd, "Folder not found"_, folder);
-    array<string> list; byte buffer[256];
+    array<string> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
             ref<byte> name = str(entry.name);
