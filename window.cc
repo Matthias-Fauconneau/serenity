@@ -97,7 +97,7 @@ void Window::readEvent(uint8 type) {
             signal<>* shortcut = localShortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
-        } else if(type==Shm::Completion) { if(state==Wait) render(); else state=Idle;
+        } else if(type==Shm::Completion()) { if(state==Wait) render(); else state=Idle;
         } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
     }
 }
@@ -149,10 +149,13 @@ void Window::render() {
             {Shm::Detach r; r.seg=id+Segment; write(x, raw(r));}
             shmdt(buffer.data);
             shmctl(shm, IPC_RMID, 0);
+        } else {
+            {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; write(x,string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
+            {QueryExtensionReply r=readReply<QueryExtensionReply>(); Shm::major=r.major; Shm::event=r.firstEvent; Shm::error=r.firstError; }
         }
         buffer.stride=buffer.width= widget->size.x, buffer.height = widget->size.y;
         shm = check( shmget(IPC_NEW, sizeof(pixel)*buffer.width*buffer.height , IPC_CREAT | 0777) );
-        buffer.data = (pixel*)shmat(shm, 0, 0); assert(buffer.data);
+        buffer.data = (pixel*)check( shmat(shm, 0, 0) ); assert(buffer.data); log(ptr(buffer.data));
         {Shm::Attach r; r.seg=id+Segment; r.shm=shm; write(x,raw(r));}
     }
     framebuffer = share(buffer);

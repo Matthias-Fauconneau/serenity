@@ -1,2 +1,4 @@
 linux.h
+display.cc
+window.cc
 test.cc
