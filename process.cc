@@ -25,8 +25,8 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
     abort();
 }
 
-void init_() {
-    extern void setupHeap(); setupHeap(); //memory.cc
+void init() {
+    void setupHeap(); setupHeap(); //memory.cc
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
         enum { SA_SIGINFO=4 } flags = SA_SIGINFO;
@@ -39,7 +39,6 @@ void init_() {
     sigaction(SIGPIPE, &sa, 0, 8);
     //rlimit limit = {2<<20,2<<20}; setrlimit(RLIMIT_STACK,&limit); //2 MB
 }
-void exit_(int code) { exit(code); } //TODO: check leaks
 
 //FIXME: parallel arrays is bad for realloc TODO: put pollfd in Poll, and use stack array for poll(pollfd[])
 static array<Poll*> polls;

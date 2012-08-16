@@ -34,13 +34,7 @@ struct Application {
 };
 
 /// Macro to compile an executable entry point starting an Application with the default event loop
-void init_();
-void exit_(int);
-#if STANDALONE
-#define Application(App) extern "C" void _start() { init_(); for(App app;app.running && dispatchEvents();); exit_(0); }
-#else
-#define Application(App) int main() { init_(); for(App app;app.running && dispatchEvents();); return 0; }
-#endif
+#define Application(App) int main() { void init(); init(); for(App app;app.running && dispatchEvents();); return 0; }
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const string& path, const array<string>& args=array<string>());

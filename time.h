@@ -33,5 +33,5 @@ struct Timer : Poll {
     Timer();
     void setAbsolute(uint date);
     virtual void expired() =0;
-    void event(pollfd);
+    void event(const pollfd&);
 };

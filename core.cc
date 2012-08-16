@@ -1,17 +1,16 @@
 #include "core.h"
+#include "linux.h"
 
-//void*   __dso_handle = (void*) &__dso_handle;
+#ifdef STANDALONE
+extern "C" void _start() { int main(void); exit(main()); } //TODO: check leaks
+void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" int __aeabi_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" void __cxa_pure_virtual() { log_("__cxa_pure_virtual"); abort(); }
 void operator delete(void*) { log_("new/delete is deprecated, use alloc<T>(Args...)/free(T*)"); abort(); }
 extern "C" void memset(byte* dst, uint size, byte value) { clear(dst,size,value); }
 extern "C" void memcpy(byte* dst, byte* src, uint size) { copy(dst,src,size); }
-extern "C" void __gxx_personality_v0() { log_("__gxx_personality_v0"); abort(); }
-extern "C" void __cxa_call_unexpected() { log_("__cxa_call_unexpected"); abort(); }
-extern "C" void __cxa_begin_catch() { log_("__cxa_begin_catch"); abort(); }
-extern "C" void __cxa_end_catch() { log_("__cxa_end_catch"); abort(); }
-namespace std { void terminate() { log_("std::terminate"); abort(); } }
+
 #if __arm__
 extern "C" void __aeabi_memset(byte* dst, uint size, byte value) { return memset(dst,size,value); }
 extern "C" void __aeabi_memcpy(byte* dst, byte* src, uint size) { memcpy(dst,src,size); }
@@ -43,4 +42,5 @@ extern "C" uint __umodsi3(uint num, uint den) {
     }
     return num;
 }
+#endif
 #endif

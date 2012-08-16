@@ -47,3 +47,4 @@ desktop.cc
 utf8.h
 utf8.cc
 calendar.cc
+test.cc

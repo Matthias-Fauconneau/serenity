@@ -56,7 +56,7 @@ struct HTTP : Poll, virtual TextStream, virtual Socket {
    enum { Connect, Request, Header, Data, Cache, Handle, Done } state = Connect;
     void request();
     void header();
-    void event(pollfd) override;
+    void event(const pollfd&) override;
 };
 
 /// Requests ressource at \a url and call \a handler when available

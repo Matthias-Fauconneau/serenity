@@ -2,60 +2,50 @@
 #pragma GCC system_header
 
 #if __arm__
-#define NR "7"
+#define rN "r7"
 #define rR "r0"
-#define rA "=r0"
-#define r0 "r0"
-#define r1 "r1"
-#define r2 "r2"
-#define r3 "r3"
-#define r4 "r4"
-#define r5 "r5"
 #define kernel "swi 0"
 #elif __x86_64__ || __i386__
-#define NR "a"
+#define rN "eax"
 #define rR "eax"
-#define rA "=a"
-#define r0 "b"
-#define r1 "c"
-#define r2 "d"
-#define r3 "S"
-#define r4 "D"
+#define r0 ebx
+#define r1 ecx
+#define r2 edx
+#define r3 esi
+#define r4 edi
+#define r5 ebp
 #define kernel "int $0x80"
 #else
 #error Unsupported architecture
 #endif
 
-#define syscall(type, name, args ...) register long r asm(rR); asm volatile(kernel : rA (r): NR (sys::name), ## args ); return (type)r;
+#define r(reg,arg) volatile register long reg asm(#reg) = (long)arg;
+#define syscall(type, name, args ...) \
+    volatile register long n asm(rN) = (long)sys::name; \
+    volatile register long r asm(rR); \
+    asm volatile(kernel: "=r" (r): "r"(n), ## args); \
+    return (type)r;
 #define syscall0(type,name) \
     inline type name() \
 {syscall(type, name)}
 #define syscall1(type,name,type0,arg0) \
     inline type name(type0 arg0) \
-{syscall(type, name, r0 ((long)arg0))}
+{r(r0,arg0) syscall(type, name, "r"(r0))}
 #define syscall2(type,name,type0,arg0,type1,arg1) \
     inline type name(type0 arg0, type1 arg1) \
-{syscall(type, name, r0 ((long)arg0), r1 ((long)arg1))}
+{r(r0,arg0) r(r1,arg1) syscall(type, name, "r"(r0), "r"(r1))}
 #define syscall3(type,name,type0,arg0,type1,arg1,type2,arg2) \
     inline type name(type0 arg0, type1 arg1, type2 arg2) \
-{syscall(type, name, r0 ((long)arg0), r1 ((long)arg1), r2 ((long)arg2))}
+{r(r0,arg0) r(r1,arg1) r(r2,arg2) syscall(type, name, "r"(r0), "r"(r1), "r"(r2))}
 #define syscall4(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3) \
     inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3) \
-{syscall(type, name, r0 ((long)arg0), r1 ((long)arg1), r2 ((long)arg2), r3 ((long)arg3))}
+{r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) syscall(type, name, "r"(r0), "r"(r1), "r"(r2))}
 #define syscall5(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4) \
     inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4) \
-{syscall(type, name, r0 ((long)arg0), r1 ((long)arg1), r2 ((long)arg2), r3 ((long)arg3), r4 ((long)arg4))}
-#if __x86_64__ || __i386__
-#define syscall6(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5) \
-    inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) { \
-    register long r5 asm("ebp") = (long)arg5; \
-    syscall(type, name, r0 ((long)arg0), r1 ((long)arg1), r2 ((long)arg2), r3 ((long)arg3), r4 ((long)arg4), "r" (r5)) \
-}
-#else
+{r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4))}
 #define syscall6(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5) \
     inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) \
-{syscall(type, name, r0 ((long)arg0), r1 ((long)arg1), r2 ((long)arg2), r3 ((long)arg3), r4 ((long)arg4), r5 ((long)arg5))}
-#endif
+{r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) r(r5, arg5) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5))}
 
 enum class sys : long {
     exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
@@ -144,11 +134,13 @@ inline int shmdt(const void* ptr) { return ipc(22,0,0,0,ptr,0); }
 inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,0); }
 inline int shmctl(int id, int cmd, struct shmid_ds* buf) { return ipc(24,id,cmd,0,buf,0); }
 
-#undef NR
-#undef rA
+#undef r
+#undef rN
+#undef rR
 #undef r0
 #undef r1
 #undef r2
 #undef r3
 #undef r4
 #undef r5
+#undef kernel

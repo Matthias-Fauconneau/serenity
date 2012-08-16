@@ -2,8 +2,8 @@ PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= fast
 
-CC = clang -pipe -std=c++11  -march=native -funsigned-char -fno-threadsafe-statics -fno-omit-frame-pointer -fno-exceptions -fno-rtti \
--Wall -Wextra -Wno-missing-field-initializers
+CC = clang -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-omit-frame-pointer -fno-exceptions -fno-rtti \
+-Wall -Wextra -Wno-missing-field-initializers -DSTANDALONE
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG
 FLAGS_fast := -g -DDEBUG -O
@@ -36,13 +36,13 @@ INSTALL_music = icons/$(TARGET).png $(TARGET).desktop
 all: prepare $(BUILD)/$(TARGET)
 
 %.l: %.d
-	@./dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
+	@python dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
 
 $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@clang $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	ld $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
 
 $(BUILD)/%.d: %.cc
