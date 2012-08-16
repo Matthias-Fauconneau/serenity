@@ -1,4 +1,4 @@
-player: text wrap?, resize flicker
+player: label
 apps: taskbar, desktop
 font: fix streaks, hinting, kerning, compound glyph transform, subpixel rendering, subpixel position | revert to freetype
 feeds: check text main content, left arrow=previous entry, preload image, progressive image, status, own inflate, own|turbo jpeg, better html

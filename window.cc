@@ -55,7 +55,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     widget->size=size;
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; write(x,raw(r));}
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
-        r.backgroundPixel=r.borderPixel=0xF0F0F0F0; r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
+        r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
     {ChangeProperty r; r.id=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
     r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; write(x,raw(r));}

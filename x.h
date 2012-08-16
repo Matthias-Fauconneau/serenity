@@ -15,8 +15,8 @@ struct Screen { int32 root, colormap, white, black, inputMask; int16 width, heig
                 int8 backingStores, saveUnders, depth, numDepths; };
 struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint32 id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
-struct CreateWindow { int8 req=1, depth=32; uint16 size=12; uint32 id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1;
-                      uint32 visual=0, mask=0x280A, backgroundPixel, borderPixel, eventMask, colormap; };
+struct CreateWindow { int8 req=1, depth=32; uint16 size=13; uint32 id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1;
+                      uint32 visual=0, mask=0x281A, backgroundPixel=0xF0F0F0F0, borderPixel=0, bitGravity=10, eventMask, colormap; };
 struct ChangeWindowAttribute { int8 req=2; uint16 size; uint32 window, mask; };
 struct GetWindowAttributes { int8 req=3; uint16 size; uint32 window; };
 struct GetWindowAttributesReply { int8 backingStore; uint16 seq; uint32 replySize, visual; int16 class_; int8 bit,win; uint32 planes, pixel; int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; int colormap, allEventMask, yourEventMask; int16 nopropagate, pad; };
