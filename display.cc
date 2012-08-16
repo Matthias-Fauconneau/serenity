@@ -1,5 +1,4 @@
 #include "display.h"
-#include "linux.h"
 
 /// Clip
 

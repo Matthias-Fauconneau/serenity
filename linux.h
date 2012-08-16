@@ -53,7 +53,7 @@ enum class sys : long {
     ipc = 117, socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197,
 #if __arm__
     clock_gettime=263,
-    shmat_=305,shmdt,shmget,shmctl,
+    shmat=305,shmdt,shmget,shmctl,
     openat=322, mkdirat, fstatat, unlinkat, symlinkat=331,
     timerfd_create=350, timerfd_settime=353
 #elif __x86_64__ || __i386__
@@ -137,8 +137,7 @@ inline int shmdt(const void* ptr) { return ipc(22,0,0,0,ptr,0); }
 inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,0); }
 inline int shmctl(int id, int cmd, struct shmid_ds* buf) { return ipc(24,id,cmd,0,buf,0); }
 #else
-syscall4(long, shmat_, int,id, long*,addr, const void*,ptr, int,flag)
-inline long shmat(int id, const void* ptr, int flag) { long addr; return shmat_(id,&addr,ptr,flag)<0 ?: addr; }
+syscall3(long, shmat, int,id, const void*,ptr, int,flag)
 syscall1(int, shmdt, const void*,ptr)
 syscall3(int, shmget, int,key, long,size, int,flag)
 syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)

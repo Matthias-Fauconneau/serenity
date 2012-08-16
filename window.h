@@ -75,7 +75,9 @@ struct Window : Poll {
     uint id = 0;
     /// Associated window resource (relative to \a id)
     enum { XWindow, GContext, Colormap, Segment };
-    /// Posix shared memory
+    /// MIT-SHM extension code
+
+    /// System V shared memory
     int shm = 0;
     /// Shared window back buffer
     Image<byte4> buffer;
