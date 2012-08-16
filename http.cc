@@ -212,7 +212,7 @@ void HTTP::header() {
     }
     state = Data;
 }
-void HTTP::event(pollfd poll) {
+void HTTP::event(const pollfd& poll) {
     assert(fd); assert(state>=Connect && state <=Done, int(state));
     if(poll.revents&POLLHUP) { log("Connection broken",poll.revents&POLLIN,url); state=Done; free(this); return; }
     if(state == Connect) {

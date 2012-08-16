@@ -5,9 +5,6 @@
 #include "flac.h"
 #include "time.h"
 
-#include <sys/mman.h>
-#include <unistd.h>
-
 double exp2(double x) { return __builtin_exp2(x); }
 double exp10(double x) { return __builtin_exp10(x); }
 
@@ -55,6 +52,17 @@ void Sampler::open(const string& path) {
         if(l.size!=period) new (&l.resampler) Resampler(2, l.size, period);
     }
     close(folder);
+}
+
+#include "map.h"
+uint availableMemory() {
+    map<string, uint> info;
+    for(TextStream s = ::readUpTo(openFile("/proc/meminfo"_),2048);s;) {
+        ref<byte> key=s.until(':'); s.skip();
+        uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
+        info.insert(string(key), value);
+    }
+    return info.at("MemFree"_)+info.at("Inactive"_);
 }
 
 void Sampler::lock() {

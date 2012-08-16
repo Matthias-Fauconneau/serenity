@@ -1,7 +1,7 @@
 player: text wrap?, resize flicker
 apps: taskbar, desktop
 font: fix streaks, hinting, kerning, compound glyph transform, subpixel rendering, subpixel position | revert to freetype
-feeds: left: previous entry, preload image, progressive image, status, own inflate, own|turbo jpeg, better html
+feeds: check text main content, left arrow=previous entry, preload image, progressive image, status, own inflate, own|turbo jpeg, better html
 apps: music, text editor, file manager, pdf, wiki, search, irc, imap (ssl)
 player: own mp3, video
 touchbook: hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait

@@ -80,19 +80,13 @@ void execute(const string& path, const array<string>& args) {
 
 void setPriority(int priority) { setpriority(0,0,priority); }
 
-#if PROCFS
-#include "map.h"
 #include "file.h"
 #include "stream.h"
-uint availableMemory() {
-    TextBuffer s = ::readUpTo(openFile("/proc/meminfo"_),2048);
-    close(fd);
-    map<string, uint> info;
-    while(s) {
-        string key=s.until(':'); s.skip();
-        uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
-        info.insert(move(key), value);
+ref<byte> getenv(const ref<byte>& name) {
+    static string environ = ::readUpTo(openFile("proc/self/environ"_),4096);
+    for(TextStream s = TextStream::byReference(environ);s;) {
+        ref<byte> key=s.until('='); ref<byte> value=s.until('\0');
+        if(key==name) return value;
     }
-    return info.at("MemFree"_)+info.at("Inactive"_);
+    return ""_;
 }
-#endif

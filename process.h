@@ -1,6 +1,5 @@
 #pragma once
 #include "string.h"
-struct pollfd;
 
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
@@ -8,7 +7,7 @@ struct Poll {
     Poll(){}
     /// Add this to the process-wide event loop
     /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
-    void registerPoll(const pollfd&);
+    void registerPoll(const struct pollfd&);
     /// Remove this from the process-wide event loop
     void unregisterPoll();
     /// Remove an fd from the process-wide event loop
@@ -17,7 +16,7 @@ struct Poll {
     void wait();
     virtual ~Poll() { unregisterPoll(); }
     /// Callback on new events
-    virtual void event(const pollfd&) =0;
+    virtual void event(const struct pollfd&) =0;
 };
 
 /// Dispatches events to registered Poll objects
@@ -50,7 +49,4 @@ inline uint64 rdtsc() {
 struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
 #endif
 
-#if PROCFS
-/// Return available memory in kB
-uint availableMemory();
-#endif
+ref<byte> getenv(const ref<byte>& name);

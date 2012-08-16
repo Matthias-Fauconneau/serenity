@@ -25,10 +25,10 @@ template<class T> array<T> read(int fd, uint capacity) {
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<byte4>& icon) : widget(widget),
     x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
     // Setups X connection
-    ref<byte> path = "/tmp/.X11-unix/X0"_;
-    sockaddr_un addr; copy(addr.path,path.data,path.size);
-    int e=connect(x,(sockaddr*)&addr,2+path.size); if(e) error("No X server",errno[-e],ref<byte>(addr.path,path.size));
-    {ConnectionSetup r; write(x, string(raw(r)+readFile("root/.Xauthority"_).slice(18,align(4,r.nameSize)+r.dataSize)));}
+    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_);
+    sockaddr_un addr; copy(addr.path,path.data(),path.size());
+    check_(connect(x,(sockaddr*)&addr,2+path.size()),path);
+    {ConnectionSetup r; write(x, string(raw(r)+readFile(string(getenv("HOME"_)+"/.Xauthority"_)).slice(18,align(4,r.nameSize)+r.dataSize)));}
     uint visual=0;
     {ConnectionSetupReply r=read<ConnectionSetupReply>(x); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
         read(x,align(4,r.vendorLength));

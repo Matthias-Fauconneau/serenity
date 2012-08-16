@@ -1,3 +1,3 @@
-#include "linux.h"
 #include "debug.h"
-int main() { extern void setupHeap(); setupHeap(); log("Hello World!"_); exit(0); }
+#include "process.h"
+Application(struct Test:Application{Test(){log(getenv("HOME"_),getenv("DISPLAY"_));}})

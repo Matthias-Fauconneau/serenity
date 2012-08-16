@@ -67,13 +67,8 @@ inline string hex(const ref<byte>& data) { string s; for(byte b: data) s<<hex(b)
 inline string str(const ptr& n) { string s("0x"_); s<<hex(n); return s; }
 
 /// Converts arrays
-template<class T> string str(const ref<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
-    if(!a) return string();
-    string s; if(bracket) s<<bracket[0]; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<sep;} if(bracket) s<<bracket[1]; return s;
-}
-template<class T> string str(const array<T>& a, const ref<byte>& sep=" "_, const ref<byte>& bracket=""_) {
-    return str(ref<T>(a),sep,bracket);
-}
+template<class T> string str(const ref<T>& a) { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
+template<class T> string str(const array<T>& a) { return str(ref<T>(a)); }
 
 /// Expression template to hold recursive concatenation operations
 template<class A, class B> struct cat {
