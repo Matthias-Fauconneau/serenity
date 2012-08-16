@@ -1,13 +1,12 @@
 #include "core.h"
-#include "linux.h"
 
 #ifdef STANDALONE
-extern "C" void _start() { int main(void); exit(main()); } //TODO: check leaks
+extern "C" void _start() { int main(void); exit_(main()); } //TODO: check leaks
 void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }
 extern "C" int __aeabi_atexit(void (*) (void *), void*, void*) { return 0; }
-extern "C" void __cxa_pure_virtual() { log_("__cxa_pure_virtual"); abort(); }
-void operator delete(void*) { log_("new/delete is deprecated, use alloc<T>(Args...)/free(T*)"); abort(); }
+extern "C" void __cxa_pure_virtual() { error_("cxa_pure_virtual"); }
+void operator delete(void*) { error_("new/delete is deprecated, use alloc<T>(Args...)/free(T*)"); }
 extern "C" void memset(byte* dst, uint size, byte value) { clear(dst,size,value); }
 extern "C" void memcpy(byte* dst, byte* src, uint size) { copy(dst,src,size); }
 

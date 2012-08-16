@@ -58,11 +58,15 @@ typedef unsigned long long uint64;
 #else
 #define debug( statements... )
 #endif
-void trace(int skip, uint size);
+/// Logs current stack trace skipping /a skip last frames
+void trace(int skip=0, uint size=-1);
+/// Simplified debug methods (avoid header dependencies on debug.h/string.h/array.h/memory.h)
 void log_(const char*);
-void abort() __attribute((noreturn));
+void exit_(int) __attribute((noreturn));
+/// Aborts unconditionally and display \a message
+#define error_(message) ({ trace(0,-1); log_(message); exit_(-1); })
 /// Aborts if \a expr evaluates to false and display \a expr
-#define assert_(expr) ({ debug( if(!(expr)) { trace(0,-1); log_(#expr); abort(); } ) })
+#define assert_(expr) ({debug( if(!(expr)) error_(#expr); )})
 
 /// initializer_list
 namespace std {

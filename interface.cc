@@ -2,8 +2,6 @@
 #include "display.h"
 #include "layout.h"
 
-Widget* focus;
-
 /// ScrollArea
 
 void ScrollArea::update() {

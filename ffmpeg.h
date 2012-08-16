@@ -1,4 +1,3 @@
-#include "string.h"
 #include "function.h"
 #include "resample.h"
 
@@ -11,7 +10,7 @@ struct AudioFile {
     float* input=0; int inputBufferSize=0;
     int inputSize=0;
 
-    void open(const string& path);
+    void open(const ref<byte>& path);
     void close();
     int position();
     int duration();

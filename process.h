@@ -1,5 +1,5 @@
 #pragma once
-#include "string.h"
+#include "array.h"
 
 /// Poll is an interface for objects needing to participate in event handling
 struct Poll {
@@ -36,7 +36,7 @@ struct Application {
 #define Application(App) int main() { void init(); init(); for(App app;app.running && dispatchEvents();); return 0; }
 
 /// Execute binary at \a path with command line arguments \a args
-void execute(const string& path, const array<string>& args=array<string>());
+void execute(const ref<byte>& path, const array<string>& args=array<string>());
 
 /// Set process CPU scheduling priority (-20 high priority, 19 low priority)
 void setPriority(int priority);

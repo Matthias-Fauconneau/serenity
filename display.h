@@ -14,7 +14,6 @@ inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,off
 inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,b.max)); }
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline bool operator ==(Rect a, Rect b) { return a.min==b.min && a.max==b.max; }
-inline string str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
 
 /// Remove any intersections between \a neg and \a rects, subdividing as necessary
 /// \note Used to fill background accurately to optimize bandwidth usage (and avoid flickering if rendering to front)

@@ -1,6 +1,5 @@
 #pragma once
 #include "function.h"
-#include "string.h"
 #include "file.h"
 #include "resample.h"
 #include "flac.h"

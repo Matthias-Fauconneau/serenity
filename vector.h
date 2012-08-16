@@ -1,5 +1,5 @@
 #pragma once
-#include "string.h"
+#include "array.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access components directly

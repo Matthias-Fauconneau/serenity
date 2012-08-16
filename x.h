@@ -8,7 +8,7 @@ union XEvent {
     struct { byte pad; uint16 seq; uint32 parent,window; int16 x,y,w,h,border; int8 override_redirect; } packed create; //Create
     struct { byte pad; uint16 seq; uint32 event,window,above; int16 x,y,w,h,border; } packed configure; //Configure
     byte pad[31]; } packed;
-struct ConnectionSetup { byte bom=0x6C, pad=0; int16 major=11,minor=0; int16 nameSize=18, dataSize=16, pad2=0; };
+struct ConnectionSetup { byte bom=0x6C, pad=0; int16 major=11,minor=0; int16 nameSize=0, dataSize=0, pad2=0; };
 struct ConnectionSetupReply { int8 status,reason; int16 major,minor,additionnal; int32 release, ridBase, ridMask, motionBufferSize; int16 vendorLength, maxRequestSize; int8 numScreens, numFormats, imageByteOrder, bitmapBitOrder, bitmapScanlineUnit, bitmapScanlinePad, minKeyCode, maxKeyCode; int32 pad2; };
 struct Format { uint8 depth, bitsPerPixel, scanlinePad; int32 pad; };
 struct Screen { int32 root, colormap, white, black, inputMask; int16 width, height, widthMM, heightMM, minMaps, maxMaps; int32 visual;

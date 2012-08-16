@@ -21,12 +21,13 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
 #elif __x86_64__ || __i386__
     {Symbol s = findNearestLine((void*)ctx->eip); log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
 #endif
-    if(sig==SIGSEGV) log("Segmentation fault at 0x"_+str(ptr(info->fault.addr)));
-    abort();
+    if(sig==SIGSEGV) log("Segmentation fault at "_+str(ptr(info->fault.addr)));
+    exit(-1);
 }
 
 void init() {
     void setupHeap(); setupHeap(); //memory.cc
+    /// Setup signal handlers to log trace on {ABRT,SEGV,TERM.PIPE}
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
         enum { SA_SIGINFO=4 } flags = SA_SIGINFO;
@@ -40,7 +41,7 @@ void init() {
     //rlimit limit = {2<<20,2<<20}; setrlimit(RLIMIT_STACK,&limit); //2 MB
 }
 
-//FIXME: parallel arrays is bad for realloc TODO: put pollfd in Poll, and use stack array for poll(pollfd[])
+//FIXME: parallel arrays is bad for realloc TODO: global {Poll*,pollfd}[] and stack pollfd[] for poll()
 static array<Poll*> polls;
 static array<pollfd> pollfds;
 void Poll::registerPoll(const pollfd& fd) { polls << this; pollfds << fd; }
@@ -67,7 +68,7 @@ int dispatchEvents() {
     return polls.size();
 }
 
-void execute(const string& path, const array<string>& args) {
+void execute(const ref<byte>& path, const array<string>& args) {
     array<stringz> args0(1+args.size());
     args0 << strz(path);
     for(uint i=0;i<args.size();i++) args0 << strz(args[i]);

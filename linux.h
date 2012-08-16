@@ -52,10 +52,13 @@ enum class sys : long {
     exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
     ipc = 117, socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197,
 #if __arm__
-    clock_gettime=263, openat=322, mkdirat, fstatat, unlinkat, symlinkat=331,
+    clock_gettime=263,
+    shmat_=305,shmdt,shmget,shmctl,
+    openat=322, mkdirat, fstatat, unlinkat, symlinkat=331,
     timerfd_create=350, timerfd_settime=353
 #elif __x86_64__ || __i386__
-    clock_gettime=265, openat=295, mkdirat, fstatat=300, unlinkat, symlinkat=304,
+    clock_gettime=265,
+    openat=295, mkdirat, fstatat=300, unlinkat, symlinkat=304,
     timerfd_create=322, timerfd_settime=325
 #endif
 };
@@ -127,11 +130,19 @@ syscall3(int, socket, int,domain, int,type, int,protocol)
 syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
 #endif
 
+#if __i386__
 syscall6(int, ipc, uint,call, long,first, long,second, long,third, const void*,ptr, long,fifth)
 inline long shmat(int id, const void* ptr, int flag) { long addr; return ipc(21,id,flag,(long)&addr,ptr,0)<0 ?: addr; }
 inline int shmdt(const void* ptr) { return ipc(22,0,0,0,ptr,0); }
 inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,0); }
 inline int shmctl(int id, int cmd, struct shmid_ds* buf) { return ipc(24,id,cmd,0,buf,0); }
+#else
+syscall4(long, shmat_, int,id, long*,addr, const void*,ptr, int,flag)
+inline long shmat(int id, const void* ptr, int flag) { long addr; return shmat_(id,&addr,ptr,flag)<0 ?: addr; }
+syscall1(int, shmdt, const void*,ptr)
+syscall3(int, shmget, int,key, long,size, int,flag)
+syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)
+#endif
 
 #undef str
 #undef r

@@ -6,6 +6,8 @@
 #include "stream.h"
 #include "linux.h"
 
+Widget* focus;
+
 /// Reads a raw value from \a fd
 template<class T> T read(int fd) {
     T t;
@@ -25,17 +27,20 @@ template<class T> array<T> read(int fd, uint capacity) {
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<byte4>& icon) : widget(widget),
     x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
     // Setups X connection
-    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_);
+    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
     check_(connect(x,(sockaddr*)&addr,2+path.size()),path);
-    {ConnectionSetup r; write(x, string(raw(r)+readFile(string(getenv("HOME"_)+"/.Xauthority"_)).slice(18,align(4,r.nameSize)+r.dataSize)));}
+    {ConnectionSetup r;
+        string authority = getenv("HOME"_)+"/.Xauthority"_;
+        if(exists(authority)) write(x, string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
+        else write(x,raw(r)); }
     uint visual=0;
     {ConnectionSetupReply r=read<ConnectionSetupReply>(x); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
         read(x,align(4,r.vendorLength));
         read<Format>(x,r.numFormats);
         for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>(x);
             for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>(x);
-                for(VisualType visualType: read<VisualType>(x,depth.numVisualTypes)) {
+                if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(x,depth.numVisualTypes)) {
                     if(!visual && depth.depth==32) { display=int2(screen.width,screen.height); root = screen.root; visual=visualType.id; }
                 }
             }

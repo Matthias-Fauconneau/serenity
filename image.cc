@@ -1,7 +1,6 @@
 #include "image.h"
 #include "stream.h"
 #include "vector.h"
-#include "string.h"
 
 Image<byte4> resize(const Image<byte4>& image, uint width, uint height) {
     if(!image) return Image<byte4>();

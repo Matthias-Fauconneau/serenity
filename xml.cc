@@ -2,7 +2,6 @@
 #include "string.h"
 #include "utf8.h"
 
-
 static Element parse(const ref<byte>& document, bool html) {
     assert(document);
     TextStream s=TextStream::byReference(document);

@@ -1,6 +1,5 @@
 #pragma once
 #include "vector.h"
-#include "string.h"
 
 /// Event type
 enum Event { Error, Reply, KeyPress, KeyRelease, ButtonPress, ButtonRelease, Motion, Enter, Leave, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage };

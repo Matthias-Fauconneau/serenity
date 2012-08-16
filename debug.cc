@@ -3,9 +3,9 @@
 #include "stream.h"
 #include "linux.h"
 
-void write(int fd, const ref<byte>& s) { int unused r=write(fd,s.data,s.size); assert(r==(int)s.size,r); }
-void abort() { ioctl(open("/dev/console", O_RDWR, 0), 0x5606, (void*)7); exit(-1); }
+void exit_(int code) { exit(code); }
 void log_(const char* expr) { log(expr); }
+void write(int fd, const ref<byte>& s) { int unused r=write(fd,s.data,s.size); assert(r==(int)s.size,r); }
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version,entry,phoff,shoff,flags;
               uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };

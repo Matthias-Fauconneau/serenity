@@ -1,20 +1,18 @@
 #pragma once
 #include "array.h"
-#include "string.h"
-#include "debug.h"
 
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
 /// Returns padding zeroes to append in order to align an array of \a size bytes to \a width
-inline ref<byte> pad(uint width, uint size) { static byte zero[4]={}; assert(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }
+inline ref<byte> pad(uint width, uint size){ static byte zero[4]={}; assert_(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }
 
 /// References raw memory representation of \a t
 template<class T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 /// Casts raw memory to \a T
-template<class T> const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
+template<class T> const T& raw(const ref<byte>& a) { assert_(a.size==sizeof(T)); return *(T*)a.data; }
 /// Casts between element types
 template<class T, class O> ref<T> cast(const ref<O>& o) {
-    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    assert_((o.size*sizeof(O))%sizeof(T) == 0);
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
 
@@ -33,16 +31,14 @@ struct Stream {
     /// Returns number of bytes available, reading \a need bytes from underlying device if possible
     virtual uint available(uint /*need*/) { return buffer.size()-index; }
     /// Returns next \a size bytes from stream
-    virtual ref<byte> get(uint size) {
-        assert(index+size<=buffer.size(),index,size,buffer.size());  return ref<byte>(buffer.data()+index,size); //TODO: escape analysis
-    }
+    virtual ref<byte> get(uint size) { assert_(index+size<=buffer.size());  return ref<byte>(buffer.data()+index,size); } //TODO: escape analysis
     /// Advances \a count bytes in stream
-    virtual void advance(int count) { index+=count;  assert(index<=buffer.size()); }
+    virtual void advance(int count) { index+=count;  assert_(index<=buffer.size()); }
 //Stream helpers
     /// Returns the next byte in stream without advancing
-    ubyte peek() const { assert(index<buffer.size()); return buffer[index]; }
+    ubyte peek() const { assert_(index<buffer.size()); return buffer[index]; }
     /// Returns the next byte in stream and advance
-    ubyte next() { assert(index<buffer.size()); ubyte b=buffer[index]; advance(1); return b; }
+    ubyte next() { assert_(index<buffer.size()); ubyte b=buffer[index]; advance(1); return b; }
     /// Reads \a size bytes from stream
     ref<byte> read(uint size) { ref<byte> t = get(size); advance(size); return t; }
     /// Slices an array referencing this data (valid as long as this stream)
@@ -72,7 +68,7 @@ struct DataStream : virtual Stream {
     /// Slices a stream referencing this data
     DataStream slice(int pos, int size) { return DataStream(array<byte>(buffer.data()+pos,size),isBigEndian); } //TODO: escape analysis
     /// Seeks stream to /a index
-    void seek(uint index) { assert(index<buffer.size(),index,buffer.size()); this->index=index; }
+    void seek(uint index) { assert_(index<buffer.size()); this->index=index; }
     /// Seeks last match for \a key.
     bool seekLast(const ref<byte>& key);
 

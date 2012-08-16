@@ -1,9 +1,8 @@
 #pragma once
-#include "string.h"
 #include "map.h"
 #include "stream.h"
-#include "function.h"
 #include "memory.h"
+#include "function.h"
 
 /// XML element
 struct Element {

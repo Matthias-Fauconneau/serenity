@@ -1,7 +1,6 @@
 #pragma once
 #include "function.h"
 #include "stream.h"
-#include "string.h"
 
 struct Track { int time=0; int type=0; DataStream stream; Track(DataStream&& stream):stream(move(stream)){} };
 

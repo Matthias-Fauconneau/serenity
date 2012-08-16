@@ -1,9 +1,6 @@
 #pragma once
 #include "string.h"
 
-/// Setup signal handlers to log trace on {ABRT,SEGV,TERM.PIPE}
-void catchErrors();
-
 /// Writes /a data to /a fd
 void write(int fd, const ref<byte>& data);
 
@@ -18,12 +15,8 @@ struct Symbol { ref<byte> file; string function; uint line=0; };
 /// Returns debug symbol nearest to address
 Symbol findNearestLine(void* address);
 
-/// Logs current stack trace skipping /a skip last frames
-void trace(int skip=0, uint size=-1);
-/// Aborts unconditionally without any message
-void abort() __attribute((noreturn));
 /// Aborts unconditionally and display \a message
-#define error(message...) ({ trace(); log(message); abort(); })
+#define error(message...) ({ trace(); log(message); exit_(-1); })
 /// Aborts if \a expr evaluates to false and display \a expr and \a message
 #define assert(expr, message...) ({debug( if(!(expr)) error(#expr, ##message);)})
 /// Aborts if \a expr is negative and display corresponding error code

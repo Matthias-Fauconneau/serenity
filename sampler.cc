@@ -1,6 +1,5 @@
 #include "sampler.h"
 #include "stream.h"
-#include "string.h"
 #include "file.h"
 #include "flac.h"
 #include "time.h"
