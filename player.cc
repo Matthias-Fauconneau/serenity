@@ -9,7 +9,7 @@
 ICON(play)
 ICON(pause)
 ICON(next)
-
+#include "X11/keysymdef.h"
 struct Player : Application {
     array<string> folders;
     array<string> files;
@@ -19,9 +19,9 @@ struct Player : Application {
 
     ToggleButton playButton __(share(playIcon()), share(pauseIcon()));
     TriggerButton nextButton __(share(nextIcon()));
-    Text elapsed __(string(" 00:00 "_));
+    Text elapsed __(string("00:00"_));
     Slider slider;
-    Text remaining __(string(" 00:00 "_));
+    Text remaining __(string("00:00"_));
     HBox toolbar __(&playButton, &nextButton, &elapsed, &slider, &remaining);
     Scroll< List<Text> > albums;
     Scroll< List<Text> > titles;
@@ -30,8 +30,8 @@ struct Player : Application {
     Window window __(&layout, int2(512,512), "Player"_, pauseIcon());
 
     Player() {
-        //window.globalShortcut(XF86AudioPlay).connect(this, &Player::togglePlay);
         window.localShortcut(Escape).connect(this, &Player::quit);
+        window.localShortcut(Space).connect(this, &Player::togglePlay);
         playButton.toggled.connect(this, &Player::setPlaying);
         nextButton.triggered.connect(this, &Player::next);
         slider.valueChanged.connect(this, &Player::seek);
@@ -101,9 +101,9 @@ struct Player : Application {
     void stop() {
         setPlaying(false);
         media.close();
-        elapsed.setText(string(" 00:00 "_));
+        elapsed.setText(string("00:00"_));
         slider.value = -1;
-        remaining.setText(string(" 00:00 "_));
+        remaining.setText(string("00:00"_));
         titles.index=-1;
     }
     void seek(int position) { media.seek(position); }

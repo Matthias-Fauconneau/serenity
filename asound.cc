@@ -98,8 +98,7 @@ void AudioOutput::event(const pollfd&) {
     if(!available){/*log(status->state,bufferSize,"=",periodCount,"x",periodSize,"hw",status->hwPointer,"sw",control->swPointer);*/return;}//FIXME
     uint offset = control->swPointer % bufferSize;
     uint frames = min(min((uint)available,bufferSize),bufferSize-offset);
-    assert(frames>=periodSize);
-    read(buffer+offset*channels,(int)frames); //+offset*2?
+    read(buffer+offset*channels, frames);
     control->swPointer += frames;
     if(status->state == Prepared) { check_(ioctl(fd, IOCTL_START, 0)); }
 }

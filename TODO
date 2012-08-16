@@ -1,9 +1,8 @@
-player: label
 apps: taskbar, desktop
 font: fix streaks, hinting, kerning, compound glyph transform, subpixel rendering, subpixel position | revert to freetype
 feeds: check text main content, left arrow=previous entry, preload image, progressive image, status, own inflate, own|turbo jpeg, better html
 apps: music, text editor, file manager, pdf, wiki, search, irc, imap (ssl)
-player: own mp3, video
+player: XF86AudioPlay, own mp3, video
 touchbook: hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait
 parser: attributes (L+S), scoped symbols, GLR
 IDE: build driver (+frepo), syntax highlighting, navigation, completion, git, debugger, profiler, static analyzer, interpreter, compiler

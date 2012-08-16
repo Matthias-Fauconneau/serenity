@@ -81,6 +81,7 @@ void Window::readEvent(uint8 type) {
             if(widget->mouseEvent(int2(e.x,e.y), ButtonPress, (Key)e.key)) wait();
         } else if(type==KeyPress) {
             uint key = KeySym(e.key);
+            log(hex(e.key),hex(key));
             signal<>* shortcut = localShortcuts.find(key);
             if(shortcut) (*shortcut)(); //local window shortcut
             else if(focus) if( focus->keyPress((Key)key) ) wait(); //normal keyPress event
@@ -92,7 +93,9 @@ void Window::readEvent(uint8 type) {
         } else if(type==UnmapNotify) { mapped=false;
         } else if(type==MapNotify) { mapped=true;
         } else if(type==ReparentNotify) {
-        } else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(widget->size!=size) { widget->size=size; needUpdate=true; }
+        } else if(type==ConfigureNotify) {
+            int2 size(e.configure.w,e.configure.h);
+            if(widget->size!=size) { widget->size=size; needUpdate=true; wait(); }
         } else if(type==ClientMessage) {
             signal<>* shortcut = localShortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
@@ -155,7 +158,7 @@ void Window::render() {
         }
         buffer.stride=buffer.width= widget->size.x, buffer.height = widget->size.y;
         shm = check( shmget(IPC_NEW, sizeof(pixel)*buffer.width*buffer.height , IPC_CREAT | 0777) );
-        buffer.data = (pixel*)check( shmat(shm, 0, 0) ); assert(buffer.data); log(ptr(buffer.data));
+        buffer.data = (pixel*)check( shmat(shm, 0, 0) ); assert(buffer.data);
         {Shm::Attach r; r.seg=id+Segment; r.shm=shm; write(x,raw(r));}
     }
     framebuffer = share(buffer);

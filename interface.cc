@@ -23,10 +23,10 @@ bool ScrollArea::mouseEvent(int2 cursor, Event event, Key button) {
     }
     if(widget().mouseEvent(cursor-widget().position,event,button)) return true;
     static int dragStart=0, flickStart=0;
-    if(event==ButtonPress && button==Left) {
+    if(event==ButtonPress && button==LeftButton) {
         dragStart=cursor.y, flickStart=widget().position.y;
     }
-    if(event==Motion && button==Left && size.y<abs(widget().sizeHint().y)) {
+    if(event==Motion && button==LeftButton && size.y<abs(widget().sizeHint().y)) {
         int2& position = widget().position;
         position.y = flickStart+cursor.y-dragStart;
         position.y = max(size.y-abs(widget().sizeHint().y),min(0,position.y));
@@ -54,7 +54,7 @@ void Slider::render(int2 parent) {
 }
 
 bool Slider::mouseEvent(int2 position, Event event, Key button) {
-    if((event == Motion || event==ButtonPress) && button==Left) {
+    if((event == Motion || event==ButtonPress) && button==LeftButton) {
         value = minimum+position.x*uint(maximum-minimum)/size.x;
         valueChanged(value);
         return true;
@@ -73,7 +73,7 @@ bool Selection::mouseEvent(int2 position, Event event, Key button) {
     for(uint i=0;i<count();i++) { Widget& child=at(i);
         if(position>=child.position && position<=child.position+child.size) {
             if(index!=i) { index=i; at(index).selectEvent(); activeChanged(index); }
-            if(button == Left) itemPressed(index);
+            if(button == LeftButton) itemPressed(index);
             return true;
         }
     }
@@ -81,8 +81,8 @@ bool Selection::mouseEvent(int2 position, Event event, Key button) {
 }
 
 bool Selection::keyPress(Key key) {
-    if(key==Down && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
-    if(key==Up && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
+    if(key==DownArrow && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
+    if(key==UpArrow && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
     return false;
 }
 
@@ -155,6 +155,6 @@ void ToggleButton::render(int2 parent) {
     }
 }
 bool ToggleButton::mouseEvent(int2, Event event, Key button) {
-    if(event==ButtonPress && button==Left) { enabled = !enabled; toggled(enabled); return true; }
+    if(event==ButtonPress && button==LeftButton) { enabled = !enabled; toggled(enabled); return true; }
     return false;
 }

@@ -10,7 +10,7 @@ struct Glyph {
     int advance=0; //in .4
     Image<uint8> image; //not owned
     Glyph(){}
-    Glyph(Glyph&& o):offset(o.offset),advance(o.advance),image(move(o.image)){}
+    Glyph(Glyph&& o)____(=default);
     Glyph(const Glyph& o):offset(o.offset),advance(o.advance),image(share(o.image)){}
 };
 

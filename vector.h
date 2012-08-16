@@ -1,5 +1,5 @@
 #pragma once
-#include "array.h"
+#include "string.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access components directly
@@ -36,7 +36,7 @@ generic vector operator -(const vector& u, const vector& v) { vector r; for(int 
 generic vector operator *(const vector& u, const vector& v) { vector r; for(int i=0;i<N;i++) r[i]=u[i]*v[i]; return r; }
 generic vector operator *(const vector& u, int s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]*s; return r; }
 generic vector operator *(int s, const vector& u) { vector r; for(int i=0;i<N;i++) r[i]=s*u[i]; return r; }
-generic vector operator /(const vector& u, uint s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]/s; return r; }
+generic vector operator /(const vector& u, int s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]/s; return r; }
 generic bool operator ==(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]!=v[i]) return false; return true; }
 generic bool operator >(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
 generic bool operator <(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]>=v[i]) return false; return true; }

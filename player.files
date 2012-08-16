@@ -24,6 +24,8 @@ interface.h
 interface.cc
 layout.h
 layout.cc
+text.h
+text.cc
 
 mpg123.cc
 ffmpeg.cc

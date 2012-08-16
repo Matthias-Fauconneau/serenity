@@ -4,12 +4,12 @@
 /// Event type
 enum Event { Error, Reply, KeyPress, KeyRelease, ButtonPress, ButtonRelease, Motion, Enter, Leave, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage };
 /// Button/Key codes
-//#include <X11/X.h>
 //#include <X11/keysym.h>
 enum Key {
     None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp,
     Escape=0xff1b, Return=0xff0d, Delete=0xffff, BackSpace=0xff08,
-    Home=0xff50, Left, Up, Right, Down, End=0xff57
+    Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57,
+    Email = 0x1008ff19, WWW=1008ff18 //TODO: Play
     //TODO: Touchbook buttons Extra,Power (XInput)
 };
 
