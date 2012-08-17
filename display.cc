@@ -38,7 +38,7 @@ void blit(int2 target, const Image<uint8>& source, bool unused invert) { //TODO:
     for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
         uint8 value = source(x-target.x,y-target.y);
         auto& d = framebuffer(x,y);
-        d = byte4(div255(int4(d)*value));
+        d = byte4(div255(d.b*value),div255(d.g*value),div255(d.r*value),d.a);
     }
 }
 

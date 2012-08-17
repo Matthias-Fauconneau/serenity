@@ -7,16 +7,19 @@
 array<byte> read(int fd, uint capacity) {
     array<byte> buffer(capacity);
     int size = check( read(fd,buffer.data(),capacity) );
-    assert((uint)size==capacity,size);
+    assert((uint)size==capacity,size,capacity);
     buffer.setSize(size);
     return buffer;
 }
+
 array<byte> readUpTo(int fd, uint capacity) {
     array<byte> buffer(capacity);
     int size = check( read(fd,buffer.data(),capacity) );
     buffer.setSize(size);
     return buffer;
 }
+
+int read_(int fd, void* buf, long size) { return read(fd, buf, size); }
 
 /// File
 

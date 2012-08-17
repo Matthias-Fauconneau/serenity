@@ -25,10 +25,10 @@ template<class T> struct Image {
         : data(allocate<T>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true), alpha(alpha) {
         debug( clear((byte*)data,height*stride*sizeof(T)); ) assert(width); assert(height);
     }
-    /*Image(array<T>&& data, uint width, uint height) : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
-        assert(data.size() >= width*height, data.size(), width, height); assert(data.buffer.capacity);
+    Image(array<T>&& data, uint width, uint height) : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
+        assert(data.size() == width*height, data.size(), width, height); assert(data.buffer.capacity);
         data.buffer.capacity = 0; //taking ownership
-    }*/
+    }
 
     ~Image(){ if(data && own) { unallocate(data,height*stride); } }
     explicit operator bool() const { return data; }

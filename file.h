@@ -65,3 +65,20 @@ Map mapFile(int fd);
 array<byte> read(int fd, uint size);
 /// Reads up to \a capacity bytes from \a fd
 array<byte> readUpTo(int fd, uint capacity);
+
+int read_(int fd, void* buf, long size);
+/// Reads a raw value from \a fd
+template<class T> T read(int fd) {
+    T t;
+    int unused size = read_(fd,(byte*)&t,sizeof(T));
+    assert_(size==sizeof(T));
+    return t;
+}
+/// Reads \a size raw values from \a fd
+template<class T> array<T> read(int fd, uint capacity) {
+    array<T> buffer(capacity);
+    int unused size = read_(fd,(byte*)buffer.data(),sizeof(T)*capacity);
+    assert_((uint)size==capacity*sizeof(T));
+    buffer.setSize(capacity);
+    return buffer;
+}

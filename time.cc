@@ -1,6 +1,7 @@
 #include "time.h"
 #include "linux.h"
 #include "stream.h"
+#include "string.h"
 
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
 long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
@@ -8,14 +9,14 @@ long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts)
 template<class T> bool inRange(T min, T x, T max) { return x>=min && x<=max; }
 void Date::invariant() {
     //Hour
-    if(seconds>=0) { assert(inRange(0, seconds, 59)); assert(minutes>=0); }
-    if(minutes>=0) { assert(inRange(0, minutes, 59)); assert(hours>=0); }
-    if(hours>=0) { assert(inRange(0, hours, 23)); }
+    if(seconds>=0) { assert_(inRange(0, seconds, 59)); assert_(minutes>=0); }
+    if(minutes>=0) { assert_(inRange(0, minutes, 59)); assert_(hours>=0); }
+    if(hours>=0) { assert_(inRange(0, hours, 23)); }
     //Date
-    if(day>=0) { assert(inRange(1, day, 31)); assert(month>=0); }
-    if(month>=0) { assert(inRange(0, month, 11)); }
+    if(day>=0) { assert_(inRange(1, day, 31)); assert_(month>=0); }
+    if(month>=0) { assert_(inRange(0, month, 11)); }
     if(weekDay>=0) {
-        assert(inRange(0, weekDay, 6));
+        assert_(inRange(0, weekDay, 6));
         //if(day>=0) TODO: check if valid
     }
 }

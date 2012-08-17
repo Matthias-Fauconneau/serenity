@@ -6,16 +6,8 @@
 #include "interface.h"
 #include "file.h"
 
-
-const string iconPaths[4] = {
-    "/usr/share/pixmaps/"_,
-    "/usr/share/icons/oxygen/$size/apps/"_,
-    "/usr/share/icons/hicolor/$size/apps/"_,
-    "/usr/local/share/icons/hicolor/$size/apps/"_
-};
-
 bool Search::keyPress(Key key) {
-    if(key == Enter) {
+    if(key == Return) {
         //execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text}); TODO: serenity browser
         text.clear(); update(); triggered(); return true;
     }
@@ -23,18 +15,18 @@ bool Search::keyPress(Key key) {
 }
 
 bool Command::mouseEvent(int2, Event event, Key button) {
-    if(event == Press && button == LeftKey) { execute(path,args); triggered(); return true; }
+    if(event == ButtonPress && button == LeftArrow) { execute(path,args); triggered(); return true; }
     return false;
 }
 
-map<string,string> readSettings(const string& path) {
+map<string,string> readSettings(const ref<byte>& path) {
     map<string,string> entries;
     if(!exists(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
     for(TextStream s(readFile(path));s;) {
         if(s.matchAny("[#"_)) s.until('\n');
         else {
-            string key = s.until('='), value=s.until('\n');
-            entries.insertMulti(move(key),move(value));
+            ref<byte> key = s.until('='), value=s.until('\n');
+            entries.insertMulti(string(key),string(value));
         }
         s.whileAny("\n"_);
     }
@@ -48,23 +40,23 @@ List<Command> readShortcuts() {
     for(const ref<byte>& desktop: split(readFile("launcher"_,config),'\n')) {
         map<string,string> entries = readSettings(desktop);
         Image<byte4> icon;
-        for(const string& folder: iconPaths) {
-            string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
+        for(const ref<byte>& folder: iconPaths) {
+            string path = replace(folder,"$size"_,"32x32"_)+entries[string("Icon"_)]+".png"_;
             if(exists(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
         }
-        string path = section(entries["Exec"_],' ');
+        string path = string(section(entries[string("Exec"_)],' '));
         if(!exists(path)) path="/usr/bin/"_+path;
         if(!exists(path)) { warn("Executable not found",path); continue; }
-        array<string> arguments = section(entries["Exec"_],' ',1,-1);
-        for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
-        for(uint i=0;i<arguments.size();) if(contains(arguments[i],byte('%'))) arguments.removeAt(i); else i++;
-        shortcuts << Command(move(icon),move(entries["Name"_]),move(path),move(arguments));
+        array<string> arguments;  arguments<<string(section(entries[string("Exec"_)],' ',1,-1));
+        for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries[string("Name"_)]);
+        for(uint i=0;i<arguments.size();) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
+        shortcuts << Command(move(icon),move(entries[string("Name"_)]),move(path),move(arguments));
     }
     return shortcuts;
 }
 
-Launcher::Launcher() : shortcuts(readShortcuts()), menu(__(&search, &shortcuts)), window(&menu,""_,Image<byte4>(),int2(-3,-3)) {
-    //window.hideOnLeave = true;
+Launcher::Launcher() {
+    window.hideOnLeave = true;
     window.localShortcut(Escape).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(Command& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);

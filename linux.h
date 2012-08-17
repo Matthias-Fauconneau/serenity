@@ -1,5 +1,4 @@
 #pragma once
-#pragma GCC system_header
 
 #if __arm__
 #define rN "r7"
@@ -95,7 +94,6 @@ enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
 
 int exit(int code) __attribute((noreturn));
-syscall1(int, exit, int,code)
 syscall0(int, fork)
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
@@ -142,6 +140,9 @@ syscall1(int, shmdt, const void*,ptr)
 syscall3(int, shmget, int,key, long,size, int,flag)
 syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)
 #endif
+
+#pragma GCC system_header
+syscall1(int, exit, int,code)
 
 #undef str
 #undef r

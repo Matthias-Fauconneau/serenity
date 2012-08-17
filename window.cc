@@ -6,23 +6,8 @@
 #include "stream.h"
 #include "linux.h"
 
+namespace Shm { int major, event, error; }
 Widget* focus;
-
-/// Reads a raw value from \a fd
-template<class T> T read(int fd) {
-    T t;
-    int unused size = read(fd,(byte*)&t,sizeof(T));
-    assert(size==sizeof(T),size,sizeof(T));
-    return t;
-}
-/// Reads \a size raw values from \a fd
-template<class T> array<T> read(int fd, uint capacity) {
-    array<T> buffer(capacity);
-    int unused size = check( read(fd,(byte*)buffer.data(),sizeof(T)*capacity) );
-    assert((uint)size==capacity*sizeof(T),size,sizeof(T));
-    buffer.setSize(capacity);
-    return buffer;
-}
 
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<byte4>& icon) : widget(widget),
     x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
@@ -37,7 +22,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     uint visual=0;
     {ConnectionSetupReply r=read<ConnectionSetupReply>(x); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
         read(x,align(4,r.vendorLength));
-        read<Format>(x,r.numFormats);
+        read<XFormat>(x,r.numFormats);
         for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>(x);
             for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>(x);
                 if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(x,depth.numVisualTypes)) {
@@ -56,7 +41,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; write(x,raw(r));}
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x,raw(r));}
-    {ChangeProperty r; r.id=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
+    {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
     r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; write(x,raw(r));}
     setTitle(title);
@@ -81,11 +66,11 @@ void Window::readEvent(uint8 type) {
             if(widget->mouseEvent(int2(e.x,e.y), ButtonPress, (Key)e.key)) wait();
         } else if(type==KeyPress) {
             uint key = KeySym(e.key);
-            log(hex(e.key),hex(key));
             signal<>* shortcut = localShortcuts.find(key);
             if(shortcut) (*shortcut)(); //local window shortcut
             else if(focus) if( focus->keyPress((Key)key) ) wait(); //normal keyPress event
         } else if(type==Enter || type==Leave) {
+            if(hideOnLeave) hide();
             signal<>* shortcut = localShortcuts.find(Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
             if( widget->mouseEvent(int2(e.x,e.y), (Event)type, (e.state&Button1Mask)?LeftButton:None) ) wait();
@@ -100,7 +85,7 @@ void Window::readEvent(uint8 type) {
             signal<>* shortcut = localShortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
-        } else if(type==Shm::Completion()) { if(state==Wait) render(); else state=Idle;
+        } else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); else state=Idle;
         } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
     }
 }
@@ -131,11 +116,11 @@ void Window::setSize(int2 size) {
     {ConfigureWindow r; r.id=id+XWindow; r.mask=4+8; r.x=size.x, r.y=size.y; write(x,raw(r));}
 }
 void Window::setTitle(const ref<byte>& title) {
-    ChangeProperty r; r.id=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
+    ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
     r.length=title.size; r.size+=align(4, r.length)/4; write(x,string(raw(r)+title+pad(4,title.size)));
 }
 void Window::setIcon(const Image<byte4>& icon) {
-    ChangeProperty r; r.id=id+XWindow; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
+    ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
     r.length=2+icon.width*icon.height; r.size+=r.length; write(x,string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }
 
