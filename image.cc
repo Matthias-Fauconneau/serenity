@@ -7,7 +7,7 @@ Image<byte4> resize(const Image<byte4>& image, uint width, uint height) {
     if(width==image.width && height==image.height) return copy(image);
     Image<byte4> target(width,height,image.alpha);
     const byte4* src = image.data;
-    byte4* dst = target.data;
+    byte4* dst = (byte4*)target.data;
     if(image.width/width==image.height/height && !(image.width%width) && !(image.height%height)) { //integer box
         int scale = image.width/width;
         for(uint y=0; y<height; y++) {

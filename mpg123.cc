@@ -1,5 +1,5 @@
 #include "mpg123.h"
-#include "debug.h"
+#include "string.h"
 #include <mpg123.h>
 
 void AudioFile::open(const ref<byte>& path) {
@@ -7,11 +7,11 @@ void AudioFile::open(const ref<byte>& path) {
     close();
 	file = mpg123_new(0,0);
 	mpg123_param(file, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.);
-	if(mpg123_open(file,strz(path))) { file=0; return; }
+	if(mpg123_open(file,strz(string("/"_+path)))) { file=0; return; }
 	long rate; int channels, encoding;
 	mpg123_getformat(file,&rate,&channels,&encoding);
     audioInput = __( (uint)rate, (uint)channels );
-	assert(audioInput.channels == audioOutput.channels);
+	assert_(audioInput.channels == audioOutput.channels);
 	timeChanged(position(),duration());
 
 	if(audioInput.frequency != audioOutput.frequency) {
@@ -44,14 +44,14 @@ void AudioFile::read(int16* output, uint outputSize) {
 			return;
 		}
         inputSize /= audioInput.channels*sizeof(float);
-		assert(inputSize);
+		assert_(inputSize);
 
 		if(resampler) {
 			int size = (inputSize*audioOutput.frequency-1)/audioInput.frequency+1;
 			buffer = allocate<float>(bufferSize=size*audioOutput.channels);
 			int in = inputSize, out = size;
 			resampler.filter(input,&in,buffer,&out,false);
-			assert(in == (int)inputSize,in,inputSize,out,size);
+			assert_(in == (int)inputSize);
 			input = buffer; inputBufferSize=bufferSize; bufferSize=0; inputSize = out;
 		}
 	}

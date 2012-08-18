@@ -15,10 +15,6 @@ inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline bool operator ==(Rect a, Rect b) { return a.min==b.min && a.max==b.max; }
 
-/// Remove any intersections between \a neg and \a rects, subdividing as necessary
-/// \note Used to fill background accurately to optimize bandwidth usage (and avoid flickering if rendering to front)
-void remove(array<Rect>& rects, Rect neg);
-
 extern array<Rect> clipStack;
 extern Rect currentClip;
 inline void push(Rect clip) { clipStack << currentClip; currentClip=currentClip & clip; }
@@ -27,15 +23,14 @@ inline void pop() { currentClip=clipStack.pop(); }
 /// Current framebuffer (X11 shared memory mapped by Window::render)
 extern Image<pixel> framebuffer;
 
-constexpr byte4 black __(0, 0, 0, 255);
-constexpr byte4 gray __(128, 128, 128, 255);
-constexpr byte4 lightGray __(192, 192, 192, 255);
-constexpr byte4 backgroundColor __(240, 240, 240, 240);
-constexpr byte4 white __(255, 255, 255, 255);
-constexpr byte4 selectionColor __(224, 192, 128, 255);
+constexpr byte4 black __(0, 0, 0, 0xFF);
+constexpr byte4 gray __(0xC0, 0xC0, 0xC0, 0xFF);
+constexpr byte4 lightGray __(0xE0, 0xE0, 0xE0, 0xFF);
+constexpr byte4 white __(0xFF, 0xFF, 0xFF, 0xFF);
+constexpr byte4 selectionColor __(0xE0, 0xC0, 0x80, 0xFF);
 
 /// Fills framebuffer pixels inside \a rect with \a color
-void fill(Rect rect, byte4 color=backgroundColor);
+void fill(Rect rect, byte4 color);
 /// Blits single channel intensity/alpha \a source to framebuffer at \a target
 /// \note if \a invert is set, source is blitted with inverted intensity (1-v,1-v,1-v,v), useful for text selections
 void blit(int2 target, const Image<uint8>& source, bool invert=false);

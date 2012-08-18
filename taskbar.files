@@ -34,16 +34,6 @@ dbus.h
 taskbar.cc
 launcher.cc
 launcher.h
-dbus.cc
 calendar.h
 calendar.cc
-
-http.h
-http.cc
-xml.cc
-html.cc
-feeds.cc
-browser.cc
-feeds.h
-desktop.cc
 x.h

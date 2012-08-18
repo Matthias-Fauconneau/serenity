@@ -29,6 +29,12 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4;
        round = (1<<scale)/2; //round to nearest not down
     }
+    {
+        DataStream& s = hhea;
+        uint32 unused version=s.read();
+        ascent=s.read(); /*uint16 unused descent=s.read(), unused lineGap=s.read();
+        uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();*/
+    }
 }
 
 uint16 Font::index(uint16 code) {
@@ -125,8 +131,7 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
         yMax = scale(yMax); if(yMax<0) yMax=(yMax/16)*16; else if(yMax%16) yMax+=16-yMax%16; yMax=unscale(yMax); //round up to pixel
 
         int width=scale(xMax-xMin), height=scale(yMax-yMin);
-        raster = Image<int8>(width+1,height+1);
-        for(int i=0;i<width*height; i++) raster.data[i]=0;
+        raster = Image<int8>(width+1,height+1); clear((byte*)raster.data,raster.height*raster.stride);
         assert(raster);
     } else s.advance(4*2);
 
@@ -232,6 +237,6 @@ Glyph Font::glyph(uint16 code) {
             glyph.image(x,y) = acc? 256-acc : 255; //TODO: alpha blitnt16)
         }
     }
-    glyph.offset = int2(scale(xMin),(size<<4)-scale(yMax));
+    glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax));
     return Glyph(glyph);
 }

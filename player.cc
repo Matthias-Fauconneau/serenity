@@ -31,7 +31,7 @@ struct Player : Application {
 
     Player() {
         window.localShortcut(Escape).connect(this, &Player::quit);
-        window.localShortcut(Space).connect(this, &Player::togglePlay);
+        window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
         playButton.toggled.connect(this, &Player::setPlaying);
         nextButton.triggered.connect(this, &Player::next);
         slider.valueChanged.connect(this, &Player::seek);
@@ -48,16 +48,16 @@ struct Player : Application {
             assert(exists(path),path);
             if(isFolder(path)) play(path); else appendFile(move(path));
         }*/
-        if(!files && exists("/Music/.last"_)) {
-            string last = readFile("/Music/.last"_);
-            string folder = string(section(last,'/',0,3));
+        if(!files && exists("Music/.last"_)) {
+            string last = readFile("Music/.last"_);
+            string folder = string(section(last,'/',0,2));
             albums.index = folders.indexOf(folder);
             array<string> files = listFiles(folder,Recursive|Sort|Files);
             uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
             for(;i<files.size();i++) appendFile(move(files[i]));
         }
-        if(files) next();
         window.show();
+        if(files) next();
     }
     void appendFile(string&& path) {
         string title = string(section(section(path,'/',-2,-1),'.',0,-2));
@@ -71,15 +71,16 @@ struct Player : Application {
         assert(isFolder(path));
         array<string> files = listFiles(path,Recursive|Sort|Files);
         for(string& file: files) appendFile(move(file));
-        window.setSize(int2(-16,-16)); layout.update(); window.render();
+        window.setSize(layout.sizeHint());
+        next();
     }
     void playAlbum(uint index) {
         stop(); files.clear(); titles.clear();
-        window.setTitle(albums.active().text);
+        window.setTitle(albums[index].text);
         play(folders[index]);
     }
     void playTitle(uint index) {
-        window.setTitle(titles.active().text);
+        window.setTitle(titles[index].text);
         media.open(files[index]);
         audio.start();
         setPlaying(true);
@@ -89,14 +90,14 @@ struct Player : Application {
         if(!titles.count()) return;
         if(!playButton.enabled) setPlaying(true);
         if(titles.index+1<titles.count()) playTitle(++titles.index);
-        else window.setTitle(albums.active().text);
+        else if(albums.index<albums.count()) window.setTitle(albums.active().text);
         titles.ensureVisible(titles.active());
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        playButton.enabled=play;
         if(play) { audio.start(); window.setIcon(playIcon()); }
         else { audio.stop(); window.setIcon(pauseIcon()); }
+        playButton.enabled=play; window.render();
     }
     void stop() {
         setPlaying(false);
@@ -113,7 +114,7 @@ struct Player : Application {
         slider.value = position; slider.maximum=duration;
         elapsed.setText(dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2));
         remaining.setText(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2));
-        window.render();
+        window.wait();
     }
 };
 Application(Player)

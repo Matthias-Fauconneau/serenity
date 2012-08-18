@@ -40,8 +40,8 @@ struct Clock : Text, Timer {
     signal<> triggered;
     Clock(int size):Text(::str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
     void expired() { text=::str(date(),"hh:mm"_); update(); setAbsolute(currentTime()+60); timeout(); }
-    bool mouseEvent(int2, Event event, Key) override {
-        if(event==ButtonPress) { triggered(); return true; }
+    bool mouseEvent(int2, Event event, Button) override {
+        if(event==Press) { triggered(); return true; }
         return false;
     }
 };

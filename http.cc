@@ -5,6 +5,7 @@
 #include "linux.h"
 #include "map.h"
 #include "memory.h"
+#include "debug.h"
 
 /// Socket
 
@@ -24,7 +25,6 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
         static int dns;
         if(!dns) {
             dns = socket(PF_INET,SOCK_DGRAM,0);
-            assert(dns>0,dns);
             TextStream s(readFile("etc/resolv.conf"_));
             s.until("nameserver "_);
             uint a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());

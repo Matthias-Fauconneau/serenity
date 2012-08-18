@@ -43,10 +43,16 @@
 #define syscall5(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4) \
     inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4))}
+#if __i386__ || __x86_64__
+#define syscall6(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5) \
+    inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) __attribute((noinline)) \
+    /*noinline forces compiler to save ebp and load variable using esp */ \
+{r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) r(r5, arg5) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5))}
+#else
 #define syscall6(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5) \
     inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) r(r5, arg5) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5))}
-
+#endif
 enum class sys : long {
     exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
     ipc = 117, socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197,
@@ -93,7 +99,9 @@ enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_R
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 enum { CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3 };
 
+#pragma GCC system_header
 int exit(int code) __attribute((noreturn));
+syscall1(int, exit, int,code)
 syscall0(int, fork)
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
@@ -108,7 +116,10 @@ syscall3(int, setpriority, int,which, int,who, int,prio)
 syscall3(int, getdents, int,fd, void*,entry, long,size)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
+
+
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
+
 syscall2(int, fstat, int,fd, stat*,buf)
 syscall2(int, clock_gettime, int,type, timespec*,ts)
 syscall4(int, openat, int,fd, const char*,name, int,oflag, int,perms)
@@ -140,9 +151,6 @@ syscall1(int, shmdt, const void*,ptr)
 syscall3(int, shmget, int,key, long,size, int,flag)
 syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)
 #endif
-
-#pragma GCC system_header
-syscall1(int, exit, int,code)
 
 #undef str
 #undef r

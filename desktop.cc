@@ -20,14 +20,14 @@ struct Desktop : Application {
         clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::update);
         feeds.pageChanged.connect(this,&Desktop::showPage);
-        window.localShortcut(Right).connect(&feeds, &Feeds::readNext);
+        window.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);
         //window.localShortcut(Extra).connect(&feeds, &Feeds::readNext);
         //window.localShortcut(Power).connect(this, &Desktop::showDesktop);
         window.localShortcut(Escape).connect(this, &Desktop::showDesktop);
         window.show();
     }
     void showDesktop() {
-        if(window.widget != &applets) { window.setWidget(&applets); window.update(); window.render(); }
+        if(window.widget != &applets) { window.setWidget(&applets); window.render(); }
         //else window.setWidget(&shutdown);
         else quit(); //DEBUG
     }

@@ -1,6 +1,8 @@
 #include "process.h"
 #include "linux.h"
 #include "debug.h"
+#include "file.h"
+#include "stream.h"
 
 enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
 struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
@@ -81,8 +83,6 @@ void execute(const ref<byte>& path, const array<string>& args) {
 
 void setPriority(int priority) { setpriority(0,0,priority); }
 
-#include "file.h"
-#include "stream.h"
 ref<byte> getenv(const ref<byte>& name) {
     static string environ = ::readUpTo(openFile("proc/self/environ"_),4096);
     for(TextStream s = TextStream::byReference(environ);s;) {

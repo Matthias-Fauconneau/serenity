@@ -33,10 +33,11 @@ extern "C" byte* malloc(ulong size);
 extern "C" int posix_memalign(byte** buffer, ulong alignment, ulong size);
 extern "C" byte* realloc(void* buffer, ulong size);
 extern "C" void free(byte* buffer);
-byte* allocate_(uint size) {
+static byte* lastFree;
+byte* allocate_(uint size) { lastFree=0;
     //return malloc(size); //aligned to 8-byte
-    byte* buffer; assert_(!posix_memalign(&buffer,16,size)); return buffer;
+    byte* buffer; posix_memalign(&buffer,16,size); return buffer;
 }
 byte* reallocate_(byte* buffer, int unused size, int need) { return realloc(buffer,need); }
-void unallocate_(byte* unused buffer, int unused size) { free(buffer); }
+void unallocate_(byte* buffer, int unused size) { assert_(lastFree!=buffer); free(lastFree=buffer); }
 #endif

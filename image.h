@@ -9,7 +9,7 @@ typedef vector<bgra,uint,4> int4;
 typedef byte4 pixel;
 
 template<class T> struct Image {
-    T* data=0;
+    const T* data=0;
     uint width=0, height=0, stride=0;
     bool own=false, alpha=false;
 
@@ -23,11 +23,10 @@ template<class T> struct Image {
         data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
     Image(int width, int height, bool alpha=false, int stride=0)
         : data(allocate<T>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true), alpha(alpha) {
-        debug( clear((byte*)data,height*stride*sizeof(T)); ) assert(width); assert(height);
+        assert(width); assert(height);
     }
-    Image(array<T>&& data, uint width, uint height) : data((T*)data.data()),width(width),height(height),stride(width),own(true) {
-        assert(data.size() == width*height, data.size(), width, height); assert(data.buffer.capacity);
-        data.buffer.capacity = 0; //taking ownership
+    Image(array<T>&& o, uint width, uint height, bool alpha) : data(o.data()),width(width),height(height),stride(width),own(true),alpha(alpha) {
+        assert(o.size() == width*height, o.size(), width, height); assert(o.tag==-2); o.tag = 0;
     }
 
     ~Image(){ if(data && own) { unallocate(data,height*stride); } }
@@ -35,7 +34,7 @@ template<class T> struct Image {
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(T)); }
 
     T operator()(uint x, uint y) const {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
-    T& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
+    T& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return (T&)data[y*stride+x]; }
     int2 size() const { return int2(width,height); }
 };
 
@@ -43,9 +42,9 @@ template<class T> struct Image {
 
 generic string str(const Image<T>& o) { return str(o.width,"x"_,o.height); }
 /// Creates a new handle to \a image data (unsafe if freed)
-generic Image<T> share(const Image<T>& o) { return Image<T>(o.data,o.width,o.height,o.stride,false,o.alpha); }
+generic Image<T> share(const Image<T>& o) { return Image<T>((T*)o.data,o.width,o.height,o.stride,false,o.alpha); }
 /// Copies the image buffer
-generic Image<T> copy(const Image<T>& o) {Image<T> copy(o.width,o.height,o.alpha); ::copy(copy.data,o.data,o.stride*o.height); return copy;}
+generic Image<T> copy(const Image<T>& o) {Image<T> r(o.width,o.height,o.alpha); ::copy((T*)r.data,o.data,o.stride*o.height); return r;}
 /// Returns a copy of the image resized to \a width x \a height
 Image<byte4> resize(const Image<byte4>& image, uint width, uint height);
 /// Flip the image around the horizontal axis in place

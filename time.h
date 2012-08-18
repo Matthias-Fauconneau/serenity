@@ -6,6 +6,8 @@
 long currentTime();
 /// Returns CPU timestamp in microseconds
 long cpuTime();
+/// Logs the process time used to execute \a expr
+#define profile(expr) { long start=cpuTime(); expr write(1,string(#expr##_+" "_+dec(cpuTime()-start)+"ms\n"_)); }
 
 struct Date {
     int seconds=-1, minutes=-1, hours=-1, day=-1, month=-1, year=-1, weekDay=-1;

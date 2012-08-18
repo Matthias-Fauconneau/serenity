@@ -1,12 +1,12 @@
 PREFIX ?= /usr
-TARGET ?= taskbar
-BUILD ?= fast
+TARGET ?= player
+BUILD ?= release
 
-CC = clang -pipe -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-omit-frame-pointer -fno-exceptions -fno-rtti \
+CC = clang -pipe -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti \
 -Wall -Wextra -Wno-missing-field-initializers
 CC += $(FLAGS_$(BUILD))
-FLAGS_debug := -g -DDEBUG
-FLAGS_fast := -g -DDEBUG -O
+FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer
+FLAGS_release := -O3 -fomit-frame-pointer
 FLAGS_profile := -g -O -finstrument-functions
 
 SRCS = $(SRCS_$(BUILD)) $(SRCS_$(TARGET))
@@ -67,12 +67,12 @@ prepare:
 	@ln -sf $(TARGET).files serenity.files
 
 clean:
-	rm -f $(BUILD)/*.l
-	rm -f $(BUILD)/*.d
-	rm -f $(BUILD)/*.o
-	rm -f $(BUILD)/$(TARGET)
-	rm -fR $(BUILD)/icons
-	rmdir $(BUILD)
+	@rm -f $(BUILD)/*.l
+	@rm -f $(BUILD)/*.d
+	@rm -f $(BUILD)/*.o
+	@rm -f $(BUILD)/$(TARGET)
+	@rm -fR $(BUILD)/icons
+	@rmdir $(BUILD)
 
 install_icons/%.png: icons/%.png
 	cp $< $(PREFIX)/share/icons/hicolor/32x32/apps

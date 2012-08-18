@@ -8,26 +8,33 @@
 #include "x.h"
 #include "linux.h"
 
+ICON(cursor)
 ICON(button)
 struct Taskbar : Application, Poll {
-    static Taskbar* taskbar;
     struct Task : Item {
+        Taskbar* parent=0;
         uint id;
         Task(uint id):id(id){} //for indexOf
-        Task(uint id, Image<byte4>&& icon, string&& text):Item(move(icon),move(text)),id(id){}
-        bool selectEvent() override { /*taskbar->raise(id);*/ return true; }
-        /*bool mouseEvent(int2, Event event, Key button) override {
+        Task(Taskbar* parent, uint id, Image<byte4>&& icon, string&& text):Item(move(icon),move(text)),parent(parent),id(id){}
+        bool selectEvent() override { parent->raise(id); return true; }
+        bool mouseEvent(int2, Event event, Button button) override {
             //TODO: preview on hover
             if(button!=LeftButton) return false;
-            if(event==KeyPress && getWindows().last()==id) { MoveResizeWindow(x,id, 0, 16, display.x,display.y-16); return true; } //Set Maximized
-            if(event==Motion) { XMoveResizeWindow(x,id, display.x/4,16+(display.y-16)/4,display.x/2,(display.y-16)/2); return true; } //Set windowed
+            if(event==Press && parent->windows.last()==id) { //Set Maximized
+                {MoveResizeWindow r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; write(parent->x,raw(r));}
+                return true;
+            }
+            if(event==Motion) { //Set windowed
+                {MoveResizeWindow r; r.id=id; r.x=display.x/4, r.y=16+(display.y-16)/4; r.w=display.x/2; r.h=(display.y-16)/2; write(parent->x,raw(r));}
+                return true;
+            }
             return false;
-        }*/
+        }
     };
 
     const int x;
-    bool wm=false; //TODO: detect
-    signal<int> tasksChanged;
+    bool ownWM=true;
+    array<uint> windows;
 
     TriggerButton start __(resize(buttonIcon(), 16,16));
     Launcher launcher;
@@ -35,56 +42,35 @@ struct Taskbar : Application, Poll {
     Clock clock __(16);
     Popup<Calendar> calendar;
     HBox panel __(&start, &tasks, &clock);
-    Window window __(&panel,int2(0,16));
-
-    /// Popup launcher or raise desktop on second click
-    void startButton() {
-        if(launcher.window.mapped) launcher.window.hide(); else { launcher.window.show(); return; }
-        tasks.setActive(-1); window.render();
-        /*for(uint id: getWindows()) {
-            array<Atom> type=Window::getAtomProperty(id,"_NET_WM_WINDOW_TYPE"_);
-            if(type.size()>=1 && (type[0]==Atom(_NET_WM_WINDOW_TYPE_DESKTOP)||type[0]==Atom(_NET_WM_WINDOW_TYPE_DOCK))) {
-                XRaiseWindow(x, id);
-            }
-        }*/
-    }
-
-    int addTask(uint id) {
-        /*XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect||wa.map_state!=IsViewable) return -1;
-        array<Atom> type=Window::getAtomProperty(id,"_NET_WM_WINDOW_TYPE"_);
-        if(type.size()>=1 && type.first()!=Atom(_NET_WM_WINDOW_TYPE_NORMAL)) return -1;
-        if(contains(Window::getAtomProperty(id,"_NET_WM_STATE"),Atom(_NET_WM_SKIP_TASKBAR))) return -1;*/
-        string title = getTitle(id);
-        if(!title) return -1;
-        Image<byte4> icon = getIcon(id);
-        tasks << Task(id,move(icon),move(title));
-        return tasks.array::size()-1;
-    }
+    Window window __(&panel,int2(0,16),""_,__(),true);
+    uint root=window.root;
+    uint desktop=0;
 
     Taskbar() : x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
-        taskbar=this;
-        // Setups X connection
         string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
         sockaddr_un addr; copy(addr.path,path.data(),path.size());
         check_(connect(x,(sockaddr*)&addr,2+path.size()),path);
         {ConnectionSetup r;
             string authority = getenv("HOME"_)+"/.Xauthority"_;
             if(exists(authority)) write(x, string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
-            else write(x,raw(r)); }
+            else write(x, raw(r)); }
         {ConnectionSetupReply r=read<ConnectionSetupReply>(x); assert(r.status==1);
             read(x,r.additionnal*4-(sizeof(ConnectionSetupReply)-8)); }
-        //XSetWindowAttributes attributes; attributes.cursor=XCreateFontCursor(x,68); XChangeWindowAttributes(root,CWCursor,&attributes);
 
-        {ChangeWindowAttribute r; r.window=window.root; r.eventMask=SubstructureNotifyMask|PropertyChangeMask|ButtonPressMask;
-            if(wm) r.eventMask|=SubstructureRedirectMask;
-            write(x,raw(r)); }
-
-        /*for(XID id: getWindows()) {
-            addTask(id);
-            XSelectInput(x, id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
-            XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
-            XGrabButton(x,1,AnyModifier,id,0,ButtonPressMask,0,1,0,0);
-        }*/
+        if(getProperty<uint>(root,"_NET_SUPPORTING_WM_CHECK"_)) ownWM=false;
+        else window.setCursor(share(cursorIcon()), root);
+        {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask|PropertyChangeMask|ButtonPressMask;
+            if(ownWM) r.eventMask|=SubstructureRedirectMask; write(x, raw(r)); }
+        if(ownWM) {
+            {QueryTree r; r.id=root; write(x, raw(r));}
+            {QueryTreeReply r = readReply<QueryTreeReply>(); windows=read<uint>(x, r.count);}
+        } else windows=getProperty<uint>(root,"_NET_CLIENT_LIST_STACKING"_);
+        for(uint id: windows) {
+            addWindow(id);
+            {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
+                write(x, raw(r));}
+            if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
+        }
         registerPoll(__(x, POLLIN));
 
         start.triggered.connect(this,&Taskbar::startButton);
@@ -98,123 +84,153 @@ struct Taskbar : Application, Poll {
         window.show();
     }
 
-    void event(const pollfd& poll) { if(poll.fd==x) { uint8 type = read<uint8>(x); readEvent(type); } }
-    void readEvent(uint8 type) {
-        /***/ if(type==0) { XError e=read<XError>(x);
-            error("Error",e.code<sizeof(xerror)/sizeof(*xerror)?xerror[e.code]:dec(e.code),"seq:",e.seq,"id",e.id,"request",
+    void processEvent(uint8 type, const Event& event) {
+        if(type==0) { const Error& e=(Error&)event;
+            log("Error",e.code<sizeof(xerror)/sizeof(*xerror)?xerror[e.code]:dec(e.code),"seq:",e.seq,"id",e.id,"request",
                   e.major<sizeof(xrequest)/sizeof(*xrequest)?xrequest[e.major]:dec(e.major),"minor",e.minor);
         } else if(type==1) { error("Unexpected reply");
-        } else { XEvent unused e=read<XEvent>(x); type&=0b01111111; //msb set if sent by SendEvent
-            /*bool needUpdate = false;
-            while(XPending(x)) { XEvent e; XNextEvent(x,&e); XID id = e.window;
-                if(e.type==CreateNotify) {
-                    XSelectInput(x,id, StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask);
-                    XWindowAttributes wa; XGetWindowAttributes(x, id, &wa); if(wa.override_redirect) continue;
-                    XGrabButton(x,1,AnyModifier,id,0,ButtonPressMask,0,1,0,0);
-                    continue;
-                } else if(e.type == MapRequest) {
-                    XMapWindow(x, id);
-                    raise(id);
-                    int i = indexOf(tasks, Task(id));
-                    if(i<0) { i=addTask(id); if(i>=0) tasksChanged.emit(tasks.array::size()); }
-                    if(i<0) continue;
-                    tasks.index=i;
-                } else if(e.type == ConfigureRequest) {
-                    XConfigureRequestEvent& c = (XConfigureRequestEvent&)e;
-                    id = c.window;
-                    XWindowAttributes wa; XGetWindowAttributes(x, id, &wa);
-                    if(c.value_mask & CWX) wa.x=c.x; if(c.value_mask & CWY) wa.y=c.y;
-                    if(c.value_mask & CWWidth) wa.width=c.width; if(c.value_mask & CWHeight) wa.height=c.height;
-                    array<Atom> motif = Window::getAtomProperty(id,"_MOTIF_WM_HINTS"_);
-                    array<Atom> type = Window::getAtomProperty(id,"_NET_WM_WINDOW_TYPE"_);
-                    if(!wa.override_redirect &&
-                            (!type || type[0]==Atom(_NET_WM_WINDOW_TYPE_NORMAL) || type[0]==Atom(_NET_WM_WINDOW_TYPE_DESKTOP))
-                            && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                        wa.width=min(display.x,wa.width); wa.height=min(display.y-16,wa.height);
-                        wa.x = (display.x - wa.width)/2;
-                        wa.y = 16+(display.y-16-wa.height)/2;
-                    }
-                    XMoveResizeWindow(x,id, wa.x,wa.y,wa.width,wa.height);
-                    continue;
-                } else if(e.type == ButtonPress) {
-                    raise(id);
-                    XAllowEvents(x, 2, 0);
-                    int i = indexOf(tasks, Task(id));
-                    if(i>=0) tasks.index=i;
-                } else if(e.type==PropertyNotify) {
-                    int i = indexOf(tasks, Task(id));
-                    if(i<0) i=addTask(id);
-                    if(i<0) continue;
-                    Atom atom = ((XPropertyEvent&)e).atom;
-                    if(atom==Atom(_NET_WM_NAME)) tasks[i].get<Text>().setText( getTitle(id) );
-                    else if(atom==Atom(_NET_WM_ICON)) tasks[i].get<Icon>().image = getIcon(id);
-                    else continue;
-                } else if(e.type == UnmapNotify || e.type == DestroyNotify || e.type == ReparentNotify || e.type == VisibilityNotify) {
-                    int i = indexOf(tasks, Task(id));
-                    if(i>=0) {
-                        tasks.removeAt(i);
-                        if(tasks.index == uint(i)) tasks.index=-1;
-                        tasksChanged.emit(tasks.array::size());
-                    }
-
-                    array<XID> windows = getWindows();
-                    if(windows) {
-                        XID id=windows.last();
-                        //XSetInputFocus(x, id, RevertToPointerRoot, CurrentTime);
-                        if(tasks.index==uint(-1)) tasks.setActive(indexOf(tasks, Task(id)));
-                    }
+        } else { const Event& e=event; type&=0b01111111; //msb set if sent by SendEvent
+            if(type==CreateNotify) { uint id=e.create.window;
+                if(e.create.override_redirect) return;
+                {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
+                    write(x, raw(r));}
+                if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
+                return;
+            } else if(type == MapRequest) { uint id=e.map_request.window;
+                {MapWindow r; r.id=id; write(x,raw(r));}
+                raise(id);
+                int i = tasks.indexOf(id);
+                if(i<0) i=addWindow(id);
+                if(i<0) return;
+                tasks.index=i;
+            } else if(type == ConfigureRequest) { uint id = e.configure_request.window;
+                {GetGeometry r; r.id=id; write(x, raw(r));}
+                GetGeometryReply w=readReply<GetGeometryReply>();
+                const auto& c = e.configure_request;
+                if(c.valueMask & X) w.x=c.x; if(c.valueMask & Y) w.y=c.y; if(c.valueMask & W) w.w=c.w; if(c.valueMask & H) w.h=c.h;
+                array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
+                GetWindowAttributes r; r.window=id; write(x, raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
+                if(!wa.overrideRedirect && (!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
+                    w.w=min<int16>(display.x,w.w); w.h=min<int16>(display.y-16,w.h);
+                    w.x = (display.x - w.w)/2; w.y = 16+(display.y-16-w.h)/2;
                 }
-                needUpdate = true;
-            }
-            if(needUpdate && window.visible) { panel.update(); window.render(); }*/
-            log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
+                {MoveResizeWindow r; r.id=id; r.x=w.x, r.y=w.y; r.w=w.w; r.h=w.h; write(x, raw(r));}
+                return;
+            } else if(type == ButtonPress) { uint id = e.event;
+                raise(id);
+                write(x, raw(AllowEvents()));
+                int i = tasks.indexOf(id);
+                if(i>=0) tasks.index=i;
+            } else if(type==PropertyNotify) { uint id=e.property.window;
+                int i = tasks.indexOf(id);
+                if(i<0) i=addWindow(id);
+                if(i<0) return;
+                if(e.property.atom==Atom("_NET_WM_NAME"_)) tasks[i].get<Text>().setText( getTitle(id) );
+                else if(e.property.atom==Atom("_NET_WM_ICON"_)) tasks[i].get<Icon>().image = getIcon(id);
+                else return;
+            } else if(type == DestroyNotify) { uint id=e.property.window;
+                int i = tasks.indexOf(id);
+                if(i>=0) {
+                    tasks.removeAt(i);
+                    if(tasks.index == uint(i)) tasks.index=-1;
+                }
+                if(windows) {
+                    uint id=windows.last();
+                    {SetInputFocus r; r.window=id; write(x, raw(r));}
+                    if(tasks.index==uint(-1)) tasks.setActive(tasks.indexOf(id));
+                }
+            } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage) {
+            } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
+            window.needUpdate=true; window.render();
         }
     }
 
-    template<class T> T readReply() { for(;;) { uint8 type = read<uint8>(x); if(type==1) return read<T>(x); else readEvent(type); } }
-    uint Atom(const ref<byte>& name) {
-        {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; write(x,string(raw(r)+name+pad(4,r.length)));}
-        {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
-    }
+    /// Adds \a id to \a windows and to \a tasks if necessary
+    int addWindow(uint id) {
+        windows+= id;
+        if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==ref<uint>__(Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_))) desktop=id;
 
-    array<byte> getProperty(uint window, const ref<byte>& name) {
-        {GetProperty r; r.window=window; r.property=Atom(name); write(x,string(raw(r)));}
-        {GetPropertyReply r=readReply<GetPropertyReply>(); return read(x, r.length*r.format/8); }
+        if(id==root) return -1;
+        {GetWindowAttributes r; r.window=id; write(x, raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
+            if(wa.overrideRedirect||wa.mapState==IsUnviewable) return -1;}
+        array<uint> type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
+        if(type.size()>=1 && type.first()!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) return -1;
+        if(getProperty<uint>(id,"_NET_WM_STATE"_).contains(Atom("_NET_WM_SKIP_TASKBAR"_))) return -1;
+        string title = getTitle(id); if(!title) return -1;
+        Image<byte4> icon = getIcon(id);
+        tasks << Task(this,id,move(icon),move(title));
+        return tasks.array::size()-1;
     }
 
     string getTitle(uint id) {
-        string name = getProperty(id,"_NET_WM_NAME"_);
-        if(!name) name = getProperty(id,"WM_NAME"_);
+        string name = getProperty<byte>(id,"_NET_WM_NAME"_);
+        if(!name) name = getProperty<byte>(id,"WM_NAME"_);
         return move(name);
     }
-
     Image<byte4> getIcon(uint id) {
-        array<byte> buffer = getProperty(id,"_NET_WM_ICON"_);
-        if(buffer.size()<=8) return Image<byte4>();
-        array<byte4> image(buffer.size()/4-2); image.setSize(buffer.size()/4-2);
-        for(uint i=0;i<buffer.size()/4-2;i++) image[i] = *(byte4*)&buffer[8+i*4];
-        return resize(Image<byte4>(move(image), *(uint*)&buffer[0], *(uint*)&buffer[4]), 16,16);
+        array<uint> buffer = getProperty<uint>(id,"_NET_WM_ICON"_,2+32*32);
+        if(buffer.size()<2) return Image<byte4>();
+        uint w=buffer[0], h=buffer[1];
+        if(buffer.size()<2+w*h) return Image<byte4>();
+        return resize(Image<byte4>(array<byte4>(cast<byte4>(buffer.slice(2,w*h))),w,h,true), 16, 16);
     }
 
-    /*static XID* topLevelWindowList=0;
-    static array<XID> getWindows() {
-    if(topLevelWindowList) XFree(topLevelWindowList);
-    XID root,parent; uint count=0; XQueryTree(x,x->screens[0].root,&root,&parent,&topLevelWindowList,&count);
-    return array<XID>(topLevelWindowList,count);
-    }*/
+    uint Atom(const ref<byte>& name) {
+        {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; write(x, string(raw(r)+name+pad(4,r.length)));}
+        {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
+    }
+    string AtomName(uint atom) {
+        {GetAtomName r; r.atom=atom; write(x, raw(r));}
+        {GetAtomNameReply r=readReply<GetAtomNameReply>(); string name=read(x,r.size); int pad=align(4,r.size)-r.size; if(pad) read(x,pad);
+            return name;}
+    }
+    template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=258) {
+        {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; write(x, raw(r));}
+        {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
+            array<T> a; if(size) a=read<T>(x,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(x,pad); return a; }
+    }
 
-    void raise(uint unused id) {
-        /*XRaiseWindow(x, id);
-    XSetInputFocus(x, id, 1, 0);
-    for(XID w: getWindows()) {
-        if(Window::getAtomProperty(w,"WM_TRANSIENT_FOR") == array<Atom>{id}) {
-            XRaiseWindow(x, w);
-            XSetInputFocus(x, w, 1, 0);
+    void raise(uint id) {
+        if(ownWM) {
+            {RaiseWindow r; r.id=id; write(x, raw(r));}
+            {SetInputFocus r; r.window=id; write(x, raw(r));}
+            for(uint w: windows) {
+                if(getProperty<uint>(w,"WM_TRANSIENT_FOR"_) == ref<uint>__(id)) {
+                    {RaiseWindow r; r.id=id; write(x, raw(r));}
+                    {SetInputFocus r; r.window=id; write(x, raw(r));}
+                }
+            }
+        } else {
+            {SendEvent r; r.window=root; r.type=ClientMessage; r.eventMask=SubstructureNotifyMask;
+                auto& e=r.event.client; e.format=32; e.window=id; e.type=Atom("_NET_ACTIVE_WINDOW"_); clear(e.data); e.data[0]=2;
+                write(x, raw(r));}
         }
-    }*/
     }
 
+    void startButton() { // Opens launcher or raise desktop on second click
+        if(!launcher.window.mapped) launcher.window.show();
+        else {
+            launcher.window.hide();
+            if(tasks.index<tasks.count()) { tasks.setActive(-1); window.render(); }
+            if(desktop) raise(desktop);
+        }
+    }
+
+    struct QEvent { uint8 type; Event event; } packed;
+    array<QEvent> queue;
+    void event(const pollfd& poll) {
+        assert(poll.fd==x);
+        uint8 type = read<uint8>(x);
+        processEvent(type, read<Event>(x));
+        while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
+    }
+    template<class T> T readReply(bool ignore=false) {
+        for(;;) { uint8 type = read<uint8>(x);
+            if(type==0) { ::Event e=read<::Event>(x); if(!ignore) processEvent(0,e); T t; clear(t); return t; }
+            else if(type==1) return read<T>(x);
+            else queue << QEvent __(type, read<::Event>(x)); //queue events to avoid reentrance
+        }
+    }
 };
-Taskbar* Taskbar::taskbar;
 bool operator==(const Taskbar::Task& a,const Taskbar::Task& b){return a.id==b.id;}
 Application(Taskbar)

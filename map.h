@@ -38,7 +38,7 @@ template<class K, class V> struct map {
         keys << forward<Kf>(key); values << V(); return values.last();
     }
     V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
-    void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
+    void remove(const K& key) { int i=keys.indexOf(key); assert_(i>=0); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
         const K* k; const V* v;
@@ -66,7 +66,5 @@ template<class K, class V> map<K,V> copy(const map<K,V>& o) {
 }
 
 template<class K, class V> string str(const map<K,V>& m) {
-    string s("{"_);
-    for(uint i=0;i<m.size();i++) { s<<str(m.keys[i])+": "_+str(m.values[i]); if(i<m.size()-1) s<<", "_; }
-    return s+"}"_;
+    string s; s<<'{'; for(uint i=0;i<m.size();i++) { s<<str(m.keys[i])<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }

@@ -1,6 +1,7 @@
 #include "xml.h"
 #include "string.h"
 #include "utf8.h"
+#include "debug.h"
 
 static Element parse(const ref<byte>& document, bool html) {
     assert(document);

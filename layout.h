@@ -9,7 +9,7 @@ struct Layout : Widget {
     virtual Widget& at(int) =0;
 
     /// Forwards event to intersecting child widgets until accepted
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
     /// Renders every child widget
     void render(int2 parent) override;
 };
@@ -56,8 +56,8 @@ template<class... T> struct Tuple : virtual Layout {
     tuple<Widget,T...> items;
     Tuple() : items() {}
     Tuple(T&& ___ t) : items(0,move(t)___) {}
-    Widget& at(int i) { return items.at(i); }
-    uint count() const { return items.size(); }
+    Widget& at(int i) override { return items.at(i); }
+    uint count() const override { return items.size(); }
     template<class A> A& get() { return items.template get<A>(); }
     template<class A> const A& get() const { return items.template get<A>(); }
 };
@@ -124,7 +124,7 @@ struct Selection : virtual Layout {
     /// User clicked on an item.
     signal<uint /*index*/> itemPressed;
 
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
     bool keyPress(Key key) override;
 };
 

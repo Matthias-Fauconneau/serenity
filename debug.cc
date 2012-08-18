@@ -198,7 +198,7 @@ void trace(int skip, uint size) {
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);
     for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x8000000 && ptr(stack[i])<0xb0000000) {
         Symbol s = findNearestLine(stack[i]);
-        if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log("0x"_+str(ptr(stack[i])));
+        if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr(stack[i]));
     }
     recurse--;
 }

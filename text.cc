@@ -135,14 +135,13 @@ int2 Text::sizeHint() {
 
 void Text::render(int2 parent) {
     if(!textSize) update(wrap);
-    fill(parent+position+Rect(Widget::size));
     int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
     for(const Blit& b: blits) blit(offset+b.pos, b.image);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
 }
 
-bool Text::mouseEvent(int2 position, Event event, Key) {
-    if(event!=ButtonPress) return false;
+bool Text::mouseEvent(int2 position, Event event, Button) {
+    if(event!=Press) return false;
     position -= max(int2(0,0),(Widget::size-textSize)/2);
     for(uint i=0;i<blits.size();i++) { const Blit& b=blits[i];
         if(position>=b.pos && position<=b.pos+b.image.size()) {
@@ -155,8 +154,8 @@ bool Text::mouseEvent(int2 position, Event event, Key) {
 
 /// TextInput
 
-bool TextInput::mouseEvent(int2 position, Event event, Key) {
-    if(event!=ButtonPress) return false;
+bool TextInput::mouseEvent(int2 position, Event event, Button) {
+    if(event!=Press) return false;
     focus=this;
     int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
     for(cursor=0;cursor<blits.size() && x>blits[cursor].pos.x+(int)blits[cursor].image.width/2;cursor++) {}

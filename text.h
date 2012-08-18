@@ -36,7 +36,7 @@ struct Text : Widget {
     void update() override { if(!textSize || textSize > Widget::size) update(min(wrap,Widget::size.x)); }
     void update(int wrap);
     void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
 
     // cache layout bounding box
     int2 textSize;
@@ -57,7 +57,7 @@ struct Text : Widget {
 struct TextInput : Text {
     uint cursor=0;
 
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
     bool keyPress(Key key) override;
     void render(int2 parent);
 };

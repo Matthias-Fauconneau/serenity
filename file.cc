@@ -31,7 +31,7 @@ File openFile(const ref<byte>& file, int at) {
     return File( check( openat(at, strz(file), O_RDONLY, 0), file) );
 }
 File createFile(const ref<byte>& file, int at, bool overwrite) {
-    assert(overwrite || !exists(file,at), file);
+    if(!overwrite && exists(file,at)) error("Exists",file);
     return File( check( openat(at, strz(file),O_CREAT|O_WRONLY|O_TRUNC,0666), file ) );
 }
 File appendFile(const ref<byte>& file, int at) {
@@ -54,7 +54,7 @@ void writeFile(const ref<byte>& file, const ref<byte>& content, int at, bool ove
 
 Map mapFile(const ref<byte>& file, int at) { File fd=openFile(file,at); Map map=mapFile(fd); return map; }
 Map mapFile(int fd) {
-    struct stat sb; fstat(fd, &sb);
+    stat sb; check_( fstat(fd, &sb) );
     if(sb.size==0) return Map(0,0);
     const byte* data = (byte*)mmap(0,sb.size,PROT_READ,MAP_PRIVATE,fd,0);
     assert(data);
@@ -91,11 +91,11 @@ array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
             if(type==DT_DIR && flags&Recursive) {
-                array<string> files = listFiles(name,flags,fd);
+                array<string> files = listFiles(folder?string(folder+"/"_+name):string(name),flags,at);
                 if(flags&Sort) for(string& e: files) list.insertSorted(move(e));
                 else list << move(files);
             } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
-                string path = folder+"/"_+name;
+                string path = folder?string(folder+"/"_+name):string(name);
                 if(flags&Sort) list.insertSorted(move(path));
                 else list << move(path);
             }

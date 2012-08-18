@@ -66,7 +66,7 @@ void AudioOutput::start(bool realtime) {
     hparams.interval(PeriodSize).min= periodSize;
     if(realtime) hparams.interval(Periods).max = 2;
     else hparams.interval(Periods).min = 2;
-    assert(!ioctl(fd, IOCTL_HW_PARAMS, &hparams));
+    check_(ioctl(fd, IOCTL_HW_PARAMS, &hparams));
     periodSize = hparams.interval(PeriodSize);
     periodCount = hparams.interval(Periods);
     bufferSize = periodCount * periodSize;
@@ -76,7 +76,7 @@ void AudioOutput::start(bool realtime) {
     SWParams sparams;
     sparams.avail_min = periodSize;
     sparams.stop_threshold = sparams.boundary = bufferSize;
-    assert(!ioctl(fd, IOCTL_SW_PARAMS, &sparams));
+    check_(ioctl(fd, IOCTL_SW_PARAMS, &sparams));
 
     status = (Status*)mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset);
     control = (Control*)mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset);

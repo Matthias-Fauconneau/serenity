@@ -9,7 +9,7 @@
 /// Space is a proxy Widget to add space as needed
 struct Space : Widget {
     int2 sizeHint() { return int2(-1,-1); }
-    void render(int2 parent) { fill(parent+position+Rect(size)); }
+    void render(int2) {}
 };
 
 /// Scroll is a proxy Widget containing a widget in a scrollable area.
@@ -25,7 +25,7 @@ struct ScrollArea : Widget {
 
     int2 sizeHint() { return widget().sizeHint(); }
     void update() override;
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
     void render(int2 parent) { return widget().render(parent+position); }
 };
 
@@ -58,7 +58,7 @@ struct TriggerButton : Icon {
     TriggerButton(Image<byte4>&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
 };
 
 /// ToggleButton is a togglable Icon
@@ -74,7 +74,7 @@ struct ToggleButton : Widget {
 
     int2 sizeHint();
     void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
 
     Image<byte4> enableIcon;
     Image<byte4> disableIcon;
@@ -91,7 +91,7 @@ struct Slider : Widget {
 
     int2 sizeHint();
     void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Key button) override;
+    bool mouseEvent(int2 position, Event event, Button button) override;
 
     static const int height = 32;
 };
@@ -99,7 +99,7 @@ struct Slider : Widget {
 /// Item is an icon with text
 struct Item : Horizontal, Tuple<Icon,Text,Space> {
     Item():Tuple(){}
-    Item(Image<byte4>&& icon, string&& text):Tuple(move(icon),move(text),Space()){}
+    Item(Image<byte4>&& icon, string&& text, int size=16):Tuple(move(icon),Text(move(text),size),Space()){}
 };
 
 /// TabBar is a \a Bar containing \a Item elements

@@ -1,24 +1,10 @@
 #include "display.h"
 
 /// Clip
-
-void remove(array<Rect>& rects, Rect neg) {
-    for(uint j=0;j<rects.size();) { Rect rect=rects[j];
-        if(rect&neg) { //split
-            rects.removeAt(j);
-            {Rect r(rect.min,int2(rect.max.x,neg.min.y)); if(r) rects<<r;} //top
-            {Rect r(int2(rect.min.x,max(rect.min.y,neg.min.y)), int2(neg.min.x,min(rect.max.y,neg.max.y))); if(r) rects<<r;} //left
-            {Rect r(int2(neg.max.x,max(rect.min.y,neg.min.y)), int2(rect.max.x,min(rect.max.y,neg.max.y))); if(r) rects<<r;} //right
-            {Rect r(int2(rect.min.x,neg.max.y),rect.max); if(r) rects<<r;} //bottom
-        } else j++;
-    }
-}
-
 array<Rect> clipStack;
 Rect currentClip=Rect(int2(0,0));
 
-/// Primitives
-
+/// Render
 Image<pixel> framebuffer;
 
 void fill(Rect rect, pixel color) { //TODO: blend
@@ -36,9 +22,9 @@ inline int4 div255(const int4& v) { int4 r; for(int i=0;i<4;i++) r[i]=div255(v[i
 void blit(int2 target, const Image<uint8>& source, bool unused invert) { //TODO: invert
     Rect rect = (target+Rect(source.size())) & currentClip;
     for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-        uint8 value = source(x-target.x,y-target.y);
+        int value = source(x-target.x,y-target.y);
         auto& d = framebuffer(x,y);
-        d = byte4(div255(d.b*value),div255(d.g*value),div255(d.r*value),d.a);
+        d = byte4(div255(d.b*value),div255(d.g*value),div255(d.r*value),min(255,d.a+(255-value)));
     }
 }
 

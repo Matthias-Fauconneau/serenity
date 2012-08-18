@@ -1095,7 +1095,7 @@ void jpeg_decoder::stop_decoding(jpgd_status status)
 {
     m_error_code = status;
     free_all_blocks();
-    abort();
+    exit_(-1);
 }
 
 void *jpeg_decoder::alloc(int nSize, bool zero)

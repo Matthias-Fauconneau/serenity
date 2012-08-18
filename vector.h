@@ -25,6 +25,7 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     vector& operator +=(const vector& v) { for(int i=0;i<N;i++) at(i)+=v[i]; return *this; }
     vector& operator -=(const vector& v) { for(int i=0;i<N;i++) at(i)-=v[i]; return *this; }
     vector& operator *=(const vector& v) { for(int i=0;i<N;i++) at(i)*=v[i]; return *this; }
+    vector& operator /=(const T& s) { for(int i=0;i<N;i++) at(i)/=s; return *this; }
 };
 
 #define generic template <template <typename> class V, class T, int N>
@@ -43,12 +44,21 @@ generic bool operator <(const vector& u, const vector& v) { for(int i=0;i<N;i++)
 generic bool operator >=(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<v[i]) return false; return true; }
 generic bool operator <=(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]>v[i]) return false; return true; }
 
-generic vector abs(vector v){ vector r; for(int i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
-generic vector min(vector a, vector b){ vector r; for(int i=0;i<N;i++) r[i]=min(a[i],b[i]); return r;  }
-generic vector max(vector a, vector b){ vector r; for(int i=0;i<N;i++) r[i]=max(a[i],b[i]); return r;  }
-generic vector clip(T min, vector x, T max){ vector r; for(int i=0;i<N;i++) r[i]=clip(min,x[i],max); return r;  }
+generic vector abs(const vector& v){ vector r; for(int i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
+generic vector min(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=min(a[i],b[i]); return r;  }
+generic vector max(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=max(a[i],b[i]); return r;  }
+generic vector clip(T min, const vector& x, T max){ vector r; for(int i=0;i<N;i++) r[i]=clip(min,x[i],max); return r;  }
 
-generic string str(vector v) { string s = string("("_); for(int i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
+generic float dot(const vector& a, const vector& b) { float l=0; for(int i=0;i<N;i++) l+=a[i]*b[i]; return l; }
+generic float length(const vector& a) { return __builtin_sqrtf(dot(a,a)); }
+generic vector normalize(const vector& a){ return a/length(a); }
+
+template<class T> T mix(const T& a,const T& b, float t) { return a*t + b*(1-t); }
+
+//inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
+//inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+
+generic string str(const vector& v) { string s = string("("_); for(int i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
 
 #undef vector
 #undef generic
