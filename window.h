@@ -80,7 +80,7 @@ struct Window : Poll {
     /// Socket to system local X display server
     const int x; /// \note Each window opens its own socket to simplify code (i.e no same process optimization)
     /// Root window
-    uint root;
+    uint root = 0;
     /// This window base resource id
     uint id = 0;
     /// Associated window resource (relative to \a id)

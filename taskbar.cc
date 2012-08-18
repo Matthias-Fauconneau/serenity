@@ -20,7 +20,7 @@ struct Taskbar : Application, Poll {
         bool mouseEvent(int2, Event event, Button button) override {
             //TODO: preview on hover
             if(button!=LeftButton) return false;
-            if(event==Press && parent->windows.last()==id) { //Set Maximized
+            if(event==Press && parent->getProperty<uint>(parent->root,"_NET_ACTIVE_WINDOW"_)==ref<uint>__(id)) { //Set Maximized
                 {MoveResizeWindow r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; write(parent->x,raw(r));}
                 return true;
             }
@@ -64,7 +64,7 @@ struct Taskbar : Application, Poll {
         if(ownWM) {
             {QueryTree r; r.id=root; write(x, raw(r));}
             {QueryTreeReply r = readReply<QueryTreeReply>(); windows=read<uint>(x, r.count);}
-        } else windows=getProperty<uint>(root,"_NET_CLIENT_LIST_STACKING"_);
+        } else windows=getProperty<uint>(root,"_NET_CLIENT_LIST"_);
         for(uint id: windows) {
             addWindow(id);
             {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
@@ -86,7 +86,7 @@ struct Taskbar : Application, Poll {
 
     void processEvent(uint8 type, const Event& event) {
         if(type==0) { const Error& e=(Error&)event;
-            log("Error",e.code<sizeof(xerror)/sizeof(*xerror)?xerror[e.code]:dec(e.code),"seq:",e.seq,"id",e.id,"request",
+            trace(); log("Error",e.code<sizeof(xerror)/sizeof(*xerror)?xerror[e.code]:dec(e.code),"seq:",e.seq,"id",e.id,"request",
                   e.major<sizeof(xrequest)/sizeof(*xrequest)?xrequest[e.major]:dec(e.major),"minor",e.minor);
         } else if(type==1) { error("Unexpected reply");
         } else { const Event& e=event; type&=0b01111111; //msb set if sent by SendEvent
@@ -122,12 +122,23 @@ struct Taskbar : Application, Poll {
                 int i = tasks.indexOf(id);
                 if(i>=0) tasks.index=i;
             } else if(type==PropertyNotify) { uint id=e.property.window;
-                int i = tasks.indexOf(id);
-                if(i<0) i=addWindow(id);
-                if(i<0) return;
-                if(e.property.atom==Atom("_NET_WM_NAME"_)) tasks[i].get<Text>().setText( getTitle(id) );
-                else if(e.property.atom==Atom("_NET_WM_ICON"_)) tasks[i].get<Icon>().image = getIcon(id);
-                else return;
+                if(id==root && e.property.atom==Atom("_NET_ACTIVE_WINDOW"_)) {
+                    int i = tasks.indexOf(getProperty<uint>(root,"_NET_ACTIVE_WINDOW"_).first()); if(i<0) return; tasks.setActive(i);
+                } else if(id==root && e.property.atom==Atom("_NET_CLIENT_LIST"_)) {
+                     windows=getProperty<uint>(root,"_NET_CLIENT_LIST"_); tasks.clear();
+                     for(uint id: windows) {
+                         addWindow(id);
+                         {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
+                             write(x, raw(r));}
+                         if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
+                     }
+                } else if(e.property.atom==Atom("_NET_WM_NAME"_)) {
+                    int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
+                    tasks[i].get<Text>().setText( getTitle(id) );
+                } else if(e.property.atom==Atom("_NET_WM_ICON"_)) {
+                    int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
+                    tasks[i].get<Icon>().image = getIcon(id);
+                } else return;
             } else if(type == DestroyNotify) { uint id=e.property.window;
                 int i = tasks.indexOf(id);
                 if(i>=0) {
@@ -139,7 +150,7 @@ struct Taskbar : Application, Poll {
                     {SetInputFocus r; r.window=id; write(x, raw(r));}
                     if(tasks.index==uint(-1)) tasks.setActive(tasks.indexOf(id));
                 }
-            } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage) {
+            } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify) {
             } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
             window.needUpdate=true; window.render();
         }
@@ -149,7 +160,6 @@ struct Taskbar : Application, Poll {
     int addWindow(uint id) {
         windows+= id;
         if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==ref<uint>__(Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_))) desktop=id;
-
         if(id==root) return -1;
         {GetWindowAttributes r; r.window=id; write(x, raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
             if(wa.overrideRedirect||wa.mapState==IsUnviewable) return -1;}
@@ -179,15 +189,10 @@ struct Taskbar : Application, Poll {
         {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; write(x, string(raw(r)+name+pad(4,r.length)));}
         {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
     }
-    string AtomName(uint atom) {
-        {GetAtomName r; r.atom=atom; write(x, raw(r));}
-        {GetAtomNameReply r=readReply<GetAtomNameReply>(); string name=read(x,r.size); int pad=align(4,r.size)-r.size; if(pad) read(x,pad);
-            return name;}
-    }
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=258) {
         {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; write(x, raw(r));}
         {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
-            array<T> a; if(size) a=read<T>(x,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(x,pad); return a; }
+            array<T> a; if(size) a=read<T>(x,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(x, pad); return a; }
     }
 
     void raise(uint id) {

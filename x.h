@@ -20,7 +20,7 @@ union Event {
     struct { byte pad; uint16 seq; uint parent,window; } packed map_request;
     struct { byte pad; uint16 seq; uint event,window,above; int16 x,y,w,h,border; } packed configure;
     struct { byte stackMode; uint16 seq; uint parent,window,sibling; int16 x,y,w,h,border; int16 valueMask; } packed configure_request;
-    struct { byte pad; uint16 seq; uint window, atom, time; } packed property;
+    struct { byte pad; uint16 seq; uint window, atom, time; uint8 state; } packed property;
     struct { byte pad; uint16 seq; uint time, requestor,selection,target,property; } packed selection;
     struct { byte format; uint16 seq; uint window, type; uint data[5]; } packed client;
     byte pad[31];
