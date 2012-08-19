@@ -17,7 +17,7 @@ struct Taskbar : Application, Poll {
         Task(uint id):id(id){} //for indexOf
         Task(Taskbar* parent, uint id, Image<byte4>&& icon, string&& text):Item(move(icon),move(text)),parent(parent),id(id){}
         bool selectEvent() override { parent->raise(id); return true; }
-        bool mouseEvent(int2, Event event, Button button) override {
+        bool mouseEvent(int2, int2, Event event, Button button) override {
             //TODO: preview on hover
             if(button!=LeftButton) return false;
             if(event==Press && parent->getProperty<uint>(parent->root,"_NET_ACTIVE_WINDOW"_)==ref<uint>__(id)) { //Set Maximized
@@ -40,9 +40,10 @@ struct Taskbar : Application, Poll {
     Launcher launcher;
     Bar<Task> tasks;
     Clock clock __(16);
-    Popup<Calendar> calendar;
+    Calendar calendar;
+    Window popup __(&calendar.layout, int2(-256,-256));
     HBox panel __(&start, &tasks, &clock);
-    Window window __(&panel,int2(0,16),""_,__(),true);
+    Window window __(&panel,int2(0,16));
     uint root=window.root;
     uint desktop=0;
 
@@ -61,6 +62,7 @@ struct Taskbar : Application, Poll {
         else window.setCursor(share(cursorIcon()), root);
         {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask|PropertyChangeMask|ButtonPressMask;
             if(ownWM) r.eventMask|=SubstructureRedirectMask; write(x, raw(r)); }
+        array<uint> windows;
         if(ownWM) {
             {QueryTree r; r.id=root; write(x, raw(r));}
             {QueryTreeReply r = readReply<QueryTreeReply>(); windows=read<uint>(x, r.count);}
@@ -78,9 +80,11 @@ struct Taskbar : Application, Poll {
         tasks.expanding=true;
         clock.timeout.connect(&window, &Window::render);
         clock.timeout.connect(&calendar, &Calendar::checkAlarm);
-        clock.triggered.connect(&calendar.window,&Window::toggle);
-        calendar.eventAlarm.connect(&calendar.window,&Window::show);
-        calendar.window.setPosition(int2(-300, 16));
+        clock.triggered.connect(&calendar,&Calendar::reset);
+        clock.triggered.connect(&popup,&Window::toggle);
+        calendar.eventAlarm.connect(&popup,&Window::show);
+        popup.hideOnLeave = true;
+        popup.setPosition(int2(-popup.size.x, window.size.y));
         window.show();
     }
 
@@ -125,8 +129,8 @@ struct Taskbar : Application, Poll {
                 if(id==root && e.property.atom==Atom("_NET_ACTIVE_WINDOW"_)) {
                     int i = tasks.indexOf(getProperty<uint>(root,"_NET_ACTIVE_WINDOW"_).first()); if(i<0) return; tasks.setActive(i);
                 } else if(id==root && e.property.atom==Atom("_NET_CLIENT_LIST"_)) {
-                     windows=getProperty<uint>(root,"_NET_CLIENT_LIST"_); tasks.clear();
-                     for(uint id: windows) {
+                     windows.clear(); tasks.clear();
+                     for(uint id: getProperty<uint>(root,"_NET_CLIENT_LIST"_)) {
                          addWindow(id);
                          {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
                              write(x, raw(r));}
@@ -147,18 +151,19 @@ struct Taskbar : Application, Poll {
                 }
                 if(windows) {
                     uint id=windows.last();
-                    {SetInputFocus r; r.window=id; write(x, raw(r));}
+                    //{SetInputFocus r; r.window=id; write(x, raw(r));}
                     if(tasks.index==uint(-1)) tasks.setActive(tasks.indexOf(id));
                 }
             } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify) {
             } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
-            window.needUpdate=true; window.render();
+            window.render();
         }
     }
 
     /// Adds \a id to \a windows and to \a tasks if necessary
     int addWindow(uint id) {
-        windows+= id;
+        if(windows.contains(id)) return -1;
+        windows << id;
         if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==ref<uint>__(Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_))) desktop=id;
         if(id==root) return -1;
         {GetWindowAttributes r; r.window=id; write(x, raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
@@ -185,9 +190,14 @@ struct Taskbar : Application, Poll {
         return resize(Image<byte4>(array<byte4>(cast<byte4>(buffer.slice(2,w*h))),w,h,true), 16, 16);
     }
 
+    map<string, uint> cache;
     uint Atom(const ref<byte>& name) {
-        {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; write(x, string(raw(r)+name+pad(4,r.length)));}
-        {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
+        uint& atom = cache[string(name)];
+        if(!atom) {
+            {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; write(x, string(raw(r)+name+pad(4,r.length)));}
+            {InternAtomReply r=readReply<InternAtomReply>(); atom=r.atom;}
+        }
+        return atom;
     }
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=258) {
         {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; write(x, raw(r));}
@@ -198,11 +208,11 @@ struct Taskbar : Application, Poll {
     void raise(uint id) {
         if(ownWM) {
             {RaiseWindow r; r.id=id; write(x, raw(r));}
-            {SetInputFocus r; r.window=id; write(x, raw(r));}
+            //{SetInputFocus r; r.window=id; write(x, raw(r));}
             for(uint w: windows) {
                 if(getProperty<uint>(w,"WM_TRANSIENT_FOR"_) == ref<uint>__(id)) {
                     {RaiseWindow r; r.id=id; write(x, raw(r));}
-                    {SetInputFocus r; r.window=id; write(x, raw(r));}
+                    //{SetInputFocus r; r.window=id; write(x, raw(r));}
                 }
             }
         } else {

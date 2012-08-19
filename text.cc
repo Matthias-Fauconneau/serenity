@@ -122,29 +122,28 @@ struct TextLayout {
 };
 
 Text::Text(string&& text, int size, ubyte opacity, int wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap), textSize(0,0) {}
-void Text::update(int wrap) {
-    TextLayout layout(text, size, wrap>=0 ? wrap : Widget::size.x+wrap);
+void Text::layout() {
+    TextLayout layout(text, size, wrap);
     blits.clear(); for(const TextLayout::Character& c: layout.text) blits << Blit __(int2((c.pos.x+8)>>4, (c.pos.y+8)>>4), share(c.glyph.image));
     lines = move(layout.lines); links = move(layout.links);
     textSize=int2(0,0); for(const Blit& c: blits) textSize=max(textSize,int2(c.pos)+c.image.size()); textSize.y=max(textSize.y, size+4);
 }
 int2 Text::sizeHint() {
-    if(!textSize) update(wrap);
+    if(!textSize) layout();
     return wrap?int2(-textSize.x,textSize.y):textSize;
 }
-
-void Text::render(int2 parent) {
-    if(!textSize) update(wrap);
-    int2 offset = parent+position+max(int2(0,0),(Widget::size-textSize)/2);
-    for(const Blit& b: blits) blit(offset+b.pos, b.image);
+void Text::render(int2 position, int2 size) {
+    if(!textSize) layout();
+    int2 offset = position+max(int2(0,0),(size-textSize)/2);
+    for(const Blit& b: blits) blit(offset+b.pos, b.image, opacity);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
 }
 
-bool Text::mouseEvent(int2 position, Event event, Button) {
+bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
     if(event!=Press) return false;
-    position -= max(int2(0,0),(Widget::size-textSize)/2);
+    position -= max(int2(0,0),(size-textSize)/2);
     for(uint i=0;i<blits.size();i++) { const Blit& b=blits[i];
-        if(position>=b.pos && position<=b.pos+b.image.size()) {
+        if(Rect(b.pos,b.image.size()).contains(position)) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated(link.identifier); return true; }
         }
     }
@@ -154,11 +153,11 @@ bool Text::mouseEvent(int2 position, Event event, Button) {
 
 /// TextInput
 
-bool TextInput::mouseEvent(int2 position, Event event, Button) {
+bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button) {
     if(event!=Press) return false;
     focus=this;
-    int x = position.x-(this->position.x+(Widget::size.x-textSize.x)/2);
-    for(cursor=0;cursor<blits.size() && x>blits[cursor].pos.x+(int)blits[cursor].image.width/2;cursor++) {}
+    position -= max(int2(0,0),(size-textSize)/2);
+    for(cursor=0;cursor<blits.size() && position.x>blits[cursor].pos.x+(int)blits[cursor].image.width/2;cursor++) {}
     //if(button==MiddleKey) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); update(); }
     return true;
 }
@@ -169,20 +168,19 @@ bool TextInput::keyPress(Key key) {
     else if(key==RightArrow && cursor<text.size()) cursor++;
     else if(key==Home) cursor=0;
     else if(key==End) cursor=text.size();
-    else if(key==Delete && cursor<text.size()) { text.removeAt(cursor); update(); }
-    else if(key==BackSpace && cursor>0) { text.removeAt(--cursor); update(); }
-    else if(key>=' ' && key<=0xFF) { //TODO: UTF8
-        text.insertAt(cursor++, (byte)key); update();
-    } else return false;
+    else if(key==Delete && cursor<text.size()) text.removeAt(cursor);
+    else if(key==BackSpace && cursor>0) text.removeAt(--cursor);
+    else if(key>=' ' && key<=0xFF) text.insertAt(cursor++, (byte)key); //TODO: UTF8
+    else return false;
     return true;
 }
 
-void TextInput::render(int2 parent) {
-    Text::render(parent);
+void TextInput::render(int2 position, int2 size) {
+    Text::render(position, size);
     if(focus==this) {
         if(cursor>text.size()) cursor=text.size();
         int x = cursor < blits.size()? blits[cursor].pos.x : cursor>0 ? blits.last().pos.x+blits.last().image.width : 0;
-        fill(parent+position+max(int2(0,0), (Widget::size-textSize)/2)+Rect(int2(x,0), int2(x+1,Widget::size.y)), black);
+        fill(position+max(int2(0,0), (size-textSize)/2)+Rect(int2(x,0), int2(x+1,size.y)), black);
     }
 }
 

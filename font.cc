@@ -115,6 +115,11 @@ void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
 #endif
 }
 
+/// Fixed point rounding
+int truncate(int width, uint value) { return value/width*width; }
+int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
+int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
+
 //void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {
 void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int, int, int, int, int, int) {
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
@@ -125,10 +130,8 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
     int16 numContours = s.read();
     if(!raster) {
         xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
-        xMin = scale(xMin); if(xMin>0) xMin=(xMin/16)*16; else if(-xMax%16) xMax-=16-(-xMax%16); xMin=unscale(xMin); //round down to pixel
-        //yMin = scale(yMin); yMin=(yMin/16)*16; yMin=unscale(yMin); //round down to pixel
-        xMax = scale(xMax); if(xMax<0) xMax=(xMax/16)*16; else /*if(xMax%16)*/ xMax+=16-xMax%16; xMax=unscale(xMax); //round up to pixel
-        yMax = scale(yMax); if(yMax<0) yMax=(yMax/16)*16; else if(yMax%16) yMax+=16-yMax%16; yMax=unscale(yMax); //round up to pixel
+        xMin  = unscale(floor(16,scale(xMin))); yMin = unscale(floor(16,scale(yMin))); //round down to pixel
+        xMax = unscale(ceil(16,scale(xMax))); yMax = unscale(ceil(16,scale(yMax))); //round up to pixel
 
         int width=scale(xMax-xMin), height=scale(yMax-yMin);
         raster = Image<int8>(width+1,height+1); clear((byte*)raster.data,raster.height*raster.stride);
@@ -237,6 +240,6 @@ Glyph Font::glyph(uint16 code) {
             glyph.image(x,y) = acc? 256-acc : 255; //TODO: alpha blitnt16)
         }
     }
-    glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax));
+    glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
     return Glyph(glyph);
 }

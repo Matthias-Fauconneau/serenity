@@ -27,7 +27,7 @@ struct Player : Application {
     Scroll< List<Text> > titles;
     HBox main __( &albums.area(), &titles.area() );
     VBox layout __( &toolbar, &main );
-    Window window __(&layout, int2(512,512), "Player"_, pauseIcon());
+    Window window __(&layout, int2(-512,-512), "Player"_, pauseIcon());
 
     Player() {
         window.localShortcut(Escape).connect(this, &Player::quit);
@@ -42,7 +42,7 @@ struct Player : Application {
 
         folders = listFiles("Music"_,Sort|Folders);
         assert(folders);
-        for(string& folder : folders) albums << Text(string(section(folder,'/',-2,-1)), 10);
+        for(string& folder : folders) albums << Text(string(section(folder,'/',-2,-1)), 12);
 
         /*for(string&& path: arguments) {
             assert(exists(path),path);
@@ -91,7 +91,7 @@ struct Player : Application {
         if(!playButton.enabled) setPlaying(true);
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else if(albums.index<albums.count()) window.setTitle(albums.active().text);
-        titles.ensureVisible(titles.active());
+        //titles.ensureVisible(titles.active());
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {

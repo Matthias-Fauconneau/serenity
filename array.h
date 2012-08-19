@@ -110,8 +110,8 @@ template<class T> struct array {
     /// Finds elements
     int indexOf(const T& value) const { return ref<T>(*this).indexOf(value); }
     bool contains(const T& value) const { return ref<T>(*this).contains(value); }
-    uint min() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)<at(best)) best=i; return best; }
-    uint max() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)>at(best)) best=i; return best; }
+    /*uint min() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)<at(best)) best=i; return best; }
+    uint max() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)>at(best)) best=i; return best; }*/
 
     /// Appends elements
     array& operator <<(T&& e) { int s=size()+1; reserve(s); new (end()) T(move(e)); setSize(s); return *this; }

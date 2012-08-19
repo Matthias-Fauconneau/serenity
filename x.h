@@ -35,7 +35,7 @@ struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
 struct CreateWindow { int8 req=1, depth=32; uint16 size=14; uint id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1; uint visual;
-                      uint mask=BackgroundPixel|BorderPixel|BitGravity|OverrideRedirect|EventMask|ColorMap, backgroundPixel=0xF0F0F0F0,
+                      uint mask=BackgroundPixel|BorderPixel|BitGravity|OverrideRedirect|EventMask|ColorMap, backgroundPixel=0xE0E0E0E0,
                                         borderPixel=0, bitGravity=10, overrideRedirect=0, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
 struct SetWindowCursor { int8 req=2; uint16 size=4; uint window, mask=Cursor; uint cursor; };

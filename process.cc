@@ -56,6 +56,7 @@ void Poll::wait() { queue+= this; }
 
 int dispatchEvents() {
     if(!polls) return 0;
+    while(queue) queue.takeFirst()->event(__());
     ::poll((pollfd*)pollfds.data(),polls.size(),-1);
     for(uint i=0;i<polls.size();i++) {
         int events = pollfds[i].revents;
@@ -66,7 +67,6 @@ int dispatchEvents() {
             else if(events&POLLHUP) { log("POLLHUP"); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
         }
     }
-    while(queue) queue.takeFirst()->event(__());
     return polls.size();
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "vector.h"
+#include "display.h"
 
 /// Button/Key codes
 enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
@@ -12,37 +13,32 @@ enum Key {
 
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
-    Widget(){}
-    Widget(Widget&& o):position(o.position),size(o.size){}
+    Widget(){}Widget(Widget&&){}
     virtual ~Widget() {}
 // Layout
-    int2 position; /// position of the widget within its parent widget
-    int2 size; /// size of the widget
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint() { return int2(0,0); }
-    /// Notify widgets to update any cache invalidated by \a position,\a size or property changes
-    virtual void update() {}
-
-// Render
     /// Renders this widget.
-    /// \a offset is the absolute position of the parent widget
-    virtual void render(int2 parent)=0;
+    /// \arg rect is the absolute region for the widget
+    virtual void render(int2 position, int2 size)=0;
+    void render(Rect rect) { render(rect.position(),rect.size()); }
 
 // Event
     /// Mouse event type
     enum Event { Press, Release, Motion, Enter, Leave };
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root \a Window::widget
-    /// \return whether the mouse event should trigger rendering
-    virtual bool mouseEvent(int2 unused position, Event unused event, Button unused button) { return false; }
+    /// \return Whether the mouse event should trigger rendering
+    virtual bool mouseEvent(int2 unused cursor, int2 unused size, Event unused event, Button unused button) { return false; }
+    bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.min,rect.size(),event,button); }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current \a Window::focus
-    /// \return whether the key press should trigger rendering
+    /// \return Whether the key press should trigger rendering
     virtual bool keyPress(Key) { return false; }
     /// Override \a selectEvent to handle or forward user input
     /// \note \a selectEvent is called by \a Selection when user changes selection (using press, wheel or arrows)
-    /// \return whether the select event should trigger rendering
+    /// \return Whether the select event should trigger rendering
     virtual bool selectEvent() { return false; }
 };
 

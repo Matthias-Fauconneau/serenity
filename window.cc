@@ -12,8 +12,8 @@ int2 display;
 Widget* focus;
 namespace Shm { int major, event, error; }
 
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<byte4>& icon, bool overrideRedirect)
-    : widget(widget), overrideRedirect(overrideRedirect), x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<byte4>& icon)
+    : widget(widget), overrideRedirect(title.size?false:true), x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
     // Setups X connection
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
@@ -38,9 +38,14 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<by
     assert(visual);
 
     // Creates X window
-    if(size.x<=0) size.x=display.x+size.x;
-    if(size.y<=0) size.y=display.y+size.y;
-    widget->size=this->size=size;
+    if(size.x<0||size.y<0) {
+        int2 hint=widget->sizeHint();
+        if(size.x<0) size.x=max(abs(hint.x),-size.x);
+        if(size.y<0) size.y=max(abs(hint.y),-size.y);
+    }
+    if(size.x==0) size.x=display.x;
+    if(size.y==0) size.y=display.y-16;
+    this->size=size;
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; write(x, raw(r));}
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
@@ -57,7 +62,6 @@ void Window::event(const pollfd& poll) {
     if(poll.fd==0) {
         assert(mapped); assert(size);
         if(state==Server) { state=Wait; return; }
-        if(needUpdate) { widget->update(); needUpdate=false; }
         if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
             if(shm) {
                 {Shm::Detach r; r.seg=id+Segment; write(x, raw(r));}
@@ -84,17 +88,17 @@ void Window::event(const pollfd& poll) {
         }
         if(overrideRedirect) {
             //feather edges //TODO: client side shadow
-            if(position.y>0) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
             if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
             if(position.x+size.x<display.x-1) for(int y=0;y<size.y;y++) framebuffer(size.x-1,y) /= 2;
-            if(position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+            if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
             //feather corners
             if(overrideRedirect && position.x>0 && position.y>0) framebuffer(0,0) /= 2;
             if(overrideRedirect && position.x+size.x<display.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
             if(position.x>0 && position.y+size.y<display.y-1) framebuffer(0,size.y-1) /= 2;
             if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;
         }
-        widget->render(int2(0,0));
+        widget->render(int2(0,0),size);
         assert(!clipStack);
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
             r.totalWidth=r.width=buffer.width; r.totalHeight=r.height=buffer.height; write(x, raw(r)); }
@@ -110,9 +114,9 @@ void Window::readEvent(uint8 type) {
     } else if(type==1) { error("Unexpected reply");
     } else { Event e=read<Event>(x); type&=0b01111111; //msb set if sent by SendEvent
         if(type==MotionNotify) {
-            if(widget->mouseEvent(int2(e.x,e.y), Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
         } else if(type==ButtonPress) {
-            if(widget->mouseEvent(int2(e.x,e.y), Widget::Press, (Button)e.key)) wait();
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Button)e.key)) wait();
         } else if(type==KeyPress) {
             uint key = KeySym(e.key);
             signal<>* shortcut = localShortcuts.find(key);
@@ -122,14 +126,15 @@ void Window::readEvent(uint8 type) {
             if(hideOnLeave) hide();
             signal<>* shortcut = localShortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
-            if(widget->mouseEvent(int2(e.x,e.y), type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None)) wait();
+            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None))
+                wait();
         } else if(type==Expose) { if(!e.expose.count && e.expose.w>1 && e.expose.h>1) wait();
         } else if(type==UnmapNotify) { mapped=false;
         } else if(type==MapNotify) { mapped=true;
         } else if(type==ReparentNotify) {
         } else if(type==ConfigureNotify) {
-            position=int2(e.configure.x,e.configure.y); size=int2(e.configure.w,e.configure.h);
-            if(widget->size!=size) { widget->size=size; needUpdate=true; if(mapped) wait(); }
+            position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
+            if(this->size!=size) { this->size=size; if(mapped) wait(); }
         } else if(type==ClientMessage) {
             signal<>* shortcut = localShortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
@@ -166,7 +171,7 @@ template<class T> array<T> Window::getProperty(uint window, const ref<byte>& nam
 template array<uint> Window::getProperty(uint window, const ref<byte>& name, uint size);
 template array<byte> Window::getProperty(uint window, const ref<byte>& name, uint size);
 
-void Window::setWidget(Widget* widget) { this->widget=widget; widget->size=size; needUpdate=true; }
+void Window::setWidget(Widget* widget) { this->widget=widget; if(mapped) wait(); }
 
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;
@@ -174,8 +179,13 @@ void Window::setPosition(int2 position) {
     {ConfigureWindow r; r.id=id+XWindow; r.mask=X|Y; r.x=position.x, r.y=position.y; write(x, raw(r));}
 }
 void Window::setSize(int2 size) {
-    if(size.x<=0) size.x=display.x+size.x;
-    if(size.y<=0) size.y=display.y+size.y;
+    if(size.x<0||size.y<0) {
+        int2 hint=widget->sizeHint();
+        if(size.x<0) size.x=max(abs(hint.x),-size.x);
+        if(size.y<0) size.y=max(abs(hint.y),-size.y);
+    }
+    if(size.x==0) size.x=display.x;
+    if(size.y==0) size.y=display.y-16;
     if(size!=this->size){ConfigureWindow r; r.id=id+XWindow; r.mask=W|H; r.x=size.x, r.y=size.y; write(x, raw(r));}
 }
 void Window::setTitle(const ref<byte>& title) {

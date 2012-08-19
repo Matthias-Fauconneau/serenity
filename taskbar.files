@@ -21,6 +21,7 @@ image.cc
 png.cc
 jpeg.cc
 
+widget.h
 interface.h
 interface.cc
 window.h

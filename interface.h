@@ -6,12 +6,6 @@
 #include "layout.h"
 #include "text.h"
 
-/// Space is a proxy Widget to add space as needed
-struct Space : Widget {
-    int2 sizeHint() { return int2(-1,-1); }
-    void render(int2) {}
-};
-
 /// Scroll is a proxy Widget containing a widget in a scrollable area.
 //TODO: flick, scroll indicator, scrollbar
 struct ScrollArea : Widget {
@@ -19,14 +13,14 @@ struct ScrollArea : Widget {
     virtual Widget& widget() =0;
     /// Ensures \a target is visible inside the region of the viewport
     /// \note Assumes \a target is a direct child of the proxied \a widget
-    void ensureVisible(Widget& target);
+    //void ensureVisible(Widget& target);
     /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
+    int2 delta, dragStart, flickStart;
 
     int2 sizeHint() { return widget().sizeHint(); }
-    void update() override;
-    bool mouseEvent(int2 position, Event event, Button button) override;
-    void render(int2 parent) { return widget().render(parent+position); }
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    void render(int2 position, int2 size);
 };
 
 /// Scroll<T> implements a scrollable \a T by proxying it through \a ScrollArea
@@ -48,7 +42,7 @@ struct ImageView : Widget {
     ImageView(Image<byte4>&& image):image(move(image)){}
 
     int2 sizeHint();
-    void render(int2 parent);
+    void render(int2 position, int2 size) override;
 };
 typedef ImageView Icon;
 
@@ -58,7 +52,7 @@ struct TriggerButton : Icon {
     TriggerButton(Image<byte4>&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 
 /// ToggleButton is a togglable Icon
@@ -73,8 +67,8 @@ struct ToggleButton : Widget {
     bool enabled = false;
 
     int2 sizeHint();
-    void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    void render(int2 position, int2 size) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     Image<byte4> enableIcon;
     Image<byte4> disableIcon;
@@ -90,16 +84,16 @@ struct Slider : Widget {
     signal<int> valueChanged;
 
     int2 sizeHint();
-    void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    void render(int2 position, int2 size) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     static const int height = 32;
 };
 
 /// Item is an icon with text
-struct Item : Horizontal, Tuple<Icon,Text,Space> {
-    Item():Tuple(){}
-    Item(Image<byte4>&& icon, string&& text, int size=16):Tuple(move(icon),Text(move(text),size),Space()){}
+struct Item : Horizontal, Tuple<Icon,Text> {
+    Item():Tuple(){main=Left;}
+    Item(Image<byte4>&& icon, string&& text, int size=16):Tuple(move(icon),Text(move(text),size)){}
 };
 
 /// TabBar is a \a Bar containing \a Item elements

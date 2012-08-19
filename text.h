@@ -25,18 +25,17 @@ struct Text : Widget {
     int size;
     /// Opacity
     ubyte opacity;
-    /// Line wrap limit in pixels (0: no wrap, -margin: widget size - margin)
-    int wrap=0;
+    /// Line wrap limit in pixels (0: no wrap)
+    uint wrap=0;
     /// User clicked on this Text
     signal<> textClicked;
     /// User clicked on a \a Format::Link
     signal<const ref<byte>&> linkActivated;
 
     int2 sizeHint();
-    void update() override { if(!textSize || textSize > Widget::size) update(min(wrap,Widget::size.x)); }
-    void update(int wrap);
-    void render(int2 parent);
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    void layout();
+    void render(int2 position, int2 size);
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     // cache layout bounding box
     int2 textSize;
@@ -57,7 +56,7 @@ struct Text : Widget {
 struct TextInput : Text {
     uint cursor=0;
 
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key) override;
-    void render(int2 parent);
+    void render(int2 position, int2 size) override;
 };

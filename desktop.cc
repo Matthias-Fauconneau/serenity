@@ -14,7 +14,7 @@ struct Desktop : Application {
     Calendar calendar;
     VBox timeBox __( &clock, &calendar );
     HBox applets __( &feeds, &timeBox/*, &shortcuts*/ );
-    Window window __(&applets,int2(1024,600)/*int2(0,-16)*/,string("Desktop"_),shutdownIcon());
+    Window window __(&applets,int2(0,0));
     //Command shutdown __(share(shutdownIcon()),"Shutdown"_,"/sbin/poweroff"_,{});
     Desktop() {
         clock.timeout.connect(&window, &Window::render);

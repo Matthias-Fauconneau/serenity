@@ -8,10 +8,13 @@ struct Layout : Widget {
     virtual uint count() const =0;
     virtual Widget& at(int) =0;
 
+    /// Computes widgets layout
+    virtual array<Rect> layout(int2 position, int2 size)=0;
+
+    /// Renders all visible child widgets
+    void render(int2 position, int2 size) override;
     /// Forwards event to intersecting child widgets until accepted
-    bool mouseEvent(int2 position, Event event, Button button) override;
-    /// Renders every child widget
-    void render(int2 parent) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 
 /// Widgets implements Layout storage using array<Widget*> (i.e by reference)
@@ -19,8 +22,8 @@ struct Layout : Widget {
 struct Widgets : virtual Layout, array<Widget*> {
     Widgets(){}
     Widgets(const ref<Widget*>& widgets):array(widgets){}
-    uint count() const;
-    Widget& at(int i);
+    uint count() const { return array::size(); }
+    Widget& at(int i)  { return *array::at(i); }
 };
 
 /// Array implements Layout storage using array<T> (i.e by value)
@@ -62,24 +65,32 @@ template<class... T> struct Tuple : virtual Layout {
     template<class A> const A& get() const { return items.template get<A>(); }
 };
 
-/// Linear divide space between contained widgets
-/// \note this is an abstract class, use \a Horizontal or \a Vertical
+/// Linear divides space between contained widgets
+/// \note This is an abstract class, use \a Horizontal or \a Vertical
 struct Linear: virtual Layout {
-    /// If true, try to fill parent space to spread out contained items
+    /// Expands main axis even when no widget is expanding
     bool expanding = false;
-    /// Align to { -1 = left/top, 0 = center, 1 = right/bottom }
-    int align=0;
+    /// How to use any extra main axis space when no widget is expanding
+    enum {
+        Left,Top=0, /// Aligns tighly packed widgets
+        Right,Bottom=1, /// Aligns tighly packed widgets
+        Center, /// Aligns tighly packed widgets
+        Share,  /// Only for main axis, shares space evenly between all widgets (fixed size widgets will center within their extra space)
+        Spread /// Only for main axis, spreads widgets evenly leaving no outside margin (use \a Share to leave outside margin)
+    };
+    int main = Share, side = Center;
 
     int2 sizeHint() override;
-    void update() override;
-    virtual int2 xy(int2 xy) =0; //transform coordinates so that x/y always mean along/across the line to reuse same code in Vertical/Horizontal
+    array<Rect> layout(int2 position, int2 size) override;
+    /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
+    virtual int2 xy(int2 xy) =0;
 };
 
-/// Horizontal divide horizontal space between contained widgets
+/// Horizontal divides horizontal space between contained widgets
 struct Horizontal : virtual Linear {
     int2 xy(int2 xy) override { return xy; }
 };
-/// Vertical divide vertical space between contained widgets
+/// Vertical divides vertical space between contained widgets
 struct Vertical : virtual Linear{
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };
@@ -94,23 +105,24 @@ struct VBox : Vertical, Widgets {
     VBox(){}
     VBox(const ref<Widget*>& widgets):Widgets(widgets){}
 };
-
+/// HList is a \a Horizontal layout of items (\sa Array)
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
     HList(array<T>&& widgets):Array<T>(move(widgets)){}
 };
+/// VList is a \a Vertical layout of items (\sa Array)
 template<class T> struct VList : Vertical, Array<T> {
     VList(){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
 };
 
-/// Layout items on an uniform \a width x \a height grid
+/// UniformGrid layouts items on an uniform \a width x \a height grid
 struct UniformGrid : virtual Layout {
-    /// horizontal and vertical element count, 0 means automatic
+    /// Horizontal and vertical element count, 0 means automatic
     int width,height;
     UniformGrid(int width=0, int height=0):width(width),height(height){}
     int2 sizeHint();
-    void update();
+    array<Rect> layout(int2 position, int2 size) override;
 };
 
 /// Selection implements selection of active widget/item for a \a Layout
@@ -124,18 +136,18 @@ struct Selection : virtual Layout {
     /// User clicked on an item.
     signal<uint /*index*/> itemPressed;
 
-    bool mouseEvent(int2 position, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key) override;
 };
 
 /// Displays a selection using a blue highlight
 struct HighlightSelection : virtual Selection {
-    void render(int2 parent) override;
+    void render(int2 position, int2 size) override;
 };
 
 /// Displays a selection using horizontal tabs
 struct TabSelection : virtual Selection {
-    void render(int2 parent) override;
+    void render(int2 position, int2 size) override;
 };
 
 /// ListSelection is an \a Array with \a Selection

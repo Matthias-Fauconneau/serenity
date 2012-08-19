@@ -9,12 +9,12 @@
 bool Search::keyPress(Key key) {
     if(key == Return) {
         //execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text}); TODO: serenity browser
-        text.clear(); update(); triggered(); return true;
+        setText(string()); triggered(); return true;
     }
     else return TextInput::keyPress(key);
 }
 
-bool Command::mouseEvent(int2, Event event, Button button) {
+bool Command::mouseEvent(int2, int2, Event event, Button button) {
     if(event == Press && button == LeftButton) { execute(path,args); triggered(); return true; }
     return false;
 }

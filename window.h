@@ -13,9 +13,8 @@ struct Window : Poll {
     no_copy(Window)
 
     /// Creates an initially hidden window for \a widget, use \a show to display
-    /// \note negative size is screen.size+size
-    Window(Widget* widget, int2 size=int2(-1,-1),
-           const ref<byte>& name=""_, const Image<byte4>& icon=Image<byte4>(), bool overrideRedirect=false);
+    /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
+    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image<byte4>& icon=Image<byte4>());
 
     /// Event handler
     void event(const pollfd&);
@@ -70,8 +69,6 @@ struct Window : Poll {
     bool mapped = false;
     /// If set, this window will hide on leave events (e.g for dropdown menus)
     bool hideOnLeave = false;
-    /// If set, \a Widget::update will be called before next \a render
-    bool needUpdate = true;
     /// If set, this window will not be managed by the session window manager
     bool overrideRedirect;
     /// Window position and size
@@ -97,10 +94,4 @@ struct Window : Poll {
     /// Shortcuts triggered when a key is pressed
     map<uint16, signal<> > localShortcuts;
     map<uint16, signal<> > globalShortcuts;
-};
-
-/// Popup instantiates a widget in a small popup window
-template<class T> struct Popup : T {
-    Window window __(this, int2(256,256));
-    Popup(T&& t=T()) : T(move(t)) { window.hideOnLeave=true; }
 };

@@ -19,12 +19,22 @@ inline uint div255(uint x) { return x/255; }
 #endif
 inline int4 div255(const int4& v) { int4 r; for(int i=0;i<4;i++) r[i]=div255(v[i]); return r; }
 
-void blit(int2 target, const Image<uint8>& source, bool unused invert) { //TODO: invert
+void blit(int2 target, const Image<uint8>& source, uint8 opacity, bool unused invert) { //TODO: invert
     Rect rect = (target+Rect(source.size())) & currentClip;
-    for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-        int value = source(x-target.x,y-target.y);
-        auto& d = framebuffer(x,y);
-        d = byte4(div255(d.b*value),div255(d.g*value),div255(d.r*value),min(255,d.a+(255-value)));
+    if(opacity==255) {
+        for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+            int s = source(x-target.x,y-target.y), a=255-s;
+            pixel& d = framebuffer(x,y);
+            byte4 t = byte4(div255(int4(d)*s)); t.a=min(255,d.a+a);
+            d = t;
+        }
+    } else {
+        for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+            int s = source(x-target.x,y-target.y), a=255-s;
+            pixel& d = framebuffer(x,y);
+            byte4 t = byte4(div255(int4(d)*(255-a) + int4(s)*a)); t.a=min(255,d.a+a);
+            d = t;
+        }
     }
 }
 
@@ -33,8 +43,9 @@ void blit(int2 target, const Image<byte4>& source, bool unused invert) { //TODO:
     if(source.alpha) {
         for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
             byte4 s = source(x-target.x,y-target.y);
-            auto& d = framebuffer(x,y);
-            d = byte4(div255(int4(d)*(255-s.a) + int4(s)*s.a));
+            pixel& d = framebuffer(x,y);
+            byte4 t = byte4(div255(int4(d)*(255-s.a) + int4(s)*s.a)); t.a=min(255,d.a+s.a);
+            d = t;
         }
     } else {
         for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {

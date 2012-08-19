@@ -1,4 +1,5 @@
-taskbar/window manager: grab background to move, grab border to resize, window title bar decoration
+taskbar: fix calendar
+client-side WM: grab background to move, grab border to resize, title bar
 font: fix streaks, hinting, kerning, subpixel rendering, subpixel position, compound glyph transform
 feeds: check text main content, left arrow=previous entry, preload image, progressive image, status, own inflate, own jpeg, better html
 apps: music, text editor, file manager, pdf, wiki, search, irc, imap (ssl)

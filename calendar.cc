@@ -65,7 +65,7 @@ void Month::setActive(Date active) {
         int previousMonth = (active.month+11)%12;
         int day = nofDays[previousMonth]-first+i+1;
         dates << Date(count()%7, day, previousMonth);
-        *this<< Text(format(Italic)+dec(day,2));
+        *this<< Text(format(Italic)+dec(day,2),16,128);
     }
     Date today=::date();
     for(int i=1;i<=nofDays[active.month];i++) { //current month
@@ -76,29 +76,31 @@ void Month::setActive(Date active) {
     }
     for(int i=1;count()<7*8;i++) { //next month
         dates << Date(count()%7, i, (active.month+1)%12);
-        *this<< Text(format(Italic)+dec(i,2));
+        *this<< Text(format(Italic)+dec(i,2),16,128);
     }
     Selection::setActive(todayIndex);
-    update();
 }
 
 void Month::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-Calendar::Calendar() { *this<< ref<Widget*>__(&date, &month, &events);
+Calendar::Calendar() {
+    layout.main=Linear::Spread;
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::showEvents);
+    reset();
+}
+void Calendar::reset() {
     date[1].setText( format(Bold)+::str(::date(),"dddd, dd MMMM yyyy"_) ); month.setActive(::date());
 }
-
 void Calendar::previousMonth() {
     month.previousMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
-    events.setText(string()); update();
+    events.setText(string());
 }
 void Calendar::nextMonth() {
     month.nextMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
-    events.setText(string()); update();
+    events.setText(string());
 }
 
 void Calendar::showEvents(uint index) {
@@ -111,12 +113,7 @@ void Calendar::showEvents(uint index) {
         text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
         text << join(::getEvents(date),"\n"_);
     }
-    events.setText(move(text)); update();
-}
-
-void Calendar::update() {
-    events.update(); events.textSize=::max(events.textSize,int2(256,256));
-    VBox::update();
+    events.setText(move(text));
 }
 
 void Calendar::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm(); }

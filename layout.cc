@@ -3,25 +3,18 @@
 
 /// Layout
 
-bool Layout::mouseEvent(int2 position, Event event, Button button) {
-    for(uint i=0;i<count();i++) { Widget& child=at(i);
-        if(position >= child.position && position <= child.position+child.size) {
-            if(child.mouseEvent(position-child.position,event,button)) return true;
-        }
-    }
-    return false;
-}
-
-void Layout::render(int2 parent) {
-    push(parent+position+Rect(size));
-    for(uint i=0;i<count();i++) at(i).render(parent+position);
+void Layout::render(int2 position, int2 size) {
+    push(position+Rect(size));
+    array<Rect> widgets = layout(position,size);
+    for(uint i=0;i<count();i++) at(i).render(widgets[i]);
     pop();
 }
 
-/// Widgets
-
-uint Widgets::count() const { return array::size(); }
-Widget& Widgets::at(int i) { return *array::at(i); }
+bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+    array<Rect> widgets = layout(int2(0,0), size);
+    for(uint i=0;i<count();i++) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
+    return false;
+}
 
 /// Linear
 
@@ -44,60 +37,57 @@ template<class T> void fill(array<T>& a, const T& value, int size) {
     for(int i=0;i<size;i++) new (&a[i]) T(copy(value));
 }
 
-void Linear::update() {
-    if(!count()) return;
-    int2 size = xy(this->size);
-    int width = size.x /*remaining space*/, sharing=0 /*expanding count*/, expandingWidth=0, height=0;
-    array<int> hints; fill(hints,-1,count()); array<int> sizes; fill(sizes,-1,count());
-    //allocate fixed space and convert to expanding if not enough space
+array<Rect> Linear::layout(int2 position, int2 size) {
+    if(!count()) return __();
+    size = xy(size);
+    int width = size.x /*remaining space*/; int expanding=0, height=0;
+    int sizes[count()];
     for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child);
         int2 sizeHint = xy(child.sizeHint());
-        int hint = sizeHint.x; if(abs(sizeHint.y)>abs(height)) height=sizeHint.y;
-        if(hint >= width) hint = -hint; //convert to expanding if not enough space
-        if(hint >= 0) width -= (sizes[i]=hints[i]=hint); //allocate fixed size
-        else {
-            hints[i] = -hint;
-            sharing++; //count expanding widgets
-            expandingWidth += -hint; //compute minimum total expanding size
-        }
+        width -= (sizes[i]= sizeHint.x); //commit minimum width
+        if(sizeHint.x<0) expanding++; //counts expanding widgets
+        height=max(height, sizeHint.y<0 ? size.y : sizeHint.y); //necessary height
     }
-    width -= expandingWidth;
-    bool expanding=sharing;
-    if(!expanding) sharing=count(); //if no expanding: all widgets will share the extra space
-    if(width > 0 || sharing==1) { //share extra space evenly between expanding/all widgets
-        int extra = uint(width)/uint(sharing+!expanding); //if no expanding: keep space for margins
+
+    int sharing = expanding ?: main==Share? count() : 0;
+    if(sharing && width >= sharing) { //shares extra space evenly between sharing widgets
+        int extra = uint(width)/uint(sharing);
         for(uint i=0;i<count();i++) {
-            sizes[i] = hints[i] + ((!expanding || sizes[i]<0)?extra:0);
+            if(!expanding || sizes[i]<0) //if all widgets are sharing or this widget is expanding
+                sizes[i] += extra; width -= extra; //commit extra space
         }
-        width -= extra*sharing; //remaining margin due to integer rounding
-    } else { //reduce biggest widgets first until all fit
-        for(uint i=0;i<count();i++) if(sizes[i]<0) sizes[i]=hints[i]; //allocate all widgets
-        while(width<-sharing) {
-            int first = sizes[sizes.max()];
-            int second=first; for(int e: sizes) if(e>second && e<first) second=e;
-            int delta = first-second;
-            if(delta==0 || delta>int(uint(-width)/uint(sharing))) delta=uint(-width)/uint(sharing); //if no change or bigger than necessary
-            first -= delta; width += delta;
+        //width%sharing margin remains as extra is truncated
+    } else while(width<0) { //while layout is overcommited
+        uint best=0; for(uint i=0;i<count();i++) if(sizes[i]>sizes[best]) best=i;
+        int& first = sizes[best]; //largest size
+        int next=first; for(int e: sizes) if(e>next && e<first) next=e; //next largest widget size
+        uint delta = min(-width, first-next);
+        if(delta!=0) { first -= delta; width += delta; } //cap size to next largest
+        else { //all widgets already have the same size
+            for(uint i=0;i<count();i++) { uint delta=uint(-width)/count(); sizes[i]-=delta; width+=delta; }
+            assert(width>=-sharing);
         }
     }
-    int2 pen = int2(width/2,0); //external margin
-    if(align>=0) {
-        pen.y=size.y-min(abs(height),size.y); //align right/bottom
-        if(align==0) pen.y/=2; //align center
-    } //else align top/left
+
+    int2 pen = position;
+    if(main==Left) pen.x=0;
+    else if(main==Center) pen.x=(size.x-width)/2;
+    else if(main==Right) pen.x=size.x-width;
+    if(side==Left) pen.y=0;
+    else if(side==Center) pen.y=(size.y-height)/2;
+    else if(side==Right) pen.y=size.y-height;
+    array<Rect> widgets(count());
     for(uint i=0;i<count();i++) {
-        at(i).size = xy(int2(sizes[i],min(abs(height),size.y)));
-        at(i).position = xy(pen);
-        at(i).update();
+        widgets<< xy(pen)+Rect(xy(int2(sizes[i],height)));
         pen.x += sizes[i];
     }
+    return widgets;
 }
 
 /// UniformGrid
 
 int2 UniformGrid::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
-
     int2 max(0,0);
     for(uint i=0;i<count();i++) {
         int2 size=at(i).sizeHint();
@@ -106,12 +96,13 @@ int2 UniformGrid::sizeHint() {
     return int2(w,h)*max; //fixed size
 }
 
-void UniformGrid::update() {
+array<Rect> UniformGrid::layout(int2 position, int2 size) {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
-
-    int2 size(Widget::size.x/w,  Widget::size.y/h);
-    int2 margin = (Widget::size - int2(w,h)*size) / 2;
-    uint i=0; for(uint y=0;y<h;y++) for(uint x=0;x<w;x++,i++) { if(i>=count()) return; Widget& child=at(i);
-        child.position = margin + int2(x,y)*size; child.size=size;
+    int2 elementSize = int2(size.x/w,size.y/h);
+    int2 margin = (size - int2(w,h)*elementSize) / 2;
+    array<Rect> widgets(count());
+    uint i=0; for(uint y=0;y<h;y++) for(uint x=0;x<w;x++,i++) { if(i>=count()) return widgets;
+        widgets<< position + margin + int2(x,y)*size + Rect(elementSize);
     }
+    return widgets;
 }
