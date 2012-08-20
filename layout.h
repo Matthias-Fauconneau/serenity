@@ -78,7 +78,7 @@ struct Linear: virtual Layout {
         Share,  /// Only for main axis, shares space evenly between all widgets (fixed size widgets will center within their extra space)
         Spread /// Only for main axis, spreads widgets evenly leaving no outside margin (use \a Share to leave outside margin)
     };
-    const Extra main, side;
+    Extra main, side;
     /// Constructs a linear layout
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
     Linear(Extra main=Share, Extra side=Center):main(main),side(side){}

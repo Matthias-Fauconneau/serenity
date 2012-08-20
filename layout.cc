@@ -54,10 +54,11 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     if(sharing && width >= sharing) { //shares extra space evenly between sharing widgets
         int extra = width/sharing;
         for(uint i=0;i<count();i++) {
-            if(!expanding || sizes[i]<0) //if all widgets are sharing or this widget is expanding
-                sizes[i] = abs(sizes[i])+extra; width -= extra; //commits extra space
+            if(!expanding || sizes[i]<0) { //if all widgets are sharing or this widget is expanding
+                sizes[i] = abs(sizes[i])+extra, width -= extra; //commits extra space
+            }
         }
-        //width%sharing margin remains as extra is truncated
+        //width%sharing space remains as extra is rounded down
     } else {
         for(uint i=0;i<count();i++) sizes[i]=abs(sizes[i]); //converts all expanding widgets to fixed
         while(width<=-int(count())) { //while layout is overcommited
@@ -69,18 +70,22 @@ array<Rect> Linear::layout(int2 position, int2 size) {
             else { int delta=-width/count(); for(uint i=0;i<count();i++) sizes[i]-=delta, width+=delta; } //all widgets already have the same size
         }
     }
+    int margin = (main==Spread && count()>1) ? width/(count()-1) : 0; //Spread distribute any margin between all widgets
+    width -= margin*(count()-1); //width%(count()-1) space remains as margin is rounded down
 
     int2 pen = position;
     if(main==Left) pen.x+=0;
-    else if(main==Center) pen.x+=(size.x-width)/2;
+    else if(main==Center || main==Share || main== Spread) pen.x+=width/2;
     else if(main==Right) pen.x+=size.x-width;
+    else error("");
     if(side==Left) pen.y+=0;
     else if(side==Center) pen.y+=(size.y-height)/2;
     else if(side==Right) pen.y+=size.y-height;
+    else error("");
     array<Rect> widgets(count());
     for(uint i=0;i<count();i++) {
         widgets<< xy(pen)+Rect(xy(int2(sizes[i],height)));
-        pen.x += sizes[i];
+        pen.x += sizes[i]+margin;
     }
     return widgets;
 }
@@ -103,7 +108,7 @@ array<Rect> UniformGrid::layout(int2 position, int2 size) {
     int2 margin = (size - int2(w,h)*elementSize) / 2;
     array<Rect> widgets(count());
     uint i=0; for(uint y=0;y<h;y++) for(uint x=0;x<w;x++,i++) { if(i>=count()) return widgets;
-        widgets<< position + margin + int2(x,y)*size + Rect(elementSize);
+        widgets<< position + margin + int2(x,y)*elementSize + Rect(elementSize);
     }
     return widgets;
 }

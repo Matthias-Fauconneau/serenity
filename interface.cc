@@ -87,7 +87,7 @@ void Selection::setActive(uint i) {
 void HighlightSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
     for(uint i=0;i<count();i++) {
-        if(i==index && widgets[i].min>=int2(-4,-4) && widgets[i].max<=(size+int2(4,4))) fill(widgets[i], selectionColor);
+        if(i==index) fill(widgets[i], selectionColor);
         at(i).render(widgets[i]);
     }
 }

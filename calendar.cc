@@ -85,35 +85,41 @@ void Month::previousMonth() { active.month--; if(active.month<0) active.year--, 
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
 Calendar::Calendar() {
-    //layout.main=Linear::Spread;
+    date.main=Linear::Spread;
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::showEvents);
     reset();
 }
 void Calendar::reset() {
-    date[1].setText( format(Bold)+::str(::date(),"dddd, dd MMMM yyyy"_) ); month.setActive(::date());
+    date[1].setText(::str(month.active,"MMMM yyyy"_) ); month.setActive(::date());
 }
 void Calendar::previousMonth() {
-    month.previousMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
+    month.previousMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) );
     events.setText(string());
 }
 void Calendar::nextMonth() {
-    month.nextMonth(); date[1].setText( format(Bold)+::str(month.active,"MMMM yyyy"_) );
+    month.nextMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) );
     events.setText(string());
 }
 
 void Calendar::showEvents(uint index) {
     string text;
     Date date = month.dates[index];
-    text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date))+format(Regular)+"\n"_);
-    text << join(::getEvents(date),"\n"_)+"\n"_;
+    array<string> events = getEvents(date);
+    if(events) {
+        text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date,"dddd, dd"))+format(Regular)+"\n"_);
+        text << join(events,"\n"_)+"\n"_;
+    }
     if(index==month.todayIndex) {
         Date date = month.dates[index+1];
-        text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
-        text << join(::getEvents(date),"\n"_);
+        array<string> events = getEvents(date);
+        if(events) {
+            text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
+            text << join(::getEvents(date),"\n"_);
+        }
     }
-    events.setText(move(text));
+    this->events.setText(move(text));
 }
 
 void Calendar::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm(); }

@@ -127,7 +127,8 @@ struct Taskbar : Application, Poll {
                 if(i>=0) tasks.index=i;
             } else if(type==PropertyNotify) { uint id=e.property.window;
                 if(id==root && e.property.atom==Atom("_NET_ACTIVE_WINDOW"_)) {
-                    int i = tasks.indexOf(getProperty<uint>(root,"_NET_ACTIVE_WINDOW"_).first()); if(i<0) return; tasks.setActive(i);
+                    array<uint> active = getProperty<uint>(root,"_NET_ACTIVE_WINDOW"_);
+                    if(active) { int i = tasks.indexOf(active.first()); if(i<0) return; tasks.setActive(i); }
                 } else if(id==root && e.property.atom==Atom("_NET_CLIENT_LIST"_)) {
                      windows.clear(); tasks.clear();
                      for(uint id: getProperty<uint>(root,"_NET_CLIENT_LIST"_)) {

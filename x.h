@@ -113,9 +113,10 @@ template<class T> T read(int fd) {
 }
 /// Reads \a size raw values from \a fd
 template<class T> array<T> read(int fd, uint capacity) {
-    array<T> buffer(capacity);
-    int unused size = read_(fd,(byte*)buffer.data(),capacity*sizeof(T));
-    assert((uint)size==capacity*sizeof(T),size,capacity*sizeof(T));
-    buffer.setSize(capacity);
+    array<T> buffer(capacity); buffer.setSize(capacity);
+    for(uint i=0;i<capacity*sizeof(T);) {
+        int read = check( read_(fd,(byte*)buffer.data()+i,capacity*sizeof(T)-i) );
+        i+=read; assert(i<=capacity*sizeof(T),i,read,capacity);
+    }
     return buffer;
 }
