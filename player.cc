@@ -30,6 +30,7 @@ struct Player : Application {
     Window window __(&layout, int2(-512,-512), "Player"_, pauseIcon());
 
     Player() {
+        albums.expanding=true; titles.main=Linear::Center;
         window.localShortcut(Escape).connect(this, &Player::quit);
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
         playButton.toggled.connect(this, &Player::setPlaying);

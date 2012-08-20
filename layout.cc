@@ -73,7 +73,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     int margin = (main==Spread && count()>1) ? width/(count()-1) : 0; //Spread distribute any margin between all widgets
     width -= margin*(count()-1); //width%(count()-1) space remains as margin is rounded down
 
-    int2 pen = position;
+    int2 pen = xy(position);
     if(main==Left) pen.x+=0;
     else if(main==Center || main==Share || main== Spread) pen.x+=width/2;
     else if(main==Right) pen.x+=size.x-width;
@@ -84,7 +84,8 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     else error("");
     array<Rect> widgets(count());
     for(uint i=0;i<count();i++) {
-        widgets<< xy(pen)+Rect(xy(int2(sizes[i],height)));
+        Rect widget = pen+Rect(int2(sizes[i],height));
+        widgets<< Rect(xy(widget.min),xy(widget.max));
         pen.x += sizes[i]+margin;
     }
     return widgets;

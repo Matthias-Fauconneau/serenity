@@ -7,7 +7,7 @@
 void ScrollArea::render(int2 position, int2 size) {
     int2 hint = abs(widget().sizeHint());
     delta = min(int2(0,0), max(size-hint, delta));
-    widget().render(position+delta, hint);
+    widget().render(position+delta, max(hint,size));
 }
 
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
@@ -17,7 +17,7 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) 
         delta = min(int2(0,0), max(size-hint, delta));
         return true;
     }
-    if(widget().mouseEvent(cursor-delta,hint,event,button)) return true;
+    if(widget().mouseEvent(cursor-delta,max(hint,size),event,button)) return true;
     if(event==Press && button==LeftButton) { dragStart=cursor, flickStart=delta; }
     if(event==Motion && button==LeftButton && size.y<hint.y) {
         delta = min(int2(0,0), max(size-hint, flickStart+cursor-dragStart));

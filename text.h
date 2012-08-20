@@ -34,7 +34,7 @@ struct Text : Widget {
 
     int2 sizeHint();
     void layout();
-    void render(int2 position, int2 size);
+    void render(int2 position, int2 size) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     // cache layout bounding box

@@ -121,7 +121,7 @@ struct TextLayout {
     }
 };
 
-Text::Text(string&& text, int size, ubyte opacity/*, uint wrap*/) : text(move(text)), size(size), opacity(opacity), wrap(0), textSize(0,0) {}
+Text::Text(string&& text, int size, ubyte opacity/*, uint wrap*/) : text(move(text)), size(size), opacity(opacity), wrap(0), textSize(0) {}
 void Text::layout() {
     TextLayout layout(text, size, wrap);
     blits.clear(); for(const TextLayout::Character& c: layout.text) blits << Blit __(int2((c.pos.x+8)>>4, (c.pos.y+8)>>4), share(c.glyph.image));
@@ -130,7 +130,7 @@ void Text::layout() {
 }
 int2 Text::sizeHint() {
     if(!textSize) layout();
-    return wrap?int2(-textSize.x,textSize.y):textSize;
+    return textSize;
 }
 void Text::render(int2 position, int2 size) {
     if(!textSize) layout();

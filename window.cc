@@ -104,7 +104,7 @@ void Window::event(const pollfd& poll) {
             r.totalWidth=r.width=buffer.width; r.totalHeight=r.height=buffer.height; write(x, raw(r)); }
         state=Server;
     }
-    if(poll.fd==x) { uint8 type = read<uint8>(x); readEvent(type); }
+    if(poll.fd==x) do { uint8 type = read<uint8>(x); readEvent(type); } while(::poll((pollfd*)&poll,1,0));
 }
 
 void Window::readEvent(uint8 type) {

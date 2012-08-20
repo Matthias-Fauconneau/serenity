@@ -20,7 +20,7 @@ struct ScrollArea : Widget {
 
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-    void render(int2 position, int2 size);
+    void render(int2 position, int2 size) override;
 };
 
 /// Scroll<T> implements a scrollable \a T by proxying it through \a ScrollArea

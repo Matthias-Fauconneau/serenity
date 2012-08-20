@@ -96,6 +96,7 @@ struct Taskbar : Application, Poll {
         } else { const Event& e=event; type&=0b01111111; //msb set if sent by SendEvent
             if(type==CreateNotify) { uint id=e.create.window;
                 if(e.create.override_redirect) return;
+                log(id);
                 {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
                     write(x, raw(r));}
                 if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
