@@ -19,7 +19,7 @@ struct Command : Item {
     signal<> triggered;
     string path; array<string> args;
     Command(Image<byte4>&& icon, string&& text, string&& path, array<string>&& args) :
-        Item(move(icon),move(text)),path(move(path)),args(move(args)){}
+        Linear(Left),Item(move(icon),move(text)),path(move(path)),args(move(args)){}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button) override;
 };
 

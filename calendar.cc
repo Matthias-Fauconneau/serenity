@@ -85,7 +85,7 @@ void Month::previousMonth() { active.month--; if(active.month<0) active.year--, 
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
 Calendar::Calendar() {
-    layout.main=Linear::Spread;
+    //layout.main=Linear::Spread;
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::showEvents);

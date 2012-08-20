@@ -92,7 +92,7 @@ struct Slider : Widget {
 
 /// Item is an icon with text
 struct Item : Horizontal, Tuple<Icon,Text> {
-    Item():Tuple(){main=Left;}
+    Item(){}
     Item(Image<byte4>&& icon, string&& text, int size=16):Tuple(move(icon),Text(move(text),size)){}
 };
 

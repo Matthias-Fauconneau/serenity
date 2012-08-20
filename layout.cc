@@ -42,40 +42,41 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     size = xy(size);
     int width = size.x /*remaining space*/; int expanding=0, height=0;
     int sizes[count()];
+
     for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child);
         int2 sizeHint = xy(child.sizeHint());
-        width -= (sizes[i]= sizeHint.x); //commit minimum width
+        width -= abs(sizes[i]=sizeHint.x); //commits minimum width for all widgets
         if(sizeHint.x<0) expanding++; //counts expanding widgets
         height=max(height, sizeHint.y<0 ? size.y : sizeHint.y); //necessary height
     }
 
-    int sharing = expanding ?: main==Share? count() : 0;
+    int sharing = expanding ?: (main==Share? count() : 0);
     if(sharing && width >= sharing) { //shares extra space evenly between sharing widgets
-        int extra = uint(width)/uint(sharing);
+        int extra = width/sharing;
         for(uint i=0;i<count();i++) {
             if(!expanding || sizes[i]<0) //if all widgets are sharing or this widget is expanding
-                sizes[i] += extra; width -= extra; //commit extra space
+                sizes[i] = abs(sizes[i])+extra; width -= extra; //commits extra space
         }
         //width%sharing margin remains as extra is truncated
-    } else while(width<0) { //while layout is overcommited
-        uint best=0; for(uint i=0;i<count();i++) if(sizes[i]>sizes[best]) best=i;
-        int& first = sizes[best]; //largest size
-        int next=first; for(int e: sizes) if(e>next && e<first) next=e; //next largest widget size
-        uint delta = min(-width, first-next);
-        if(delta!=0) { first -= delta; width += delta; } //cap size to next largest
-        else { //all widgets already have the same size
-            for(uint i=0;i<count();i++) { uint delta=uint(-width)/count(); sizes[i]-=delta; width+=delta; }
-            assert(width>=-sharing);
+    } else {
+        for(uint i=0;i<count();i++) sizes[i]=abs(sizes[i]); //converts all expanding widgets to fixed
+        while(width<=-int(count())) { //while layout is overcommited
+            uint best=0; for(uint i=0;i<count();i++) if(sizes[i]>sizes[best]) best=i;
+            int& first = sizes[best]; //largest size
+            int next=0; for(int size: sizes) if(size>next && size<first) next=size; //next largest widget size
+            int delta = min(-width, first-next);
+            if(delta!=0) { first -= delta; width += delta; } //cap size to next largest
+            else { int delta=-width/count(); for(uint i=0;i<count();i++) sizes[i]-=delta, width+=delta; } //all widgets already have the same size
         }
     }
 
     int2 pen = position;
-    if(main==Left) pen.x=0;
-    else if(main==Center) pen.x=(size.x-width)/2;
-    else if(main==Right) pen.x=size.x-width;
-    if(side==Left) pen.y=0;
-    else if(side==Center) pen.y=(size.y-height)/2;
-    else if(side==Right) pen.y=size.y-height;
+    if(main==Left) pen.x+=0;
+    else if(main==Center) pen.x+=(size.x-width)/2;
+    else if(main==Right) pen.x+=size.x-width;
+    if(side==Left) pen.y+=0;
+    else if(side==Center) pen.y+=(size.y-height)/2;
+    else if(side==Right) pen.y+=size.y-height;
     array<Rect> widgets(count());
     for(uint i=0;i<count();i++) {
         widgets<< xy(pen)+Rect(xy(int2(sizes[i],height)));

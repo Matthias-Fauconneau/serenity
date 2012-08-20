@@ -56,9 +56,9 @@ bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button button) {
     focus=this;
     array<Rect> widgets = layout(int2(0,0), size);
-    for(uint i=0;i<widgets.size();i++) { Rect r=widgets[i];
-        if(r.contains(cursor)) {
-            if(at(i).mouseEvent(cursor-r.position(),r.size(),event,button)) return true;
+    for(uint i=0;i<widgets.size();i++) {
+        if(widgets[i].contains(cursor)) {
+            if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
             if(event==Press) {
                 if(index!=i) { index=i; at(index).selectEvent(); activeChanged(index); }
                 if(button == LeftButton) itemPressed(index);

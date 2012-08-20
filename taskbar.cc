@@ -15,7 +15,7 @@ struct Taskbar : Application, Poll {
         Taskbar* parent=0;
         uint id;
         Task(uint id):id(id){} //for indexOf
-        Task(Taskbar* parent, uint id, Image<byte4>&& icon, string&& text):Item(move(icon),move(text)),parent(parent),id(id){}
+        Task(Taskbar* parent, uint id, Image<byte4>&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
         bool selectEvent() override { parent->raise(id); return true; }
         bool mouseEvent(int2, int2, Event event, Button button) override {
             //TODO: preview on hover
@@ -183,7 +183,7 @@ struct Taskbar : Application, Poll {
         return move(name);
     }
     Image<byte4> getIcon(uint id) {
-        array<uint> buffer = getProperty<uint>(id,"_NET_WM_ICON"_,2+32*32);
+        array<uint> buffer = getProperty<uint>(id,"_NET_WM_ICON"_,2+128*128);
         if(buffer.size()<2) return Image<byte4>();
         uint w=buffer[0], h=buffer[1];
         if(buffer.size()<2+w*h) return Image<byte4>();
@@ -199,7 +199,7 @@ struct Taskbar : Application, Poll {
         }
         return atom;
     }
-    template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=258) {
+    template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=128*128+2) {
         {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; write(x, raw(r));}
         {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
             array<T> a; if(size) a=read<T>(x,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(x, pad); return a; }
