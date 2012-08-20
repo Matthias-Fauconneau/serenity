@@ -18,17 +18,17 @@ struct Taskbar : Application, Poll {
         Task(Taskbar* parent, uint id, Image<byte4>&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
         bool selectEvent() override { parent->raise(id); return true; }
         bool mouseEvent(int2, int2, Event event, Button button) override {
-            //TODO: preview on hover
-            if(button!=LeftButton) return false;
-            if(event==Press && parent->getProperty<uint>(parent->root,"_NET_ACTIVE_WINDOW"_)==ref<uint>__(id)) { //Set Maximized
-                {MoveResizeWindow r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; write(parent->x,raw(r));}
-                return true;
+            if(event!=Press || button!=LeftButton) return false;
+            if(parent->getProperty<uint>(parent->root,"_NET_ACTIVE_WINDOW"_)==ref<uint>__(id)) { // Maximize
+                MoveResizeWindow r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; write(parent->x,raw(r));
             }
-            if(event==Motion) { //Set windowed
-                {MoveResizeWindow r; r.id=id; r.x=display.x/4, r.y=16+(display.y-16)/4; r.w=display.x/2; r.h=(display.y-16)/2; write(parent->x,raw(r));}
-                return true;
-            }
-            return false;
+        }
+        bool keyPress(Key key) override {
+            if(key != Escape) return false;
+            {SendEvent r; r.window=id; r.type=ClientMessage;
+                auto& e=r.event.client; e.format=32; e.window=id; e.type=parent->Atom("WM_PROTOCOLS"_);
+                clear(e.data); e.data[0]=parent->Atom("WM_DELETE_WINDOW"_); write(parent->x, raw(r));}
+            return true;
         }
     };
 
@@ -59,7 +59,6 @@ struct Taskbar : Application, Poll {
             read(x,r.additionnal*4-(sizeof(ConnectionSetupReply)-8)); }
 
         if(getProperty<uint>(root,"_NET_SUPPORTING_WM_CHECK"_)) ownWM=false;
-        else window.setCursor(share(cursorIcon()), root);
         {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask|PropertyChangeMask|ButtonPressMask;
             if(ownWM) r.eventMask|=SubstructureRedirectMask; write(x, raw(r)); }
         array<uint> windows;
@@ -88,78 +87,74 @@ struct Taskbar : Application, Poll {
         window.show();
     }
 
-    void processEvent(uint8 type, const Event& event) {
-        if(type==0) { const Error& e=(Error&)event;
-            trace(); log("Error",e.code<sizeof(xerror)/sizeof(*xerror)?xerror[e.code]:dec(e.code),"seq:",e.seq,"id",e.id,"request",
-                  e.major<sizeof(xrequest)/sizeof(*xrequest)?xrequest[e.major]:dec(e.major),"minor",e.minor);
-        } else if(type==1) { error("Unexpected reply");
-        } else { const Event& e=event; type&=0b01111111; //msb set if sent by SendEvent
-            if(type==CreateNotify) { uint id=e.create.window;
-                if(e.create.override_redirect) return;
-                log(id);
-                {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
-                    write(x, raw(r));}
-                if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
-                return;
-            } else if(type == MapRequest) { uint id=e.map_request.window;
-                {MapWindow r; r.id=id; write(x,raw(r));}
-                raise(id);
-                int i = tasks.indexOf(id);
-                if(i<0) i=addWindow(id);
-                if(i<0) return;
-                tasks.index=i;
-            } else if(type == ConfigureRequest) { uint id = e.configure_request.window;
-                {GetGeometry r; r.id=id; write(x, raw(r));}
-                GetGeometryReply w=readReply<GetGeometryReply>();
-                const auto& c = e.configure_request;
-                if(c.valueMask & X) w.x=c.x; if(c.valueMask & Y) w.y=c.y; if(c.valueMask & W) w.w=c.w; if(c.valueMask & H) w.h=c.h;
-                array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
-                GetWindowAttributes r; r.window=id; write(x, raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
-                if(!wa.overrideRedirect && (!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                    w.w=min<int16>(display.x,w.w); w.h=min<int16>(display.y-16,w.h);
-                    w.x = (display.x - w.w)/2; w.y = 16+(display.y-16-w.h)/2;
+    void processEvent(uint8 type, const Event& e) {
+        if(type==0) return;
+        if(type==1) error("Unexpected reply");
+        type&=0b01111111; //msb set if sent by SendEvent
+        if(type==CreateNotify) { uint id=e.create.window;
+            if(e.create.override_redirect) return;
+            {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
+                write(x, raw(r));}
+            if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
+            return;
+        } else if(type == MapRequest) { uint id=e.map_request.window;
+            {MapWindow r; r.id=id; write(x,raw(r));}
+            raise(id);
+            int i = tasks.indexOf(id);
+            if(i<0) i=addWindow(id);
+            if(i<0) return;
+            tasks.index=i;
+        } else if(type == ConfigureRequest) { uint id = e.configure_request.window;
+            {GetGeometry r; r.id=id; write(x, raw(r));}
+            GetGeometryReply w=readReply<GetGeometryReply>();
+            const auto& c = e.configure_request;
+            if(c.valueMask & X) w.x=c.x; if(c.valueMask & Y) w.y=c.y; if(c.valueMask & W) w.w=c.w; if(c.valueMask & H) w.h=c.h;
+            array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
+            GetWindowAttributes r; r.window=id; write(x, raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
+            if(!wa.overrideRedirect && (!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
+                w.w=min<int16>(display.x,w.w); w.h=min<int16>(display.y-16,w.h);
+                w.x = (display.x - w.w)/2; w.y = 16+(display.y-16-w.h)/2;
+            }
+            {SetGeometry r; r.id=id; r.x=w.x, r.y=w.y; r.w=w.w; r.h=w.h; write(x, raw(r));}
+            return;
+        } else if(type == ButtonPress) { uint id = e.event;
+            raise(id);
+            write(x, raw(AllowEvents()));
+            int i = tasks.indexOf(id);
+            if(i>=0) tasks.index=i;
+        } else if(type==PropertyNotify) { uint id=e.property.window;
+            if(id==root && e.property.atom==Atom("_NET_ACTIVE_WINDOW"_)) {
+                array<uint> active = getProperty<uint>(root,"_NET_ACTIVE_WINDOW"_);
+                if(active) { int i = tasks.indexOf(active.first()); if(i<0) return; tasks.setActive(i); }
+            } else if(id==root && e.property.atom==Atom("_NET_CLIENT_LIST"_)) {
+                windows.clear(); tasks.clear();
+                for(uint id: getProperty<uint>(root,"_NET_CLIENT_LIST"_)) {
+                    addWindow(id);
+                    {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
+                        write(x, raw(r));}
+                    if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
                 }
-                {MoveResizeWindow r; r.id=id; r.x=w.x, r.y=w.y; r.w=w.w; r.h=w.h; write(x, raw(r));}
-                return;
-            } else if(type == ButtonPress) { uint id = e.event;
-                raise(id);
-                write(x, raw(AllowEvents()));
-                int i = tasks.indexOf(id);
-                if(i>=0) tasks.index=i;
-            } else if(type==PropertyNotify) { uint id=e.property.window;
-                if(id==root && e.property.atom==Atom("_NET_ACTIVE_WINDOW"_)) {
-                    array<uint> active = getProperty<uint>(root,"_NET_ACTIVE_WINDOW"_);
-                    if(active) { int i = tasks.indexOf(active.first()); if(i<0) return; tasks.setActive(i); }
-                } else if(id==root && e.property.atom==Atom("_NET_CLIENT_LIST"_)) {
-                     windows.clear(); tasks.clear();
-                     for(uint id: getProperty<uint>(root,"_NET_CLIENT_LIST"_)) {
-                         addWindow(id);
-                         {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
-                             write(x, raw(r));}
-                         if(ownWM){GrabButton r; r.window=id; write(x, raw(r));}
-                     }
-                } else if(e.property.atom==Atom("_NET_WM_NAME"_)) {
-                    int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
-                    tasks[i].get<Text>().setText( getTitle(id) );
-                } else if(e.property.atom==Atom("_NET_WM_ICON"_)) {
-                    int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
-                    tasks[i].get<Icon>().image = getIcon(id);
-                } else return;
-            } else if(type == DestroyNotify) { uint id=e.property.window;
-                int i = tasks.indexOf(id);
-                if(i>=0) {
-                    tasks.removeAt(i);
-                    if(tasks.index == uint(i)) tasks.index=-1;
-                }
-                if(windows) {
-                    uint id=windows.last();
-                    //{SetInputFocus r; r.window=id; write(x, raw(r));}
-                    if(tasks.index==uint(-1)) tasks.setActive(tasks.indexOf(id));
-                }
-            } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify) {
-            } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
-            window.render();
-        }
+            } else if(e.property.atom==Atom("_NET_WM_NAME"_)) {
+                int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
+                tasks[i].get<Text>().setText( getTitle(id) );
+            } else if(e.property.atom==Atom("_NET_WM_ICON"_)) {
+                int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
+                tasks[i].get<Icon>().image = getIcon(id);
+            } else return;
+        } else if(type == DestroyNotify) { uint id=e.property.window;
+            int i = tasks.indexOf(id);
+            if(i>=0) {
+                tasks.removeAt(i);
+                if(tasks.index == uint(i)) tasks.index=-1;
+            }
+            if(windows) {
+                uint id=windows.last();
+                if(ownWM) {SetInputFocus r; r.window=id; write(x, raw(r));}
+                if(tasks.index==uint(-1)) tasks.setActive(tasks.indexOf(id));
+            }
+        } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify) {
+        } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
+        window.render();
     }
 
     /// Adds \a id to \a windows and to \a tasks if necessary
@@ -210,17 +205,17 @@ struct Taskbar : Application, Poll {
     void raise(uint id) {
         if(ownWM) {
             {RaiseWindow r; r.id=id; write(x, raw(r));}
-            //{SetInputFocus r; r.window=id; write(x, raw(r));}
+            {SetInputFocus r; r.window=id; write(x, raw(r));}
             for(uint w: windows) {
                 if(getProperty<uint>(w,"WM_TRANSIENT_FOR"_) == ref<uint>__(id)) {
                     {RaiseWindow r; r.id=id; write(x, raw(r));}
-                    //{SetInputFocus r; r.window=id; write(x, raw(r));}
+                    {SetInputFocus r; r.window=id; write(x, raw(r));}
                 }
             }
         } else {
-            {SendEvent r; r.window=root; r.type=ClientMessage; r.eventMask=SubstructureNotifyMask;
-                auto& e=r.event.client; e.format=32; e.window=id; e.type=Atom("_NET_ACTIVE_WINDOW"_); clear(e.data); e.data[0]=2;
-                write(x, raw(r));}
+            {SendEvent r; r.window=root; r.eventMask=SubstructureNotifyMask; r.type=ClientMessage;
+                auto& e=r.event.client; e.format=32; e.window=id; e.type=Atom("_NET_ACTIVE_WINDOW"_);
+                clear(e.data); e.data[0]=2; write(x, raw(r));}
         }
     }
 
@@ -241,9 +236,9 @@ struct Taskbar : Application, Poll {
         processEvent(type, read<Event>(x));
         while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
     }
-    template<class T> T readReply(bool ignore=false) {
+    template<class T> T readReply() {
         for(;;) { uint8 type = read<uint8>(x);
-            if(type==0) { ::Event e=read<::Event>(x); if(!ignore) processEvent(0,e); T t; clear(t); return t; }
+            if(type==0) { read<Error>(x); T t; clear(t); return t; }
             else if(type==1) return read<T>(x);
             else queue << QEvent __(type, read<::Event>(x)); //queue events to avoid reentrance
         }

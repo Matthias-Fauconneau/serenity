@@ -29,17 +29,20 @@ struct Widget {
     enum Event { Press, Release, Motion, Enter, Leave };
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root \a Window::widget
-    /// \return Whether the mouse event should trigger rendering
+    /// \return Whether the mouse event was accepted
     virtual bool mouseEvent(int2 unused cursor, int2 unused size, Event unused event, Button unused button) { return false; }
     bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.min,rect.size(),event,button); }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current \a Window::focus
-    /// \return Whether the key press should trigger rendering
+    /// \return Whether the key press was accepted
     virtual bool keyPress(Key) { return false; }
     /// Override \a selectEvent to handle or forward user input
     /// \note \a selectEvent is called by \a Selection when user changes selection (using press, wheel or arrows)
-    /// \return Whether the select event should trigger rendering
+    /// \return Whether the select event was accepted
     virtual bool selectEvent() { return false; }
 };
 
+/// Current widget that has the keyboard input focus
 extern Widget* focus;
+/// Current widget that has the drag focus
+extern Widget* drag;

@@ -1,6 +1,7 @@
 #include "mpg123.h"
 #include "string.h"
 #include <mpg123.h>
+#include "debug.h"
 
 void AudioFile::open(const ref<byte>& path) {
     static int unused once=mpg123_init();
@@ -18,7 +19,11 @@ void AudioFile::open(const ref<byte>& path) {
 		new (&resampler) Resampler(audioInput.channels, audioInput.frequency, audioOutput.frequency);
 	}
 }
-void AudioFile::close() { if(file) { mpg123_close(file); mpg123_delete(file); file=0; } }
+void AudioFile::close() {
+    if(file) { mpg123_close(file); mpg123_delete(file); file=0; }
+    if(buffer) { unallocate(buffer,bufferSize); bufferSize=0; }
+    input=0; inputBufferSize=0; inputSize=0;
+}
 int AudioFile::position() { return (int)mpg123_tell(file)/audioInput.frequency; }
 int AudioFile::duration() { return (int)mpg123_length(file)/audioInput.frequency; }
 void AudioFile::seek( int time ) { mpg123_seek_frame(file,mpg123_timeframe(file,time),0); }
@@ -51,7 +56,7 @@ void AudioFile::read(int16* output, uint outputSize) {
 			buffer = allocate<float>(bufferSize=size*audioOutput.channels);
 			int in = inputSize, out = size;
 			resampler.filter(input,&in,buffer,&out,false);
-			assert_(in == (int)inputSize);
+			//assert(in == (int)inputSize, in, inputSize);
 			input = buffer; inputBufferSize=bufferSize; bufferSize=0; inputSize = out;
 		}
 	}

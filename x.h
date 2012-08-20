@@ -1,3 +1,4 @@
+#pragma once
 #include "core.h"
 
 #define fixed(T) packed ____(; static_assert(sizeof(T)==31,""))
@@ -34,9 +35,9 @@ struct Screen { int32 root, colormap, white, black, inputMask; int16 width, heig
 struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
-struct CreateWindow { int8 req=1, depth=32; uint16 size=14; uint id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1; uint visual;
-                      uint mask=BackgroundPixel|BorderPixel|BitGravity|OverrideRedirect|EventMask|ColorMap;
-                                        uint backgroundPixel=0,borderPixel=0, bitGravity=5, overrideRedirect=0, eventMask, colormap; };
+struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1; uint visual;
+                      uint mask=BackgroundPixel|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
+                                        uint backgroundPixel=0,borderPixel=0, bitGravity=5, winGravity=5, overrideRedirect, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
 struct SetWindowCursor { int8 req=2; uint16 size=4; uint window, mask=Cursor; uint cursor; };
 struct GetWindowAttributes { int8 req=3; uint16 size=2; uint window; };
@@ -45,7 +46,7 @@ struct DestroyWindow { int8 req=4; uint16 size=2; uint id; };
 struct MapWindow { int8 req=8; uint16 size=2; uint id;};
 struct UnmapWindow { int8 req=10; uint16 size=2; uint id;};
 struct ConfigureWindow { int8 req=12; uint16 size=5; uint id; int16 mask,pad; uint x,y; };
-struct MoveResizeWindow { int8 req=12; uint16 size=7; uint id; int16 mask=X|Y|W|H,pad; uint x,y,w,h; };
+struct SetGeometry { int8 req=12; uint16 size=7; uint id; int16 mask=X|Y|W|H,pad; uint x,y,w,h; };
 struct RaiseWindow { int8 req=12; uint16 size=4; uint id; int16 mask=StackMode,pad; uint stackMode=Above; };
 struct GetGeometry{ int8 req=14; uint16 size=2; uint id; };
 struct GetGeometryReply { byte depth; uint16 seq; uint length; uint root; int16 x,y,w,h,border; byte pad[10]; } fixed(GetGeometryReply);
@@ -67,39 +68,63 @@ struct GrabKeyboard { int8 req=31,owner=0; uint16 size=6; uint window; uint time
 struct GrabKeyboardReply { uint8 status; uint16 seq; uint size; byte pad[24]; } fixed(GrabKeyboardReply);
 struct AllowEvents { int8 req=35, mode=2; uint16 size=2; uint time=0; };
 struct SetInputFocus { int8 req=42,revertTo=1; uint16 size=3; uint window; uint time=0; };
-struct CreatePixmap { int8 req=53,depth=32; uint size=4; uint pixmap,window; int16 w,h; };
-struct FreePixmap { int8 req=54,pad; uint size=2; uint pixmap; };
+struct CreatePixmap { int8 req=53,depth=32; uint16 size=4; uint pixmap,window; int16 w,h; };
+struct FreePixmap { int8 req=54,pad; uint16 size=2; uint pixmap; };
 struct CreateGC { int8 req=55,pad; uint16 size=4; uint context,window,mask=0; };
 struct CopyArea { int8 req=62,pad; uint16 size=7; uint src,dst,gc; int16 srcX,srcY,dstX,dstY,w,h; };
 struct PutImage { int8 req=72,format=2; uint16 size=6; uint drawable,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad; };
 struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint colormap,window,visual; };
-struct CreateCursor { int8 req=93,pad; uint16 size=8; uint cursor,image,mask=0; int16 fore[3],back[3],x=0,y=0; };
+struct FreeCursor { int8 req=95,pad; uint16 size=2; uint cursor; };
 struct QueryExtension { int8 req=98,pad; uint16 size=2, length, pad2; };
 struct QueryExtensionReply { byte pad; uint16 seq; uint length; uint8 present,major,firstEvent,firstError; byte pad2[20]; } fixed(QueryExtensionReply);
 struct GetKeyboardMapping { int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad; };
 struct GetKeyboardMappingReply { uint8 numKeySymsPerKeyCode; uint16 seq; uint length; byte pad[24]; } fixed(GetKeyboardMappingReply);
-constexpr ref<byte> xerror[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
-                                  "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
-constexpr ref<byte> xrequest[] = {"0"_,"CreateWindow"_,"ChangeWindowAttributes"_,"GetWindowAttributes"_,"DestroyWindow"_,"DestroySubwindows"_,"ChangeSaveSet"_,"ReparentWindow"_,"MapWindow"_,"MapSubwindows"_,"UnmapWindow"_,"UnmapSubwindows"_,"ConfigureWindow"_,"CirculateWindow"_,"GetGeometry"_,"QueryTree"_,"InternAtom"_,"GetAtomName"_,"ChangeProperty"_,"DeleteProperty"_,"GetProperty"_,"ListProperties"_,"SetSelectionOwner"_,"GetSelectionOwner"_,"ConvertSelection"_,"SendEvents"_,"GrabPointer"_,"UngrabPointer"_,"GrabButton"_,"UngrabButton"_,"ChangeActivePointerGrab"_,"GrabKeyboard"_,"UngrabKeyboard"_,"GrabKey"_,"UngrabKey"_,"AllowEvents"_,"GrabServer"_,"UngrabServer"_,"QueryPointer"_,"GetMotionEvents"_,"TranslateCoordinates"_,"WarpPointer"_,"SetInputFocus"_,"GetInputFocus"_,"QueryKeymap"_,"OpenFont"_,"CloseFont"_,"QueryFont"_,"QueryTextElements"_,"ListFonts"_,"ListFontsWithInfo"_,"SetFontPath"_,"GetFontPath"_,"CreatePixmap"_,"FreePixmap"_,"CreateGC"_,"ChangeGC"_,"CopyGC"_,"SetDashes"_,"SetClipRectangles"_,"FreeGC"_,"ClearArea"_,"CopyArea"_,"CopyPlane"_,"PolyPoint"_,"PolyLine"_,"PolySegment"_,"PolyRectange"_,"PolyArc"_,"FillPoly"_,"PolyFillRectangle"_,"PolyFillArc"_,"PutImage"_};
-constexpr ref<byte> xevent[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"ButtonPress"_,"ButtonRelease"_,"MotionNotify"_,"EnterNotify"_,
+
+constexpr ref<byte> requests[] = {"0"_,"CreateWindow"_,"ChangeWindowAttributes"_,"GetWindowAttributes"_,"DestroyWindow"_,"DestroySubwindows"_,"ChangeSaveSet"_,"ReparentWindow"_,"MapWindow"_,"MapSubwindows"_,"UnmapWindow"_,"UnmapSubwindows"_,"ConfigureWindow"_,"CirculateWindow"_,"GetGeometry"_,"QueryTree"_,"InternAtom"_,"GetAtomName"_,"ChangeProperty"_,"DeleteProperty"_,"GetProperty"_,"ListProperties"_,"SetSelectionOwner"_,"GetSelectionOwner"_,"ConvertSelection"_,"SendEvents"_,"GrabPointer"_,"UngrabPointer"_,"GrabButton"_,"UngrabButton"_,"ChangeActivePointerGrab"_,"GrabKeyboard"_,"UngrabKeyboard"_,"GrabKey"_,"UngrabKey"_,"AllowEvents"_,"GrabServer"_,"UngrabServer"_,"QueryPointer"_,"GetMotionEvents"_,"TranslateCoordinates"_,"WarpPointer"_,"SetInputFocus"_,"GetInputFocus"_,"QueryKeymap"_,"OpenFont"_,"CloseFont"_,"QueryFont"_,"QueryTextElements"_,"ListFonts"_,"ListFontsWithInfo"_,"SetFontPath"_,"GetFontPath"_,"CreatePixmap"_,"FreePixmap"_,"CreateGC"_,"ChangeGC"_,"CopyGC"_,"SetDashes"_,"SetClipRectangles"_,"FreeGC"_,"ClearArea"_,"CopyArea"_,"CopyPlane"_,"PolyPoint"_,"PolyLine"_,"PolySegment"_,"PolyRectange"_,"PolyArc"_,"FillPoly"_,"PolyFillRectangle"_,"PolyFillArc"_,"PutImage"_};
+constexpr ref<byte> events[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"ButtonPress"_,"ButtonRelease"_,"MotionNotify"_,"EnterNotify"_,
                                 "LeaveNotify"_,"FocusIn"_,"FocusOut"_,"KeymapNotify"_,"Expose"_,"GraphicsExpose"_,"NoExpose"_,"VisibilityNotify"_,
                                 "CreateNotify"_,"DestroyNotify"_,"UnmapNotify"_,"MapNotify"_,"MapRequest"_,"ReparentNotify"_,"ConfigureNotify"_,
                                 "ConfigureRequest"_,"GravityNotify"_,"ResizeRequest"_,"CirculateNotify"_,"CirculateRequest"_,"PropertyNotify"_,
                                 "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_};
+constexpr ref<byte> errors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
+                                  "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
 
 namespace Shm {
-extern int major, event, error;
-enum Error { BadSeg };
-enum { Completion };
-struct QueryVersion { int8 ext=major, req=0; uint16 size=1; };
+extern int EXT, event, error;
+struct QueryVersion { int8 ext=EXT, req=0; uint16 size=1; };
 struct QueryVersionReply { int8 sharedPixmaps; uint16 seq; uint length; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
-struct Attach { int8 ext=major, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]; };
-struct Detach { int8 ext=major, req=2; uint16 size=2; uint seg; };
-struct PutImage { int8 ext=major, req=3; uint16 size=10; uint window,context; uint16 totalWidth, totalHeight, srcX=0, srcY=0, width, height,
+struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]; };
+struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
+struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalWidth, totalHeight, srcX=0, srcY=0, width, height,
                   dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
-struct GetImage { int8 ext=major, req=4; uint16 size=8; uint window; uint16 x,y,w,h; uint mask; uint8 format; uint seg,offset; };
+struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x,y,w,h; uint mask; uint8 format; uint seg,offset; };
 struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual,size,pad[4]; };
-struct CreatePixmap { int8 ext=major, req=5; uint16 size=7; uint pixmap,drawable; uint16 w,h; uint8 depth; uint seg,offset; };
+struct CreatePixmap { int8 ext=EXT, req=5; uint16 size=7; uint pixmap,drawable; uint16 w,h; uint8 depth; uint seg,offset; };
+enum { Completion };
+constexpr ref<byte> errors[] = {"BadSeg"_};
+constexpr int errorCount = sizeof(errors)/sizeof(*errors);
+}
+
+namespace Render {
+//#include "X11/extensions/render.h"
+#include "X11/extensions/renderproto.h"
+
+struct PictFormInfo { uint format; uint8 type,depth; uint16 direct[8]; uint colormap; }; static_assert(sizeof(PictFormInfo)==28,"");
+struct PictVisual { uint visual, format; }; static_assert(sizeof(PictVisual)==8,"");
+struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ }; static_assert(sizeof(PictDepth)==8,"");
+struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ }; static_assert(sizeof(PictScreen)==8,"");
+
+extern int EXT, event, error;
+struct QueryVersion { int8 ext=EXT,req=0; uint16 size=3; uint major=0,minor=11; };
+struct QueryVersionReply { int8 pad; uint16 seq; uint length; uint major,minor,pad2[4]; } fixed(QueryVersionReply);
+struct QueryPictFormats{ int8 ext=EXT,req=1; uint16 size=1; };
+struct QueryPictFormatsReply { int8 pad; uint16 seq; uint length; uint numFormats,numScreens,numDepths,numVisuals,numSubpixels,pad2; } fixed(QueryPictFormatsReply);
+struct CreatePicture { int8 ext=EXT,req=4; uint16 size=5; uint picture,drawable,format,valueMask=0; };
+struct FreePicture { int8 ext=EXT,req=7; uint16 size=2; uint picture; };
+struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
+constexpr ref<byte> requests[] = {"QueryVersion"_,"QueryPictFormats"_,"QueryPictIndexValues"_,"QueryFilters"_,"CreatePicture"_,"ChangePicture"_,"SetPictureClipRectangles"_,"SetPictureTransform"_,"SetPictureFilter"_,"FreePicture"_};
+constexpr ref<byte> errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
+constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 
 #include "debug.h"

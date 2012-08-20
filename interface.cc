@@ -12,14 +12,15 @@ void ScrollArea::render(int2 position, int2 size) {
 
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 hint = abs(widget().sizeHint());
-    if(event==Press && (button==WheelDown || button==WheelUp) && size.y<abs(widget().sizeHint().y)) {
+    if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
         delta.y += button==WheelUp?-32:32;
         delta = min(int2(0,0), max(size-hint, delta));
         return true;
     }
-    if(widget().mouseEvent(cursor-delta,max(hint,size),event,button)) return true;
     if(event==Press && button==LeftButton) { dragStart=cursor, flickStart=delta; }
+    if(widget().mouseEvent(cursor-delta,max(hint,size),event,button)) return true;
     if(event==Motion && button==LeftButton && size.y<hint.y) {
+        drag=this;
         delta = min(int2(0,0), max(size-hint, flickStart+cursor-dragStart));
         return true;
     }
@@ -54,14 +55,14 @@ bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 /// Selection
 
 bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button button) {
-    focus=this;
     array<Rect> widgets = layout(int2(0,0), size);
     for(uint i=0;i<widgets.size();i++) {
         if(widgets[i].contains(cursor)) {
             if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
-            if(event==Press) {
+            if(event==Press && button == LeftButton) {
+                focus=this;
                 if(index!=i) { index=i; at(index).selectEvent(); activeChanged(index); }
-                if(button == LeftButton) itemPressed(index);
+                itemPressed(index);
                 return true;
             }
         }
@@ -72,6 +73,7 @@ bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button bu
 }
 
 bool Selection::keyPress(Key key) {
+    if(index<=count()) if(at(index).keyPress(key)) return true;
     if(key==DownArrow && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
     if(key==UpArrow && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
     return false;

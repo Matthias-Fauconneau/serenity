@@ -17,12 +17,11 @@ SRCS_taskbar += png inflate
 SRCS_player += png inflate
 SRCS_music += png inflate
 
-ICONS = $(ICONS_$(TARGET))
-ICONS_browser := cursor
-ICONS_taskbar := cursor button
-ICONS_desktop := cursor shutdown network
-ICONS_player := cursor play pause next
-ICONS_music := cursor music
+ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
+ICONS_taskbar := button
+ICONS_desktop := shutdown network
+ICONS_player := play pause next
+ICONS_music := music
 SRCS += $(ICONS:%=icons/%)
 
 LIBS_mpg123 = mpg123

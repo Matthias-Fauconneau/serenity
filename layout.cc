@@ -47,7 +47,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
         int2 sizeHint = xy(child.sizeHint());
         width -= abs(sizes[i]=sizeHint.x); //commits minimum width for all widgets
         if(sizeHint.x<0) expanding++; //counts expanding widgets
-        height=max(height, sizeHint.y<0 ? size.y : sizeHint.y); //necessary height
+        height=max(height, sizeHint.y<0 ? size.y : min(size.y,sizeHint.y)); //necessary height
     }
 
     int sharing = expanding ?: (main==Share? count() : 0);
