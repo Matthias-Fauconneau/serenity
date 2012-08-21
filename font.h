@@ -9,15 +9,16 @@ struct Glyph {
     int2 offset; // (left bearing, min.y-baseline) (in .4)
     int advance=0; //in .4
     Image<uint8> image; //not owned
+    uint16 index;
     Glyph(){}
     Glyph(Glyph&& o)____(=default);
-    Glyph(const Glyph& o):offset(o.offset),advance(o.advance),image(share(o.image)){}
+    Glyph(const Glyph& o):offset(o.offset),advance(o.advance),image(share(o.image)),index(o.index){}
 };
 
 /// Truetype font renderer stub
 struct Font {
     Map keep;
-    DataStream cmap;
+    DataStream cmap, kern;
     uint16* hmtx;
     void* loca; uint16 indexToLocFormat, ascent;
     byte* glyf; int scale, round, size;
@@ -26,8 +27,8 @@ struct Font {
 
     /// Opens font at /a path scaled to /a size pixels high
     Font(const ref<byte>& path, int size);
-    /// Returns kerning space between \a left and \a right
-    int kerning(uint16 left, uint16 right); //space in .4
+    /// Returns scaled kerning adjustment between \a left and \a right
+    int kerning(uint16 leftIndex, uint16 rightIndex); //space in .4
     /// Caches and returns glyph for \a code
     Glyph glyph(uint16 code);
 private:

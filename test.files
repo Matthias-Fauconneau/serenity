@@ -1,4 +1,6 @@
 linux.h
 display.cc
+font.h
+font.cc
 window.cc
 test.cc

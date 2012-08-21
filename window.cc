@@ -107,6 +107,7 @@ void Window::event(const pollfd& poll) {
             int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
             framebuffer(x,y) = byte4(g,g,g,opacity);
         }
+        fill(currentClip,white);
         //feather edges //TODO: client side shadow
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
         if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
@@ -169,7 +170,7 @@ void Window::processEvent(uint8 type, const Event& event) {
                     else if(left) position.x+=delta.x, size.x-=delta.x;
                     else if(right) size.x+=delta.x;
                     else position+=delta;
-                    position=clip(int2(0,16),position,display), size=clip(int2(16,16),size,display-int2(0,16));
+                    //position=clip(int2(0,16),position,display), size=clip(int2(16,16),size,display-int2(0,16));
                     setGeometry(position,size);
                 } else {
                     if((top && left)||(bottom && right)) setCursor(FDiagonal);
@@ -179,10 +180,10 @@ void Window::processEvent(uint8 type, const Event& event) {
                     else setCursor(Arrow);
                 }
             }
-        } else if(type==ButtonPress) { int2 cursor(e.rootX,e.rootY);
-            if(cursor.x>position.x+1 && cursor.y>position.y+1 && widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Button)e.key)) {
-                wait(); {SetInputFocus r; r.window=id; write(x, raw(r));}
-            } else { dragStart=cursor, dragPosition=position, dragSize=size; }
+        } else if(type==ButtonPress) {
+            dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
+            {SetInputFocus r; r.window=id; write(x, raw(r));}
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Button)e.key)) wait();
         } else if(type==ButtonPress) { drag=0;
         } else if(type==KeyPress) {
             uint key = KeySym(e.key);
@@ -315,7 +316,6 @@ int2 Window::cursorHotspot(Window::Cursor cursor) {
     if(cursor==Move) return int2(16,15);
     error("");
 }
-
 
 void Window::setCursor(Cursor cursor) {
     if(cursor==this->cursor) return; this->cursor=cursor;

@@ -95,7 +95,6 @@ struct DataStream : virtual Stream {
         operator uint8() { return s->read<uint8>(); }
         operator int8() { return s->read<int8>(); }
         operator byte() { return s->read<byte>(); }
-        //template<class T> operator const T&(){ return s->read<T>(); }
     };
     ReadOperator read() { return __(this); }
 

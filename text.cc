@@ -103,8 +103,8 @@ struct TextLayout {
                 continue;
             }
             Glyph glyph = font->glyph(c);
-            pen.x += font->kerning(previous,c);
-            previous = c;
+            pen.x += font->kerning(previous,glyph.index);
+            previous = glyph.index;
             if(glyph.image) word << Character __(int2(pen.x,0)+glyph.offset, move(glyph)); glyphCount++;
             pen.x += glyph.advance;
         }

@@ -12,12 +12,12 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
         if(tag==raw<uint32>("head"_)) head=s.slice(offset,size);
         if(tag==raw<uint32>("hhea"_)) hhea=s.slice(offset,size);
         if(tag==raw<uint32>("cmap"_)) cmap=s.slice(offset,size);
+        if(tag==raw<uint32>("kern"_)) kern=s.slice(offset,size);
         if(tag==raw<uint32>("hmtx"_)) hmtx=(uint16*)(s.buffer.data()+offset);
         if(tag==raw<uint32>("loca"_)) loca=s.buffer.data()+offset;
         if(tag==raw<uint32>("glyf"_)) glyf=s.buffer.data()+offset;
     }
-    {
-       DataStream& s = head;
+    {DataStream& s = head;
        uint32 unused version=s.read(), unused revision=s.read();
        uint32 unused checksum=s.read(), unused magic=s.read();
        uint16 unused flags=s.read(), unitsPerEm=s.read();
@@ -29,8 +29,7 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4;
        round = (1<<scale)/2; //round to nearest not down
     }
-    {
-        DataStream& s = hhea;
+    {DataStream& s = hhea;
         uint32 unused version=s.read();
         ascent=s.read(); /*uint16 unused descent=s.read(), unused lineGap=s.read();
         uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();*/
@@ -72,11 +71,23 @@ uint16 Font::index(uint16 code) {
     error("Not Found"_);
 }
 
-int Font::kerning(uint16 /*leftCode*/, uint16 /*rightCode*/) {
-    //TODO: parse kern table
+int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
+    kern.seek(0); DataStream& s = kern;
+    uint16 unused version=s.read(), numTables=s.read();
+    for(uint i=0;i<numTables;i++) {
+        uint16 unused version=s.read(), unused length = s.read(); uint8 unused coverage = s.read(), unused format = s.read();
+        assert(coverage==0); assert(format==1);
+        uint16 nPairs = s.read(), unused searchRange = s.read(), unused entrySelector = s.read(), unused rangeShift = s.read();
+        assert(14+nPairs*6==length);
+        for(uint i=0;i<nPairs;i++) {
+            uint16 left=s.read(), right=s.read(); int16 value=s.read();
+            if(left==leftIndex && right==rightIndex) return scale(value);
+        }
+    }
     return 0;
 }
 
+static int lastStepY; //dont flag first/last point twice but cancel on direction changes
 void line(Image<int8>& raster, int2 p0, int2 p1) {
     int x0=p0.x, y0=p0.y, x1=p1.x, y1=p1.y;
     if(y0==y1) return;
@@ -85,26 +96,17 @@ void line(Image<int8>& raster, int2 p0, int2 p1) {
     int sx = (x0 < x1) ? 1 : -1;
     int sy = (y0 < y1) ? 1 : -1;
     int err = dx-dy;
-#define raster \
-    if(raster(x0,y0)!=-sy \
-            && (x0==0 || raster(x0-1,y0)!=-sy) \
-            && (x0==int(raster.width-1) || raster(x0+1,y0)!=-sy)) raster(x0,y0) -= sy; //first y (try to avoid dropout inducing duplicates)
-    raster
+    if(sy!=lastStepY) raster(x0,y0) -= sy;
     for(;;) {
         if(x0 == x1 && y0 == y1) break;
         int e2 = 2*err;
         if(e2 > -dy) { err -= dy, x0 += sx; }
-        if(e2 < dx) { err += dx, y0 += sy; raster } //only raster at y step
+        if(e2 < dx) { err += dx, y0 += sy; raster(x0,y0) -= sy; } //only raster at y step
     }
-#undef raster
+    lastStepY=sy;
 }
 
 void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
-#if 0
-    int2 mid = (p0 + 2*p1 + p2)/4;
-    line(raster,p0,mid);
-    line(raster,mid,p2);
-#else
     const int N=3;
     int2 a = p0;
     for(int t=1;t<=N;t++) {
@@ -112,7 +114,6 @@ void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
         line(raster,a,b);
         a=b;
     }
-#endif
 }
 
 /// Fixed point rounding
@@ -120,8 +121,7 @@ int truncate(int width, uint value) { return value/width*width; }
 int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
 int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
 
-//void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {
-void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int, int, int, int, int, int) {
+void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
     DataStream s=DataStream::byReference(ref<byte>(glyf +start, length), true);
@@ -136,7 +136,7 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
         int width=scale(xMax-xMin), height=scale(yMax-yMin);
         raster = Image<int8>(width+1,height+1); clear((byte*)raster.data,raster.height*raster.stride);
         assert(raster);
-    } else s.advance(4*2);
+    } else s.advance(4*2); //TODO: resize as needed
 
     if(numContours>0) {
         ref<uint16> endPtsOfContours = s.read<uint16>(numContours);
@@ -153,24 +153,26 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
         }
 
         int P_[2*nofPoints]; int2* P=(int2*)P_;
-        {
-            int16 last=-xMin;
-            for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
-                if(flags.short_x) {
-                    uint8 delta=s.read();
-                    if(flags.same_sign_x) last+=delta; else last-= delta;
-                } else if(!flags.same_sign_x) last+= (int16)s.read();
-                P[i].x= scale(last);
-                assert(P[i].x<32768);
-            }
-            last=-yMax;
-            for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
-                if(flags.short_y) {
-                    if(flags.same_sign_y) last+= (uint8)s.read();
-                    else last-= (uint8)s.read();
-                } else if(!flags.same_sign_y) last+= (int16)s.read();
-                P[i].y= scale(-last); //flip to downward y
-            }
+        int16 last=-xMin;
+        for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
+            if(flags.short_x) {
+                uint8 delta=s.read();
+                if(flags.same_sign_x) last+=delta; else last-= delta;
+            } else if(!flags.same_sign_x) last+= (int16)s.read();
+            P[i].x= last;
+            assert(P[i].x<32768);
+        }
+        last=-yMax;
+        for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
+            if(flags.short_y) {
+                if(flags.same_sign_y) last+= (uint8)s.read();
+                else last-= (uint8)s.read();
+            } else if(!flags.same_sign_y) last+= (int16)s.read();
+            P[i].y= -last; //flip to downward y
+        }
+        for(int i=0;i<nofPoints;i++) { int2& p=P[i];
+            p.x=scale(xx*p.x/16384+yx*p.y/16384+dx);
+            p.y=scale(xy*p.x/16384+yy*p.y/16384+dy);
         }
 
         for(int n=0,i=0; n<numContours; n++) {
@@ -179,19 +181,19 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
             if(flagsArray[last].on_curve) p=P[last];
             else if(flagsArray[last-1].on_curve) p=P[last-1];
             else p=(P[last-1]+P[last])/2;
+            for(int i=last;i>0;i--) if(P[i-1].y != P[i].y) { lastStepY = (P[i-1].y < P[i].y) ? 1 : -1; break; }
             for(int prev=last; i<=last; i++) {
                 if(flagsArray[prev].on_curve && flagsArray[i].on_curve) { line(raster, P[prev], P[i]); p=P[i]; } //on-on
-                else if(flagsArray[prev].on_curve && !flagsArray[i].on_curve) { p=P[prev]; } //on-off (drawn on next step (either on-off-on or on-off-off))
+                else if(flagsArray[prev].on_curve && !flagsArray[i].on_curve) { p=P[prev]; } //on-off (next step draws as on-off-on or on-off-off))
                 else if(!flagsArray[prev].on_curve && flagsArray[i].on_curve) { curve(raster, p, P[prev], P[i]); p=P[i]; } //off-on
                 else if(!flagsArray[prev].on_curve && !flagsArray[i].on_curve) { int2 m=(P[prev]+P[i])/2; curve(raster, p, P[prev], m); p=m; } //off-off
                 prev=i;
             }
         }
     } else {
-        numContours = -numContours;
-        for(int i=0;i<numContours;i++) {
+        for(bool more=true;more;) {
             struct Flags{ uint16 instructions:1, metrics:1, overlap:1, pad:5, word:1, offset:1, round:1, uniform:1, zero:1, more:1, scale:1, affine:1; };
-            Flags unused flags = s.read<Flags>();
+            Flags unused flags = s.read<Flags>(); more=flags.more;
             uint16 glyphIndex=s.read();
             int dx,dy;
             /**/ if(flags.word && flags.offset) dx=(int16)s.read(), dy=(int16)s.read();
@@ -199,7 +201,7 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
             else if(flags.word && !flags.offset) dx=(uint16)s.read(), dy=(uint16)s.read();
             else if(!flags.word && !flags.offset) dx=(uint8)s.read(), dy=(uint8)s.read();
             uint16 xx=16384,xy=0,yx=0,yy=16384; //signed 1.14
-            if(flags.uniform) xx=yy = s.read();
+            if(flags.uniform) xx=yy= s.read();
             else if (flags.scale) xx=s.read(), yy=s.read();
             else if (flags.affine) xx=s.read(), xy=s.read(), yx=s.read(), yy=s.read();
             render(raster,glyphIndex,xMin,xMax,yMin,yMax,xx,xy,yx,yy,dx,dy);
@@ -213,33 +215,52 @@ Glyph Font::glyph(uint16 code) {
     if(glyph.image || glyph.advance) return Glyph(glyph);
 
     // map unicode to glyf outline
-    int index = Font::index(code);
+    uint16 index = glyph.index = Font::index(code);
     glyph.advance = scale(swap16(hmtx[2*index]));
     Image<int8> raster; int16 xMin,xMax,yMin,yMax;
-    render(raster,index,xMin,xMax,yMin,yMax,16384,0,0,16384,0,0);
+    render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
     if(!raster) return Glyph(glyph);
-    int width=raster.width,height=raster.height;
+    glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
 
+    int width=raster.width,height=raster.height;
+#if 0
+    glyph.image = Image<uint8>(width,height);
+    for(int y=0; y<height; y++) {
+        int acc=0;
+        for(int x=0; x<width; x++) {
+            glyph.image(x,y) = 128+raster(x,y)*63+acc*31;
+            acc += raster(x,y);
+        }
+    }
+    glyph.advance *= 16; glyph.offset=glyph.offset*16;
+#elif 0
+    glyph.image = Image<uint8>(width*2,height*2);
+    for(int y=0; y<height; y++) {
+        int acc=0;
+        for(int x=0; x<width; x++) {
+            glyph.image(x*2,y*2) = glyph.image(x*2+1,y*2)= glyph.image(x*2,y*2+1)= glyph.image(x*2+1,y*2+1)= 128+raster(x,y)*63+acc*31;
+            acc += raster(x,y);
+        }
+    }
+    glyph.advance *= 32; glyph.offset=glyph.offset*32;
+#else
     /// Rasterizes edge flags
-    int8 buffer[width*height];
-    Image<int8> bitmap(buffer,width,height,width,false,false);
     for(int y=0; y<height; y++) {
         int acc=0;
         for(int x=0; x<width; x++) {
             acc += raster(x,y);
-            bitmap(x,y) = acc>0; //TODO: alpha blit
+            raster(x,y) = acc>0;
         }
     }
-
-    /// Resolves supersampling
+    /// Resolves supersampling (TODO: directly rasterize 16 parallel lines in target)
     glyph.image = Image<uint8>(width/16,height/16);
     for(int y=0; y<height/16; y++) {
         for(int x=0; x<width/16; x++) {
             int acc=0;
-            for(int j=0; j<16; j++) for(int i=0; i<16; i++) acc += bitmap(x*16+i,y*16+j);
-            glyph.image(x,y) = acc? 256-acc : 255; //TODO: alpha blitnt16)
+            for(int j=0; j<16; j++) for(int i=0; i<16; i++) acc += raster(x*16+i,y*16+j);
+            glyph.image(x,y) = acc<255 ? 255-acc : 0;
         }
     }
-    glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
+#endif
     return Glyph(glyph);
 }

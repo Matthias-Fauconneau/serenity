@@ -16,6 +16,7 @@ SRCS_desktop += png inflate jpeg ico
 SRCS_taskbar += png inflate
 SRCS_player += png inflate
 SRCS_music += png inflate
+SRCS_test += png inflate
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button
