@@ -1,4 +1,4 @@
-font: subpixel position, chroma subpixel filtering, autohinting
+font: chroma subpixel filtering, autohinting
 feeds: check text main content, left arrow=previous entry, preload image, progressive image, status, own inflate, own jpeg, better html
 music: update, raw midi
 apps: text editor, file manager, pdf, wiki, search, irc, imap (ssl)

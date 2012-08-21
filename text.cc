@@ -40,8 +40,9 @@ struct TextLayout {
         static map<int,Font> defaultSans;
         if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
         Font* font = &defaultSans.at(size);
-        spaceAdvance = font->glyph(' ').advance;
-        uint previous=' ';
+        uint16 spaceIndex = font->index(' ');
+        spaceAdvance = font->glyph(spaceIndex).advance;
+        uint16 previous=spaceIndex;
         Format format=Format::Regular;
         Text::Link link;
         uint underlineBegin=0;
@@ -50,7 +51,7 @@ struct TextLayout {
         for(utf8_iterator it=text.begin();it!=text.end();++it) {
             uint c = *it;
             if(c==' '||c=='\t'||c=='\n') {//next word/line
-                if(c==' ') previous = c;
+                if(c==' ') previous = spaceIndex;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
                 int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+spaceAdvance;
                 length += word.last().pos.x+(word.last().glyph.image.width<<4); //last word
@@ -102,9 +103,10 @@ struct TextLayout {
                 }
                 continue;
             }
-            Glyph glyph = font->glyph(c);
-            pen.x += font->kerning(previous,glyph.index);
-            previous = glyph.index;
+            uint16 index = font->index(c);
+            pen.x += font->kerning(previous,index);
+            Glyph glyph = font->glyph(index,pen.x);
+            previous = index;
             if(glyph.image) word << Character __(int2(pen.x,0)+glyph.offset, move(glyph)); glyphCount++;
             pen.x += glyph.advance;
         }
@@ -124,7 +126,7 @@ struct TextLayout {
 Text::Text(string&& text, int size, ubyte opacity/*, uint wrap*/) : text(move(text)), size(size), opacity(opacity), wrap(0), textSize(0) {}
 void Text::layout() {
     TextLayout layout(text, size, wrap);
-    blits.clear(); for(const TextLayout::Character& c: layout.text) blits << Blit __(int2((c.pos.x+8)>>4, (c.pos.y+8)>>4), share(c.glyph.image));
+    blits.clear(); for(const TextLayout::Character& c: layout.text) blits << Blit __(int2(c.pos.x>>4, c.pos.y>>4), share(c.glyph.image));
     lines = move(layout.lines); links = move(layout.links);
     textSize=int2(0,0); for(const Blit& c: blits) textSize=max(textSize,int2(c.pos)+c.image.size()); textSize.y=max(textSize.y, size);
 }

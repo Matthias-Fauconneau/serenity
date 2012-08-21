@@ -1,8 +1,15 @@
 #include "font.h"
 
+/// Gamma correction
+static uint8 gamma[257];
+#define pow __builtin_pow
+inline float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4f)-0.055; else return 12.92*c; }
+inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(255*sRGB(i/255.))); return true; }
+
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 
 Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
+    static bool unused once = computeGammaLookup();
     DataStream s = DataStream::byReference(keep, true);
     uint32 unused scaler=s.read();
     uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
@@ -130,8 +137,8 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
     int16 numContours = s.read();
     if(!raster) {
         xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
-        xMin  = unscale(floor(16,scale(xMin))); yMin = unscale(floor(16,scale(yMin))); //round down to pixel
-        xMax = unscale(ceil(16,scale(xMax))); yMax = unscale(ceil(16,scale(yMax))); //round up to pixel
+        //xMin  = unscale(floor(16,scale(xMin))); xMax = unscale(ceil(16,scale(xMax))); //keep horizontal subpixel accuracy
+        yMin = unscale(floor(16,scale(yMin))); yMax = unscale(ceil(16,scale(yMax))); //align canvas to integer pixels
 
         int width=scale(xMax-xMin), height=scale(yMax-yMin);
         raster = Image<int8>(width+1,height+1); clear((byte*)raster.data,raster.height*raster.stride);
@@ -209,13 +216,12 @@ void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int1
     }
 }
 
-Glyph Font::glyph(uint16 code) {
+Glyph Font::glyph(uint16 index, int fx) { //fx=0;
     // Lookup glyph in cache
-    Glyph& glyph = code<256 ? cacheASCII[code] : cacheUnicode[code];
+    Glyph& glyph = index<256 ? cacheASCII[fx%16][index] : cacheUnicode[fx%16][index];
     if(glyph.image || glyph.advance) return Glyph(glyph);
 
     // map unicode to glyf outline
-    uint16 index = glyph.index = Font::index(code);
     glyph.advance = scale(swap16(hmtx[2*index]));
     Image<int8> raster; int16 xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
@@ -233,16 +239,6 @@ Glyph Font::glyph(uint16 code) {
         }
     }
     glyph.advance *= 16; glyph.offset=glyph.offset*16;
-#elif 0
-    glyph.image = Image<uint8>(width*2,height*2);
-    for(int y=0; y<height; y++) {
-        int acc=0;
-        for(int x=0; x<width; x++) {
-            glyph.image(x*2,y*2) = glyph.image(x*2+1,y*2)= glyph.image(x*2,y*2+1)= glyph.image(x*2+1,y*2+1)= 128+raster(x,y)*63+acc*31;
-            acc += raster(x,y);
-        }
-    }
-    glyph.advance *= 32; glyph.offset=glyph.offset*32;
 #else
     /// Rasterizes edge flags
     for(int y=0; y<height; y++) {
@@ -253,13 +249,15 @@ Glyph Font::glyph(uint16 code) {
         }
     }
     /// Resolves supersampling (TODO: directly rasterize 16 parallel lines in target)
-    glyph.image = Image<uint8>(width/16,height/16);
-    for(int y=0; y<height/16; y++) {
-        for(int x=0; x<width/16; x++) {
-            int acc=0;
-            for(int j=0; j<16; j++) for(int i=0; i<16; i++) acc += raster(x*16+i,y*16+j);
-            glyph.image(x,y) = acc<255 ? 255-acc : 0;
+    glyph.image = Image<uint8>(ceil(16,width)/16+1,height/16);
+    for(uint y=0; y<glyph.image.height; y++) for(uint x=0; x<glyph.image.width; x++) {
+        int acc=0;
+        for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
+            int sx=x*16+i-fx%16;
+            if(sx>0 && sx<(int)raster.width) acc += raster(x*16+i-fx%16,y*16+j);
         }
+        glyph.image(x,y) = acc<255 ? 255-gamma[acc] : 0;
+        //glyph.image(x,y) = acc<255 ? 255-acc : 0;
     }
 #endif
     return Glyph(glyph);
