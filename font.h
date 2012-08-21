@@ -8,7 +8,7 @@
 struct Glyph {
     int2 offset; // (left bearing, min.y-baseline) (in .4)
     int advance=0; //in .4
-    Image<byte4> image; //not owned
+    Image image; //not owned
     Glyph(){}
     Glyph(Glyph&& o)____(=default);
     Glyph(const Glyph& o):offset(o.offset),advance(o.advance),image(share(o.image)){}
@@ -34,5 +34,5 @@ struct Font {
     /// \a x fractional part is used to return subpixel positionned images
     Glyph glyph(uint16 index, int x=0);
 private:
-    void render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
+    void render(struct Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 };

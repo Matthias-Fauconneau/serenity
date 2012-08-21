@@ -14,7 +14,7 @@ Widget* drag;
 namespace Shm { int EXT, event, error; } using namespace Shm;
 namespace Render { int EXT, event, error; } using namespace Render;
 
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image<byte4>& icon)
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon)
     : widget(widget), overrideRedirect(title.size?false:true), x(socket(PF_LOCAL, SOCK_STREAM, 0)) {
     // Setups X connection
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
@@ -93,8 +93,8 @@ void Window::event(const pollfd& poll) {
                 shmctl(shm, IPC_RMID, 0);
             }
             buffer.stride=buffer.width=size.x, buffer.height=size.y;
-            shm = check( shmget(IPC_NEW, sizeof(pixel)*buffer.width*buffer.height , IPC_CREAT | 0777) );
-            buffer.data = (pixel*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+            shm = check( shmget(IPC_NEW, sizeof(byte4)*buffer.width*buffer.height , IPC_CREAT | 0777) );
+            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; write(x, raw(r));}
         }
         framebuffer = share(buffer);
@@ -270,7 +270,7 @@ void Window::setTitle(const ref<byte>& title) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
     r.length=title.size; r.size+=align(4, r.length)/4; write(x,string(raw(r)+title+pad(4,title.size)));
 }
-void Window::setIcon(const Image<byte4>& icon) {
+void Window::setIcon(const Image& icon) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
     r.length=2+icon.width*icon.height; r.size+=r.length; write(x,string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }
@@ -298,7 +298,7 @@ ICON(fdiagonal)
 ICON(bdiagonal)
 ICON(move)
 
-const Image<byte4>& Window::cursorIcon(Window::Cursor cursor) {
+const Image& Window::cursorIcon(Window::Cursor cursor) {
     if(cursor==Arrow) return arrowIcon();
     if(cursor==Horizontal) return horizontalIcon();
     if(cursor==Vertical) return verticalIcon();
@@ -319,8 +319,8 @@ int2 Window::cursorHotspot(Window::Cursor cursor) {
 
 void Window::setCursor(Cursor cursor) {
     if(cursor==this->cursor) return; this->cursor=cursor;
-    const Image<byte4>& image = cursorIcon(cursor); int2 hotspot = cursorHotspot(cursor);
-    Image<byte4> premultiplied(image.width,image.height);
+    const Image& image = cursorIcon(cursor); int2 hotspot = cursorHotspot(cursor);
+    Image premultiplied(image.width,image.height);
     for(uint y=0;y<image.height;y++) for(uint x=0;x<image.height;x++) {
         byte4 p=image(x,y); premultiplied(x,y)=byte4(p.b*p.a/255,p.g*p.a/255,p.r*p.a/255,p.a);
     }

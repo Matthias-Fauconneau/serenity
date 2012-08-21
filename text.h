@@ -41,7 +41,7 @@ struct Text : Widget {
     int2 textSize;
 
     // laid out glyphs to blit
-    struct Blit { int2 pos; Image<uint8> image; };
+    struct Blit { int2 pos; Image image; };
     array<Blit> blits;
     struct Line { int2 min,max; };
     array<Line> lines;

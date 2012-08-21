@@ -15,7 +15,7 @@ struct Window : Poll {
 
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image<byte4>& icon=Image<byte4>());
+    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image());
 
     struct QEvent { uint8 type; Event event; } packed;
     array<QEvent> queue;
@@ -56,7 +56,7 @@ struct Window : Poll {
     /// Sets window title to \a title
     void setTitle(const ref<byte>& title);
     /// Sets window icon to \a icon
-    void setIcon(const Image<byte4>& icon);
+    void setIcon(const Image& icon);
 
     /// Registers local shortcut on \a key
     signal<>& localShortcut(Key);
@@ -69,7 +69,7 @@ struct Window : Poll {
 
     enum Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move } cursor=Arrow;
     /// Returns cursor icon for \a cursor
-    const Image<byte4>& cursorIcon(Cursor cursor);
+    const Image& cursorIcon(Cursor cursor);
     /// Returns cursor hotspot for \a cursor
     int2 cursorHotspot(Window::Cursor cursor);
     /// Sets window cursor
@@ -99,7 +99,7 @@ struct Window : Poll {
     /// System V shared memory
     int shm = 0;
     /// Shared window back buffer
-    Image<byte4> buffer;
+    Image buffer;
     /// Shared window buffer state
     enum { Idle, Server, Wait } state = Idle;
 

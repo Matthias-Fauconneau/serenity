@@ -94,8 +94,10 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     return 0;
 }
 
+struct Bitmap { int8* data; uint w,h; int8& operator()(uint x, uint y){assert(x<w && y<h); return data[y*w+x];} };
+
 static int lastStepY; //dont flag first/last point twice but cancel on direction changes
-void line(Image<int8>& raster, int2 p0, int2 p1) {
+void line(Bitmap& raster, int2 p0, int2 p1) {
     int x0=p0.x, y0=p0.y, x1=p1.x, y1=p1.y;
     if(y0==y1) return;
     int dx = abs(x1-x0);
@@ -113,7 +115,7 @@ void line(Image<int8>& raster, int2 p0, int2 p1) {
     lastStepY=sy;
 }
 
-void curve(Image<int8>& raster, int2 p0, int2 p1, int2 p2) {
+void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
     const int N=3;
     int2 a = p0;
     for(int t=1;t<=N;t++) {
@@ -128,21 +130,20 @@ int truncate(int width, uint value) { return value/width*width; }
 int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
 int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
 
-void Font::render(Image<int8>& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {
+void Font::render(Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy) {
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
     DataStream s=DataStream::byReference(ref<byte>(glyf +start, length), true);
     if(!s) return;
 
     int16 numContours = s.read();
-    if(!raster) {
+    if(!raster.data) {
         xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
         //xMin  = unscale(floor(16,scale(xMin))); xMax = unscale(ceil(16,scale(xMax))); //keep horizontal subpixel accuracy
         yMin = unscale(floor(16,scale(yMin))); yMax = unscale(ceil(16,scale(yMax))); //align canvas to integer pixels
 
         int width=scale(xMax-xMin), height=scale(yMax-yMin);
-        raster = Image<int8>(width+1,height+1); clear((byte*)raster.data,raster.height*raster.stride);
-        assert(raster);
+        raster.data = allocate<int8>((raster.w=width+1)*(raster.h=height+1)); clear((byte*)raster.data,raster.h*raster.w);
     } else s.advance(4*2); //TODO: resize as needed
 
     if(numContours>0) {
@@ -223,12 +224,12 @@ Glyph Font::glyph(uint16 index, int fx) { //fx=0;
 
     // map unicode to glyf outline
     glyph.advance = scale(swap16(hmtx[2*index]));
-    Image<int8> raster; int16 xMin,xMax,yMin,yMax;
+    Bitmap raster; int16 xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
-    if(!raster) return Glyph(glyph);
+    if(!raster.data) return Glyph(glyph);
     glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
 
-    int width=raster.width,height=raster.height;
+    int width=raster.w,height=raster.h;
 #if 0
     glyph.image = Image<uint8>(width,height);
     for(int y=0; y<height; y++) {
@@ -249,15 +250,15 @@ Glyph Font::glyph(uint16 index, int fx) { //fx=0;
         }
     }
     /// Resolves supersampling (TODO: directly rasterize 16 parallel lines in target)
-    glyph.image = Image<uint8>(ceil(16,width)/16+1,height/16);
+    glyph.image = Image(ceil(16,width)/16+1,height/16);
     for(uint y=0; y<glyph.image.height; y++) for(uint x=0; x<glyph.image.width; x++) {
         int acc=0;
         for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
             int sx=x*16+i-fx%16;
-            if(sx>0 && sx<(int)raster.width) acc += raster(x*16+i-fx%16,y*16+j);
+            if(sx>0 && sx<(int)raster.w) acc += raster(x*16+i-fx%16,y*16+j);
         }
-        glyph.image(x,y) = acc<255 ? 255-gamma[acc] : 0;
-        //glyph.image(x,y) = acc<255 ? 255-acc : 0;
+        int v = acc<255 ? 255-gamma[acc] : 0;
+        glyph.image(x,y) = byte4(v,v,v,255);
     }
 #endif
     return Glyph(glyph);
