@@ -96,7 +96,12 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     return 0;
 }
 
-struct Bitmap { int8* data=0; uint w=0,h=0; int8& operator()(uint x, uint y){assert(x<w && y<h); return data[y*w+x];} };
+struct Bitmap {
+    int8* data; uint width,height;
+    Bitmap():data(0),width(0),height(0){}
+    Bitmap(uint width,uint height):data(allocate<int8>(width*height)),width(width),height(height){clear((byte*)data,height*width);}
+    int8& operator()(uint x, uint y){assert(x<width && y<height); return data[y*width+x];}
+};
 
 static int lastStepY; //dont flag first/last point twice but cancel on direction changes
 void line(Bitmap& raster, int2 p0, int2 p1) {
@@ -145,7 +150,7 @@ void Font::render(Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yM
         yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
         int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin);
-        raster.data = allocate<int8>((raster.w=width+1)*(raster.h=height+1)); clear((byte*)raster.data,raster.h*raster.w);
+        raster = Bitmap(width+1,height+1);
     } else s.advance(4*2); //TODO: resize as needed
 
     if(numContours>0) {
@@ -231,7 +236,7 @@ Glyph Font::glyph(uint16 index, int fx) { //fx=0;
     if(!raster.data) return Glyph(glyph);
     glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
 
-    int width=raster.w,height=raster.h;
+    int width=raster.width,height=raster.height;
 #if 0
     glyph.image = Image<uint8>(width,height);
     for(int y=0; y<height; y++) {
@@ -252,17 +257,26 @@ Glyph Font::glyph(uint16 index, int fx) { //fx=0;
         }
     }
     /// Resolves supersampling (TODO: directly rasterize 16 parallel lines in target)
-    glyph.image = Image(ceil(48,width)/48+1,height/16);
+    Bitmap subpixel(ceil(16,width)/16+1,height/16);
     for(uint y=0; y<glyph.image.height; y++) for(uint x=0; x<glyph.image.width; x++) {
         int r=0,g=0,b=0;
         for(int j=0; j<16; j++) {
-#define acc(c) { int sx=x*48+i-fx%16; if(sx>0 && sx<(int)raster.w) c += raster(x*48+i-fx%16,y*16+j); }
+#define acc(c) { int sx=x*48+i-fx%16; if(sx>0 && sx<(int)raster.width) c += raster(x*48+i-fx%16,y*16+j); }
             for(int i=0; i<16; i++) acc(r)
             for(int i=16; i<32; i++) acc(g)
             for(int i=32; i<48; i++) acc(b)
 #undef acc
         }
-        glyph.image(x,y) = byte4(255-gamma[b],255-gamma[g],255-gamma[r],255);
+        subpixel(x,y) = byte4(255-gamma[b],255-gamma[g],255-gamma[r],255);
+    }
+    glyph.image = Image(ceil(48,width)/48+1,height/16);
+    for(uint y=0; y<glyph.image.height; y++) {
+        for(uint x=0; x<glyph.image.width; x++) {
+            uint8 filter[5] = {1, 4, 6, 4, 1};
+            int r=0,g=0,b=0;
+            for(int i=0;i<5;i++) if(x+i-2>0 && x+i-2<glyph.image.width) sum+=filter[i]*line[x+i-2,y];
+            glyph.image(x,y) = byte4(sum/16);
+        }
     }
 #endif
     unallocate(raster.data,raster.w*raster.h);
