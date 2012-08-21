@@ -31,7 +31,9 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
        s.advance(8+8+4*2+2+2+2); //created, modified, bbox[4], maxStyle, lowestRec, direction
        indexToLocFormat=s.read();
        // parameters for scale from design (FUnits) to device (.4 pixel)
-#define scale(p) ((size*int64(p)+round)>>scale)
+#define scaleX(p) ((3*size*int64(p)+round)>>scale)
+#define scaleY(p) ((size*int64(p)+round)>>scale)
+#define scale(p) scaleY(p)
 #define unscale(p) (((p)<<scale)/size)
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4;
        round = (1<<scale)/2; //round to nearest not down
@@ -94,7 +96,7 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     return 0;
 }
 
-struct Bitmap { int8* data; uint w,h; int8& operator()(uint x, uint y){assert(x<w && y<h); return data[y*w+x];} };
+struct Bitmap { int8* data=0; uint w=0,h=0; int8& operator()(uint x, uint y){assert(x<w && y<h); return data[y*w+x];} };
 
 static int lastStepY; //dont flag first/last point twice but cancel on direction changes
 void line(Bitmap& raster, int2 p0, int2 p1) {
@@ -140,9 +142,9 @@ void Font::render(Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yM
     if(!raster.data) {
         xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
         //xMin  = unscale(floor(16,scale(xMin))); xMax = unscale(ceil(16,scale(xMax))); //keep horizontal subpixel accuracy
-        yMin = unscale(floor(16,scale(yMin))); yMax = unscale(ceil(16,scale(yMax))); //align canvas to integer pixels
+        yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
-        int width=scale(xMax-xMin), height=scale(yMax-yMin);
+        int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin);
         raster.data = allocate<int8>((raster.w=width+1)*(raster.h=height+1)); clear((byte*)raster.data,raster.h*raster.w);
     } else s.advance(4*2); //TODO: resize as needed
 
@@ -179,8 +181,8 @@ void Font::render(Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yM
             P[i].y= -last; //flip to downward y
         }
         for(int i=0;i<nofPoints;i++) { int2& p=P[i];
-            p.x=scale(xx*p.x/16384+yx*p.y/16384+dx);
-            p.y=scale(xy*p.x/16384+yy*p.y/16384+dy);
+            p.x=scaleX(xx*p.x/16384+yx*p.y/16384+dx);
+            p.y=scaleY(xy*p.x/16384+yy*p.y/16384+dy);
         }
 
         for(int n=0,i=0; n<numContours; n++) {
@@ -250,16 +252,19 @@ Glyph Font::glyph(uint16 index, int fx) { //fx=0;
         }
     }
     /// Resolves supersampling (TODO: directly rasterize 16 parallel lines in target)
-    glyph.image = Image(ceil(16,width)/16+1,height/16);
+    glyph.image = Image(ceil(48,width)/48+1,height/16);
     for(uint y=0; y<glyph.image.height; y++) for(uint x=0; x<glyph.image.width; x++) {
-        int acc=0;
-        for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
-            int sx=x*16+i-fx%16;
-            if(sx>0 && sx<(int)raster.w) acc += raster(x*16+i-fx%16,y*16+j);
+        int r=0,g=0,b=0;
+        for(int j=0; j<16; j++) {
+#define acc(c) { int sx=x*48+i-fx%16; if(sx>0 && sx<(int)raster.w) c += raster(x*48+i-fx%16,y*16+j); }
+            for(int i=0; i<16; i++) acc(r)
+            for(int i=16; i<32; i++) acc(g)
+            for(int i=32; i<48; i++) acc(b)
+#undef acc
         }
-        int v = acc<255 ? 255-gamma[acc] : 0;
-        glyph.image(x,y) = byte4(v,v,v,255);
+        glyph.image(x,y) = byte4(255-gamma[b],255-gamma[g],255-gamma[r],255);
     }
 #endif
+    unallocate(raster.data,raster.w*raster.h);
     return Glyph(glyph);
 }
