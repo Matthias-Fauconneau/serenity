@@ -5,9 +5,9 @@
 
 /// Asynchronously load an image, sending a signal if the image was not cached
 struct ImageLoader : signal<> {
-    ImageLoader(const URL& url, Image<byte4>* target, signal<>* imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
+    ImageLoader(const URL& url, Image* target, signal<>* imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
     /// Reference to target to load (need to stay valid)
-    Image<byte4>* target;
+    Image* target;
     /// Reference to a signal to trigger on load if the image was not cached.
     signal<>* imageLoaded=0;
     /// Preferred size
@@ -32,7 +32,7 @@ struct HTML : VBox {
 
     int2 sizeHint() override { int2 hint=VBox::sizeHint(); return int2(hint.x,hint.y); }
 
-    void layout(const URL& url, const Element& e);
+    void parse(const URL& url, const Element& e);
     void flushText();
     void flushImages();
 

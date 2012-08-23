@@ -17,12 +17,11 @@ struct Month : Grid<Text> {
 };
 
 /// Calendar shows current date, month grid and events
-struct Calendar {
-    HList<Text> date __(array<Text>{string( "<"_), string(""_), string(">"_)});
+struct Calendar : VBox {
+    HList<Text> date;// __(array<Text>{string( "<"_), string(""_), string(">"_)});
     Month month;
     Text events;
     signal<> eventAlarm;
-    VBox layout __(&date, &month, &events);
     Calendar();
     /// Resets calendar to today
     void reset();

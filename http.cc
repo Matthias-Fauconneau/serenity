@@ -6,6 +6,7 @@
 #include "map.h"
 #include "memory.h"
 #include "debug.h"
+#include "process.h"
 
 /// Socket
 
@@ -16,7 +17,7 @@ uint32 ip(TextStream& s) {
 
 bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
     disconnect();
-    static File dnsCache = appendFile("cache/dns"_);
+    static File dnsCache = appendFile(string(getenv("HOME"_)+"/.cache/dns"_));
     static Map dnsMap = mapFile(dnsCache);
     uint ip=-1;
     for(TextStream s=TextStream::byReference(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
@@ -50,8 +51,8 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
             if(type!=1) { s.advance(size); continue; }
             assert(type=1/*A*/); assert(class_==1/*INET*/);
             ip = s.read<uint>(); //IP (no swap)
-            string entry = host+" "_+str(raw(ip),"."_)+"\n"_;
-            log(str(raw(ip),"."_));
+            string entry = host+" "_+dec(raw(ip),'.')+"\n"_;
+            log(dec(raw(ip),'.'));
             ::write(dnsCache,entry); // add new entry
             dnsMap = mapFile(dnsCache); //remap cache
             break;
@@ -145,7 +146,7 @@ string str(const URL& url) {
 
 int cache;
 string cacheFile(const URL& url) {
-    if(!cache) cache=openFolder("cache"_);
+    if(!cache) cache=openFolder(string(getenv("HOME"_)+"/.cache"_),root(),true);
     string name = replace(url.path,"/"_,"."_);
     if(!name || name=="."_) name=string("index.htm"_);
     assert(!url.host.contains('/'));
@@ -156,7 +157,7 @@ HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, ar
     : url(str(url)), headers(move(headers)), method(method), handler(handler) {
     debug( log("Request",url); )
     if(!connect(url.host, url.scheme)) { free(this); return; }
-    registerPoll(__(fd, POLLIN|POLLOUT));
+    registerPoll(Socket::fd, POLLIN|POLLOUT);
 }
 void HTTP::request() {
     state=Request;
@@ -174,7 +175,7 @@ void HTTP::header() {
     until("\r\n"_);
     if(status==200||status==301||status==302) {}
     else if(status==304) { //Not Modified
-        assert(exists(file,cache));
+        assert(existsFile(file,cache));
         content = readFile(file,cache);
         assert(content);
         writeFile(file,content,cache); //TODO: touch instead of rewriting
@@ -206,18 +207,19 @@ void HTTP::header() {
             redirect << file;
             buffer.clear(); index=0; contentLength=0; chunked=false; unregisterPoll(); disconnect(); state=Connect;
             url=move(next);
-            if(!connect(url.host, url.scheme)) free(this); else registerPoll(__(fd, POLLIN|POLLOUT));
+            if(!connect(url.host, url.scheme)) { free(this); return; }
+            registerPoll(Socket::fd, POLLIN|POLLOUT);
             return;
         } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }
     state = Data;
 }
-void HTTP::event(const pollfd& poll) {
-    assert(fd); assert(state>=Connect && state <=Done, int(state));
-    if(poll.revents&POLLHUP) { log("Connection broken",poll.revents&POLLIN,url); state=Done; free(this); return; }
+void HTTP::event() {
+    assert(Socket::fd); assert(state>=Connect && state <=Done, int(state));
+    if(revents&POLLHUP) { log("Connection broken",revents&POLLIN,url); state=Done; free(this); return; }
     if(state == Connect) {
-        if(!poll.revents) { log("Connection timeout",url); state=Done; free(this); return; }
-        fcntl(fd,F_SETFL,0);
+        if(!revents) { log("Connection timeout",url); state=Done; free(this); return; }
+        fcntl(Socket::fd,F_SETFL,0);
         request();
         return;
     }
@@ -245,10 +247,10 @@ void HTTP::event(const pollfd& poll) {
 
         redirect << cacheFile(url);
         for(const string& file: redirect) {
-            if(!exists(section(file,'/'),cache)) createFolder(section(file,'/'),cache);
+            openFolder(section(file,'/'),cache,true);
             writeFile(file,content,cache);
         }
-        state=Handle; //wait(); return;  //Cache other outstanding requests before handling this one
+        state=Handle; wait(); return;  //Cache other outstanding requests before handling this one
     }
     if(state==Handle) {
         handler(url,move(content));
@@ -263,7 +265,7 @@ void getURL(const URL &url, function<void(const URL&, array<byte>&&)> handler, i
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;
     // Check if cached
-    if(exists(file,cache)) {
+    if(existsFile(file,cache)) {
         long modified = modifiedTime(file,cache);
         if(currentTime()-modified < maximumAge*60) {
             debug( log("Cached",url); )

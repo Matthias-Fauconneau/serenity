@@ -1,22 +1,23 @@
 #pragma once
 #include "array.h"
 
-/// Poll is an interface for objects needing to participate in event handling
-struct Poll {
-    no_copy(Poll)
-    Poll(){}
-    /// Add this to the process-wide event loop
-    /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
-    void registerPoll(const struct pollfd&);
-    /// Remove this from the process-wide event loop
-    void unregisterPoll();
-    /// Remove an fd from the process-wide event loop
-    static void unregisterPoll(int fd);
-    /// Wait for all outstanding poll events to be processed before calling \a event again
-    void wait();
+struct pollfd { int fd; short events, revents; };
+enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64};
+
+/// Poll is a convenient interface to participate in the process-wide event loop
+struct Poll : pollfd {
+    no_copy(Poll) Poll(){fd=events=revents=0;}
     virtual ~Poll() { unregisterPoll(); }
-    /// Callback on new events
-    virtual void event(const struct pollfd&) =0;
+    /// Registers this file descriptor to be polled in the process-wide event loop
+    /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
+    void registerPoll(int fd, short events=POLLIN);
+    void registerPoll(short events=POLLIN);
+    /// Removes this file descriptor from the process-wide event poll loop
+    void unregisterPoll();
+    /// Schedules an \a event call after all process-wide outstanding poll events have beem processed
+    void wait();
+    /// Callback on new poll events (or after a \a wait)
+    virtual void event() =0;
 };
 
 /// Dispatches events to registered Poll objects

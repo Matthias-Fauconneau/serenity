@@ -43,30 +43,24 @@ void init() {
     //rlimit limit = {2<<20,2<<20}; setrlimit(RLIMIT_STACK,&limit); //2 MB
 }
 
-//FIXME: parallel arrays is bad for realloc TODO: global {Poll*,pollfd}[] and stack pollfd[] for poll()
 static array<Poll*> polls;
-static array<pollfd> pollfds;
-void Poll::registerPoll(const pollfd& fd) { polls << this; pollfds << fd; }
-static Poll* lastUnregistered; //for correct looping
-void Poll::unregisterPoll() { for(int i;(i=polls.removeOne(this))>=0;) pollfds.removeAt(i); lastUnregistered=this; }
-bool operator ==(pollfd a, pollfd b) { return a.fd==b.fd; }
-void Poll::unregisterPoll(int fd) { int i=pollfds.removeOne(__(fd)); if(i>=0) polls.removeAt(i); }
+void Poll::registerPoll(int fd, short events) { if(this->fd!=0) unregisterPoll(); this->fd=fd; this->events=events; polls << this; }
+void Poll::registerPoll(short events) { registerPoll(fd,events); }
+static bool inLoop;
+void Poll::unregisterPoll() { assert(!inLoop,"unregister within dispatch unsupported. use wait()"); polls.removeAll(this); }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
 
 int dispatchEvents() {
     if(!polls) return 0;
-    while(queue) queue.takeFirst()->event(__());
-    ::poll((pollfd*)pollfds.data(),polls.size(),-1);
-    for(uint i=0;i<polls.size();i++) {
-        int events = pollfds[i].revents;
-        if(events) {
-            lastUnregistered=0;
-            polls[i]->event(pollfds[i]);
-            if(i==polls.size() || polls[i]==lastUnregistered) i--;
-            else if(events&POLLHUP) { log("POLLHUP"); polls.removeAt(i); pollfds.removeAt(i); i--; continue; }
-        }
-    }
+    while(queue){ Poll* poll=queue.takeFirst(); poll->revents=IDLE; poll->event(); }
+    uint size=polls.size();
+    pollfd pollfds[size]; for(uint i=0;i<size;i++) { pollfds[i]=*polls[i];  assert(polls[i]->fd==pollfds[i].fd); }
+    ::poll(pollfds,size,-1); inLoop=true;
+    for(uint i=0;i<size;i++) { assert(polls[i]->fd==pollfds[i].fd,polls[i]->fd,pollfds[i].fd);
+        int events = polls[i]->revents = pollfds[i].revents;
+        if(events) { polls[i]->event(); if(events&POLLHUP) { log("POLLHUP"); continue; } }
+    } inLoop=false;
     return polls.size();
 }
 

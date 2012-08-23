@@ -5,13 +5,12 @@
 #include "html.h"
 #include "interface.h"
 
-
 ICON(network)
 
-Feeds::Feeds() : config(openFolder("config"_)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
+Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),true)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
-    for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 12*60);
+    for(TextStream s(readFile("feeds"_,config));s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 12*60); }
 }
 
 bool Feeds::isRead(const ref<byte>& title, const ref<byte>& link) {
@@ -21,28 +20,26 @@ bool Feeds::isRead(const ref<byte>& title, const ref<byte>& link) {
     }
     return false;
 }
-bool Feeds::isRead(const Entry& entry) { return isRead(entry.get<Text>().text, entry.link); }
+bool Feeds::isRead(const Entry& entry) { return isRead(entry.text.text, entry.link); }
 
 void Feeds::loadFeed(const URL&, array<byte>&& document) {
     Element feed = parseXML(document);
-    //string link = feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]); //RSS ?: Atom //fails for GCC
-    string link = feed.text("rss/channel/link"_); if(!link) link = string(feed("feed"_)("link"_)["href"_]);
+    string link = feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]); //RSS ?: Atom
     string favicon = cacheFile(URL(link).relative("/favicon.ico"_));
-    if(exists(favicon,cache)) {
+    if(existsFile(favicon,cache)) {
         favicons.insert(link) = ::resize(decodeImage(readFile(favicon,cache)),16,16);
     } else {
         favicons.insert(link) = ::resize(networkIcon(),16,16);
         getURL(URL(link), Handler(this, &Feeds::getFavicon), 7*24*60);
     }
-    array<Entry> entries; int count=0;
-    auto addEntry = [this,&link,&count,&entries](const Element& e)->void{
+    array<Entry> entries; int count=0; int unreadCount=0;
+    auto addEntry = [this,&link,&count,&unreadCount,&entries](const Element& e)->void{
         if(count>=32) return; //avoid getting old unreads on feeds with big history
         if(array::size()+entries.size()>=30) return;
         string title = e("title"_).text(); //RSS&Atom
-        //string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS //fails for GCC
-        string url = unescape(e("link"_)["href"_]); if(!url) url = e("link"_).text(); //Atom ?: RSS
-        if(!isRead(title, url)) entries<< Entry(move(title),move(url),share(favicons.at(link)));
-        else if(count==0) entries<< Entry(Text(move(title),12),move(url),share(favicons.at(link))); //display at least one entry per feed
+        string url = unescape(e("link"_)["href"_]) ?: e("link"_).text(); //Atom ?: RSS
+        if(!isRead(title, url)) entries<< Entry(move(url),share(favicons.at(link)),move(title)); //display all unread entries
+        else if(count==0 || unreadCount==0) { unreadCount++; entries<< Entry(move(url),share(favicons.at(link)),move(title),12); } //also display last unread entry
         count++;
     };
     feed.xpath("feed/entry"_,addEntry); //Atom
@@ -62,7 +59,7 @@ void Feeds::getFavicon(const URL& url, array<byte>&& document) {
     }
     for(Entry& entry: *this) {
         if(find(entry.link,url.host)) {
-            alloc<ImageLoader>(url.relative(icon), &entry.get<Icon>().image, &listChanged, int2(16,16), 7*24*60*60);
+            alloc<ImageLoader>(url.relative(icon), &entry.icon.image, &listChanged, int2(16,16), 7*24*60*60);
             break; //only header
         }
     }
@@ -71,13 +68,13 @@ void Feeds::getFavicon(const URL& url, array<byte>&& document) {
 void Feeds::setRead(uint index) {
     Entry& entry = array::at(index);
     if(isRead(entry)) return;
-    ::write(readConfig,string(entry.get<Text>().text+" "_+entry.link+"\n"_));
+    ::write(readConfig,string(entry.text.text+" "_+entry.link+"\n"_));
     readMap = mapFile(readConfig); //remap
-    entry.get<Text>().setSize(12);
+    entry.text.setSize(12);
 }
 
 void Feeds::readEntry(uint index) {
-    pageChanged( array::at(index).link );
+    pageChanged( array::at(index).link, array::at(index).text.text, array::at(index).icon.image );
     if(index+1<count()) getURL(URL(array::at(index+1).link)); //preload next entry (TODO: preload image)
 }
 
@@ -90,6 +87,6 @@ void Feeds::readNext() {
             return;
         }
     }
-    clear(); favicons.clear(); for(TextStream s(readFile("feeds"_,config));s;) getURL(s.until('\n'), Handler(this, &Feeds::loadFeed), 24*60); //reload
-    pageChanged(""_); //return to desktop
+    clear(); favicons.clear(); for(TextStream s(readFile("feeds"_,config));s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 12*60); } //reload
+    pageChanged(""_,""_,Image()); //return to desktop
 }

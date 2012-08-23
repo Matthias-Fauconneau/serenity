@@ -4,16 +4,16 @@
 
 /// Returns events occuring on \a query date (-1=unspecified)
 array<string> getEvents(Date query) {
-    static int config = openFolder("config"_);
+    static int config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
     array<string> events;
-    if(!exists("events"_,config)) { /*warn("No events settings [config/events]");*/ return events; }
+    if(!existsFile("events"_,config)) { /*warn("No events settings [$HOME/.config/events]");*/ return events; }
 
     TextStream s = readFile("events"_,config);
     map<string, array<Date>> exceptions; //Exceptions for recurring events
     while(s) { //first parse all exceptions (may occur after recurrence definitions)
         if(s.match("except "_)) {
             Date except=parse(s); s.skip(); string title=string(s.until('\n'));
-            exceptions.insert(move(title),array<Date>__(except));
+            exceptions[move(title)] << except;
         } else s.until('\n');
     }
     s.index=0;
@@ -84,31 +84,23 @@ void Month::setActive(Date active) {
 void Month::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
 void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-Calendar::Calendar() {
+Calendar::Calendar()/*:VBox(__(&date, &month, &events))*/ { *this<<&date<<&month<<&events; date<<string( "<"_)<<string(""_)<<string(">"_);
     date.main=Linear::Spread;
     date[0].textClicked.connect(this, &Calendar::previousMonth);
     date[2].textClicked.connect(this, &Calendar::nextMonth);
     month.activeChanged.connect(this,&Calendar::showEvents);
     reset();
 }
-void Calendar::reset() {
-    date[1].setText(::str(month.active,"MMMM yyyy"_) ); month.setActive(::date());
-}
-void Calendar::previousMonth() {
-    month.previousMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) );
-    events.setText(string());
-}
-void Calendar::nextMonth() {
-    month.nextMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) );
-    events.setText(string());
-}
+void Calendar::reset() { month.setActive(::date());  date[1].setText(::str(month.active,"MMMM yyyy"_) ); }
+void Calendar::previousMonth() { month.previousMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
+void Calendar::nextMonth() { month.nextMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
 
 void Calendar::showEvents(uint index) {
     string text;
     Date date = month.dates[index];
     array<string> events = getEvents(date);
     if(events) {
-        text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date,"dddd, dd"))+format(Regular)+"\n"_);
+        text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date,"dddd, dd"_))+format(Regular)+"\n"_);
         text << join(events,"\n"_)+"\n"_;
     }
     if(index==month.todayIndex) {

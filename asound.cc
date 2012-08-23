@@ -80,12 +80,11 @@ void AudioOutput::start(bool realtime) {
 
     status = (Status*)mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset);
     control = (Control*)mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset);
-    registerPoll(__(fd,POLLOUT|POLLERR |POLLNVAL));
+    registerPoll(POLLOUT|POLLERR|POLLNVAL);
     ioctl(fd, IOCTL_PREPARE, 0);
 }
 void AudioOutput::stop() {
-    if(!fd) return;
-    unregisterPoll();
+    if(!fd) return; unregisterPoll();
     if(status->state == Running) ioctl(fd, IOCTL_DRAIN,0);
     munmap(status, 0x1000); status=0;
     munmap(control, 0x1000); control=0;

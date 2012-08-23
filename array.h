@@ -95,6 +95,8 @@ template<class T> struct array {
     operator ref<T>() const { return ref<T>(data(),size()); } //TODO: escape analysis
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
+    /// Compares to single value
+    bool operator ==(const T& value) const { return  (ref<T>)*this==value; }
 
     /// Accessors
     /// \note Use \a ref to avoid inline checking or \a data() to avoid bound checking in performance critical code
@@ -110,8 +112,6 @@ template<class T> struct array {
     /// Finds elements
     int indexOf(const T& value) const { return ref<T>(*this).indexOf(value); }
     bool contains(const T& value) const { return ref<T>(*this).contains(value); }
-    /*uint min() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)<at(best)) best=i; return best; }
-    uint max() const { uint best=0; for(uint i=0;i<size();i++) if(at(i)>at(best)) best=i; return best; }*/
 
     /// Appends elements
     array& operator <<(T&& e) { int s=size()+1; reserve(s); new (end()) T(move(e)); setSize(s); return *this; }
@@ -141,8 +141,6 @@ template<class T> struct array {
 
     /// Removes elements
     void removeAt(uint i) { at(i).~T(); for(;i<size()-1;i++) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); setSize(size()-1); }
-    void removeFirst() { removeAt(0); }
-    void removeLast() { removeAt((size()-1)); }
     T take(int i) { T value = move(at(i)); removeAt(i); return value; }
     T takeFirst() { return take(0); }
     T takeLast() { return take(size()-1); }

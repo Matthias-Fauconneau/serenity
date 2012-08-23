@@ -38,6 +38,6 @@ byte* allocate_(uint size) { lastFree=0;
     //return malloc(size); //aligned to 8-byte
     byte* buffer; posix_memalign(&buffer,16,size); return buffer;
 }
-byte* reallocate_(byte* buffer, int unused size, int need) { return realloc(buffer,need); }
+byte* reallocate_(byte* buffer, int unused size, int need) { lastFree=0; return realloc(buffer,need); }
 void unallocate_(byte* buffer, int unused size) { assert_(buffer); assert_(lastFree!=buffer); free(lastFree=buffer); }
 #endif

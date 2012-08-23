@@ -13,7 +13,7 @@ inline Format format(uint f) { assert_(f<32); return Format(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(string&& text=string(), int size=16, ubyte opacity=255/*, uint wrap=0*/);
+    Text(string&& text=string(), int size=16, ubyte opacity=255, uint wrap=0);
     Text(Text&&)____(=default);
 
     void setText(string&& text) { this->text=move(text); textSize=int2(0,0); }
@@ -37,16 +37,17 @@ struct Text : Widget {
     void render(int2 position, int2 size) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
-    // cache layout bounding box
-    int2 textSize;
+    // Layout bounding box
+    int2 textSize=int2(0,0);
 
-    // laid out glyphs to blit
-    struct Blit { int2 pos; Image image; };
-    array<Blit> blits;
+    // Characters to render
+    struct Character { int2 pos; Image image; };
+    array<Character> characters;
+    // Underlines and strikes
     struct Line { int2 min,max; };
     array<Line> lines;
 
-    // inline text links
+    // Inline links
     struct Link { uint begin,end; string identifier;};
     array<Link> links;
 };

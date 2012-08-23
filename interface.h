@@ -35,11 +35,11 @@ template<class T> struct Scroll : ScrollArea, T {
 /// ImageView is a widget displaying a static image
 struct ImageView : Widget {
     /// Displayed image
-    Image<byte4> image;
+    Image image;
 
     ImageView(){}
     /// Creates a widget displaying \a image
-    ImageView(Image<byte4>&& image):image(move(image)){}
+    ImageView(Image&& image):image(move(image)){}
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
@@ -49,7 +49,7 @@ typedef ImageView Icon;
 /// TriggerButton is a clickable Icon
 struct TriggerButton : Icon {
     TriggerButton(){}
-    TriggerButton(Image<byte4>&& image):Icon(move(image)){}
+    TriggerButton(Image&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
@@ -58,7 +58,7 @@ struct TriggerButton : Icon {
 /// ToggleButton is a togglable Icon
 struct ToggleButton : Widget {
     /// Creates a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(Image<byte4>&& enable, Image<byte4>&& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
+    ToggleButton(Image&& enable, Image&& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
     signal<bool /*state*/> toggled;
@@ -70,8 +70,8 @@ struct ToggleButton : Widget {
     void render(int2 position, int2 size) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
-    Image<byte4> enableIcon;
-    Image<byte4> disableIcon;
+    Image enableIcon;
+    Image disableIcon;
 };
 
 /// Slider is a Widget to show or control a bounded value
@@ -90,10 +90,45 @@ struct Slider : Widget {
     static const int height = 32;
 };
 
+#if TUPLE
+/// item is an helper to instanciate a class and append the instance to the tuple offset table
+template<class B, class T> struct item : T { //FIXME: static register
+    void registerInstance(byte* object, ubyte* list, int& i) { int d=(byte*)(B*)this-object; assert_(d>=0&&d<256); list[i++]=d; }
+    item(byte* object, ubyte* list, int& i) { registerInstance(object,list,i); }
+    item(T&& t, byte* object, ubyte* list, int& i) : T(move(t)) { registerInstance(object,list,i); }
+};
+/// \a tuple with static indexing by type and dynamic indexing using an offset table
+template<class B, class... T> struct tuple  : item<B,T>... {
+    static ubyte offsets[sizeof...(T)];
+    tuple(int i=0) : item<B,T>((byte*)this, offsets,i)... {}
+    tuple(int i,T&&... t) : item<B,T>(move(t), (byte*)this, offsets,i)... {}
+    int size() const { return sizeof...(T); }
+    template<class A> A& get() { return static_cast<A&>(*this); }
+    template<class A> const A& get() const { return static_cast<const A&>(*this); }
+    B& at(int i) { return *(B*)((byte*)this+offsets[i]); }
+};
+template<class B, class... T> ubyte tuple<B,T...>::offsets[sizeof...(T)];
+
+/// Tuple implements Layout storage using static inheritance
+/// \note It allows a layout to directly contain heterogenous Widgets without managing heap pointers.
+template<class... T> struct Tuple : virtual Layout {
+    tuple<Widget,T...> items;
+    Tuple() : items() {}
+    Tuple(T&& ___ t) : items(0,move(t)___) {}
+    Widget& at(int i) override { return items.at(i); }
+    uint count() const override { return items.size(); }
+    template<class A> A& get() { return items.template get<A>(); }
+    template<class A> const A& get() const { return items.template get<A>(); }
+};
+#endif
+
 /// Item is an icon with text
-struct Item : Horizontal, Tuple<Icon,Text> {
+struct Item : Horizontal {
+    Icon icon; Text text;
     Item(){}
-    Item(Image<byte4>&& icon, string&& text, int size=16):Tuple(move(icon),Text(move(text),size)){}
+    Item(Image&& icon, string&& text, int size=16):icon(move(icon)),text(move(text),size){}
+    Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
+    uint count() const override { return 2; }
 };
 
 /// TabBar is a \a Bar containing \a Item elements

@@ -6,18 +6,18 @@
 /// Entry is an \a Item with a \a link to an article
 struct Entry : Item {
     string link;
-    Entry(Text&& text, string&& link, Image<byte4>&& icon):Item(move(icon),move(text)),link(move(link)){}
+    Entry(string&& link, Image&& icon, string&& text, int size=16):Item(move(icon),move(text),size),link(move(link)){}
 };
 
-/// Feeds is a list of unread entries fetched from RSS/Atom feeds
-/// \note config/feeds contains the list of feeds to fetch, config/read contains the list of read articles
+/// Feeds is a list of entries fetched from RSS/Atom feeds
+/// \note .config/feeds contains the list of feeds to fetch, .config/read contains the list of read articles
 struct Feeds : List<Entry> {
     int config;
     File readConfig;
     Map readMap;
     signal<> listChanged;
-    signal< const ref<byte>& > pageChanged;
-    map<string/*link*/, Image<byte4> > favicons; //store strong references to favicons weakly referenced by entries
+    signal< const ref<byte>& /*link*/, const ref<byte>& /*title*/, const Image& /*favicon*/ > pageChanged;
+    map<string/*link*/, Image> favicons; //store strong references to favicons weakly referenced by entries
 
     /// Polls all feeds on startup
     Feeds();

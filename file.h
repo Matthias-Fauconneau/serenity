@@ -1,23 +1,13 @@
 #pragma once
 #include "array.h"
 
-// File system
-
 /// Returns a file descriptor to the root folder
 int root();
-/// Opens \a folder
-int openFolder(const ref<byte>& folder, int at=root());
-/// Creates a new \a folder
-void createFolder(const ref<byte>& folder, int at);
-/// Returns wether \a path is a folder
-bool isFolder(const ref<byte>& path, int at=root());
-/// Creates a symbolic link to \a target at \a name, replacing any existing files or links
-void symlink(const ref<byte>& target,const ref<byte>& name, int at=root());
-/// Returns the last modified time for \a path
-long modifiedTime(const ref<byte>& path, int at=root());
 
-enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
-array<string> listFiles(const ref<byte>& folder, Flags flags, int at=root());
+/// Reads exactly \a size bytes from \a fd
+array<byte> read(int fd, uint size);
+/// Reads up to \a capacity bytes from \a fd
+array<byte> readUpTo(int fd, uint capacity);
 
 /// File is a file descriptor which close itself in the destructor
 struct File {
@@ -29,20 +19,12 @@ struct File {
     operator int() { return fd; }
 };
 
-/// Returns wether \a file exists
-bool exists(const ref<byte>& file, int at=root());
+/// Returns wether \a file exists (as a file)
+bool existsFile(const ref<byte>& file, int at=root());
 /// Opens \a file for reading, fails if not existing
 File openFile(const ref<byte>& file, int at=root());
-/// Opens \a file for writing
-/// \note if \a overwrite is set, any existing file will be truncated
-File createFile(const ref<byte>& file, int at=root(), bool overwrite=false);
-/// Opens \a file for writing, append if existing
-File appendFile(const ref<byte>& file, int at=root());
 /// Reads \a file content into an heap buffer
 array<byte> readFile(const ref<byte>& file, int at=root());
-/// Writes \a content into \a file
-/// \note if \a overwrite is set, any existing file will be replaced
-void writeFile(const ref<byte>& file, const ref<byte>& content, int at=root(), bool overwrite=true);
 
 struct Map {
     no_copy(Map)
@@ -61,7 +43,30 @@ Map mapFile(const ref<byte>& file, int at=root());
 /// Maps \a fd as read-only memory pages
 Map mapFile(int fd);
 
-/// Reads exactly \a size bytes from \a fd
-array<byte> read(int fd, uint size);
-/// Reads up to \a capacity bytes from \a fd
-array<byte> readUpTo(int fd, uint capacity);
+/// Opens \a file for writing
+/// \note if \a overwrite is set, any existing file will be truncated
+File createFile(const ref<byte>& file, int at=root(), bool overwrite=false);
+/// Opens \a file for writing, append if existing
+File appendFile(const ref<byte>& file, int at=root());
+/// Writes \a content into \a file
+/// \note if \a overwrite is set, any existing file will be replaced
+void writeFile(const ref<byte>& file, const ref<byte>& content, int at=root(), bool overwrite=true);
+
+// File system
+
+/// Returns whether \a folder exists (as a folder)
+bool existsFolder(const ref<byte>& folder, int at=root());
+/// Opens \a folder
+int openFolder(const ref<byte>& folder, int at=root(), bool create=false);
+/// Creates a new \a folder
+void createFolder(const ref<byte>& folder, int at=root());
+/// Returns whether \a path is a folder
+bool isFolder(const ref<byte>& path, int at=root());
+
+/// Creates a symbolic link to \a target at \a name, replacing any existing files or links
+void symlink(const ref<byte>& target,const ref<byte>& name, int at=root());
+/// Returns the last modified time for \a path
+long modifiedTime(const ref<byte>& path, int at=root());
+
+enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
+array<string> listFiles(const ref<byte>& folder, Flags flags, int at=root());

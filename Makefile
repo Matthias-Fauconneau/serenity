@@ -2,7 +2,7 @@ PREFIX ?= /usr
 TARGET ?= player
 BUILD ?= release
 
-CC = clang -pipe -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+CC = clang++ -pipe -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
 CC += $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer
 FLAGS_release := -O3 -fomit-frame-pointer

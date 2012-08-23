@@ -244,7 +244,7 @@ Glyph Font::glyph(uint16 index, int fx) {
     if(!raster.data) return Glyph(glyph);
     glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
 
-    glyph.image = Image(ceil(48,raster.width)/48+1,raster.height/16);
+    glyph.image = Image(ceil(48,raster.width)/48+2,raster.height/16); //add 1px for subpixel position + 1px for filtering
     for(uint y=0; y<glyph.image.height; y++) {
         uint16 line[glyph.image.width*3];
         int acc[16]={};
@@ -253,7 +253,7 @@ Glyph Font::glyph(uint16 index, int fx) {
                 int sum=0;
                 for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
                     sum += acc[j];
-                    int idx=(x*3+c)*16+i-fx%16; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
+                    int idx=-(fx%16)*3+(x*3+c)*16+i; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
                     assert(acc[j]==0||acc[j]==1,x,y,c,i,j,acc[j]);
                 }
                 line[x*3+c]=sum; assert(sum<=256);
@@ -262,8 +262,8 @@ Glyph Font::glyph(uint16 index, int fx) {
         for(uint x=0; x<glyph.image.width; x++) { //LCD subpixel filtering
             uint8 filter[5] = {1, 4, 6, 4, 1};
             uint16 pixel[3]={};
-            for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-3; if(idx>=0 && idx<(int)glyph.image.width*3) pixel[c]+=filter[i]*line[idx]; }
-            glyph.image(x,y) = byte4(igamma[pixel[2]/16],igamma[pixel[1]/16],igamma[pixel[0]/16],255); //vertical RGB pixels
+            for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)glyph.image.width*3) pixel[c]+=filter[i]*line[idx]; }
+            glyph.image(x,y) = byte4(igamma[pixel[2]/16],igamma[pixel[1]/16],igamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
         }
     }
 #define DEBUG_SUBPIXEL 0

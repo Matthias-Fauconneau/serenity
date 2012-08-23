@@ -63,13 +63,14 @@ inline string str(const int16& n) { return dec(n); }
 inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
 inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
-inline string hex(const ref<byte>& data) { string s; for(byte b: data) s<<hex(b)<<' '; return s; }
 inline string str(const long& n) { string s("0x"_); s<<hex(n); return s; }
 inline string str(const ptr& n) { string s("0x"_); s<<hex(n); return s; }
 
 /// Converts arrays
-template<class T> string str(const ref<T>& a) { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
+template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string str(const array<T>& a) { return str(ref<T>(a)); }
+template<class T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
 
 /// Expression template to hold recursive concatenation operations
 template<class A, class B> struct cat {

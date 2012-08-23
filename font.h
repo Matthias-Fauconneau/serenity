@@ -33,6 +33,6 @@ struct Font {
     /// Caches and returns glyph for \a index at position \a x (in .4)
     /// \a x fractional part is used to return subpixel positionned images
     Glyph glyph(uint16 index, int x=0);
-private:
+    /// Renders glyph \a index with transformation matrix \a xx, xy, yx, yy, dx, dy into \a raster
     void render(struct Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 };

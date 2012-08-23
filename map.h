@@ -16,25 +16,22 @@ template<class K, class V> struct map {
     explicit operator bool() const { return keys.size(); }
     void clear() { keys.clear(); values.clear(); }
 
-    const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"); return values[i];}
-    V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"); return values[i];}
+    const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
+    V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
     template<perfect(V)> Vf value(const K& key, Vf&& value) {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : forward<Vf>(value);
     }
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
     template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {'"_+str(keys,"', '"_)+"'}"_);
-        //insertAt(values, insertSorted(keys, forward<Kf>(key)), forward<Vf>(value));
+        if(contains(key)) error("'"_+str(key)+"' already in {'"_,keys,"}"_);
         keys << forward<Kf>(key); values << forward<Vf>(value);
     }
     template<perfect2(K,V)> void insertMulti(Kf&& key, Vf&& value) {
-        //insertAt(values, insertSorted(keys, forward<Kf>(key)), forward<Vf>(value));
         keys << forward<Kf>(key); values << forward<Vf>(value);
     }
     template<perfect(K)> V& insert(Kf&& key) {
         assert(!contains(key));
-        //return insertAt(values, insertSorted(keys, forward<Kf>(key)), move(V()));
         keys << forward<Kf>(key); values << V(); return values.last();
     }
     V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }

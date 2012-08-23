@@ -35,7 +35,7 @@ struct Screen { int32 root, colormap, white, black, inputMask; int16 width, heig
 struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
-struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1; uint visual;
+struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x=0,y=16,width,height,border=0,class_=1; uint visual;
                       uint mask=BackgroundPixel|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
                                         uint backgroundPixel=0,borderPixel=0, bitGravity=5, winGravity=5, overrideRedirect, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };

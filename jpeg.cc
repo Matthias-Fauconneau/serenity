@@ -101,7 +101,6 @@ public:
     // Returns the total number of bytes actually consumed by the decoder (which should equal the actual size of the JPEG file).
     inline int get_total_bytes_read() const { return m_total_bytes_read; }
 
-private:
     jpeg_decoder(const jpeg_decoder &);
     jpeg_decoder &operator =(const jpeg_decoder &);
 

@@ -2,6 +2,7 @@
 #include "linux.h"
 #include "stream.h"
 #include "string.h"
+#include "debug.h"
 
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
 long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
@@ -61,8 +62,8 @@ string str(Date date, const ref<byte>& format) {
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
         else r << s.next();
     }
-    if(endsWith(r,","_)) r.removeLast(); //prevent dangling comma when last valid part is week day
-    //return simplify(move(r));
+    if(endsWith(r,","_)) r.pop(); //prevent dangling comma when last valid part is week day
+    assert(r,date.month,date.year,format);
     return r;
 }
 
@@ -91,6 +92,6 @@ Date parse(TextStream& s) {
     return date;
 }
 
-Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll({fd, POLLIN}); }
+Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll(); }
 void Timer::setAbsolute(uint date) { timespec time[2]={{0,0},{date,0}}; timerfd_settime(fd,1,time,0); }
-void Timer::event(const pollfd&) { expired(); }
+void Timer::event() { expired(); }

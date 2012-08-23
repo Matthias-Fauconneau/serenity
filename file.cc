@@ -25,13 +25,13 @@ int read_(int fd, void* buf, long size) { return read(fd, buf, size); }
 
 File::~File() { if(fd>0) close(fd); }
 
-bool exists(const ref<byte>& file, int at) { return File( openat(at, strz(file), O_RDONLY, 0) ).fd > 0; }
+bool existsFile(const ref<byte>& file, int at) { return File( openat(at, strz(file), O_RDONLY, 0) ).fd > 0; }
 
 File openFile(const ref<byte>& file, int at) {
     return File( check( openat(at, strz(file), O_RDONLY, 0), file) );
 }
 File createFile(const ref<byte>& file, int at, bool overwrite) {
-    if(!overwrite && exists(file,at)) error("Exists",file);
+    if(!overwrite && existsFile(file,at)) error("File already exists",file);
     return File( check( openat(at, strz(file),O_CREAT|O_WRONLY|O_TRUNC,0666), file ) );
 }
 File appendFile(const ref<byte>& file, int at) {
@@ -66,8 +66,11 @@ Map::~Map() { if(data) munmap((void*)data,size); }
 
 int root() { static int fd = openFolder("/"_,-100); return fd; }
 
-int openFolder(const ref<byte>& folder, int at) { return check( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder ); }
-
+bool existsFolder(const ref<byte>& folder, int at) { return File( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
+int openFolder(const ref<byte>& folder, int at, bool create) {
+    if(create && !existsFolder(folder,at)) createFolder(folder,at);
+    return check( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder);
+}
 void createFolder(const ref<byte>& folder, int at) { check_(mkdirat(at, strz(folder), 0666), folder); }
 
 void symlink(const ref<byte>& target,const ref<byte>& name, int at) {

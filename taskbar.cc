@@ -8,20 +8,20 @@
 #include "x.h"
 #include "linux.h"
 
-ICON(cursor)
 ICON(button)
 struct Taskbar : Application, Poll {
     struct Task : Item {
         Taskbar* parent=0;
         uint id;
         Task(uint id):id(id){} //for indexOf
-        Task(Taskbar* parent, uint id, Image<byte4>&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
+        Task(Taskbar* parent, uint id, Image&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
         bool selectEvent() override { parent->raise(id); return true; }
         bool mouseEvent(int2, int2, Event event, Button button) override {
             if(event!=Press || button!=LeftButton) return false;
-            if(parent->getProperty<uint>(parent->root,"_NET_ACTIVE_WINDOW"_)==ref<uint>__(id)) { // Maximize
-                MoveResizeWindow r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; write(parent->x,raw(r));
+            if(parent->getProperty<uint>(parent->root,"_NET_ACTIVE_WINDOW"_)==id) { // Maximize
+                SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; write(parent->x,raw(r));
             }
+            return true;
         }
         bool keyPress(Key key) override {
             if(key != Escape) return false;
@@ -41,8 +41,8 @@ struct Taskbar : Application, Poll {
     Bar<Task> tasks;
     Clock clock __(16);
     Calendar calendar;
-    Window popup __(&calendar.layout, int2(-256,-256));
-    HBox panel __(&start, &tasks, &clock);
+    Window popup __(&calendar, int2(-256,-256));
+    HBox panel; //__(&start, &tasks, &clock);
     Window window __(&panel,int2(0,16));
     uint root=window.root;
     uint desktop=0;
@@ -53,7 +53,7 @@ struct Taskbar : Application, Poll {
         check_(connect(x,(sockaddr*)&addr,2+path.size()),path);
         {ConnectionSetup r;
             string authority = getenv("HOME"_)+"/.Xauthority"_;
-            if(exists(authority)) write(x, string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
+            if(existsFile(authority)) write(x, string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
             else write(x, raw(r)); }
         {ConnectionSetupReply r=read<ConnectionSetupReply>(x); assert(r.status==1);
             read(x,r.additionnal*4-(sizeof(ConnectionSetupReply)-8)); }
@@ -136,10 +136,10 @@ struct Taskbar : Application, Poll {
                 }
             } else if(e.property.atom==Atom("_NET_WM_NAME"_)) {
                 int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
-                tasks[i].get<Text>().setText( getTitle(id) );
+                tasks[i].text.setText( getTitle(id) );
             } else if(e.property.atom==Atom("_NET_WM_ICON"_)) {
                 int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
-                tasks[i].get<Icon>().image = getIcon(id);
+                tasks[i].icon.image = getIcon(id);
             } else return;
         } else if(type == DestroyNotify) { uint id=e.property.window;
             int i = tasks.indexOf(id);
@@ -153,7 +153,7 @@ struct Taskbar : Application, Poll {
                 if(tasks.index==uint(-1)) tasks.setActive(tasks.indexOf(id));
             }
         } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify) {
-        } else log("Event", type<sizeof(xevent)/sizeof(*xevent)?xevent[type]:str(type));
+        } else log("Event", type<sizeof(events)/sizeof(*events)?events[type]:str(type));
         window.render();
     }
 
@@ -161,7 +161,7 @@ struct Taskbar : Application, Poll {
     int addWindow(uint id) {
         if(windows.contains(id)) return -1;
         windows << id;
-        if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==ref<uint>__(Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_))) desktop=id;
+        if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
         if(id==root) return -1;
         {GetWindowAttributes r; r.window=id; write(x, raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
             if(wa.overrideRedirect||wa.mapState==IsUnviewable) return -1;}
@@ -169,7 +169,7 @@ struct Taskbar : Application, Poll {
         if(type.size()>=1 && type.first()!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) return -1;
         if(getProperty<uint>(id,"_NET_WM_STATE"_).contains(Atom("_NET_WM_SKIP_TASKBAR"_))) return -1;
         string title = getTitle(id); if(!title) return -1;
-        Image<byte4> icon = getIcon(id);
+        Image icon = getIcon(id);
         tasks << Task(this,id,move(icon),move(title));
         return tasks.array::size()-1;
     }
@@ -179,12 +179,12 @@ struct Taskbar : Application, Poll {
         if(!name) name = getProperty<byte>(id,"WM_NAME"_);
         return move(name);
     }
-    Image<byte4> getIcon(uint id) {
+    Image getIcon(uint id) {
         array<uint> buffer = getProperty<uint>(id,"_NET_WM_ICON"_,2+128*128);
-        if(buffer.size()<2) return Image<byte4>();
+        if(buffer.size()<2) return Image();
         uint w=buffer[0], h=buffer[1];
-        if(buffer.size()<2+w*h) return Image<byte4>();
-        return resize(Image<byte4>(array<byte4>(cast<byte4>(buffer.slice(2,w*h))),w,h,true), 16, 16);
+        if(buffer.size()<2+w*h) return Image();
+        return resize(Image(array<byte4>(cast<byte4>(buffer.slice(2,w*h))),w,h,true), 16, 16);
     }
 
     map<string, uint> cache;
@@ -207,7 +207,7 @@ struct Taskbar : Application, Poll {
             {RaiseWindow r; r.id=id; write(x, raw(r));}
             {SetInputFocus r; r.window=id; write(x, raw(r));}
             for(uint w: windows) {
-                if(getProperty<uint>(w,"WM_TRANSIENT_FOR"_) == ref<uint>__(id)) {
+                if(getProperty<uint>(w,"WM_TRANSIENT_FOR"_) == id) {
                     {RaiseWindow r; r.id=id; write(x, raw(r));}
                     {SetInputFocus r; r.window=id; write(x, raw(r));}
                 }
@@ -238,7 +238,7 @@ struct Taskbar : Application, Poll {
     }
     template<class T> T readReply() {
         for(;;) { uint8 type = read<uint8>(x);
-            if(type==0) { read<Error>(x); T t; clear(t); return t; }
+            if(type==0) { Error e=read<Error>(x); processEvent(0,(Event&)e); T t; clear(t); return t; }
             else if(type==1) return read<T>(x);
             else queue << QEvent __(type, read<::Event>(x)); //queue events to avoid reentrance
         }

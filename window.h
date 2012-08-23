@@ -21,7 +21,7 @@ struct Window : Poll {
     array<QEvent> queue;
 
     /// Event handler
-    void event(const pollfd&);
+    void event();
     /// Reads one X event
     void processEvent(uint8 type, const Event& e);
     /// Reads an X reply while checking pending errors and processing queued events
@@ -35,9 +35,9 @@ struct Window : Poll {
     /// Returns property \a name on \a window
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
 
-    /// Shows window. Connects to (i.e registerPoll) 'WM' local broadcast port and emits a new top level (id=0) window
+    /// Shows window.
     void show();
-    /// Hides window. Emits a window hide and disconnect from 'WM" local broadcast (i.e unregisterPoll)
+    /// Hides window.
     void hide();
     /// Toggle visibility (e.g for popup menus)
     void toggle() { if(mapped) hide(); else show(); }

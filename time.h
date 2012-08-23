@@ -31,9 +31,8 @@ string str(Date date, const ref<byte>& format="dddd, dd MMMM yyyy hh:mm"_);
 Date parse(TextStream& s);
 
 struct Timer : Poll {
-    int fd;
     Timer();
     void setAbsolute(uint date);
     virtual void expired() =0;
-    void event(const pollfd&);
+    void event();
 };

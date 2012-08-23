@@ -34,3 +34,13 @@ void blit(int2 target, const Image& source, uint8 opacity) {
         }
     }
 }
+
+void multiply(int2 target, const Image& source, uint8 opacity) {
+    Rect rect = (target+Rect(source.size())) & currentClip;
+    for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+        byte4 s = source(x-target.x,y-target.y); int a=s.a*opacity/255;
+        byte4& d = framebuffer(x,y);
+        byte4 t = byte4(div255(int4(d)*int4(s))); t.a=min(255,d.a+a);
+        d = t;
+    }
+}

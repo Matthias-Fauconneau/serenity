@@ -88,6 +88,8 @@ template<class T> struct initializer_list {
         for(uint i=0;i<size;i++) if(!(data[i]==o.data[i])) return false;
         return true;
     }
+    /// Compares to single value
+    bool operator ==(const T& value) const { return size==1 && *data == value; }
     /// Slices a reference to elements from \a pos to \a pos + \a size
     initializer_list<T> slice(uint pos, uint size) const { assert_(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
     /// Slices a reference to elements from to the end of the reference

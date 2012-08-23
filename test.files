@@ -5,7 +5,6 @@ linux.h
 memory.h
 memory.cc
 array.h
-array.cc
 string.h
 string.cc
 debug.h

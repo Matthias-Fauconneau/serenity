@@ -2,23 +2,22 @@
 #include "window.h"
 #include "calendar.h"
 #include "feeds.h"
-//#include "launcher.h"
-ICON(shutdown)
+#include "launcher.h"
 
 struct Desktop : Application {
     Text status;
     Feeds feeds;
     Scroll<HTML> page;
-    //List<Command> shortcuts;// = readShortcuts();
+    List<Command> shortcuts;// = readShortcuts();
     Clock clock __( 64 );
     Calendar calendar;
-    VBox timeBox __( &clock, &calendar );
-    HBox applets __( &feeds, &timeBox/*, &shortcuts*/ );
-    Window window __(&applets,int2(0,0));
-    //Command shutdown __(share(shutdownIcon()),"Shutdown"_,"/sbin/poweroff"_,{});
-    Desktop() {
+    VBox timeBox;//  __(&clock, &calendar);
+    HBox applets;// __(&feeds, &timeBox, &shortcuts);
+    Window window __(&applets,int2(1024,768),"Desktop"_);
+    ICON(shutdown) Command shutdown __(share(shutdownIcon()),string("Shutdown"_),string("/sbin/poweroff"_),{});
+    Desktop() { timeBox<<&clock<<&calendar; applets<<&feeds<<&timeBox<<&shortcuts;
         clock.timeout.connect(&window, &Window::render);
-        feeds.listChanged.connect(&window,&Window::update);
+        feeds.listChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&Desktop::showPage);
         window.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);
         //window.localShortcut(Extra).connect(&feeds, &Feeds::readNext);
@@ -28,15 +27,15 @@ struct Desktop : Application {
     }
     void showDesktop() {
         if(window.widget != &applets) { window.setWidget(&applets); window.render(); }
-        //else window.setWidget(&shutdown);
-        else quit(); //DEBUG
+        else window.setWidget(&shutdown);
+        //else quit(); //DEBUG
     }
-    void showPage(const ref<byte>& link) {
+    void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
         if(!link) { showDesktop(); return; }
         window.setWidget( &page.area() );
-        page.contentChanged.connect(&window, &Window::update);
+        page.contentChanged.connect(&window, &Window::render);
         page.go(link);
-        status.setText("Loading "_+link); status.render(int2(0,0));
+        window.setTitle(title); window.setIcon(favicon);
     }
 };
 Application(Desktop)

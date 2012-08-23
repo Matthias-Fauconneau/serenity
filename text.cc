@@ -4,10 +4,11 @@
 #include "utf8.h"
 
 /// Layouts formatted text with wrapping, justification and links
+/// \note Characters are positioned with .4 subpixel precision
 struct TextLayout {
-    int size;
-    int wrap;
-    int spaceAdvance;
+    int size; //.4
+    int wrap; //.4
+    int spaceAdvance; //.4
     int2 pen; //.4
     struct Character { int2 pos;/*.4*/ Glyph glyph; };
     typedef array<Character> Word;
@@ -17,7 +18,7 @@ struct TextLayout {
     array<Text::Line> lines;
 
     void nextLine(bool justify) {
-        if(!line) { pen.y+=size<<4; return; }
+        if(!line) { pen.y+=size; return; }
         //justify
         int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
         length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
@@ -33,10 +34,10 @@ struct TextLayout {
             pen.x += word.last().pos.x+word.last().glyph.advance+space;
         }
         line.clear();
-        pen.x=0; pen.y+=size<<4;
+        pen.x=0; pen.y+=size;
     }
 
-    TextLayout(const ref<byte>& text, int size, int wrap):size(size),wrap(wrap) {
+    TextLayout(const ref<byte>& text, int size, int wrap):size(size<<4),wrap(wrap<<4) {
         static map<int,Font> defaultSans;
         if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
         Font* font = &defaultSans.at(size);
@@ -123,12 +124,12 @@ struct TextLayout {
     }
 };
 
-Text::Text(string&& text, int size, ubyte opacity/*, uint wrap*/) : text(move(text)), size(size), opacity(opacity), wrap(0), textSize(0) {}
+Text::Text(string&& text, int size, ubyte opacity, uint wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
 void Text::layout() {
     TextLayout layout(text, size, wrap);
-    blits.clear(); for(const TextLayout::Character& c: layout.text) blits << Blit __(int2(c.pos.x>>4, c.pos.y>>4), share(c.glyph.image));
+    characters.clear(); for(const TextLayout::Character& c: layout.text) characters << Character __(int2(c.pos.x>>4, c.pos.y>>4), share(c.glyph.image));
     lines = move(layout.lines); links = move(layout.links);
-    textSize=int2(0,0); for(const Blit& c: blits) textSize=max(textSize,int2(c.pos)+c.image.size()); textSize.y=max(textSize.y, size);
+    textSize=int2(0,0); for(const Character& c: characters) textSize=max(textSize,int2(c.pos)+c.image.size()); textSize.y=max(textSize.y, size);
 }
 int2 Text::sizeHint() {
     if(!textSize) layout();
@@ -137,14 +138,14 @@ int2 Text::sizeHint() {
 void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
     int2 offset = position+max(int2(0,0),(size-textSize)/2);
-    for(const Blit& b: blits) blit(offset+b.pos, b.image, opacity);
+    for(const Character& b: characters) multiply(offset+b.pos, b.image, opacity);
     for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
 }
 
 bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
     if(event!=Press) return false;
     position -= max(int2(0,0),(size-textSize)/2);
-    for(uint i=0;i<blits.size();i++) { const Blit& b=blits[i];
+    for(uint i=0;i<characters.size();i++) { const Character& b=characters[i];
         if(Rect(b.pos,b.image.size()).contains(position)) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated(link.identifier); return true; }
         }
@@ -159,7 +160,7 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button) {
     if(event!=Press) return false;
     focus=this;
     position -= max(int2(0,0),(size-textSize)/2);
-    for(cursor=0;cursor<blits.size() && position.x>blits[cursor].pos.x+(int)blits[cursor].image.width/2;cursor++) {}
+    for(cursor=0;cursor<characters.size() && position.x>characters[cursor].pos.x+(int)characters[cursor].image.width/2;cursor++) {}
     //if(button==MiddleKey) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); update(); }
     return true;
 }
@@ -181,7 +182,7 @@ void TextInput::render(int2 position, int2 size) {
     Text::render(position, size);
     if(focus==this) {
         if(cursor>text.size()) cursor=text.size();
-        int x = cursor < blits.size()? blits[cursor].pos.x : cursor>0 ? blits.last().pos.x+blits.last().image.width : 0;
+        int x = cursor < characters.size()? characters[cursor].pos.x : cursor>0 ? characters.last().pos.x+characters.last().image.width : 0;
         fill(position+max(int2(0,0), (size-textSize)/2)+Rect(int2(x,0), int2(x+1,size.y)), black);
     }
 }

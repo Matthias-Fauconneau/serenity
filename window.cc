@@ -22,7 +22,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     check_(connect(x,(sockaddr*)&addr,2+path.size()),path);
     {ConnectionSetup r;
         string authority = getenv("HOME"_)+"/.Xauthority"_;
-        if(exists(authority)) write(x, string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
+        if(existsFile(authority)) write(x, string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
         else write(x, raw(r)); }
     uint visual=0;
     {ConnectionSetupReply r=read<ConnectionSetupReply>(x); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
@@ -79,11 +79,11 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
 
     setTitle(title);
     setIcon(icon);
-    registerPoll(__(x,POLLIN));
+    registerPoll(x);
 }
 
-void Window::event(const pollfd& poll) {
-    if(poll.fd==0) {
+void Window::event() {
+    if(revents==IDLE) {
         assert(mapped); assert(size);
         if(state==Server) { state=Wait; return; }
         if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
@@ -126,12 +126,11 @@ void Window::event(const pollfd& poll) {
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
             r.totalWidth=r.width=buffer.width; r.totalHeight=r.height=buffer.height; write(x, raw(r)); }
         state=Server;
-    }
-    if(poll.fd==x) do {
+    } else {
         uint8 type = read<uint8>(x);
         processEvent(type, read<Event>(x));
         while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
-    } while(::poll((pollfd*)&poll,1,0));
+    }
 }
 
 void Window::processEvent(uint8 type, const Event& event) {
@@ -212,7 +211,7 @@ void Window::processEvent(uint8 type, const Event& event) {
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
         } else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) wait(); else state=Idle;
-        } else log("Event", events[type]);
+        } else log("Event", ::events[type]);
     }
 }
 

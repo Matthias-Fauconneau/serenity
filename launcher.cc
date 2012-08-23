@@ -21,7 +21,7 @@ bool Command::mouseEvent(int2, int2, Event event, Button button) {
 
 map<string,string> readSettings(const ref<byte>& path) {
     map<string,string> entries;
-    if(!exists(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
+    if(!existsFile(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
     for(TextStream s(readFile(path));s;) {
         if(s.matchAny("[#"_)) s.until('\n');
         else {
@@ -35,18 +35,19 @@ map<string,string> readSettings(const ref<byte>& path) {
 
 List<Command> readShortcuts() {
     List<Command> shortcuts;
-    static int config = openFolder("config"_);
-    if(!exists("launcher"_,config)) { warn("No launcher settings [config/launcher]"); return shortcuts; }
-    for(const ref<byte>& desktop: split(readFile("launcher"_,config),'\n')) {
+    static int config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
+    if(!existsFile("launcher"_,config)) { warn("No launcher settings [config/launcher]"); return shortcuts; }
+    auto apps = readFile("launcher"_,config);
+    for(const ref<byte>& desktop: split(apps,'\n')) {
         map<string,string> entries = readSettings(desktop);
-        Image<byte4> icon;
+        Image icon;
         for(const ref<byte>& folder: iconPaths) {
             string path = replace(folder,"$size"_,"32x32"_)+entries[string("Icon"_)]+".png"_;
-            if(exists(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
+            if(existsFile(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
         }
         string path = string(section(entries[string("Exec"_)],' '));
-        if(!exists(path)) path="/usr/bin/"_+path;
-        if(!exists(path)) { warn("Executable not found",path); continue; }
+        if(!existsFile(path)) path="/usr/bin/"_+path;
+        if(!existsFile(path)) { warn("Executable not found",path); continue; }
         array<string> arguments;  arguments<<string(section(entries[string("Exec"_)],' ',1,-1));
         for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries[string("Name"_)]);
         for(uint i=0;i<arguments.size();) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;

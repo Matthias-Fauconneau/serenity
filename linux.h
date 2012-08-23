@@ -87,7 +87,6 @@ enum class sys : long {
 
 typedef unsigned short uint16;
 typedef unsigned int uint;
-struct pollfd { int fd; short events, revents; };
 struct sockaddr { uint16 family; uint16 port; uint ip; int pad[2]; };
 struct sockaddr_un { uint16 family=1; char path[108]; };
 struct timespec { long sec,nsec; };
@@ -102,7 +101,6 @@ struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid
 
 struct dirent { long ino, off; short len; char name[]; };
 
-enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32};
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000,
 #if __arm
       O_DIRECTORY=040000
