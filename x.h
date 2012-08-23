@@ -52,7 +52,7 @@ struct GetGeometry{ int8 req=14; uint16 size=2; uint id; };
 struct GetGeometryReply { byte depth; uint16 seq; uint length; uint root; int16 x,y,w,h,border; byte pad[10]; } fixed(GetGeometryReply);
 struct QueryTree { int8 req=15, pad; uint16 size=2; uint id; };
 struct QueryTreeReply { byte pad; uint16 seq; uint length; uint root,parent; uint16 count; byte pad2[14]; } fixed(QueryTreeReply);
-struct InternAtom { int8 req=16,exists=1; uint16 size=2; int16 length, pad; };
+struct InternAtom { int8 req=16,exists=0; uint16 size=2; int16 length, pad; };
 struct InternAtomReply { byte pad; uint16 seq; uint length,atom; byte pad2[20]; } fixed(InternAtomReply);
 struct GetAtomName { int8 req=17,pad; uint16 size=2; uint atom; };
 struct GetAtomNameReply { byte pad; uint16 seq; uint length; uint16 size; byte pad2[22]; } fixed(GetAtomNameReply);
@@ -133,7 +133,7 @@ int read_(int fd, void* buf, long size);
 template<class T> T read(int fd) {
     T t;
     int unused size = read_(fd,(byte*)&t,sizeof(T));
-    assert_(size==sizeof(T));
+    assert(size==sizeof(T),size,sizeof(T));
     return t;
 }
 /// Reads \a size raw values from \a fd

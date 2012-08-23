@@ -89,5 +89,6 @@ ref<byte> getenv(const ref<byte>& name) {
         ref<byte> key=s.until('='); ref<byte> value=s.until('\0');
         if(key==name) return value;
     }
+    error("Undefined environment variable"_, name);
     return ""_;
 }

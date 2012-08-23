@@ -71,12 +71,12 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; write(x, raw(r));}
+    {CreateGC r; r.context=id+GContext; r.window=id+XWindow; write(x, raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
     r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
-    {ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_WINDOW_TYPE"_); r.type=Atom("ATOM"_); r.format=32;
-    r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom("_KDE_NET_WM_WINDOW_TYPE_OVERRIDE"_))));}
+    //setType("_KDE_NET_WM_WINDOW_TYPE_OVERRIDE"_); //Client side decorations
+    setType("_NET_WM_WINDOW_TYPE_NORMAL"_); //Client side decorations
 
-    {CreateGC r; r.context=id+GContext; r.window=id+XWindow; write(x, raw(r));}
     setTitle(title);
     setIcon(icon);
     registerPoll(__(x,POLLIN));
@@ -99,7 +99,9 @@ void Window::event(const pollfd& poll) {
         }
         framebuffer = share(buffer);
         currentClip=Rect(framebuffer.size());
-#ifndef __arm__
+#if 1
+        fill(currentClip,white);
+#else
         // Oxygen like radial gradient background
         int2 center = int2(size.x/2,0); int radius=256;
         for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
@@ -108,9 +110,6 @@ void Window::event(const pollfd& poll) {
             int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
             framebuffer(x,y) = byte4(g,g,g,opacity);
         }
-#else
-        fill(currentClip,white);
-#endif
         //feather edges //TODO: client side shadow
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
         if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
@@ -121,6 +120,7 @@ void Window::event(const pollfd& poll) {
         if(position.x+size.x<display.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
         if(position.x>0 && position.y+size.y<display.y-1) framebuffer(0,size.y-1) /= 2;
         if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;
+#endif
         widget->render(int2(0,0),size);
         assert(!clipStack);
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
@@ -268,6 +268,10 @@ void Window::setGeometry(int2 position, int2 size) {
     if(position!=this->position || size!=this->size) {
         SetGeometry r; r.id=id+XWindow; r.x=position.x; r.y=position.y; r.w=size.x, r.h=size.y; write(x, raw(r));
     }
+}
+void Window::setType(const ref<byte>& type) {
+    ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_TYPE"_); r.type=Atom("ATOM"_); r.format=32;
+    r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom(type))));
 }
 void Window::setTitle(const ref<byte>& title) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;

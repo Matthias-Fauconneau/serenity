@@ -22,7 +22,7 @@ template<class O, class R, class... Args> struct method<O, R(Args...)> : functor
 
 template<class R, class... Args> struct function;
 template<class R, class... Args> struct function<R(Args...)> {
-    uint any[5]; //store any functor on stack
+    uint any[8]; //store any functor on stack
     template<class F> function(F f) {
         assert_(sizeof(lambda<F,R(Args...)>)<=sizeof(any));
         new (any) lambda<F,R(Args...)>(move(f));

@@ -53,6 +53,8 @@ struct Window : Poll {
     void setSize(int2 size);
     /// Moves window to \a position and resizes to \a size in one request
     void setGeometry(int2 position, int2 size);
+    /// Sets window type to \a type
+    void setType(const ref<byte>& type);
     /// Sets window title to \a title
     void setTitle(const ref<byte>& title);
     /// Sets window icon to \a icon

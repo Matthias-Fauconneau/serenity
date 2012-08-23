@@ -25,6 +25,7 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     vector& operator +=(const vector& v) { for(int i=0;i<N;i++) at(i)+=v[i]; return *this; }
     vector& operator -=(const vector& v) { for(int i=0;i<N;i++) at(i)-=v[i]; return *this; }
     vector& operator *=(const vector& v) { for(int i=0;i<N;i++) at(i)*=v[i]; return *this; }
+    vector& operator *=(const T& s) { for(int i=0;i<N;i++) at(i)*=s; return *this; }
     vector& operator /=(const T& s) { for(int i=0;i<N;i++) at(i)/=s; return *this; }
 };
 
