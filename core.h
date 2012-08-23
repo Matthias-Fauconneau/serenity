@@ -6,7 +6,7 @@
 #define nodebug __attribute((always_inline, nodebug))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
-inline void* operator new(unsigned int, void* p) { return p; } //placement new
+inline void* operator new(unsigned long, void* p) { return p; } //placement new
 
 /// Move
 template<typename T> struct remove_reference { typedef T type; };
@@ -112,7 +112,7 @@ template<class T> struct ref;
 /// \note As \a data is not owned, ref should be used carefully (only as argument, never as field)
 template<class T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
-inline constexpr ref<byte> operator "" _(const char* data, uint size) { return ref<byte>((byte*)data,size); }
+inline constexpr ref<byte> operator "" _(const char* data, unsigned long size) { return ref<byte>((byte*)data,size); }
 #define __( args... ) { args }
 #define ___ ...
 #define ____( ignore... ) ignore

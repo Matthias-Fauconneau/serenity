@@ -7,10 +7,13 @@ void exit_(int code) { exit(code); }
 void log_(const char* expr) { log(expr); }
 void write(int fd, const ref<byte>& s) { int unused r=write(fd,s.data,s.size); assert(r==(int)s.size,r); }
 
-struct Ehdr { byte ident[16]; uint16 type,machine; uint version,entry,phoff,shoff,flags;
-              uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
-struct Shdr { uint name,type,flags,addr,offset,size,link,info,addralign,entsize; };
+struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
+struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };
+#if __x86_64
+struct Sym { uint	name; ubyte info,other; uint16 shndx; byte* value; long size; };
+#else
 struct Sym { uint	name; byte* value; uint size; ubyte info,other; uint16 shndx; };
+#endif
 
 /// Reads a little endian variable size integer
 static int readLEV(DataStream& s, bool sign=false) {
@@ -194,9 +197,9 @@ void trace(int skip, uint size) {
     if(recurse>1) {write(1,"Debugger error\n"_); void**p=0;*p=0; } recurse++;
     void* stack[16]; clear(stack);
     stack[0] = __builtin_return_address(0);
-    #define bra(i) if(ptr(stack[i-1])>0x8000000 && ptr(stack[i-1])<0xb0000000) stack[i] = __builtin_return_address(i)
+    #define bra(i) if(ptr(stack[i-1])>0x100000 && ptr(stack[i-1])<0x1000000) stack[i] = __builtin_return_address(i)
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);
-    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x8000000 && ptr(stack[i])<0xb0000000) {
+    for(int i=min(15u,skip+size-1);i>=skip;i--) if(stack[i]) {
         Symbol s = findNearestLine(stack[i]);
         if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr(stack[i]));
     }

@@ -2,12 +2,12 @@
 
 /// Gamma correction
 static uint8 gamma[257];
-#define pow __builtin_pow
-inline float sRGB(float c) { if(c>=0.0031308f) return 1.055f*pow(c,1/2.4f)-0.055f; else return 12.92f*c; }
 #ifdef __arm__
 inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(i)); return true; }
 #else
-//inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(255*sRGB(i/255.f))); return true; }
+#define pow __builtin_pow
+inline float sRGB(float c) { if(c>=0.0031308f) return 1.055f*pow(c,1/2.4f)-0.055f; else return 12.92f*c; }
+inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(255*sRGB(i/255.f))); return true; }
 #endif
 
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }

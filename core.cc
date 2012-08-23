@@ -1,6 +1,6 @@
 #include "core.h"
 
-#ifdef STANDALONE
+#if STANDALONE
 extern "C" void _start() { int main(void); exit_(main()); } //TODO: check leaks
 void*   __dso_handle = (void*) &__dso_handle;
 extern "C" int __cxa_atexit(void (*) (void *), void*, void*) { return 0; }

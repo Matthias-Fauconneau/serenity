@@ -7,11 +7,11 @@
 enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
 struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
 struct ucontext {
-    ulong flags; ucontext *link; void* ss_sp; int ss_flags; ulong ss_size;
+    long flags; ucontext *link; void* ss_sp; int ss_flags; long ss_size;
 #if __arm__
-    ulong trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,pc,cpsr,fault;
+    long trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,pc,cpsr,fault;
 #elif __x86_64__ || __i386__
-    ulong gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,eip,cs,efl,uesp,ss;
+    long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,eip,cs,efl,uesp,ss;
 #endif
 };
 

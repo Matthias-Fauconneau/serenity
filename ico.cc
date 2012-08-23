@@ -5,7 +5,7 @@ struct Directory { uint16 reserved, type, count; };
 struct Entry { ubyte width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
 struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
 
-Image<byte4> decodeICO(const ref<byte>& file) {
+Image decodeICO(const ref<byte>& file) {
     DataStream s(array<byte>(file.data,file.size));
 
     Directory unused directory = s.read<Directory>();
@@ -31,9 +31,9 @@ Image<byte4> decodeICO(const ref<byte>& file) {
 
     uint w=header.width,h=header.height/2;
     uint size = header.depth*w*h/8;
-    if(size>s.available(size)) { warn("Invalid ICO"); return Image<byte4>(); }
+    if(size>s.available(size)) { warn("Invalid ICO"); return Image(); }
 
-    Image<byte4> image(w,h,true);
+    Image image(w,h,true);
     array<byte> source = s.read(size);
     assert(source,size);
     ubyte* src=(ubyte*)source.data();

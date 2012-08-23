@@ -1,6 +1,5 @@
 debug
-fast
 release
 profile
-*.creator*
+*.creator.*
 serenity.files

@@ -2,7 +2,7 @@
 #include "core.h"
 #include "linux.h"
 
-#if 1
+#if 0
 byte* heapEnd;
 byte* systemEnd;
 void setupHeap() { systemEnd = heapEnd = (byte*)brk(0); }
@@ -29,9 +29,9 @@ void unallocate_(byte* buffer, int size) {
 }
 #else
 void setupHeap() {}
-extern "C" byte* malloc(ulong size);
-extern "C" int posix_memalign(byte** buffer, ulong alignment, ulong size);
-extern "C" byte* realloc(void* buffer, ulong size);
+extern "C" byte* malloc(long size);
+extern "C" int posix_memalign(byte** buffer, long alignment, long size);
+extern "C" byte* realloc(void* buffer, long size);
 extern "C" void free(byte* buffer);
 static byte* lastFree;
 byte* allocate_(uint size) { lastFree=0;
