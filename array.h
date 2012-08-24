@@ -2,26 +2,26 @@
 #include "core.h"
 #include "memory.h"
 
-/// \a array is a typed bounded mutable growable memory reference (heap/stack/static/mmap)
-/// \note array use move semantics to avoid reference counting when managing heap reference
-/// \note array transparently store small arrays inline (<=31bytes)
-/// \note array transparently detach when trying to modify a foreign (i.e not owned heap) reference
+/// \a array is a typed bounded mutable growable memory region
+/// \note array uses move semantics to avoid reference counting when holding an heap buffer
+/// \note array stores small arrays inline (<=31bytes)
+/// \note array copies to an heap buffer when modifying a reference
 template<class T> struct array {
-    int8 tag = -1; //0: empty, >0: inline, -1 = not owned (reference), -2 = owned (heap)
+    int8 tag = 0; //0: empty, >0: inline, -1 = reference, -2 = heap buffer, -3 = static buffer
     struct Buffer {
         const T* data;
         uint size;
         uint capacity;
         Buffer(const T* data, uint size, uint capacity):data(data),size(size),capacity(capacity){}
     } buffer = {0,0,0};
-    //int pad[4]; // (4+4)*4=32 Pads to fill half a cache line (31 inline bytes)
+    int pad[2]; //1+7+8+4+4+2*4=32 Pads to fill half a cache line (31 inline bytes)
     /// Number of elements fitting inline
-    static constexpr uint32 inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
+    static constexpr uint inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
     /// Data pointer valid while the array is not reallocated (resize or inline array move)
-    T* data() { return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
+    T* data() { assert_(tag!=-1); return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
     const T* data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
     /// Number of elements currently in this array
-    uint size() const { return tag>=0?tag:buffer.size; }
+    uint size() const { assert_((tag==-1) || ((tag>=0?tag:buffer.size)<=capacity())); return tag>=0?tag:buffer.size; }
     /// Sets size without any construction/destruction. /sa resize
     void setSize(uint size) { assert_(size<=capacity()); if(tag>=0) tag=size; else buffer.size=size;}
     /// Maximum number of elements without reallocation (0 for references)
@@ -32,38 +32,38 @@ template<class T> struct array {
     no_copy(array)
 
     /// Default constructs an empty inline array
-    array() : tag(0) {}
+    array() {}
 
     /// Move constructor
     array(array&& o) { if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy(*this,o); o.tag=0; }
     /// Move assignment
     array& operator=(array&& o) { this->~array(); if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy(*this,o); o.tag=0; return *this; }
     /// Allocates a new uninitialized array for \a capacity elements
-    explicit array(uint capacity) { reserve(capacity); }
+    explicit array(uint capacity){reserve(capacity); }
     /// Moves elements from a reference
     explicit array(ref<T>&& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(move((T&)ref[i]));}
     /// Copies elements from a reference
     explicit array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
     /// References \a size elements from read-only \a data pointer
-    array(const T* data, uint size) : buffer(data, size, 0) {} //TODO: escape analysis
+    array(const T* data, uint size) : tag(-1), buffer(data, size, 0) {} //TODO: escape analysis
     /// Initializes array with a writable buffer of \a capacity elements
-    array(const T* data, uint size, uint capacity) : tag(-2), buffer(data, size, capacity) {} //TODO: escape analysis
+    array(const T* data, uint size, uint capacity) : tag(-3), buffer(data, size, capacity) { assert_(capacity>inline_capacity()); }
 
     /// If the array own the data, destroys all initialized elements and frees the buffer
-    ~array() { if(tag!=-1) { for(uint i=0;i<size();i++) at(i).~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); } }
+    ~array() { if(tag!=-1) { for(uint i=0,size=this->size();i<size;i++) data()[i].~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); } }
 
-    /// Allocates enough memory for \a capacity elements
-    void reserve(uint capacity) {
-        if(capacity <= this->capacity()) return;
-        if(tag==-2 && buffer.capacity) {
+    /// Allocates strictly enough memory for \a capacity elements
+    void setCapacity(uint capacity) {
+        assert_(tag!=-1);
+        assert_(capacity>=size());
+        if(tag==-2 && buffer.capacity) { //already on heap: reallocate
             buffer.data=reallocate<T>(buffer.data,buffer.capacity,capacity);
             buffer.capacity=capacity;
         } else if(capacity <= inline_capacity()) {
-            if(tag<0) {
-                 tag=buffer.size;
-                 copy((byte*)(&tag+1),(byte*)buffer.data,buffer.size*sizeof(T));
-            }
-        } else {
+            if(tag>=0) return; //already inline
+            tag=buffer.size;
+            copy((byte*)(&tag+1),(byte*)buffer.data,buffer.size*sizeof(T));
+        } else { //inline or reference: allocate
             T* heap=allocate<T>(capacity);
             copy((byte*)heap,(byte*)data(),size()*sizeof(T));
             buffer.data=heap;
@@ -72,6 +72,8 @@ template<class T> struct array {
             buffer.capacity=capacity;
         }
     }
+    /// Allocates enough memory for \a capacity elements
+    void reserve(uint capacity) { if(capacity > this->capacity()) setCapacity(capacity); }
 
     /// Sets the array size to \a size and destroys removed elements
     void shrink(uint size) {
@@ -85,9 +87,9 @@ template<class T> struct array {
     void resize(uint size) { if(size<this->size()) shrink(size); else if(size>this->size()) grow(size); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(uint pos, uint size) { return ref<T>(*this).slice(pos,size); }
+    ref<T> slice(uint pos, uint size) const { return ref<T>(*this).slice(pos,size); }
     /// Slices a reference to elements from to the end of the array
-    ref<T> slice(uint pos) { return ref<T>(*this).slice(pos); }
+    ref<T> slice(uint pos) const { return ref<T>(*this).slice(pos); }
 
     /// Returns true if not empty
     explicit operator bool() const { return size(); }
@@ -156,6 +158,7 @@ template<class T> struct array {
     T* begin() { return (T*)data(); }
     T* end() { return (T*)data()+size(); }
 };
+//static_assert(sizeof(array<byte>)==32,"");
 
 /// Copies all elements in a new array
 template<class T> array<T> copy(const array<T>& a) { return array<T>((ref<T>)a); }

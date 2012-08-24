@@ -219,7 +219,7 @@ template<class T> T Window::readReply() {
     for(;;) { uint8 type = read<uint8>(x);
         if(type==0) { processEvent(0,read<Event>(x)); T t; clear(t); return t; }
         else if(type==1) return read<T>(x);
-        else queue << QEvent __(type, read<::Event>(x)); //queue events to avoid reentrance
+        else queue << QEvent __(type, read<Event>(x)); //queue events to avoid reentrance
     }
 }
 
@@ -245,8 +245,6 @@ template<class T> array<T> Window::getProperty(uint window, const ref<byte>& nam
 }
 template array<uint> Window::getProperty(uint window, const ref<byte>& name, uint size);
 template array<byte> Window::getProperty(uint window, const ref<byte>& name, uint size);
-
-void Window::setWidget(Widget* widget) { this->widget=widget; if(mapped) wait(); }
 
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;

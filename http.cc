@@ -20,13 +20,13 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
     static File dnsCache = appendFile(string(getenv("HOME"_)+"/.cache/dns"_));
     static Map dnsMap = mapFile(dnsCache);
     uint ip=-1;
-    for(TextStream s=TextStream::byReference(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
+    for(TextStream s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
     if(!ip) ip=-1;//return false; //negative entry
     if(ip==uint(-1)) {
         static int dns;
         if(!dns) {
             dns = socket(PF_INET,SOCK_DGRAM,0);
-            TextStream s(readFile("etc/resolv.conf"_));
+            TextStream s=readFile("etc/resolv.conf"_);
             s.until("nameserver "_);
             uint a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
             sockaddr addr = {PF_INET, swap16(53), (d<<24)|(c<<16)|(b<<8)|a};
@@ -35,7 +35,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
         array<byte> query;
         struct Header { uint16 id=swap16(currentTime()); uint16 flags=1; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
-        for(TextStream s=TextStream::byReference(host);s;) { //QNAME
+        for(TextStream s(host);s;) { //QNAME
             ref<byte> label = s.until('.');
             query << label.size << label;
         }
@@ -76,21 +76,17 @@ array<byte> Socket::receive(uint size) { return readUpTo(fd,size); }
 void Socket::write(const ref<byte>& buffer) { ::write(fd,buffer); }
 
 uint Socket::available(uint need) {
-    if(need==uint(-1)) buffer<<this->receive(4096);
-    else while(need>Stream::available(need)) buffer<<this->receive(max(4096u,need-Stream::available(need)));
+    while(need>Stream::available(need)) (array<byte>&)buffer<<this->receive(max(4096u,need-Stream::available(need)));
     return Stream::available(need);
 }
-ref<byte> Socket::get(uint size) {
-    while(size>Stream::available(size)) buffer<<this->receive(max(4096u,size-Stream::available(size)));
-    return Stream::get(size);
-}
+ref<byte> Socket::get(uint size) const { return Stream::get(size); }
 
 /// Base64
 
 string base64(const ref<byte>& input) {
     string output(input.size*4/3+1);
     for(uint j=0;j<input.size;) {
-        ubyte block[3];
+        ubyte block[3]={};
         uint i=0; while(i<3 && j<input.size) block[i++] = input[j++];
         assert(i);
         //encode 3 8-bit binary bytes as 4 '6-bit' characters
@@ -108,7 +104,7 @@ string base64(const ref<byte>& input) {
 
 URL::URL(const ref<byte>& url) {
     if(!url) { trace(); warn("Empty URL"); return; }
-    TextStream s=TextStream::byReference(url);
+    TextStream s(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
     ref<byte> domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
@@ -153,7 +149,7 @@ string cacheFile(const URL& url) {
     return url.host+"/"_+name;
 }
 
-HTTP::HTTP(const URL& url, function<void(const URL&, array<byte>&&)> handler, array<string>&& headers, const ref<byte>& method)
+HTTP::HTTP(const URL& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : url(str(url)), headers(move(headers)), method(method), handler(handler) {
     debug( log("Request",url); )
     if(!connect(url.host, url.scheme)) { free(this); return; }
@@ -205,10 +201,10 @@ void HTTP::header() {
             URL next = url.relative(value);
             assert(!url.host.contains('/') && !next.host.contains('/'),url,next);
             redirect << file;
-            buffer.clear(); index=0; contentLength=0; chunked=false; unregisterPoll(); disconnect(); state=Connect;
+            ((array<byte>&)buffer).clear(); index=0; contentLength=0; chunked=false; disconnect(); state=Connect;
             url=move(next);
             if(!connect(url.host, url.scheme)) { free(this); return; }
-            registerPoll(Socket::fd, POLLIN|POLLOUT);
+            Poll::fd=Socket::fd;
             return;
         } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
     }
@@ -236,8 +232,8 @@ void HTTP::event() {
             if(content.size()>=contentLength) state=Cache;
         }
         else if(chunked) {
-            int contentLength = number(16); match("\r\n"_);
-            if(contentLength) { content << read(contentLength); match("\r\n"_); }
+            uint contentLength = number(16); match("\r\n"_);
+            if(contentLength) { assert(available(contentLength)>=contentLength); content << read(contentLength); match("\r\n"_); }
             else state=Cache;
         }
     }
@@ -253,14 +249,14 @@ void HTTP::event() {
         state=Handle; wait(); return;  //Cache other outstanding requests before handling this one
     }
     if(state==Handle) {
-        handler(url,move(content));
+        handler(url,mapFile(cacheFile(url),cache));
         state=Done;
         free(this);
         return;
     }
 }
 
-void getURL(const URL &url, function<void(const URL&, array<byte>&&)> handler, int maximumAge) {
+void getURL(const URL &url, Handler handler, int maximumAge) {
     string file = cacheFile(url);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;
@@ -269,7 +265,7 @@ void getURL(const URL &url, function<void(const URL&, array<byte>&&)> handler, i
         long modified = modifiedTime(file,cache);
         if(currentTime()-modified < maximumAge*60) {
             debug( log("Cached",url); )
-            array<byte> content = readFile(file,cache);
+            Map content = mapFile(file,cache);
             assert(content,file);
             handler(url,move(content));
             return;

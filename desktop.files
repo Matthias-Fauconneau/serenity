@@ -48,3 +48,6 @@ utf8.h
 utf8.cc
 calendar.cc
 test.cc
+png.h
+jpeg.h
+ico.h

@@ -45,8 +45,6 @@ struct Window : Poll {
     /// Schedules window rendering after all events have been processed (i.e Poll::wait())
     void render();
 
-    /// Displays \a widget
-    void setWidget(Widget* widget);
     /// Moves window to \a position
     void setPosition(int2 position);
     /// Resizes window to \a size

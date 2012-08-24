@@ -14,21 +14,19 @@
 
 #include <sys/resource.h>
 
-ICON(music);
-ICON(music256);
-
 struct Music : Application {
     Sequencer seq;
     Sampler sampler;
     AudioOutput audio{true};
     MidiFile midi;
 
+    ICON(music)
 #ifdef PDF
     PDF widget;
     //Score score;
     map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
 #else
-    Icon widget {move(music256Icon)};
+    Icon widget {move(musicIcon)};
 #endif
     Window window{&widget,"Music"_,move(musicIcon)};
     ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }

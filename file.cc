@@ -15,7 +15,7 @@ array<byte> read(int fd, uint capacity) {
 array<byte> readUpTo(int fd, uint capacity) {
     array<byte> buffer(capacity);
     int size = check( read(fd,buffer.data(),capacity) );
-    buffer.setSize(size);
+    buffer.setCapacity(size); buffer.setSize(size);
     return buffer;
 }
 
@@ -42,7 +42,7 @@ array<byte> readFile(const ref<byte>& file, int at) {
     File fd = openFile(file,at);
     struct stat sb; fstat(fd, &sb);
     array<byte> content = read(fd,sb.size);
-    debug( if(content.size()>1<<20) { trace(); log("use mapFile to avoid copying "_+dec(content.size()>>10)+"KB"_); } )
+    debug( if(content.size()>1<<16) { trace(); log("use mapFile to avoid copying "_+dec(content.size()>>10)+"KB"_); } )
     return content;
 }
 

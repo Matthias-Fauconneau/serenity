@@ -4,31 +4,27 @@
 #include "interface.h"
 
 /// Asynchronously load an image, sending a signal if the image was not cached
-struct ImageLoader : signal<> {
-    ImageLoader(const URL& url, Image* target, signal<>* imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
+struct ImageLoader {
+    ImageLoader(const URL& url, Image* target, function<void()>&& imageLoaded, int2 size=int2(0,0), uint maximumAge=24*60);
     /// Reference to target to load (need to stay valid)
     Image* target;
-    /// Reference to a signal to trigger on load if the image was not cached.
-    signal<>* imageLoaded=0;
+    /// function to call on load if the image was not cached.
+    function<void()> imageLoaded;
     /// Preferred size
     int2 size;
-    void load(const URL&, array<byte>&&);
+    void load(const URL&, Map&&);
 };
 
-/// Crude HTML layout engine
+/// Simple HTML layout engine
 struct HTML : VBox {
     URL url;
     /// Signal content changes to trigger updates
     signal<> contentChanged;
 
-    /// Replace layout with content downloaded from \a link
+    /// Displays document at \a link
     void go(const ref<byte>& link);
-    /// Replace layout with existing \a document
-    void load(const URL& url, array<byte>&& document);
-    /// Append existing \a document to layout
-    void append(const URL& url, array<byte>&& document);
-    /// Clear any content
-    void clear();
+    /// Displays \a document
+    void load(const URL& url, Map&& document);
 
     int2 sizeHint() override { int2 hint=VBox::sizeHint(); return int2(hint.x,hint.y); }
 
@@ -38,4 +34,5 @@ struct HTML : VBox {
 
     string text;
     array<URL> images;
+    int paragraphCount;
 };

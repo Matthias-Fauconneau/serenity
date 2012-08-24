@@ -2,6 +2,7 @@
 #include "stream.h"
 #include "process.h"
 #include "function.h"
+#include "file.h"
 
 /// \a Socket is a network socket
 struct Socket : virtual Stream {
@@ -17,7 +18,7 @@ struct Socket : virtual Stream {
     virtual void write(const ref<byte>& buffer);
     /// Stream
     uint available(uint need) override;
-    ref<byte> get(uint size) override;
+    ref<byte> get(uint size) const override;
 };
 
 /// Encodes \a input to Base64 to transfer binary data through text protocol
@@ -35,7 +36,7 @@ inline bool operator ==(const URL& a, const URL& b) {
     return a.scheme==b.scheme&&a.authorization==b.authorization&&a.host==b.host&&a.path==b.path&&a.fragment==b.fragment;
 }
 
-typedef function<void(const URL&, array<byte>&&)> Handler;
+typedef function<void(const URL&, Map&&)> Handler;
 
 struct HTTP : Poll, virtual TextStream, virtual Socket {
     URL url;
@@ -61,7 +62,7 @@ struct HTTP : Poll, virtual TextStream, virtual Socket {
 
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge minutes
-void getURL(const URL &url, Handler handler=[](const URL&, array<byte>&&){}, int maximumAge=24*60);
+void getURL(const URL &url, Handler handler=[](const URL&, Map&&){}, int maximumAge=24*60);
 
 /// Returns path to cache file for \a url
 string cacheFile(const URL& url);

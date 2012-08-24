@@ -72,11 +72,11 @@ Image decodePNG(const ref<byte>& file) {
         s.advance(4); //CRC
         assert(s);
     }
-    array<byte> data = inflate(buffer, true);
+    const array<byte> data = inflate(buffer, true);
     if(data.size() < height*(1+width*depth)) { warn("Invalid PNG"); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
-    byte* src=data.data();
+    const byte* src=data.data();
     for(int i=0;i==0 || (interlace && i<7);i++) {
         int xStride=1,yStride=1;
         int offset=0;

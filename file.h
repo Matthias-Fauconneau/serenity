@@ -36,6 +36,7 @@ struct Map {
     ~Map();
     /// Returns a reference to the map, valid only while the map exists.
     operator ref<byte>() { return ref<byte>(data,size); } //TODO: escape analysis
+    explicit operator bool() { return data && size; }
 };
 
 /// Maps \a file as read-only memory pages

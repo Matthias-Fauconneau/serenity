@@ -1,26 +1,26 @@
 #include "html.h"
+#include "jpeg.h"
 
-ImageLoader::ImageLoader(const URL& url, Image* target, signal<>* imageLoaded, int2 size, uint maximumAge)
-    : target(target), size(size) {
+ImageLoader::ImageLoader(const URL& url, Image* target, function<void()>&& imageLoaded, int2 size, uint maximumAge)
+    : target(target), imageLoaded(imageLoaded), size(size) {
     getURL(url, Handler(this, &ImageLoader::load), maximumAge);
-    this->imageLoaded=imageLoaded;
 }
 
-void ImageLoader::load(const URL&, array<byte>&& file) {
+void ImageLoader::load(const URL&, Map&& file) {
     Image image = decodeImage(file);
     if(!image) return;
     if(size) image = resize(image,size.x,size.y);
     *target = move(image);
-    if(imageLoaded) (*imageLoaded)();
+    imageLoaded();
     free(this);
 }
 
 static array< ref<byte> > textElement, boldElement, ignoreElement;
 
 void HTML::go(const ref<byte>& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 24*60); }
+void HTML::load(const URL& url, Map&& document) {
+    for(Widget* w: *this) free(w); VBox::clear(); paragraphCount=0;
 
-void HTML::load(const URL& url, array<byte>&& document) { clear(); append(url,move(document)); }
-void HTML::append(const URL& url, array<byte>&& document) {
     Element html = parseHTML(document);
 
     if(!textElement)
@@ -77,7 +77,7 @@ void HTML::append(const URL& url, array<byte>&& document) {
     flushText();
     flushImages();
     //log(count(),"elements");
-    contentChanged();
+    if(paragraphCount) contentChanged(); //else ImageLoader will signal
 }
 
 void HTML::parse(const URL& url, const Element &e) {
@@ -89,7 +89,7 @@ void HTML::parse(const URL& url, const Element &e) {
     }
     else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
         flushText();
-        TextStream s=TextStream::byReference(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
+        TextStream s(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
         images << url.relative(src);
     }
     else if(!e.name) { //Text
@@ -126,7 +126,7 @@ void HTML::parse(const URL& url, const Element &e) {
 }
 void HTML::flushText() {
     string paragraph = move(text); //simplify(move(text));
-    if(!paragraph) return;
+    if(!paragraph) return; paragraphCount++;
     Text& textLayout = alloc<Text>(move(paragraph), 16, 255, 640 /*60 characters*/);
     textLayout.linkActivated.connect(this, &HTML::go);
     VBox::operator<<(&textLayout);
@@ -141,14 +141,9 @@ void HTML::flushImages() {
         HList<ImageView>& list = alloc< HList<ImageView> >();
         for(uint x=0;x<w && i<images.size();x++,i++) {
             list << ImageView();
-            alloc<ImageLoader>(images[i], &list.last().image, &contentChanged);
+            alloc<ImageLoader>(images[i], &list.last().image, contentChanged);
         }
         VBox::operator<<(&list);
     }
     images.clear();
-}
-
-void HTML::clear() {
-    for(Widget* w: *this) free(w);
-    VBox::clear();
 }

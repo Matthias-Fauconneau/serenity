@@ -5,6 +5,7 @@
 #include "window.h"
 #include "interface.h"
 #include "file.h"
+#include "png.h"
 
 bool Search::keyPress(Key key) {
     if(key == Return) {
@@ -22,7 +23,7 @@ bool Command::mouseEvent(int2, int2, Event event, Button button) {
 map<string,string> readSettings(const ref<byte>& path) {
     map<string,string> entries;
     if(!existsFile(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
-    for(TextStream s(readFile(path));s;) {
+    for(TextStream s=readFile(path);s;) {
         if(s.matchAny("[#"_)) s.until('\n');
         else {
             ref<byte> key = s.until('='), value=s.until('\n');

@@ -6,7 +6,7 @@
 /// Entry is an \a Item with a \a link to an article
 struct Entry : Item {
     string link;
-    Entry(string&& link, Image&& icon, string&& text, int size=16):Item(move(icon),move(text),size),link(move(link)){}
+    Entry(string&& link, Image&& icon, string&& text, int size=16):Linear(Left),Item(move(icon),move(text),size),link(move(link)){}
 };
 
 /// Feeds is a list of entries fetched from RSS/Atom feeds
@@ -26,9 +26,11 @@ struct Feeds : List<Entry> {
     /// Returns whether \a entry is read (according to config/read)
     bool isRead(const Entry& entry);
     /// Loads an RSS/Atom feed
-    void loadFeed(const URL&, array<byte>&& document);
+    void loadFeed(const URL&, Map&& document);
     /// Parses HTML link elements to find out favicon location
-    void getFavicon(const URL& url, array<byte>&& document);
+    void getFavicon(const URL& url, Map&& document);
+    /// Resets favicons for all entries
+    void resetFavicons();
     /// If unread, appends entry at \a index to config\read
     void setRead(uint index);
     /// Sends pageChanged signal and preload next page

@@ -1114,7 +1114,7 @@ void *jpeg_decoder::alloc(int nSize, bool zero)
     {
         int capacity = max(32768 - 256, (nSize + 2047) & ~2047);
         mem_block *b = (mem_block*)allocate_(sizeof(mem_block) + capacity);
-        if (!b) stop_decoding(JPGD_NOTENOUGHMEM);
+        assert(b);
         b->m_pNext = m_pMem_blocks; m_pMem_blocks = b;
         b->m_used_count = nSize;
         b->m_size = capacity;
@@ -2530,17 +2530,12 @@ void jpeg_decoder::calc_mcu_block_order()
     int component_num, component_id;
     uint max_h_samp = 0, max_v_samp = 0;
 
-    for (component_id = 0; component_id < m_comps_in_frame; component_id++)
-    {
-        if (m_comp_h_samp[component_id] > max_h_samp)
-            max_h_samp = m_comp_h_samp[component_id];
-
-        if (m_comp_v_samp[component_id] > max_v_samp)
-            max_v_samp = m_comp_v_samp[component_id];
+    for (component_id = 0; component_id < m_comps_in_frame; component_id++) {
+        if (m_comp_h_samp[component_id] > max_h_samp) max_h_samp = m_comp_h_samp[component_id];
+        if (m_comp_v_samp[component_id] > max_v_samp) max_v_samp = m_comp_v_samp[component_id];
     }
-
-    for (component_id = 0; component_id < m_comps_in_frame; component_id++)
-    {
+    assert(max_h_samp); assert(max_v_samp);
+    for (component_id = 0; component_id < m_comps_in_frame; component_id++) {
         m_comp_h_blocks[component_id] = ((((m_image_x_size * m_comp_h_samp[component_id]) + (max_h_samp - 1)) / max_h_samp) + 7) / 8;
         m_comp_v_blocks[component_id] = ((((m_image_y_size * m_comp_v_samp[component_id]) + (max_v_samp - 1)) / max_v_samp) + 7) / 8;
     }

@@ -6,10 +6,7 @@
 #include "layout.h"
 #include "window.h"
 #include "text.h"
-ICON(play)
-ICON(pause)
-ICON(next)
-#include "X11/keysymdef.h"
+
 struct Player : Application {
     array<string> folders;
     array<string> files;
@@ -17,8 +14,8 @@ struct Player : Application {
     AudioFile media;
     AudioOutput audio __({&media,&AudioFile::read});
 
-    ToggleButton playButton __(share(playIcon()), share(pauseIcon()));
-    TriggerButton nextButton __(share(nextIcon()));
+    ICON(play) ICON(pause) ToggleButton playButton __(share(playIcon()), share(pauseIcon()));
+    ICON(next) TriggerButton nextButton __(share(nextIcon()));
     Text elapsed __(string("00:00"_));
     Slider slider;
     Text remaining __(string("00:00"_));

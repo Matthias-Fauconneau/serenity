@@ -169,9 +169,9 @@ struct Parser : Application {
 
     Parser() {
         /// Parses grammar
-        TextStream s(readFile("serenity/math.g"_));
-        //TextStream s(readFile("serenity/url.g"_));
-        //TextStream s(readFile("serenity/grammar.g"_));
+        TextStream s=readFile("serenity/math.g"_);
+        //TextStream s=readFile("serenity/url.g"_);
+        //TextStream s=readFile("serenity/grammar.g"_);
         while(s.match('#')) s.until('\n');
         ref<byte> text = s.until('\n');
         word firstRule=""_;

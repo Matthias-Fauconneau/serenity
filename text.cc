@@ -108,7 +108,7 @@ struct TextLayout {
             pen.x += font->kerning(previous,index);
             Glyph glyph = font->glyph(index,pen.x);
             previous = index;
-            if(glyph.image) word << Character __(int2(pen.x,0)+glyph.offset, move(glyph)); glyphCount++;
+            if(glyph.image) { word << Character __(int2(pen.x,0)+glyph.offset, move(glyph)); glyphCount++; }
             pen.x += glyph.advance;
         }
         if(!text || text[text.size-1]!='\n') {

@@ -5,7 +5,7 @@
 
 static Element parse(const ref<byte>& document, bool html) {
     assert(document);
-    TextStream s=TextStream::byReference(document);
+    TextStream s(document);
     s.match("\xEF\xBB\xBF"_); //spurious BOM
     Element root(""_);
     while(s) {
@@ -154,8 +154,7 @@ string unescape(const ref<byte>& xml) {
         for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
     string out;
-    TextStream s=TextStream::byReference(xml);
-    while(s) {
+    for(TextStream s(xml);s;) {
         out << s.until("&"_);
         if(!s) break;
 

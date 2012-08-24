@@ -7,19 +7,18 @@ array<string> getEvents(Date query) {
     static int config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
     array<string> events;
     if(!existsFile("events"_,config)) { /*warn("No events settings [$HOME/.config/events]");*/ return events; }
+    string file = readFile("events"_,config);
 
-    TextStream s = readFile("events"_,config);
     map<string, array<Date>> exceptions; //Exceptions for recurring events
-    while(s) { //first parse all exceptions (may occur after recurrence definitions)
+    for(TextStream s(file);s;) { //first parse all exceptions (may occur after recurrence definitions)
         if(s.match("except "_)) {
             Date except=parse(s); s.skip(); string title=string(s.until('\n'));
             exceptions[move(title)] << except;
         } else s.until('\n');
     }
-    s.index=0;
 
     Date until; //End date for recurring events
-    while(s) {
+    for(TextStream s(file);s;) {
         s.skip();
         if(s.match("#"_)) s.until('\n'); //comment
         else if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions

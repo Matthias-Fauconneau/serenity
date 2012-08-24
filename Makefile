@@ -1,21 +1,11 @@
 PREFIX ?= /usr
-TARGET ?= player
+TARGET ?= desktop
 BUILD ?= release
-
-CC = clang++ -pipe -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
-CC += $(FLAGS_$(BUILD))
+CC ?= clang++ -pipe
+FLAGS = -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer
 FLAGS_release := -O3 -fomit-frame-pointer
 FLAGS_profile := -g -O -finstrument-functions
-
-SRCS = $(SRCS_$(BUILD)) $(SRCS_$(TARGET))
-SRCS_profile += profile
-SRCS_browser += png inflate jpeg ico
-SRCS_desktop += png inflate jpeg ico
-SRCS_taskbar += png inflate
-SRCS_player += png inflate
-SRCS_music += png inflate
-SRCS_test += png inflate
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button
@@ -46,7 +36,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+	@$(CC) $(FLAGS) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(BUILD)/$(TARGET).l
@@ -55,7 +45,7 @@ endif
 $(BUILD)/%.o : %.cc
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) -c -o $@ $<
+	@$(CC) $(FLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: %.png
 	@echo $<

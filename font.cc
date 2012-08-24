@@ -15,7 +15,7 @@ static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; 
 
 Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
     static bool unused once = computeGammaLookup();
-    DataStream s = DataStream::byReference(keep, true);
+    DataStream s = DataStream(keep, true);
     uint32 unused scaler=s.read();
     uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
     DataStream head, hhea;
@@ -40,7 +40,7 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
 #define scaleY(p) ((size*int64(p)+round)>>scale)
 #define scale(p) scaleY(p)
 #define unscale(p) (((p)<<scale)/size)
-       scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4;
+       scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4; assert(scale<32);
        round = (1<<scale)/2; //round to nearest not down
     }
     {DataStream& s = hhea;
@@ -145,19 +145,19 @@ int truncate(int width, uint value) { return value/width*width; }
 int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
 int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
 
-void Font::render(Bitmap& raster, int index, int16& xMin, int16& xMax, int16& yMin, int16& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
+void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
     int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
-    DataStream s=DataStream::byReference(ref<byte>(glyf +start, length), true);
+    DataStream s=DataStream(ref<byte>(glyf +start, length), true);
     if(!s) return;
 
     int16 numContours = s.read();
     if(!raster.data) {
-        xMin=s.read(), yMin=s.read(), xMax=s.read(), yMax=s.read();
+        xMin= s.read16(), yMin= s.read16(), xMax= s.read16(), yMax= s.read16();
         //xMin  = unscale(floor(16,scale(xMin))); xMax = unscale(ceil(16,scale(xMax))); //keep horizontal subpixel accuracy
         yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
-        int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin);
+        int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin); assert(width>0,xMax,xMin); assert(height>0,yMax,yMin);
         new (&raster) Bitmap(width+1,height+1);
     } else s.advance(4*2); //TODO: resize as needed
 
@@ -239,16 +239,17 @@ Glyph Font::glyph(uint16 index, int fx) {
 
     // map unicode to glyf outline
     glyph.advance = scale(swap16(hmtx[2*index]));
-    Bitmap raster; int16 xMin,xMax,yMin,yMax;
+    Bitmap raster; int xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
     if(!raster.data) return Glyph(glyph);
     glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
 
-    glyph.image = Image(ceil(48,raster.width)/48+2,raster.height/16); //add 1px for subpixel position + 1px for filtering
-    for(uint y=0; y<glyph.image.height; y++) {
-        uint16 line[glyph.image.width*3];
+    uint width=ceil(48,raster.width)/48+2, height=raster.height/16;
+    glyph.image = Image(width, height); //add 1px for subpixel position + 1px for filtering
+    for(uint y=0; y<height; y++) {
+        uint16 line[width*3];
         int acc[16]={};
-        for(uint x=0; x<glyph.image.width; x++) { //Supersampled rasterization
+        for(uint x=0; x<width; x++) { //Supersampled rasterization
             for(uint c=0; c<3; c++) {
                 int sum=0;
                 for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
@@ -259,27 +260,27 @@ Glyph Font::glyph(uint16 index, int fx) {
                 line[x*3+c]=sum; assert(sum<=256);
             }
         }
-        for(uint x=0; x<glyph.image.width; x++) { //LCD subpixel filtering
+        for(uint x=0; x<width; x++) { //LCD subpixel filtering
             uint8 filter[5] = {1, 4, 6, 4, 1};
             uint16 pixel[3]={};
-            for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)glyph.image.width*3) pixel[c]+=filter[i]*line[idx]; }
+            for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)width*3) pixel[c]+=filter[i]*line[idx]; }
             glyph.image(x,y) = byte4(igamma[pixel[2]/16],igamma[pixel[1]/16],igamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
         }
     }
 #define DEBUG_SUBPIXEL 0
 #if DEBUG_SUBPIXEL
-    Image image = Image(glyph.image.width*3,glyph.image.height*3);
-    for(uint y=0; y<glyph.image.height; y++) for(uint x=0; x<glyph.image.width; x++) {
+    Image image = Image(width*3,height*3);
+    for(uint y=0; y<height; y++) for(uint x=0; x<width; x++) {
         image(x*3+0,y*3+0)=image(x*3+0,y*3+1)=image(x*3+0,y*3+2)= byte4(0,0,glyph.image(x,y).r,255);
         image(x*3+1,y*3+0)=image(x*3+1,y*3+1)=image(x*3+1,y*3+2)= byte4(0,glyph.image(x,y).g,0,255);
         image(x*3+2,y*3+0)=image(x*3+2,y*3+1)=image(x*3+2,y*3+2)= byte4(glyph.image(x,y).b,0,0,255);
     }
-    glyph.image=move(image); glyph.advance *= 3; glyph.offset=glyph.offset*3;
+    glyph.image=move(image); glyph.advance *= 3; glyph.offset=glyph.offset*3; width*=3; height*=3;
 #endif
 #define DEBUG_UPSCALE 0
 #if DEBUG_UPSCALE
-    {Image image = Image(glyph.image.width*2,glyph.image.height*2);
-    for(uint y=0; y<glyph.image.height; y++) for(uint x=0; x<glyph.image.width; x++) {
+    {Image image = Image(width*2,height*2);
+    for(uint y=0; y<height; y++) for(uint x=0; x<width; x++) {
         image(x*2+0,y*2+0)=image(x*2+0,y*2+1)=image(x*2+1,y*2+0)=image(x*2+1,y*2+1)= glyph.image(x,y);
     }
     glyph.image=move(image); glyph.advance *= 2; glyph.offset*=2;}

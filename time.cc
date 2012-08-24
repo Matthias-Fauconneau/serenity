@@ -46,9 +46,8 @@ Date date(long time) {
 }
 
 string str(Date date, const ref<byte>& format) {
-    TextStream s = TextStream::byReference(format);
     string r;
-    while(s) {
+    for(TextStream s(format);s;) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(' '); }
         else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); else s.until(' '); }
         else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); else s.until(' '); }

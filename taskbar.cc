@@ -8,7 +8,6 @@
 #include "x.h"
 #include "linux.h"
 
-ICON(button)
 struct Taskbar : Application, Poll {
     struct Task : Item {
         Taskbar* parent=0;
@@ -36,7 +35,7 @@ struct Taskbar : Application, Poll {
     bool ownWM=true;
     array<uint> windows;
 
-    TriggerButton start __(resize(buttonIcon(), 16,16));
+    ICON(button) TriggerButton start __(resize(buttonIcon(), 16,16));
     Launcher launcher;
     Bar<Task> tasks;
     Clock clock __(16);

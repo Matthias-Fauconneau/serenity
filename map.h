@@ -31,7 +31,7 @@ template<class K, class V> struct map {
         keys << forward<Kf>(key); values << forward<Vf>(value);
     }
     template<perfect(K)> V& insert(Kf&& key) {
-        assert(!contains(key));
+        assert(!contains(key),key);
         keys << forward<Kf>(key); values << V(); return values.last();
     }
     V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }

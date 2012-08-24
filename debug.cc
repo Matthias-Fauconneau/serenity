@@ -23,6 +23,7 @@ static int readLEV(DataStream& s, bool sign=false) {
     return result;
 }
 
+#if 1
 string demangle(TextStream& s, bool function=true) {
     string r;
     bool rvalue=false,ref=false; int pointer=0;
@@ -91,7 +92,7 @@ string demangle(TextStream& s, bool function=true) {
         if(s.match('K')) const_method=true;
         while(s && !s.match('E')) {
             list<< demangle(s);
-            if(s.peek()=='I'||s.peek()=='J') list.last()<< demangle(s);
+            if(s && (s.peek()=='I'||s.peek()=='J')) list.last()<< demangle(s);
         }
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
@@ -99,12 +100,22 @@ string demangle(TextStream& s, bool function=true) {
         assert(l<=s.available(l),l,r,s.untilEnd(),move(s.buffer));
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
-    } else { error("D"_,r,s.untilEnd(),move(s.buffer)); }
+    } else { /*warn("demangle error"_,s.untilEnd());*/ r<<s.untilEnd(); }
     for(int i=0;i<pointer;i++) r<<'*';
     if(rvalue) r<<"&&"_;
     if(ref) r<<'&';
     return r;
 }
+string demangle(const ref<byte>& symbol) { TextStream s(symbol); return s.match('_')&&s.peek()=='Z'? demangle(s) : string(s.untilEnd()); }
+#else
+namespace abi { char* __cxa_demangle(const char* symbol, char* output, long* length, int* status); }
+extern "C" byte* malloc(long size);
+string demangle(const ref<byte>& symbol) {
+    long length=128; static char* buffer=(char*)malloc(length); int status;
+    buffer=abi::__cxa_demangle(strz(symbol),buffer,&length,&status);
+    return string(!status?str((const char*)buffer):symbol);
+}
+#endif
 
 Symbol findNearestLine(void* find) {
     static Map map = mapFile("proc/self/exe"_);
@@ -115,19 +126,14 @@ Symbol findNearestLine(void* find) {
     const char* shstrtab = (char*)elf+sections[hdr.shstrndx].offset;
     const char* strtab = 0; ref<Sym> symtab; DataStream debug_line;
     for(const Shdr& s: sections)  {
-        if(str(shstrtab+s.name)==".debug_line"_) debug_line=DataStream::byReference(ref<byte>(elf+s.offset,s.size));
+        if(str(shstrtab+s.name)==".debug_line"_) debug_line=DataStream(ref<byte>(elf+s.offset,s.size));
         else if(str(shstrtab+s.name)==".strtab"_) strtab=(const char*)elf+s.offset;
         else if(str(shstrtab+s.name)==".symtab"_) symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
-    for(const Sym& sym: symtab) {
-        if(find >= sym.value && find < sym.value+sym.size) {
-            TextStream s = TextStream::byReference(str(strtab+sym.name));
-            symbol.function = s.match('_')&&s.peek()=='Z'? (s.buffer.size()>80?string("delegate"_) :demangle(s)) : string(s.untilEnd());
-        }
-    }
+    for(const Sym& sym: symtab) if(find >= sym.value && find < sym.value+sym.size) symbol.function = demangle(str(strtab+sym.name));
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
-        int start = s.index;
+        uint start = s.index;
         struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; int8 line_base; ubyte line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
@@ -199,7 +205,7 @@ void trace(int skip, uint size) {
     stack[0] = __builtin_return_address(0);
     #define bra(i) if(ptr(stack[i-1])>0x100000 && ptr(stack[i-1])<0x1000000) stack[i] = __builtin_return_address(i)
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);
-    for(int i=min(15u,skip+size-1);i>=skip;i--) if(stack[i]) {
+    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x100000 && ptr(stack[i])<0x1000000) {
         Symbol s = findNearestLine(stack[i]);
         if(s.file) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr(stack[i]));
     }

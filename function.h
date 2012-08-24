@@ -19,17 +19,29 @@ template<class O, class R, class... Args> struct method<O, R(Args...)> : functor
     method(O* object, R (O::*pmf)(Args...)): object(object), pmf(pmf){}
     R operator ()(Args... args) const { return (object->*pmf)(forward<Args>(args)___); }
 };
+/// functor template specialization for const methods
+template<class O, class R, class... Args> struct const_method;
+template<class O, class R, class... Args> struct const_method<O, R(Args...)> : functor<R(Args...)> {
+    const O* object;
+    R (O::*pmf)(Args...) const;
+    const_method(const O* object, R (O::*pmf)(Args...) const): object(object), pmf(pmf){}
+    R operator ()(Args... args) const { return (object->*pmf)(forward<Args>(args)___); }
+};
 
 template<class R, class... Args> struct function;
 template<class R, class... Args> struct function<R(Args...)> {
     long any[6]; //always store functor on stack
     template<class F> function(F f) {
-        assert_(sizeof(lambda<F,R(Args...)>)<=sizeof(any));
+        static_assert(sizeof(lambda<F,R(Args...)>)<=sizeof(any),"");
         new (any) lambda<F,R(Args...)>(move(f));
     }
     template<class O> function(O* object, void (O::*pmf)(Args...)) {
-        assert_(sizeof(method<O,R(Args...)>)<=sizeof(any));
+        static_assert(sizeof(method<O,R(Args...)>)<=sizeof(any),"");
         new (any) method<O,R(Args...)>(object, pmf);
+    }
+    template<class O> function(const O* object, void (O::*pmf)(Args...) const) {
+        static_assert(sizeof(const_method<O,R(Args...)>)<=sizeof(any),"");
+        new (any) const_method<O,R(Args...)>(object, pmf);
     }
     R operator()(Args... args) const { return ((functor<R(Args...)>&)any)(forward<Args>(args)___); }
 };
@@ -40,6 +52,9 @@ template<class... Args> struct signal {
     template<class F> void connect(F f) { delegates<< f; }
     template<class C, class B, predicate(__is_base_of(B,C))>
     void connect(C* object, void (B::*pmf)(Args...)) { delegates<< function<void(Args...)>(static_cast<B*>(object),pmf); }
+    template<class C, class B, predicate(__is_base_of(B,C))>
+    void connect(const C* object, void (B::*pmf)(Args...) const) { delegates<< function<void(Args...)>(static_cast<const B*>(object),pmf); }
     explicit operator bool() { return delegates.size(); }
+    operator function<void(Args...)>(){ return __(this,&signal<Args...>::operator()); }
 };
 template<class... Args> signal<Args...> copy(const signal<Args...>& b) { signal<Args...> a; a.delegates=copy(b.delegates); return a; }
