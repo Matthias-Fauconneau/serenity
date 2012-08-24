@@ -1,5 +1,5 @@
 fix taskbar, player (+XF86AudioPlay)
-feeds: parse date, check text main content, left arrow=previous entry, preload image, progressive image, status, own inflate, own jpeg, better html
+feeds: broken favicons, parse date, left arrow=previous entry, preload image, progressive image, status, own inflate, own jpeg, better html
 music: update, raw midi
 font: automatic vertical fitting
 apps: text editor, file manager, pdf, wiki, search, irc, imap (ssl)

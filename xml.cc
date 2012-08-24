@@ -7,7 +7,7 @@ static Element parse(const ref<byte>& document, bool html) {
     assert(document);
     TextStream s(document);
     s.match("\xEF\xBB\xBF"_); //spurious BOM
-    Element root(""_);
+    Element root;
     while(s) {
         s.skip();
         if(s.match("</"_)) warn("Unexpected","</"_+s.until('>')+">"_);
@@ -38,12 +38,12 @@ Element::Element(TextStream& s, bool html) {
         string key = string(s.identifier());/*TODO:reference*/ s.skip();
         if(!key) { log("Attribute syntax error"_,s.slice(start,s.index-start),"|"_,s.until('>')); break; }
         if(html) key=toLower(key);
-        ref<byte> value;
+        string value;
         if(s.match('=')) {
             s.skip();
-            if(s.match('"')) value=s.until('"'); //FIXME: escape
-            else if(s.match('\'')) value=s.until('\''); //FIXME: escape
-            else { value=s.untilAny(" \t\n>"_); if(s.buffer[s.index-1]=='>') s.index--; }
+            if(s.match('"')) value=unescape(s.until('"'));
+            else if(s.match('\'')) value=unescape(s.until('\''));
+            else { value=string(s.untilAny(" \t\n>"_)); if(s.buffer[s.index-1]=='>') s.index--; }
             s.match("\""_); //duplicate "
         }
         attributes.insertMulti(move(key), move(value));
@@ -54,10 +54,7 @@ Element::Element(TextStream& s, bool html) {
         if(voidElements.contains(name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
-            //content=simplify(unescape(s.until(string("</"_+name+">"_))));
-            //content=unescape(s.until(string("</"_+name+">"_)));
-            //removeAll(content,byte('\n'));
-            content = s.until(string("</"_+name+">"_));
+            content = string(s.until(string("</"_+name+">"_)));
             s.skip();
             return;
         }
@@ -66,18 +63,16 @@ Element::Element(TextStream& s, bool html) {
         //if(s.available(4)<4) { warn("Expecting","</"_+name+">"_,"got EOF"); return; } //warn unclosed tag
         if(s.available(4)<4) {  return; } //ignore unclosed tag
         if(s.match("<![CDATA["_)) {
-            ref<byte> content= s.until("]]>"_);
-            if(content) children << Element(content);
+            string content (s.until("]]>"_));
+            if(content) children << Element(move(content));
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
         else if(s.match("</"_)) { if(name==s.until(">"_)) break; } //ignore
         else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
         else if(s.match('<')) children << Element(s,html);
         else {
-            //string content=simplify(trim(unescape(s.until("<"_)))); s.index--;
-            //string content=unescape(trim(s.until("<"_))); s.index--;
-            ref<byte> content = trim(s.whileNot('<'));
-            if(content) children << Element(content);
+            string content = unescape(s.whileNot('<'));
+            if(content) children << Element(move(content));
         }
     }
 }

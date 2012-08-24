@@ -6,13 +6,12 @@
 
 /// XML element
 struct Element {
-    string name; ref<byte> content;
-    //array< ref<byte> > content; //explicit content optimization (break interleaved content/Element order)
-    map< string, ref<byte> > attributes;
+    string name, content;
+    map< string, string > attributes;
     array< unique<Element> > children; //inline array of Element* instead of heap array of Element (faster reallocation)
-    //Element(){}
+    Element(){}
     /// Creates a content element from \a content
-    Element(const ref<byte>& content):content(content){} //TODO: escape analysis
+    Element(string&& content):content(move(content)){} //TODO: escape analysis
     /// Parses XML stream to construct a DOM tree of \a Elements
     /// \note As all name, content and attribute strings are referenced, the input document should live as long as the parsed elements.
     Element(TextStream& stream, bool html=false); //TODO: escape analysis

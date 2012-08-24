@@ -40,13 +40,14 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
 #define scaleY(p) ((size*int64(p)+round)>>scale)
 #define scale(p) scaleY(p)
 #define unscale(p) (((p)<<scale)/size)
+#define unscaleX(p) (((p)<<scale)/(size*3))
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4; assert(scale<32);
        round = (1<<scale)/2; //round to nearest not down
     }
     {DataStream& s = hhea;
         uint32 unused version=s.read();
-        ascent=s.read(); /*uint16 unused descent=s.read(), unused lineGap=s.read();
-        uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();*/
+        ascent=scale(s.read16()), descent=scale(s.read16()), lineGap=scale(s.read16());
+        //uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();*/
     }
 }
 
@@ -79,7 +80,7 @@ uint16 Font::index(uint16 code) {
                 uint32 first=s.read(), last=s.read(), firstIndex=s.read();
                 if(code>=first && code<=last) return firstIndex+code-first;
             }
-        } else error("Unsupported"_,format,code);
+        } else { trace(); log("Unsupported"_,format,code); return this->index('?'); }
         s.index=index;
     }
     error("Not Found"_);
@@ -108,7 +109,7 @@ struct Bitmap {
     Bitmap():data(0),width(0),height(0){}
     Bitmap(uint width,uint height):data(allocate<int8>(width*height)),width(width),height(height){clear((byte*)data,height*width);}
     ~Bitmap(){ if(data) unallocate(data,width*height);}
-    int8& operator()(uint x, uint y){assert(x<width && y<height); return data[y*width+x];}
+    int8& operator()(uint x, uint y){assert(x<width && y<height,x,y,width,height); return data[y*width+x];}
 };
 
 static int lastStepY; //dont flag first/last point twice but cancel on direction changes
@@ -154,7 +155,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
     int16 numContours = s.read();
     if(!raster.data) {
         xMin= s.read16(), yMin= s.read16(), xMax= s.read16(), yMax= s.read16();
-        //xMin  = unscale(floor(16,scale(xMin))); xMax = unscale(ceil(16,scale(xMax))); //keep horizontal subpixel accuracy
+        xMin  = unscaleX(floor(48,scaleX(xMin))); xMax = unscaleX(ceil(48,scaleX(xMax))); //align canvas to integer pixels
         yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
         int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin); assert(width>0,xMax,xMin); assert(height>0,yMax,yMin);
@@ -232,7 +233,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
     }
 }
 
-Glyph Font::glyph(uint16 index, int fx) {
+Glyph Font::glyph(uint16 index, int fx) { fx+=16; assert(fx>=0,fx);
     // Lookup glyph in cache
     Glyph& glyph = index<256 ? cacheASCII[fx%16][index] : cacheUnicode[fx%16][index];
     if(glyph.image || glyph.advance) return Glyph(glyph);
@@ -242,10 +243,10 @@ Glyph Font::glyph(uint16 index, int fx) {
     Bitmap raster; int xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
     if(!raster.data) return Glyph(glyph);
-    glyph.offset = int2(scale(xMin),scale(ascent)-scale(yMax)-16); //yMax was rounded up
+    glyph.offset = int2(floor(16,scale(xMin)),ascent-scale(yMax)-16); //yMax was rounded up
 
-    uint width=ceil(48,raster.width)/48+2, height=raster.height/16;
-    glyph.image = Image(width, height); //add 1px for subpixel position + 1px for filtering
+    uint width=ceil(48,raster.width)/48+1, height=raster.height/16; //add 1px for filtering
+    glyph.image = Image(width, height);
     for(uint y=0; y<height; y++) {
         uint16 line[width*3];
         int acc[16]={};
@@ -253,9 +254,8 @@ Glyph Font::glyph(uint16 index, int fx) {
             for(uint c=0; c<3; c++) {
                 int sum=0;
                 for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
-                    sum += acc[j];
+                    sum += acc[j]>0;
                     int idx=-(fx%16)*3+(x*3+c)*16+i; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
-                    assert(acc[j]==0||acc[j]==1,x,y,c,i,j,acc[j]);
                 }
                 line[x*3+c]=sum; assert(sum<=256);
             }
@@ -267,23 +267,5 @@ Glyph Font::glyph(uint16 index, int fx) {
             glyph.image(x,y) = byte4(igamma[pixel[2]/16],igamma[pixel[1]/16],igamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
         }
     }
-#define DEBUG_SUBPIXEL 0
-#if DEBUG_SUBPIXEL
-    Image image = Image(width*3,height*3);
-    for(uint y=0; y<height; y++) for(uint x=0; x<width; x++) {
-        image(x*3+0,y*3+0)=image(x*3+0,y*3+1)=image(x*3+0,y*3+2)= byte4(0,0,glyph.image(x,y).r,255);
-        image(x*3+1,y*3+0)=image(x*3+1,y*3+1)=image(x*3+1,y*3+2)= byte4(0,glyph.image(x,y).g,0,255);
-        image(x*3+2,y*3+0)=image(x*3+2,y*3+1)=image(x*3+2,y*3+2)= byte4(glyph.image(x,y).b,0,0,255);
-    }
-    glyph.image=move(image); glyph.advance *= 3; glyph.offset=glyph.offset*3; width*=3; height*=3;
-#endif
-#define DEBUG_UPSCALE 0
-#if DEBUG_UPSCALE
-    {Image image = Image(width*2,height*2);
-    for(uint y=0; y<height; y++) for(uint x=0; x<width; x++) {
-        image(x*2+0,y*2+0)=image(x*2+0,y*2+1)=image(x*2+1,y*2+0)=image(x*2+1,y*2+1)= glyph.image(x,y);
-    }
-    glyph.image=move(image); glyph.advance *= 2; glyph.offset*=2;}
-#endif
     return Glyph(glyph);
 }

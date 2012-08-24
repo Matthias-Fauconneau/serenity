@@ -15,7 +15,7 @@ array<byte> read(int fd, uint capacity) {
 array<byte> readUpTo(int fd, uint capacity) {
     array<byte> buffer(capacity);
     int size = check( read(fd,buffer.data(),capacity) );
-    buffer.setCapacity(size); buffer.setSize(size);
+    if(size) { buffer.setCapacity(size); buffer.setSize(size); }
     return buffer;
 }
 

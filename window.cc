@@ -7,6 +7,7 @@
 #include "linux.h"
 #include "debug.h"
 #include "time.h"
+#include "png.h"
 
 int2 display;
 Widget* focus;

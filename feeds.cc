@@ -31,7 +31,7 @@ void Feeds::loadFeed(const URL&, Map&& document) {
         if(count>=16) return; //limit history
         if(array::size()+entries.size()>=array::capacity()) return; //limit total entry count
         string title = e("title"_).text(); //RSS&Atom
-        string link = unescape(e("link"_)["href"_]); if(!link) link=string(e("link"_).text()); //Atom ?: RSS
+        string link = string(e("link"_)["href"_]); if(!link) link=e("link"_).text(); //Atom ?: RSS
         if(!favicon) {
             URL url = URL(link);
             favicon = &favicons[copy(url.host)];
@@ -59,7 +59,7 @@ void Feeds::getFavicon(const URL& url, Map&& document) {
 }
 
 void Feeds::resetFavicons() {
-    for(Entry& entry: *this) entry.icon.image = share(favicons.at(URL(entry.link).host));
+    for(Entry& entry: *this) { Image* favicon=favicons.find(URL(entry.link).host); if(favicon) entry.icon.image = share(*favicon); }
     listChanged();
 }
 

@@ -14,8 +14,9 @@ struct TextLayout {
     typedef array<Character> Word;
     array<Word> line;
     array<Character> text;
+    struct Line { uint begin,end; };
+    array<Line> lines;
     array<Text::Link> links;
-    array<Text::Line> lines;
 
     void nextLine(bool justify) {
         if(!line) { pen.y+=size; return; }
@@ -23,8 +24,8 @@ struct TextLayout {
         int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
         length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
         int space=0;
-        if(justify && line.size()>1) space = ((wrap<<4)-length)/(line.size()-1);
-        if(space<=0||space>64<<4) space = spaceAdvance; //compact
+        if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
+        if(space<=0||space>(64<<4)) space = spaceAdvance; //compact
 
         //layout
         pen.x=0;
@@ -44,7 +45,7 @@ struct TextLayout {
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->glyph(spaceIndex).advance;
         uint16 previous=spaceIndex;
-        Format format=Format::Regular;
+        Format format=Regular;
         Text::Link link;
         uint underlineBegin=0;
         uint glyphCount=0;
@@ -63,27 +64,18 @@ struct TextLayout {
                 continue;
             }
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
-                if(format&Format::Link) {
+                if(format&Link) {
                     link.end=glyphCount;
                     links << Text::Link __(link.begin,link.end,move(link.identifier));
                 }
                 Format newFormat = ::format(c);
-                if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) {
-                    const Character& c = this->text[underlineBegin];
-                    Text::Line line __(.min = c.pos-c.glyph.offset);
-                    for(uint i=underlineBegin;i<glyphCount;i++) {
-                        const Character& c = this->text[i];
-                        int2 p = int2(c.pos) - int2(0,c.glyph.offset.y);
-                        if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.glyph.advance,0);
-                    }
-                    if(line.max != line.min) lines<< move(line);
-                }
+                if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line __(underlineBegin,glyphCount);
                 format=newFormat;
-                if(format&Format::Bold) {
+                if(format&Bold) {
                     static map<int,Font> defaultBold;
                     if(!defaultBold.contains(size)) defaultBold.insert(size,Font("dejavu/DejaVuSans-Bold.ttf"_, size));
                     font = &defaultBold.at(size);
-                } else if(format&Format::Italic) {
+                } else if(format&Italic) {
                     static map<int,Font> defaultItalic;
                     if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font("dejavu/DejaVuSans-Oblique.ttf"_, size));
                     font = &defaultItalic.at(size);
@@ -127,8 +119,19 @@ struct TextLayout {
 Text::Text(string&& text, int size, ubyte opacity, uint wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
 void Text::layout() {
     TextLayout layout(text, size, wrap);
-    characters.clear(); for(const TextLayout::Character& c: layout.text) characters << Character __(int2(c.pos.x>>4, c.pos.y>>4), share(c.glyph.image));
-    lines = move(layout.lines); links = move(layout.links);
+    characters.clear(); for(const TextLayout::Character& c: layout.text) characters << Character __(int2(c.pos.x/16, c.pos.y/16), share(c.glyph.image));
+    links = move(layout.links);
+    for(const TextLayout::Line& l: layout.lines) {
+        Line line;
+        const TextLayout::Character& c = layout.text[l.begin];
+        line.min = (c.pos-c.glyph.offset)/16+int2(0,size);
+        for(uint i=l.begin;i<l.end;i++) {
+            const TextLayout::Character& c = layout.text[i];
+            int2 p = (c.pos-int2(0,c.glyph.offset.y))/16 + int2(0,size);
+            if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.glyph.advance/16,0);
+        }
+        if(line.max != line.min) lines<< move(line);
+    }
     textSize=int2(0,0); for(const Character& c: characters) textSize=max(textSize,int2(c.pos)+c.image.size()); textSize.y=max(textSize.y, size);
 }
 int2 Text::sizeHint() {
@@ -139,14 +142,14 @@ void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
     int2 offset = position+max(int2(0,0),(size-textSize)/2);
     for(const Character& b: characters) multiply(offset+b.pos, b.image, opacity);
-    for(const Line& l: lines) fill(offset+Rect(l.min+int2(0,1),l.max+int2(0,2)), black);
+    for(const Line& l: lines) fill(offset+Rect(l.min,l.max+int2(0,1)), black);
 }
 
 bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
     if(event!=Press) return false;
     position -= max(int2(0,0),(size-textSize)/2);
     for(uint i=0;i<characters.size();i++) { const Character& b=characters[i];
-        if(Rect(b.pos,b.image.size()).contains(position)) {
+        if((b.pos+Rect(b.image.size())).contains(position)) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated(link.identifier); return true; }
         }
     }

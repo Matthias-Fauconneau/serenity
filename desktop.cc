@@ -32,7 +32,7 @@ struct Desktop : Application {
     }
     void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
         if(!link) { showDesktop(); return; }
-        window.widget= &page.area();
+        window.widget= &page.area(); page.delta=int2(0,0);
         page.contentChanged.connect(&window, &Window::render);
         page.go(link);
         window.setTitle(title); window.setIcon(favicon);

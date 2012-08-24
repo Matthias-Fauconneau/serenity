@@ -19,7 +19,7 @@ struct Font {
     Map keep;
     DataStream cmap, kern;
     uint16* hmtx;
-    const void* loca; uint16 indexToLocFormat, ascent;
+    const void* loca; uint16 indexToLocFormat; int ascent, descent, lineGap;
     const byte* glyf; uint scale; int round, size;
     Glyph cacheASCII[16][256];
     map<uint16, Glyph> cacheUnicode[16];

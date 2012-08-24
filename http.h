@@ -21,6 +21,15 @@ struct Socket : virtual Stream {
     ref<byte> get(uint size) const override;
 };
 
+typedef struct ssl_st SSL;
+struct SSLSocket : Socket {
+    ~SSLSocket();
+    SSL* ssl=0;
+    bool connect(const ref<byte>& host, const ref<byte>& service);
+    array<byte> receive(uint size) override;
+    void write(const ref<byte>& buffer) override;
+};
+
 /// Encodes \a input to Base64 to transfer binary data through text protocol
 string base64(const string& input);
 
@@ -38,7 +47,7 @@ inline bool operator ==(const URL& a, const URL& b) {
 
 typedef function<void(const URL&, Map&&)> Handler;
 
-struct HTTP : Poll, virtual TextStream, virtual Socket {
+struct HTTP : Poll, virtual TextStream, virtual SSLSocket {
     URL url;
     array<string> headers;
     ref<byte> method;

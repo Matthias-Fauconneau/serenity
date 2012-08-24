@@ -8,12 +8,12 @@
 
 struct Browser : Application {
     Scroll<HTML> page;
-    Window window _(&page.area(),int2(0,0));
+    Window window __(&page.area(),int2(0,0),"Browser"_);
 
     Browser() {
         window.localShortcut(Escape).connect(this, &Application::quit);
-        page.contentChanged.connect(&window, &Window::update);
-        page.go("http://www.thedreamercomic.com/issues/issue_15/05_Issue_15.jpg"_);
+        page.contentChanged.connect(&window, &Window::render);
+        page.go("http://www.phoronix.com/scan.php?page=news_item&px=MTE2NjQ"_);
         window.show();
     }
 };

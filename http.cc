@@ -15,7 +15,7 @@ uint32 ip(TextStream& s) {
     return (d<<24)|(c<<16)|(b<<8)|a;
 }
 
-bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
+bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
     disconnect();
     static File dnsCache = appendFile(string(getenv("HOME"_)+"/.cache/dns"_));
     static Map dnsMap = mapFile(dnsCache);
@@ -66,7 +66,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& /*service*/) {
     }
 
     fd = socket(PF_INET,SOCK_STREAM|O_NONBLOCK,0);
-    sockaddr addr = {PF_INET,swap16(80),ip}; //http
+    sockaddr addr = {PF_INET,swap16(service=="https"_?443:80),ip};
     ::connect(fd, &addr, sizeof(addr));
     return true;
 }
@@ -80,6 +80,43 @@ uint Socket::available(uint need) {
     return Stream::available(need);
 }
 ref<byte> Socket::get(uint size) const { return Stream::get(size); }
+
+/// SSLSocket
+
+extern "C" {
+ int SSL_library_init();
+ struct SSLContext* SSL_CTX_new(const struct SSLMethod* method);
+ const SSLMethod* TLSv1_client_method();
+ SSL* SSL_new(SSLContext *ctx);
+ int SSL_set_fd(SSL*, int fd);
+ int SSL_connect(SSL*);
+ int SSL_shutdown(SSL*);
+ int SSL_read(SSL*,void *buf,int num);
+ int SSL_write(SSL*,const void *buf,int num);
+}
+bool SSLSocket::connect(const ref<byte>& host, const ref<byte>& service) {
+    if(!Socket::connect(host,service)) return false;
+    if(service=="https"_) {
+        static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
+        ssl = SSL_new(ctx);
+        SSL_set_fd(ssl,fd);
+        SSL_connect(ssl);
+    }
+    return true;
+}
+SSLSocket::~SSLSocket() { if(ssl) SSL_shutdown(ssl); }
+array<byte> SSLSocket::receive(uint size) {
+    if(!ssl) return Socket::receive(size);
+    array<byte> buffer(size);
+    if(ssl) size=SSL_read(ssl, buffer.data(), size);
+    if(int(size)<0) error("SSL");
+    buffer.setSize(size);
+    return buffer;
+}
+void SSLSocket::write(const ref<byte>& buffer) {
+    if(!ssl) return Socket::write(buffer);
+    SSL_write(ssl,buffer.data,buffer.size);
+}
 
 /// Base64
 
@@ -206,7 +243,7 @@ void HTTP::header() {
             if(!connect(url.host, url.scheme)) { free(this); return; }
             Poll::fd=Socket::fd;
             return;
-        } //else if(key=="Set-Cookie"_) log("Set-Cookie"_,value); //ignored
+        }
     }
     state = Data;
 }
@@ -239,7 +276,7 @@ void HTTP::event() {
     }
     if(state == Cache) {
         if(!content) { log("Missing content",(string&)buffer); free(this); return; }
-        log("Downloaded",url,content.size()/1024,"KB");
+        if(content.size()>1024) log("Downloaded",url,content.size()/1024,"KB"); else log("Downloaded",url,content.size(),"B");
 
         redirect << cacheFile(url);
         for(const string& file: redirect) {
