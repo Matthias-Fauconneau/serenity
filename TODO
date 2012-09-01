@@ -1,9 +1,10 @@
 fix taskbar, player (+XF86AudioPlay)
-feeds: broken favicons, parse date, left arrow=previous entry, preload image, progressive image, status, own inflate, own jpeg, better html
+feeds: broken favicons, left arrow=previous entry
 music: update, raw midi
 font: automatic vertical fitting
 apps: text editor, file manager, pdf, wiki, search, irc, imap (ssl)
-player: own mp3, video
+player: video
+own: inflate, jpeg, mp3
 parser: attributes (L+S), scoped symbols, GLR
 IDE: build driver (+frepo), syntax highlighting, navigation, completion, git, debugger, profiler, static analyzer, interpreter, compiler
 touchbook: hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait

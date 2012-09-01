@@ -118,7 +118,6 @@ enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_R
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 
-#pragma GCC system_header
 syscall0(int, fork)
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
@@ -132,6 +131,7 @@ syscall2(int, munmap, void*,addr, long,len)
 syscall1(void*, brk, void*,new_brk)
 
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
+#pragma GCC system_header //function declared 'noreturn' has a 'return' statement
 int exit(int code) __attribute((noreturn)); syscall1(int, exit, int,code)
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
 

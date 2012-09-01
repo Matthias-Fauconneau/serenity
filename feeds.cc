@@ -55,7 +55,7 @@ void Feeds::getFavicon(const URL& url, Map&& document) {
     page.xpath("html/head/link"_, [&icon](const Element& e){ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
     if(!icon) icon="/favicon.ico"_;
     if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink(string("../"_+cacheFile(url.relative(icon))), cacheFile(url.relative("/favicon.ico"_)),cache);
-    alloc<ImageLoader>(url.relative(icon), &favicons.at(url.host), function<void()>(this, &Feeds::resetFavicons), int2(16,16), 7*24*60*60);
+    alloc<ImageLoader>(url.relative(icon), &favicons[copy(url.host)], function<void()>(this, &Feeds::resetFavicons), int2(16,16), 7*24*60*60);
 }
 
 void Feeds::resetFavicons() {

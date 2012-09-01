@@ -43,7 +43,7 @@ static array<Poll*> polls;
 void Poll::registerPoll(int fd, short events) { assert(!polls.contains(this)); this->fd=fd; this->events=events; polls << this; }
 void Poll::registerPoll(short events) { registerPoll(fd,events); }
 static int currentPoll; //correct looping when unregistering from event loop
-void Poll::unregisterPoll() { int i=polls.indexOf(this); polls.removeAt(i); if(i<=currentPoll) currentPoll--; }
+void Poll::unregisterPoll() { int i=polls.indexOf(this); if(i==-1) return; polls.removeAt(i);  if(i<=currentPoll) currentPoll--; }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
 
@@ -57,7 +57,7 @@ int dispatchEvents() {
         int events = poll->revents = pollfds[i].revents;
         if(events) {
             poll->event();
-            if(events&POLLHUP) { log("POLLHUP"); poll->unregisterPoll(); }
+            if(events&POLLHUP) poll->unregisterPoll();
         }
     }
     return polls.size();

@@ -4,7 +4,7 @@ BUILD ?= release
 CC ?= clang++ -pipe
 FLAGS = -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer
-FLAGS_release := -O3 -fomit-frame-pointer
+FLAGS_release := -O3 -fomit-frame-pointer -Wno-volatile-register-var
 FLAGS_profile := -g -O -finstrument-functions
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))

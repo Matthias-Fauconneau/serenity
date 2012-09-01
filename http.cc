@@ -249,7 +249,6 @@ void HTTP::header() {
 }
 void HTTP::event() {
     assert(Socket::fd); assert(state>=Connect && state <=Done, int(state));
-    if(revents&POLLHUP) { log("Connection broken",revents&POLLIN,url); state=Done; free(this); return; }
     if(state == Connect) {
         if(!revents) { log("Connection timeout",url); state=Done; free(this); return; }
         fcntl(Socket::fd,F_SETFL,0);

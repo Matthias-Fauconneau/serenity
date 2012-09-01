@@ -54,20 +54,23 @@ void Month::setActive(Date active) {
     clear(); dates.clear();
     todayIndex=-1; this->active=active;
     static const ref<byte> days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
-    const int nofDays[12] = { 31, !(active.year%4)&&(active.year%400)?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     for(int i=0;i<7;i++) {
         *this<< string(days[i]);
         dates << Date(-1,-1,-1,-1,-1,-1,i);
     }
-    int first = (35+active.weekDay+1-active.day)%7;
+    int first=0; //days from Thursday, 1st January 1970 until the first of active month
+    for(int year=1970;year<active.year;year++) first+= ((year%400)||(!(year%100)&&year%4))?366:365;
+    const int daysPerMonth[12] = { 31, ((active.year%400)||(!(active.year%100)&&active.year%4))?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    for(int month=0;month<active.month;month++) first+=daysPerMonth[month];
+    first = first%7; //to week day (starting with Monday)
     for(int i=0;i<first;i++) { //previous month
         int previousMonth = (active.month+11)%12;
-        int day = nofDays[previousMonth]-first+i+1;
+        int day = daysPerMonth[previousMonth]-first+i+1;
         dates << Date(count()%7, day, previousMonth);
         *this<< Text(format(Italic)+dec(day,2),16,128);
     }
     Date today=::date();
-    for(int i=1;i<=nofDays[active.month];i++) { //current month
+    for(int i=1;i<=daysPerMonth[active.month];i++) { //current month
         bool isToday = today.month==active.month && i==today.day;
         if(isToday) todayIndex=count();
         dates << Date(count()%7, i, active.month);
