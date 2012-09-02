@@ -95,7 +95,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
 /// UniformGrid
 
 int2 UniformGrid::sizeHint() {
-    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
+    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else h++; }
     int2 max(0,0);
     for(uint i=0;i<count();i++) {
         int2 size=at(i).sizeHint();
@@ -105,12 +105,10 @@ int2 UniformGrid::sizeHint() {
 }
 
 array<Rect> UniformGrid::layout(int2 position, int2 size) {
-    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else  h++; }
+    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else h++; }
     int2 elementSize = int2(size.x/w,size.y/h);
     int2 margin = (size - int2(w,h)*elementSize) / 2;
     array<Rect> widgets(count());
-    uint i=0; for(uint y=0;y<h;y++) for(uint x=0;x<w;x++,i++) { if(i>=count()) return widgets;
-        widgets<< position + margin + int2(x,y)*elementSize + Rect(elementSize);
-    }
+    for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++)  widgets<< position + margin + int2(x,y)*elementSize + Rect(elementSize);
     return widgets;
 }

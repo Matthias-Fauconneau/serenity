@@ -143,6 +143,6 @@ template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {
 };
 /// Grid is an \a UniformGrid layout of selectable items (\sa ListSelection)
 template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelection {
-    Grid(int width, int height):UniformGrid(width,height){}
+    Grid(int width=0, int height=0):UniformGrid(width,height){}
     Grid(array<T>&& items) : ListSelection<T>(move(items)){}
 };

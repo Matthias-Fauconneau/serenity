@@ -85,33 +85,31 @@ void HTML::load(const URL& url, Map&& document) {
 }
 
 void HTML::parse(const URL& url, const Element &e) {
-    if(find(e["class"_],"comment"_)) return;
-    /***/ if(e.name=="img"_) { //Images
+    if(!e.name) {
+        if(text || trim(e.content)) { flushImages(); text << e.content; }
+    }
+    else if(find(e["class"_],"comment"_) || e["class"_]=="editsection"_) return;
+    else if(e.name=="img"_) {
         if(endsWith(e["src"_],".gif"_)) return;
         flushText();
         images << url.relative(e["src"_]);
     }
-    else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) { //Images
-        flushText();
+    else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) {
         TextStream s(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
+        flushText();
         images << url.relative(src);
     }
-    else if(!e.name) { //Text
-       flushImages();
-       if(!e.name) text << e.content;
-    }
     else if(e.name=="a"_) { //Link
-        flushImages();
-        bool inlineText=true; //TODO:
+        bool inlineText=true;
         e.visit([&inlineText](const Element& e){if(e.name&&!textElement.contains(e.name)) inlineText=false;});
+        if(inlineText) flushImages();
         if(inlineText) text << format(Underline|Link) << e["href"_] << " "_;
         for(const Element& c: e.children) parse(url, c);
         if(inlineText) text << format(Regular);
     }
     else if(paragraphElement.contains(e.name)) { //Paragraph
-        flushImages();
         for(const Element& c: e.children) parse(url, c);
-        text<<'\n';
+        if(text) { flushImages(); text<<'\n'; }
     }
     else if(boldElement.contains(e.name)) { //Bold
         text << format(Bold);
@@ -124,7 +122,6 @@ void HTML::parse(const URL& url, const Element &e) {
         for(const Element& c: e.children) parse(url, c);
         text << format(Regular);
     }
-    else if(e.name=="span"_&&e["class"_]=="editsection"_) { return; }//wikipedia [edit]
     else if(textElement.contains(e.name)) { for(const Element& c: e.children) parse(url, c); } // Unhandled format tags
     else if(ignoreElement.contains(e.name)) { return; } // Ignored elements
     else if(!e.name.contains(':')) warn("Unknown element '"_+e.name+"'"_);
@@ -138,17 +135,11 @@ void HTML::flushText() {
 }
 void HTML::flushImages() {
     if(!images) return;
-    uint w=1,h=1; for(;;) {
-        if(w*h>=images.size()) break; w++;
-        if(w*h>=images.size()) break; h++;
+    Grid<ImageView>& grid = heap<Grid<ImageView> >();
+    for(URL& image: images) {
+        grid << ImageView();
+        heap<ImageLoader>(image, &grid.last().image, contentChanged);
     }
-    for(uint y=0,i=0;y<h;y++) {
-        HList<ImageView>& list = heap< HList<ImageView> >();
-        for(uint x=0;x<w && i<images.size();x++,i++) {
-            list << ImageView();
-            heap<ImageLoader>(images[i], &list.last().image, contentChanged);
-        }
-        VBox::operator<<(&list);
-    }
+    VBox::operator<<(&grid);
     images.clear();
 }

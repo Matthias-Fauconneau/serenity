@@ -42,6 +42,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
         query << 0 << 0 << 1 << 0 << 1;
         ::write(dns,query);
         ::write(1,string(host+" "_));
+        pollfd fd __(dns,POLLIN); if(!poll(&fd,1,1000)){warn("DNS query timed out, retrying... "); ::write(dns,query); if(!poll(&fd,1,1000)){warn("giving up"); return false; } }
         DataStream s(readUpTo(dns,4096), true);
         header = s.read<Header>();
         for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
@@ -53,7 +54,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
             ip = s.read<uint>(); //IP (no swap)
             string entry = host+" "_+dec(raw(ip),'.')+"\n"_;
             log(dec(raw(ip),'.'));
-            ::write(dnsCache,entry); // add new entry
+            ::write(dnsCache,entry); //add new entry
             dnsMap = mapFile(dnsCache); //remap cache
             break;
         }
@@ -187,7 +188,7 @@ string cacheFile(const URL& url) {
 
 HTTP::HTTP(const URL& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : url(str(url)), headers(move(headers)), method(method), handler(handler) {
-    log("Request",url);
+    debug( log("Request",url); )
     if(!connect(url.host, url.scheme)) { free(this); return; }
     registerPoll(Socket::fd, POLLIN|POLLOUT);
 }
@@ -211,7 +212,7 @@ void HTTP::header() {
         content = readFile(file,cache);
         assert(content);
         writeFile(file,content,cache); //TODO: touch instead of rewriting
-        log("Not Modified",url);
+        debug( log("Not Modified",url); )
         state = Handle;
         return;
     } else if(status==404||status==408) { warn(status==404?"Not Found"_:"Request timeout"_,url); state=Done; free(this); return;
@@ -292,7 +293,7 @@ void getURL(const URL &url, Handler handler, int maximumAge) {
     if(existsFile(file,cache)) {
         long modified = modifiedTime(file,cache);
         if(currentTime()-modified < maximumAge*60) {
-            log("Cached",url);
+            debug( log("Cached",url); )
             Map content = mapFile(file,cache);
             handler(url,move(content));
             return;

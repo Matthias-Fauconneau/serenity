@@ -123,7 +123,7 @@ string Element::text(const ref<byte>& path) const {
 }
 
 string Element::str(const ref<byte>& prefix) const {
-    if(!name&&!trim(content)&&!children) return string();
+    assert(name||content||children);
     string line; line<< prefix;
     if(name||attributes) line << "<"_+name;
     for(auto attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
@@ -143,7 +143,7 @@ string unescape(const ref<byte>& xml) {
         array< ref<byte> > kv = split(
 "quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — "
 "euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull • "
-"agrave à acirc â egrave è ocirc ô ecirc ê szlig ß"_,' ');
+"agrave à acirc â ccedil ç egrave è ocirc ô ecirc ê ugrave iacute í ù szlig ß"_,' ');
         assert(kv.size()%2==0,kv.size());
         entities.reserve(kv.size()/2);
         for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
@@ -159,7 +159,7 @@ string unescape(const ref<byte>& xml) {
             ref<byte> key = s.word();
             if(s.match(';')) {
                 ref<byte>* c = entities.find(key);
-                if(c) out<<*c; else warn("Unknown entity",key);
+                if(c) out<<*c; else { debug(error("Unknown entity",key);) warn("Unknown entity",key); out<<key; }
             }
             else out<<"&"_; //unescaped &
         }

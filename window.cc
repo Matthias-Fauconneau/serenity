@@ -75,8 +75,8 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; write(x, raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
     r.length=1; r.size+=r.length; write(x,string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
-    //setType("_KDE_NET_WM_WINDOW_TYPE_OVERRIDE"_); //Client side decorations
-    setType("_NET_WM_WINDOW_TYPE_NORMAL"_); //Client side decorations
+    //setType("_KDE_NET_WM_WINDOW_TYPE_OVERRIDE"_); //Disable KWin server-side decorations
+    setType("_NET_WM_WINDOW_TYPE_NORMAL"_);
 
     setTitle(title);
     setIcon(icon);
@@ -86,7 +86,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
 void Window::event() {
     if(revents==IDLE) {
         assert(mapped); assert(size);
-        if(state==Server) { state=Wait; return; }
+        if(state!=Idle) { state=Wait; return; }
         if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
             if(shm) {
                 {Shm::Detach r; r.seg=id+Segment; write(x, raw(r));}
@@ -155,15 +155,15 @@ void Window::processEvent(uint8 type, const Event& event) {
         }
     } else if(type==1) { error("Unexpected reply");
     } else { Event e=event; type&=0b01111111; //msb set if sent by SendEvent
-        if(type==MotionNotify) { int2 cursor(e.rootX,e.rootY);
-            if(drag && e.state&Button1Mask && drag->mouseEvent(cursor, size, Widget::Motion, LeftButton)) wait();
-            else if( widget->mouseEvent(cursor, size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
+        if(type==MotionNotify) {
+            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, LeftButton)) wait();
+            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
             else {
-                if(!(e.state&Button1Mask)) { dragStart=cursor; dragPosition=position; dragSize=size; } //to reuse border intersection checks
-                bool top = dragStart.y<=dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-2;
-                bool left = dragStart.x<=dragPosition.x+1, right = dragStart.x>=dragPosition.x+dragSize.x-2;
+                if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; } //to reuse border intersection checks
+                bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
+                bool left = dragStart.x<dragPosition.x+1, right = dragStart.x>=dragPosition.x+dragSize.x-1;
                 if(e.state&Button1Mask) {
-                    int2 position=dragPosition, size=dragSize, delta=cursor-dragStart;
+                    int2 position=dragPosition, size=dragSize, delta=int2(e.rootX,e.rootY)-dragStart;
                     if(top && left) position+=delta, size-=delta;
                     else if(top && right) position.y+=delta.y, size+=int2(delta.x,-delta.y);
                     else if(bottom && left) position.x+=delta.x, size+=int2(-delta.x,delta.y);
@@ -187,7 +187,7 @@ void Window::processEvent(uint8 type, const Event& event) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
             {SetInputFocus r; r.window=id; write(x, raw(r));}
             if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Button)e.key)) wait();
-        } else if(type==ButtonPress) { drag=0;
+        } else if(type==ButtonRelease) { drag=0;
         } else if(type==KeyPress) {
             uint key = KeySym(e.key);
             signal<>* shortcut = localShortcuts.find(key);
@@ -211,7 +211,7 @@ void Window::processEvent(uint8 type, const Event& event) {
             signal<>* shortcut = localShortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
-        } else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) wait(); else state=Idle;
+        } else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) wait(); state=Idle;
         } else log("Event", ::events[type]);
     }
 }

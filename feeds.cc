@@ -7,7 +7,7 @@
 #include "ico.h"
 
 Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),true)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
-    array::reserve(64);
+    array::reserve(48);
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
     for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 12*60); }

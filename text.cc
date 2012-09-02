@@ -53,7 +53,7 @@ struct TextLayout {
         for(utf8_iterator it=text.begin();it!=text.end();++it) {
             uint c = *it;
             if(c==' '||c=='\t'||c=='\n') {//next word/line
-                if(c==' ') previous = spaceIndex;
+                previous = spaceIndex;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
                 int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance+spaceAdvance;
                 length += word.last().pos.x+(word.last().glyph.image.width<<4); //last word
@@ -97,7 +97,7 @@ struct TextLayout {
                 continue;
             }
             uint16 index = font->index(c);
-            pen.x += font->kerning(previous,index);
+            if(previous!=spaceIndex) pen.x += font->kerning(previous,index);
             Glyph glyph = font->glyph(index,pen.x);
             previous = index;
             if(glyph.image) { word << Character __(int2(pen.x,0)+glyph.offset, move(glyph)); glyphCount++; }
@@ -142,12 +142,13 @@ void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
     int2 offset = position+max(int2(0,0),(size-textSize)/2);
     for(const Character& b: characters) multiply(offset+b.pos, b.image, opacity);
-    for(const Line& l: lines) fill(offset+Rect(l.min,l.max+int2(0,1)), black);
+    for(const Line& l: lines) fill(offset+Rect(l.min-int2(0,1),l.max), black);
 }
 
 bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
     if(event!=Press) return false;
     position -= max(int2(0,0),(size-textSize)/2);
+    if(!Rect(textSize).contains(position)) return false;
     for(uint i=0;i<characters.size();i++) { const Character& b=characters[i];
         if((b.pos+Rect(b.image.size())).contains(position)) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated(link.identifier); return true; }

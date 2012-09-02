@@ -221,9 +221,9 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
     }
 }
 
-Glyph Font::glyph(uint16 index, int fx) { fx+=16; assert(fx>=0,fx);
+Glyph Font::glyph(uint16 index, int fx) { assert(fx>=-16,fx); fx=(fx+16)%16;
     // Lookup glyph in cache
-    Glyph& glyph = index<256 ? cacheASCII[fx%16][index] : cacheUnicode[fx%16][index];
+    Glyph& glyph = index<256 ? cacheASCII[fx][index] : cacheUnicode[fx][index];
     if(glyph.image || glyph.advance) return Glyph(glyph);
 
     // map unicode to glyf outline
@@ -243,7 +243,7 @@ Glyph Font::glyph(uint16 index, int fx) { fx+=16; assert(fx>=0,fx);
                 int sum=0;
                 for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
                     sum += acc[j]>0;
-                    int idx=-(fx%16)*3+(x*3+c)*16+i; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
+                    int idx=-fx*3+(x*3+c)*16+i; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
                 }
                 line[x*3+c]=sum; assert(sum<=256);
             }

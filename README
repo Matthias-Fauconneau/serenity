@@ -1,1 +1,1 @@
-The *.sh scripts will build and install an application.
+"TARGET=<application> make install" will build and install an application (default TARGET = desktop).
