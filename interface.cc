@@ -61,7 +61,7 @@ bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button bu
             if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
             if(event==Press && button == LeftButton) {
                 focus=this;
-                if(index!=i) { index=i; at(index).selectEvent(); activeChanged(index); }
+                setActive(i);
                 itemPressed(index);
                 return true;
             }

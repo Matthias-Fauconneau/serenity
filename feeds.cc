@@ -4,7 +4,6 @@
 #include "xml.h"
 #include "html.h"
 #include "interface.h"
-#include "ico.h"
 
 Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),true)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
     array::reserve(48);
@@ -13,14 +12,14 @@ Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),tr
     for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 12*60); }
 }
 
-bool Feeds::isRead(const ref<byte>& title, const ref<byte>& link) {
-    assert(!title.contains('\n') && !link.contains('\n'));
-    for(TextStream s(readMap);s;s.until('\n')) { //feed+date (instead of title+link) would be less readable and fail on feed relocation
-        if(s.match(title) && s.match(' ') && s.match(link)) return true;
+bool Feeds::isRead(const ref<byte>& date, const ref<byte>& link) {
+    assert(!date.contains('\n') && !link.contains('\n'));
+    for(TextStream s(readMap);s;s.until('\n')) {
+        if(s.match(date) && s.match(' ') && s.match(link)) return true;
     }
     return false;
 }
-bool Feeds::isRead(const Entry& entry) { return isRead(entry.text.text, entry.link); }
+bool Feeds::isRead(const Entry& entry) { return isRead(entry.date, entry.link); }
 
 ICON(network)
 void Feeds::loadFeed(const URL&, Map&& document) {
@@ -66,7 +65,7 @@ void Feeds::resetFavicons() {
 void Feeds::setRead(uint index) {
     Entry& entry = array::at(index);
     if(isRead(entry)) return;
-    ::write(readConfig,string(entry.text.text+" "_+entry.link+"\n"_));
+    ::write(readConfig,string(entry.date+" "_+entry.link+"\n"_));
     readMap = mapFile(readConfig); //remap
     entry.text.setSize(12);
 }

@@ -171,7 +171,7 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button) {
 
 bool TextInput::keyPress(Key key) {
     if(cursor>text.size()) cursor=text.size();
-    /***/ if(key==LeftArrow && cursor>0) cursor--;
+    /**/  if(key==LeftArrow && cursor>0) cursor--;
     else if(key==RightArrow && cursor<text.size()) cursor++;
     else if(key==Home) cursor=0;
     else if(key==End) cursor=text.size();

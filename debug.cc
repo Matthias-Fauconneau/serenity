@@ -27,7 +27,7 @@ string demangle(TextStream& s, bool function=true) {
     string r;
     bool rvalue=false,ref=false; int pointer=0;
     for(;;) {
-        if(s.match('O')) rvalue=true;
+        /**/  if(s.match('O')) rvalue=true;
         else if(s.match('R')) ref=true;
         else if(s.match('K')) r<<"const "_;
         else if(function && s.match('L')) r<<"static "_;
@@ -35,7 +35,7 @@ string demangle(TextStream& s, bool function=true) {
         else break;
     }
     uint l;
-    if(s.match('v')) { if(pointer) r<<"void"_; }
+    /**/  if(s.match('v')) { if(pointer) r<<"void"_; }
     else if(s.match("C1"_)) r<< "this"_;
     else if(s.match("C2"_)) r<< "this"_;
     else if(s.match("D1"_)) r<< "~this"_;
@@ -79,13 +79,15 @@ string demangle(TextStream& s, bool function=true) {
             else args<<demangle(s,false);
         }
         r<<'<'<<join(args,", "_)<<'>';
-    } else if(s.match('Z')) {
+    }
+    else if(s.match('Z')) {
         r<< demangle(s);
         array<string> args;
         while(s && !s.match('E')) args << demangle(s);
         r<< '(' << join(args,", "_) << ')';
-    } else if(s.match("_0"_)) {
-    } else if(s.match('N')) {
+    }
+    else if(s.match("_0"_)) {}
+    else if(s.match('N')) {
         array<string> list;
         bool const_method =false;
         if(s.match('K')) const_method=true;
@@ -95,11 +97,13 @@ string demangle(TextStream& s, bool function=true) {
         }
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
-    } else if((l=uint(s.number()))!=uint(-1)) {
+    }
+    else if((l=uint(s.number()))!=uint(-1)) {
         assert(l<=s.available(l),l,r,s.untilEnd(),move(s.buffer));
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
-    } else { /*warn("demangle error"_,s.untilEnd());*/ r<<s.untilEnd(); }
+    }
+    else r<<s.untilEnd();
     for(int i=0;i<pointer;i++) r<<'*';
     if(rvalue) r<<"&&"_;
     if(ref) r<<'&';
@@ -140,7 +144,7 @@ Symbol findNearestLine(void* find) {
             ubyte opcode = s.read();
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
                          fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };
-            /***/ if (opcode >= cu.opcode_base) {
+            /**/ if(opcode >= cu.opcode_base) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
                 line += (opcode % cu.line_range) + cu.line_base;
@@ -152,7 +156,7 @@ Symbol findNearestLine(void* find) {
                 if (size == 0) continue;
                 opcode = s.read();
                 enum { end_sequence = 1, set_address, define_file, set_discriminator };
-                /***/ if(opcode == end_sequence) { if (cu.stmt) { address = 0; file_index = 1; line = 1; is_stmt = cu.stmt; } }
+                /**/  if(opcode == end_sequence) { if (cu.stmt) { address = 0; file_index = 1; line = 1; is_stmt = cu.stmt; } }
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }

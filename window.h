@@ -15,17 +15,12 @@ struct Window : Poll {
 
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image());
-
-    struct QEvent { uint8 type; Event event; } packed;
-    array<QEvent> queue;
+    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(), const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_);
 
     /// Event handler
     void event();
-    /// Reads one X event
+    /// Processes one X event
     void processEvent(uint8 type, const Event& e);
-    /// Reads an X reply while checking pending errors and processing queued events
-    template<class T> T readReply();
     /// Returns Atom for \a name
     uint Atom(const ref<byte>& name);
     /// Returns name for \a atom
@@ -34,6 +29,14 @@ struct Window : Poll {
     uint KeySym(uint8 code);
     /// Returns property \a name on \a window
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
+
+    uint16 sequence=-1;
+    void send(const ref<byte>& request);
+
+    struct QEvent { uint8 type; Event event; } packed;
+    array<QEvent> queue;
+    /// Reads an X reply while checking pending errors and processing queued events
+    template<class T> T readReply();
 
     /// Shows window.
     void show();
@@ -51,12 +54,12 @@ struct Window : Poll {
     void setSize(int2 size);
     /// Moves window to \a position and resizes to \a size in one request
     void setGeometry(int2 position, int2 size);
-    /// Sets window type to \a type
-    void setType(const ref<byte>& type);
     /// Sets window title to \a title
     void setTitle(const ref<byte>& title);
     /// Sets window icon to \a icon
     void setIcon(const Image& icon);
+    /// Sets window type to \a type
+    void setType(const ref<byte>& type);
 
     /// Registers local shortcut on \a key
     signal<>& localShortcut(Key);
@@ -86,8 +89,6 @@ struct Window : Poll {
     /// Window position and size
     int2 position, size;
 
-    /// Socket to system local X display server
-    const int x; /// \note Each window opens its own socket to simplify code (i.e no same process optimization)
     /// Root window
     uint root = 0;
     /// This window base resource id

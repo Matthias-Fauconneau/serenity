@@ -19,7 +19,7 @@ union Event {
     struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
     struct { byte pad; uint16 seq; uint parent,window; int16 x,y,w,h,border; int8 override_redirect; } packed create;
     struct { byte pad; uint16 seq; uint parent,window; } packed map_request;
-    struct { byte pad; uint16 seq; uint event,window,above; int16 x,y,w,h,border; } packed configure;
+    struct { byte pad; uint16 seq; uint event,window,above; int16 x,y,w,h,border; int8 override_redirect; } packed configure;
     struct { byte stackMode; uint16 seq; uint parent,window,sibling; int16 x,y,w,h,border; int16 valueMask; } packed configure_request;
     struct { byte pad; uint16 seq; uint window, atom, time; uint8 state; } packed property;
     struct { byte pad; uint16 seq; uint time, requestor,selection,target,property; } packed selection;
@@ -35,7 +35,7 @@ struct Screen { int32 root, colormap, white, black, inputMask; int16 width, heig
 struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
-struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x=0,y=16,width,height,border=0,class_=1; uint visual;
+struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1; uint visual;
                       uint mask=BackgroundPixel|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
                                         uint backgroundPixel=0,borderPixel=0, bitGravity=5, winGravity=5, overrideRedirect, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
@@ -45,7 +45,9 @@ struct GetWindowAttributesReply { int8 backingStore; uint16 seq; uint length, vi
 struct DestroyWindow { int8 req=4; uint16 size=2; uint id; };
 struct MapWindow { int8 req=8; uint16 size=2; uint id;};
 struct UnmapWindow { int8 req=10; uint16 size=2; uint id;};
-struct ConfigureWindow { int8 req=12; uint16 size=5; uint id; int16 mask,pad; uint x,y; };
+struct ConfigureWindow { int8 req=12; uint16 size=8; uint id; int16 mask=X|Y|W|H|StackMode,pad; uint x,y,w,h,stackMode; };
+struct SetPosition { int8 req=12; uint16 size=5; uint id; int16 mask=X|Y,pad; uint x,y; };
+struct SetSize { int8 req=12; uint16 size=5; uint id; int16 mask=W|H,pad; uint w,h; };
 struct SetGeometry { int8 req=12; uint16 size=7; uint id; int16 mask=X|Y|W|H,pad; uint x,y,w,h; };
 struct RaiseWindow { int8 req=12; uint16 size=4; uint id; int16 mask=StackMode,pad; uint stackMode=Above; };
 struct GetGeometry{ int8 req=14; uint16 size=2; uint id; };
@@ -106,9 +108,6 @@ constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 
 namespace Render {
-//#include "X11/extensions/render.h"
-#include "X11/extensions/renderproto.h"
-
 struct PictFormInfo { uint format; uint8 type,depth; uint16 direct[8]; uint colormap; }; static_assert(sizeof(PictFormInfo)==28,"");
 struct PictVisual { uint visual, format; }; static_assert(sizeof(PictVisual)==8,"");
 struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ }; static_assert(sizeof(PictDepth)==8,"");

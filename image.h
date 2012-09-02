@@ -25,7 +25,7 @@ struct Image {
         assert(width); assert(height);
     }
     Image(array<byte4>&& o, uint width, uint height, bool alpha) : data(o.data()),width(width),height(height),stride(width),own(true),alpha(alpha) {
-        assert(o.size() == width*height, o.size(), width, height); assert(o.tag==-2); o.tag = 0;
+        assert(width && height && o.size() == width*height, width, height, o.size()); assert(o.tag==-2); o.tag = 0;
     }
 
     ~Image(){ if(data && own) { unallocate(data,height*stride); } }

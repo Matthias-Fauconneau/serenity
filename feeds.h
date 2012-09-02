@@ -5,8 +5,8 @@
 
 /// Entry is an \a Item with a \a link to an article
 struct Entry : Item {
-    string link;
-    Entry(string&& link, Image&& icon, string&& text, int size=16):Linear(Left),Item(move(icon),move(text),size),link(move(link)){}
+    string date, link;
+    Entry(string&& date, string&& link, Image&& icon, string&& text, int size=16):Linear(Left),Item(move(icon),move(text),size),date(move(date)),link(move(link)){}
 };
 
 /// Feeds is a list of entries fetched from RSS/Atom feeds

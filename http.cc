@@ -42,7 +42,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
         query << 0 << 0 << 1 << 0 << 1;
         ::write(dns,query);
         ::write(1,string(host+" "_));
-        pollfd fd __(dns,POLLIN); if(!poll(&fd,1,1000)){warn("DNS query timed out, retrying... "); ::write(dns,query); if(!poll(&fd,1,1000)){warn("giving up"); return false; } }
+        pollfd pollfd __(dns,POLLIN); if(!poll(&pollfd,1,1000)){warn("DNS query timed out, retrying... "); ::write(dns,query); if(!poll(&pollfd,1,1000)){warn("giving up"); return false; } }
         DataStream s(readUpTo(dns,4096), true);
         header = s.read<Header>();
         for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
@@ -59,7 +59,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
             break;
         }
         if(ip==uint(-1)) {
-            log("unknown");
+            warn("unknown");
             ::write(dnsCache,string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = mapFile(dnsCache); //remap cache
             return false;
@@ -69,15 +69,20 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
     fd = socket(PF_INET,SOCK_STREAM|O_NONBLOCK,0);
     sockaddr addr = {PF_INET,swap16(service=="https"_?443:80),ip};
     ::connect(fd, &addr, sizeof(addr));
+    fcntl(fd,F_SETFL,0);
+    registerPoll(fd,POLLOUT);
     return true;
 }
-void Socket::disconnect() { if(fd) close(fd); fd=0; }
+void Socket::disconnect() {if(fd) close(fd); unregisterPoll(); }
 
 array<byte> Socket::receive(uint size) { return readUpTo(fd,size); }
 void Socket::write(const ref<byte>& buffer) { ::write(fd,buffer); }
 
 uint Socket::available(uint need) {
-    while(need>Stream::available(need)) (array<byte>&)buffer<<this->receive(max(4096u,need-Stream::available(need)));
+    while(need>Stream::available(need)) {
+        if(!poll(this,1,1000)) { warn("wait for",need,"bytes timed out"); break; }
+        (array<byte>&)buffer<<this->receive(max(4096u,need-Stream::available(need)));
+    }
     return Stream::available(need);
 }
 
@@ -188,20 +193,17 @@ string cacheFile(const URL& url) {
 
 HTTP::HTTP(const URL& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : url(str(url)), headers(move(headers)), method(method), handler(handler) {
-    debug( log("Request",url); )
-    if(!connect(url.host, url.scheme)) { free(this); return; }
-    registerPoll(Socket::fd, POLLIN|POLLOUT);
+    if(!connect(url.host, url.scheme)) { free(this); return; } state=Connect;
 }
 void HTTP::request() {
-    state=Request;
+    assert(state==Connect); state=Request; events=POLLIN;
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;
-    write( string(request+"\r\n"_) );
+    write( string(request+"\r\n"_) );log("Request",url);
 }
 void HTTP::header() {
     string file = cacheFile(url);
-    assert(state==Request);
-    state=Header;
+    assert(state==Request); state=Header;
     // Status
     if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer); warn("No HTTP",url); state=Done; free(this); return; }
     int status = toInteger(until(" "_));
@@ -212,12 +214,14 @@ void HTTP::header() {
         content = readFile(file,cache);
         assert(content);
         writeFile(file,content,cache); //TODO: touch instead of rewriting
-        debug( log("Not Modified",url); )
+        log("Not Modified",url);
         state = Handle;
         return;
-    } else if(status==404||status==408) { warn(status==404?"Not Found"_:"Request timeout"_,url); state=Done; free(this); return;
-    } else if(status==400) { warn("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
-    } else { log((string&)buffer); warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
+    }
+    else if(status==400) warn("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
+    else if(status==404||status==408) { warn(status==404?"Not Found"_:"Request timeout"_,url); state=Done; free(this); return; }
+    else if(status==504) { warn(content=string("Gateway Time-out"_),url); state = Handle; return; }
+    else { log((string&)buffer); warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
 
     // Headers
     for(;;) {
@@ -231,20 +235,18 @@ void HTTP::header() {
             URL next = url.relative(value);
             assert(!url.host.contains('/') && !next.host.contains('/'),url,next);
             redirect << file;
-            ((array<byte>&)buffer).clear(); index=0; contentLength=0; chunked=false; disconnect(); state=Connect;
+            ((array<byte>&)buffer).clear(); index=0; contentLength=0; chunked=false; disconnect(); //state=Connect;
             url=move(next);
-            if(!connect(url.host, url.scheme)) { free(this); return; }
-            Poll::fd=Socket::fd;
+            if(!connect(url.host, url.scheme)) { free(this); return; } state=Connect;
             return;
         }
     }
     state = Data;
 }
 void HTTP::event() {
-    assert(Socket::fd); assert(state>=Connect && state <=Done, int(state));
     if(state == Connect) {
         if(!revents) { log("Connection timeout",url); state=Done; free(this); return; }
-        fcntl(Socket::fd,F_SETFL,0);
+        fcntl(fd,F_SETFL,0);
         request();
         return;
     }
@@ -261,9 +263,12 @@ void HTTP::event() {
             if(content.size()>=contentLength) state=Cache;
         }
         else if(chunked) {
-            uint chunkSize = number(16); match("\r\n"_);
-            if(chunkSize) { uint unused packetSize=available(chunkSize); assert(packetSize>=chunkSize); content << read(chunkSize); match("\r\n"_); }
-            else state=Cache;
+            do {
+                uint chunkSize = number(16); match("\r\n"_);
+                if(chunkSize==0) {  state=Cache; break; }
+                uint unused packetSize=available(chunkSize); assert(packetSize>=chunkSize);
+                content << read(chunkSize); match("\r\n"_);
+            } while(Stream::available(3)>=3);
         }
     }
     if(state == Cache) {

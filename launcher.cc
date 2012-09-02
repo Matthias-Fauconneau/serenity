@@ -9,14 +9,14 @@
 
 bool Search::keyPress(Key key) {
     if(key == Return) {
-        //execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text}); TODO: serenity browser
+        //execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text},false);
         setText(string()); triggered(); return true;
     }
     else return TextInput::keyPress(key);
 }
 
 bool Command::mouseEvent(int2, int2, Event event, Button button) {
-    if(event == Press && button == LeftButton) { execute(path,args); triggered(); return true; }
+    if(event == Press && button == LeftButton) { execute(path,args,false); triggered(); return true; }
     return false;
 }
 
@@ -57,7 +57,7 @@ List<Command> readShortcuts() {
     return shortcuts;
 }
 
-Launcher::Launcher() {
+Launcher::Launcher() {menu<<&search<<&shortcuts;
     window.hideOnLeave = true;
     window.localShortcut(Escape).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);

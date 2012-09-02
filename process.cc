@@ -42,7 +42,7 @@ static array<Poll*> polls;
 void Poll::registerPoll(int fd, short events) { assert(!polls.contains(this)); this->fd=fd; this->events=events; polls << this; }
 void Poll::registerPoll(short events) { registerPoll(fd,events); }
 static int currentPoll; //correct looping when unregistering from event loop
-void Poll::unregisterPoll() { int i=polls.indexOf(this); if(i==-1) return; polls.removeAt(i);  if(i<=currentPoll) currentPoll--; }
+void Poll::unregisterPoll() { int i=polls.indexOf(this); if(i==-1) return; polls.removeAt(i);  if(i<=currentPoll) currentPoll--; fd=events=revents=0; }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
 
@@ -62,15 +62,16 @@ int dispatchEvents() {
     return polls.size();
 }
 
-void execute(const ref<byte>& path, const array<string>& args) {
-    array<stringz> args0(1+args.size());
+void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
+    array<stringz> args0(1+args.size);
     args0 << strz(path);
-    for(uint i=0;i<args.size();i++) args0 << strz(args[i]);
+    for(uint i=0;i<args.size;i++) args0 << strz(args[i]);
     const char* argv[args0.size()+1];
     for(uint i=0;i<args0.size();i++) argv[i]=args0[i];
     argv[args0.size()]=0;
     int pid = fork();
-    if(pid==0) if(!execve(strz(path),argv,0)) exit(-1);
+    if(pid==0) { if(!execve(strz(path),argv,0)) exit(-1); }
+    else if(wait) wait4(pid,0,0,0);
 }
 
 void setPriority(int priority) { setpriority(0,0,priority); }

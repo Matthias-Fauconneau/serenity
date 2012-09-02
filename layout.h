@@ -90,12 +90,15 @@ template<class T> struct VList : Vertical, Array<T> {
 };
 
 /// UniformGrid layouts items on an uniform \a width x \a height grid
-struct UniformGrid : virtual Layout {
+struct Grid : virtual Layout {
     /// Horizontal and vertical element count, 0 means automatic
     int width,height;
-    UniformGrid(int width=0, int height=0):width(width),height(height){}
+    Grid(int width=0, int height=0):width(width),height(height){}
     int2 sizeHint();
     array<Rect> layout(int2 position, int2 size) override;
+};
+template<class T> struct UniformGrid : Grid,  Array<T> {
+
 };
 
 /// Selection implements selection of active widget/item for a \a Layout
@@ -123,26 +126,26 @@ struct TabSelection : virtual Selection {
     void render(int2 position, int2 size) override;
 };
 
-/// ListSelection is an \a Array with \a Selection
-template<class T> struct ListSelection : Array<T>, virtual Selection {
-    ListSelection(){}
-    ListSelection(array<T>&& items) : Array<T>(move(items)){}
+/// ArraySelection is an \a Array with \a Selection
+template<class T> struct ArraySelection : Array<T>, virtual Selection {
+    ArraySelection(){}
+    ArraySelection(array<T>&& items) : Array<T>(move(items)){}
     /// Return active item (last selection)
     T& active() { return array<T>::at(this->index); }
 };
 
-/// List is a \a Vertical layout of selectable items (\sa ListSelection)
-template<class T> struct List : Vertical, ListSelection<T>, HighlightSelection {
+/// List is a \a Vertical layout of selectable items (\sa ArraySelection)
+template<class T> struct List : Vertical, ArraySelection<T>, HighlightSelection {
     List(){}
-    List(array<T>&& items) : ListSelection<T>(move(items)){}
+    List(array<T>&& items) : ArraySelection<T>(move(items)){}
 };
-/// Bar is a \a Horizontal layout of selectable items (\sa ListSelection)
-template<class T> struct Bar : Horizontal, ListSelection<T>, TabSelection {
+/// Bar is a \a Horizontal layout of selectable items (\sa ArraySelection)
+template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
     Bar(){}
-    Bar(array<T>&& items) : ListSelection<T>(move(items)){}
+    Bar(array<T>&& items) : ArraySelection<T>(move(items)){}
 };
-/// Grid is an \a UniformGrid layout of selectable items (\sa ListSelection)
-template<class T> struct Grid : UniformGrid, ListSelection<T>, HighlightSelection {
-    Grid(int width=0, int height=0):UniformGrid(width,height){}
-    Grid(array<T>&& items) : ListSelection<T>(move(items)){}
+/// GridSelection is a \a Grid layout of selectable items (\sa ArraySelection)
+template<class T> struct GridSelection : Grid, ArraySelection<T>, HighlightSelection {
+    GridSelection(int width=0, int height=0) : Grid(width,height){}
+    GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}
 };

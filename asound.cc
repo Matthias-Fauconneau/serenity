@@ -94,7 +94,7 @@ void AudioOutput::stop() {
 void AudioOutput::event(const pollfd&) {
     if(status->state == XRun) { warn("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
     int available = status->hwPointer + bufferSize - control->swPointer;
-    if(!available){/*log(status->state,bufferSize,"=",periodCount,"x",periodSize,"hw",status->hwPointer,"sw",control->swPointer);*/return;}//FIXME
+    if(!available){/*warn(status->state,bufferSize,"=",periodCount,"x",periodSize,"hw",status->hwPointer,"sw",control->swPointer);*/return;}//FIXME
     uint offset = control->swPointer % bufferSize;
     uint frames = min(min((uint)available,bufferSize),bufferSize-offset);
     read(buffer+offset*channels, frames);

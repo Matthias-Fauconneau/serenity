@@ -106,7 +106,7 @@ int TextStream::number(uint base) {
 
 char TextStream::character() {
     if(!match('\\')) return next();
-    /***/ if(match('n')) return '\n';
+    /**/  if(match('n')) return '\n';
     else if(match('"')) return '"';
     else if(match('\'')) return '\'';
     else if(match('\\')) return '\\';

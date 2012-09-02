@@ -6,11 +6,11 @@
 array<string> getEvents(Date query);
 
 /// Month shows a week-aligned calendar month
-struct Month : Grid<Text> {
+struct Month : GridSelection<Text> {
     Date active;
     array<Date> dates;
     uint todayIndex;
-    Month() : Grid(7,8) {}
+    Month() : GridSelection(7,8) {}
     void setActive(Date active);
     void previousMonth();
     void nextMonth();

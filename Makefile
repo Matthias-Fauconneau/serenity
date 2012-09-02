@@ -1,5 +1,5 @@
 PREFIX ?= /usr
-TARGET ?= desktop
+TARGET ?= taskbar
 BUILD ?= release
 CC = clang++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
@@ -76,4 +76,5 @@ install_%.desktop: %.desktop
 	cp $< $(PREFIX)/share/applications/
 
 install: all $(INSTALL:%=install_%)
+	killall $(PREFIX)/bin/$(TARGET)
 	cp $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)

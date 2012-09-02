@@ -67,7 +67,7 @@
 enum class sys : long {
 #if __x86_64
     read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, shmget=29, shmat, shmctl,
-    socket=41, connect, fork=57, vfork, execve, exit, shmdt=67, fcntl=72, getdents=78, setpriority=141, setrlimit=160, clock_gettime=228,
+    socket=41, connect, fork=57, vfork, execve, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, setrlimit=160, clock_gettime=228,
     openat=257, mkdirat, unlinkat=263, symlinkat=266, timerfd_create=283, timerfd_settime=286
 #else
     exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
@@ -118,7 +118,6 @@ enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_R
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 
-syscall0(int, fork)
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
 syscall3(int, open, const char*,name, int,oflag, int,perms)
@@ -131,8 +130,10 @@ syscall2(int, munmap, void*,addr, long,len)
 syscall1(void*, brk, void*,new_brk)
 
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
-inline __attribute((noreturn)) int exit(int code) {r(r0,code) volatile register long n asm(rN) = (long)sys::exit; asm volatile(kernel:: "r"(n), "r"(r0)); __builtin_unreachable();}
+syscall0(int, fork)
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
+inline __attribute((noreturn)) int exit(int code) {r(r0,code) volatile register long n asm(rN) = (long)sys::exit; asm volatile(kernel:: "r"(n), "r"(r0)); __builtin_unreachable();}
+syscall4(int, wait4, int,pid, int*,status, int,options, struct rusage*, rusage)
 
 syscall3(int, ioctl, int,fd, long,request, void*,buf)
 syscall3(int, fcntl, int,fd, int,cmd, int,param)

@@ -5,8 +5,7 @@
 #include "file.h"
 
 /// \a Socket is a network socket
-struct Socket : virtual Stream {
-    int fd=0;
+struct Socket : virtual Stream, Poll {
     Socket(){}
     ~Socket() { disconnect(); }
     /// Connects to \a service on \a host
@@ -46,7 +45,7 @@ inline bool operator ==(const URL& a, const URL& b) {
 
 typedef function<void(const URL&, Map&&)> Handler;
 
-struct HTTP : Poll, virtual TextStream, virtual SSLSocket {
+struct HTTP : TextStream, SSLSocket {
     URL url;
     array<string> headers;
     ref<byte> method;

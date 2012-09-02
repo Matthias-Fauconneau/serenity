@@ -21,7 +21,7 @@ struct HTMLTest : Application {
     HTMLTest() {
         window.localShortcut(Escape).connect(this, &Application::quit);
         page.contentChanged.connect(&window, &Window::render);
-        page.go("http://mango.blender.org/production/the-premiere-photos-of-steel/"_);
+        page.go("http://www.tryinghuman.com/?id=607"_);
         window.show();
     }
 };

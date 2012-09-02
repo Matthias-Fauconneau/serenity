@@ -37,7 +37,7 @@ struct Application {
 #define Application(App) int main() { void init(); init(); for(App app;app.running && dispatchEvents();); return 0; }
 
 /// Execute binary at \a path with command line arguments \a args
-void execute(const ref<byte>& path, const array<string>& args=array<string>());
+void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);
 
 /// Set process CPU scheduling priority (-20 high priority, 19 low priority)
 void setPriority(int priority);

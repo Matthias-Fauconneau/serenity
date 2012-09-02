@@ -92,19 +92,19 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     return widgets;
 }
 
-/// UniformGrid
+/// Grid
 
-int2 UniformGrid::sizeHint() {
+int2 Grid::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else h++; }
     int2 max(0,0);
     for(uint i=0;i<count();i++) {
         int2 size=at(i).sizeHint();
         max = ::max(max,size);
     }
-    return int2(w,h)*max; //fixed size
+    return int2(w,h)*max;
 }
 
-array<Rect> UniformGrid::layout(int2 position, int2 size) {
+array<Rect> Grid::layout(int2 position, int2 size) {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else h++; }
     int2 elementSize = int2(size.x/w,size.y/h);
     int2 margin = (size - int2(w,h)*elementSize) / 2;
