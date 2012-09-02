@@ -27,14 +27,14 @@ struct Stream {
     Stream(array<byte>&& array) : buffer(move(array)) {invariant();}
     /// Creates a Stream interface to a \a reference
     explicit Stream(const ref<byte>& reference) : buffer(reference.data,reference.size) {invariant();} //TODO: escape analysis
-//interface (default to buffer source)
+
     /// Returns number of bytes available, reading \a need bytes from underlying device if possible
     virtual uint available(uint /*need*/) { invariant(); return buffer.size()-index; }
+
     /// Returns next \a size bytes from stream
-    virtual ref<byte> get(uint size) const { assert_(index+size<=buffer.size());  return ref<byte>(buffer.data()+index,size); } //TODO: escape analysis
+    ref<byte> get(uint size) const { assert_(index+size<=buffer.size());  return ref<byte>(buffer.data()+index,size); } //TODO: escape analysis
     /// Advances \a count bytes in stream
-    virtual void advance(uint count) { invariant(); index+=count; invariant(); }
-//Stream helpers
+    void advance(uint count) { invariant(); index+=count; invariant(); }
     /// Returns the next byte in stream without advancing
     ubyte peek() const { assert_(index<buffer.size()); return buffer[index]; }
     /// Returns the next byte in stream and advance

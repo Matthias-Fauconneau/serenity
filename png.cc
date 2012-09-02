@@ -15,7 +15,7 @@ template<template<typename> class T, int N> void filter(byte4* dst, const byte* 
     typedef vector<T,int,N> V;
     byte buffer[width*sizeof(S)]; S* prior = (S*)buffer; clear(prior,width,S(0));
     for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
-        uint filter = *raw++; debug( if(filter>4) warn("Unknown PNG filter",filter); )
+        uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);
         S* src = (S*)raw;
         S a(0);
         if(filter==0) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]=      src[i];

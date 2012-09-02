@@ -1,22 +1,22 @@
 #pragma once
 #include "core.h"
 
-byte* allocate_(uint size);
-byte* reallocate_(byte* buffer, int size, int need);
-void unallocate_(byte* buffer, int size);
+extern "C" byte* malloc(long size);
+extern "C" byte* realloc(void* buffer, long size);
+extern "C" void free(void* buffer);
 
-template<class T> T* allocate(int size) { return (T*)allocate_(size*sizeof(T)); }
-template<class T> T* reallocate(const T* buffer, int size, int need) { return (T*)reallocate_((byte*)buffer, size*sizeof(T), need*sizeof(T)); }
-template<class T> void unallocate(T*& buffer, int size) { unallocate_((byte*)buffer,size*sizeof(T)); buffer=0; }
+template<class T> T* allocate(int size) { assert_(size); return (T*)malloc(size*sizeof(T)); }
+template<class T> void reallocate(T*& buffer, int unused size, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
+template<class T> void unallocate(T*& buffer, int unused size) { assert_(buffer); free((void*)buffer); buffer=0; }
 
-template<class T, class... Args> T& alloc(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)...); return *t; }
+template<class T, class... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }
 template<class T> void free(T* t) { t->~T(); unallocate(t,1); }
 
 /// Unique reference to an heap allocated value
 template<class T> struct unique {
     no_copy(unique)
     T* pointer;
-    template<class... Args> unique(Args&&... args):pointer(&alloc<T>(forward<Args>(args)...)){}
+    template<class... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)___)){}
     unique(unique&& o){pointer=o.pointer; o.pointer=0;}
     ~unique() { if(pointer) free(pointer); }
     operator T&() { return *pointer; }

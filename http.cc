@@ -41,7 +41,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
         }
         query << 0 << 0 << 1 << 0 << 1;
         ::write(dns,query);
-        ::write(1,string("query "_+host+" "_));
+        ::write(1,string(host+" "_));
         DataStream s(readUpTo(dns,4096), true);
         header = s.read<Header>();
         for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
@@ -70,7 +70,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
     ::connect(fd, &addr, sizeof(addr));
     return true;
 }
-void Socket::disconnect() { if(fd) close( fd ); fd=0; }
+void Socket::disconnect() { if(fd) close(fd); fd=0; }
 
 array<byte> Socket::receive(uint size) { return readUpTo(fd,size); }
 void Socket::write(const ref<byte>& buffer) { ::write(fd,buffer); }
@@ -79,7 +79,6 @@ uint Socket::available(uint need) {
     while(need>Stream::available(need)) (array<byte>&)buffer<<this->receive(max(4096u,need-Stream::available(need)));
     return Stream::available(need);
 }
-ref<byte> Socket::get(uint size) const { return Stream::get(size); }
 
 /// SSLSocket
 
@@ -188,7 +187,7 @@ string cacheFile(const URL& url) {
 
 HTTP::HTTP(const URL& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : url(str(url)), headers(move(headers)), method(method), handler(handler) {
-    debug( log("Request",url); )
+    log("Request",url);
     if(!connect(url.host, url.scheme)) { free(this); return; }
     registerPoll(Socket::fd, POLLIN|POLLOUT);
 }
@@ -203,7 +202,7 @@ void HTTP::header() {
     assert(state==Request);
     state=Header;
     // Status
-    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer, index); warn("No HTTP",url); state=Done; free(this); return; }
+    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer); warn("No HTTP",url); state=Done; free(this); return; }
     int status = toInteger(until(" "_));
     until("\r\n"_);
     if(status==200||status==301||status==302) {}
@@ -212,26 +211,19 @@ void HTTP::header() {
         content = readFile(file,cache);
         assert(content);
         writeFile(file,content,cache); //TODO: touch instead of rewriting
-        debug( log("Not Modified",url); )
+        log("Not Modified",url);
         state = Handle;
         return;
-    } else if(status==404||status==408) {
-        warn(status==404?"Not Found"_:"Request timeout"_,url);
-        state=Done; free(this); return;
-    } else {
-        log(until("\r\n\r\n"_)); warn("Unhandled status",status,"from",url);
-        state=Done; free(this); return;
-    }
+    } else if(status==404||status==408) { warn(status==404?"Not Found"_:"Request timeout"_,url); state=Done; free(this); return;
+    } else if(status==400) { warn("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
+    } else { log((string&)buffer); warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
 
     // Headers
     for(;;) {
         if(match("\r\n"_)) break;
         ref<byte> key = until(": "_); assert(key,buffer);
         ref<byte> value=until("\r\n"_);
-        if(key=="Content-Length"_) {
-            contentLength=toInteger(value);
-            if(contentLength==0) { state=Done; free(this); return; }
-        }
+        if(key=="Content-Length"_) contentLength=toInteger(value);
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
         else if((key=="Location"_ && (status==301||status==302)) || key=="Refresh"_) {
             if(startsWith(value,"0;URL="_)) value=value.slice(6);
@@ -268,13 +260,13 @@ void HTTP::event() {
             if(content.size()>=contentLength) state=Cache;
         }
         else if(chunked) {
-            uint contentLength = number(16); match("\r\n"_);
-            if(contentLength) { assert(available(contentLength)>=contentLength); content << read(contentLength); match("\r\n"_); }
+            uint chunkSize = number(16); match("\r\n"_);
+            if(chunkSize) { uint unused packetSize=available(chunkSize); assert(packetSize>=chunkSize); content << read(chunkSize); match("\r\n"_); }
             else state=Cache;
         }
     }
     if(state == Cache) {
-        if(!content) { log("Missing content",(string&)buffer); free(this); return; }
+        if(!content) warn("Missing content",(string&)buffer);
         if(content.size()>1024) log("Downloaded",url,content.size()/1024,"KB"); else log("Downloaded",url,content.size(),"B");
 
         redirect << cacheFile(url);
@@ -300,13 +292,12 @@ void getURL(const URL &url, Handler handler, int maximumAge) {
     if(existsFile(file,cache)) {
         long modified = modifiedTime(file,cache);
         if(currentTime()-modified < maximumAge*60) {
-            debug( log("Cached",url); )
+            log("Cached",url);
             Map content = mapFile(file,cache);
-            assert(content,file);
             handler(url,move(content));
             return;
         }
         headers<< "If-Modified-Since: "_+str(date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
-    alloc<HTTP>(url,handler,move(headers));
+    heap<HTTP>(url,handler,move(headers));
 }

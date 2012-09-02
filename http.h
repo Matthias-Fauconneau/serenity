@@ -18,7 +18,6 @@ struct Socket : virtual Stream {
     virtual void write(const ref<byte>& buffer);
     /// Stream
     uint available(uint need) override;
-    ref<byte> get(uint size) const override;
 };
 
 typedef struct ssl_st SSL;

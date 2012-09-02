@@ -24,7 +24,6 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
 }
 
 void init() {
-    void setupHeap(); setupHeap(); //memory.cc
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM.PIPE}
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;

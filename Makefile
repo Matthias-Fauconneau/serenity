@@ -1,11 +1,16 @@
 PREFIX ?= /usr
 TARGET ?= desktop
 BUILD ?= release
-CC ?= clang++ -pipe
-FLAGS = -std=c++11 -march=native -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
+CC = clang++ -pipe -march=native
+FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
+#debug: include debug symbols, keep all assertions, disable all optimizations
 FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer
-FLAGS_release := -O3 -fomit-frame-pointer -Wno-volatile-register-var
-FLAGS_profile := -g -O -finstrument-functions
+#fast: include debug symbols, keep all assertions, use light optimizations
+FLAGS_fast := -g -DDEBUG -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls
+#profile: include debug symbols, keep all assertions, use light optimizations, instrument functions
+FLAGS_profile := $(FLAGS_fast) -finstrument-functions
+#release: strip debug symbols, disable all assertions, use all optimizations
+FLAGS_release := -O3 -fomit-frame-pointer
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button
@@ -32,7 +37,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@clang++ $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	@$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
 
 $(BUILD)/%.d: %.cc

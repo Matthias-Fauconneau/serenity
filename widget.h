@@ -14,7 +14,6 @@ enum Key {
 /// Widget is an abstract component to compose user interfaces
 struct Widget {
     Widget(){}Widget(Widget&&){}
-    virtual ~Widget() {}
 // Layout
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.

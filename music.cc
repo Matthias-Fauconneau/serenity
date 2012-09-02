@@ -77,9 +77,7 @@ struct Music : Application {
         window.show();
         sampler.lock();
         window.setTitle(instrument);
-#ifndef DEBUG
-        setPriority(-20);
-#endif
+        //setPriority(-20);
         audio.start();
     }
     void keyPress(Key key) { if(key==Escape) running=false; }

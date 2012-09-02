@@ -1,20 +1,8 @@
 #include "font.h"
 
-/// Gamma correction
-static uint8 gamma[257];
-static uint8 igamma[257];
-#ifdef __arm__
-inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(i)), igamma[i]=255-gamma[i]; return true; }
-#else
-#define pow __builtin_pow
-inline float sRGB(float c) { if(c>=0.0031308f) return 1.055f*pow(c,1/2.4f)-0.055f; else return 12.92f*c; }
-inline bool computeGammaLookup() { for(int i=0;i<=256;i++) gamma[i]=min(255,int(255*sRGB(i/255.f))), igamma[i]=255-gamma[i]; return true; }
-#endif
-
 static int fonts() { static int fd = openFolder("usr/share/fonts"_); return fd; }
 
 Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
-    static bool unused once = computeGammaLookup();
     DataStream s = DataStream(keep, true);
     uint32 unused scaler=s.read();
     uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
@@ -264,7 +252,7 @@ Glyph Font::glyph(uint16 index, int fx) { fx+=16; assert(fx>=0,fx);
             uint8 filter[5] = {1, 4, 6, 4, 1};
             uint16 pixel[3]={};
             for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)width*3) pixel[c]+=filter[i]*line[idx]; }
-            glyph.image(x,y) = byte4(igamma[pixel[2]/16],igamma[pixel[1]/16],igamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
+            glyph.image(x,y) = byte4(255-gamma[pixel[2]/16],255-gamma[pixel[1]/16],255-gamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
         }
     }
     return Glyph(glyph);

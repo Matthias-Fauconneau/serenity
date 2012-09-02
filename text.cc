@@ -22,10 +22,10 @@ struct TextLayout {
         if(!line) { pen.y+=size; return; }
         //justify
         int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().glyph.advance; //sum word length
-        length += line.last().last().glyph.image.width - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
+        length += (line.last().last().glyph.image.width<<4) - line.last().last().glyph.advance; //for last word of line, use glyph bound instead of advance
         int space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0||space>(64<<4)) space = spaceAdvance; //compact
+        if(space<=0) space = spaceAdvance; //compact
 
         //layout
         pen.x=0;
@@ -43,7 +43,7 @@ struct TextLayout {
         if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
         Font* font = &defaultSans.at(size);
         uint16 spaceIndex = font->index(' ');
-        spaceAdvance = font->glyph(spaceIndex).advance;
+        spaceAdvance = font->glyph(spaceIndex).advance; assert(spaceAdvance);
         uint16 previous=spaceIndex;
         Format format=Regular;
         Text::Link link;

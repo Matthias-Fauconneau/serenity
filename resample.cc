@@ -50,6 +50,11 @@ float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v; } __at
 #define shuffle __builtin_shufflevector
 #define moveHighToLow(a,b) shuffle(a, b, 6, 7, 2, 3);
 
+template<class T> T* allocate_aligned(int size) {
+    extern "C" int posix_memalign(byte** buffer, long alignment, long size);
+    byte* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer;
+}
+
 //TODO: store FIR of order 48 in registers
 inline float inner_product_single(const float* kernel, const float* signal, int len) {
     assert_(kernel); assert_(signal); assert_(ptr(kernel)%16==0);
@@ -111,7 +116,7 @@ Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channel
         N = filterSize;
     }
 
-    kernel = allocate<float>(N*targetRate);
+    kernel = allocate_aligned<float>(N*targetRate);
     for(int i=0;i<targetRate;i++) {
         for (int j=0;j<N;j++) {
             kernel[i*N+j] = sinc(cutoff, (j-N/2+1)-float(i)/targetRate, N);

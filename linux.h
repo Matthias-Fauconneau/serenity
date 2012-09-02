@@ -46,22 +46,22 @@
     inline type name() \
 {syscall(type, name)}
 #define syscall1(type,name,type0,arg0) \
-    inline type name(type0 arg0) attribute \
+    inline attribute type name(type0 arg0) \
 {r(r0,arg0) syscall(type, name, "r"(r0))}
 #define syscall2(type,name,type0,arg0,type1,arg1) \
-    inline type name(type0 arg0, type1 arg1) attribute \
+    inline attribute type name(type0 arg0, type1 arg1) \
 {r(r0,arg0) r(r1,arg1) syscall(type, name, "r"(r0), "r"(r1))}
 #define syscall3(type,name,type0,arg0,type1,arg1,type2,arg2) \
-    inline type name(type0 arg0, type1 arg1, type2 arg2) attribute \
+    inline attribute type name(type0 arg0, type1 arg1, type2 arg2) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) syscall(type, name, "r"(r0), "r"(r1), "r"(r2))}
 #define syscall4(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3) \
-    inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3) attribute \
+    inline attribute type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3))}
 #define syscall5(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4) \
-    inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4) attribute \
+    inline attribute type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4))}
 #define syscall6(type,name,type0,arg0,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5) \
-    inline type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) attribute \
+    inline attribute type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) r(r5, arg5) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5))}
 
 enum class sys : long {
@@ -131,8 +131,7 @@ syscall2(int, munmap, void*,addr, long,len)
 syscall1(void*, brk, void*,new_brk)
 
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
-#pragma GCC system_header //function declared 'noreturn' has a 'return' statement
-int exit(int code) __attribute((noreturn)); syscall1(int, exit, int,code)
+inline __attribute((noreturn)) int exit(int code) {r(r0,code) volatile register long n asm(rN) = (long)sys::exit; asm volatile(kernel:: "r"(n), "r"(r0)); __builtin_unreachable();}
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
 
 syscall3(int, ioctl, int,fd, long,request, void*,buf)

@@ -23,7 +23,6 @@ static int readLEV(DataStream& s, bool sign=false) {
     return result;
 }
 
-#if 1
 string demangle(TextStream& s, bool function=true) {
     string r;
     bool rvalue=false,ref=false; int pointer=0;
@@ -107,15 +106,6 @@ string demangle(TextStream& s, bool function=true) {
     return r;
 }
 string demangle(const ref<byte>& symbol) { TextStream s(symbol); return s.match('_')&&s.peek()=='Z'? demangle(s) : string(s.untilEnd()); }
-#else
-namespace abi { char* __cxa_demangle(const char* symbol, char* output, long* length, int* status); }
-extern "C" byte* malloc(long size);
-string demangle(const ref<byte>& symbol) {
-    long length=128; static char* buffer=(char*)malloc(length); int status;
-    buffer=abi::__cxa_demangle(strz(symbol),buffer,&length,&status);
-    return string(!status?str((const char*)buffer):symbol);
-}
-#endif
 
 Symbol findNearestLine(void* find) {
     static Map map = mapFile("proc/self/exe"_);

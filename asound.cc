@@ -12,8 +12,8 @@ enum Intervals { SampleBits, FrameBits, Channels, Rate, PeriodTime, PeriodSize, 
 enum Flags { NoResample=1, ExportBuffer=2, NoPeriodWakeUp=4 };
 
 struct interval {
-    uint min=0, max=~0; uint openmin:1, openmax:1, integer:1, empty:1;
-    interval():min(0),max(~0),openmin(0),openmax(0),integer(0),empty(0){}
+    uint min, max; uint openmin:1, openmax:1, integer:1, empty:1;
+    interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0){}
     interval(uint exact):min(exact),max(exact),openmin(0),openmax(0),integer(1),empty(0){}
     operator uint() { assert(integer); assert(min==max); return max; }
 };

@@ -1113,7 +1113,7 @@ void *jpeg_decoder::alloc(int nSize, bool zero)
     if (!rv)
     {
         int capacity = max(32768 - 256, (nSize + 2047) & ~2047);
-        mem_block *b = (mem_block*)allocate_(sizeof(mem_block) + capacity);
+        mem_block *b = (mem_block*)allocate<byte>(sizeof(mem_block) + capacity);
         assert(b);
         b->m_pNext = m_pMem_blocks; m_pMem_blocks = b;
         b->m_used_count = nSize;
