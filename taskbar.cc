@@ -36,7 +36,7 @@ struct Taskbar : Application, Poll {
     Launcher launcher;
     Bar<Task> tasks;
     Clock clock __(16);
-    Calendar calendar;
+    Events calendar;
     Window popup __(&calendar,int2(256,-1));
     HBox panel;//__(&start, &tasks, &clock);
     Window window __(&panel,int2(0,16));
@@ -71,8 +71,8 @@ struct Taskbar : Application, Poll {
         tasks.expanding=true;
         tasks.activeChanged.connect(this, &Taskbar::raiseTask);
         clock.timeout.connect(&window, &Window::render);
-        clock.timeout.connect(&calendar, &Calendar::checkAlarm);
-        clock.triggered.connect(&calendar,&Calendar::reset);
+        clock.timeout.connect(&calendar, &Events::checkAlarm);
+        clock.triggered.connect(&calendar,&Events::reset);
         clock.triggered.connect(&popup,&Window::toggle);
         calendar.eventAlarm.connect(&popup,&Window::show);
         calendar.side=Linear::Right;
@@ -100,7 +100,6 @@ struct Taskbar : Application, Poll {
             }
             if(x!=g.x || y!=g.y || w!=g.w || h!=g.h){SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}
             {MapWindow r; r.id=id; send(raw(r));}
-            raise(id);
             int i = tasks.indexOf(id);
             if(i<0) i=addWindow(id);
             if(i<0) return;
@@ -137,7 +136,7 @@ struct Taskbar : Application, Poll {
                 tasks.removeAt(i);
                 if(tasks.index == uint(i)) {
                     tasks.index=-1;
-                    if(tasks) raise(tasks.last().id);
+                    //if(tasks) raise(tasks.last().id);
                 }
             }
         } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify||type==MappingNotify) {

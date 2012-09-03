@@ -100,14 +100,9 @@ struct Window : Poll {
     /// This window base resource id
     uint id = 0;
     /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor };
-    /// MIT-SHM extension code
+    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, WindowPicture };
 
-    /// System V shared memory
-    int shm = 0;
-    /// Shared window back buffer
-    Image buffer;
-    /// Shared window buffer state
+    /// Shared memory state
     enum { Idle, Server, Wait } state = Idle;
 
     /// bgra32 Render PictFormat

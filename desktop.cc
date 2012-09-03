@@ -10,7 +10,7 @@ struct Desktop : Application {
     Scroll<HTML> page;
     List<Command> shortcuts = readShortcuts();
     Clock clock __( 64 );
-    Calendar calendar;
+    Events calendar;
     VBox timeBox;//  __(&clock, &calendar);
     HBox applets;// __(&feeds, &timeBox, &shortcuts);
     Window window __(&applets,int2(0,0),"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);

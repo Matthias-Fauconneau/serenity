@@ -43,7 +43,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     assert(visual);
 
     {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; send(string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::error=r.firstError; }
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::error=r.firstError;}
 
     {QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; send(string(raw(r)+"RENDER"_+pad(4,r.length)));}
     {QueryExtensionReply r=readReply<QueryExtensionReply>(); Render::EXT=r.major; Render::event=r.firstEvent; Render::error=r.firstError; }
@@ -92,30 +92,21 @@ void Window::event() {
         }
         assert(mapped); assert(size);
         if(state!=Idle) { state=Wait; return; }
-        if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
-            if(shm) {
-                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                shmdt(buffer.data);
-                shmctl(shm, IPC_RMID, 0);
-            }
-            buffer.stride=buffer.width=size.x, buffer.height=size.y;
-            shm = check( shmget(IPC_NEW, sizeof(byte4)*buffer.width*buffer.height , IPC_CREAT | 0777) );
-            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
-            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
-        }
-        framebuffer = share(buffer);
-        currentClip=Rect(framebuffer.size());
-#if 0
-        fill(currentClip,white);
-#else
+
+        framebuffer.stride=framebuffer.width=size.x, framebuffer.height=size.y;
+        int shm = check( shmget(IPC_NEW, sizeof(byte4)*framebuffer.width*framebuffer.height , IPC_CREAT | 0777) );
+        framebuffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(framebuffer.data);
+        {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
+
         // Oxygen like radial gradient background
         int2 center = int2(size.x/2,0); int radius=256;
         for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
             int2 pos = int2(x,y);
-            const int bgCenter=0xF0,bgOuter=0xE0,opacity=0xFF/*0xF0*/;
+            const int bgCenter=0xF0,bgOuter=0xE0,opacity=/*0xFF*/0xF0;
             int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
             framebuffer(x,y) = byte4(g,g,g,opacity);
         }
+
         //feather edges //TODO: client side shadow
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
         if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
@@ -126,11 +117,16 @@ void Window::event() {
         if(position.x+size.x<display.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
         if(position.x>0 && position.y+size.y<display.y-1) framebuffer(0,size.y-1) /= 2;
         if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;
-#endif
+
+        currentClip=Rect(framebuffer.size());
         widget->render(int2(0,0),size);
         assert(!clipStack);
+
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-            r.totalWidth=r.width=buffer.width; r.totalHeight=r.height=buffer.height; send(raw(r)); }
+            r.totalWidth=r.width=framebuffer.width; r.totalHeight=r.height=framebuffer.height; send(raw(r)); }
+        {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+        shmdt(framebuffer.data);
+        shmctl(shm, IPC_RMID, 0);
         state=Server;
     } else {
         uint8 type = read<uint8>(fd);
@@ -146,18 +142,15 @@ void Window::processEvent(uint8 type, const Event& event) {
             int reqSize=sizeof(Render::requests)/sizeof(*Render::requests);
             if(code>=Render::error && code<=Render::error+Render::errorCount) { code-=Render::error;
                 assert(code<sizeof(Render::errors)/sizeof(*Render::errors));
-                trace(); warn("Error",Render::errors[code],"seq:",e.seq,"id",e.id,
-                      "request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+                warn("Error",Render::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                trace(); warn("Error",::errors[code],"seq:",e.seq,"id",e.id,
-                      "request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+                warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             }
         } else {
             assert(code<sizeof(::errors)/sizeof(*::errors));
             int reqSize=sizeof(::requests)/sizeof(*::requests);
-            trace(); warn("Error",::errors[code],"seq:",e.seq,"id",e.id,
-                  "request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
+            warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
     }
     else if(type==1) error("Unexpected reply");

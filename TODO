@@ -1,4 +1,3 @@
-taskbar: test alarm
 player: update, +XF86AudioPlay
 music: update, raw midi
 font: automatic fitting

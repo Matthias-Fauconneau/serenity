@@ -49,7 +49,7 @@ array<string> getEvents(Date query) {
     return events;
 }
 
-void Month::setActive(Date active) {
+void Calendar::setActive(Date active) {
     clear(); dates.clear();
     todayIndex=-1; this->active=active;
     static const ref<byte> days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
@@ -62,37 +62,37 @@ void Month::setActive(Date active) {
         int previousMonth = (active.month+11)%12;
         int day = daysInMonth(previousMonth,active.year)-first+i+1;
         dates << Date(count()%7, day, previousMonth, active.year-(active.month==0));
-        *this<< Text(format(Italic)+dec(day,2),16,128);
+        *this<< Text(format(Italic)+dec(day+1,2),16,128);
     }
     Date today=::date();
-    for(int i=1;i<=daysInMonth(active.month,active.year);i++) { //current month
+    for(int i=0;i<daysInMonth(active.month,active.year);i++) { //current month
         bool isToday = today.month==active.month && i==today.day;
         if(isToday) todayIndex=count();
         dates << Date(count()%7, i, active.month, active.year);
-        *this<< string((isToday?format(Bold):string())+dec(i,2)); //current day
+        *this<< string((isToday?format(Bold):string())+dec(i+1,2)); //current day
     }
-    for(int i=1;count()<7*8;i++) { //next month
+    for(int i=0;count()<7*8;i++) { //next month
         dates << Date(count()%7, i, (active.month+1)%12, active.year+(active.month==11));
-        *this<< Text(format(Italic)+dec(i,2),16,128);
+        *this<< Text(format(Italic)+dec(i+1,2),16,128);
     }
     Selection::setActive(todayIndex);
 }
 
-void Month::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
-void Month::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
+void Calendar::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
+void Calendar::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-Calendar::Calendar()/*:VBox(__(&date, &month, &events))*/ { *this<<&date<<&month<<&events; date<<string( "<"_)<<string(""_)<<string(">"_);
+Events::Events()/*:VBox(__(&date, &month, &events))*/ { *this<<&date<<&month<<&events; date<<string( "<"_)<<string(""_)<<string(">"_);
     date.main=Linear::Spread;
-    date[0].textClicked.connect(this, &Calendar::previousMonth);
-    date[2].textClicked.connect(this, &Calendar::nextMonth);
-    month.activeChanged.connect(this,&Calendar::showEvents);
+    date[0].textClicked.connect(this, &Events::previousMonth);
+    date[2].textClicked.connect(this, &Events::nextMonth);
+    month.activeChanged.connect(this,&Events::showEvents);
     reset();
 }
-void Calendar::reset() { month.setActive(::date());  date[1].setText(::str(month.active,"MMMM yyyy"_) ); }
-void Calendar::previousMonth() { month.previousMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
-void Calendar::nextMonth() { month.nextMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
+void Events::reset() { month.setActive(::date());  date[1].setText(::str(month.active,"MMMM yyyy"_) ); }
+void Events::previousMonth() { month.previousMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
+void Events::nextMonth() { month.nextMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
 
-void Calendar::showEvents(uint index) {
+void Events::showEvents(uint index) {
     string text;
     Date date = month.dates[index];
     array<string> events = getEvents(date);
@@ -111,4 +111,4 @@ void Calendar::showEvents(uint index) {
     this->events.setText(move(text));
 }
 
-void Calendar::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm(); }
+void Events::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm(); }

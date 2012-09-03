@@ -3,7 +3,7 @@
 
 #define fixed(T) packed ____(; static_assert(sizeof(T)==31,""))
 
-enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, EventMask=1<<11, ColorMap=1<<13, Cursor=1<<14 };
+enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, Cursor=1<<14 };
 enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3,
        EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15,
        StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, PropertyChangeMask=1<<22 };
@@ -99,19 +99,19 @@ struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
 struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalWidth, totalHeight, srcX=0, srcY=0, width, height,
                   dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
-struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x,y,w,h; uint mask; uint8 format; uint seg,offset; };
-struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual,size,pad[4]; };
-struct CreatePixmap { int8 ext=EXT, req=5; uint16 size=7; uint pixmap,drawable; uint16 w,h; uint8 depth; uint seg,offset; };
+struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0; };
+struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual,size,pad[4]; } fixed(GetImageReply);
 enum { Completion };
 constexpr ref<byte> errors[] = {"BadSeg"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 
 namespace Render {
-struct PictFormInfo { uint format; uint8 type,depth; uint16 direct[8]; uint colormap; }; static_assert(sizeof(PictFormInfo)==28,"");
-struct PictVisual { uint visual, format; }; static_assert(sizeof(PictVisual)==8,"");
-struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ }; static_assert(sizeof(PictDepth)==8,"");
-struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ }; static_assert(sizeof(PictScreen)==8,"");
+enum PICTOP { Clear, Src, Dst, Over };
+struct PictFormInfo { uint format; uint8 type,depth; uint16 direct[8]; uint colormap; };
+struct PictVisual { uint visual, format; };
+struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ };
+struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ };
 
 extern int EXT, event, error;
 struct QueryVersion { int8 ext=EXT,req=0; uint16 size=3; uint major=0,minor=11; };
@@ -120,8 +120,9 @@ struct QueryPictFormats{ int8 ext=EXT,req=1; uint16 size=1; };
 struct QueryPictFormatsReply { int8 pad; uint16 seq; uint length; uint numFormats,numScreens,numDepths,numVisuals,numSubpixels,pad2; } fixed(QueryPictFormatsReply);
 struct CreatePicture { int8 ext=EXT,req=4; uint16 size=5; uint picture,drawable,format,valueMask=0; };
 struct FreePicture { int8 ext=EXT,req=7; uint16 size=2; uint picture; };
+struct Composite { int8 ext=EXT,req=8; uint16 size=9; uint8 op=Over; uint src,mask=0,dst; int16 srcX=0,srcY=0,maskX=0,maskY=0,dstX=0,dstY=0,width,height; };
 struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
-constexpr ref<byte> requests[] = {"QueryVersion"_,"QueryPictFormats"_,"QueryPictIndexValues"_,"QueryFilters"_,"CreatePicture"_,"ChangePicture"_,"SetPictureClipRectangles"_,"SetPictureTransform"_,"SetPictureFilter"_,"FreePicture"_};
+constexpr ref<byte> requests[] = {"QueryVersion"_,"QueryPictFormats"_,"QueryPictIndexValues"_,"QueryFilters"_,"CreatePicture"_,"ChangePicture"_,"SetPictureClipRectangles"_,"SetPictureTransform"_,"SetPictureFilter"_,"FreePicture"_,"Composite"_};
 constexpr ref<byte> errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }

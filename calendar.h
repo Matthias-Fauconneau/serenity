@@ -6,23 +6,23 @@
 array<string> getEvents(Date query);
 
 /// Month shows a week-aligned calendar month
-struct Month : GridSelection<Text> {
+struct Calendar : GridSelection<Text> {
     Date active;
     array<Date> dates;
     uint todayIndex;
-    Month() : GridSelection(7,8) {}
+    Calendar() : GridSelection(7,8) {}
     void setActive(Date active);
     void previousMonth();
     void nextMonth();
 };
 
 /// Calendar shows current date, month grid and events
-struct Calendar : VBox {
+struct Events : VBox {
     HList<Text> date;// __(array<Text>{string( "<"_), string(""_), string(">"_)});
-    Month month;
+    Calendar month;
     Text events;
     signal<> eventAlarm;
-    Calendar();
+    Events();
     /// Resets calendar to today
     void reset();
     /// Shows previous month

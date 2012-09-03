@@ -12,18 +12,20 @@ long cpuTime();
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
-    void invariant();
+    debug(void invariant();)
     Date(){}
-    Date(int weekDay, int monthDay, int month, int year):year(year),month(month),day(monthDay),weekDay(weekDay){invariant();}
+    Date(int weekDay, int monthDay, int month, int year):year(year),month(month),day(monthDay),weekDay(weekDay) {debug(invariant();)}
     Date(int seconds, int minutes, int hours, int day, int month, int year, int weekDay) :
-        year(year),month(month),day(day),hours(hours),minutes(minutes),seconds(seconds),weekDay(weekDay){ invariant(); }
+        year(year),month(month),day(day),hours(hours),minutes(minutes),seconds(seconds),weekDay(weekDay) {debug(invariant();)}
     /// Sets month day and matching week day
     void setDay(int monthDay);
 };
 bool operator >(const Date& a, const Date& b);
 bool operator ==(const Date& a, const Date& b);
 
+enum WeekDay { Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday };
 static constexpr ref<byte> days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
+enum Month { January, February, March, April, May, June, July, August, September, October, November, December };
 static constexpr ref<byte> months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
 constexpr bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year);

@@ -41,7 +41,8 @@ inline string str(const Image& o) { return str(o.width,"x"_,o.height); }
 /// Creates a new handle to \a image data (unsafe if freed)
 inline Image share(const Image& o) { return Image((byte4*)o.data,o.width,o.height,o.stride,false,o.alpha); }
 /// Copies the image buffer
-inline Image copy(const Image& o) {Image r(o.width,o.height,o.alpha); ::copy((byte4*)r.data,o.data,o.stride*o.height); return r;}
+inline void copy(Image& dst, const Image& src) {assert(dst.size()==src.size() && dst.stride==src.stride); ::copy((byte4*)dst.data,src.data,src.stride*src.height); }
+inline Image copy(const Image& src) {Image dst(src.width,src.height,src.alpha); ::copy(dst,src); return dst;}
 /// Returns a copy of the image resized to \a width x \a height
 Image resize(const Image& image, uint width, uint height);
 /// Flip the image around the horizontal axis in place

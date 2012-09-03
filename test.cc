@@ -1,9 +1,10 @@
 #include "window.h"
 
+#include "display.h"
 struct VSyncTest : Application, Widget {
-    Window window __(this,int2(0,0),"VSync Test"_);
-    VSyncTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.show(); }
-    void render(int2 position, int2 size) {static bool odd; fill(position+Rect(size),(odd=!odd)?black:white); window.render();}
+    Window window __(this,int2(256,256));
+    VSyncTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.setPosition(int2(512,512)); window.show(); }
+    void render(int2 unused position, int2 unused size) {/*static bool odd; fill(position+Rect(size),(odd=!odd)?black:white); window.render();*/}
 };
 
 #include "text.h"
@@ -26,4 +27,4 @@ struct HTMLTest : Application {
     }
 };
 
-Application(HTMLTest)
+Application(VSyncTest)

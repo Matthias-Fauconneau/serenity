@@ -7,14 +7,14 @@
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
 long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
 
-int daysInMonth(int month, int year) {
-    if(month==1 && leap(year)) return 29;
+int daysInMonth(int month, int year=0) {
+    if(month==1 && leap(year)) { assert_(year!=0); return 29; }
     static constexpr int daysPerMonth[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     return daysPerMonth[month];
 }
 
 template<class T> bool inRange(T min, T x, T max) { return x>=min && x<=max; }
-void Date::invariant() {
+debug(void Date::invariant() {
     //Date
     if(year>=0) { assert_(inRange(2012, year, 2012)); }
     if(month>=0) { assert_(year>=0); assert_(inRange(0, month, 11)); }
@@ -32,7 +32,7 @@ void Date::invariant() {
     if(minutes>=0) { assert_(inRange(0, minutes, 59)); assert_(hours>=0); }
     if(seconds>=0) { assert_(inRange(0, seconds, 59)); assert_(minutes>=0); }
     assert_(year>=0 || hours>=0);
-}
+})
 void Date::setDay(int monthDay) {
     assert(year>=0 && month>=0);
     int days=3; //days from Thursday, 1st January 1970
@@ -54,14 +54,18 @@ bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && 
             && a.day==b.day && a.month==b.month && a.year==b.year ; }
 
 Date date(long time) {
-    int seconds = time, minutes=seconds/60, hours=minutes/60+2, days=hours/24+1, weekDay = (days+2)%7, month=0, year=1970;
-    for(;;) { int nofDays = leap(year)?366:365; if(days>=nofDays) days-=nofDays, year++; else break; }
-    for(;days>daysInMonth(month,year);month++) days-=daysInMonth(month,year);
-    return Date( seconds%60, minutes%60, hours%24, days, month, year, weekDay ); //GMT+1 and DST
+    int seconds = time, minutes=seconds/60, hours=minutes/60+1/*UTC+1*/, day=hours/24, weekDay = (day+2)%7, month=0, year=1970;
+    for(;;) { int nofDays = leap(year)?366:365; if(day>=nofDays) day-=nofDays, year++; else break; }
+    for(;day>daysInMonth(month,year);month++) day-=daysInMonth(month,year);
+    //European Summer Time (01:00 UTC on the last Sunday in March until 01:00 UTC on the last Sunday in October) [using 00:00 UTC+1 to simplify]
+    if(     (month==March && day+(6-weekDay)>=daysInMonth(March)) ||
+            (month>March && month<October) ||
+            (month==October && day+(6-weekDay)<daysInMonth(October) ) ) hours++;
+    else error("Not tested yet");
+    return Date( seconds%60, minutes%60, hours%24, day, month, year, weekDay );
 }
 
 string str(Date date, const ref<byte>& format) {
-    date.invariant();
     string r;
     for(TextStream s(format);s;) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(' '); }
@@ -92,7 +96,7 @@ Date parse(TextStream& s) {
         int number = s.number();
         if(number<0) return date;
         if(s.match(":"_)) date.hours=number, date.minutes=s.number();
-        else date.day = number;
+        else date.day = number-1;
     }
 
     s.whileAny(" ,\t"_);
@@ -101,12 +105,11 @@ Date parse(TextStream& s) {
     s.whileAny(" ,\t"_);
     {
         int number = s.number();
-        if(number<0) return date;
-        if(s.match(":"_)) date.hours=number, date.minutes=s.number();
+        if(number>=0 && s.match(":"_)) date.hours=number, date.minutes=s.number();
     }
 
     if(date.year==-1 && date.month>=0) date.year=::date().year;
-    date.invariant();
+    debug(date.invariant();)
     return date;
 }
 
