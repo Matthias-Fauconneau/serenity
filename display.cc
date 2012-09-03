@@ -1,5 +1,12 @@
 #include "display.h"
 
+#if __arm__
+inline uint div255(uint x) { return (x+(x<<8)+257)>>16; }
+#else
+inline uint div255(uint x) { return x/255; }
+#endif
+inline int4 div255(const int4& v) { int4 r; for(int i=0;i<4;i++) r[i]=div255(v[i]); return r; }
+
 /// Clip
 array<Rect> clipStack;
 Rect currentClip=Rect(int2(0,0));
@@ -9,15 +16,11 @@ Image framebuffer;
 
 void fill(Rect rect, byte4 color) { //TODO: blend
     rect = rect & currentClip;
-    for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = color;
+    for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+        byte4& d = framebuffer(x,y);
+        d = byte4(div255(int4(d)*(255-color.a) + int4(color)*color.a));
+    }
 }
-
-#if __arm__
-inline uint div255(uint x) { return (x+(x<<8)+257)>>16; }
-#else
-inline uint div255(uint x) { return x/255; }
-#endif
-inline int4 div255(const int4& v) { int4 r; for(int i=0;i<4;i++) r[i]=div255(v[i]); return r; }
 
 void blit(int2 target, const Image& source, uint8 opacity) {
     Rect rect = (target+Rect(source.size())) & currentClip;

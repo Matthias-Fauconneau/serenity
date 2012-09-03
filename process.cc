@@ -15,16 +15,21 @@ struct ucontext {
 #endif
 };
 
+Application* app;
 static void handler(int sig, siginfo* info, ucontext* ctx) {
-    if(sig==SIGABRT) log("Abort");
     trace(1);
     {Symbol s = findNearestLine((void*)ctx->eip); log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(ptr(info->fault.addr)));
+    if(sig==SIGABRT) log("Abort");
+    if(sig==SIGPIPE) log("Broken pipe");
+    if(sig==SIGTERM) { log("Terminated"); app->running=false; return; }
     exit(-1);
 }
 
-void init() {
-    /// Setup signal handlers to log trace on {ABRT,SEGV,TERM.PIPE}
+#undef Application
+Application::Application () {
+    assert(!app); app=this;
+    /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
         enum { SA_SIGINFO=4 } flags = SA_SIGINFO;
@@ -69,8 +74,17 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     const char* argv[args0.size()+1];
     for(uint i=0;i<args0.size();i++) argv[i]=args0[i];
     argv[args0.size()]=0;
+
+    array< ref<byte> > env0;
+    static string environ = ::readUpTo(openFile("proc/self/environ"_),4096);
+    for(TextStream s(environ);s;) env0<<s.until('\0');
+
+    const char* envp[env0.size()+1];
+    for(uint i=0;i<env0.size();i++) envp[i]=env0[i].data;
+    envp[env0.size()]=0;
+
     int pid = fork();
-    if(pid==0) { if(!execve(strz(path),argv,0)) exit(-1); }
+    if(pid==0) { if(!execve(strz(path),argv,envp)) exit(-1); }
     else if(wait) wait4(pid,0,0,0);
 }
 

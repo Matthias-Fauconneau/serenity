@@ -42,16 +42,20 @@ struct Linear: virtual Layout {
     bool expanding = false;
     /// How to use any extra space when no widget is expanding
     enum Extra {
-        Left,Top=Left, /// Aligns tighly packed widgets
-        Right,Bottom=Right, /// Aligns tighly packed widgets
-        Center, /// Aligns tighly packed widgets
+        Left,Top=Left, /// Aligns tightly packed widgets
+        Right,Bottom=Right, /// Aligns tightly packed widgets
+        Center, /// Aligns tightly packed widgets
         Share,  /// Only for main axis, shares space evenly between all widgets (fixed size widgets will center within their extra space)
-        Spread /// Only for main axis, spreads widgets evenly leaving no outside margin (use \a Share to leave outside margin)
+        Spread, /// Only for main axis, spreads widgets evenly leaving no outside margin (use \a Share to leave outside margin)
+        AlignLeft,AlignTop=AlignLeft, /// Only for side axis, sets all widgets side size to maximum needed and aligns left/top
+        AlignRight,AlignBottom=AlignRight, /// Only for side axis, sets all widgets side size to maximum needed and aligns right/bottom
+        AlignCenter, /// Only for side axis, sets all widgets side size to largest hint (or total available if any widget is expanding) and centers
+        Expand /// Only for side axis, sets all widgets side size to layout available side size
     };
     Extra main, side;
     /// Constructs a linear layout
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
-    Linear(Extra main=Share, Extra side=Center):main(main),side(side){}
+    Linear(Extra main=Share, Extra side=AlignCenter):main(main),side(side){}
 
     int2 sizeHint() override;
     array<Rect> layout(int2 position, int2 size) override;

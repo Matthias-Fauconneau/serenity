@@ -12,10 +12,9 @@ inline void pop() { currentClip=clipStack.pop(); }
 extern Image framebuffer;
 
 constexpr byte4 black __(0, 0, 0, 0xFF);
-constexpr byte4 gray __(0xC0, 0xC0, 0xC0, 0xFF);
-constexpr byte4 lightGray __(0xE0, 0xE0, 0xE0, 0xFF);
-constexpr byte4 white __(0xFF, 0xFF, 0xFF, 0xFF);
-constexpr byte4 selectionColor __(0xE0, 0xC0, 0x80, 0xFF);
+constexpr byte4 darken __(0x00, 0x00, 0x00, 0x40);
+constexpr byte4 lighten __(0xE0, 0xE0, 0xE0, 0xFF);
+constexpr byte4 highlight __(0xE0, 0xC0, 0x80, 0xFF);
 
 /// Fills pixels inside \a rect with \a color
 void fill(Rect rect, byte4 color);

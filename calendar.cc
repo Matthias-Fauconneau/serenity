@@ -18,8 +18,7 @@ array<string> getEvents(Date query) {
     }
 
     Date until; //End date for recurring events
-    for(TextStream s(file);s;) {
-        s.skip();
+    for(TextStream s(file);s.skip(), s;) {
         if(s.match("#"_)) s.until('\n'); //comment
         else if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
         else if(s.match("except "_)) s.until('\n'); //already parsed
@@ -56,28 +55,24 @@ void Month::setActive(Date active) {
     static const ref<byte> days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
     for(int i=0;i<7;i++) {
         *this<< string(days[i]);
-        dates << Date(-1,-1,-1,-1,-1,-1,i);
+        dates << Date(i,-1,active.month,active.year);
     }
-    int first=0; //days from Thursday, 1st January 1970 until the first of active month
-    for(int year=1970;year<active.year;year++) first+= ((year%400)||(!(year%100)&&year%4))?366:365;
-    const int daysPerMonth[12] = { 31, ((active.year%400)||(!(active.year%100)&&active.year%4))?29:28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-    for(int month=0;month<active.month;month++) first+=daysPerMonth[month];
-    first = first%7; //to week day (starting with Monday)
+    Date date=active; date.setDay(1); int first=date.weekDay;
     for(int i=0;i<first;i++) { //previous month
         int previousMonth = (active.month+11)%12;
-        int day = daysPerMonth[previousMonth]-first+i+1;
-        dates << Date(count()%7, day, previousMonth);
+        int day = daysInMonth(previousMonth,active.year)-first+i+1;
+        dates << Date(count()%7, day, previousMonth, active.year-(active.month==0));
         *this<< Text(format(Italic)+dec(day,2),16,128);
     }
     Date today=::date();
-    for(int i=1;i<=daysPerMonth[active.month];i++) { //current month
+    for(int i=1;i<=daysInMonth(active.month,active.year);i++) { //current month
         bool isToday = today.month==active.month && i==today.day;
         if(isToday) todayIndex=count();
-        dates << Date(count()%7, i, active.month);
+        dates << Date(count()%7, i, active.month, active.year);
         *this<< string((isToday?format(Bold):string())+dec(i,2)); //current day
     }
     for(int i=1;count()<7*8;i++) { //next month
-        dates << Date(count()%7, i, (active.month+1)%12);
+        dates << Date(count()%7, i, (active.month+1)%12, active.year+(active.month==11));
         *this<< Text(format(Italic)+dec(i,2),16,128);
     }
     Selection::setActive(todayIndex);

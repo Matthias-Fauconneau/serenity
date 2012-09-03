@@ -1,6 +1,5 @@
 #pragma once
 #include "vector.h"
-#include "display.h"
 
 /// Button/Key codes
 enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
@@ -35,13 +34,11 @@ struct Widget {
     /// \note \a keyPress is directly called on the current \a Window::focus
     /// \return Whether the key press was accepted
     virtual bool keyPress(Key) { return false; }
-    /// Override \a selectEvent to handle or forward user input
-    /// \note \a selectEvent is called by \a Selection when user changes selection (using press, wheel or arrows)
-    /// \return Whether the select event was accepted
-    virtual bool selectEvent() { return false; }
 };
 
 /// Current widget that has the keyboard input focus
 extern Widget* focus;
 /// Current widget that has the drag focus
 extern Widget* drag;
+/// Returns last text selection (middle-click paste)
+string getSelection();

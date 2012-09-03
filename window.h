@@ -16,6 +16,7 @@ struct Window : Poll {
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(), const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_);
+    ~Window();
 
     /// Event handler
     void event();
@@ -70,13 +71,13 @@ struct Window : Poll {
     /// \note The selection owner might lock this process if it fails to notify
     string getSelection();
 
-    enum Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move } cursor=Arrow;
+    enum Cursor { Cross, Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move } cursor=Cross;
     /// Returns cursor icon for \a cursor
     const Image& cursorIcon(Cursor cursor);
     /// Returns cursor hotspot for \a cursor
     int2 cursorHotspot(Window::Cursor cursor);
     /// Sets window cursor
-    void setCursor(Cursor cursor);
+    void setCursor(Cursor cursor, uint window=0);
 
     /// Widget managed by this window
     Widget* widget;
@@ -86,6 +87,11 @@ struct Window : Poll {
     bool hideOnLeave = false;
     /// If set, this window will not be managed by the session window manager
     bool overrideRedirect;
+    /// If set, this window will resize to widget->sizeHint before any rendering
+    bool autoResize = false;
+    /// If set, this window will always be anchored to this position
+    enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
+                  Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right } anchor = Float;
     /// Window position and size
     int2 position, size;
 

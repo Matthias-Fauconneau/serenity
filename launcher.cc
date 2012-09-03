@@ -9,7 +9,7 @@
 
 bool Search::keyPress(Key key) {
     if(key == Return) {
-        //execute("/usr/bin/chromium-browser"_,{"google.com/search?q="_+text},false);
+        array<string> args; args<<string("google.com/search?q="_+text); execute("/usr/bin/chromium-browser"_,args,false);
         setText(string()); triggered(); return true;
     }
     else return TextInput::keyPress(key);
@@ -40,6 +40,7 @@ List<Command> readShortcuts() {
     if(!existsFile("launcher"_,config)) { warn("No launcher settings [config/launcher]"); return shortcuts; }
     auto apps = readFile("launcher"_,config);
     for(const ref<byte>& desktop: split(apps,'\n')) {
+        if(startsWith(desktop,"#"_)) continue;
         map<string,string> entries = readSettings(desktop);
         Image icon;
         for(const ref<byte>& folder: iconPaths) {
@@ -57,8 +58,10 @@ List<Command> readShortcuts() {
     return shortcuts;
 }
 
-Launcher::Launcher() {menu<<&search<<&shortcuts;
+Launcher::Launcher() {
+    menu<<&search<<&shortcuts;
     window.hideOnLeave = true;
+    window.anchor = Window::TopLeft;
     window.localShortcut(Escape).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(Command& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);

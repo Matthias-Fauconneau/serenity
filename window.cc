@@ -9,11 +9,14 @@
 #include "time.h"
 #include "png.h"
 
+namespace Shm { int EXT, event, error; } using namespace Shm;
+namespace Render { int EXT, event, error; } using namespace Render;
 int2 display;
 Widget* focus;
 Widget* drag;
-namespace Shm { int EXT, event, error; } using namespace Shm;
-namespace Render { int EXT, event, error; } using namespace Render;
+Window* current;
+
+string getSelection() { assert(current); return current->getSelection(); }
 
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : widget(widget), overrideRedirect(title.size?false:true) {
     registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
@@ -78,9 +81,15 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     setIcon(icon);
     setType(type);
 }
+Window::~Window() { close(fd); }
 
 void Window::event() {
+    current=this;
     if(revents==IDLE) {
+        if(autoResize) {
+            int2 hint = widget->sizeHint();
+            if(hint != size) { setSize(hint); return; }
+        }
         assert(mapped); assert(size);
         if(state!=Idle) { state=Wait; return; }
         if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
@@ -96,14 +105,14 @@ void Window::event() {
         }
         framebuffer = share(buffer);
         currentClip=Rect(framebuffer.size());
-#if 1
+#if 0
         fill(currentClip,white);
 #else
         // Oxygen like radial gradient background
         int2 center = int2(size.x/2,0); int radius=256;
         for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
             int2 pos = int2(x,y);
-            const int bgCenter=0xF0,bgOuter=0xE0,opacity=0xF0;
+            const int bgCenter=0xF0,bgOuter=0xE0,opacity=0xFF/*0xF0*/;
             int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
             framebuffer(x,y) = byte4(g,g,g,opacity);
         }
@@ -128,6 +137,7 @@ void Window::event() {
         processEvent(type, read<Event>(fd));
         while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
     }
+    current=0;
 }
 
 void Window::processEvent(uint8 type, const Event& event) {
@@ -155,7 +165,7 @@ void Window::processEvent(uint8 type, const Event& event) {
         /**/ if(type==MotionNotify) {
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, LeftButton)) wait();
             else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
-            else {
+            else if(anchor==Float) {
                 if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; } //to reuse border intersection checks
                 bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
                 bool left = dragStart.x<dragPosition.x+1, right = dragStart.x>=dragPosition.x+dragSize.x-1;
@@ -170,7 +180,7 @@ void Window::processEvent(uint8 type, const Event& event) {
                     else if(left) position.x+=delta.x, size.x-=delta.x;
                     else if(right) size.x+=delta.x;
                     else position+=delta;
-                    //position=clip(int2(0,16),position,display), size=clip(int2(16,16),size,display-int2(0,16));
+                    position=clip(int2(0,16),position,display), size=clip(int2(16,16),size,display-int2(0,16));
                     setGeometry(position,size);
                 } else {
                     if((top && left)||(bottom && right)) setCursor(FDiagonal);
@@ -200,7 +210,7 @@ void Window::processEvent(uint8 type, const Event& event) {
             if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None))
                 wait();
         }
-        else if(type==Expose) { if(!e.expose.count && e.expose.w>1 && e.expose.h>1) wait(); }
+        else if(type==Expose) { if(!e.expose.count) wait(); }
         else if(type==UnmapNotify) mapped=false;
         else if(type==MapNotify) mapped=true;
         else if(type==ReparentNotify) {}
@@ -215,7 +225,8 @@ void Window::processEvent(uint8 type, const Event& event) {
             else widget->keyPress(Escape);
         }
         else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) wait(); state=Idle; }
-        else log("Event", ::events[type]);
+        else if(type==MappingNotify) {}
+        else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
 }
 
@@ -223,7 +234,7 @@ void Window::send(const ref<byte>& request) { write(fd, request); sequence++; }
 
 template<class T> T Window::readReply() {
     for(;;) { uint8 type = read<uint8>(fd);
-        if(type==0){Error e=read<Error>(fd); log("X Error",e.seq,sequence); if(e.seq==sequence) { T t; clear(t); return t; }}
+        if(type==0){Error e=read<Error>(fd); processEvent(0,(Event&)e);  if(e.seq==sequence) { T t; clear(t); return t; }}
         else if(type==1) return read<T>(fd);
         else queue << QEvent __(type, read<::Event>(fd)); //queue events to avoid reentrance
     }
@@ -255,7 +266,7 @@ template array<byte> Window::getProperty(uint window, const ref<byte>& name, uin
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;
     if(position.y<0) position.y=display.y+position.y;
-    if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
+    setGeometry(position,this->size);
 }
 void Window::setSize(int2 size) {
     if(size.x<0||size.y<0) {
@@ -265,13 +276,20 @@ void Window::setSize(int2 size) {
     }
     if(size.x==0 || size.x>display.x) size.x=display.x;
     if(size.y==0 || size.x>display.x-16) size.y=display.y-16;
-    if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
+    setGeometry(this->position,size);
 }
 void Window::setGeometry(int2 position, int2 size) {
-    if(position!=this->position || size!=this->size) {
-        SetGeometry r; r.id=id+XWindow; r.x=position.x; r.y=position.y; r.w=size.x, r.h=size.y; send(raw(r));
-    }
+    if(anchor&Left && anchor&Right) position.x=(display.x-size.x)/2;
+    else if(anchor&Left) position.x=0;
+    else if(anchor&Right) position.x=display.x-size.x;
+    if(anchor&Top && anchor&Bottom) position.y=16+(display.y-16-size.y)/2;
+    else if(anchor&Top) position.y=16;
+    else if(anchor&Bottom) position.y=display.y-size.y;
+    if(position!=this->position && size!=this->size) {SetGeometry r; r.id=id+XWindow; r.x=position.x; r.y=position.y; r.w=size.x, r.h=size.y; send(raw(r));}
+    else if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
+    else if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
 }
+
 void Window::setType(const ref<byte>& type) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_TYPE"_); r.type=Atom("ATOM"_); r.format=32;
     r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom(type))));
@@ -285,20 +303,20 @@ void Window::setIcon(const Image& icon) {
     r.length=2+icon.width*icon.height; r.size+=r.length; send(string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }
 
-void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}}
-void Window::hide() { if(!mapped) return;{UnmapWindow r; r.id=id; send(raw(r));}}
+void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}{RaiseWindow r; r.id=id; send(raw(r));}}
+void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
 void Window::render() { if(mapped) Poll::wait(); }
 
 signal<>& Window::localShortcut(Key key) { return localShortcuts.insert((uint16)key); }
 signal<>& Window::globalShortcut(Key key) { return globalShortcuts.insert((uint16)key); }
 
 string Window::getSelection() {
-    {GetSelectionOwner r; r.selection=1; send(raw(r));} uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();
-    {ConvertSelection r; r.requestor=id; r.target=Atom("UTF8_STRING"_);}
-     for(;;) { uint8 type = read<uint8>(fd);
-         if((type&0b01111111)==SelectionNotify) { read<Event>(fd); return getProperty<byte>(owner,"UTF8_STRING"_); }
-         else processEvent(type, read<Event>(fd));
-     }
+    send(raw(GetSelectionOwner())); uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();
+    {ConvertSelection r; r.requestor=id; r.target=Atom("UTF8_STRING"_); send(raw(r));}
+    for(;;) { uint8 type = read<uint8>(fd);
+        if((type&0b01111111)==SelectionNotify) { read<Event>(fd); return getProperty<byte>(id,"UTF8_STRING"_); }
+        else queue << QEvent __(type, read<::Event>(fd)); //queue events to avoid reentrance
+    }
 }
 
 ICON(arrow)
@@ -327,7 +345,7 @@ int2 Window::cursorHotspot(Window::Cursor cursor) {
     error("");
 }
 
-void Window::setCursor(Cursor cursor) {
+void Window::setCursor(Cursor cursor, uint window) {
     if(cursor==this->cursor) return; this->cursor=cursor;
     const Image& image = cursorIcon(cursor); int2 hotspot = cursorHotspot(cursor);
     Image premultiplied(image.width,image.height);
@@ -339,7 +357,7 @@ void Window::setCursor(Cursor cursor) {
         send(string(raw(r)+ref<byte>(premultiplied)));}
     {Render::CreatePicture r; r.picture=id+Picture; r.drawable=id+Pixmap; r.format=format; send(raw(r));}
     {Render::CreateCursor r; r.cursor=id+XCursor; r.picture=id+Picture; r.x=hotspot.x; r.y=hotspot.y; send(raw(r));}
-    {SetWindowCursor r; r.window=id; r.cursor=id+XCursor; send(raw(r));}
+    {SetWindowCursor r; r.window=window?:id; r.cursor=id+XCursor; send(raw(r));}
     {FreeCursor r; r.cursor=id+XCursor; send(raw(r));}
     {FreePicture r; r.picture=id+Picture; send(raw(r));}
     {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}

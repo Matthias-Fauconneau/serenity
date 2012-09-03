@@ -7,7 +7,7 @@ enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2,
 enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3,
        EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15,
        StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, PropertyChangeMask=1<<22 };
-enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage };
+enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify };
 enum ModifierMask { Button1Mask=1<<8, AnyModifier=1<<15 };
 enum MapState { IsUnmapped, IsUnviewable, IsViewable };
 enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
@@ -36,8 +36,8 @@ struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
 struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1; uint visual;
-                      uint mask=BackgroundPixel|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
-                                        uint backgroundPixel=0,borderPixel=0, bitGravity=5, winGravity=5, overrideRedirect, eventMask, colormap; };
+                      uint mask=BackgroundPixmap|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
+                                        uint backgroundPixmap=0,borderPixel=0, bitGravity=10, winGravity=10, overrideRedirect, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
 struct SetWindowCursor { int8 req=2; uint16 size=4; uint window, mask=Cursor; uint cursor; };
 struct GetWindowAttributes { int8 req=3; uint16 size=2; uint window; };
@@ -61,15 +61,15 @@ struct GetAtomNameReply { byte pad; uint16 seq; uint length; uint16 size; byte p
 struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint window,property,type; uint8 format; uint length; };
 struct GetProperty { int8 req=20,remove=0; uint16 size=6; uint window,property,type=0; uint offset=0,length=-1; };
 struct GetPropertyReply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length; byte pad2[12]; } fixed(GetPropertyReply);
-struct GetSelectionOwner { uint req=23,pad; uint size=2; uint selection; };
+struct GetSelectionOwner { uint8 req=23,pad; uint16 size=2; uint selection=1; };
 struct GetSelectionOwnerReply { uint8 pad; uint16 seq; uint size; uint owner; byte pad2[20]; } fixed(GetSelectionOwnerReply);
-struct ConvertSelection { uint8 req=24,pad; uint size=6; uint requestor,selection=1,target,property=0,time=0; };
+struct ConvertSelection { uint8 req=24,pad; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
 struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; Event event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
 struct GrabKeyboard { int8 req=31,owner=0; uint16 size=6; uint window; uint time=0; uint8 pointerMode=0,keyboardMode=1; };
 struct GrabKeyboardReply { uint8 status; uint16 seq; uint size; byte pad[24]; } fixed(GrabKeyboardReply);
 struct AllowEvents { int8 req=35, mode=2; uint16 size=2; uint time=0; };
-struct SetInputFocus { int8 req=42,revertTo=1; uint16 size=3; uint window; uint time=0; };
+struct SetInputFocus { int8 req=42,revertTo=1; uint16 size=3; uint window=1; uint time=0; };
 struct CreatePixmap { int8 req=53,depth=32; uint16 size=4; uint pixmap,window; int16 w,h; };
 struct FreePixmap { int8 req=54,pad; uint16 size=2; uint pixmap; };
 struct CreateGC { int8 req=55,pad; uint16 size=4; uint context,window,mask=0; };
@@ -87,7 +87,7 @@ constexpr ref<byte> events[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"But
                                 "LeaveNotify"_,"FocusIn"_,"FocusOut"_,"KeymapNotify"_,"Expose"_,"GraphicsExpose"_,"NoExpose"_,"VisibilityNotify"_,
                                 "CreateNotify"_,"DestroyNotify"_,"UnmapNotify"_,"MapNotify"_,"MapRequest"_,"ReparentNotify"_,"ConfigureNotify"_,
                                 "ConfigureRequest"_,"GravityNotify"_,"ResizeRequest"_,"CirculateNotify"_,"CirculateRequest"_,"PropertyNotify"_,
-                                "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_};
+                                "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_,"MappingNotify"_};
 constexpr ref<byte> errors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
                                   "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
 

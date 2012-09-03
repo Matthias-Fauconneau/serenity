@@ -14,13 +14,10 @@ struct Taskbar : Application, Poll {
         uint id;
         Task(uint id):id(id){} //for indexOf
         Task(Taskbar* parent, uint id, Image&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
-        bool selectEvent() override { parent->raise(id); return true; }
-        bool mouseEvent(int2, int2, Event event, Button button) override {
-            if(event==Press && button==LeftButton) return false;
-            {SetInputFocus r; r.window=id; parent->send(raw(r));}
-             if(parent->getProperty<uint>(parent->root,"_NET_ACTIVE_WINDOW"_)==id) { // Maximize
-                SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; parent->send(raw(r));
-                return true;
+        bool mouseEvent(int2, int2, Event event, Button) override {
+            if(event==Press) {
+                parent->raise(id);
+                if(parent->tasks.index!=uint(-1) && &parent->tasks.active()==this) {SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; parent->send(raw(r));}
             }
             return false;
         }
@@ -33,7 +30,6 @@ struct Taskbar : Application, Poll {
         }
     };
 
-    bool ownWM=true;
     array<uint> windows;
 
     ICON(button) TriggerButton start __(resize(buttonIcon(), 16,16));
@@ -41,15 +37,15 @@ struct Taskbar : Application, Poll {
     Bar<Task> tasks;
     Clock clock __(16);
     Calendar calendar;
-    Window popup __(&calendar, int2(-256,-256));
+    Window popup __(&calendar,int2(256,-1));
     HBox panel;//__(&start, &tasks, &clock);
-    Window window __(&panel,int2(0,16),""_,Image(),"_NET_WM_WINDOW_TYPE_DOCK"_);
+    Window window __(&panel,int2(0,16));
     uint root=window.root;
     uint desktop=0;
 
     Taskbar() {
+        window.anchor=Window::Top;
         panel<<&start<<&tasks<<&clock;
-        debug( window.localShortcut(Escape).connect(this, &Application::quit); )
         registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
         string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
         sockaddr_un addr; copy(addr.path,path.data(),path.size());
@@ -61,43 +57,31 @@ struct Taskbar : Application, Poll {
         {ConnectionSetupReply r=read<ConnectionSetupReply>(fd); assert(r.status==1);
             read(fd,r.additionnal*4-(sizeof(ConnectionSetupReply)-8)); }
 
-        debug( array<string> args; args<<string("-w"_)<<string("/usr/bin/taskbar"_); execute("/usr/bin/killall"_,args); )
+        {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask|SubstructureRedirectMask; send(raw(r));}
+        window.setCursor(Window::Arrow,root);
 
-        /*array<uint> wm=getProperty<uint>(root,"_NET_SUPPORTING_WM_CHECK"_);
-        if(wm && getProperty<uint>(wm[0],"_NET_SUPPORTING_WM_CHECK"_)) ownWM=false;
-        else {
-            {ChangeProperty r; r.window=root; r.property=Atom("_NET_SUPPORTING_WM_CHECK"_); r.type=Atom("WINDOW"_); r.format=32;
-            r.length=1; r.size+=r.length; send(string(raw(r)+raw(window.id+Window::XWindow)));}
-            {ChangeProperty r; r.window=window.id+Window::XWindow; r.property=Atom("_NET_SUPPORTING_WM_CHECK"_); r.type=Atom("WINDOW"_); r.format=32;
-            r.length=1; r.size+=r.length; send(string(raw(r)+raw(window.id+Window::XWindow)));}
-        }*/
-
-        {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask|PropertyChangeMask|ButtonPressMask;
-            if(ownWM) r.eventMask|=SubstructureRedirectMask; send(raw(r)); }
         array<uint> windows;
-        if(ownWM) {
-            {QueryTree r; r.id=root; send(raw(r));}
-            {QueryTreeReply r = readReply<QueryTreeReply>(); windows=read<uint>(fd, r.count);}
-        } else windows=getProperty<uint>(root,"_NET_CLIENT_LIST"_);
-        for(uint id: windows) {
-            addWindow(id);
-            {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
-                send(raw(r));}
-            if(ownWM){GrabButton r; r.window=id; send(raw(r));}
-        }
+        {QueryTree r; r.id=root; send(raw(r));}
+        {QueryTreeReply r = readReply<QueryTreeReply>(); windows=read<uint>(fd, r.count);}
+        for(uint id: windows) addWindow(id);
 
         start.triggered.connect(this,&Taskbar::startButton);
-        launcher.window.setPosition(int2(0, 0));
+        launcher.window.autoResize=true;
+        launcher.window.anchor=Window::TopLeft;
         tasks.expanding=true;
+        tasks.activeChanged.connect(this, &Taskbar::raiseTask);
         clock.timeout.connect(&window, &Window::render);
         clock.timeout.connect(&calendar, &Calendar::checkAlarm);
         clock.triggered.connect(&calendar,&Calendar::reset);
         clock.triggered.connect(&popup,&Window::toggle);
         calendar.eventAlarm.connect(&popup,&Window::show);
+        calendar.side=Linear::Right;
         popup.hideOnLeave = true;
-        popup.setPosition(int2(-popup.size.x, window.size.y));
+        popup.autoResize=true;
+        popup.anchor = Window::TopRight;
         window.show();
     }
+    ~Taskbar() { {SetInputFocus r; r.window=1; send(raw(r));} close(fd); }
 
     void processEvent(uint8 type, const Event& e) {
         if(type==0) return;
@@ -105,30 +89,33 @@ struct Taskbar : Application, Poll {
         type&=0b01111111; //msb set if sent by SendEvent
         if(type==CreateNotify) { uint id=e.create.window;
             if(e.create.override_redirect) return;
-            {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
-                send(raw(r));}
-            if(ownWM){GrabButton r; r.window=id; send(raw(r));}
+            addWindow(id);
             return;
         } else if(type == MapRequest) { uint id=e.map_request.window;
+            {GetGeometry r; r.id=id; send(raw(r));} GetGeometryReply g=readReply<GetGeometryReply>(); int x=g.x,y=g.y,w=g.w,h=g.h;
+            array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
+            if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
+                w=min<int16>(display.x,w); h=min<int16>(display.y-16,h);
+                x = (display.x-w)/2; y = 16+(display.y-16-h)/2;
+            }
+            if(x!=g.x || y!=g.y || w!=g.w || h!=g.h){SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}
             {MapWindow r; r.id=id; send(raw(r));}
             raise(id);
             int i = tasks.indexOf(id);
             if(i<0) i=addWindow(id);
             if(i<0) return;
             tasks.index=i;
-        } else if(type == ConfigureRequest) { uint id = e.configure_request.window;
-            {GetGeometry r; r.id=id; send(raw(r));}
-            GetGeometryReply w=readReply<GetGeometryReply>();
+        } else if(type == ConfigureRequest) { uint id = e.configure_request.window; log(id);
+            {GetGeometry r; r.id=id; send(raw(r));} GetGeometryReply g=readReply<GetGeometryReply>(); int x=g.x,y=g.y,w=g.w,h=g.h;
             const auto& c = e.configure_request;
-            if(c.valueMask & X) w.x=c.x; if(c.valueMask & Y) w.y=c.y; if(c.valueMask & W) w.w=c.w; if(c.valueMask & H) w.h=c.h;
+            if(c.valueMask & X) x=c.x; if(c.valueMask & Y) y=c.y; if(c.valueMask & W) w=c.w; if(c.valueMask & H) h=c.h;
             array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
-            GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
-            if(!wa.overrideRedirect && (!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                w.w=min<int16>(display.x,w.w); w.h=min<int16>(display.y-16,w.h);
-                w.x = (display.x - w.w)/2; w.y = 16+(display.y-16-w.h)/2;
+            if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
+                w=min<int16>(display.x,w); h=min<int16>(display.y-16,h);
+                x = (display.x - w)/2; y = 16+(display.y-16-h)/2;
             }
-            if(c.valueMask&StackMode) {ConfigureWindow r; r.id=id; r.x=w.x, r.y=w.y; r.w=w.w; r.h=w.h; r.stackMode=e.configure_request.stackMode; send(raw(r));}
-            else {SetGeometry r; r.id=id; r.x=w.x, r.y=w.y; r.w=w.w; r.h=w.h; send(raw(r));}
+            if(c.valueMask&StackMode) {ConfigureWindow r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; r.stackMode=e.configure_request.stackMode; send(raw(r));}
+            else {SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}
             return;
         } else if(type == ButtonPress) { uint id = e.event;
             raise(id);
@@ -136,22 +123,11 @@ struct Taskbar : Application, Poll {
             int i = tasks.indexOf(id);
             if(i>=0) tasks.index=i;
         } else if(type==PropertyNotify) { uint id=e.property.window;
-            if(id==root && e.property.atom==Atom("_NET_ACTIVE_WINDOW"_)) {
-                array<uint> active = getProperty<uint>(root,"_NET_ACTIVE_WINDOW"_);
-                if(active) { int i = tasks.indexOf(active.first()); if(i<0) return; tasks.setActive(i); }
-            } else if(id==root && e.property.atom==Atom("_NET_CLIENT_LIST"_)) {
-                windows.clear(); tasks.clear();
-                for(uint id: getProperty<uint>(root,"_NET_CLIENT_LIST"_)) {
-                    addWindow(id);
-                    {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask;
-                        send(raw(r));}
-                    if(ownWM){GrabButton r; r.window=id; send(raw(r));}
-                }
-            } else if(e.property.atom==Atom("_NET_WM_NAME"_)) {
-                int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
+            if(e.property.atom==Atom("_NET_WM_NAME"_)) {
+                int i = tasks.indexOf(id); if(i<0) i=addWindow(id); if(i<0) return;
                 tasks[i].text.setText( getTitle(id) );
             } else if(e.property.atom==Atom("_NET_WM_ICON"_)) {
-                int i = tasks.indexOf(id); /*if(i<0) i=addWindow(id);*/ if(i<0) return;
+                int i = tasks.indexOf(id); if(i<0) i=addWindow(id); if(i<0) return;
                 tasks[i].icon.image = getIcon(id);
             } else return;
         } else if(type == DestroyNotify) { uint id=e.property.window;
@@ -159,24 +135,24 @@ struct Taskbar : Application, Poll {
             int i = tasks.indexOf(id);
             if(i>=0) {
                 tasks.removeAt(i);
-                if(tasks.index == uint(i)) tasks.index=-1;
+                if(tasks.index == uint(i)) {
+                    tasks.index=-1;
+                    if(tasks) raise(tasks.last().id);
+                }
             }
-            if(windows) {
-                uint id=windows.last();
-                if(ownWM) {SetInputFocus r; r.window=id; send(raw(r));}
-                if(tasks.index==uint(-1)) tasks.setActive(tasks.indexOf(id));
-            }
-        } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify) {
+        } else if(type==MapNotify||type==UnmapNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify||type==MappingNotify) {
         } else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
         window.render();
     }
 
     /// Adds \a id to \a windows and to \a tasks if necessary
     int addWindow(uint id) {
-        if(windows.contains(id)) return -1;
-        windows << id;
-        if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
         if(id==root) return -1;
+        if(!windows.contains(id)) {
+            windows << id;
+            {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask; send(raw(r));}
+        }
+        if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
         GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
         if(wa.overrideRedirect||wa.mapState!=IsViewable) return -1;
         array<uint> type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
@@ -185,6 +161,7 @@ struct Taskbar : Application, Poll {
         string title = getTitle(id); if(!title) return -1;
         Image icon = getIcon(id);
         tasks << Task(this,id,move(icon),move(title));
+        {GrabButton r; r.window=id; send(raw(r));}
         return tasks.array::size()-1;
     }
 
@@ -216,25 +193,17 @@ struct Taskbar : Application, Poll {
             array<T> a; if(size) a=read<T>(fd,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(fd, pad); return a; }
     }
 
+    void raiseTask(uint index) { raise(tasks[index].id); }
     void raise(uint id) {
-        if(ownWM) {
-            {RaiseWindow r; r.id=id; send(raw(r));}
-            {SetInputFocus r; r.window=id; send(raw(r));}
-            for(uint w: windows) {
-                if(getProperty<uint>(w,"WM_TRANSIENT_FOR"_) == id) {
-                    {RaiseWindow r; r.id=id; send(raw(r));}
-                    {SetInputFocus r; r.window=id; send(raw(r));}
-                }
-            }
-        } else {
-            {SendEvent r; r.window=root; r.eventMask=SubstructureNotifyMask; r.type=ClientMessage;
-                auto& e=r.event.client; e.format=32; e.window=id; e.type=Atom("_NET_ACTIVE_WINDOW"_);
-                clear(e.data); e.data[0]=2; send(raw(r));}
-        }
+        {RaiseWindow r; r.id=id; send(raw(r));}
+        GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
+        if(wa.mapState==IsViewable) {SetInputFocus r; r.window=id; send(raw(r));}
+        for(uint w: windows) if(getProperty<uint>(w,"WM_TRANSIENT_FOR"_) == id) raise(w);
+        if(popup.mapped) raise(popup.id);
     }
 
     void startButton() { // Opens launcher or raise desktop on second click
-        if(!launcher.window.mapped) { launcher.window.show(); raise(launcher.window.id); }
+        if(!launcher.window.mapped) launcher.window.show();
         else {
             launcher.window.hide();
             if(tasks.index<tasks.count()) { tasks.setActive(-1); window.render(); }

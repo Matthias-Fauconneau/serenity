@@ -30,6 +30,7 @@ void Feeds::loadFeed(const URL&, Map&& document) {
         if(count>=16) return; //limit history
         if(array::size()+entries.size()>=array::capacity()) return; //limit total entry count
         string title = e("title"_).text(); //RSS&Atom
+        string date = e("pubDate"_).text(); //RSS&Atom
         string link = string(e("link"_)["href"_]); if(!link) link=e("link"_).text(); //Atom ?: RSS
         if(!favicon) {
             URL url = URL(link);
@@ -38,8 +39,8 @@ void Feeds::loadFeed(const URL&, Map&& document) {
             if(existsFile(faviconFile,cache)) *favicon = ::resize(decodeImage(readFile(faviconFile,cache)),16,16);
             else { *favicon = ::resize(networkIcon(),16,16); getURL(url, Handler(this, &Feeds::getFavicon), 7*24*60); }
         }
-        if(!isRead(title, link)) entries<< Entry(move(link),share(*favicon),move(title)); //display all unread entries
-        else if(count==0) entries<< Entry(move(link),share(*favicon),move(title),12); //display last read entry
+        if(!isRead(title, link)) entries<< Entry(move(date),move(link),share(*favicon),move(title)); //display all unread entries
+        else if(count==0) entries<< Entry(move(date),move(link),share(*favicon),move(title),12); //display last read entry
         count++;
     };
     feed.xpath("feed/entry"_,addEntry); //Atom

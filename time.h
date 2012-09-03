@@ -10,15 +10,23 @@ long cpuTime();
 #define profile(expr) { long start=cpuTime(); expr write(1,string(#expr##_+" "_+dec(cpuTime()-start)+"ms\n"_)); }
 
 struct Date {
-    int seconds=-1, minutes=-1, hours=-1, day=-1, month=-1, year=-1, weekDay=-1;
+    int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
+    int weekDay=-1;
     void invariant();
     Date(){}
-    Date(int weekDay, int monthDay, int month):day(monthDay),month(month),weekDay(weekDay){invariant();}
+    Date(int weekDay, int monthDay, int month, int year):year(year),month(month),day(monthDay),weekDay(weekDay){invariant();}
     Date(int seconds, int minutes, int hours, int day, int month, int year, int weekDay) :
-        seconds(seconds),minutes(minutes),hours(hours),day(day),month(month),year(year),weekDay(weekDay){ invariant(); }
+        year(year),month(month),day(day),hours(hours),minutes(minutes),seconds(seconds),weekDay(weekDay){ invariant(); }
+    /// Sets month day and matching week day
+    void setDay(int monthDay);
 };
 bool operator >(const Date& a, const Date& b);
 bool operator ==(const Date& a, const Date& b);
+
+static constexpr ref<byte> days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
+static constexpr ref<byte> months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
+constexpr bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
+int daysInMonth(int month, int year);
 
 /// Convert unix timestamp to a calendar date
 Date date(long time=currentTime());

@@ -160,12 +160,12 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
 
 /// TextInput
 
-bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button) {
+bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button) {
     if(event!=Press) return false;
     focus=this;
     position -= max(int2(0,0),(size-textSize)/2);
     for(cursor=0;cursor<characters.size() && position.x>characters[cursor].pos.x+(int)characters[cursor].image.width/2;cursor++) {}
-    //if(button==MiddleKey) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); update(); }
+    if(button==MiddleButton) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); textSize=int2(0,0); }
     return true;
 }
 
@@ -177,16 +177,16 @@ bool TextInput::keyPress(Key key) {
     else if(key==End) cursor=text.size();
     else if(key==Delete && cursor<text.size()) text.removeAt(cursor);
     else if(key==BackSpace && cursor>0) text.removeAt(--cursor);
-    else if(key>=' ' && key<=0xFF) text.insertAt(cursor++, (byte)key); //TODO: UTF8
+    else if(key>=' ' && key<=0xFF) { text.insertAt(cursor++, (byte)key); } //TODO: UTF8
     else return false;
-    return true;
+    textSize=int2(0,0); return true;
 }
 
 void TextInput::render(int2 position, int2 size) {
     Text::render(position, size);
     if(focus==this) {
         if(cursor>text.size()) cursor=text.size();
-        int x = cursor < characters.size()? characters[cursor].pos.x : cursor>0 ? characters.last().pos.x+characters.last().image.width : 0;
+        int x = cursor < characters.size()? characters[cursor].pos.x : (cursor>0 && characters) ? characters.last().pos.x+characters.last().image.width : 0;
         fill(position+max(int2(0,0), (size-textSize)/2)+Rect(int2(x,0), int2(x+1,size.y)), black);
     }
 }

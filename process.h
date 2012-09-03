@@ -26,6 +26,8 @@ int dispatchEvents();
 
 /// Application can be inherited to interface with the event loop
 struct Application {
+    /// Setup signal handlers
+    Application();
     /// Flag to exit event loop and quit application
     bool running=true;
     /// Set running flag to false so as to quit the application when returning to the event loop.
@@ -34,7 +36,7 @@ struct Application {
 };
 
 /// Macro to compile an executable entry point starting an Application with the default event loop
-#define Application(App) int main() { void init(); init(); for(App app;app.running && dispatchEvents();); return 0; }
+#define Application(App) int main() { for(App app;app.running && dispatchEvents();); return 0; }
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);

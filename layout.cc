@@ -42,33 +42,33 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     if(!count) return __();
     size = xy(size);
     int width = size.x /*remaining space*/; int expanding=0, height=0;
-    int sizes[count];
+    int widths[count], heights[count];
 
     for(uint i=0;i<count;i++) { Widget& child=at(i); assert(*(void**)&child);
         int2 sizeHint = xy(child.sizeHint());
-        width -= abs(sizes[i]=sizeHint.x); //commits minimum width for all widgets
+        width -= abs(widths[i]=sizeHint.x); //commits minimum width for all widgets
         if(sizeHint.x<0) expanding++; //counts expanding widgets
-        height=max(height, sizeHint.y<0 ? size.y : min(size.y,sizeHint.y)); //necessary height
+        height=max(height, heights[i]=(sizeHint.y<0 ? size.y : min(size.y,sizeHint.y))); //necessary height
     }
 
     int sharing = expanding ?: (main==Share? count : 0);
     if(sharing && width >= sharing) { //shares extra space evenly between sharing widgets
         int extra = width/sharing;
         for(uint i=0;i<count;i++) {
-            if(!expanding || sizes[i]<0) { //if all widgets are sharing or this widget is expanding
-                sizes[i] = abs(sizes[i])+extra, width -= extra; //commits extra space
+            if(!expanding || widths[i]<0) { //if all widgets are sharing or this widget is expanding
+                widths[i] = abs(widths[i])+extra, width -= extra; //commits extra space
             }
         }
         //width%sharing space remains as extra is rounded down
     } else {
-        for(uint i=0;i<count;i++) sizes[i]=abs(sizes[i]); //converts all expanding widgets to fixed
+        for(uint i=0;i<count;i++) widths[i]=abs(widths[i]); //converts all expanding widgets to fixed
         while(width<=-int(count)) { //while layout is overcommited
-            uint best=0; for(uint i=0;i<count;i++) if(sizes[i]>sizes[best]) best=i;
-            int& first = sizes[best]; //largest size
-            int next=0; for(int size: sizes) if(size>next && size<first) next=size; //next largest widget size
+            uint best=0; for(uint i=0;i<count;i++) if(widths[i]>widths[best]) best=i;
+            int& first = widths[best]; //largest size
+            int next=0; for(int size: widths) if(size>next && size<first) next=size; //next largest widget size
             int delta = min(-width, first-next);
             if(delta!=0) { first -= delta; width += delta; } //cap size to next largest
-            else { int delta=-width/count; for(uint i=0;i<count;i++) sizes[i]-=delta, width+=delta; } //all widgets already have the same size
+            else { int delta=-width/count; for(uint i=0;i<count;i++) widths[i]-=delta, width+=delta; } //all widgets already have the same size
         }
     }
     int margin = (main==Spread && count>1) ? width/(count-1) : 0; //Spread distribute any margin between all widgets
@@ -79,15 +79,20 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     else if(main==Center || main==Share || main== Spread) pen.x+=width/2;
     else if(main==Right) pen.x+=size.x-width;
     else error("");
-    if(side==Left) pen.y+=0;
-    else if(side==Center) pen.y+=(size.y-height)/2;
-    else if(side==Right) pen.y+=size.y-height;
-    else error("");
+    if(side==AlignLeft) pen.y+=0;
+    else if(side==AlignCenter) pen.y+=(size.y-height)/2;
+    else if(side==AlignRight) pen.y+=size.y-height;
+    else height=size.y;
     array<Rect> widgets(count);
     for(uint i=0;i<count;i++) {
-        Rect widget = pen+Rect(int2(sizes[i],height));
+        int y=0;
+        if(side==AlignLeft||side==AlignCenter||side==AlignRight||side==Expand) heights[i]=height;
+        else if(side==Left) y=0;
+        else if(side==Center) y=(height-heights[i])/2;
+        else if(side==Right) y=height-heights[i];
+        Rect widget = pen+int2(0,y)+Rect(int2(widths[i],heights[i]));
         widgets<< Rect(xy(widget.min),xy(widget.max));
-        pen.x += sizes[i]+margin;
+        pen.x += widths[i]+margin;
     }
     return widgets;
 }

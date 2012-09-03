@@ -1,4 +1,5 @@
-fix taskbar, player (+XF86AudioPlay)
+taskbar: test alarm
+player: update, +XF86AudioPlay
 music: update, raw midi
 font: automatic fitting
 feeds: progressive png, http compression

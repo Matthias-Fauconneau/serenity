@@ -36,10 +36,10 @@ int2 Slider::sizeHint() { return int2(-height,height); }
 void Slider::render(int2 position, int2 size) {
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = size.x*uint(value-minimum)/uint(maximum-minimum);
-        fill(position+Rect(int2(0,0), int2(x,size.y)), gray);
-        fill(position+Rect(int2(x,0), size), lightGray);
+        fill(position+Rect(int2(0,0), int2(x,size.y)), darken);
+        fill(position+Rect(int2(x,0), size), lighten);
     } else {
-        fill(position+Rect(int2(0,0), size), gray);
+        fill(position+Rect(int2(0,0), size), darken);
     }
 }
 
@@ -67,21 +67,21 @@ bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button bu
             }
         }
     }
-    if(button == WheelDown && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
-    if(button == WheelUp && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
+    if(button == WheelDown && index>0 && index<count()) { setActive(index-1); return true; }
+    if(button == WheelUp && index<count()-1) { setActive(index+1); return true; }
     return false;
 }
 
 bool Selection::keyPress(Key key) {
     if(index<=count()) if(at(index).keyPress(key)) return true;
-    if(key==DownArrow && index<count()-1) { index++; at(index).selectEvent(); activeChanged(index); return true; }
-    if(key==UpArrow && index>0 && index<count()) { index--; at(index).selectEvent(); activeChanged(index); return true; }
+    if(key==DownArrow && index<count()-1) { setActive(index+1); return true; }
+    if(key==UpArrow && index>0 && index<count()) { setActive(index-1); return true; }
     return false;
 }
 
 void Selection::setActive(uint i) {
     assert(i==uint(-1) || i<count());
-    if(index!=i) { index=i; if(index!=uint(-1)) { at(index).selectEvent(); activeChanged(index); } }
+    if(index!=i) { index=i; if(index!=uint(-1)) activeChanged(index); }
 }
 
 /// HighlightSelection
@@ -89,7 +89,7 @@ void Selection::setActive(uint i) {
 void HighlightSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
     for(uint i=0;i<count();i++) {
-        if(i==index) fill(widgets[i], selectionColor);
+        if(i==index) fill(widgets[i], highlight);
         at(i).render(widgets[i]);
     }
 }
@@ -98,12 +98,12 @@ void HighlightSelection::render(int2 position, int2 size) {
 
 void TabSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
-    if(index>=count()) fill(position+Rect(size), gray); //no active tab
+    if(index>=count()) fill(position+Rect(size), darken); //no active tab
     else {
         Rect active = widgets[index];
-        if(index>0) fill(Rect(position, int2(active.min.x, position.y+size.y)), gray); //dark inactive tabs before current
-        fill(active, lightGray); //light active tab
-        if(index<count()-1) fill(Rect(int2(active.max.x,position.y), position+size), gray); //dark inactive tabs after current
+        if(index>0) fill(Rect(position, int2(active.min.x, position.y+size.y)), darken); //darken inactive tabs before current
+        //fill(active, lightGray); //light active tab
+        if(index<count()-1) fill(Rect(int2(active.max.x,position.y), position+size), darken); //darken inactive tabs after current
     }
     for(uint i=0;i<count();i++) at(i).render(widgets[i]);
 }

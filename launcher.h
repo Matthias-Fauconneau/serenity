@@ -29,6 +29,6 @@ struct Launcher {
     Search search;
     List<Command> shortcuts = readShortcuts();
     VBox menu;// = __(&search, &shortcuts);
-    Window window __(&menu,int2(-128,-128));
+    Window window __(&menu);
     Launcher();
 };
