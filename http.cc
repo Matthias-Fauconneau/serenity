@@ -42,7 +42,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
         query << 0 << 0 << 1 << 0 << 1;
         ::write(dns,query);
         ::write(1,string(host+" "_));
-        pollfd pollfd __(dns,POLLIN); if(!poll(&pollfd,1,1000)){warn("DNS query timed out, retrying... "); ::write(dns,query); if(!poll(&pollfd,1,1000)){warn("giving up"); return false; } }
+        pollfd pollfd __(dns,POLLIN); if(!poll(&pollfd,1,1000)){log("DNS query timed out, retrying... "); ::write(dns,query); if(!poll(&pollfd,1,1000)){log("giving up"); return false; } }
         DataStream s(readUpTo(dns,4096), true);
         header = s.read<Header>();
         for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
@@ -59,7 +59,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
             break;
         }
         if(ip==uint(-1)) {
-            warn("unknown");
+            log("unknown");
             ::write(dnsCache,string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = mapFile(dnsCache); //remap cache
             return false;
@@ -145,7 +145,7 @@ string base64(const ref<byte>& input) {
 /// URL
 
 URL::URL(const ref<byte>& url) {
-    if(!url) { trace(); warn("Empty URL"); return; }
+    if(!url) { warn("Empty URL"); return; }
     TextStream s(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
@@ -196,7 +196,7 @@ HTTP::HTTP(const URL& url, Handler handler, array<string>&& headers, const ref<b
     if(!connect(url.host, url.scheme)) { free(this); return; } state=Connect;
 }
 void HTTP::request() {
-    assert(state==Connect); state=Request; events=POLLIN;
+    assert(state==Connect); state=Request; events=POLLIN|POLLHUP;
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;
     write( string(request+"\r\n"_) );log("Request",url);
@@ -216,9 +216,10 @@ void HTTP::header() {
         state = Handle;
         return;
     }
-    else if(status==400) warn("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
-    else if(status==404||status==408) { warn(status==404?"Not Found"_:"Request timeout"_,url); state=Done; free(this); return; }
-    else if(status==504) { warn(content=string("Gateway Time-out"_),url); state = Handle; return; }
+    else if(status==400) log("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
+    else if(status==404) log("Not Found"_,url);
+    else if(status==408) log("Request timeout"_);
+    else if(status==504) log("Gateway timeout"_);
     else { log((string&)buffer); warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
 
     // Headers
@@ -242,8 +243,8 @@ void HTTP::header() {
     state = Data;
 }
 void HTTP::event() {
+    if(revents==POLLHUP && state <= Data) { log("Connection broken",url); state=Done; free(this); return; } //TODO: also cleanup never established connections
     if(state == Connect) {
-        if(!revents) { log("Connection timeout",url); state=Done; free(this); return; }
         fcntl(fd,F_SETFL,0);
         request();
         return;
@@ -263,14 +264,15 @@ void HTTP::event() {
         else if(chunked) {
             do {
                 uint chunkSize = number(16); match("\r\n"_);
-                if(chunkSize==0) {  state=Cache; break; }
+                if(chunkSize==0) { state=Cache; break; }
                 uint unused packetSize=available(chunkSize); assert(packetSize>=chunkSize);
                 content << read(chunkSize); match("\r\n"_);
             } while(Stream::available(3)>=3);
         }
+        else state=Cache;
     }
     if(state == Cache) {
-        if(!content) warn("Missing content",(string&)buffer);
+        if(!content) log("Missing content",(string&)buffer);
         if(content.size()>1024) log("Downloaded",url,content.size()/1024,"KB"); else log("Downloaded",url,content.size(),"B");
 
         redirect << cacheFile(url);

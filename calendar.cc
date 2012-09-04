@@ -6,7 +6,7 @@
 array<string> getEvents(Date query) {
     static int config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
     array<string> events;
-    if(!existsFile("events"_,config)) { /*warn("No events settings [$HOME/.config/events]");*/ return events; }
+    if(!existsFile("events"_,config)) {warn("No events settings [$HOME/.config/events]"); return events; }
     string file = readFile("events"_,config);
 
     map<string, array<Date>> exceptions; //Exceptions for recurring events

@@ -34,6 +34,7 @@ struct Player : Application {
         albums.expanding=true; titles.main=Linear::Center;
         window.localShortcut(Escape).connect(this, &Player::quit);
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
+        window.globalShortcut(Play).connect(this, &Player::togglePlay);
         playButton.toggled.connect(this, &Player::setPlaying);
         nextButton.triggered.connect(this, &Player::next);
         slider.valueChanged.connect(this, &Player::seek);
@@ -44,12 +45,8 @@ struct Player : Application {
 
         folders = listFiles("Music"_,Sort|Folders);
         assert(folders);
-        for(string& folder : folders) albums << Text(string(section(folder,'/',-2,-1)), 12);
+        for(string& folder : folders) albums << Text(string(section(folder,'/',-2,-1)), 16);
 
-        /*for(string&& path: arguments) {
-            assert(exists(path),path);
-            if(isFolder(path)) play(path); else appendFile(move(path));
-        }*/
         if(!files && existsFile("Music/.last"_)) {
             string last = readFile("Music/.last"_);
             string folder = string(section(last,'/',0,2));
@@ -58,7 +55,7 @@ struct Player : Application {
             uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
             for(;i<files.size();i++) appendFile(move(files[i]));
         }
-        window.show();
+        window.setSize(int2(-512,-512)); window.show();
         if(files) next();
     }
     void appendFile(string&& path) {
@@ -73,7 +70,7 @@ struct Player : Application {
         assert(isFolder(path));
         array<string> files = listFiles(path,Recursive|Sort|Files);
         for(string& file: files) appendFile(move(file));
-        window.setSize(layout.sizeHint());
+        window.setSize(int2(-512,-512));
         next();
     }
     void playAlbum(uint index) {
@@ -116,7 +113,7 @@ struct Player : Application {
         slider.value = position; slider.maximum=duration;
         elapsed.setText(dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2));
         remaining.setText(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2));
-        window.wait();
+        window.render();
     }
 };
 Application(Player)

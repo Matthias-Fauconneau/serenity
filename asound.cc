@@ -6,7 +6,7 @@ enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused, Suspended, 
 enum Access { MMapInterleaved=0 };
 enum Format { S16_LE=2 };
 enum SubFormat { Standard=0 };
-enum MMap { StatusOffset = 0x80000, ControlOffset = 0x81000 };
+enum MMap { StatusOffset = 0x80000000, ControlOffset = 0x81000000 };
 enum Masks { Access, Format, SubFormat };
 enum Intervals { SampleBits, FrameBits, Channels, Rate, PeriodTime, PeriodSize, PeriodBytes, Periods, BufferTime, BufferSize };
 enum Flags { NoResample=1, ExportBuffer=2, NoPeriodWakeUp=4 };
@@ -53,7 +53,7 @@ struct Control { ptr swPointer; long availableMinimum; };
 void AudioOutput::start(bool realtime) {
     if(fd) return;
     fd = open("/dev/snd/pcmC0D0p", O_RDWR|O_NONBLOCK, 0);
-    if(fd<0) { warn("Busy audio output"); fd=0; return; }
+    if(fd<0) { log(errno[-fd]); fd=0; return; }
 
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
@@ -78,10 +78,10 @@ void AudioOutput::start(bool realtime) {
     sparams.stop_threshold = sparams.boundary = bufferSize;
     check_(ioctl(fd, IOCTL_SW_PARAMS, &sparams));
 
-    status = (Status*)mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset);
-    control = (Control*)mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset);
-    registerPoll(POLLOUT|POLLERR|POLLNVAL);
-    ioctl(fd, IOCTL_PREPARE, 0);
+    status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset) );
+    control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset) );
+    check_(ioctl(fd, IOCTL_PREPARE, 0),fd);
+    registerPoll(fd, POLLOUT|POLLERR|POLLNVAL);
 }
 void AudioOutput::stop() {
     if(!fd) return; unregisterPoll();
@@ -92,7 +92,8 @@ void AudioOutput::stop() {
     close(fd); fd=0;
 }
 void AudioOutput::event() {
-    if(status->state == XRun) { warn("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
+    assert(revents!=POLLNVAL);
+    if(status->state == XRun) { log("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(!available){/*warn(status->state,bufferSize,"=",periodCount,"x",periodSize,"hw",status->hwPointer,"sw",control->swPointer);*/return;}//FIXME
     uint offset = control->swPointer % bufferSize;

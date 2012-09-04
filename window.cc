@@ -40,6 +40,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
             }
         }
         id=r.ridBase;
+        minKeyCode=r.minKeyCode, maxKeyCode=r.maxKeyCode;
     }
     assert(visual);
 
@@ -206,13 +207,13 @@ void Window::processEvent(uint8 type, const Event& event) {
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
             uint key = KeySym(e.key);
-            signal<>* shortcut = localShortcuts.find(key);
+            signal<>* shortcut = shortcuts.find(key);
             if(shortcut) (*shortcut)(); //local window shortcut
             else if(focus) if( focus->keyPress((Key)key) ) wait(); //normal keyPress event
         }
         else if(type==EnterNotify || type==LeaveNotify) {
             if(hideOnLeave) hide();
-            signal<>* shortcut = localShortcuts.find(Widget::Leave);
+            signal<>* shortcut = shortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
             if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None))
                 wait();
@@ -227,7 +228,7 @@ void Window::processEvent(uint8 type, const Event& event) {
         }
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
-            signal<>* shortcut = localShortcuts.find(Escape);
+            signal<>* shortcut = shortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
         }
@@ -314,8 +315,14 @@ void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}{R
 void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
 void Window::render() { if(mapped) Poll::wait(); }
 
-signal<>& Window::localShortcut(Key key) { return localShortcuts.insert((uint16)key); }
-signal<>& Window::globalShortcut(Key key) { return globalShortcuts.insert((uint16)key); }
+signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
+signal<>& Window::globalShortcut(Key key) {
+    uint keycode=0;
+    for(uint i=minKeyCode;i<=maxKeyCode;i++) if(KeySym(i)==key) { keycode=i; break;  }
+    if(!keycode) warn("Unknown KeySym",int(key));
+    else {GrabKey r; r.window=root; r.keycode=keycode; send(raw(r));}
+    return shortcuts.insert((uint16)key);
+}
 
 string Window::getSelection() {
     send(raw(GetSelectionOwner())); uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();

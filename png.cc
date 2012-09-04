@@ -53,7 +53,7 @@ Image decodePNG(const ref<byte>& file) {
         if(name == "IHDR"_) {
             width = s.read(), height = s.read();
             uint8 unused bitDepth = s.read();
-            if(bitDepth!=8){ warn("Unsupported PNG bitdepth"_,bitDepth); return Image(); }
+            if(bitDepth!=8){ log("Unsupported PNG bitdepth"_,bitDepth); return Image(); }
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);

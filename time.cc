@@ -113,6 +113,7 @@ Date parse(TextStream& s) {
     return date;
 }
 
-Timer::Timer(){ fd=timerfd_create(CLOCK_REALTIME,0); registerPoll(); }
+Timer::Timer(){ registerPoll(timerfd_create(CLOCK_REALTIME,0)); }
+Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(uint date) { timespec time[2]={{0,0},{date,0}}; timerfd_settime(fd,1,time,0); }
 void Timer::event() { expired(); }

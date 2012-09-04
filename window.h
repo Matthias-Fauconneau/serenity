@@ -100,6 +100,8 @@ struct Window : Poll {
 
     /// Root window
     uint root = 0;
+    /// KeyCode range
+    uint minKeyCode=8, maxKeyCode=255;
     /// This window base resource id
     uint id = 0;
     /// Associated window resource (relative to \a id)
@@ -116,8 +118,7 @@ struct Window : Poll {
     uint format=0;
 
     /// Shortcuts triggered when a key is pressed
-    map<uint16, signal<> > localShortcuts;
-    map<uint16, signal<> > globalShortcuts;
+    map<uint16, signal<> > shortcuts;
 
     int2 dragStart, dragPosition, dragSize;
 };

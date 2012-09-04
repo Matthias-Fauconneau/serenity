@@ -6,8 +6,7 @@ enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
 enum Key {
     Escape=0xff1b, Return=0xff0d, Delete=0xffff, BackSpace=0xff08,
     Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57,
-    Email = 0x1008ff19, WWW=0x1008ff18 //TODO: Play
-    //TODO: Touchbook buttons Extra,Power (XInput)
+    Play=0x1008ff14, Email=0x1008ff19, WWW=0x1008ff18
 };
 
 /// Widget is an abstract component to compose user interfaces

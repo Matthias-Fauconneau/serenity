@@ -150,7 +150,7 @@ template<class T> struct array {
     /// Removes one matching element and returns an index to its successor
     int removeOne(const T& v) { int i=indexOf(v); if(i>=0) removeAt(i); return i; }
     /// Removes all matching elements
-    void removeAll(const T& v) { for(uint i=0;i<size();i++) if(at(i)==v) { removeAt(i); i--; } }
+    bool removeAll(const T& v) { bool any=false; for(uint i=0;i<size();i++) if(at(i)==v) { removeAt(i); i--; any=true; } return any; }
 
     /// Iterators
     const T* begin() const { return data(); }

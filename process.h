@@ -10,8 +10,7 @@ struct Poll : pollfd {
     virtual ~Poll() { unregisterPoll(); }
     /// Registers this file descriptor to be polled in the process-wide event loop
     /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
-    void registerPoll(int fd, short events=POLLIN);
-    void registerPoll(short events=POLLIN);
+    void registerPoll(int fd, int events=POLLIN);
     /// Removes this file descriptor from the process-wide event poll loop
     void unregisterPoll();
     /// Schedules an \a event call after all process-wide outstanding poll events have beem processed

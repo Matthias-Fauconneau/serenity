@@ -5,11 +5,13 @@
 struct AudioFormat { uint frequency, channels; };
 
 struct AudioFile {
+    struct mpg123_handle_struct* file = 0;
+    signal<int,int> timeChanged;
     AudioFormat audioInput,audioOutput;
     Resampler resampler;
     float* buffer=0; int bufferSize=0;
     float* input=0; int inputBufferSize=0;
-    int inputSize=0;
+    unsigned long inputSize=0;
 
     void open(const ref<byte>& file);
     void close();
@@ -18,7 +20,4 @@ struct AudioFile {
     void seek( int time );
     void setup(const AudioFormat& format);
     void read(int16* output, uint size);
-    signal<int,int> timeChanged;
-
-    struct mpg123_handle_struct* file = 0;
 };

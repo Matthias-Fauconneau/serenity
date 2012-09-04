@@ -1,1 +1,7 @@
-"TARGET=<application> make install" will build and install an application (default TARGET = desktop).
+Usage: install.sh APPLICATION
+
+Available applications:
+desktop: Background window with integrated feed, events calendar and application launcher (started by .xinitrc and raised by taskbar home button)
+taskbar: Tasks panel with basic integrated window management
+player: Music player
+music: Piano sampling synthesizer

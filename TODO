@@ -1,5 +1,5 @@
-player: update, +XF86AudioPlay
 music: update, raw midi
+desktop: search
 font: automatic fitting
 feeds: progressive png, http compression
 apps: text editor, file manager, pdf, wiki, search, imap, irc, shell, monitor, torrent, video

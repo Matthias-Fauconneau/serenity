@@ -59,7 +59,7 @@ void HTML::load(const URL& url, Map&& document) {
                 else if(find(e["class"_],"comment"_)) return false;
                 else if(paragraphElement.contains(e.name)||textElement.contains(e.name)||boldElement.contains(e.name)) return true; //visit children
                 else if(e.name=="img"_||ignoreElement.contains(e.name)) {}
-                else if(!e.name.contains(':')) warn("load: Unknown HTML tag",e.name);
+                else if(!e.name.contains(':')) warn("Unknown HTML tag",e.name);
                 return false;
         });
         if(score>=max) best=&e, second=max, max=score;
@@ -115,7 +115,7 @@ void HTML::parse(const URL& url, const Element &e) {
     }
     else if(textElement.contains(e.name)) { for(const Element& c: e.children) parse(url, c); } // Unhandled format tags
     else if(ignoreElement.contains(e.name)) { return; } // Ignored elements
-    else if(!e.name.contains(':')) warn("Unknown element '"_+e.name+"'"_);
+    else if(!e.name.contains(':')) warn("Unknown HTML tag '"_+e.name+"'"_);
 }
 void HTML::flushText() {
     string paragraph = simplify(move(text));

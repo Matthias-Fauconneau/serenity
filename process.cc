@@ -44,10 +44,9 @@ Application::Application () {
 }
 
 static array<Poll*> polls;
-void Poll::registerPoll(int fd, short events) { assert(!polls.contains(this)); this->fd=fd; this->events=events; polls << this; }
-void Poll::registerPoll(short events) { registerPoll(fd,events); }
-static int currentPoll; //correct looping when unregistering from event loop
-void Poll::unregisterPoll() { int i=polls.indexOf(this); if(i==-1) return; polls.removeAt(i);  if(i<=currentPoll) currentPoll--; fd=events=revents=0; }
+void Poll::registerPoll(int fd, int events) { assert(!polls.contains(this)); this->fd=fd; this->events=events; polls << this; }
+static array<Poll*> unregistered;
+void Poll::unregisterPoll() { events=revents=0; if(polls.removeAll(this)) unregistered<<this; }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
 
@@ -57,17 +56,20 @@ int dispatchEvents() {
     uint size=polls.size();
     pollfd pollfds[size]; for(uint i=0;i<size;i++) { pollfds[i]=*polls[i];  assert(polls[i]->fd==pollfds[i].fd); }
     ::poll(pollfds,size,-1);
-    currentPoll=0; for(uint i=0;i<size;i++,currentPoll++) { Poll* poll=polls[currentPoll]; assert(poll->fd==pollfds[i].fd);
-        int events = poll->revents = pollfds[i].revents;
-        if(events) {
+    Poll* polls[size]; copy(polls,::polls.data(),size);
+    for(uint i=0;i<size;i++) {
+        Poll* poll=polls[i];
+        if(!unregistered.contains(poll) && (poll->revents = pollfds[i].revents)) {
             poll->event();
-            if(events&POLLHUP) poll->unregisterPoll();
         }
     }
-    return polls.size();
+    unregistered.clear();
+    return ::polls.size();
 }
 
 void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
+    if(!existsFile(path)) { warn("Executable not found",path); return; }
+
     array<stringz> args0(1+args.size);
     args0 << strz(path);
     for(uint i=0;i<args.size;i++) args0 << strz(args[i]);

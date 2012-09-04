@@ -81,7 +81,7 @@ bool Selection::keyPress(Key key) {
 
 void Selection::setActive(uint i) {
     assert(i==uint(-1) || i<count());
-    if(index!=i) { index=i; if(index!=uint(-1)) activeChanged(index); }
+    index=i; if(index!=uint(-1)) activeChanged(index);
 }
 
 /// HighlightSelection

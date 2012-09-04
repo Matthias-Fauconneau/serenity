@@ -10,9 +10,9 @@ static Element parse(const ref<byte>& document, bool html) {
     Element root;
     while(s) {
         s.skip();
-        if(s.match("</"_)) warn("Unexpected","</"_+s.until('>')+">"_);
+        if(s.match("</"_)) log("Unexpected","</"_+s.until('>')+">"_);
         else if(s.match('<')) root.children << unique<Element>(s,html);
-        else warn("Unexpected '",s.until('\n'),"'");
+        else log("Unexpected '",s.until('\n'),"'");
         s.skip();
     }
     return root;
@@ -28,7 +28,7 @@ Element::Element(TextStream& s, bool html) {
     else if(s.match("!--"_)) { s.until("-->"_); return; }
     else if(s.match('?')){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
     else name = string(s.identifier()); //TODO: reference
-    if(!name) { log(s.slice(0,s.index)); warn("expected tag name got",s.until('\n')); }
+    if(!name) { log(s.slice(0,s.index)); log("expected tag name got",s.until('\n')); }
     if(html) name=toLower(name);
     s.skip();
     while(!s.match('>')) {
@@ -60,8 +60,7 @@ Element::Element(TextStream& s, bool html) {
         }
     }
     for(;;) {
-        //if(s.available(4)<4) { warn("Expecting","</"_+name+">"_,"got EOF"); return; } //warn unclosed tag
-        if(s.available(4)<4) {  return; } //ignore unclosed tag
+        if(s.available(4)<4) return; //ignore unclosed tag
         if(s.match("<![CDATA["_)) {
             string content (s.until("]]>"_));
             if(content) children << Element(move(content));
@@ -165,7 +164,7 @@ string unescape(const ref<byte>& xml) {
             ref<byte> key = s.word();
             if(s.match(';')) {
                 ref<byte>* c = entities.find(key);
-                if(c) out<<*c; else { debug(error("Unknown entity",key);) warn("Unknown entity",key); out<<key; }
+                if(c) out<<*c; else { warn("Unknown entity",key); out<<key; }
             }
             else out<<"&"_; //unescaped &
         }
