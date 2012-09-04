@@ -12,14 +12,14 @@ Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),tr
     for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 12*60); }
 }
 
-bool Feeds::isRead(const ref<byte>& date, const ref<byte>& link) {
-    assert(!date.contains('\n') && !link.contains('\n'));
+bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
+    assert(!guid.contains('\n') && !link.contains('\n'));
     for(TextStream s(readMap);s;s.until('\n')) {
-        if(s.match(date) && s.match(' ') && s.match(link)) return true;
+        if(s.match(guid) && s.match(' ') && s.match(link)) return true;
     }
     return false;
 }
-bool Feeds::isRead(const Entry& entry) { return isRead(entry.date, entry.link); }
+bool Feeds::isRead(const Entry& entry) { return isRead(entry.guid, entry.link); }
 
 ICON(network)
 void Feeds::loadFeed(const URL&, Map&& document) {
@@ -30,7 +30,7 @@ void Feeds::loadFeed(const URL&, Map&& document) {
         if(count>=16) return; //limit history
         if(array::size()+entries.size()>=array::capacity()) return; //limit total entry count
         string title = e("title"_).text(); //RSS&Atom
-        string date = e("pubDate"_).text(); //RSS&Atom
+        string guid = e("guid"_).text()?:e("pubDate"_).text(); //RSS
         string link = string(e("link"_)["href"_]); if(!link) link=e("link"_).text(); //Atom ?: RSS
         if(!favicon) {
             URL url = URL(link);
@@ -39,8 +39,8 @@ void Feeds::loadFeed(const URL&, Map&& document) {
             if(existsFile(faviconFile,cache)) *favicon = ::resize(decodeImage(readFile(faviconFile,cache)),16,16);
             else { *favicon = ::resize(networkIcon(),16,16); getURL(url, Handler(this, &Feeds::getFavicon), 7*24*60); }
         }
-        if(!isRead(title, link)) entries<< Entry(move(date),move(link),share(*favicon),move(title)); //display all unread entries
-        else if(count==0) entries<< Entry(move(date),move(link),share(*favicon),move(title),12); //display last read entry
+        if(!isRead(guid, link)) entries<< Entry(move(guid),move(link),share(*favicon),move(title)); //display all unread entries
+        else if(count==0) entries<< Entry(move(guid),move(link),share(*favicon),move(title),12); //display last read entry
         count++;
     };
     feed.xpath("feed/entry"_,addEntry); //Atom
@@ -66,7 +66,7 @@ void Feeds::resetFavicons() {
 void Feeds::setRead(uint index) {
     Entry& entry = array::at(index);
     if(isRead(entry)) return;
-    ::write(readConfig,string(entry.date+" "_+entry.link+"\n"_));
+    ::write(readConfig,string(entry.guid+" "_+entry.link+"\n"_));
     readMap = mapFile(readConfig); //remap
     entry.text.setSize(12);
 }

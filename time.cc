@@ -13,24 +13,24 @@ int daysInMonth(int month, int year=0) {
     return daysPerMonth[month];
 }
 
-template<class T> bool inRange(T min, T x, T max) { return x>=min && x<=max; }
+template<class T> bool inRange(T min, T x, T max) { return x>=min && x<max; }
 debug(void Date::invariant() {
     //Date
-    if(year>=0) { assert_(inRange(2012, year, 2012)); }
-    if(month>=0) { assert_(year>=0); assert_(inRange(0, month, 11)); }
-    if(day>=0) { assert_(month>=0); assert_(inRange(1, day, 31));  }
+    if(year>=0) { assert_(inRange(2012, year, 2013)); }
+    if(month>=0) { assert_(year>=0); assert_(inRange(0, month, 12)); }
+    if(day>=0) { assert_(month>=0); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
     if(weekDay>=0) {
-        assert_(inRange(0, weekDay, 6));
+        assert_(inRange(0, weekDay, 7));
         if(year>=0 && month>=0 && day>=0) {
             int setWeekDay = weekDay;
             setDay(day);
-            assert(weekDay==setWeekDay,weekDay,setWeekDay);
+            assert(weekDay==setWeekDay,weekDay,setWeekDay,str(*this));
         }
     }
     //Hour
-    if(hours>=0) { assert_(inRange(0, hours, 23)); }
-    if(minutes>=0) { assert_(inRange(0, minutes, 59)); assert_(hours>=0); }
-    if(seconds>=0) { assert_(inRange(0, seconds, 59)); assert_(minutes>=0); }
+    if(hours>=0) { assert_(inRange(0, hours, 24)); }
+    if(minutes>=0) { assert_(inRange(0, minutes, 60)); assert_(hours>=0); }
+    if(seconds>=0) { assert_(inRange(0, seconds, 60)); assert_(minutes>=0); }
     assert_(year>=0 || hours>=0);
 })
 void Date::setDay(int monthDay) {
@@ -38,7 +38,7 @@ void Date::setDay(int monthDay) {
     int days=3; //days from Thursday, 1st January 1970
     for(int year=1970;year<this->year;year++) days+= leap(year)?366:365;
     for(int month=0;month<this->month;month++) days+=daysInMonth(month,year);
-    days+=monthDay-1;
+    days+=monthDay;
     weekDay = days%7;
 }
 bool operator >(const Date& a, const Date& b) {
@@ -54,7 +54,7 @@ bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && 
             && a.day==b.day && a.month==b.month && a.year==b.year ; }
 
 Date date(long time) {
-    int seconds = time, minutes=seconds/60, hours=minutes/60+1/*UTC+1*/, day=hours/24, weekDay = (day+2)%7, month=0, year=1970;
+    int seconds = time, minutes=seconds/60, hours=minutes/60+1/*UTC+1*/, day=hours/24, weekDay = (Thursday+day)%7, month=0, year=1970;
     for(;;) { int nofDays = leap(year)?366:365; if(day>=nofDays) day-=nofDays, year++; else break; }
     for(;day>daysInMonth(month,year);month++) day-=daysInMonth(month,year);
     //European Summer Time (01:00 UTC on the last Sunday in March until 01:00 UTC on the last Sunday in October) [using 00:00 UTC+1 to simplify]

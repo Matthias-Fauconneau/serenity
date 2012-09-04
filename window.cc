@@ -18,7 +18,8 @@ Window* current;
 
 string getSelection() { assert(current); return current->getSelection(); }
 
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : widget(widget), overrideRedirect(title.size?false:true) {
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Anchor anchor) :
+    widget(widget), overrideRedirect(title.size?false:true), anchor(anchor) {
     registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
@@ -69,14 +70,15 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     }
     if(size.x==0) size.x=display.x;
     if(size.y==0) size.y=display.y-16;
+    if(anchor==Bottom) position.y=display.y-size.y;
     this->size=size;
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
-    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
+    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
-    r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
+        r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     setTitle(title);
     setIcon(icon);
     setType(type);
@@ -93,20 +95,28 @@ void Window::event() {
         assert(mapped); assert(size);
         if(state!=Idle) { state=Wait; return; }
 
-        framebuffer.stride=framebuffer.width=size.x, framebuffer.height=size.y;
-        int shm = check( shmget(IPC_NEW, sizeof(byte4)*framebuffer.width*framebuffer.height , IPC_CREAT | 0777) );
-        framebuffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(framebuffer.data);
-        {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
+        if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
+            if(shm) {
+                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                shmdt(buffer.data);
+                shmctl(shm, IPC_RMID, 0);
+            }
+            buffer.stride=buffer.width=size.x, buffer.height=size.y;
+            shm = check( shmget(IPC_NEW, sizeof(byte4)*buffer.width*buffer.height , IPC_CREAT | 0777) );
+            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
+        }
+        framebuffer=share(buffer);
 
         // Oxygen like radial gradient background
         int2 center = int2(size.x/2,0); int radius=256;
         for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
             int2 pos = int2(x,y);
-            const int bgCenter=0xF0,bgOuter=0xE0,opacity=/*0xFF*/0xF0;
+            const int bgCenter=0xF0,bgOuter=0xE0,opacity=0xFF;
             int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
             framebuffer(x,y) = byte4(g,g,g,opacity);
         }
-
+#if 0
         //feather edges //TODO: client side shadow
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
         if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
@@ -117,16 +127,12 @@ void Window::event() {
         if(position.x+size.x<display.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
         if(position.x>0 && position.y+size.y<display.y-1) framebuffer(0,size.y-1) /= 2;
         if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;
+#endif
 
         currentClip=Rect(framebuffer.size());
         widget->render(int2(0,0),size);
         assert(!clipStack);
-
-        {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-            r.totalWidth=r.width=framebuffer.width; r.totalHeight=r.height=framebuffer.height; send(raw(r)); }
-        {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-        shmdt(framebuffer.data);
-        shmctl(shm, IPC_RMID, 0);
+        {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;
     } else {
         uint8 type = read<uint8>(fd);
@@ -147,8 +153,17 @@ void Window::processEvent(uint8 type, const Event& event) {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
                 warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             }
+        } else if(e.major==Shm::EXT) {
+            int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
+            if(code>=Shm::error && code<=Shm::error+Shm::errorCount) { code-=Shm::error;
+                assert(code<sizeof(Shm::errors)/sizeof(*Shm::errors));
+                warn("Error",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+            } else {
+                assert(code<sizeof(::errors)/sizeof(*::errors));
+                warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+            }
         } else {
-            assert(code<sizeof(::errors)/sizeof(*::errors));
+            assert(code<sizeof(::errors)/sizeof(*::errors),code,e.major);
             int reqSize=sizeof(::requests)/sizeof(*::requests);
             warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
@@ -186,7 +201,6 @@ void Window::processEvent(uint8 type, const Event& event) {
         }
         else if(type==ButtonPress) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-            {SetInputFocus r; r.window=id; send(raw(r));}
             if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Button)e.key)) wait();
         }
         else if(type==ButtonRelease) drag=0;
@@ -284,7 +298,7 @@ void Window::setGeometry(int2 position, int2 size) {
 }
 
 void Window::setType(const ref<byte>& type) {
-    ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_TYPE"_); r.type=Atom("ATOM"_); r.format=32;
+    ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_WINDOW_TYPE"_); r.type=Atom("ATOM"_); r.format=32;
     r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom(type))));
 }
 void Window::setTitle(const ref<byte>& title) {

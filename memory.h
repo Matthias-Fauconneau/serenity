@@ -1,8 +1,8 @@
 #pragma once
 #include "core.h"
 
-extern "C" byte* malloc(long size);
-extern "C" byte* realloc(void* buffer, long size);
+extern "C" void* malloc(unsigned long size);
+extern "C" void* realloc(void* buffer, unsigned long size);
 extern "C" void free(void* buffer);
 
 template<class T> T* allocate(int size) { assert_(size); return (T*)malloc(size*sizeof(T)); }

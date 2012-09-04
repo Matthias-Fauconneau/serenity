@@ -83,6 +83,7 @@ stat statFile(const ref<byte>& path, int at) { File fd = openFile(path,at); stat
 enum { S_IFDIR=0040000 };
 bool isFolder(const ref<byte>& path, int at) { return statFile(path,at).mode&S_IFDIR; }
 long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtime.sec; }
+void touchFile(const ref<byte>& path, int at) { utimensat(at, strz(path), 0, 0); }
 
 array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
     int fd = openFolder(folder,at);

@@ -9,13 +9,17 @@
 /// Display size
 extern int2 display;
 
+enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
+              Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
+
 /// Window binds \a widget to an X window
 struct Window : Poll {
     no_copy(Window)
 
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(), const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_);
+    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
+           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_, Anchor anchor=Float);
     ~Window();
 
     /// Event handler
@@ -90,8 +94,7 @@ struct Window : Poll {
     /// If set, this window will resize to widget->sizeHint before any rendering
     bool autoResize = false;
     /// If set, this window will always be anchored to this position
-    enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
-                  Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right } anchor = Float;
+    Anchor anchor = Float;
     /// Window position and size
     int2 position, size;
 
@@ -100,9 +103,13 @@ struct Window : Poll {
     /// This window base resource id
     uint id = 0;
     /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, WindowPicture };
+    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor };
 
-    /// Shared memory state
+    /// System V shared memory
+    int shm = 0;
+    /// Shared window back buffer
+    Image buffer;
+    /// Shared window buffer state
     enum { Idle, Server, Wait } state = Idle;
 
     /// bgra32 Render PictFormat

@@ -13,29 +13,27 @@ struct Desktop : Application {
     Events calendar;
     VBox timeBox;//  __(&clock, &calendar);
     HBox applets;// __(&feeds, &timeBox, &shortcuts);
-    Window window __(&applets,int2(0,0),"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
+    Window window __(&applets,int2(0,0),""_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_,Bottom);
+    Window browser __(&page.area(),int2(0,0),"Browser"_);
     ICON(shutdown) Command shutdown __(share(shutdownIcon()),string("Shutdown"_),string("/sbin/poweroff"_),{});
-    Desktop() { timeBox<<&clock<<&calendar; applets<<&feeds<<&timeBox<<&shortcuts; shutdown.main=Linear::Center;
+    Desktop() {
+        timeBox<<&clock<<&calendar; applets<<&feeds<<&timeBox<<&shortcuts; shutdown.main=Linear::Center;
         clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&Desktop::showPage);
-        window.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);
-        //window.localShortcut(Extra).connect(&feeds, &Feeds::readNext);
-        //window.localShortcut(Power).connect(this, &Desktop::showDesktop);
-        window.localShortcut(Escape).connect(this, &Desktop::showDesktop);
+        browser.localShortcut(Escape).connect(&browser, &Window::hide);
+        browser.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);
+        //browser.localShortcut(Extra).connect(&feeds, &Feeds::readNext);
+        //window.localShortcut(Power).connect(&shutdown, &Window::toggle);
+        window.localShortcut(Escape).connect(this, &Application::quit);
         window.show();
     }
-    void showDesktop() {
-        if(window.widget != &applets) { window.widget= &applets; window.setTitle("Desktop"_); }
-        else quit(); //{ window.widget= &shutdown; window.setTitle("Shutdown?"_); }
-        window.render();
-    }
     void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
-        if(!link) { showDesktop(); return; }
-        window.widget= &page.area(); page.delta=int2(0,0);
-        page.contentChanged.connect(&window, &Window::render);
+        if(!link) { browser.hide(); return; }
+        page.delta=int2(0,0);
+        page.contentChanged.connect(&browser, &Window::render); browser.setIcon(favicon); browser.setTitle(title);
         page.go(link);
-        window.setTitle(title); window.setIcon(favicon);
+        browser.show();
     }
 };
 Application(Desktop)

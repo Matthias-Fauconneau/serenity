@@ -68,6 +68,8 @@ bool isFolder(const ref<byte>& path, int at=root());
 void symlink(const ref<byte>& target,const ref<byte>& name, int at=root());
 /// Returns the last modified time for \a path
 long modifiedTime(const ref<byte>& path, int at=root());
+/// Sets the last modified time for \a path to current time
+void touchFile(const ref<byte>& path, int at=root());
 
 enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
 array<string> listFiles(const ref<byte>& folder, Flags flags, int at=root());

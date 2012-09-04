@@ -50,10 +50,8 @@ float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v; } __at
 #define shuffle __builtin_shufflevector
 #define moveHighToLow(a,b) shuffle(a, b, 6, 7, 2, 3);
 
-template<class T> T* allocate_aligned(int size) {
-    extern "C" int posix_memalign(byte** buffer, long alignment, long size);
-    byte* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer;
-}
+extern "C" int posix_memalign(byte** buffer, long alignment, long size);
+template<class T> T* allocate_aligned(int size) { byte* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
 
 //TODO: store FIR of order 48 in registers
 inline float inner_product_single(const float* kernel, const float* signal, int len) {

@@ -61,7 +61,7 @@ List<Command> readShortcuts() {
 Launcher::Launcher() {
     menu<<&search<<&shortcuts;
     window.hideOnLeave = true;
-    window.anchor = Window::TopLeft;
+    window.anchor = TopLeft;
     window.localShortcut(Escape).connect(&window,&Window::hide);
     search.triggered.connect(&window,&Window::hide);
     for(Command& shortcut: shortcuts) shortcut.triggered.connect(&window,&Window::hide);

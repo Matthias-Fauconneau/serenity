@@ -77,7 +77,7 @@ Element::Element(TextStream& s, bool html) {
     }
 }
 
-ref<byte> Element::at(const ref<byte>& attribute) const {
+ref<byte> Element::attribute(const ref<byte>& attribute) const {
     assert(attributes.contains(string(attribute)),"attribute", attribute,"not found in",*this);
     return attributes.at(string(attribute));
 }
@@ -87,9 +87,15 @@ ref<byte> Element::operator[](const ref<byte>& attribute) const {
     return attributes.at(string(attribute));
 }
 
-const Element& Element::operator()(const ref<byte>& name) const {
+const Element& Element::child(const ref<byte>& name) const {
     for(const Element& e: children) if(e.name==name) return e;
     error("children"_, name, "not found in"_, *this);
+}
+
+const Element& Element::operator()(const ref<byte>& name) const {
+    for(const Element& e: children) if(e.name==name) return e;
+    static Element empty;
+    return empty;
 }
 
 void Element::visit(const function<void(const Element&)>& visitor) const {
@@ -141,9 +147,9 @@ string unescape(const ref<byte>& xml) {
     static map< ref<byte>, ref<byte> > entities;
     if(!entities) {
         array< ref<byte> > kv = split(
-"quot \" amp & apos ' lt < gt > nbsp \xA0 copy © reg ® trade ™ laquo « raquo » rsquo ’ oelig œ hellip … ndash – not ¬ mdash — "
-"euro € lsaquo ‹ rsaquo › ldquo “ rdquo ” larr ← uarr ↑ rarr → darr ↓ ouml ö oslash ø eacute é infin ∞ deg ° middot · bull • "
-"agrave à acirc â ccedil ç egrave è ocirc ô ecirc ê ugrave iacute í ù szlig ß"_,' ');
+"quot \" amp & apos ' lt < gt > nbsp \xA0 copy © euro € reg ® trade ™ lsaquo ‹ rsaquo › ldquo “ rdquo ” laquo « raquo » rsquo ’ hellip … ndash – not ¬ mdash — "
+"larr ← uarr ↑ rarr → darr ↓ infin ∞ deg ° middot · bull • "
+"aacute á Aacute Á agrave à Agrave À acirc â ccedil ç eacute é Eacute É egrave è Egrave È ecirc ê ocirc ô ouml ö oslash ø oelig œ iacute í icirc î ugrave ù ucirc û szlig ß"_,' ');
         assert(kv.size()%2==0,kv.size());
         entities.reserve(kv.size()/2);
         for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));

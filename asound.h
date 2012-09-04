@@ -13,7 +13,7 @@ struct AudioOutput : Poll {
     /// \note If \a realtime is set, the lowest latency will be used (most wakeups)
     AudioOutput(function<void(int16* output, uint size)> read) : read(read) {};
     ~AudioOutput() { stop(); }
-    void event(const pollfd&);
+    void event();
     void start(bool realtime=false);
     void stop();
 };

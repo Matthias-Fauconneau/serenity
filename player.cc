@@ -19,14 +19,18 @@ struct Player : Application {
     Text elapsed __(string("00:00"_));
     Slider slider;
     Text remaining __(string("00:00"_));
-    HBox toolbar __(&playButton, &nextButton, &elapsed, &slider, &remaining);
+    HBox toolbar;//__(&playButton, &nextButton, &elapsed, &slider, &remaining);
     Scroll< List<Text> > albums;
     Scroll< List<Text> > titles;
-    HBox main __( &albums.area(), &titles.area() );
-    VBox layout __( &toolbar, &main );
+    HBox main;// __( &albums.area(), &titles.area() );
+    VBox layout;// __( &toolbar, &main );
     Window window __(&layout, int2(-512,-512), "Player"_, pauseIcon());
 
     Player() {
+        toolbar<<&playButton<<&nextButton<<&elapsed<<&slider<<&remaining;
+        main<<&albums.area()<<&titles.area();
+        layout<<&toolbar<<&main;
+
         albums.expanding=true; titles.main=Linear::Center;
         window.localShortcut(Escape).connect(this, &Player::quit);
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
@@ -46,7 +50,7 @@ struct Player : Application {
             assert(exists(path),path);
             if(isFolder(path)) play(path); else appendFile(move(path));
         }*/
-        if(!files && exists("Music/.last"_)) {
+        if(!files && existsFile("Music/.last"_)) {
             string last = readFile("Music/.last"_);
             string folder = string(section(last,'/',0,2));
             albums.index = folders.indexOf(folder);

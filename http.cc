@@ -80,7 +80,7 @@ void Socket::write(const ref<byte>& buffer) { ::write(fd,buffer); }
 
 uint Socket::available(uint need) {
     while(need>Stream::available(need)) {
-        if(!poll(this,1,1000)) { warn("wait for",need,"bytes timed out"); break; }
+        if(!poll(this,1,2000)) { warn("wait for",need,"bytes timed out"); break; }
         (array<byte>&)buffer<<this->receive(max(4096u,need-Stream::available(need)));
     }
     return Stream::available(need);
@@ -211,9 +211,7 @@ void HTTP::header() {
     if(status==200||status==301||status==302) {}
     else if(status==304) { //Not Modified
         assert(existsFile(file,cache));
-        content = readFile(file,cache);
-        assert(content);
-        writeFile(file,content,cache); //TODO: touch instead of rewriting
+        touchFile(file,cache);
         log("Not Modified",url);
         state = Handle;
         return;

@@ -18,6 +18,8 @@ union Event {
     struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed;
     struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
     struct { byte pad; uint16 seq; uint parent,window; int16 x,y,w,h,border; int8 override_redirect; } packed create;
+    struct { byte pad; uint16 seq; uint event,window; int8 override_redirect; } packed map;
+    struct { byte pad; uint16 seq; uint event,window; int8 from_configure; } packed unmap;
     struct { byte pad; uint16 seq; uint parent,window; } packed map_request;
     struct { byte pad; uint16 seq; uint event,window,above; int16 x,y,w,h,border; int8 override_redirect; } packed configure;
     struct { byte stackMode; uint16 seq; uint parent,window,sibling; int16 x,y,w,h,border; int16 valueMask; } packed configure_request;
@@ -35,7 +37,7 @@ struct Screen { int32 root, colormap, white, black, inputMask; int16 width, heig
 struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
-struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x=0,y=0,width,height,border=0,class_=1; uint visual;
+struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x,y,width,height,border=0,class_=1; uint visual;
                       uint mask=BackgroundPixmap|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
                                         uint backgroundPixmap=0,borderPixel=0, bitGravity=10, winGravity=10, overrideRedirect, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
@@ -66,6 +68,7 @@ struct GetSelectionOwnerReply { uint8 pad; uint16 seq; uint size; uint owner; by
 struct ConvertSelection { uint8 req=24,pad; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
 struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; Event event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
+struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
 struct GrabKeyboard { int8 req=31,owner=0; uint16 size=6; uint window; uint time=0; uint8 pointerMode=0,keyboardMode=1; };
 struct GrabKeyboardReply { uint8 status; uint16 seq; uint size; byte pad[24]; } fixed(GrabKeyboardReply);
 struct AllowEvents { int8 req=35, mode=2; uint16 size=2; uint time=0; };
@@ -97,11 +100,10 @@ struct QueryVersion { int8 ext=EXT, req=0; uint16 size=1; };
 struct QueryVersionReply { int8 sharedPixmaps; uint16 seq; uint length; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
 struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]; };
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
-struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalWidth, totalHeight, srcX=0, srcY=0, width, height,
+struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 W, H, srcX=0, srcY=0, w, h,
                   dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
-struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0; };
-struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual,size,pad[4]; } fixed(GetImageReply);
 enum { Completion };
+constexpr ref<byte> requests[] = {"QueryVersion"_,"Attach"_,"Detach"_,"PutImage"_};
 constexpr ref<byte> errors[] = {"BadSeg"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
@@ -122,7 +124,7 @@ struct CreatePicture { int8 ext=EXT,req=4; uint16 size=5; uint picture,drawable,
 struct FreePicture { int8 ext=EXT,req=7; uint16 size=2; uint picture; };
 struct Composite { int8 ext=EXT,req=8; uint16 size=9; uint8 op=Over; uint src,mask=0,dst; int16 srcX=0,srcY=0,maskX=0,maskY=0,dstX=0,dstY=0,width,height; };
 struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
-constexpr ref<byte> requests[] = {"QueryVersion"_,"QueryPictFormats"_,"QueryPictIndexValues"_,"QueryFilters"_,"CreatePicture"_,"ChangePicture"_,"SetPictureClipRectangles"_,"SetPictureTransform"_,"SetPictureFilter"_,"FreePicture"_,"Composite"_};
+constexpr ref<byte> requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPictIndexValues"_, "QueryFilters"_, "CreatePicture"_, "ChangePicture"_, "SetPictureClipRectangles"_, "SetPictureTransform"_, "SetPictureFilter"_, "FreePicture"_, "Composite"_};
 constexpr ref<byte> errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }

@@ -28,7 +28,7 @@ struct HWParams {
     interval intervals[12];
     interval ires[9];
     uint rmask, cmask, info, msbits, rate_num, rate_den;
-    ulong fifo_size;
+    long fifo_size;
     byte reserved[64];
     interval& interval(int i) { assert(i<12); return intervals[i]; }
     mask& mask(int i) { assert(i<3); return masks[i]; }
@@ -36,11 +36,11 @@ struct HWParams {
 struct SWParams {
  int tstamp_mode=0;
  uint period_step=1, sleep_min=0;
- ulong avail_min=0, xfer_align=0, start_threshold=0, stop_threshold=0, silence_threshold=0, silence_size=0, boundary=0;
+ long avail_min=0, xfer_align=0, start_threshold=0, stop_threshold=0, silence_threshold=0, silence_size=0, boundary=0;
  byte reserved[64];
 };
-struct Status { int state, pad; ulong hwPointer; timespec tstamp; int suspended_state; };
-struct Control { ulong swPointer, availableMinimum; };
+struct Status { int state, pad; ptr hwPointer; timespec tstamp; int suspended_state; };
+struct Control { ptr swPointer; long availableMinimum; };
 
 #define IO(major,minor) major<<8 | minor
 #define IOWR(major,minor,type) 3<<30 | sizeof(type)<<16 | major<<8 | minor
@@ -91,7 +91,7 @@ void AudioOutput::stop() {
     munmap(buffer, bufferSize * channels * 2); buffer=0; bufferSize=0;
     close(fd); fd=0;
 }
-void AudioOutput::event(const pollfd&) {
+void AudioOutput::event() {
     if(status->state == XRun) { warn("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(!available){/*warn(status->state,bufferSize,"=",periodCount,"x",periodSize,"hw",status->hwPointer,"sw",control->swPointer);*/return;}//FIXME

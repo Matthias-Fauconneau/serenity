@@ -3,12 +3,12 @@ TARGET ?= taskbar
 BUILD ?= fast
 CC = clang++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
-#debug: include debug symbols, keep all assertions, disable all optimizations
-FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer
+#debug: include debug symbols, keep all assertions, use light optimizations
+FLAGS_debug := -g -DDEBUG -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls
 #fast: include debug symbols,  disable all assertions, use light optimizations
 FLAGS_fast := -g -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls
 #profile: include debug symbols, disable all assertions, use light optimizations, instrument functions
-FLAGS_profile := $(FLAGS_fast) -finstrument-functions
+FLAGS_profile := -g -O1 -fno-omit-frame-poiinter -fno-optimize-sibling-calls -finstrument-functions
 #release: strip debug symbols, disable all assertions, use all optimizations
 FLAGS_release := -O3 -fomit-frame-pointer
 

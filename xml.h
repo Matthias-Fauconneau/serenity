@@ -17,10 +17,12 @@ struct Element {
     Element(TextStream& stream, bool html=false); //TODO: escape analysis
     explicit operator bool() { return name||content; }
     /// Returns value for \a attribute (fail if missing)
-    ref<byte> at(const ref<byte>& attribute) const;
+    ref<byte> attribute(const ref<byte>& attribute) const;
     /// Returns value for \a attribute (empty string if missing)
     ref<byte> operator[](const ref<byte>& attribute) const;
-    /// Returns child element with tag \a name (beware of dangling reference)
+    /// Returns child element with tag \a name (fail if missing)
+    const Element& child(const ref<byte>& name) const;
+    /// Returns child element with tag \a name (empty Element if missing)
     const Element& operator()(const ref<byte>& name) const;
     /// Depth-first visits all descendants
     void visit(const function<void(const Element&)>& visitor) const;
