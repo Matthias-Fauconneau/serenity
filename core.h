@@ -127,7 +127,7 @@ template<class T> constexpr T max(T a, T b) { return a>b ? a : b; }
 template<class T> constexpr T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 template<class T> constexpr T abs(T x) { return x>=0 ? x : -x; }
 template<class A, class B> bool operator !=(const A& a, const B& b) { return !(a==b); }
-template<class A, class B> bool operator <(const A& a, const B& b) { return b>a; }
+template<class A, class B> bool operator >(const A& a, const B& b) { return b<a; }
 
 /// Raw buffer zero initialization
 inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }

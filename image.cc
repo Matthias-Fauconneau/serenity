@@ -15,18 +15,18 @@ Image resize(const Image& image, uint width, uint height) {
                 int4 s; //TODO: alpha blending
                 for(int i=0;i<scale;i++){
                     for(int j=0;j<scale;j++) {
-                        s+= int4(src[i*image.width+j]);
+                        s+= int4(src[i*image.stride+j]);
                     }
                 }
                 *dst = byte4(s/(scale*scale));
                 src+=scale, dst++;
             }
-            src += (scale-1)*image.width;
+            src += (scale-1)*image.stride;
         }
     } else { //nearest
         for(uint y=0; y<height; y++) {
             for(uint x=0; x<width; x++) {
-                *dst = src[(y*height/image.height)*image.width+x*width/image.width];
+                *dst = src[(y*image.height/height)*image.stride+x*image.width/width];
                 dst++;
             }
         }

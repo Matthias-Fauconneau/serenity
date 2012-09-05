@@ -52,13 +52,13 @@ uint16 Font::index(uint16 code) {
             segCount /= 2;
             ref<uint16> endCode = s.read<uint16>(segCount);
             s.advance(2); //pad
-            ref<uint16> startCode = s.read<uint16>(segCount);
+            ref<uint16> firstCode = s.read<uint16>(segCount);
             ref<uint16> idDelta = s.read<uint16>(segCount);
             ref<uint16> idRangeOffset = s.read<uint16>(segCount);
-            int i=0; while(swap16(endCode[i]) < code) i++;
-            if(swap16(startCode[i])<=code) {
-                if(swap16(idRangeOffset[i])) return *( &idRangeOffset[i] + swap16(idRangeOffset[i]) / 2 + (code - swap16(startCode[i])) );
-                else return swap16(idDelta[i]) + code;
+            int i=0; while(big16(endCode[i]) < code) i++;
+            if(big16(firstCode[i])<=code) {
+                if(big16(idRangeOffset[i])) return *( &idRangeOffset[i] + big16(idRangeOffset[i]) / 2 + (code - big16(firstCode[i])) );
+                else return big16(idDelta[i]) + code;
             }
         } else if(format==12) {
             uint16 unused subformat = s.read();
@@ -130,14 +130,14 @@ void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
 }
 
 /// Fixed point rounding
-int truncate(int width, uint value) { return value/width*width; }
-int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
-int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
+inline int truncate(int width, uint value) { return value/width*width; }
+inline int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
+inline int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
 
 void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
-    int start = ( indexToLocFormat? swap32(((uint32*)loca)[index]) : 2*swap16(((uint16*)loca)[index]) );
-    int length = ( indexToLocFormat? swap32(((uint32*)loca)[index+1]) : 2*swap16(((uint16*)loca)[index+1]) ) - start;
-    DataStream s=DataStream(ref<byte>(glyf +start, length), true);
+    int pointer = ( indexToLocFormat? big32(((uint32*)loca)[index]) : 2*big16(((uint16*)loca)[index]) );
+    int length = ( indexToLocFormat? big32(((uint32*)loca)[index+1]) : 2*big16(((uint16*)loca)[index+1]) ) - pointer;
+    DataStream s=DataStream(ref<byte>(glyf +pointer, length), true);
     if(!s) return;
 
     int16 numContours = s.read();
@@ -152,7 +152,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
 
     if(numContours>0) {
         ref<uint16> endPtsOfContours = s.read<uint16>(numContours);
-        int nofPoints = swap16(endPtsOfContours[numContours-1])+1;
+        int nofPoints = big16(endPtsOfContours[numContours-1])+1;
 
         uint16 instructionLength = s.read(); ref<uint8> unused instructions = s.read<uint8>(instructionLength);
 
@@ -188,7 +188,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
         }
 
         for(int n=0,i=0; n<numContours; n++) {
-            int last= swap16(endPtsOfContours[n]);
+            int last= big16(endPtsOfContours[n]);
             int2 p; //last on point
             if(flagsArray[last].on_curve) p=P[last];
             else if(flagsArray[last-1].on_curve) p=P[last-1];
@@ -227,7 +227,7 @@ Glyph Font::glyph(uint16 index, int fx) { assert(fx>=-16,fx); fx=(fx+16)%16;
     if(glyph.image || glyph.advance) return Glyph(glyph);
 
     // map unicode to glyf outline
-    glyph.advance = scale(swap16(hmtx[2*index]));
+    glyph.advance = scale(big16(hmtx[2*index]));
     Bitmap raster; int xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
     if(!raster.data) return Glyph(glyph);

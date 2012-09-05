@@ -47,9 +47,9 @@ struct Stream {
     explicit operator bool() { return available(1); }
 };
 
-#define swap32 __builtin_bswap32
+#define big32 __builtin_bswap32
 inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
-#define swap16 __builtin_bswap16
+#define big16 __builtin_bswap16
 
 /// \a DataStream provides a convenient interface to parse binaries
 struct DataStream : virtual Stream {
@@ -75,8 +75,8 @@ struct DataStream : virtual Stream {
 
     /// Reads one raw \a T element from stream
     template<class T> const T& read() { const T& t = raw<T>(Stream::read(sizeof(T))); return t; }
-    int32 read32() { return isBigEndian?swap32(read<int32>()):read<int32>(); }
-    int16 read16() { return isBigEndian?swap16(read<int16>()):read<int16>(); }
+    int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
+    int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
 
     /// Provides template overloaded specialization (for swap) and return type overloading through cast operators.
     struct ReadOperator {

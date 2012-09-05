@@ -22,7 +22,7 @@ Element parseXML(const ref<byte>& document) { return parse(document,false); }
 Element parseHTML(const ref<byte>& document) { return parse(document,true); }
 
 Element::Element(TextStream& s, bool html) {
-    uint start = s.index;
+    uint begin = s.index;
     if(s.match("!DOCTYPE"_)||s.match("!doctype"_)) { s.until('>'); return; }
     else if(s.match("?xml"_)) { s.until("?>"_); return; }
     else if(s.match("!--"_)) { s.until("-->"_); return; }
@@ -36,7 +36,7 @@ Element::Element(TextStream& s, bool html) {
         else if(s.match('/')) s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
         string key = string(s.identifier());/*TODO:reference*/ s.skip();
-        if(!key) { log("Attribute syntax error"_,s.slice(start,s.index-start),"|"_,s.until('>')); break; }
+        if(!key) { log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>')); break; }
         if(html) key=toLower(key);
         string value;
         if(s.match('=')) {
@@ -155,7 +155,7 @@ string unescape(const ref<byte>& xml) {
     }
     string out;
     for(TextStream s(xml);s;) {
-        out << s.until("&"_);
+        out << s.until('&');
         if(!s) break;
 
         if(s.match("#x"_)) out << utf8(toInteger(toLower(s.until(";"_)),16));

@@ -14,7 +14,7 @@ enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
 enum StackMode { Above,Below,TopIf,BottomIf,Opposite };
 
 struct Error { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(Error);
-union Event {
+union XEvent {
     struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed;
     struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
     struct { byte pad; uint16 seq; uint parent,window; int16 x,y,w,h,border; int8 override_redirect; } packed create;
@@ -27,7 +27,7 @@ union Event {
     struct { byte pad; uint16 seq; uint time, requestor,selection,target,property; } packed selection;
     struct { byte format; uint16 seq; uint window, type; uint data[5]; } packed client;
     byte pad[31];
-} fixed(Event);
+} fixed(XEvent);
 
 struct ConnectionSetup { byte bom='l', pad=0; int16 major=11,minor=0; int16 nameSize=0, dataSize=0, pad2=0; };
 struct ConnectionSetupReply { int8 status,reason; int16 major,minor,additionnal; int32 release, ridBase, ridMask, motionBufferSize; int16 vendorLength, maxRequestSize; int8 numScreens, numFormats, imageByteOrder, bitmapBitOrder, bitmapScanlineUnit, bitmapScanlinePad, minKeyCode, maxKeyCode; int32 pad2; };
@@ -66,7 +66,7 @@ struct GetPropertyReply { uint8 format; uint16 seq; uint size; uint type,bytesAf
 struct GetSelectionOwner { uint8 req=23,pad; uint16 size=2; uint selection=1; };
 struct GetSelectionOwnerReply { uint8 pad; uint16 seq; uint size; uint owner; byte pad2[20]; } fixed(GetSelectionOwnerReply);
 struct ConvertSelection { uint8 req=24,pad; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
-struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; Event event; };
+struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; XEvent event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=1,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
 struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
 struct GrabKey { int8 req=33,owner=0; uint16 size=4; uint window; uint16 modifiers=AnyModifier; uint8 keycode, pointerMode=1,keyboardMode=1, pad[3]; };

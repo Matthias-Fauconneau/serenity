@@ -2,10 +2,9 @@
 #include "file.h"
 #include "map.h"
 
-/// Returns events occuring on \a query date (-1=unspecified)
-array<string> getEvents(Date query) {
+array<Event> getEvents(Date query) {
     static int config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
-    array<string> events;
+    array<Event> events;
     if(!existsFile("events"_,config)) {warn("No events settings [$HOME/.config/events]"); return events; }
     string file = readFile("events"_,config);
 
@@ -40,9 +39,9 @@ array<string> getEvents(Date query) {
             }
             if(query.hours>=0 && date.hours!=query.hours) continue;
             if(query.minutes>=0 && date.minutes!=query.minutes) continue;
-            if(date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
+            if(query.weekDay>=0 && date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
             if(exceptions.contains(title)) for(Date date: exceptions.at(title)) if(date.day==query.day && date.month==query.month) goto skip;
-            events.insertSorted(string(str(date,"hh:mm"_)+(date!=end?string("-"_+str(end,"hh:mm"_)):string())+": "_+title));
+            events.insertSorted(Event __(date,end,move(title)));
             skip:;
         }
     }
@@ -95,17 +94,17 @@ void Events::nextMonth() { month.nextMonth(); date[1].setText(::str(month.active
 void Events::showEvents(uint index) {
     string text;
     Date date = month.dates[index];
-    array<string> events = getEvents(date);
+    array<::Event> events = getEvents(date);
     if(events) {
         text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date,"dddd, dd"_))+format(Regular)+"\n"_);
-        text << join(events,"\n"_)+"\n"_;
+        text << str(events,'\n')+"\n"_;
     }
     if(index==month.todayIndex) {
         Date date = month.dates[index+1];
-        array<string> events = getEvents(date);
+        array<::Event> events = getEvents(date);
         if(events) {
             text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
-            text << join(::getEvents(date),"\n"_);
+            text << str(::getEvents(date),'\n');
         }
     }
     this->events.setText(move(text));

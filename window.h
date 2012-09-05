@@ -19,13 +19,13 @@ struct Window : Poll {
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
-           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_, Anchor anchor=Float);
+           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_);
     ~Window();
 
     /// Event handler
     void event();
     /// Processes one X event
-    void processEvent(uint8 type, const Event& e);
+    void processEvent(uint8 type, const XEvent& e);
     /// Returns Atom for \a name
     uint Atom(const ref<byte>& name);
     /// Returns name for \a atom
@@ -38,7 +38,7 @@ struct Window : Poll {
     uint16 sequence=-1;
     void send(const ref<byte>& request);
 
-    struct QEvent { uint8 type; Event event; } packed;
+    struct QEvent { uint8 type; XEvent event; } packed;
     array<QEvent> queue;
     /// Reads an X reply while checking pending errors and processing queued events
     template<class T> T readReply();
@@ -97,6 +97,8 @@ struct Window : Poll {
     Anchor anchor = Float;
     /// Window position and size
     int2 position, size;
+    /// Window background intensity and opacity
+    int bgCenter=0xF0,bgOuter=0xE0,opacity=0xFF;
 
     /// Root window
     uint root = 0;

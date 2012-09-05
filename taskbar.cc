@@ -37,7 +37,7 @@ struct Taskbar : Application, Poll {
     Clock clock __(16);
     Events calendar;
     Window popup __(&calendar,int2(256,-1));
-    HBox panel;//__(&start, &tasks, &clock);
+    HBox panel;//__(&button, &tasks, &clock);
     Window window __(&panel,int2(0,16));
     uint root=window.root;
     uint desktop=0;
@@ -46,7 +46,7 @@ struct Taskbar : Application, Poll {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
-        string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
+        string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)?:":0"_).slice(1);
         sockaddr_un addr; copy(addr.path,path.data(),path.size());
         check_(connect(fd,(sockaddr*)&addr,2+path.size()),path);
         {ConnectionSetup r;
@@ -81,7 +81,7 @@ struct Taskbar : Application, Poll {
     }
     ~Taskbar() { {SetWindowEventMask r; r.window=root; r.eventMask=0; send(raw(r));}/*<- shouldn't be needed*/ close(fd); }
 
-    void processEvent(uint8 type, const Event& e) {
+    void processEvent(uint8 type, const XEvent& e) {
         if(type==0) return;
         if(type==1) error("Unexpected reply");
         type&=0b01111111; //msb set if sent by SendEvent
@@ -117,7 +117,7 @@ struct Taskbar : Application, Poll {
             const auto& c = e.configure_request;
             if(c.valueMask & X) x=c.x; if(c.valueMask & Y) y=c.y; if(c.valueMask & W) w=c.w; if(c.valueMask & H) h=c.h;
             array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
-            if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
+            if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_) || type[0]==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
                 w=min<int16>(display.x,w); h=min<int16>(display.y-16,h);
                 x = (display.x - w)/2; y = 16+(display.y-16-h)/2;
             }
@@ -141,19 +141,19 @@ struct Taskbar : Application, Poll {
 
     /// Adds \a id to \a windows and to \a tasks if necessary
     int addWindow(uint id) {
+        assert(!tasks.contains(id));
         if(id==root || id==window.id) return -1;
-        if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) { desktop=id; return -1; }
         if(!windows.contains(id)) {
             windows << id;
             {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask; send(raw(r));}
         }
-        if(tasks.contains(id)) return -1;
-        {GrabButton r; r.window=id; send(raw(r));}
         GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
         if(wa.overrideRedirect||wa.mapState!=IsViewable) return -1;
         array<uint> type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
+        if(type.size()>0 && type.first()==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
         if(type.size()>0 && type.first()!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) return -1;
         if(getProperty<uint>(id,"_NET_WM_STATE"_).contains(Atom("_NET_WM_SKIP_TASKBAR"_))) return -1;
+        {GrabButton r; r.window=id; send(raw(r));}
         string title = getTitle(id); if(!title) return -1;
         Image icon = getIcon(id);
         tasks<< Task(this,id,move(icon),move(title));
@@ -201,7 +201,7 @@ struct Taskbar : Application, Poll {
         GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
         if(wa.overrideRedirect||wa.mapState!=IsViewable) return;
         static uint active;
-        if(active){GrabButton r; r.window=active; send(raw(r));}
+        if(active && tasks.contains(active)){GrabButton r; r.window=active; send(raw(r));}
         {UngrabButton r; r.window=id; send(raw(r));}
         {SetInputFocus r; r.window=id; send(raw(r));}
         active=id;
@@ -209,26 +209,27 @@ struct Taskbar : Application, Poll {
 
     void showDesktop() {
         if(tasks.index<tasks.count()) { tasks.setActive(-1); window.render(); }
+        if(!desktop) warn("No Desktop");
         {MapWindow r; r.id=desktop; send(raw(r));} raise(desktop);
     }
 
     uint16 sequence=-1;
     void send(const ref<byte>& request) { write(fd, request); sequence++; }
 
-    struct QEvent { uint8 type; Event event; } packed;
+    struct QEvent { uint8 type; XEvent event; } packed;
     array<QEvent> queue;
 
     template<class T> T readReply() {
         for(;;) { uint8 type = read<uint8>(fd);
-            if(type==0){Error e=read<Error>(fd); if(e.code!=3) window.processEvent(0,(Event&)e); if(e.seq==sequence) { T t; clear(t); return t; }}
+            if(type==0){Error e=read<Error>(fd); if(e.code!=3) window.processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear(t); return t; }}
             else if(type==1) return read<T>(fd);
-            else queue << QEvent __(type, read<::Event>(fd)); //queue events to avoid reentrance
+            else queue << QEvent __(type, read<XEvent>(fd)); //queue events to avoid reentrance
         }
     }
 
     void event() {
         uint8 type = read<uint8>(fd);
-        processEvent(type, read<Event>(fd));
+        processEvent(type, read<XEvent>(fd));
         while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
     }
 };

@@ -138,7 +138,7 @@ template<class T> struct array {
         return at(index);
     }
     T& insertAt(int index, const T& v) { return insertAt(index,copy(v)); }
-    int insertSorted(T&& e) { uint i=0; for(;i<size();i++) if(at(i) > e) break; insertAt(i,move(e)); return i; }
+    int insertSorted(T&& e) { uint i=0; for(;i<size() && at(i) < e;i++) {} insertAt(i,move(e)); return i; }
     int insertSorted(const T& v) { return insertSorted(copy(v)); }
 
     /// Removes elements

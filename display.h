@@ -18,7 +18,7 @@ constexpr byte4 highlight __(0xE0, 0xC0, 0x80, 0xFF);
 constexpr byte4 white __(0xFF, 0xFF, 0xFF, 0xFF);
 
 /// Fills pixels inside \a rect with \a color
-void fill(Rect rect, byte4 color);
+void fill(Rect rect, byte4 color=black);
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
 /// \arg opacity multiplies alpha channel by opacity/255, alpha is accumulated in framebuffer
 void blit(int2 target, const Image& source, uint8 opacity=255);

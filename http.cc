@@ -29,11 +29,11 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
             TextStream s=readFile("etc/resolv.conf"_);
             s.until("nameserver "_);
             uint a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
-            sockaddr addr = {PF_INET, swap16(53), (d<<24)|(c<<16)|(b<<8)|a};
+            sockaddr addr = {PF_INET, big16(53), (d<<24)|(c<<16)|(b<<8)|a};
             check_( ::connect(dns, &addr, sizeof(addr)) );
         }
         array<byte> query;
-        struct Header { uint16 id=swap16(currentTime()); uint16 flags=1; uint16 qd=swap16(1), an=0, ns=0, ar=0; } packed header;
+        struct Header { uint16 id=big16(currentTime()); uint16 flags=1; uint16 qd=big16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
         for(TextStream s(host);s;) { //QNAME
             ref<byte> label = s.until('.');
@@ -45,8 +45,8 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
         pollfd pollfd __(dns,POLLIN); if(!poll(&pollfd,1,1000)){log("DNS query timed out, retrying... "); ::write(dns,query); if(!poll(&pollfd,1,1000)){log("giving up"); return false; } }
         DataStream s(readUpTo(dns,4096), true);
         header = s.read<Header>();
-        for(int i=0;i<swap16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
-        for(int i=0;i<swap16(header.an);i++) {
+        for(int i=0;i<big16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
+        for(int i=0;i<big16(header.an);i++) {
             for(ubyte n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } //skip name
             uint16 type=s.read(), unused class_=s.read(); uint32 unused ttl=s.read(); uint16 unused size=s.read();
             if(type!=1) { s.advance(size); continue; }
@@ -67,7 +67,7 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
     }
 
     fd = socket(PF_INET,SOCK_STREAM|O_NONBLOCK,0);
-    sockaddr addr = {PF_INET,swap16(service=="https"_?443:80),ip};
+    sockaddr addr = {PF_INET,big16(service=="https"_?443:80),ip};
     ::connect(fd, &addr, sizeof(addr));
     fcntl(fd,F_SETFL,0);
     registerPoll(fd,POLLOUT);

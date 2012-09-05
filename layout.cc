@@ -71,12 +71,18 @@ array<Rect> Linear::layout(int2 position, int2 size) {
             else { int delta=-width/count; for(uint i=0;i<count;i++) widths[i]-=delta, width+=delta; } //all widgets already have the same size
         }
     }
-    int margin = (main==Spread && count>1) ? width/(count-1) : 0; //Spread distribute any margin between all widgets
+
+    int margin = (main==Spread && count>1) ? width/(count-1) : 0; //spreads any margin between all widgets
     width -= margin*(count-1); //width%(count-1) space remains as margin is rounded down
+
+    if(main==Even) {
+        for(uint i=0;i<count;i++) widths[i]=size.x/count; //converts all expanding widgets to fixed
+        width = size.x-count*size.x/count;
+    }
 
     int2 pen = xy(position);
     if(main==Left) pen.x+=0;
-    else if(main==Center || main==Share || main== Spread) pen.x+=width/2;
+    else if(main==Center || main==Even || main==Spread || main==Share) pen.x+=width/2;
     else if(main==Right) pen.x+=size.x-width;
     else error("");
     if(side==AlignLeft) pen.y+=0;

@@ -127,7 +127,7 @@ Symbol findNearestLine(void* find) {
     Symbol symbol;
     for(const Sym& sym: symtab) if(find >= sym.value && find < sym.value+sym.size) symbol.function = demangle(str(strtab+sym.name));
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
-        uint start = s.index;
+        uint begin = s.index;
         struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; int8 line_base; ubyte line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
@@ -140,7 +140,7 @@ Symbol findNearestLine(void* find) {
         s.advance(1);
         byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;
 
-        while(s.index<start+cu.size+4) {
+        while(s.index<begin+cu.size+4) {
             ubyte opcode = s.read();
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
                          fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };

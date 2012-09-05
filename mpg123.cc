@@ -6,11 +6,12 @@
 void AudioFile::open(const ref<byte>& path) {
     static int unused once=mpg123_init();
     close();
+    if(!endsWith(path,".mp3"_)) { warn("Unsupported file format",path); return; }
     file = mpg123_new(0,0);
     mpg123_param(file, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.);
     if(mpg123_open(file,strz(string("/"_+path)))) { file=0; return; }
     long rate; int channels, encoding;
-    mpg123_getformat(file,&rate,&channels,&encoding);
+    if(mpg123_getformat(file,&rate,&channels,&encoding)) { file=0; return; }
     audioInput = __( (uint)rate, (uint)channels );
     assert_(audioInput.channels == audioOutput.channels);
     timeChanged(position(),duration());

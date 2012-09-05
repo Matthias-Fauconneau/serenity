@@ -25,7 +25,6 @@ bool Search::keyPress(Key key) {
 }
 
 struct Command : Item {
-    signal<> triggered;
     string path; array<string> args;
     Command(Image&& icon, string&& text, string&& path, array<string>&& args) :
         Linear(Left),Item(move(icon),move(text)),path(move(path)),args(move(args)){}
@@ -33,7 +32,7 @@ struct Command : Item {
 };
 
 bool Command::mouseEvent(int2, int2, Event event, Button button) {
-    if(event == Press && button == LeftButton) { execute(path,args,false); triggered(); return true; }
+    if(event == Press && button == LeftButton) { execute(path,args,false); }
     return false;
 }
 
@@ -59,7 +58,7 @@ struct Desktop : Application {
     VBox timeBox;//  __(&clock, &calendar);
     List<Command> shortcuts;
     HBox applets;// __(&feeds, &timeBox, &shortcuts);
-    Window window __(&applets,int2(0,0),""_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_,Bottom);
+    Window window __(&applets,int2(0,0),"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
     Window browser __(&page.area(),int2(0,0),"Browser"_);
     ICON(shutdown)
     Desktop() {

@@ -31,7 +31,6 @@ debug(void Date::invariant() {
     if(hours>=0) { assert_(inRange(0, hours, 24)); }
     if(minutes>=0) { assert_(inRange(0, minutes, 60)); assert_(hours>=0); }
     if(seconds>=0) { assert_(inRange(0, seconds, 60)); assert_(minutes>=0); }
-    assert_(year>=0 || hours>=0);
 })
 void Date::setDay(int monthDay) {
     assert(year>=0 && month>=0);
@@ -41,13 +40,13 @@ void Date::setDay(int monthDay) {
     days+=monthDay;
     weekDay = days%7;
 }
-bool operator >(const Date& a, const Date& b) {
-    if(a.year!=-1 && b.year!=-1) { if(a.year>b.year) return true; else if(a.year<b.year) return false; }
-    if(a.month!=-1 && b.month!=-1) { if(a.month>b.month) return true; else if(a.month<b.month) return false; }
-    if(a.day!=-1 && b.day!=-1) { if(a.day>b.day) return true; else if(a.day<b.day) return false; }
-    if(a.hours!=-1 && b.hours!=-1) { if(a.hours>b.hours) return true; else if(a.hours<b.hours) return false; }
-    if(a.minutes!=-1 && b.minutes!=-1) { if(a.minutes>b.minutes) return true; else if(a.minutes<b.minutes) return false; }
-    if(a.seconds!=-1 && b.seconds!=-1) { if(a.seconds>b.seconds) return true; else if(a.seconds<b.seconds) return false; }
+bool operator <(const Date& a, const Date& b) {
+    if(a.year!=-1 && b.year!=-1) { if(a.year<b.year) return true; else if(a.year>b.year) return false; }
+    if(a.month!=-1 && b.month!=-1) { if(a.month<b.month) return true; else if(a.month>b.month) return false; }
+    if(a.day!=-1 && b.day!=-1) { if(a.day<b.day) return true; else if(a.day>b.day) return false; }
+    if(a.hours!=-1 && b.hours!=-1) { if(a.hours<b.hours) return true; else if(a.hours>b.hours) return false; }
+    if(a.minutes!=-1 && b.minutes!=-1) { if(a.minutes<b.minutes) return true; else if(a.minutes>b.minutes) return false; }
+    if(a.seconds!=-1 && b.seconds!=-1) { if(a.seconds<b.seconds) return true; else if(a.seconds>b.seconds) return false; }
     return false;
 }
 bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && a.minutes==b.minutes && a.hours==b.hours

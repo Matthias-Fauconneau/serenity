@@ -18,12 +18,11 @@ Window* current;
 
 string getSelection() { assert(current); return current->getSelection(); }
 
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Anchor anchor) :
-    widget(widget), overrideRedirect(title.size?false:true), anchor(anchor) {
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : widget(widget), overrideRedirect(title.size?false:true) {
     registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
-    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
+    string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)?:":0"_).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
-    check_(connect(fd,(sockaddr*)&addr,2+path.size()),path);
+    if(check(connect(fd,(sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;
         string authority = getenv("HOME"_)+"/.Xauthority"_;
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
@@ -108,15 +107,19 @@ void Window::event() {
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
         framebuffer=share(buffer);
+        currentClip=Rect(framebuffer.size());
 
-        // Oxygen like radial gradient background
-        int2 center = int2(size.x/2,0); int radius=256;
-        for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
-            int2 pos = int2(x,y);
-            const int bgCenter=0xF0,bgOuter=0xE0,opacity=0xFF;
-            int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
-            framebuffer(x,y) = byte4(g,g,g,opacity);
+        if(bgCenter==bgOuter) fill(Rect(framebuffer.size()),byte4(bgCenter));
+        else {
+            // Oxygen like radial gradient background
+            int2 center = int2(size.x/2,0); int radius=256;
+            for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
+                int2 pos = int2(x,y);
+                int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
+                framebuffer(x,y) = byte4(g,g,g,opacity);
+            }
         }
+
 #if 0
         //feather edges //TODO: client side shadow
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
@@ -130,20 +133,19 @@ void Window::event() {
         if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;
 #endif
 
-        currentClip=Rect(framebuffer.size());
         widget->render(int2(0,0),size);
         assert(!clipStack);
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;
     } else {
         uint8 type = read<uint8>(fd);
-        processEvent(type, read<Event>(fd));
+        processEvent(type, read<XEvent>(fd));
         while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
     }
     current=0;
 }
 
-void Window::processEvent(uint8 type, const Event& event) {
+void Window::processEvent(uint8 type, const XEvent& event) {
     if(type==0) { const Error& e=(const Error&)event; uint8 code=e.code;
         if(e.major==Render::EXT) {
             int reqSize=sizeof(Render::requests)/sizeof(*Render::requests);
@@ -170,7 +172,7 @@ void Window::processEvent(uint8 type, const Event& event) {
         }
     }
     else if(type==1) error("Unexpected reply");
-    else { Event e=event; type&=0b01111111; //msb set if sent by SendEvent
+    else { XEvent e=event; type&=0b01111111; //msb set if sent by SendEvent
         /**/ if(type==MotionNotify) {
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, LeftButton)) wait();
             else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
@@ -242,9 +244,9 @@ void Window::send(const ref<byte>& request) { write(fd, request); sequence++; }
 
 template<class T> T Window::readReply() {
     for(;;) { uint8 type = read<uint8>(fd);
-        if(type==0){Error e=read<Error>(fd); processEvent(0,(Event&)e);  if(e.seq==sequence) { T t; clear(t); return t; }}
+        if(type==0){Error e=read<Error>(fd); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; clear(t); return t; }}
         else if(type==1) return read<T>(fd);
-        else queue << QEvent __(type, read<::Event>(fd)); //queue events to avoid reentrance
+        else queue << QEvent __(type, read<XEvent>(fd)); //queue events to avoid reentrance
     }
 }
 
@@ -328,8 +330,8 @@ string Window::getSelection() {
     send(raw(GetSelectionOwner())); uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();
     {ConvertSelection r; r.requestor=id; r.target=Atom("UTF8_STRING"_); send(raw(r));}
     for(;;) { uint8 type = read<uint8>(fd);
-        if((type&0b01111111)==SelectionNotify) { read<Event>(fd); return getProperty<byte>(id,"UTF8_STRING"_); }
-        else queue << QEvent __(type, read<::Event>(fd)); //queue events to avoid reentrance
+        if((type&0b01111111)==SelectionNotify) { read<XEvent>(fd); return getProperty<byte>(id,"UTF8_STRING"_); }
+        else queue << QEvent __(type, read<XEvent>(fd)); //queue events to avoid reentrance
     }
 }
 

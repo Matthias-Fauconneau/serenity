@@ -80,7 +80,7 @@ void TextStream::skip() { whileAny(" \t\n\r"_); }
 
 ref<byte> TextStream::word() {
     uint start=index;
-    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z')) break; advance(1); }
+    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z')) break; advance(1); }
     return slice(start,index-start);
 }
 

@@ -35,7 +35,7 @@ template<class T> struct Array : virtual Layout, array<T> {
     Widget& at(int i) { return array<T>::at(i); }
 };
 
-/// Linear divides space between contained widgets
+/// Linear layouts widgets on an axis
 /// \note This is an abstract class, use \a Horizontal or \a Vertical
 struct Linear: virtual Layout {
     /// Expands main axis even when no widget is expanding
@@ -45,12 +45,13 @@ struct Linear: virtual Layout {
         Left,Top=Left, /// Aligns tightly packed widgets
         Right,Bottom=Right, /// Aligns tightly packed widgets
         Center, /// Aligns tightly packed widgets
-        Share,  /// Only for main axis, shares space evenly between all widgets (fixed size widgets will center within their extra space)
-        Spread, /// Only for main axis, spreads widgets evenly leaving no outside margin (use \a Share to leave outside margin)
-        AlignLeft,AlignTop=AlignLeft, /// Only for side axis, sets all widgets side size to maximum needed and aligns left/top
-        AlignRight,AlignBottom=AlignRight, /// Only for side axis, sets all widgets side size to maximum needed and aligns right/bottom
-        AlignCenter, /// Only for side axis, sets all widgets side size to largest hint (or total available if any widget is expanding) and centers
-        Expand /// Only for side axis, sets all widgets side size to layout available side size
+        Even, /// shares space evenly
+        Spread, /// allocates minimum sizes and spreads any extra space between widgets
+        Share,  /// allocates minimum sizes and shares any extra space
+        AlignLeft,AlignTop=AlignLeft, /// For side axis, sets all widgets side size to maximum needed and aligns left/top
+        AlignRight,AlignBottom=AlignRight, /// For side axis, sets all widgets side size to maximum needed and aligns right/bottom
+        AlignCenter, /// For side axis, sets all widgets side size to largest hint (or total available if any widget is expanding) and centers
+        Expand /// For side axis, sets all widgets side size to layout available side size
     };
     Extra main, side;
     /// Constructs a linear layout
@@ -63,11 +64,11 @@ struct Linear: virtual Layout {
     virtual int2 xy(int2 xy) =0;
 };
 
-/// Horizontal divides horizontal space between contained widgets
+/// Horizontal layouts widgets on the horizontal axis
 struct Horizontal : virtual Linear {
     int2 xy(int2 xy) override { return xy; }
 };
-/// Vertical divides vertical space between contained widgets
+/// Vertical layouts widgets on the vertical axis
 struct Vertical : virtual Linear{
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };

@@ -5,11 +5,11 @@
 template<class T> void str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); }
 
 /// Lexically compare strings
-bool operator >(const ref<byte>& a, const ref<byte>& b);
+bool operator <(const ref<byte>& a, const ref<byte>& b);
 
-/// Returns a reference to the string between the \a{start}th and \a{end}th occurence of \a separator
-/// \note You can use a negative \a start or \a end to count from the right (-1=last)
-ref<byte> section(const ref<byte>& str, byte separator, int start=0, int end=1, bool includeSeparator=false);
+/// Returns a reference to the string between the \a{begin}th and \a{end}th occurence of \a separator
+/// \note You can use a negative \a begin or \a end to count from the right (-1=last)
+ref<byte> section(const ref<byte>& str, byte separator, int begin=0, int end=1, bool includeSeparator=false);
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array< ref<byte> > split(const ref<byte>& str, byte separator=' ');
 /// Returns a reference with heading and trailing whitespace removed
@@ -68,7 +68,7 @@ inline string str(const ptr& n) { string s("0x"_); s<<hex(n); return s; }
 
 /// Converts arrays
 template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<class T> string str(const array<T>& a) { return str(ref<T>(a)); }
+template<class T> string str(const array<T>& a, char separator=' ') { return str(ref<T>(a),separator); }
 template<class T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
 

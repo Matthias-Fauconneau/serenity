@@ -20,7 +20,7 @@ struct Date {
     /// Sets month day and matching week day
     void setDay(int monthDay);
 };
-bool operator >(const Date& a, const Date& b);
+bool operator <(const Date& a, const Date& b);
 bool operator ==(const Date& a, const Date& b);
 
 enum WeekDay { Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday };

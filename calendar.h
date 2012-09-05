@@ -2,8 +2,12 @@
 #include "time.h"
 #include "interface.h"
 
-/// Returns events occuring on \a query date (-1=unspecified)
-array<string> getEvents(Date query);
+struct Event { Date date,end; string title; };
+inline string str(const Event& e) { return str(e.date,"hh:mm"_)+(e.date!=e.end?string("-"_+str(e.end,"hh:mm"_)):string())+": "_+e.title; }
+inline bool operator <(const Event& a, const Event& b) { return a.date<b.date; }
+
+/// Returns events occuring on \a query date
+array<Event> getEvents(Date query=Date(-1,-1,-1,-1));
 
 /// Month shows a week-aligned calendar month
 struct Calendar : GridSelection<Text> {
