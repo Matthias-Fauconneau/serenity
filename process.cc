@@ -101,3 +101,8 @@ ref<byte> getenv(const ref<byte>& name) {
     warn("Undefined environment variable"_, name);
     return ""_;
 }
+
+array< ref<byte> > arguments() {
+    static string arguments = ::readUpTo(openFile("proc/self/cmdline"_),4096);
+    return split(section(arguments,0,1,-1),0);
+}

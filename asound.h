@@ -3,7 +3,7 @@
 #include "function.h"
 
 struct AudioOutput : Poll {
-    uint channels=2, rate=48000, periodCount=2, periodSize=8192, bufferSize = 0;
+    uint channels=2, rate=48000, bufferSize = 0;
     int16* buffer = 0;
     struct Status* status = 0;
     struct Control* control = 0;

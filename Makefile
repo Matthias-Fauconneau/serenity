@@ -22,6 +22,7 @@ SRCS += $(ICONS:%=icons/%)
 LIBS_mpg123 = mpg123
 LIBS_ffmpeg = avformat avcodec
 LIBS_http = ssl
+LIBS_music = asound
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

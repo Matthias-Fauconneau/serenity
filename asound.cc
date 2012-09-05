@@ -60,21 +60,20 @@ void AudioOutput::start(bool realtime) {
     hparams.mask(Format).set(S16_LE);
     hparams.mask(SubFormat).set(Standard);
     hparams.interval(SampleBits) = 16;
-    hparams.interval(FrameBits) = 16 * channels;
+    hparams.interval(FrameBits) = 16*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    hparams.interval(PeriodSize).min= periodSize;
-    if(realtime) hparams.interval(Periods).max = 2;
-    else hparams.interval(Periods).min = 2;
+    if(realtime) hparams.interval(PeriodSize)=1024, hparams.interval(Periods).max=2;
+    else hparams.interval(PeriodSize).min=16384, hparams.interval(Periods).min=2;
     check_(ioctl(fd, IOCTL_HW_PARAMS, &hparams));
-    periodSize = hparams.interval(PeriodSize);
-    periodCount = hparams.interval(Periods);
-    bufferSize = periodCount * periodSize;
+    bufferSize = hparams.interval(PeriodSize) * hparams.interval(Periods);
+    log("period="_+dec((int)hparams.interval(PeriodSize))+" ("_+dec(1000*hparams.interval(PeriodSize)/rate)+"ms),"
+        " buffer="_+dec(bufferSize)+" ("_+dec(1000*bufferSize/rate)+"ms)"_);
     buffer= (int16*)mmap(0, bufferSize * channels * sizeof(int16), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     assert(buffer);
 
     SWParams sparams;
-    sparams.avail_min = periodSize;
+    sparams.avail_min = hparams.interval(PeriodSize);
     sparams.stop_threshold = sparams.boundary = bufferSize;
     check_(ioctl(fd, IOCTL_SW_PARAMS, &sparams));
 
@@ -94,11 +93,13 @@ void AudioOutput::stop() {
 void AudioOutput::event() {
     assert(revents!=POLLNVAL);
     if(status->state == XRun) { log("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
-    int available = status->hwPointer + bufferSize - control->swPointer;
-    if(!available){/*warn(status->state,bufferSize,"=",periodCount,"x",periodSize,"hw",status->hwPointer,"sw",control->swPointer);*/return;}//FIXME
-    uint offset = control->swPointer % bufferSize;
-    uint frames = min(min((uint)available,bufferSize),bufferSize-offset);
-    read(buffer+offset*channels, frames);
-    control->swPointer += frames;
-    if(status->state == Prepared) { check_(ioctl(fd, IOCTL_START, 0)); }
+    for(;;){
+        int available = status->hwPointer + bufferSize - control->swPointer;
+        if(!available) return;
+        uint offset = control->swPointer % bufferSize;
+        uint frames = min(min((uint)available,bufferSize),bufferSize-offset);
+        read(buffer+offset*channels, frames);
+        control->swPointer += frames;
+        if(status->state == Prepared) { check_(ioctl(fd, IOCTL_START, 0)); }
+    }
 }

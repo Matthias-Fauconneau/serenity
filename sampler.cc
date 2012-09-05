@@ -3,32 +3,36 @@
 #include "file.h"
 #include "flac.h"
 #include "time.h"
+#include "debug.h"
+#include "linux.h"
 
 double exp2(double x) { return __builtin_exp2(x); }
-double exp10(double x) { return __builtin_exp10(x); }
+double exp10(double x) { return __builtin_exp(x*__builtin_log(10)); }
 
-void Sampler::open(const string& path) {
+constexpr uint Sampler::period;
+
+void Sampler::open(const ref<byte>& path) {
     // parse sfz and map samples
     Sample group;
-    TextBuffer s(readFile(path));
-    int folder = openFolder(section(path,'/',0,-2,true));
+    TextStream s(readFile(path));
+    Folder folder = openFolder(section(path,'/',0,-2,true));
     Sample* sample=0;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
         if(s.match("<group>"_)) { group=Sample(); sample = &group; }
-        else if(s.match("<region>"_)) { assert(!group.data.data); samples<<move(group); sample = &samples.last();  }
+        else if(s.match("<region>"_)) { assert_(!group.data.data); samples<<move(group); sample = &samples.last();  }
         else if(s.match("//"_)) {
             s.untilAny("\n\r"_);
             s.whileAny("\n\r"_);
         }
         else {
-            string key = s.until('=');
-            string value = s.untilAny(" \n\r"_);
+            ref<byte> key = s.until('=');
+            ref<byte> value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
-                string path = replace(value,"\\"_,"/"_);
+                ref<byte> path = replace(value,"\\"_,"/"_);
                 sample->data = mapFile(path,folder);
-                madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
+                //madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -45,34 +49,37 @@ void Sampler::open(const string& path) {
     }
 
     //setup layers and pitch shifting
-    for(int i=0;i<3;i++) { Layer& l=layers[i];
-        l.size = round(period*exp2((i-1)/12.0));
-        l.buffer = new float[2*l.size];
-        if(l.size!=period) new (&l.resampler) Resampler(2, l.size, period);
+    for(int i=0;i<3;i++) { Layer& layer=layers[i];
+        layer.size = round(period*exp2((i-1)/12.0));
+        layer.buffer = allocate<float>(2*layer.size);
+        if(layer.size!=period) new (&layer.resampler) Resampler(2, layer.size, period);
     }
-    close(folder);
 }
 
 #include "map.h"
 uint availableMemory() {
     map<string, uint> info;
-    for(TextStream s = ::readUpTo(openFile("/proc/meminfo"_),2048);s;) {
+    for(TextStream s = ::readUpTo(openFile("/proc/meminfo"_),4096);s;) {
         ref<byte> key=s.until(':'); s.skip();
         uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
         info.insert(string(key), value);
     }
-    return info.at("MemFree"_)+info.at("Inactive"_);
+    return info.at(string("MemFree"_))+info.at(string("Inactive"_));
 }
 
+int K(int size) { return (size+4095)/4096*4; } //size rounded up to page in KiB
 void Sampler::lock() {
-    uint size=0; for(const Sample& s : samples) size += s.data.size;
-    //lock samples in memory
+    uint full=0; for(const Sample& s : samples) full += K(s.data.size);
     uint available = availableMemory();
-    if(size/1024>available) warn(available/1024,"MiB available, need",size/1024/1024,"MiB. Samples will be streamed from disk");
-    uint64 start=getRealTime();
+    if(full>available) {
+        uint lock=0; for(const Sample& s : samples) lock += min(s.data.size/4096*4,available*1024/samples.size()/4096*4);
+        log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB");
+    }
+    uint64 start=realTime();
     int i=0; for(const Sample& s : samples) {
-        if(getRealTime()-start > 1000) { start=getRealTime(); log("Loading "_,i,"/",samples.size()); }
-        mlock((void*)s.data.data, min(s.data.size,available*1024u)); //lock full samples or fill available memory
+        if(realTime()-start > 1000) { start=realTime(); log("Loading "_,i,"/",samples.size()); }
+        uint size = s.data.size; if(full>available) size=min(size, available*1024/samples.size());
+        mlock((void*)s.data.data, size);
         i++;
     }
 }
@@ -90,7 +97,7 @@ void Sampler::event(int key, int velocity) {
         if(!!release == s.trigger && key >= s.lokey && key <= s.hikey && velocity >= s.lovel && velocity <= s.hivel) {
             active << Note();
             Note& note = active.last();
-            note.open(array<byte>(s.data.data,s.data.size));
+            note.start(s.data);
             note.remaining=note.time;
             note.release=max(240000,s.release);
             note.key=key;
@@ -105,9 +112,8 @@ void Sampler::event(int key, int velocity) {
     if(!release) error("Missing sample"_,key,velocity);
 }
 
-void Sampler::read(int16 *output, uint period) {
-    assert(period==layers[1].size,"period",period,"!=",layers[1].size);
-    timeChanged.emit(time);
+void Sampler::readPeriod(int16* output) {
+    timeChanged(time);
     for(Layer& layer : layers) layer.active=false;
     for(uint i=0;i<active.size();i++) { Note& n = active[i];
         Layer& layer = layers[n.layer];
@@ -116,15 +122,14 @@ void Sampler::read(int16 *output, uint period) {
         if(!layer.active) { clear(layer.buffer, 2*layer.size); layer.active = true; } //clear if first note in layer (could be avoided)
         if(n.remaining >= n.release) { //sustain
             n.remaining -= frame;
-            float* out = layer.buffer;
+            float* out = layer.buffer; assert(out);
             while(frame > n.blockSize) {
-                frame -= n.blockSize;
                 int* in = (int*)(n.buffer+n.position);
                 for(int i=0; i<2*n.blockSize; i++) out[i] += n.level * float(in[i]);
-                out += 2*n.blockSize;
+                out += 2*n.blockSize; frame -= n.blockSize;
                 n.readFrame();
             }
-            int* in = (int*)(n.buffer+n.position);
+            int* in = (int*)(n.buffer+n.position); assert(in);
             for(int i=0; i<2*frame; i++)  out[i] += n.level * float(in[i]);
             n.position += frame;
             n.blockSize -= frame;
@@ -152,14 +157,19 @@ void Sampler::read(int16 *output, uint period) {
     }
     if(anyActive) {
         float* in = layers[1].buffer;
-        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>9; if(o<=-32768 || o>=32768) warn("clip"); output[i] = clip(-32767,o,32767);}
+        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>8; if(o<-32768 || o>32767) log("clip",o); output[i] = clip(-32768,o,32767);}
     } else clear(output,period*2); //no active note -> play silence (TODO: pcm_stop)
-    if(record) write(record,output,period*2*sizeof(int16));
+    if(record) write(record,ref<byte>((byte*)output,period*2*sizeof(int16)));
     time+=period;
 }
 
+void Sampler::read(int16 *output, uint size) {
+    assert(size%period==0,"Sampler supports only fixed size period of", period,"frames, trying to read",size,"frames");
+    for(uint i=0;i<size/period;i++,output+=period*2) readPeriod(output);
+}
+
 void Sampler::recordWAV(const string& path) {
-    record = createFile(path);
+    record = move(createFile(path));
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
         int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=48000; int32 bps=48000*4;
         int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } packed header;
@@ -167,5 +177,6 @@ void Sampler::recordWAV(const string& path) {
 }
 Sampler::~Sampler() {
     if(!record) return;
-    lseek(record,4,SEEK_SET); write(record,raw<int32>(36+time)); lseek(record,0,SEEK_END);
+    error("Recording unsupported");
+    //lseek(record,4,SEEK_SET); write(record,raw<int32>(36+time)); lseek(record,0,SEEK_END); close(record);
 }

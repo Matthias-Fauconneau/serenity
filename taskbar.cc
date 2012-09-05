@@ -23,9 +23,11 @@ struct Taskbar : Application, Poll {
         }
         bool keyPress(Key key) override {
             if(key != Escape) return false;
-            {SendEvent r; r.window=id; r.type=ClientMessage;
+            if(parent->getProperty<uint>(id,"WM_PROTOCOLS"_).contains(parent->Atom("WM_DELETE_WINDOW"_))) {
+                SendEvent r; r.window=id; r.type=ClientMessage;
                 auto& e=r.event.client; e.format=32; e.window=id; e.type=parent->Atom("WM_PROTOCOLS"_);
-                clear(e.data); e.data[0]=parent->Atom("WM_DELETE_WINDOW"_); parent->send(raw(r));}
+                clear(e.data); e.data[0]=parent->Atom("WM_DELETE_WINDOW"_); parent->send(raw(r));
+            } else {DestroyWindow r; r.id=id; parent->send(raw(r)); }
             return true;
         }
     };
@@ -188,7 +190,7 @@ struct Taskbar : Application, Poll {
             array<T> a; if(size) a=read<T>(fd,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(fd, pad); return a; }
     }
 
-    void raiseTask(uint index) { raise(tasks[index].id); }
+    void raiseTask(uint index) { raise(tasks[index].id); setFocus(window.id); }
     void raise(uint id) {
         {RaiseWindow r; r.id=id; send(raw(r));} setFocus(id);
         windows.removeAll(id); windows<<id;
@@ -199,7 +201,7 @@ struct Taskbar : Application, Poll {
     }
     void setFocus(uint id) {
         GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
-        if(wa.overrideRedirect||wa.mapState!=IsViewable) return;
+        if((wa.overrideRedirect||wa.mapState!=IsViewable)&&id!=window.id) return;
         static uint active;
         if(active && tasks.contains(active)){GrabButton r; r.window=active; send(raw(r));}
         {UngrabButton r; r.window=id; send(raw(r));}

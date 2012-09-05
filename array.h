@@ -167,13 +167,5 @@ template<class T> array<T> replace(array<T>&& a, const T& before, const T& after
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 
-/// \a static_array is an \a array with preallocated inline space
-template<class T, int N> struct static_array : array<T> {
-    no_copy(static_array)
-    constexpr static_array():array<T>((T*)buffer,0,N){}
-    ubyte buffer[N*sizeof(T)];
-    static_assert(sizeof(buffer)>31,"");
-};
-
 /// string is an array of unsigned bytes (char is either signed/unsigned and would instanciate an incompatible template)
 typedef array<byte> string;

@@ -15,7 +15,7 @@ struct MidiFile {
     //map<int, map<int, int> > sort; //[chronologic][bass to treble order] = index
     signal<int, int> noteEvent;
 
-    void open(const string& path);
+    void open(const ref<byte>& path);
     void read(Track& track, int time, State state);
     void seek(int time);
     void update(int time);

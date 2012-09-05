@@ -4,7 +4,7 @@
 #include "memory.h"
 
 /// word is an index in a string table allowing fast move/copy/compare
-extern static_array<string,32> pool;
+extern array<string> pool;
 struct word {
     int id;
     word(const string& s) { id=indexOf(pool, s); if(id<0) { id=pool.size(); pool<<copy(s); } }

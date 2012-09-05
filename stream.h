@@ -1,8 +1,6 @@
 #pragma once
 #include "array.h"
 
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
 /// Returns padding zeroes to append in order to align an array of \a size bytes to \a width
 inline ref<byte> pad(uint width, uint size){ static byte zero[4]={}; assert_(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }
 
@@ -36,9 +34,9 @@ struct Stream {
     /// Advances \a count bytes in stream
     void advance(uint count) { invariant(); index+=count; invariant(); }
     /// Returns the next byte in stream without advancing
-    ubyte peek() const { assert_(index<buffer.size()); return buffer[index]; }
+    byte peek() const { assert_(index<buffer.size()); return buffer[index]; }
     /// Returns the next byte in stream and advance
-    ubyte next() { assert_(index<buffer.size()); ubyte b=buffer[index]; advance(1); return b; }
+    byte next() { assert_(index<buffer.size()); byte b=buffer[index]; advance(1); return b; }
     /// Reads \a size bytes from stream
     ref<byte> read(uint size) { ref<byte> t = get(size); advance(size); return t; }
     /// Slices an array referencing this data (valid as long as this stream)

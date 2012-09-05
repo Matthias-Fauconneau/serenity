@@ -64,12 +64,12 @@ Map::~Map() { if(data) munmap((void*)data,size); }
 
 /// File system
 
-int root() { static int fd = openFolder("/"_,-100); return fd; }
+int root() { static Folder root = openFolder("/"_,-100); return root.fd; }
 
 bool existsFolder(const ref<byte>& folder, int at) { return File( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
-int openFolder(const ref<byte>& folder, int at, bool create) {
+Folder openFolder(const ref<byte>& folder, int at, bool create) {
     if(create && !existsFolder(folder,at)) createFolder(folder,at);
-    return check( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder);
+    return Folder( check( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder) );
 }
 void createFolder(const ref<byte>& folder, int at) { check_(mkdirat(at, strz(folder), 0666), folder); }
 
@@ -86,7 +86,7 @@ long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtim
 void touchFile(const ref<byte>& path, int at) { utimensat(at, strz(path), 0, 0); }
 
 array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
-    int fd = openFolder(folder,at);
+    Folder fd = openFolder(folder,at);
     assert(fd, "Folder not found"_, folder);
     array<string> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd,&buffer,sizeof(buffer))))>0;) {
@@ -105,6 +105,5 @@ array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
             }
         }
     }
-    close(fd);
     return list;
 }

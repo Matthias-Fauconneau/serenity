@@ -116,7 +116,7 @@ struct TextLayout {
     }
 };
 
-Text::Text(string&& text, int size, ubyte opacity, uint wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
+Text::Text(string&& text, int size, uint8 opacity, uint wrap) : text(move(text)), size(size), opacity(opacity), wrap(wrap) {}
 void Text::layout() {
     TextLayout layout(text, size, wrap);
     characters.clear(); for(const TextLayout::Character& c: layout.text) characters << Character __(int2(c.pos.x/16, c.pos.y/16), share(c.glyph.image));

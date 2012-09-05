@@ -9,15 +9,17 @@ array<byte> read(int fd, uint size);
 /// Reads up to \a capacity bytes from \a fd
 array<byte> readUpTo(int fd, uint capacity);
 
-/// File is a file descriptor which close itself in the destructor
+/// File is a file descriptor which closes itself in the destructor
 struct File {
     no_copy(File)
     int fd;
     explicit File(int fd):fd(fd){}
-    File(File&& o) { fd=o.fd; o.fd=0; }
+    File(File&& o):fd(o.fd){ o.fd=0; }
+    File& operator=(File&& o) { this->~File(); fd=o.fd; o.fd=0; return *this; }
     ~File();
     operator int() { return fd; }
 };
+typedef File Folder;
 
 /// Returns wether \a file exists (as a file)
 bool existsFile(const ref<byte>& file, int at=root());
@@ -35,7 +37,7 @@ struct Map {
     Map& operator=(Map&& o){this->~Map();data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
     ~Map();
     /// Returns a reference to the map, valid only while the map exists.
-    operator ref<byte>() { return ref<byte>(data,size); } //TODO: escape analysis
+    operator const ref<byte>() const { return ref<byte>(data,size); } //TODO: escape analysis
     explicit operator bool() { return data && size; }
 };
 
@@ -58,7 +60,7 @@ void writeFile(const ref<byte>& file, const ref<byte>& content, int at=root(), b
 /// Returns whether \a folder exists (as a folder)
 bool existsFolder(const ref<byte>& folder, int at=root());
 /// Opens \a folder
-int openFolder(const ref<byte>& folder, int at=root(), bool create=false);
+Folder openFolder(const ref<byte>& folder, int at=root(), bool create=false);
 /// Creates a new \a folder
 void createFolder(const ref<byte>& folder, int at=root());
 /// Returns whether \a path is a folder

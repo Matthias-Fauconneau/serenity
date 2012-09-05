@@ -1,10 +1,9 @@
-calendar: week view
-music: update, raw midi
 desktop: search
 font: automatic fitting
+apps: text editor, file manager, search, imap, pdf, shell, monitor, torrent, video, irc
+music: profile, score, reverb, autolevel/autopitch, harmonic resonnance
 feeds: progressive png, http compression
-apps: text editor, file manager, pdf, wiki, search, imap, irc, shell, monitor, torrent, video
-own: inflate, jpeg, mp3
+own: inflate, jpeg, mp3, seq
 parser: attributes (L+S), scoped symbols, GLR
 IDE: build driver (+frepo), syntax highlighting, navigation, completion, git, debugger, profiler, static analyzer, interpreter, compiler
 touchbook: hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait

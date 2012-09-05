@@ -64,7 +64,7 @@ struct Desktop : Application {
     Desktop() {
         timeBox<<&clock<<&calendar;
 
-        static int config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
+        static Folder config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
         if(!existsFile("launcher"_,config)) warn("No launcher settings [config/launcher]");
         else {
             auto apps = readFile("launcher"_,config);

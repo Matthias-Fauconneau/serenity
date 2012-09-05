@@ -67,7 +67,7 @@
 enum class sys : long {
 #if __x86_64
     read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, shmget=29, shmat, shmctl,
-    socket=41, connect, fork=57, vfork, execve, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, setrlimit=160, clock_gettime=228,
+    socket=41, connect, fork=57, vfork, execve, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, setrlimit=160, clock_gettime=228,
     openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283, timerfd_settime=286
 #else
     exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
@@ -146,6 +146,7 @@ syscall3(int, symlinkat, const char*,target, int,fd, const char*,name)
 syscall4(int, utimensat, int,fd, const char*,name, const struct timespec*,times, int,flags)
 
 syscall3(int, setpriority, int,which, int,who, int,prio)
+syscall2(int, mlock,const void*,addr, long,len)
 syscall2(int, setrlimit, int,resource, rlimit*,limit)
 syscall2(int, clock_gettime, int,type, timespec*,ts)
 syscall2(int, timerfd_create, int,clock_id, int,flags)

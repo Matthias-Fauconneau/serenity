@@ -10,14 +10,14 @@ void write(int fd, const ref<byte>& s) { int unused r=write(fd,s.data,s.size); a
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };
 #if __x86_64
-struct Sym { uint	name; ubyte info,other; uint16 shndx; byte* value; long size; };
+struct Sym { uint	name; byte info,other; uint16 shndx; byte* value; long size; };
 #else
-struct Sym { uint	name; byte* value; uint size; ubyte info,other; uint16 shndx; };
+struct Sym { uint	name; byte* value; uint size; byte info,other; uint16 shndx; };
 #endif
 
 /// Reads a little endian variable size integer
 static int readLEV(DataStream& s, bool sign=false) {
-    int result=0; int shift=0; uint8 b;
+    int result=0; int shift=0; byte b;
     do { b = s.read(); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
     if(sign && (shift < 32) && (b & 0x40)) result |= -1 << shift;
     return result;
@@ -54,7 +54,7 @@ string demangle(TextStream& s, bool function=true) {
     else if(s.match('b')) r<<"bool"_;
     else if(s.match('c')) r<<"char"_;
     else if(s.match('f')) r<<"float"_;
-    else if(s.match('h')) r<<"ubyte"_;
+    else if(s.match('h')) r<<"byte"_;
     else if(s.match('i')) r<<"int"_;
     else if(s.match('j')) r<<"uint"_;
     else if(s.match('l')) r<<"long"_;
@@ -128,7 +128,7 @@ Symbol findNearestLine(void* find) {
     for(const Sym& sym: symtab) if(find >= sym.value && find < sym.value+sym.size) symbol.function = demangle(str(strtab+sym.name));
     for(DataStream& s = debug_line;s.index<s.buffer.size();) {
         uint begin = s.index;
-        struct CU { uint size; ushort version; uint prolog_size; ubyte min_inst_len, stmt; int8 line_base; ubyte line_range,opcode_base; } packed;
+        struct CU { uint size; ushort version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) s.untilNull();
@@ -141,7 +141,7 @@ Symbol findNearestLine(void* find) {
         byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;
 
         while(s.index<begin+cu.size+4) {
-            ubyte opcode = s.read();
+            byte opcode = s.read();
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
                          fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };
             /**/ if(opcode >= cu.opcode_base) {

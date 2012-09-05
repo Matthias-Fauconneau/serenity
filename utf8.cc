@@ -2,7 +2,7 @@
 
 /// utf8_iterator
 uint utf8_iterator::operator* () const {
-    ubyte code = pointer[0];
+    byte code = pointer[0];
     /**/  if((code&0b10000000)==0b00000000) return code;
     else if((code&0b11100000)==0b11000000) return(code&0b11111)<<6  |(pointer[1]&0b111111);
     else if((code&0b11110000)==0b11100000) return(code&0b01111)<<12|(pointer[1]&0b111111)<<6  |(pointer[2]&0b111111);
@@ -10,7 +10,7 @@ uint utf8_iterator::operator* () const {
     else return code; //Windows-1252
 }
 const utf8_iterator& utf8_iterator::operator++() {
-    ubyte code = *pointer;
+    byte code = *pointer;
     /**/  if((code&0b10000000)==0b00000000) pointer+=1;
     else if((code&0b11100000)==0b11000000) pointer+=2;
     else if((code&0b11110000)==0b11100000) pointer+=3;
@@ -19,7 +19,7 @@ const utf8_iterator& utf8_iterator::operator++() {
     return *this;
 }
 const utf8_iterator& utf8_iterator::operator--() {
-    ubyte code = *--pointer;
+    byte code = *--pointer;
     if(code>=128) {
         if((code&0b11000000)!=0b10000000) {} //Windows-1252
         else { //UTF-8

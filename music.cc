@@ -12,36 +12,35 @@
 #include "interface.h"
 #include "window.h"
 
-#include <sys/resource.h>
-
 struct Music : Application {
-    Sequencer seq;
-    Sampler sampler;
-    AudioOutput audio{true};
-    MidiFile midi;
-
     ICON(music)
+    Icon widget __(share(musicIcon()));
+    Window window __(&widget,int2(-1,-1),"Music"_,musicIcon());
+    Sampler sampler;
+    AudioOutput audio __( __(&sampler, &Sampler::read) );
+    Sequencer seq;
+
+#if MIDI
+    MidiFile midi;
+#endif
 #ifdef PDF
-    PDF widget;
+    PDF sheet;
     //Score score;
     map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
-#else
-    Icon widget {move(musicIcon)};
 #endif
-    Window window{&widget,"Music"_,move(musicIcon)};
     ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
-    Music(array<string>&& arguments) {
+    Music() {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
-        string instrument;
-        window.localShortcut("Escape"_).connect(this,&Application::quit);
-        for(string&& path : arguments) {
-            if(endsWith(path, ".sfz"_) && exists(path)) {
-                instrument=section(path,'.',0,-2);
+        window.localShortcut(Escape).connect(this,&Application::quit);
+        for(ref<byte> path : arguments()) {
+            if(endsWith(path, ".sfz"_) && existsFile(path)) {
+                window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
                 sampler.open(path);
                 seq.noteEvent.connect(&sampler,&Sampler::event);
-                audio.read = {&sampler, &Sampler::read};
-            } else if(endsWith(path, ".mid"_)) {
-                if(exists(path)) {
+            }
+#if MIDI
+            else if(endsWith(path, ".mid"_)) {
+                if(existsFile(path)) {
                     midi.open(path);
                     sampler.timeChanged.connect(&midi,&MidiFile::update);
                     midi.noteEvent.connect(&sampler,&Sampler::event);
@@ -49,7 +48,8 @@ struct Music : Application {
                     seq.recordMID(path);
                 }
             }
-#ifdef PDF
+#endif
+#if PDF
             else if(endsWith(path, ".pdf"_) && exists(path)) {
                 //sheet.onGlyph.connect(&score,&Score::onGlyph);
                 //sheet.onPath.connect(&score,&Score::onPath);
@@ -70,16 +70,13 @@ struct Music : Application {
                 sampler->recordWAV(path);
             }*/
 #endif
-            else error("Unhandled argument"_,path);
+            else error("Unsupported"_,path);
         }
         if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
-        //sheet.scroll=1600;
         window.show();
         sampler.lock();
-        window.setTitle(instrument);
         //setPriority(-20);
-        audio.start();
+        audio.start(true);
     }
-    void keyPress(Key key) { if(key==Escape) running=false; }
 };
 Application(Music)

@@ -7,6 +7,7 @@
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
 inline void* operator new(unsigned long, void* p) { return p; } //placement new
+#define static_this void __attribute((constructor)) static_this()
 
 /// Move
 template<typename T> struct remove_reference { typedef T type; };
@@ -38,10 +39,9 @@ template<> struct predicate<true> { typedef void* type; };
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
 
 /// Primitives
-typedef signed char int8;
 typedef char byte;
+typedef signed char int8;
 typedef unsigned char uint8;
-typedef unsigned char ubyte;
 typedef signed short int16;
 typedef unsigned short uint16;
 typedef unsigned short ushort;
@@ -51,6 +51,14 @@ typedef unsigned int uint;
 typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
+
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
+
+/// Floating point primitives
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
 
 /// compile \a statements in executable only if \a DEBUG flag is set
 #ifdef DEBUG

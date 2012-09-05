@@ -67,14 +67,13 @@ Image decodePNG(const ref<byte>& file) {
         } else if(name == "PLTE"_) {
             palette = s.read(size);
         } else {
-            warn("Unknown chunk",name);
             s.advance(size);
         }
         s.advance(4); //CRC
         assert(s);
     }
     const array<byte> data = inflate(buffer, true);
-    if(data.size() != height*(1+width*depth)) { warn("Invalid PNG",data.size(),height*(1+width*depth),width,height,depth); return Image(); }
+    if(data.size() < height*(1+width*depth)) { warn("Invalid PNG",data.size(),height*(1+width*depth),width,height,depth); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
     const byte* src=data.data();

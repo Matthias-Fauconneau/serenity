@@ -4,7 +4,7 @@
 #include "stream.h"
 
 
-static_array<string,32> pool;
+array<string> pool;
 //const ref<byte> all = "12134567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~-=\\!@#$%^&*()_+|\t\n[]{}';\":/.,?><"_;
 const ref<byte> all = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"_;
 

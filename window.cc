@@ -151,24 +151,24 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             int reqSize=sizeof(Render::requests)/sizeof(*Render::requests);
             if(code>=Render::error && code<=Render::error+Render::errorCount) { code-=Render::error;
                 assert(code<sizeof(Render::errors)/sizeof(*Render::errors));
-                warn("Error",Render::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+                log("Error",Render::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+                log("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             }
         } else if(e.major==Shm::EXT) {
             int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
             if(code>=Shm::error && code<=Shm::error+Shm::errorCount) { code-=Shm::error;
                 assert(code<sizeof(Shm::errors)/sizeof(*Shm::errors));
-                warn("Error",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+                log("Error",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+                log("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
             }
         } else {
             assert(code<sizeof(::errors)/sizeof(*::errors),code,e.major);
             int reqSize=sizeof(::requests)/sizeof(*::requests);
-            warn("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
+            log("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
     }
     else if(type==1) error("Unexpected reply");
@@ -209,9 +209,11 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
             uint key = KeySym(e.key);
-            signal<>* shortcut = shortcuts.find(key);
-            if(shortcut) (*shortcut)(); //local window shortcut
-            else if(focus) if( focus->keyPress((Key)key) ) wait(); //normal keyPress event
+            if(focus && focus->keyPress((Key)key) ) wait(); //normal keyPress event
+            else {
+                signal<>* shortcut = shortcuts.find(key);
+                if(shortcut) (*shortcut)(); //local window shortcut
+            }
         }
         else if(type==EnterNotify || type==LeaveNotify) {
             if(hideOnLeave) hide();

@@ -1,16 +1,19 @@
 #include "flac.h"
 #include "process.h"
+#include "debug.h"
+
+typedef double double2 __attribute__ ((vector_size(16)));
 
 #define swap64 __builtin_bswap64
 
-void BitReader::setData(array<byte>&& buffer) { array<byte>::operator=(move(buffer)); data=(ubyte*)array::data(); bsize=8*array::size(); index=0; }
+void BitReader::setData(const ref<byte>& buffer) { data=buffer.data; bsize=8*buffer.size; index=0; }
 
 void BitReader::skip(int count) { index+=count; }
 
 uint BitReader::bit() { uint8 bit = uint8(data[index/8]<<(index&7))>>7; index++; return bit; }
 
 uint BitReader::binary(int size) {
-    assert(size<=32);
+    assert(size<=32);//48
     assert(index<bsize);
     uint64 word = swap64(*(uint64*)(data+index/8)) << (index&7);
     index += size;
@@ -18,7 +21,7 @@ uint BitReader::binary(int size) {
 }
 
 int BitReader::sbinary(int size) {
-    assert(size<=32);
+    assert(size<=32);//48
     assert(index<bsize);
     int64 word = swap64(*(uint64*)(data+index/8)) << (index&7);
     index += size;
@@ -26,7 +29,7 @@ int BitReader::sbinary(int size) {
 }
 
 static uint8 log2[256];
-static_this() { int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); }
+static_this { int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); }
 uint BitReader::unary() {
     uint64 w = swap64(*(uint64*)(data+index/8)) << (index&7);
     assert(w);
@@ -41,18 +44,19 @@ uint BitReader::unary() {
 /// Reads a byte-aligned UTF-8 encoded value
 uint BitReader::utf8() {
     assert(index%8==0);
-    ubyte* pointer = data[index/8];
-    ubyte code = pointer[0];
+    const byte* pointer = &data[index/8];
+    byte code = pointer[0];
     /**/  if((code&0b10000000)==0b00000000) { index+=8; return code; }
     else if((code&0b11100000)==0b11000000) { index+=16; return(code&0b11111)<<6  |(pointer[1]&0b111111); }
     else if((code&0b11110000)==0b11100000) { index+=24; return(code&0b01111)<<12|(pointer[1]&0b111111)<<6  |(pointer[2]&0b111111); }
     else if((code&0b11111000)==0b11110000) { index+=32; return(code&0b00111)<<18|(pointer[1]&0b111111)<<12|(pointer[2]&0b111111)<<6|(pointer[3]&0b111111); }
+    error("");
 }
 
 
-void FLAC::open(array<byte>&& data) {
-    BitReader::setData(move(data));
-    skip(32); //fLaC
+void FLAC::start(const ref<byte>& buffer) {
+    BitReader::setData(buffer);
+    assert(startsWith(buffer,"fLaC"_)); skip(32);
     for(;;) { //METADATA_BLOCK*
         bool last=bit();
         enum BlockType { STREAMINFO, PADDING, APPLICATION, SEEKTABLE, VORBIS_COMMENT, CUESHEET, PICTURE };
@@ -70,6 +74,7 @@ void FLAC::open(array<byte>&& data) {
         if(last) break;
     };
 }
+
 
 template<int unroll> void unroll_predictor(uint order, double* predictor, double* context, double* odd, int* out, int* end, int shift) {
     assert(order<=2*unroll,order,unroll);
@@ -91,15 +96,15 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
         {//filter using aligned context for even samples
             double2 sum = {0,0};
             for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(context+2*i); //unrolled loop (for even samples)
-            int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
+            int sample = (int64(sum[0]+sum[1])>>shift) + *out; //add residual to prediction
             context[2*unroll]= odd[2*unroll]= (double)sample; context++; odd++; //write out context (misalign context, align odd)
-            *out = sample; out++; //write out decoded sample}
+            *out = sample; out++; //write out decoded sample
         }
 
         {//filter using aligned context for odd samples
             double2 sum = {0,0};
             for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(odd+2*i); //unrolled loop (for odd samples)
-            int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
+            int sample = (int64(sum[0]+sum[1])>>shift) + *out; //add residual to prediction
             context[2*unroll]=odd[2*unroll]= (double)sample; context++; odd++; //write out context (align context, misalign odd)
             *out = sample; out++; //write out decoded sample
         }
@@ -109,7 +114,7 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
             for(uint i=0;i<unroll;i++) sum += kernel[i] * loadu_pd(context+2*i); //unrolled loop (for even samples)
             int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
             context[2*unroll]= (double)sample; context++; odd++; //write out context (misalign context, align odd)
-            *out = sample; out++; //write out decoded sample}
+            *out = sample; out++; //write out decoded sample
         }
 #endif
     }
@@ -117,7 +122,7 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
 
 uint64 rice=0, predict=0, order=0;
 void FLAC::readFrame() {
-    position=0;
+    position=0; //used by sampler
     //Frame
     int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync));
     bool unused variable = bit();
@@ -225,9 +230,6 @@ void FLAC::readFrame() {
         }
 #else
         for(;out<end;) {
-            /*double sum=0;
-            for(uint i=0;i<order;i++) sum += (int64)predictor[i] * context[i];
-            int residual = (int64(sum)>>shift) + *out;*/
             double sum=0;
             for(uint i=0;i<order;i++) sum += predictor[i] * context[i];
             int sample = (int64(sum)>>shift) + *out; //add residual to prediction
@@ -238,7 +240,7 @@ void FLAC::readFrame() {
         ::predict += predict;
         ::order += order*blockSize;
     }
-    align(index,8);
+    index=align(8,index);
     skip(16);
     for(int i=0;i<blockSize;i++) {
         int a=block[0][i], b=block[1][i];

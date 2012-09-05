@@ -13,7 +13,7 @@ inline Format format(uint f) { assert_(f<32); return Format(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(string&& text=string(), int size=16, ubyte opacity=255, uint wrap=0);
+    Text(string&& text=string(), int size=16, uint8 opacity=255, uint wrap=0);
     Text(Text&&)____(=default);
 
     void setText(string&& text) { this->text=move(text); textSize=int2(0,0); }
@@ -24,7 +24,7 @@ struct Text : Widget {
     /// Font size
     int size;
     /// Opacity
-    ubyte opacity;
+    uint8 opacity;
     /// Line wrap limit in pixels (0: no wrap)
     uint wrap=0;
     /// User clicked on this Text

@@ -90,38 +90,6 @@ struct Slider : Widget {
     static const int height = 32;
 };
 
-#if TUPLE
-/// item is an helper to instanciate a class and append the instance to the tuple offset table
-template<class B, class T> struct item : T { //FIXME: static register
-    void registerInstance(byte* object, ubyte* list, int& i) { int d=(byte*)(B*)this-object; assert_(d>=0&&d<256); list[i++]=d; }
-    item(byte* object, ubyte* list, int& i) { registerInstance(object,list,i); }
-    item(T&& t, byte* object, ubyte* list, int& i) : T(move(t)) { registerInstance(object,list,i); }
-};
-/// \a tuple with static indexing by type and dynamic indexing using an offset table
-template<class B, class... T> struct tuple  : item<B,T>... {
-    static ubyte offsets[sizeof...(T)];
-    tuple(int i=0) : item<B,T>((byte*)this, offsets,i)... {}
-    tuple(int i,T&&... t) : item<B,T>(move(t), (byte*)this, offsets,i)... {}
-    int size() const { return sizeof...(T); }
-    template<class A> A& get() { return static_cast<A&>(*this); }
-    template<class A> const A& get() const { return static_cast<const A&>(*this); }
-    B& at(int i) { return *(B*)((byte*)this+offsets[i]); }
-};
-template<class B, class... T> ubyte tuple<B,T...>::offsets[sizeof...(T)];
-
-/// Tuple implements Layout storage using static inheritance
-/// \note It allows a layout to directly contain heterogenous Widgets without managing heap pointers.
-template<class... T> struct Tuple : virtual Layout {
-    tuple<Widget,T...> items;
-    Tuple() : items() {}
-    Tuple(T&& ___ t) : items(0,move(t)___) {}
-    Widget& at(int i) override { return items.at(i); }
-    uint count() const override { return items.size(); }
-    template<class A> A& get() { return items.template get<A>(); }
-    template<class A> const A& get() const { return items.template get<A>(); }
-};
-#endif
-
 /// Item is an icon with text
 struct Item : Horizontal {
     Icon icon; Text text;

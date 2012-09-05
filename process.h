@@ -51,4 +51,8 @@ inline uint64 rdtsc() {
 struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
 #endif
 
+/// Returns value for environment variable \a name
 ref<byte> getenv(const ref<byte>& name);
+
+/// Returns command line arguments
+array< ref<byte> > arguments();

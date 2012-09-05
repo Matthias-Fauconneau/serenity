@@ -32,11 +32,7 @@
 template<class T> T sq(const T& x) { return x*x; }
 template<class T> T cb(const T& x) { return x*x*x; }
 
-/// Floating point primitives
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
-
+/// Trigonometric primitives
 const float PI = 3.14159265358979323846;
 inline float sin(float t) { return __builtin_sinf(t); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
@@ -44,7 +40,6 @@ inline float atan(float f) { return __builtin_atanf(f); }
 
 /// SIMD
 typedef float float4 __attribute__ ((vector_size(16)));
-typedef double double2 __attribute__ ((vector_size(16)));
 float4 nodebug alignedLoad(const float *p) { return *(float4*)p; }
 float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
 #define shuffle __builtin_shufflevector
@@ -59,7 +54,7 @@ inline float inner_product_single(const float* kernel, const float* signal, int 
     float4 sum = {0,0,0,0};
     for(int i=0;i<len;i+=4) sum += alignedLoad(kernel+i) * unalignedLoad(signal+i); //TODO: align signal
     sum += moveHighToLow(sum, sum);
-    sum += shuffle(sum, sum, 1,1,5,5); //== shuffle_ps 0x55 ?
+    sum += shuffle(sum, sum, 1,1,5,5);
     return sum[0];
 }
 
@@ -130,7 +125,7 @@ Resampler::Resampler(int channelCount, int sourceRate, int targetRate) : channel
     clear(mem,channelCount*memSize,0.f);
 }
 Resampler::operator bool() const { return kernel; }
-Resampler::~Resampler() { unallocate(mem,channelCount*memSize); unallocate(kernel,N*targetRate); }
+Resampler::~Resampler() { if(mem) unallocate(mem,channelCount*memSize); if(kernel) unallocate(kernel,N*targetRate); }
 
 void Resampler::filter(const float* source, int *sourceSize, float* target, int *targetSize, bool mix) {
     assert_(kernel); assert_(mem); assert_(source); assert_(target);

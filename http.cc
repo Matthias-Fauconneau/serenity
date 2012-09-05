@@ -45,9 +45,9 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
         pollfd pollfd __(dns,POLLIN); if(!poll(&pollfd,1,1000)){log("DNS query timed out, retrying... "); ::write(dns,query); if(!poll(&pollfd,1,1000)){log("giving up"); return false; } }
         DataStream s(readUpTo(dns,4096), true);
         header = s.read<Header>();
-        for(int i=0;i<big16(header.qd);i++) { for(ubyte n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
+        for(int i=0;i<big16(header.qd);i++) { for(uint8 n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
         for(int i=0;i<big16(header.an);i++) {
-            for(ubyte n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } //skip name
+            for(uint8 n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } //skip name
             uint16 type=s.read(), unused class_=s.read(); uint32 unused ttl=s.read(); uint16 unused size=s.read();
             if(type!=1) { s.advance(size); continue; }
             assert(type=1/*A*/); assert(class_==1/*INET*/);
@@ -128,7 +128,7 @@ void SSLSocket::write(const ref<byte>& buffer) {
 string base64(const ref<byte>& input) {
     string output(input.size*4/3+1);
     for(uint j=0;j<input.size;) {
-        ubyte block[3]={};
+        byte block[3]={};
         uint i=0; while(i<3 && j<input.size) block[i++] = input[j++];
         assert(i);
         //encode 3 8-bit binary bytes as 4 '6-bit' characters

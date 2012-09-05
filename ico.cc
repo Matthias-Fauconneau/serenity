@@ -2,7 +2,7 @@
 #include "stream.h"
 
 struct Directory { uint16 reserved, type, count; };
-struct Entry { ubyte width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
+struct Entry { uint8 width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
 struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
 
 Image decodeICO(const ref<byte>& file) {
@@ -36,8 +36,8 @@ Image decodeICO(const ref<byte>& file) {
     byte4* image = allocate<byte4>(w*h);
     array<byte> source = s.read(size);
     assert(source,size);
-    ubyte* src=(ubyte*)source.data();
-    if(header.depth==32) { copy((ubyte*)image,src,size); }
+    byte* src=(byte*)source.data();
+    if(header.depth==32) { copy((byte*)image,src,size); }
     if(header.depth==24) for(uint i=0;i<w*h;src+=3) image[i++] = byte4(src[0],src[1],src[2],255);
     if(header.depth==8) for(uint i=0;i<w*h;src++) image[i++] = palette[*src];
     if(header.depth==4) {
@@ -47,7 +47,7 @@ Image decodeICO(const ref<byte>& file) {
     if(header.depth!=32) {
         ref<byte> mask = s.read<byte>(8*align(4,w/8)*h/8); //1-bit transparency
         assert(mask.size==8*align(4,w/8)*h/8);
-        ubyte* src=(ubyte*)mask.data;
+        byte* src=(byte*)mask.data;
         assert(w%8==0); //TODO: pad
         for(uint i=0,y=0;y<h;y++) {
             uint x=0; for(;x<w;src++) {

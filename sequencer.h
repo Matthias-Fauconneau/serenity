@@ -19,7 +19,7 @@ struct Sequencer : Poll {
     Sequencer();
     pollfd poll();
     void setRecord(bool record);
-    void event(pollfd);
-    void recordMID(const string& path);
+    void event();
+    void recordMID(const ref<byte>& path);
     ~Sequencer();
 };

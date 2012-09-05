@@ -9,7 +9,7 @@ Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),tr
     array::reserve(48);
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
-    for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 12*60); }
+    for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
 }
 
 bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
@@ -25,7 +25,7 @@ ICON(network)
 void Feeds::loadFeed(const URL&, Map&& document) {
     Element feed = parseXML(document);
     Image* favicon=0;
-    static_array<Entry,16> entries; int count=0;
+    array<Entry> entries; int count=0;
     auto addEntry = [this,&favicon,&count,&entries](const Element& e)->void{
         if(count>=16) return; //limit history
         if(array::size()+entries.size()>=array::capacity()) return; //limit total entry count
@@ -85,6 +85,6 @@ void Feeds::readNext() {
             return;
         }
     }
-    clear(); favicons.clear(); for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 12*60); } //reload
+    clear(); favicons.clear(); for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); } //reload
     pageChanged(""_,""_,Image()); //return to desktop
 }

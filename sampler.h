@@ -13,19 +13,20 @@ struct Sample {
 struct Note : FLAC { int remaining; int release; int key; int layer; int velocity; float level; };
 
 struct Sampler {
-    static const uint period = 1024; //-> latency
+    static constexpr uint period = 1024;
 
-    static_array<Sample,88*16> samples;
-    static_array<Note,128> active; //8MB
-    struct Layer { float* buffer; uint size; bool active=false; Resampler resampler; } layers[3];
-    File record=0;
+    array<Sample> samples; //88*16
+    array<Note> active;
+    struct Layer { float* buffer=0; uint size=0; bool active=false; Resampler resampler; } layers[3];
+    File record __(0);
     int16* pcm = 0; int time = 0;
     signal<int> timeChanged;
     operator bool() const { return samples.size(); }
 
-    void open(const string& path);
+    void open(const ref<byte>& path);
     void lock();
     void event(int key, int vel);
+    void readPeriod(int16* output);
     void read(int16* output, uint size);
     void recordWAV(const string& path);
     ~Sampler();
