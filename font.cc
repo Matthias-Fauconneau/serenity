@@ -229,17 +229,21 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
     }
 }
 
-Glyph Font::glyph(uint16 index, int fx) { assert(fx>=-16,fx); fx=(fx+16)%16;
+int Font::advance(uint16 index) { return scale(big16(hmtx[2*index])); }
+
+const Glyph& Font::glyph(uint16 index, int fx) {
+    assert(fx>=-16,fx); fx=(fx+16)%16;
     // Lookup glyph in cache
     Glyph& glyph = index<256 ? cacheASCII[fx][index] : cacheUnicode[fx][index];
-    if(glyph.image || glyph.advance) return Glyph(glyph);
+    if(glyph.valid) return glyph;
+    glyph.valid=true;
 
-    // map unicode to glyf outline
-    glyph.advance = scale(big16(hmtx[2*index]));
     Bitmap raster; int xMin,xMax,yMin,yMax;
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
-    if(!raster.data) return Glyph(glyph);
+    if(!raster.data) return glyph;
     glyph.offset = int2(floor(16,scale(xMin)),ascent-scale(yMax)-16); //yMax was rounded up
+    assert(glyph.offset.x%16==0); //assert(glyph.offset.y%16==0,glyph.offset.y);
+    glyph.offset /= 16;
 
     uint width=ceil(48,raster.width)/48+1, height=raster.height/16; //add 1px for filtering
     glyph.image = Image(width, height);
@@ -263,5 +267,5 @@ Glyph Font::glyph(uint16 index, int fx) { assert(fx>=-16,fx); fx=(fx+16)%16;
             glyph.image(x,y) = byte4(255-gamma[pixel[2]/16],255-gamma[pixel[1]/16],255-gamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
         }
     }
-    return Glyph(glyph);
+    return glyph;
 }
