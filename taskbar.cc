@@ -13,22 +13,11 @@ struct Taskbar : Application, Poll {
         uint id;
         Task(uint id):id(id){} //for indexOf
         Task(Taskbar* parent, uint id, Image&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
-        bool mouseEvent(int2, int2, Event event, Button button) override {
+        bool mouseEvent(int2, int2, Event event, MouseButton button) override {
             if(event==Press && button==LeftButton) {
-                focus=this;
-                parent->raise(id);
                 if(parent->tasks.index!=uint(-1) && &parent->tasks.active()==this) {SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; parent->send(raw(r));}
             }
             return false;
-        }
-        bool keyPress(Key key) override {
-            if(key != Escape) return false;
-            if(parent->getProperty<uint>(id,"WM_PROTOCOLS"_).contains(parent->Atom("WM_DELETE_WINDOW"_))) {
-                SendEvent r; r.window=id; r.type=ClientMessage;
-                auto& e=r.event.client; e.format=32; e.window=id; e.type=parent->Atom("WM_PROTOCOLS"_);
-                clear(e.data,5); e.data[0]=parent->Atom("WM_DELETE_WINDOW"_); parent->send(raw(r));
-            } else {DestroyWindow r; r.id=id; parent->send(raw(r)); }
-            return true;
         }
     };
 
@@ -70,12 +59,12 @@ struct Taskbar : Application, Poll {
         button.triggered.connect(this,&Taskbar::showDesktop);
         tasks.expanding=true;
         tasks.activeChanged.connect(this, &Taskbar::raiseTask);
+        window.globalShortcut(Escape).connect(this, &Taskbar::quitTask);
         clock.timeout.connect(&window, &Window::render);
         clock.timeout.connect(&calendar, &Events::checkAlarm);
         clock.pressed.connect(&calendar,&Events::reset);
         clock.pressed.connect(&popup,&Window::toggle);
         calendar.eventAlarm.connect(&popup,&Window::show);
-        calendar.side=Linear::Right;
         popup.hideOnLeave = true;
         popup.autoResize=true;
         popup.anchor = TopRight;
@@ -89,7 +78,7 @@ struct Taskbar : Application, Poll {
         type&=0b01111111; //msb set if sent by SendEvent
         if(type == ButtonPress) { uint id = e.event;
             raise(id);
-            {SendEvent r; r.window=id; r.type=ButtonPress; r.event=e; send(raw(r));}
+            send(raw(AllowEvents()));
             int i = tasks.indexOf(id);
             if(i>=0) tasks.index=i;
         } else if(type == UnmapNotify) { uint id=e.unmap.window;
@@ -190,7 +179,7 @@ struct Taskbar : Application, Poll {
             array<T> a; if(size) a=read<T>(fd,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(fd, pad); return a; }
     }
 
-    void raiseTask(uint index) { raise(tasks[index].id); setFocus(window.id); }
+    void raiseTask(uint index) { raise(tasks[index].id); }
     void raise(uint id) {
         {RaiseWindow r; r.id=id; send(raw(r));} setFocus(id);
         windows.removeAll(id); windows<<id;
@@ -201,7 +190,7 @@ struct Taskbar : Application, Poll {
     }
     void setFocus(uint id) {
         GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
-        if((wa.overrideRedirect||wa.mapState!=IsViewable)&&id!=window.id) return;
+        if((wa.overrideRedirect||wa.mapState!=IsViewable)) return;
         static uint active;
         if(active && tasks.contains(active)){GrabButton r; r.window=active; send(raw(r));}
         {UngrabButton r; r.window=id; send(raw(r));}
@@ -213,6 +202,13 @@ struct Taskbar : Application, Poll {
         if(tasks.index<tasks.count()) { tasks.setActive(-1); window.render(); }
         if(!desktop) warn("No Desktop");
         {MapWindow r; r.id=desktop; send(raw(r));} raise(desktop);
+    }
+
+    void quitTask() {
+        if(tasks.index>=tasks.count()) return;
+        SendEvent r; r.window=tasks.active().id; r.type=ClientMessage;
+        auto& e=r.event.client; e.format=32; e.window=r.window; e.type=Atom("WM_PROTOCOLS"_); clear(e.data,5); e.data[0]=Atom("WM_DELETE_WINDOW"_);
+        send(raw(r));
     }
 
     uint16 sequence=-1;

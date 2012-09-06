@@ -28,10 +28,10 @@ struct Command : Item {
     string path; array<string> args;
     Command(Image&& icon, string&& text, string&& path, array<string>&& args) :
         Linear(Left),Item(move(icon),move(text)),path(move(path)),args(move(args)){}
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton) override;
 };
 
-bool Command::mouseEvent(int2, int2, Event event, Button button) {
+bool Command::mouseEvent(int2, int2, Event event, MouseButton button) {
     if(event == Press && button == LeftButton) { execute(path,args,false); }
     return false;
 }
@@ -62,8 +62,6 @@ struct Desktop : Application {
     Window browser __(&page.area(),int2(0,0),"Browser"_);
     ICON(shutdown)
     Desktop() {
-        timeBox<<&clock<<&calendar;
-
         static Folder config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
         if(!existsFile("launcher"_,config)) warn("No launcher settings [config/launcher]");
         else {
@@ -87,6 +85,7 @@ struct Desktop : Application {
         }
         shortcuts<<Command(share(shutdownIcon()),string("Shutdown"_),string("/sbin/poweroff"_),__());
 
+        timeBox<<&clock<<&calendar;
         applets<<&feeds<<&timeBox<<&shortcuts;
         clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::render);

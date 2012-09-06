@@ -19,8 +19,9 @@ struct Feeds : List<Entry> {
     signal< const ref<byte>& /*link*/, const ref<byte>& /*title*/, const Image& /*favicon*/ > pageChanged;
     map<string/*link*/, Image> favicons; //store strong references to favicons weakly referenced by entries
 
-    /// Polls all feeds on startup
     Feeds();
+    /// Polls all feeds
+    void load();
     /// Returns whether the entry with \a title and \a link is read (according to config/read)
     bool isRead(const ref<byte>& title, const ref<byte>& link);
     /// Returns whether \a entry is read (according to config/read)

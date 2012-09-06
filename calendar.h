@@ -14,7 +14,7 @@ struct Calendar : GridSelection<Text> {
     Date active;
     array<Date> dates;
     uint todayIndex;
-    Calendar() : GridSelection(7,8) {}
+    Calendar() : GridSelection(7,8,16) {}
     void setActive(Date active);
     void previousMonth();
     void nextMonth();
@@ -44,7 +44,7 @@ struct Clock : Text, Timer {
     signal<> pressed;
     Clock(int size=16):Text(::str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
     void event() { setText(::str(date(),"hh:mm"_)); setAbsolute(currentTime()/60*60+60); timeout(); }
-    bool mouseEvent(int2, int2, Event event, Button) override {
+    bool mouseEvent(int2, int2, Event event, MouseButton) override {
         if(event==Press) { pressed(); return true; }
         return false;
     }

@@ -19,7 +19,7 @@ struct ScrollArea : Widget {
     int2 delta, dragStart, flickStart;
 
     int2 sizeHint() { return widget().sizeHint(); }
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
     void render(int2 position, int2 size) override;
 };
 
@@ -52,7 +52,7 @@ struct TriggerButton : Icon {
     TriggerButton(Image&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 };
 
 /// ToggleButton is a togglable Icon
@@ -68,7 +68,7 @@ struct ToggleButton : Widget {
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 
     Image enableIcon;
     Image disableIcon;
@@ -85,7 +85,7 @@ struct Slider : Widget {
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 
     static const int height = 32;
 };
@@ -97,6 +97,15 @@ struct Item : Horizontal {
     Item(Image&& icon, string&& text, int size=16):icon(move(icon)),text(move(text),size){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
+};
+
+/// TriggerButton is a clickable Item
+struct TriggerItem : Item {
+    TriggerItem(){}
+    TriggerItem(Image&& icon, string&& text, int size=16):Item(move(icon),move(text),size){}
+    /// User clicked on the button
+    signal<> triggered;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 };
 
 /// TabBar is a \a Bar containing \a Item elements

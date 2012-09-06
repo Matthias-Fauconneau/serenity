@@ -14,7 +14,7 @@ struct Layout : Widget {
     /// Renders all visible child widgets
     void render(int2 position, int2 size) override;
     /// Forwards event to intersecting child widgets until accepted
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 };
 
 /// Widgets implements Layout storage using array<Widget*> (i.e by reference)
@@ -69,7 +69,7 @@ struct Horizontal : virtual Linear {
     int2 xy(int2 xy) override { return xy; }
 };
 /// Vertical layouts widgets on the vertical axis
-struct Vertical : virtual Linear{
+struct Vertical : virtual Linear {
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };
 
@@ -98,7 +98,9 @@ template<class T> struct VList : Vertical, Array<T> {
 struct Grid : virtual Layout {
     /// Horizontal and vertical element count, 0 means automatic
     int width,height;
-    Grid(int width=0, int height=0):width(width),height(height){}
+    /// Margin between elements
+    int2 margin;
+    Grid(int width=0, int height=0, int margin=0):width(width),height(height),margin(margin){}
     int2 sizeHint();
     array<Rect> layout(int2 position, int2 size) override;
 };
@@ -117,7 +119,7 @@ struct Selection : virtual Layout {
     /// User clicked on an item.
     signal<uint /*index*/> itemPressed;
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
     bool keyPress(Key key) override;
 };
 
@@ -151,6 +153,6 @@ template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
 };
 /// GridSelection is a \a Grid layout of selectable items (\sa ArraySelection)
 template<class T> struct GridSelection : Grid, ArraySelection<T>, HighlightSelection {
-    GridSelection(int width=0, int height=0) : Grid(width,height){}
+    GridSelection(int width=0, int height=0, int margin=0) : Grid(width,height,margin){}
     GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}
 };

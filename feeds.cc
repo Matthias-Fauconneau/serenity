@@ -5,11 +5,19 @@
 #include "html.h"
 #include "interface.h"
 
+ICON(network) ICON(refresh)
+
 Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),true)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
     array::reserve(48);
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
+    load();
+}
+
+void Feeds::load() {
+    clear(); favicons.clear();
     for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
+    *this<<Entry(string(),string(":refresh"_),::resize(refreshIcon(),16,16),string());
 }
 
 bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
@@ -21,7 +29,6 @@ bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
 }
 bool Feeds::isRead(const Entry& entry) { return isRead(entry.guid, entry.link); }
 
-ICON(network)
 void Feeds::loadFeed(const URL&, Map&& document) {
     Element feed = parseXML(document);
     Image* favicon=0;
@@ -64,6 +71,7 @@ void Feeds::resetFavicons() {
 }
 
 void Feeds::setRead(uint index) {
+    if(index==count()-1) return; //:refresh
     Entry& entry = array::at(index);
     if(isRead(entry)) return;
     ::write(readConfig,string(entry.guid+" "_+entry.link+"\n"_));
@@ -72,19 +80,19 @@ void Feeds::setRead(uint index) {
 }
 
 void Feeds::readEntry(uint index) {
+    if(index==count()-1) {load(); return; } //:refresh
     pageChanged( array::at(index).link, array::at(index).text.text, array::at(index).icon.image );
-    if(index+1<count()) getURL(URL(array::at(index+1).link)); //preload next entry (TODO: preload image)
+    if(index+1<count()-1) getURL(URL(array::at(index+1).link)); //preload next entry (TODO: preload image)
 }
 
 void Feeds::readNext() {
-    if(index<count()) setRead(index);
-    for(uint i=index+1;i<count();i++) { //next unread item
+    if(index<count()-1) setRead(index);
+    for(uint i=index+1;i<count()-1;i++) { //next unread item
         if(!isRead(array::at(i))) {
             setActive(i);
             itemPressed(i);
             return;
         }
     }
-    clear(); favicons.clear(); for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); } //reload
-    pageChanged(""_,""_,Image()); //return to desktop
+    load(); pageChanged(""_,""_,Image()); //return to desktop
 }

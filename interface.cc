@@ -10,10 +10,10 @@ void ScrollArea::render(int2 position, int2 size) {
     widget().render(position+delta, max(hint,size));
 }
 
-bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
     int2 hint = abs(widget().sizeHint());
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
-        delta.y += button==WheelUp?-32:32;
+        delta.y += button==WheelUp?-64:64;
         delta = min(int2(0,0), max(size-hint, delta));
         return true;
     }
@@ -43,7 +43,7 @@ void Slider::render(int2 position, int2 size) {
     }
 }
 
-bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+bool Slider::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
     if((event == Motion || event==Press) && button==LeftButton) {
         value = minimum+cursor.x*uint(maximum-minimum)/size.x;
         valueChanged(value);
@@ -54,7 +54,7 @@ bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 
 /// Selection
 
-bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button button) {
+bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, MouseButton button) {
     array<Rect> widgets = layout(int2(0,0), size);
     for(uint i=0;i<widgets.size();i++) {
         if(widgets[i].contains(cursor)) {
@@ -89,7 +89,7 @@ void Selection::setActive(uint i) {
 void HighlightSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
     for(uint i=0;i<count();i++) {
-        if(i==index) fill(widgets[i], highlight);
+        if(i==index && (focus==this || focus==&at(i))) fill(widgets[i], highlight);
         at(i).render(widgets[i]);
     }
 }
@@ -118,7 +118,7 @@ void ImageView::render(int2 position, int2 size) {
 
 /// TriggerButton
 
-bool TriggerButton::mouseEvent(int2, int2, Event event, Button) {
+bool TriggerButton::mouseEvent(int2, int2, Event event, MouseButton) {
     if(event==Press) { triggered(); return true; }
     return false;
 }
@@ -131,7 +131,14 @@ void ToggleButton::render(int2 position, int2 size) {
     int2 pos = position+(size-image.size())/2;
     blit(pos, image);
 }
-bool ToggleButton::mouseEvent(int2, int2, Event event, Button button) {
+bool ToggleButton::mouseEvent(int2, int2, Event event, MouseButton button) {
     if(event==Press && button==LeftButton) { enabled = !enabled; toggled(enabled); return true; }
+    return false;
+}
+
+/// TriggerItem
+
+bool TriggerItem::mouseEvent(int2, int2, Event event, MouseButton) {
+    if(event==Press) { triggered(); return true; }
     return false;
 }

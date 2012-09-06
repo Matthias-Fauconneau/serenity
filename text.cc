@@ -136,7 +136,7 @@ void Text::layout() {
 }
 int2 Text::sizeHint() {
     if(!textSize) layout();
-    return textSize;
+    return max(minSize,textSize);
 }
 void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
@@ -145,7 +145,7 @@ void Text::render(int2 position, int2 size) {
     for(const Line& l: lines) fill(offset+Rect(l.min-int2(0,1),l.max), black);
 }
 
-bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
+bool Text::mouseEvent(int2 position, int2 size, Event event, MouseButton) {
     if(event!=Press) return false;
     position -= max(int2(0,0),(size-textSize)/2);
     if(!Rect(textSize).contains(position)) return false;
@@ -160,7 +160,7 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
 
 /// TextInput
 
-bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button) {
+bool TextInput::mouseEvent(int2 position, int2 size, Event event, MouseButton button) {
     if(event!=Press) return false;
     focus=this;
     position -= max(int2(0,0),(size-textSize)/2);

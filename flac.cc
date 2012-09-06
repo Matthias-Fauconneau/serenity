@@ -79,6 +79,7 @@ void FLAC::start(const ref<byte>& buffer) {
     };
 }
 
+//FIXME: clang spills the predictor
 template<int unroll> void unroll_predictor(uint order, double* predictor, double* context, double* odd, int* out, int* end, int shift) {
     assert(order<=2*unroll,order,unroll);
     //ensure enough warmup before using unrolled version

@@ -51,7 +51,7 @@ array<Event> getEvents(Date query) {
 void Calendar::setActive(Date active) {
     clear(); dates.clear();
     todayIndex=-1; this->active=active;
-    static const ref<byte> days[7] = {"Mo"_,"Tu"_,"We"_,"Th"_,"Fr"_,"Sa"_,"Su"_};
+    static const ref<byte> days[7] = {"Mon"_,"Tue"_,"Wed"_,"Thu"_,"Fri"_,"Sat"_,"Sun"_};
     for(int i=0;i<7;i++) {
         *this<< string(days[i]);
         dates << Date(i,-1,active.month,active.year);
@@ -80,11 +80,13 @@ void Calendar::setActive(Date active) {
 void Calendar::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
 void Calendar::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-Events::Events()/*:VBox(__(&date, &month, &events))*/ { *this<<&date<<&month<<&events; date<<string( "<"_)<<string(""_)<<string(">"_);
+Events::Events()/*:VBox(__(&date, &month, &events))*/ {
+    *this<<&date<<&month<<&events; date<<string( "<"_)<<string(""_)<<string(">"_);
     date.main=Linear::Spread;
     date[0].textClicked.connect(this, &Events::previousMonth);
     date[2].textClicked.connect(this, &Events::nextMonth);
     month.activeChanged.connect(this,&Events::showEvents);
+    events.minSize=int2(256,256);
     reset();
 }
 void Events::reset() { month.setActive(::date());  date[1].setText(::str(month.active,"MMMM yyyy"_) ); }

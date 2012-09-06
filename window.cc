@@ -172,7 +172,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
     }
     else if(type==1) error("Unexpected reply");
-    else { XEvent e=event; type&=0b01111111; //msb set if sent by SendEvent
+    else { const XEvent& e=event; type&=0b01111111; //msb set if sent by SendEvent
         /**/ if(type==MotionNotify) {
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, LeftButton)) wait();
             else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
@@ -204,7 +204,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonPress) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Button)e.key)) wait();
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (MouseButton)e.key)) wait();
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
