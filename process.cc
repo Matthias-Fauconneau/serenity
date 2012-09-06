@@ -90,7 +90,7 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     else if(wait) wait4(pid,0,0,0);
 }
 
-void setPriority(int priority) { setpriority(0,0,priority); }
+void setPriority(int priority) { check_(setpriority(0,0,priority)); }
 
 ref<byte> getenv(const ref<byte>& name) {
     static string environ = ::readUpTo(openFile("proc/self/environ"_),4096);

@@ -75,8 +75,8 @@ struct Music : Application {
         if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
         window.show();
         sampler.lock();
-        //setPriority(-20);
         audio.start(true);
+        setPriority(-20);
     }
 };
 Application(Music)

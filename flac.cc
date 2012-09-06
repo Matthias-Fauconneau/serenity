@@ -3,6 +3,11 @@
 #include "debug.h"
 
 typedef double double2 __attribute__ ((vector_size(16)));
+#ifndef __clang__
+/*#define loadu_ps __builtin_ia32_loadups
+#define loadu_pd __builtin_ia32_loadupd*/
+#define extract_d __builtin_ia32_vec_ext_v2df
+#endif
 
 #define swap64 __builtin_bswap64
 
@@ -53,7 +58,6 @@ uint BitReader::utf8() {
     error("");
 }
 
-
 void FLAC::start(const ref<byte>& buffer) {
     BitReader::setData(buffer);
     assert(startsWith(buffer,"fLaC"_)); skip(32);
@@ -75,7 +79,6 @@ void FLAC::start(const ref<byte>& buffer) {
     };
 }
 
-
 template<int unroll> void unroll_predictor(uint order, double* predictor, double* context, double* odd, int* out, int* end, int shift) {
     assert(order<=2*unroll,order,unroll);
     //ensure enough warmup before using unrolled version
@@ -96,7 +99,11 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
         {//filter using aligned context for even samples
             double2 sum = {0,0};
             for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(context+2*i); //unrolled loop (for even samples)
+#if __clang__
             int sample = (int64(sum[0]+sum[1])>>shift) + *out; //add residual to prediction
+#else
+            int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
+#endif
             context[2*unroll]= odd[2*unroll]= (double)sample; context++; odd++; //write out context (misalign context, align odd)
             *out = sample; out++; //write out decoded sample
         }
@@ -104,7 +111,7 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
         {//filter using aligned context for odd samples
             double2 sum = {0,0};
             for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(odd+2*i); //unrolled loop (for odd samples)
-            int sample = (int64(sum[0]+sum[1])>>shift) + *out; //add residual to prediction
+            int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
             context[2*unroll]=odd[2*unroll]= (double)sample; context++; odd++; //write out context (align context, misalign odd)
             *out = sample; out++; //write out decoded sample
         }

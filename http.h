@@ -75,4 +75,4 @@ void getURL(const URL &url, Handler handler=[](const URL&, Map&&){}, int maximum
 string cacheFile(const URL& url);
 
 /// descriptor to cache folder
-extern int cache;
+extern Folder cache;

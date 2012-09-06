@@ -6,6 +6,7 @@
 #define nodebug __attribute((always_inline))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
+#define notrace __attribute((no_instrument_function))
 inline void* operator new(unsigned long, void* p) { return p; } //placement new
 #define static_this void __attribute((constructor)) static_this()
 
@@ -14,7 +15,7 @@ template<typename T> struct remove_reference { typedef T type; };
 template<typename T> struct remove_reference<T&> { typedef T type; };
 template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
-template<class T> constexpr remove_reference(T)&& nodebug move(T&& t) { return (remove_reference(T)&&)(t); }
+template<class T> nodebug constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 #define no_copy(o) o(const o&)=delete; o& operator=(const o&)=delete;
 /// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
 template<class T> T copy(const T& t) { return t; }

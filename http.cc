@@ -182,7 +182,7 @@ string str(const URL& url) {
 
 /// HTTP
 
-int cache;
+Folder cache=Folder(0);
 string cacheFile(const URL& url) {
     if(!cache) cache=openFolder(string(getenv("HOME"_)+"/.cache"_),root(),true);
     string name = replace(url.path,"/"_,"."_);

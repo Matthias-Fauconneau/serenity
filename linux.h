@@ -66,7 +66,7 @@
 
 enum class sys : long {
 #if __x86_64
-    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, shmget=29, shmat, shmctl,
+    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, madvise=28, shmget, shmat, shmctl,
     socket=41, connect, fork=57, vfork, execve, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, setrlimit=160, clock_gettime=228,
     openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283, timerfd_settime=286
 #else
@@ -117,7 +117,7 @@ enum {SOCK_STREAM=1, SOCK_DGRAM};
 enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
-
+enum {MADV_RANDOM=1,MADV_SEQUENTIAL,MADV_WILLNEED,MADV_DONTNEED};
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
 syscall3(int, open, const char*,name, int,oflag, int,perms)
@@ -128,14 +128,29 @@ syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, munmap, void*,addr, long,len)
 syscall1(void*, brk, void*,new_brk)
-
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
+
+syscall3(int, ioctl, int,fd, long,request, void*,buf)
+syscall3(int, madvise, void*,addr, long,length, int,advice)
+
+#if __i386
+syscall6(int, ipc, uint,call, long,first, long,second, long,third, const void*,ptr, long,fifth)
+inline long shmat(int id, const void* ptr, int flag) { long addr; return ipc(21,id,flag,(long)&addr,ptr,0)<0 ?: addr; }
+inline int shmdt(const void* ptr) { return ipc(22,0,0,0,ptr,0); }
+inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,0); }
+inline int shmctl(int id, int cmd, struct shmid_ds* buf) { return ipc(24,id,cmd,0,buf,0); }
+#else
+syscall3(long, shmat, int,id, const void*,ptr, int,flag)
+syscall1(int, shmdt, const void*,ptr)
+syscall3(int, shmget, int,key, long,size, int,flag)
+syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)
+#endif
+
 syscall0(int, fork)
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
 inline __attribute((noreturn)) int exit(int code) {r(r0,code) volatile register long n asm(rN) = (long)sys::exit; asm volatile(kernel:: "r"(n), "r"(r0)); __builtin_unreachable();}
 syscall4(int, wait4, int,pid, int*,status, int,options, struct rusage*, rusage)
 
-syscall3(int, ioctl, int,fd, long,request, void*,buf)
 syscall3(int, fcntl, int,fd, int,cmd, int,param)
 syscall3(int, getdents, int,fd, void*,entry, long,size)
 
@@ -159,19 +174,6 @@ inline int connect(int fd, struct sockaddr* addr, int len) { long a[]={fd,(long)
 #else
 syscall3(int, socket, int,domain, int,type, int,protocol)
 syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
-#endif
-
-#if __i386
-syscall6(int, ipc, uint,call, long,first, long,second, long,third, const void*,ptr, long,fifth)
-inline long shmat(int id, const void* ptr, int flag) { long addr; return ipc(21,id,flag,(long)&addr,ptr,0)<0 ?: addr; }
-inline int shmdt(const void* ptr) { return ipc(22,0,0,0,ptr,0); }
-inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,0); }
-inline int shmctl(int id, int cmd, struct shmid_ds* buf) { return ipc(24,id,cmd,0,buf,0); }
-#else
-syscall3(long, shmat, int,id, const void*,ptr, int,flag)
-syscall1(int, shmdt, const void*,ptr)
-syscall3(int, shmget, int,key, long,size, int,flag)
-syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)
 #endif
 
 #undef str

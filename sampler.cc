@@ -32,7 +32,7 @@ void Sampler::open(const ref<byte>& path) {
             if(key=="sample"_) {
                 ref<byte> path = replace(value,"\\"_,"/"_);
                 sample->data = mapFile(path,folder);
-                //madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
+                madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -43,7 +43,7 @@ void Sampler::open(const ref<byte>& path) {
             else if(key=="ampeg_release"_) sample->release=48000*toInteger(value);
             else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
             else if(key=="rt_decay"_) sample->rt_decay=toInteger(value);
-            else if(key=="volume"_) sample->volume=exp10(toInteger(value)/20.0);
+            else if(key=="volume"_) sample->volume=toInteger(value);
             else error("Unknown opcode"_,key);
         }
     }
@@ -85,31 +85,34 @@ void Sampler::lock() {
 }
 
 void Sampler::event(int key, int velocity) {
-    int release=0;
+    //log(active.size());
+    int elapsed=0;
     if(velocity==0) {
         for(Note& note : active) if(note.release && note.key==key) {
-            release=note.time-note.remaining; velocity = note.velocity; //schedule release sample
+            elapsed=note.time-note.remaining; velocity = note.velocity; //schedule release sample
             note.remaining = min(note.remaining,note.release); //schedule active sample fade out
         }
-        if(!release) { warn("double release"_); return; }
+        if(!elapsed) return; //already fully decayed
     }
     for(const Sample& s : samples) {
-        if(!!release == s.trigger && key >= s.lokey && key <= s.hikey && velocity >= s.lovel && velocity <= s.hivel) {
+        if(!!elapsed == s.trigger && key >= s.lokey && key <= s.hikey && velocity >= s.lovel && velocity <= s.hivel) {
             active << Note();
             Note& note = active.last();
             note.start(s.data);
             note.remaining=note.time;
-            note.release=max(240000,s.release);
+            note.release=s.release?4096:0; //TODO: reverb
             note.key=key;
             int shift = key-s.pitch_keycenter; assert(shift>=-1 && shift<=1,"unsupported pitch shift"_,shift);
             note.layer=1+shift;
             note.velocity=velocity;
-            note.level = (1-(s.amp_veltrack/100.0*(1-float(velocity*velocity)/(127*127)))) * s.volume;
-            if(release) note.level *= exp10(-s.rt_decay * release/48000.0 / 20); //attenuation
-            return; //assume only one match
+            //if(elapsed) note.level=exp10((s.volume)/20.0);
+            if(elapsed) note.level=exp10((s.volume-6*(elapsed/48000.0))/20.0);
+            //if(elapsed) note.level=exp10((s.volume-s.rt_decay*(elapsed/48000.0))/20.0);
+            else note.level = (1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
+            return;
         }
     }
-    if(!release) error("Missing sample"_,key,velocity);
+    if(!elapsed) error("Missing sample"_,key,velocity);
 }
 
 void Sampler::readPeriod(int16* output) {
@@ -118,36 +121,34 @@ void Sampler::readPeriod(int16* output) {
     for(uint i=0;i<active.size();i++) { Note& n = active[i];
         Layer& layer = layers[n.layer];
         int frame = layer.size;
-        if(n.remaining < frame) { active.removeAt(i); i--; continue; } //released
-        if(!layer.active) { clear(layer.buffer, 2*layer.size); layer.active = true; } //clear if first note in layer (could be avoided)
-        if(n.remaining >= n.release) { //sustain
-            n.remaining -= frame;
+        if(!layer.active) { clear(layer.buffer, 2*layer.size); layer.active = true; } //clear if first note in layer
+        if(!n.release || n.remaining >= n.release+frame) { //sustain
             float* out = layer.buffer; assert(out);
-            while(frame > n.blockSize) {
+            while(frame > n.blockSize && n.remaining > n.blockSize) {
                 int* in = (int*)(n.buffer+n.position);
                 for(int i=0; i<2*n.blockSize; i++) out[i] += n.level * float(in[i]);
-                out += 2*n.blockSize; frame -= n.blockSize;
+                out += 2*n.blockSize; n.remaining -= n.blockSize; frame -= n.blockSize;
                 n.readFrame();
             }
             int* in = (int*)(n.buffer+n.position); assert(in);
-            for(int i=0; i<2*frame; i++)  out[i] += n.level * float(in[i]);
+            for(int i=0; i<2*frame && n.remaining>=0; i++, n.remaining--)  out[i] += n.level * float(in[i]);
             n.position += frame;
             n.blockSize -= frame;
         } else { //release
             float reciprocal = n.level / n.release;
             float* out = layer.buffer;
-            while(frame > n.blockSize) {
-                frame -= n.blockSize;
+            while(frame > n.blockSize && n.remaining > n.blockSize) {
                 int* in = (int*)(n.buffer+n.position);
-                for(int i=0; i<2*n.blockSize; i++,n.remaining--) out[i] += n.remaining*reciprocal * float(in[i]);
-                out += 2*n.blockSize;
+                for(int i=0; i<2*n.blockSize && n.remaining>=0; i++,n.remaining--) out[i] += min(n.release,n.remaining)*reciprocal * float(in[i]);
+                out += 2*n.blockSize; frame -= n.blockSize;
                 n.readFrame();
             }
             int* in = (int*)(n.buffer+n.position);
-            for(int i=0; i<2*frame; i++,n.remaining--) out[i] += n.remaining*reciprocal * float(in[i]);
+            for(int i=0; i<2*frame && n.remaining>=0; i++,n.remaining--) out[i] += min(n.release,n.remaining)*reciprocal * float(in[i]);
             n.position += frame;
             n.blockSize -= frame;
         }
+        if(n.remaining <= 0) { active.removeAt(i); i--; continue; } //released
     }
     bool anyActive = layers[1].active;
     for(int i=0;i<=2;i+=2) { if(!layers[i].active) continue;
@@ -157,7 +158,9 @@ void Sampler::readPeriod(int16* output) {
     }
     if(anyActive) {
         float* in = layers[1].buffer;
-        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>8; if(o<-32768 || o>32767) log("clip",o); output[i] = clip(-32768,o,32767);}
+        uint clip=0;
+        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>8; if(o<-32768 || o>32767) clip++; output[i] = ::clip(-32768,o,32767);}
+        if(clip>32) log("clip",clip);
     } else clear(output,period*2); //no active note -> play silence (TODO: pcm_stop)
     if(record) write(record,ref<byte>((byte*)output,period*2*sizeof(int16)));
     time+=period;

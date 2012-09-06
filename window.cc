@@ -20,7 +20,7 @@ string getSelection() { assert(current); return current->getSelection(); }
 
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : widget(widget), overrideRedirect(title.size?false:true) {
     registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
-    string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)?:":0"_).slice(1);
+    string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
     if(check(connect(fd,(sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;

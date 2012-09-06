@@ -33,6 +33,7 @@ void Sequencer::event() {
             uint8 key = ev->data.note.note;
             int vel = ev->data.note.velocity;
             if( vel == 0 ) {
+                assert(pressed.contains(key));
                 pressed.removeAll(key);
                 if(sustain) sustained+= key;
                 else {
@@ -44,8 +45,11 @@ void Sequencer::event() {
                     }
                 }
             } else {
+                sustained.removeAll(key);
+                assert(!pressed.contains(key));
                 pressed << key;
-                if(vel>maxVelocity) maxVelocity=vel;
+                if(vel>maxVelocity) { maxVelocity=vel; log("max",maxVelocity); }
+                assert(vel*127/maxVelocity);
                 noteEvent(key, vel*127/maxVelocity);
                 if(record) {
                     int tick = realTime();
@@ -57,7 +61,7 @@ void Sequencer::event() {
             if(ev->data.control.param==64) {
                 sustain = (ev->data.control.value != 0);
                 if(!sustain) {
-                    for(int key : sustained) noteEvent(key,0);
+                    for(int key : sustained) { noteEvent(key,0); assert(!pressed.contains(key)); }
                     sustained.clear();
                 }
             }

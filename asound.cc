@@ -11,27 +11,27 @@ enum Masks { Access, Format, SubFormat };
 enum Intervals { SampleBits, FrameBits, Channels, Rate, PeriodTime, PeriodSize, PeriodBytes, Periods, BufferTime, BufferSize };
 enum Flags { NoResample=1, ExportBuffer=2, NoPeriodWakeUp=4 };
 
-struct interval {
+struct Interval {
     uint min, max; uint openmin:1, openmax:1, integer:1, empty:1;
-    interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0){}
-    interval(uint exact):min(exact),max(exact),openmin(0),openmax(0),integer(1),empty(0){}
+    Interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0){}
+    Interval(uint exact):min(exact),max(exact),openmin(0),openmax(0),integer(1),empty(0){}
     operator uint() { assert(integer); assert(min==max); return max; }
 };
-struct mask {
+struct Mask {
     int bits[8] = {~0,~0,0,0,0,0,0,0};
     void set(uint bit) { assert(bit < 256); bits[0] = bits[1] = 0; bits[bit >> 5] |= (1 << (bit & 31)); }
 };
 struct HWParams {
-    uint flags = NoResample; //|NoPeriodWakeUp
-    mask masks[3];
-    mask mres[5];
-    interval intervals[12];
-    interval ires[9];
+    uint flags = NoResample;
+    Mask masks[3];
+    Mask mres[5];
+    Interval intervals[12];
+    Interval ires[9];
     uint rmask, cmask, info, msbits, rate_num, rate_den;
     long fifo_size;
     byte reserved[64];
-    interval& interval(int i) { assert(i<12); return intervals[i]; }
-    mask& mask(int i) { assert(i<3); return masks[i]; }
+    Interval& interval(int i) { assert(i<12); return intervals[i]; }
+    Mask& mask(int i) { assert(i<3); return masks[i]; }
 };
 struct SWParams {
  int tstamp_mode=0;
@@ -64,7 +64,7 @@ void AudioOutput::start(bool realtime) {
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
     if(realtime) hparams.interval(PeriodSize)=1024, hparams.interval(Periods).max=2;
-    else hparams.interval(PeriodSize).min=16384, hparams.interval(Periods).min=2;
+    else hparams.interval(PeriodSize).min=1024, hparams.interval(Periods).min=2;
     check_(ioctl(fd, IOCTL_HW_PARAMS, &hparams));
     bufferSize = hparams.interval(PeriodSize) * hparams.interval(Periods);
     log("period="_+dec((int)hparams.interval(PeriodSize))+" ("_+dec(1000*hparams.interval(PeriodSize)/rate)+"ms),"
@@ -95,7 +95,7 @@ void AudioOutput::event() {
     if(status->state == XRun) { log("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
     for(;;){
         int available = status->hwPointer + bufferSize - control->swPointer;
-        if(!available) return;
+        if(!available) break;
         uint offset = control->swPointer % bufferSize;
         uint frames = min(min((uint)available,bufferSize),bufferSize-offset);
         read(buffer+offset*channels, frames);

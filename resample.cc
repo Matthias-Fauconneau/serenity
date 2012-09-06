@@ -40,11 +40,17 @@ inline float atan(float f) { return __builtin_atanf(f); }
 
 /// SIMD
 typedef float float4 __attribute__ ((vector_size(16)));
-float4 nodebug alignedLoad(const float *p) { return *(float4*)p; }
-float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
+inline float4 nodebug alignedLoad(const float *p) { return *(float4*)p; }
+#if __clang__
 #define shuffle __builtin_shufflevector
 #define moveHighToLow(a,b) shuffle(a, b, 6, 7, 2, 3);
-
+inline float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
+#else
+#define unalignedLoad __builtin_ia32_loadups
+#define extract_s __builtin_ia32_vec_ext_v4sf
+#define moveHighToLow(a,b) __builtin_ia32_movhlps(a,b)
+#define shuffle_ps __builtin_ia32_shufps
+#endif
 extern "C" int posix_memalign(byte** buffer, long alignment, long size);
 template<class T> T* allocate_aligned(int size) { byte* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
 
@@ -54,8 +60,13 @@ inline float inner_product_single(const float* kernel, const float* signal, int 
     float4 sum = {0,0,0,0};
     for(int i=0;i<len;i+=4) sum += alignedLoad(kernel+i) * unalignedLoad(signal+i); //TODO: align signal
     sum += moveHighToLow(sum, sum);
+#if __clang__
     sum += shuffle(sum, sum, 1,1,5,5);
     return sum[0];
+#else
+    sum += shuffle_ps(sum, sum, 0x55);
+    return extract_s(sum, 0);
+#endif
 }
 
 const int filterSize = 256;
