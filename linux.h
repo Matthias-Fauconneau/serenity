@@ -118,6 +118,8 @@ enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_R
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 enum {MADV_RANDOM=1,MADV_SEQUENTIAL,MADV_WILLNEED,MADV_DONTNEED};
+enum {TFD_CLOEXEC = 02000000};
+
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
 syscall3(int, open, const char*,name, int,oflag, int,perms)
@@ -165,7 +167,7 @@ syscall2(int, mlock,const void*,addr, long,len)
 syscall2(int, setrlimit, int,resource, rlimit*,limit)
 syscall2(int, clock_gettime, int,type, timespec*,ts)
 syscall2(int, timerfd_create, int,clock_id, int,flags)
-syscall4(int, timerfd_settime, int,ufd, int,flags, timespec*,utmr, timespec*,otmr)
+syscall4(int, timerfd_settime, int,ufd, int,flags, const timespec*,utmr, timespec*,otmr)
 
 #if __i386
 syscall2(int, socketcall, int,call, long*,args)

@@ -63,7 +63,7 @@ void AudioOutput::start(bool realtime) {
     hparams.interval(FrameBits) = 16*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=1024, hparams.interval(Periods).max=2;
+    if(realtime) hparams.interval(PeriodSize)=256, hparams.interval(Periods).max=4;
     else hparams.interval(PeriodSize).min=1024, hparams.interval(Periods).min=2;
     check_(ioctl(fd, IOCTL_HW_PARAMS, &hparams));
     bufferSize = hparams.interval(PeriodSize) * hparams.interval(Periods);

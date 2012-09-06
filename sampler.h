@@ -13,10 +13,11 @@ struct Sample {
 struct Note : FLAC { int remaining; int release; int key; int layer; int velocity; float level; };
 
 struct Sampler {
-    static constexpr uint period = 1024;
+    static constexpr uint period = 256;
 
     array<Sample> samples; //88*16
     array<Note> active;
+    struct Event { int key,velocity; }; array<Event> queue; //starting all release samples at once when releasing pedal might trigger an overrun
     struct Layer { float* buffer=0; uint size=0; bool active=false; Resampler resampler; } layers[3];
     File record __(0);
     int16* pcm = 0; int time = 0;
@@ -25,8 +26,8 @@ struct Sampler {
 
     void open(const ref<byte>& path);
     void lock();
-    void event(int key, int vel);
-    void readPeriod(int16* output);
+    void queueEvent(int key, int velocity);
+    void processEvent(Event e);
     void read(int16* output, uint size);
     void recordWAV(const string& path);
     ~Sampler();

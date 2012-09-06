@@ -3,9 +3,9 @@ TARGET ?= taskbar
 BUILD ?= fast
 CC = g++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
-#debug: include debug symbols, keep all assertions, use light optimizations
-FLAGS_debug := -g -DDEBUG -O0 -fno-omit-frame-pointer -fno-optimize-sibling-calls
-#fast: include debug symbols,  disable all assertions, use medium optimizations
+#debug: include debug symbols, keep all assertions
+FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer -fno-optimize-sibling-calls
+#fast: include debug symbols, disable all assertions, use medium optimizations
 FLAGS_fast := -g -O2 -fno-omit-frame-pointer -fno-optimize-sibling-calls
 #profile: include debug symbols, disable all assertions, use medium optimizations, instrument functions
 FLAGS_profile := -g -O3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -finstrument-functions

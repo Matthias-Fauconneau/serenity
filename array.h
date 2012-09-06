@@ -144,9 +144,7 @@ template<class T> struct array {
     /// Removes elements
     void removeAt(uint i) { at(i).~T(); for(;i<size()-1;i++) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); setSize(size()-1); }
     T take(int i) { T value = move(at(i)); removeAt(i); return value; }
-    T takeFirst() { return take(0); }
-    T takeLast() { return take(size()-1); }
-    T pop() { return takeLast(); }
+    T pop() { return take(size()-1); }
     /// Removes one matching element and returns an index to its successor
     int removeOne(const T& v) { int i=indexOf(v); if(i>=0) removeAt(i); return i; }
     /// Removes all matching elements

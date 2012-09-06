@@ -26,7 +26,7 @@ struct Taskbar : Application, Poll {
             if(parent->getProperty<uint>(id,"WM_PROTOCOLS"_).contains(parent->Atom("WM_DELETE_WINDOW"_))) {
                 SendEvent r; r.window=id; r.type=ClientMessage;
                 auto& e=r.event.client; e.format=32; e.window=id; e.type=parent->Atom("WM_PROTOCOLS"_);
-                clear(e.data); e.data[0]=parent->Atom("WM_DELETE_WINDOW"_); parent->send(raw(r));
+                clear(e.data,5); e.data[0]=parent->Atom("WM_DELETE_WINDOW"_); parent->send(raw(r));
             } else {DestroyWindow r; r.id=id; parent->send(raw(r)); }
             return true;
         }
@@ -48,7 +48,7 @@ struct Taskbar : Application, Poll {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
-        string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)?:":0"_).slice(1);
+        string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
         sockaddr_un addr; copy(addr.path,path.data(),path.size());
         check_(connect(fd,(sockaddr*)&addr,2+path.size()),path);
         {ConnectionSetup r;
@@ -72,8 +72,8 @@ struct Taskbar : Application, Poll {
         tasks.activeChanged.connect(this, &Taskbar::raiseTask);
         clock.timeout.connect(&window, &Window::render);
         clock.timeout.connect(&calendar, &Events::checkAlarm);
-        clock.triggered.connect(&calendar,&Events::reset);
-        clock.triggered.connect(&popup,&Window::toggle);
+        clock.pressed.connect(&calendar,&Events::reset);
+        clock.pressed.connect(&popup,&Window::toggle);
         calendar.eventAlarm.connect(&popup,&Window::show);
         calendar.side=Linear::Right;
         popup.hideOnLeave = true;
@@ -89,7 +89,7 @@ struct Taskbar : Application, Poll {
         type&=0b01111111; //msb set if sent by SendEvent
         if(type == ButtonPress) { uint id = e.event;
             raise(id);
-            //{SendEvent r; r.window=id; r.type=ButtonPress; r.event=e; send(raw(r));}
+            {SendEvent r; r.window=id; r.type=ButtonPress; r.event=e; send(raw(r));}
             int i = tasks.indexOf(id);
             if(i>=0) tasks.index=i;
         } else if(type == UnmapNotify) { uint id=e.unmap.window;
@@ -232,7 +232,7 @@ struct Taskbar : Application, Poll {
     void event() {
         uint8 type = read<uint8>(fd);
         processEvent(type, read<XEvent>(fd));
-        while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
+        while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
     }
 };
 bool operator==(const Taskbar::Task& a,const Taskbar::Task& b){return a.id==b.id;}

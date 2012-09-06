@@ -140,7 +140,7 @@ void Window::event() {
     } else {
         uint8 type = read<uint8>(fd);
         processEvent(type, read<XEvent>(fd));
-        while(queue) { QEvent e=queue.takeFirst(); processEvent(e.type, e.event); }
+        while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
     }
     current=0;
 }

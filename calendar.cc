@@ -94,14 +94,14 @@ void Events::nextMonth() { month.nextMonth(); date[1].setText(::str(month.active
 void Events::showEvents(uint index) {
     string text;
     Date date = month.dates[index];
-    array<::Event> events = getEvents(date);
+    array< ::Event> events = getEvents(date);
     if(events) {
         text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date,"dddd, dd"_))+format(Regular)+"\n"_);
         text << str(events,'\n')+"\n"_;
     }
     if(index==month.todayIndex) {
         Date date = month.dates[index+1];
-        array<::Event> events = getEvents(date);
+        array< ::Event> events = getEvents(date);
         if(events) {
             text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
             text << str(::getEvents(date),'\n');

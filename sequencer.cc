@@ -1,38 +1,30 @@
-#include <sys/types.h>
-#include <alsa/global.h>
-struct snd_input_t;
-struct snd_output_t;
-#include <alsa/conf.h>
-#include <alsa/timer.h>
-#include <alsa/control.h>
-#include <alsa/seq_event.h>
-#include <alsa/seq.h>
-#include <alsa/seqmid.h>
-#undef offsetof
-
 #include "sequencer.h"
 #include "stream.h"
 #include "file.h"
 #include "time.h"
 #include "debug.h"
+#include "midi.h"
+#include "linux.h"
+
+extern "C" int snd_rawmidi_open(snd_rawmidi_t **in_rmidi, snd_rawmidi_t **out_rmidi, const char *name, int mode);
+extern "C" int snd_rawmidi_poll_descriptors(snd_rawmidi_t *rmidi, struct pollfd *pfds, unsigned int space);
+extern "C" long snd_rawmidi_read(snd_rawmidi_t *rmidi, void *buffer, long size);
 
 Sequencer::Sequencer() {
-    snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0);
-    snd_seq_set_client_name(seq,"Piano");
-    snd_seq_create_simple_port(seq,"Input",SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,SND_SEQ_PORT_TYPE_APPLICATION);
-    if(snd_seq_connect_from(seq,0,20,0)) log("MIDI controller not connected"_);
-    pollfd p; snd_seq_poll_descriptors(seq,&p,1,POLLIN); registerPoll(p.fd,p.events);
+    snd_rawmidi_open(&midi,0,"hw:1,0,0",0);
+    pollfd p; snd_rawmidi_poll_descriptors(midi,&p,1); registerPoll(p.fd,p.events);
 }
 
 void Sequencer::event() {
-    while(snd_seq_event_input_pending(seq,1)) {
-        snd_seq_event_t* ev;
-        int remaining = snd_seq_event_input(seq, &ev);
-        if(remaining<=0) log(remaining);
-        if(ev->type == SND_SEQ_EVENT_NOTEON) {
-            uint8 key = ev->data.note.note;
-            int vel = ev->data.note.velocity;
-            if( vel == 0 ) {
+    do {
+#define read ({ byte b; snd_rawmidi_read(midi,&b,1); b; })
+        uint8 key=read;
+        if(key & 0x80) { type=key>>4; key=read; }
+        uint8 value=0;
+        if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value=read;
+        else warn("Unhandled MIDI event",type);
+        if(type == NoteOn) {
+            if(value == 0 ) {
                 assert(pressed.contains(key));
                 pressed.removeAll(key);
                 if(sustain) sustained+= key;
@@ -48,26 +40,23 @@ void Sequencer::event() {
                 sustained.removeAll(key);
                 assert(!pressed.contains(key));
                 pressed << key;
-                if(vel>maxVelocity) { maxVelocity=vel; log("max",maxVelocity); }
-                assert(vel*127/maxVelocity);
-                noteEvent(key, vel*127/maxVelocity);
+                noteEvent(key, value*3/2); //x3/2 to use reach maximum velocity without destroying the keyboard
                 if(record) {
                     int tick = realTime();
-                    events << Event((int16)(tick-lastTick), (uint8)key, (uint8)vel);
+                    events << Event((int16)(tick-lastTick), (uint8)key, (uint8)value);
                     lastTick = tick;
                 }
             }
-        } else if( ev->type == SND_SEQ_EVENT_CONTROLLER ) {
-            if(ev->data.control.param==64) {
-                sustain = (ev->data.control.value != 0);
+        } else if(type == Controller) {
+            if(key==64) {
+                sustain = (value != 0);
                 if(!sustain) {
                     for(int key : sustained) { noteEvent(key,0); assert(!pressed.contains(key)); }
                     sustained.clear();
                 }
             }
         }
-        snd_seq_free_event(ev);
-    };
+    } while(::poll(this,1,0));
 }
 
 void Sequencer::recordMID(const ref<byte>& path) { record=string(path); }

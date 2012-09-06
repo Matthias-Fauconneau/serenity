@@ -1,7 +1,10 @@
 #include "window.h"
+
+#if 0
 #include "display.h"
 #include "text.h"
 #include "html.h"
+#include "png.h"
 
 struct VSyncTest : Application, Widget {
     Window window __(this,int2(0,0),"VSyncTest"_);
@@ -33,7 +36,6 @@ struct HTMLTest : Application {
     }
 };
 
-#include "png.h"
 struct PNGTest : Application, ImageView {
     Window window __(this,int2(16,16),"PNGTest"_);
     ICON(arrow) PNGTest(){
@@ -42,7 +44,6 @@ struct PNGTest : Application, ImageView {
     }
 };
 
-#include "calendar.h"
 struct WeekView : Widget {
     uint time(Date date) { return date.hours*60+date.minutes; }
     inline uint floor(uint width, uint value) { return value/width*width; }
@@ -55,7 +56,7 @@ struct WeekView : Widget {
             y=max(y,day.sizeHint().y);
             day.render(position+int2(i*w,0),int2(w,0));
         }
-        array<::Event> events = getEvents();
+        array< ::Event> events = getEvents();
         uint min=-1,max=0;
         for(::Event& e: events) min=::min(min,floor(60,time(e.date))), max=::max(max,ceil(60,time(e.end)));
         for(::Event& e: events) {
@@ -74,7 +75,6 @@ struct WeekView : Widget {
     }
 };
 
-#include "png.h"
 struct WeekViewTest : Application, Widget {
     //Window window __(this,int2(0,0),"WeekView"_);
     Image page __(2480,3508);
@@ -91,5 +91,9 @@ struct WeekViewTest : Application, Widget {
     }
     void render(int2 position, int2 size) { blit(position,resize(page,page.width*size.y/page.height,size.y)); }
 };
+#endif
 
-Application(WeekViewTest)
+#include "calendar.h"
+struct ClockTest : Application, Clock { Window window __(this,int2(-1,-1),"Clock"_); };
+
+Application(ClockTest)

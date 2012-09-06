@@ -71,6 +71,7 @@ int K(int size) { return (size+4095)/4096*4; } //size rounded up to page in KiB
 void Sampler::lock() {
     uint full=0; for(const Sample& s : samples) full += K(s.data.size);
     uint available = availableMemory();
+    debug(log("Not locking in debug mode (",available/1024,"MiB available memory, full cache need",full/1024,"MiB)"); return;)
     if(full>available) {
         uint lock=0; for(const Sample& s : samples) lock += min(s.data.size/4096*4,available*1024/samples.size()/4096*4);
         log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB");
@@ -84,8 +85,8 @@ void Sampler::lock() {
     }
 }
 
-void Sampler::event(int key, int velocity) {
-    //log(active.size());
+void Sampler::queueEvent(int key, int velocity) { queue<<Event __(key,velocity); }
+void Sampler::processEvent(Event e) { int key=e.key, velocity=e.velocity;
     int elapsed=0;
     if(velocity==0) {
         for(Note& note : active) if(note.release && note.key==key) {
@@ -96,7 +97,11 @@ void Sampler::event(int key, int velocity) {
     }
     for(const Sample& s : samples) {
         if(!!elapsed == s.trigger && key >= s.lokey && key <= s.hikey && velocity >= s.lovel && velocity <= s.hivel) {
-            active << Note();
+            float level=1;
+            if(elapsed) level=exp10((s.volume-3*(elapsed/48000.0))/20.0);
+            else level = (1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
+            if(level<1/256.0) return;
+            active.grow(active.size()+1);
             Note& note = active.last();
             note.start(s.data);
             note.remaining=note.time;
@@ -105,17 +110,16 @@ void Sampler::event(int key, int velocity) {
             int shift = key-s.pitch_keycenter; assert(shift>=-1 && shift<=1,"unsupported pitch shift"_,shift);
             note.layer=1+shift;
             note.velocity=velocity;
-            //if(elapsed) note.level=exp10((s.volume)/20.0);
-            if(elapsed) note.level=exp10((s.volume-6*(elapsed/48000.0))/20.0);
-            //if(elapsed) note.level=exp10((s.volume-s.rt_decay*(elapsed/48000.0))/20.0);
-            else note.level = (1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
+            note.level=level;
             return;
         }
     }
     if(!elapsed) error("Missing sample"_,key,velocity);
 }
 
-void Sampler::readPeriod(int16* output) {
+void Sampler::read(int16 *output, uint unused size) {
+    assert(size==period,"Sampler supports only fixed size period of", period,"frames, trying to read",size,"frames");
+    if(queue) processEvent(queue.take(0));
     timeChanged(time);
     for(Layer& layer : layers) layer.active=false;
     for(uint i=0;i<active.size();i++) { Note& n = active[i];
@@ -159,16 +163,11 @@ void Sampler::readPeriod(int16* output) {
     if(anyActive) {
         float* in = layers[1].buffer;
         uint clip=0;
-        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>8; if(o<-32768 || o>32767) clip++; output[i] = ::clip(-32768,o,32767);}
-        if(clip>32) log("clip",clip);
+        for(uint i=0;i<period*2;i++) { int o=int(in[i])>>9; if(o<-32768 || o>32767) clip++; output[i] = ::clip(-32768,o,32767);} //>>9 to play at least 4 attacks without clipping
+        if(clip>64) log("clip",clip);
     } else clear(output,period*2); //no active note -> play silence (TODO: pcm_stop)
     if(record) write(record,ref<byte>((byte*)output,period*2*sizeof(int16)));
     time+=period;
-}
-
-void Sampler::read(int16 *output, uint size) {
-    assert(size%period==0,"Sampler supports only fixed size period of", period,"frames, trying to read",size,"frames");
-    for(uint i=0;i<size/period;i++,output+=period*2) readPeriod(output);
 }
 
 void Sampler::recordWAV(const string& path) {

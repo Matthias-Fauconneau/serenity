@@ -9,13 +9,10 @@
 #ifdef PDF
 #include "pdf.h"
 #endif
-#include "interface.h"
 #include "window.h"
 
-struct Music : Application {
-    ICON(music)
-    Icon widget __(share(musicIcon()));
-    Window window __(&widget,int2(-1,-1),"Music"_,musicIcon());
+struct Music : Application, Widget {
+    ICON(music) Window window __(this,int2(0,0),"Music"_,musicIcon());
     Sampler sampler;
     AudioOutput audio __( __(&sampler, &Sampler::read) );
     Sequencer seq;
@@ -32,11 +29,12 @@ struct Music : Application {
     Music() {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         window.localShortcut(Escape).connect(this,&Application::quit);
+        window.bgCenter=window.bgOuter=0;
         for(ref<byte> path : arguments()) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
                 sampler.open(path);
-                seq.noteEvent.connect(&sampler,&Sampler::event);
+                seq.noteEvent.connect(&sampler,&Sampler::queueEvent);
             }
 #if MIDI
             else if(endsWith(path, ".mid"_)) {
@@ -78,5 +76,6 @@ struct Music : Application {
         audio.start(true);
         setPriority(-20);
     }
+    void render(int2, int2){}
 };
 Application(Music)
