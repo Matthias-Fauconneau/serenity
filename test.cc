@@ -1,20 +1,43 @@
 #include "window.h"
+
 #include "text.h"
+#include "font.h"
+struct FontTest : Application, Widget {
+    Window window __(this,int2(512,512),"Font Test"_);
+    FontTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.bgCenter=window.bgOuter=0xFF; window.show(); }
+    void render(int2 position, int2 size) {
+        static const array< ref<byte> > lines = split(
+                    "The quick brown fox jumps over the lazy dog\n"
+                    //"I know that a lot of you are passionate about the civil war\n"
+                    //"La Poste Mobile a gagné 4000 clients en six mois\n"
+                    //"Fixed subpixel font layout (was broken by justification\n"
+                    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"_,'\n');
+        int i=1; for(ref<byte> line: lines) {
+            int y=(i++)*size.y/(lines.size()+1);
+            extern bool up; up=1; extern bool fit; extern map<int,Font> defaultSans;
+            fit=0; Text(string(line)).render(position+int2(0,y),int2(size.x,up?32:16));
+            defaultSans.clear(); fit=1; Text(string(line)).render(position+int2(0,y+(up?32:16)),int2(size.x,up?32:16));
+        }
+    }
+};Application(FontTest)
 
-struct FontTest : Application {
-    Text text __(string(
-                     //"The quick brown fox jumps over the lazy dog\n"
-                     //"I know that a lot of you are passionate about the civil war\n"
-                     //"La Poste Mobile a gagné 4000 clients en six mois"
-                     "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"_));
-    Window window __(&text,int2(-1,-1),"Font Test"_);
-    FontTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.bgCenter=window.bgCenter=0xFF; window.show(); }
-};
+/*#include "html.h"
+struct HTMLTest : Application {
+    Scroll<HTML> page;
+    Window window __(&page.area(),0,"Browser"_);
 
-#if 0
+    HTMLTest() {
+        window.localShortcut(Escape).connect(this, &Application::quit);
+        page.contentChanged.connect(&window, &Window::render);
+        page.go("http://feedproxy.google.com/~r/Phoronix/~3/tLzs7apkEps/vr.php"_);
+        window.show();
+    }
+};Application(HTMLTest)*/
+
+/*
 #include "display.h"
 struct VSyncTest : Application, Widget {
-    Window window __(this,int2(0,0),"VSyncTest"_);
+    Window window __(this,0,"VSyncTest"_);
     VSyncTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.show(); }
     void render(int2 position, int2 size) {static bool odd; fill(position+Rect(size),(odd=!odd)?black:white); window.render();}
 };
@@ -23,19 +46,6 @@ struct KeyTest : Application, Text {
     Window window __(this,int2(640,480),"KeyTest"_);
     KeyTest(){ window.globalShortcut(Play).connect(this,&Application::quit); focus=this; window.localShortcut(Escape).connect(this,&Application::quit); window.show(); }
     bool keyPress(Key key) { setText(str(dec(int(key)),hex(int(key)))); return true; }
-};
-
-#include "html.h"
-struct HTMLTest : Application {
-    Scroll<HTML> page;
-    Window window __(&page.area(),int2(0,0),"Browser"_);
-
-    HTMLTest() {
-        window.localShortcut(Escape).connect(this, &Application::quit);
-        page.contentChanged.connect(&window, &Window::render);
-        page.go("http://www.tryinghuman.com/?id=607"_);
-        window.show();
-    }
 };
 
 #include "png.h"
@@ -80,7 +90,7 @@ struct WeekViewTest : Application, Widget {
         }
     };
 
-    Window window __(this,int2(0,0),"WeekView"_);
+    Window window __(this,0,"WeekView"_);
     Image page __(2480,3508);
     WeekViewTest(){
         renderPage();
@@ -98,6 +108,4 @@ struct WeekViewTest : Application, Widget {
 
 #include "calendar.h"
 struct ClockTest : Application, Clock { Window window __(this,int2(-1,-1),"Clock"_); };
-#endif
-
-Application(FontTest)
+*/

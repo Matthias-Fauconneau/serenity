@@ -27,6 +27,8 @@ struct Player : Application {
     Window window __(&layout, int2(-512,-512), "Player"_, pauseIcon());
 
     Player() {
+        albums.always=titles.always=true;
+        elapsed.minSize.x=remaining.minSize.x=64;
         toolbar<<&playButton<<&nextButton<<&elapsed<<&slider<<&remaining;
         main<<&albums.area()<<&titles.area();
         layout<<&toolbar<<&main;
@@ -47,8 +49,11 @@ struct Player : Application {
         assert(folders);
         for(string& folder : folders) albums << Text(string(section(folder,'/',-2,-1)), 16);
 
+        int time=0;
         if(!files && existsFile("Music/.last"_)) {
-            string last = readFile("Music/.last"_);
+            string mark = readFile("Music/.last"_);
+            ref<byte> last = section(mark,0);
+            time = toInteger(section(mark,0,1,2)); log(mark,section(mark,0,1,2),time);
             string folder = string(section(last,'/',0,2));
             albums.index = folders.indexOf(folder);
             array<string> files = listFiles(folder,Recursive|Sort|Files);
@@ -57,6 +62,7 @@ struct Player : Application {
         }
         window.setSize(int2(-512,-512)); window.show();
         if(files) next();
+        if(time) seek(time);
     }
     void appendFile(string&& path) {
         string title = string(section(section(path,'/',-2,-1),'.',0,-2));
@@ -83,7 +89,7 @@ struct Player : Application {
         media.open(files[index]);
         audio.start();
         setPlaying(true);
-        writeFile("/Music/.last"_,files[index]);
+        writeFile("/Music/.last"_,string(files[index]+"\0"_+dec(0)));
     }
     void next() {
         if(!titles.count()) return;
@@ -109,7 +115,9 @@ struct Player : Application {
     void seek(int position) { media.seek(position); }
     void update(int position, int duration) {
         if(position == duration) next();
-        if(!window.mapped || slider.value == position) return;
+        if(slider.value == position) return;
+        writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));
+        if(!window.mapped) return;
         slider.value = position; slider.maximum=duration;
         elapsed.setText(dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2));
         remaining.setText(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2));

@@ -4,10 +4,9 @@
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access components directly
 template<template<typename> class V, class T, int N> struct vector : V<T> {
-    /// Initializes all components to their default values
-    constexpr vector():____(V<T>{}){} //TODO: change to uninitialized for performance
+    vector(){}
     /// Initializes all components to the same value \a v
-    explicit vector(T v){ for(int i=0;i<N;i++) at(i)=v; }
+    vector(T v){ for(int i=0;i<N;i++) at(i)=v; }
     /// Initializes each component separately
     template<class... Args> explicit constexpr vector(T a, T b, Args... args):____(V<T>{a,b,T(args)...}){
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");

@@ -70,6 +70,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     }
     if(size.x==0) size.x=display.x;
     if(size.y==0) size.y=display.y-16;
+    position=0;
     if(anchor==Bottom) position.y=display.y-size.y;
     this->size=size;
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
@@ -120,21 +121,20 @@ void Window::event() {
             }
         }
 
-#if 0
+        widget->render(0,size);
+        assert(!clipStack);
+
         //feather edges //TODO: client side shadow
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
         if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
         if(position.x+size.x<display.x-1) for(int y=0;y<size.y;y++) framebuffer(size.x-1,y) /= 2;
         if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-        //feather corners
+        /*//feather corners
         if(position.x>0 && position.y>0) framebuffer(0,0) /= 2;
         if(position.x+size.x<display.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
         if(position.x>0 && position.y+size.y<display.y-1) framebuffer(0,size.y-1) /= 2;
-        if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;
-#endif
+        if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;*/
 
-        widget->render(int2(0,0),size);
-        assert(!clipStack);
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;
     } else {
@@ -267,6 +267,12 @@ uint Window::KeySym(uint8 code) {
         return keysyms?keysyms.first():0;
     }
 }
+uint Window::KeyCode(Key sym) {
+    uint keycode=0;
+    for(uint i=minKeyCode;i<=maxKeyCode;i++) if(KeySym(i)==sym) { keycode=i; break;  }
+    if(!keycode) warn("Unknown KeySym",int(sym));
+    return keycode;
+}
 template<class T> array<T> Window::getProperty(uint window, const ref<byte>& name, uint size) {
     {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
     {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
@@ -321,10 +327,8 @@ void Window::render() { if(mapped) Poll::wait(); }
 
 signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
 signal<>& Window::globalShortcut(Key key) {
-    uint keycode=0;
-    for(uint i=minKeyCode;i<=maxKeyCode;i++) if(KeySym(i)==key) { keycode=i; break;  }
-    if(!keycode) warn("Unknown KeySym",int(key));
-    else {GrabKey r; r.window=root; r.keycode=keycode; send(raw(r));}
+    uint code = KeyCode(key);
+    if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
     return shortcuts.insert((uint16)key);
 }
 

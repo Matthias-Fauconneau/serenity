@@ -80,7 +80,7 @@ long toInteger(const ref<byte>& number, int base) {
         if(*i>='0' && *i<='9') n = *i-'0';
         else if(*i>='a' && *i<='f') n = *i+10-'a';
         else if(*i>='A' && *i<='F') n = *i+10-'A';
-        else error("Invalid input '"_+number+"'"_);
+        else { warn("Invalid input '"_+number+"'"_); break; }
         value *= base;
         value += n;
     }

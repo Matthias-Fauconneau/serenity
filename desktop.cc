@@ -58,8 +58,8 @@ struct Desktop : Application {
     VBox timeBox;//  __(&clock, &calendar);
     List<Command> shortcuts;
     HBox applets;// __(&feeds, &timeBox, &shortcuts);
-    Window window __(&applets,int2(0,0),"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
-    Window browser __(&page.area(),int2(0,0),"Browser"_);
+    Window window __(&applets,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
+    Window browser __(&page.area(),0,"Browser"_);
     ICON(shutdown)
     Desktop() {
         static Folder config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
@@ -96,7 +96,7 @@ struct Desktop : Application {
     }
     void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
         if(!link) { browser.hide(); return; }
-        page.delta=int2(0,0);
+        page.delta=0;
         page.contentChanged.connect(&browser, &Window::render);
         browser.setTitle(title);
         browser.setIcon(favicon);

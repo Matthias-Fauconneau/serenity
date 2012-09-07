@@ -1,8 +1,8 @@
-font: automatic fitting
+font: grid fit
+music: score, auto rt_decay, auto volume, reverb, auto tune
+fibermesh
+own: midi, inflate, jpeg, mp3, ssl
 apps: text editor, file manager, search, imap, pdf, shell, monitor, torrent, video, irc
-music: reverb, score, auto rt_decay, auto volume, auto tune, harmonic resonnance
-feeds: progressive png, http compression
-own: inflate, jpeg, mp3, seq
 parser: attributes (L+S), scoped symbols, GLR
 IDE: build driver (+frepo), syntax highlighting, navigation, completion, git, debugger, profiler, static analyzer, interpreter, compiler
 touchbook: hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait

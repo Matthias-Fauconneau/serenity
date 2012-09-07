@@ -14,7 +14,7 @@ struct Widget {
 // Layout
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint() { return int2(0,0); }
+    virtual int2 sizeHint() { return 0; }
     /// Renders this widget.
     /// \arg rect is the absolute region for the widget
     virtual void render(int2 position, int2 size)=0;

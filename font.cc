@@ -1,5 +1,11 @@
 #include "font.h"
 
+/// Fixed point rounding
+inline int truncate(int width, uint value) { return value/width*width; }
+inline int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
+inline int round(int width, int value) { return floor(width,value+width/2); }
+inline int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
+
 /// Gamma correction lookup table
 constexpr uint8 gamma[257] = { 0, 12, 21, 28, 33, 38, 42, 46, 49, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 81, 82, 84, 86, 88, 89, 91, 93, 94, 96, 97, 99, 100, 102, 103, 104, 106, 107, 109, 110, 111, 112, 114, 115, 116, 117, 118, 120, 121, 122, 123, 124, 125, 126, 127, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 151, 152, 153, 154, 155, 156, 157, 157, 158, 159, 160, 161, 161, 162, 163, 164, 165, 165, 166, 167, 168, 168, 169, 170, 171, 171, 172, 173, 174, 174, 175, 176, 176, 177, 178, 179, 179, 180, 181, 181, 182, 183, 183, 184, 185, 185, 186, 187, 187, 188, 189, 189, 190, 191, 191, 192, 193, 193, 194, 194, 195, 196, 196, 197, 197, 198, 199, 199, 200, 201, 201, 202, 202, 203, 204, 204, 205, 205, 206, 206, 207, 208, 208, 209, 209, 210, 210, 211, 212, 212, 213, 213, 214, 214, 215, 215, 216, 217, 217, 218, 218, 219, 219, 220, 220, 221, 221, 222, 222, 223, 223, 224, 224, 225, 226, 226, 227, 227, 228, 228, 229, 229, 230, 230, 231, 231, 232, 232, 233, 233, 234, 234, 235, 235, 236, 236, 237, 237, 237, 238, 238, 239, 239, 240, 240, 241, 241, 242, 242, 243, 243, 244, 244, 245, 245, 245, 246, 246, 247, 247, 248, 248, 249, 249, 250, 250, 251, 251, 251, 252, 252, 253, 253, 254, 254, 254, 255 };
 #if 0
@@ -9,6 +15,11 @@ int main() {  for(int i=0;i<=256;i++) write(1,string(str(min(255,int(255*sRGB(i/
 #endif
 
 static int fonts() { static Folder fd = openFolder("usr/share/fonts"_); return fd; }
+
+/// Enable automatic grid fitting
+bool fit;
+/// 2x nearest upsample for debugging
+bool up;
 
 Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
     DataStream s = DataStream(keep, true);
@@ -42,7 +53,7 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
     }
     {DataStream& s = hhea;
         uint32 unused version=s.read();
-        ascent=scale(s.read16()), descent=scale(s.read16()), lineGap=scale(s.read16());
+        ascent=ceil(16,scale(s.read16())), descent=scale(s.read16()), lineGap=scale(s.read16());
         //uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();*/
     }
 }
@@ -82,6 +93,8 @@ uint16 Font::index(uint16 code) {
     error("Not Found"_);
 }
 
+int Font::advance(uint16 index) { return (up?2:1)*scale(big16(hmtx[2*index])); }
+
 int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     kern.seek(0); DataStream& s = kern;
     uint16 unused version=s.read(), numTables=s.read();
@@ -92,7 +105,7 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
         assert(14+nPairs*6==length);
         for(uint i=0;i<nPairs;i++) {
             uint16 left=s.read(), right=s.read(); int16 value=s.read();
-            if(left==leftIndex && right==rightIndex) return scale(value);
+            if(left==leftIndex && right==rightIndex) return (up?2:1)*scale(value);
         }
     }
     return 0;
@@ -137,10 +150,24 @@ void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
     }
 }
 
-/// Fixed point rounding
-inline int truncate(int width, uint value) { return value/width*width; }
-inline int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
-inline int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
+template<class T> T& min_(T& a, T& b) { assert(a!=b,a); return a<b ? a : b; }
+template<class T> T& max_(T& a, T& b) { assert(a!=b,a); return a>b ? a : b; }
+struct Stem { int& a; int& b; int& n; int& N; };
+void fitStem(int I, array<Stem>& stems, int2& A, int2& B, int unused max) {
+    int& a=A.x; int& b=B.x; int& n=A.y; int& N=B.y;
+    for(Stem& s: stems) { //fit horizontal stems size (TODO: fit position, best not first)
+        if((a>b) != (s.a<s.b)) continue; //only opposite directions (same stem)
+        if(n==s.n) continue; //assert(n!=s.n,n,a,b,A,B);
+        int& n1=min_(n,s.n); int& N1=min_(N,s.N);
+        int& n2=max_(n,s.n); int& N2=max_(N,s.N);
+        int m = ::round(I,(n1+n2)/2), w = ::round(I,n2-n1);
+        n1=N1=m-floor(I,w/2), n2=N2=m+ceil(I,w/2)-1;
+        assert(n1%I==0,n1,m,w,floor(I,w/2)); assert((n2+1)%I==0,n2+1,(n2+1)/I,(n2+1)%I,m,w);
+        assert(n1<max,n1,max); assert(n2<max,n2,max);
+        break;
+    }
+    stems<<Stem __(a,b,n,N);
+}
 
 void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
     int pointer = ( indexToLocFormat? big32(((uint32*)loca)[index]) : 2*big16(((uint16*)loca)[index]) );
@@ -155,7 +182,8 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
         yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
         int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin); assert(width>0,xMax,xMin); assert(height>0,yMax,yMin);
-        new (&raster) Bitmap(width+1,height+1);
+        if(fit) new (&raster) Bitmap(width+16,height+16);
+        else new (&raster) Bitmap(width+1,height+1);
     } else s.advance(4*2); //TODO: resize as needed
 
     if(numContours>0) {
@@ -172,7 +200,11 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
             flagsArray[i]=flags;
         }
 
+#if __clang__
         int P_[2*nofPoints]; int2* P=(int2*)P_;
+#else
+        int2 P[nofPoints];
+#endif
         int16 last=-xMin;
         for(int i=0;i<nofPoints;i++) { Flags flags=flagsArray[i];
             if(flags.short_x) {
@@ -195,6 +227,21 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
             p.y=scaleY(xy*p.x/16384+yy*p.y/16384+dy);
         }
 
+        if(fit) {
+            // Fit (TODO: align baseline and x-height to avoid overshoot (blue zone = xzroesc), align horizontal stems, align vertical stems width)
+            array<Stem> hStems; array<Stem> vStems;
+            for(int n=0,i=0; n<numContours; n++) {
+                int last= big16(endPtsOfContours[n]);
+                for(int prev=last; i<=last; i++) {
+                    int2& A = P[prev]; int2& B=P[i];
+                    if(A==B) continue;
+                    if(A.y==B.y) fitStem(16,hStems,A,B,raster.height); //vertically fit horizontal stems
+                    if(A.x==B.x) fitStem(48,vStems,A,B,raster.width); //horizontally fit horizontal stems
+                    prev=i;
+                }
+            }
+        }
+        // Render
         for(int n=0,i=0; n<numContours; n++) {
             int last= big16(endPtsOfContours[n]);
             int2 p; //last on point
@@ -229,12 +276,10 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
     }
 }
 
-int Font::advance(uint16 index) { return scale(big16(hmtx[2*index])); }
-
 const Glyph& Font::glyph(uint16 index, int fx) {
-    assert(fx>=-16,fx); fx=(fx+16)%16;
+    if(fit) fx=0; else fx=fx&(16-1);
     // Lookup glyph in cache
-    Glyph& glyph = index<256 ? cacheASCII[fx][index] : cacheUnicode[fx][index];
+    Glyph& glyph = index<128 ? cacheASCII[fx][index] : cacheUnicode[fx][index];
     if(glyph.valid) return glyph;
     glyph.valid=true;
 
@@ -242,7 +287,7 @@ const Glyph& Font::glyph(uint16 index, int fx) {
     render(raster,index,xMin,xMax,yMin,yMax,1<<14,0,0,1<<14,0,0);
     if(!raster.data) return glyph;
     glyph.offset = int2(floor(16,scale(xMin)),ascent-scale(yMax)-16); //yMax was rounded up
-    assert(glyph.offset.x%16==0); //assert(glyph.offset.y%16==0,glyph.offset.y);
+    assert(glyph.offset.x%16==0); assert(glyph.offset.y%16==0,glyph.offset.y);
     glyph.offset /= 16;
 
     uint width=ceil(48,raster.width)/48+1, height=raster.height/16; //add 1px for filtering
@@ -261,11 +306,18 @@ const Glyph& Font::glyph(uint16 index, int fx) {
             }
         }
         for(uint x=0; x<width; x++) { //LCD subpixel filtering
-            uint8 filter[5] = {1, 4, 6, 4, 1};
+            uint8 filter[5] = {1, 4, 6, 4, 1}; if(fit) clear(filter,5), filter[2]=16;
             uint16 pixel[3]={};
             for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)width*3) pixel[c]+=filter[i]*line[idx]; }
             glyph.image(x,y) = byte4(255-gamma[pixel[2]/16],255-gamma[pixel[1]/16],255-gamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
         }
+    }
+    if(up){
+        Image image = Image(width*2,height*2);
+        for(uint y=0; y<height; y++) for(uint x=0; x<width; x++) {
+            image(x*2+0,y*2+0)=image(x*2+0,y*2+1)=image(x*2+1,y*2+0)=image(x*2+1,y*2+1)= glyph.image(x,y);
+        }
+        glyph.image=move(image); glyph.offset*=2;
     }
     return glyph;
 }

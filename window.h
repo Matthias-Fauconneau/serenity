@@ -32,6 +32,8 @@ struct Window : Poll {
     string AtomName(uint atom);
     /// Returns KeySym for \a code
     uint KeySym(uint8 code);
+    /// Returns KeyCode for \a sym
+    uint KeyCode(Key sym);
     /// Returns property \a name on \a window
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
 

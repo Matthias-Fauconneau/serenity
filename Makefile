@@ -80,4 +80,4 @@ install_%.desktop: %.desktop
 	cp $< $(PREFIX)/share/applications/
 
 install: all $(INSTALL:%=install_%)
-	cp $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)
+	mv $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)

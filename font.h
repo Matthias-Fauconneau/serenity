@@ -18,7 +18,7 @@ struct Font {
     uint16* hmtx;
     const void* loca; uint16 indexToLocFormat; int ascent, descent, lineGap;
     const byte* glyf; uint scale; int round, size;
-    Glyph cacheASCII[16][256];
+    Glyph cacheASCII[16][128];
     map<uint16, Glyph> cacheUnicode[16];
 
     /// Opens font at /a path scaled to /a size pixels high

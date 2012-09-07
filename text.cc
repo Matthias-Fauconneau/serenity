@@ -3,14 +3,18 @@
 #include "font.h"
 #include "utf8.h"
 
+map<int,Font> defaultSans;
+map<int,Font> defaultBold;
+map<int,Font> defaultItalic;
+
 /// Layouts formatted text with wrapping, justification and links
 /// \note Characters are positioned with .4 subpixel precision
 struct TextLayout {
     int size; //.4
     int wrap; //.4
     int spaceAdvance; //.4
-    int2 pen; //.4
-    struct Character { Font* font; int2 pos;/*.4*/ int index,advance; };
+    int2 pen=0; //.4
+    struct Character { Font* font; int2 pos;/*.4*/ uint index,advance,width; };
     typedef array<Character> Word;
     array<Word> line;
     array<Character> text;
@@ -22,10 +26,10 @@ struct TextLayout {
         if(!line) { pen.y+=size; return; }
         //justify
         int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance; //sum word length
-        //length += (line.last().last().glyph.image.width<<4) - line.last().last().advance; //for last word of line, use glyph bound instead of advance
+        length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
         int space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0) space = spaceAdvance; //compact
+        if(space<=0 || space>=16*spaceAdvance) space = spaceAdvance; //compact
 
         //layout
         pen.x=0;
@@ -39,7 +43,6 @@ struct TextLayout {
     }
 
     TextLayout(const ref<byte>& text, int size, int wrap):size(size<<4),wrap(wrap<<4) {
-        static map<int,Font> defaultSans;
         if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
         Font* font = &defaultSans.at(size);
         uint16 spaceIndex = font->index(' ');
@@ -56,7 +59,7 @@ struct TextLayout {
                 previous = spaceIndex;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
                 int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
-                //length += word.last().pos.x+(word.last().glyph.image.width<<4); //last word
+                length += word.last().pos.x+word.last().width; //last word
                 if(wrap && length>=(wrap<<4)) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
                 pen.x=0;
@@ -72,11 +75,9 @@ struct TextLayout {
                 if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line __(underlineBegin,glyphCount);
                 format=newFormat;
                 if(format&Bold) {
-                    static map<int,Font> defaultBold;
                     if(!defaultBold.contains(size)) defaultBold.insert(size,Font("dejavu/DejaVuSans-Bold.ttf"_, size));
                     font = &defaultBold.at(size);
                 } else if(format&Italic) {
-                    static map<int,Font> defaultItalic;
                     if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font("dejavu/DejaVuSans-Oblique.ttf"_, size));
                     font = &defaultItalic.at(size);
                 } else {
@@ -99,14 +100,15 @@ struct TextLayout {
             uint16 index = font->index(c);
             if(previous!=spaceIndex) pen.x += font->kerning(previous,index);
             previous = index;
-            int advance = font->advance(index);
-            if(font->glyph(index).image) word << Character __(font, int2(pen.x,0), index, advance); glyphCount++;
+            uint advance = font->advance(index);
+            const Image& image = font->glyph(index).image;
+            if(image) { word << Character __(font, int2(pen.x,0), index, advance, image.width<<4); glyphCount++; }
             pen.x += advance;
         }
         if(!text || text[text.size-1]!='\n') {
             if(word) {
                 int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
-                //length += word.last().pos.x+(word.last().glyph.image.width<<4); //last word
+                length += word.last().pos.x+word.last().width; //last word
                 if(wrap && length>=(wrap<<4)) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
                 pen.x=0;
@@ -124,7 +126,7 @@ void Text::layout() {
     characters.clear();
     for(TextLayout::Character o: layout.text) {
         const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
-        Character c __(int2(o.pos.x/16, o.pos.y/16)+glyph.offset, share(glyph.image));
+        Character c __(o.pos/16+glyph.offset, share(glyph.image));
         textSize=max(textSize,int2(c.pos)+c.image.size());
         characters << move(c);
     }
@@ -133,12 +135,10 @@ void Text::layout() {
     for(TextLayout::Line l: layout.lines) {
         Line line;
         TextLayout::Character c = layout.text[l.begin];
-        const Glyph& glyph=c.font->glyph(c.index,c.pos.x);
-        line.min = c.pos/16-glyph.offset+int2(0,size);
+        line.min = c.pos/16 + int2(0,size);
         for(uint i=l.begin;i<l.end;i++) {
             TextLayout::Character c = layout.text[i];
-            const Glyph& glyph=c.font->glyph(c.index,c.pos.x);
-            int2 p = c.pos/16 - int2(0,glyph.offset.y) + int2(0,size);
+            int2 p = c.pos/16 + int2(0,size);
             if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.font->advance(c.index)/16,0);
         }
         if(line.max != line.min) lines<< move(line);
@@ -150,14 +150,14 @@ int2 Text::sizeHint() {
 }
 void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
-    int2 offset = position+max(int2(0,0),(size-textSize)/2);
+    int2 offset = position+max(int2(0),(size-textSize)/2);
     for(const Character& b: characters) multiply(offset+b.pos, b.image, opacity);
     for(const Line& l: lines) fill(offset+Rect(l.min-int2(0,1),l.max), black);
 }
 
 bool Text::mouseEvent(int2 position, int2 size, Event event, MouseButton) {
     if(event!=Press) return false;
-    position -= max(int2(0,0),(size-textSize)/2);
+    position -= max(int2(0),(size-textSize)/2);
     if(!Rect(textSize).contains(position)) return false;
     for(uint i=0;i<characters.size();i++) { const Character& b=characters[i];
         if((b.pos+Rect(b.image.size())).contains(position)) {
@@ -173,9 +173,9 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, MouseButton) {
 bool TextInput::mouseEvent(int2 position, int2 size, Event event, MouseButton button) {
     if(event!=Press) return false;
     focus=this;
-    position -= max(int2(0,0),(size-textSize)/2);
+    position -= max<int2>(0,(size-textSize)/2);
     for(cursor=0;cursor<characters.size() && position.x>characters[cursor].pos.x+(int)characters[cursor].image.width/2;cursor++) {}
-    if(button==MiddleButton) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); textSize=int2(0,0); }
+    if(button==MiddleButton) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); textSize=0; }
     return true;
 }
 
@@ -189,7 +189,7 @@ bool TextInput::keyPress(Key key) {
     else if(key==BackSpace && cursor>0) text.removeAt(--cursor);
     else if(key>=' ' && key<=0xFF) { text.insertAt(cursor++, (byte)key); } //TODO: UTF8
     else return false;
-    textSize=int2(0,0); return true;
+    textSize=0; return true;
 }
 
 void TextInput::render(int2 position, int2 size) {

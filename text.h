@@ -16,8 +16,8 @@ struct Text : Widget {
     Text(string&& text=string(), int size=16, uint8 opacity=255, uint wrap=0);
     Text(Text&&)____(=default);
 
-    void setText(string&& text) { this->text=move(text); textSize=int2(0,0); }
-    void setSize(int size) { this->size=size; textSize=int2(0,0); }
+    void setText(string&& text) { this->text=move(text); textSize=0; }
+    void setSize(int size) { this->size=size; textSize=0; }
 
     /// Displayed text
     string text;
@@ -38,9 +38,9 @@ struct Text : Widget {
     bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 
     // Layout bounding box
-    int2 textSize=int2(0,0);
+    int2 textSize=0;
     // Minimal size hint
-    int2 minSize=int2(0,0);
+    int2 minSize=0;
 
     // Characters to render
     struct Character { int2 pos; Image image; };

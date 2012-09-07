@@ -12,7 +12,7 @@
 #include "window.h"
 
 struct Music : Application, Widget {
-    ICON(music) Window window __(this,int2(0,0),"Music"_,musicIcon());
+    ICON(music) Window window __(this,0,"Music"_,musicIcon());
     Sampler sampler;
     AudioOutput audio __( __(&sampler, &Sampler::read) );
     Sequencer seq;

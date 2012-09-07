@@ -6,7 +6,7 @@
 enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, Cursor=1<<14 };
 enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3,
        EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15,
-       StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, PropertyChangeMask=1<<22 };
+       StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, FocusChangeMask=1<<21, PropertyChangeMask=1<<22 };
 enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify };
 enum ModifierMask { Button1Mask=1<<8, AnyModifier=1<<15 };
 enum MapState { IsUnmapped, IsUnviewable, IsViewable };
@@ -16,6 +16,7 @@ enum StackMode { Above,Below,TopIf,BottomIf,Opposite };
 struct Error { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(Error);
 union XEvent {
     struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed;
+    struct { byte detail; uint16 seq; uint window; uint8 mode; } packed focus;
     struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
     struct { byte pad; uint16 seq; uint parent,window; int16 x,y,w,h,border; int8 override_redirect; } packed create;
     struct { byte pad; uint16 seq; uint event,window; int8 override_redirect; } packed map;
@@ -70,6 +71,7 @@ struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint ev
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
 struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
 struct GrabKey { int8 req=33,owner=0; uint16 size=4; uint window; uint16 modifiers=AnyModifier; uint8 keycode, pointerMode=1,keyboardMode=1, pad[3]; };
+struct UngrabKey { int8 req=34; uint8 keycode; uint16 size=3; uint window; uint16 modifiers=AnyModifier; uint16 pad; };
 struct AllowEvents { int8 req=35, mode=2; uint16 size=2; uint time=0; };
 struct SetInputFocus { int8 req=42,revertTo=1; uint16 size=3; uint window=1; uint time=0; };
 struct CreatePixmap { int8 req=53,depth=32; uint16 size=4; uint pixmap,window; int16 w,h; };

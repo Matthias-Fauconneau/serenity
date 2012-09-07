@@ -16,7 +16,7 @@ struct ScrollArea : Widget {
     //void ensureVisible(Widget& target);
     /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
-    int2 delta, dragStart, flickStart;
+    int2 delta=0, dragStart, flickStart;
 
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
