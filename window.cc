@@ -215,8 +215,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
-            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None))
-                wait();
+            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None)) wait();
         }
         else if(type==Expose) { if(!e.expose.count) wait(); }
         else if(type==UnmapNotify) mapped=false;

@@ -62,19 +62,23 @@ struct MP3Media : AudioMedia {
 /// FLAC audio decoder
 struct FLACMedia : AudioMedia, FLAC {
     Map file;
-    uint blockPosition=0; //position of last decoded FLAC frame in samples
+    uint blockPosition=0; //position of next FLAC block in samples
     float* block=0;
     FLACMedia(){}
     FLACMedia(int fd) { file=mapFile(fd); start(file); AudioMedia::rate=FLAC::rate; AudioMedia::channels=FLAC::channels; }
     int position() { return blockPosition/FLAC::rate; }
     int duration() { return FLAC::duration/FLAC::rate; }
-    void seek(int position) { if(position<this->position()) start(file); while(position>this->position()) readBlock(); }
+    void seek(int position) {
+        blockSize=0;
+        if(position<this->position()) start(file), blockPosition=0;
+        while(position>this->position()) readBlock(), block=buffer, blockPosition+=blockSize;
+    }
     bool read(float* out, uint size) {
         while(size > blockSize) {
-            if(blockPosition+blockSize >= FLAC::duration) return false;
             for(float* end=out+2*blockSize; out<end; block++, out++) out[0]=block[0];
             size -= blockSize;
-            blockPosition+=blockSize; readBlock(); block=buffer;
+            if(blockPosition >= FLAC::duration) return false;
+            readBlock(); block=buffer; blockPosition+=blockSize;
         }
         for(float* end=out+2*size; out<end; block++, out++) out[0]=block[0];
         blockSize -= size;

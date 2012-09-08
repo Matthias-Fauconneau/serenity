@@ -9,7 +9,9 @@
 #ifdef PDF
 #include "pdf.h"
 #endif
+
 #include "window.h"
+#include "interface.h"
 
 struct Music : Application, Widget {
     ICON(music) Window window __(this,0,"Music"_,musicIcon());
@@ -29,11 +31,11 @@ struct Music : Application, Widget {
     Music() {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         window.localShortcut(Escape).connect(this,&Application::quit);
-        window.bgCenter=window.bgOuter=0;
         for(ref<byte> path : arguments()) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
                 sampler.open(path);
+                sampler.progressChanged.connect(this,&Music::showProgress);
                 seq.noteEvent.connect(&sampler,&Sampler::queueEvent);
             }
 #if MIDI
@@ -74,8 +76,17 @@ struct Music : Application, Widget {
         window.show();
         sampler.lock();
         audio.start(true);
-        setPriority(-20);
     }
-    void render(int2, int2){}
+    int current=0,count=0;
+    void render(int2 position, int2 size){ if(current!=count) Progress(0,count,current).render(position,size); }
+    void showProgress(int current, int count) {
+        log(current,count);
+        this->current=current; this->count=count; window.render(); //display loading progress
+        if(current==count) { //loading completed
+            //window.bgCenter=window.bgOuter=0; //set black background
+            //window.bgCenter=window.bgOuter=0xFF; //set white background
+            setPriority(-20); //raise priority
+        }
+    }
 };
 Application(Music)

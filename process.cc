@@ -52,10 +52,11 @@ void Poll::wait() { queue+= this; }
 
 int dispatchEvents() {
     if(!polls) return 0;
-    while(queue){ Poll* poll=queue.take(0); poll->revents=IDLE; poll->event(); }
     uint size=polls.size();
     pollfd pollfds[size]; for(uint i=0;i<size;i++) { pollfds[i]=*polls[i];  assert(polls[i]->fd==pollfds[i].fd); }
-    ::poll(pollfds,size,-1);
+    while(queue){ Poll* poll=queue.take(0); poll->revents=IDLE; poll->event(); assert(size==polls.size()); if(::poll(pollfds,size,0)) goto break_; }
+    /*else*/ ::poll(pollfds,size,-1);
+    break_:;
     Poll* polls[size]; copy(polls,::polls.data(),size);
     for(uint i=0;i<size;i++) {
         Poll* poll=polls[i];

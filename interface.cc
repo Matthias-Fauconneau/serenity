@@ -29,11 +29,11 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, MouseButton but
 
 //void ScrollArea::ensureVisible(Widget& target) { delta = max(-target.position, min(size-(target.position+target.size), widget().position)); }
 
-/// Slider
+/// Progress
 
-int2 Slider::sizeHint() { return int2(-height,height); }
+int2 Progress::sizeHint() { return int2(-height,height); }
 
-void Slider::render(int2 position, int2 size) {
+void Progress::render(int2 position, int2 size) {
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = size.x*uint(value-minimum)/uint(maximum-minimum);
         fill(position+Rect(int2(0,1), int2(x,size.y-2)), lighten);
@@ -42,6 +42,8 @@ void Slider::render(int2 position, int2 size) {
         fill(position+Rect(0, size), darken);
     }
 }
+
+/// Slider
 
 bool Slider::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
     if((event == Motion || event==Press) && button==LeftButton) {

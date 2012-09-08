@@ -69,9 +69,9 @@ void FLAC::start(const ref<byte>& buffer) {
         if(blockType==STREAMINFO) {
             assert(size=0x22);
             skip(16+16+24+24);
-            int unused sampleRate = binary(20); assert(sampleRate==48000);
+            rate = binary(20); assert(rate == 44100 || rate==48000);
             int unused channels = binary(3)+1; assert(channels==2);
-            int unused bitsPerSample = binary(5)+1; assert(bitsPerSample==24);
+            sampleSize = binary(5)+1; assert(sampleSize==16);
             duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
             skip(128); //MD5
         } else skip(size*8);
@@ -123,7 +123,7 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
 #else
         {//filter using unaligned context
             double2 sum = {0,0};
-            for(uint i=0;i<unroll;i++) sum += kernel[i] * loadu_pd(context+2*i); //unrolled loop (for even samples)
+            for(uint i=0;i<unroll;i++) sum += kernel[i] * loadu_pd(context+2*i); //unrolled loop
             int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
             context[2*unroll]= (double)sample; context++; odd++; //write out context (misalign context, align odd)
             *out = sample; out++; //write out decoded sample
@@ -139,15 +139,15 @@ void FLAC::readBlock() {
     int blockSize_[16] = {0, 192, 576,1152,2304,4608, -8,-16, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768};
     int blockSize = blockSize_[binary(4)];
     int sampleRate_[16] = {0, 88200, 176400, 192000, 8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, -1, -2, -20 };
-    int unused sampleRate = sampleRate_[binary(4)]; assert(sampleRate==48000);
+    uint unused rate = sampleRate_[binary(4)]; assert(rate==this->rate);
     enum { Independent=1, LeftSide=8, RightSide=9, MidSide=10 };
     int channels = binary(4); assert(channels==Independent||channels==LeftSide||channels==MidSide||channels==RightSide,channels);
     int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
-    int sampleSize = sampleSize_[binary(3)]; assert(sampleSize==24); //FIXME
+    uint sampleSize = sampleSize_[binary(3)]; assert(sampleSize==this->sampleSize);
     int unused zero = bit(); assert(zero==0);
     int unused frameNumber = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;
-    assert(blockSize>0&&uint(blockSize)<=sizeof(buffer)/sizeof(int2),blockSize);
+    assert(blockSize>0&&uint(blockSize)<=maxBlockSize,blockSize);
     skip(8);
 
     int block[2][blockSize];
@@ -180,11 +180,11 @@ void FLAC::readBlock() {
         if (type >= 32) { //LPC
             order = (type&~0x20)+1; assert(order>0 && order<=32,order);
             for(;i<order;i++) context[i]=odd[i]= *out++ = sbinary(rawSampleSize);
-            int precision = binary(4)+1; assert(precision==15,precision);
+            int precision = binary(4)+1; assert(precision<=15,precision);
             shift = sbinary(5); assert(shift>=0);
             for(uint i=0;i<order;i++) predictor[order-1-i]= sbinary(precision);
         } else if(type>=8 && type <=12) { //Fixed
-            order = type & ~0x8; assert(order>0 && order<=4);
+            order = type & ~0x8; assert(order>=0 && order<=4,order);
             for(;i<order;i++) context[i]=odd[i]= *out++ = sbinary(rawSampleSize);
             if(order==1) predictor[0]=1;
             else if(order==2) predictor[0]=-1, predictor[1]=2;

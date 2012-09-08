@@ -3,6 +3,7 @@
 #include "file.h"
 #include "resample.h"
 #include "flac.h"
+#include "process.h"
 
 struct Sample {
     Map data; //Sample Definition
@@ -12,17 +13,18 @@ struct Sample {
 
 struct Note : FLAC {
     float* block; //current position in FLAC::buffer (last decoded FLAC block)
-    int remaining; // remaining frames before release or decay
-    int release; int key; int layer; int velocity; float level; // \sa Sample
-    template<bool mix> void Note::read(float* out, int size);
+    uint remaining; // remaining frames before release or decay
+    uint release; int key; int layer; int velocity; float level; // \sa Sample
+    Note(const ref<byte>& buffer):FLAC(buffer){}
+    template<bool mix> void read(float* out, uint size);
 };
 
-struct Sampler {
+struct Sampler : Poll {
     //FIXME: resampling is rounded to feed same input size for each period (causing a tuning relative error of 1/period)
     //FIXME: on the other hand, samples can only begin at the start of each period
     static constexpr uint period = 512; // every 11ms (94Hz), 3 cents error
 
-    array<Sample> samples; //88*16
+    array<Sample> samples;
     array<Note> active;
     struct Event { int key,velocity; }; array<Event> queue; //starting all release samples at once when releasing pedal might trigger an overrun
     struct Layer { float* buffer=0; uint size=0; bool active=false; Resampler resampler; } layers[3];
@@ -32,10 +34,15 @@ struct Sampler {
     operator bool() const { return samples.size(); }
 
     void open(const ref<byte>& path);
+
     void lock();
+    uint full=0,available=0,current=0;
+    void event();
+    signal<int, int> progressChanged;
+
     void queueEvent(int key, int velocity);
     void processEvent(Event e);
-    void read(int16* output, uint size);
-    void recordWAV(const string& path);
+    bool read(int16* output, uint size);
+    void recordWAV(const ref<byte>& path);
     ~Sampler();
 };

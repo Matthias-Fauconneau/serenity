@@ -3,7 +3,7 @@
 #include "vector.h"
 
 /// Decodes packed bitstreams
-struct BitReader : array<byte> {
+struct BitReader {
     const byte* data=0;
     uint bsize=0;
     uint index=0;
@@ -26,13 +26,17 @@ struct BitReader : array<byte> {
 };
 
 struct FLAC : BitReader {
-    FLAC(){}
-    const uint rate = 48000;
+    uint rate = 0;
     const uint channels = 2;
+    uint sampleSize = 0;
+
     uint duration=0;
-    float* buffer = allocate<float>(2*8192); //64K
-    ~FLAC(){unallocate<float>(buffer,2*8192);}
+    static const uint maxBlockSize = 8192;
+    float* buffer = allocate<float>(channels*maxBlockSize); //64K
     uint blockSize=0;
+
+    ~FLAC(){unallocate<float>(buffer,channels*maxBlockSize);}
+
     /// Reads header and prepare to read frames
     void start(const ref<byte>& buffer);
     /// Decodes next FLAC block

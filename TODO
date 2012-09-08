@@ -1,4 +1,4 @@
-player: 16bit flac
+player: 16bit flac, ffmpeg
 font: grid fit
 pdf,ebook -> touchbook
 IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion

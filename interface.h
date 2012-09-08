@@ -74,20 +74,26 @@ struct ToggleButton : Widget {
     Image disableIcon;
 };
 
-/// Slider is a Widget to show or control a bounded value
-struct Slider : Widget {
-    /// \a minimum and \a maximum displayable/settable value
-    int minimum = 0, maximum = 0;
-    /// current \a value shown by the slider
-    int value = -1;
-    /// User edited the \a value
-    signal<int> valueChanged;
+/// Progress is a Widget to show a bounded value
+struct Progress : Widget {
+    int minimum, maximum;
+    /// current \a value shown by the progress bar
+    int value;
+
+    Progress(int minimum=0, int maximum=0, int value=-1):minimum(minimum),maximum(maximum),value(value){}
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 
     static const int height = 32;
+};
+
+/// Slider is a Widget to show and control a bounded value
+struct Slider : Progress {
+    /// User edited the \a value
+    signal<int> valueChanged;
+
+    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 };
 
 /// Item is an icon with text
