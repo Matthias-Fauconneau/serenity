@@ -106,7 +106,8 @@ struct Taskbar : Application, Poll {
         } else if(type == UnmapNotify) { uint id=e.unmap.window;
             windows.removeAll(id);
             uint i = tasks.removeOne(id);
-            if(i!=uint(-1) && tasks.index == i) { tasks.index=tasks.indexOf(windows.last()); setFocus(windows.last()); }
+            if(i!=uint(-1) && tasks.index == i) tasks.index=tasks.indexOf(windows.last());
+            setFocus(windows.last());
         } else if(type==MapNotify) { uint id=e.map.window;
             setFocus(id);
             int i = tasks.indexOf(id); if(i<0) i=addWindow(id); if(i<0) return; tasks.index=i;
@@ -131,7 +132,7 @@ struct Taskbar : Application, Poll {
             }
             if(c.valueMask&StackMode) {ConfigureWindow r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; r.stackMode=e.configure_request.stackMode; send(raw(r));}
             else {SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}
-            return;
+            if(i<0) return;
         } else if(type==PropertyNotify) { uint id=e.property.window;
             if(e.property.atom==Atom("_NET_WM_NAME"_)) {
                 int i = tasks.indexOf(id); if(i<0) i=addWindow(id); if(i<0) return;

@@ -32,7 +32,6 @@ void Sampler::open(const ref<byte>& path) {
             if(key=="sample"_) {
                 ref<byte> path = replace(value,"\\"_,"/"_);
                 sample->data = mapFile(path,folder);
-                madvise((void*)sample->data.data, sample->data.size, MADV_SEQUENTIAL);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, sample->release=0; }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -117,47 +116,47 @@ void Sampler::processEvent(Event e) { int key=e.key, velocity=e.velocity;
     if(!elapsed) error("Missing sample"_,key,velocity);
 }
 
+template<bool mix> void Note::read(float* out, int size) {
+#define mix(expr) ({float s=expr; if(mix) out[0]+=s; else out[0]=s; })
+    if(!release || remaining >= release+size) { //sustain
+        while(size > blockSize && remaining > blockSize) {
+            for(float* end=out+2*blockSize; out<end; block++, out++) mix(level * block[0]);
+            remaining -= blockSize;
+            size -= blockSize;
+            readBlock(); block=buffer;
+        }
+        if(remaining<size) size=remaining;
+        for(float* end=out+2*size; out<end; block++, out++) mix(level * block[0]);
+        remaining -= size;
+        if(!mix) for(;out<end;out++) out[0]=0;
+        blockSize -= size;
+    } else { //release
+        float reciprocal = level / release;
+        while(size > blockSize && remaining > blockSize) {
+            for(float* end=out+2*blockSize; out<end; remaining--, block++, out++) mix(min(release,remaining)*reciprocal * block[0]);
+            size -= blockSize;
+            readBlock(); block=buffer;
+        }
+        if(remaining<size) size=remaining;
+        for(float* end=out+2*size; out<end; remaining--, block++, out++) mix(min(release,remaining)*reciprocal * block[0]);
+        if(!mix) for(;out<end;out++) out[0]=0;
+        blockSize -= size;
+    }
+}
+
 void Sampler::read(int16 *output, uint unused size) {
     assert(size==period,"Sampler supports only fixed size period of", period,"frames, trying to read",size,"frames");
     if(queue) processEvent(queue.take(0));
     timeChanged(time);
     for(Layer& layer : layers) layer.active=false;
-    for(uint i=0;i<active.size();i++) { Note& n = active[i];
+    for(uint i=0;i<active.size();) { Note& n = active[i];
         Layer& layer = layers[n.layer];
-        int frame = layer.size;
-        if(!layer.active) { clear(layer.buffer, 2*layer.size); layer.active = true; } //clear if first note in layer
-        if(!n.release || n.remaining >= n.release+frame) { //sustain
-            float* out = layer.buffer; assert(out);
-            while(frame > n.blockSize && n.remaining > n.blockSize) {
-                int* in = (int*)(n.buffer+n.position);
-                for(int i=0; i<2*n.blockSize; i++) out[i] += n.level * float(in[i]);
-                out += 2*n.blockSize; n.remaining -= n.blockSize; frame -= n.blockSize;
-                n.readFrame();
-            }
-            int* in = (int*)(n.buffer+n.position); assert(in);
-            for(int i=0; i<2*frame && n.remaining>=0; i++, n.remaining--)  out[i] += n.level * float(in[i]);
-            n.position += frame;
-            n.blockSize -= frame;
-        } else { //release
-            float reciprocal = n.level / n.release;
-            float* out = layer.buffer;
-            while(frame > n.blockSize && n.remaining > n.blockSize) {
-                int* in = (int*)(n.buffer+n.position);
-                for(int i=0; i<2*n.blockSize && n.remaining>=0; i++,n.remaining--) out[i] += min(n.release,n.remaining)*reciprocal * float(in[i]);
-                out += 2*n.blockSize; frame -= n.blockSize;
-                n.readFrame();
-            }
-            int* in = (int*)(n.buffer+n.position);
-            for(int i=0; i<2*frame && n.remaining>=0; i++,n.remaining--) out[i] += min(n.release,n.remaining)*reciprocal * float(in[i]);
-            n.position += frame;
-            n.blockSize -= frame;
-        }
-        if(n.remaining <= 0) { active.removeAt(i); i--; continue; } //released
+        n.sample<layer.active>(layer.buffer,layer.size);  layer.active = true;
+        if(n.remaining <= 0) active.removeAt(i); else i++; //cleanup released or decayed notes
     }
     bool anyActive = layers[1].active;
     for(int i=0;i<=2;i+=2) { if(!layers[i].active) continue;
-        int in = layers[i].size, out = period;
-        layers[i].resampler.filter(layers[i].buffer,&in, layers[1].buffer, &out, anyActive);
+        layers[i].resampler.filter(layers[i].buffer, layers[i].size, layers[1].buffer, period, anyActive);
         anyActive=true; //directly mix if unresampled layer or any previous layer is active
     }
     if(anyActive) {

@@ -27,9 +27,10 @@ layout.cc
 text.h
 text.cc
 
+flac.h
+flac.cc
+mpg123.h
 mpg123.cc
-ffmpeg.cc
-ffmpeg.h
 asound.cc
 asound.h
 resample.cc

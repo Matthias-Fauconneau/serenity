@@ -1,13 +1,13 @@
 #include "font.h"
 
 /// Fixed point rounding
-inline int truncate(int width, uint value) { return value/width*width; }
-inline int floor(int width, int value) { return value>=0?truncate(width,value):-align(width,-value); }
-inline int round(int width, int value) { return floor(width,value+width/2); }
-inline int ceil(int width, int value) { return value>=0?align(width,value):-truncate(width,-value); }
+inline constexpr int truncate(int width, uint value) { return value/width*width; } //towards 0
+inline constexpr int floor(int width, int value) { return value>=0?truncate(width,value):-truncate(width,-value+width-1); } //towards negative
+inline constexpr int round(int width, int value) { return  value>=0?truncate(width,value+width/2):-truncate(width,-value+width/2); } //0.5 rounds away from 0
+inline constexpr int ceil(int width, int value) { return value>=0?truncate(width,value+width-1):-truncate(width,-value); } //towards positive
 
 /// Gamma correction lookup table
-constexpr uint8 gamma[257] = { 0, 12, 21, 28, 33, 38, 42, 46, 49, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 81, 82, 84, 86, 88, 89, 91, 93, 94, 96, 97, 99, 100, 102, 103, 104, 106, 107, 109, 110, 111, 112, 114, 115, 116, 117, 118, 120, 121, 122, 123, 124, 125, 126, 127, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 151, 152, 153, 154, 155, 156, 157, 157, 158, 159, 160, 161, 161, 162, 163, 164, 165, 165, 166, 167, 168, 168, 169, 170, 171, 171, 172, 173, 174, 174, 175, 176, 176, 177, 178, 179, 179, 180, 181, 181, 182, 183, 183, 184, 185, 185, 186, 187, 187, 188, 189, 189, 190, 191, 191, 192, 193, 193, 194, 194, 195, 196, 196, 197, 197, 198, 199, 199, 200, 201, 201, 202, 202, 203, 204, 204, 205, 205, 206, 206, 207, 208, 208, 209, 209, 210, 210, 211, 212, 212, 213, 213, 214, 214, 215, 215, 216, 217, 217, 218, 218, 219, 219, 220, 220, 221, 221, 222, 222, 223, 223, 224, 224, 225, 226, 226, 227, 227, 228, 228, 229, 229, 230, 230, 231, 231, 232, 232, 233, 233, 234, 234, 235, 235, 236, 236, 237, 237, 237, 238, 238, 239, 239, 240, 240, 241, 241, 242, 242, 243, 243, 244, 244, 245, 245, 245, 246, 246, 247, 247, 248, 248, 249, 249, 250, 250, 251, 251, 251, 252, 252, 253, 253, 254, 254, 254, 255 };
+constexpr uint8 sRGB[257] = { 0, 12, 21, 28, 33, 38, 42, 46, 49, 52, 55, 58, 61, 63, 66, 68, 70, 73, 75, 77, 79, 81, 82, 84, 86, 88, 89, 91, 93, 94, 96, 97, 99, 100, 102, 103, 104, 106, 107, 109, 110, 111, 112, 114, 115, 116, 117, 118, 120, 121, 122, 123, 124, 125, 126, 127, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 151, 152, 153, 154, 155, 156, 157, 157, 158, 159, 160, 161, 161, 162, 163, 164, 165, 165, 166, 167, 168, 168, 169, 170, 171, 171, 172, 173, 174, 174, 175, 176, 176, 177, 178, 179, 179, 180, 181, 181, 182, 183, 183, 184, 185, 185, 186, 187, 187, 188, 189, 189, 190, 191, 191, 192, 193, 193, 194, 194, 195, 196, 196, 197, 197, 198, 199, 199, 200, 201, 201, 202, 202, 203, 204, 204, 205, 205, 206, 206, 207, 208, 208, 209, 209, 210, 210, 211, 212, 212, 213, 213, 214, 214, 215, 215, 216, 217, 217, 218, 218, 219, 219, 220, 220, 221, 221, 222, 222, 223, 223, 224, 224, 225, 226, 226, 227, 227, 228, 228, 229, 229, 230, 230, 231, 231, 232, 232, 233, 233, 234, 234, 235, 235, 236, 236, 237, 237, 237, 238, 238, 239, 239, 240, 240, 241, 241, 242, 242, 243, 243, 244, 244, 245, 245, 245, 246, 246, 247, 247, 248, 248, 249, 249, 250, 250, 251, 251, 251, 252, 252, 253, 253, 254, 254, 254, 255 };
 #if 0
 #define pow __builtin_pow
 inline float sRGB(float c) { if(c>=0.0031308f) return 1.055f*pow(c,1/2.4f)-0.055f; else return 12.92f*c; }
@@ -17,9 +17,13 @@ int main() {  for(int i=0;i<=256;i++) write(1,string(str(min(255,int(255*sRGB(i/
 static int fonts() { static Folder fd = openFolder("usr/share/fonts"_); return fd; }
 
 /// Enable automatic grid fitting
-bool fit;
+int fit=0;
+/// Disable LCD filtering
+int nofilter=0;
 /// 2x nearest upsample for debugging
-bool up;
+int up=0;
+/// enable luminance correction
+int correct=0;
 
 Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
     DataStream s = DataStream(keep, true);
@@ -93,7 +97,7 @@ uint16 Font::index(uint16 code) {
     error("Not Found"_);
 }
 
-int Font::advance(uint16 index) { return (up?2:1)*scale(big16(hmtx[2*index])); }
+int Font::advance(uint16 index) { return (up?:1)*scale(big16(hmtx[2*index])); }
 
 int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     kern.seek(0); DataStream& s = kern;
@@ -105,7 +109,7 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
         assert(14+nPairs*6==length);
         for(uint i=0;i<nPairs;i++) {
             uint16 left=s.read(), right=s.read(); int16 value=s.read();
-            if(left==leftIndex && right==rightIndex) return (up?2:1)*scale(value);
+            if(left==leftIndex && right==rightIndex) return (up?:1)*scale(value);
         }
     }
     return 0;
@@ -150,25 +154,6 @@ void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
     }
 }
 
-template<class T> T& min_(T& a, T& b) { assert(a!=b,a); return a<b ? a : b; }
-template<class T> T& max_(T& a, T& b) { assert(a!=b,a); return a>b ? a : b; }
-struct Stem { int& a; int& b; int& n; int& N; };
-void fitStem(int I, array<Stem>& stems, int2& A, int2& B, int unused max) {
-    int& a=A.x; int& b=B.x; int& n=A.y; int& N=B.y;
-    for(Stem& s: stems) { //fit horizontal stems size (TODO: fit position, best not first)
-        if((a>b) != (s.a<s.b)) continue; //only opposite directions (same stem)
-        if(n==s.n) continue; //assert(n!=s.n,n,a,b,A,B);
-        int& n1=min_(n,s.n); int& N1=min_(N,s.N);
-        int& n2=max_(n,s.n); int& N2=max_(N,s.N);
-        int m = ::round(I,(n1+n2)/2), w = ::round(I,n2-n1);
-        n1=N1=m-floor(I,w/2), n2=N2=m+ceil(I,w/2)-1;
-        assert(n1%I==0,n1,m,w,floor(I,w/2)); assert((n2+1)%I==0,n2+1,(n2+1)/I,(n2+1)%I,m,w);
-        assert(n1<max,n1,max); assert(n2<max,n2,max);
-        break;
-    }
-    stems<<Stem __(a,b,n,N);
-}
-
 void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
     int pointer = ( indexToLocFormat? big32(((uint32*)loca)[index]) : 2*big16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? big32(((uint32*)loca)[index+1]) : 2*big16(((uint16*)loca)[index+1]) ) - pointer;
@@ -182,7 +167,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
         yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
         int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin); assert(width>0,xMax,xMin); assert(height>0,yMax,yMin);
-        if(fit) new (&raster) Bitmap(width+16,height+16);
+        if(fit) new (&raster) Bitmap(width+2*48,height+3*16); //new (&raster) Bitmap(width+48,height+16);
         else new (&raster) Bitmap(width+1,height+1);
     } else s.advance(4*2); //TODO: resize as needed
 
@@ -227,17 +212,114 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
             p.y=scaleY(xy*p.x/16384+yy*p.y/16384+dy);
         }
 
+        // Fit
         if(fit) {
             // Fit (TODO: align baseline and x-height to avoid overshoot (blue zone = xzroesc), align horizontal stems, align vertical stems width)
-            array<Stem> hStems; array<Stem> vStems;
-            for(int n=0,i=0; n<numContours; n++) {
-                int last= big16(endPtsOfContours[n]);
-                for(int prev=last; i<=last; i++) {
-                    int2& A = P[prev]; int2& B=P[i];
-                    if(A==B) continue;
-                    if(A.y==B.y) fitStem(16,hStems,A,B,raster.height); //vertically fit horizontal stems
-                    if(A.x==B.x) fitStem(48,vStems,A,B,raster.width); //horizontally fit horizontal stems
-                    prev=i;
+            struct Stem {
+                array<int2> tn; //array of points in (tangent, normal) coordinates
+                array<int> ref; //array of original references to the points
+                int pos=0,min=1<<30,max=0; int direction=0;
+                int size() {assert(tn.size()==ref.size()); return tn.size(); }
+            };
+            for(int pass=0;pass<2;pass++) { //vertically fit horizontal stems (then horizontally fit vertical stems)
+                int I = pass?48:16;
+                int M = pass?raster.width:raster.height;
+#define xy(p) (pass?int2(p.y,p.x):p)
+                array<Stem> stems;
+                for(int n=0,i=0; n<numContours; n++) { //create stems from points
+                    int first=i;
+                    int last= big16(endPtsOfContours[n]);
+                    for(; i<=last; i++) {
+                        int2 n=xy(P[i]); int x=n.x,y=n.y;
+                        for(Stem& s: stems) {
+                            for(int2 a: s.tn) if(12*abs(a.y-y)>abs(a.x-x)) goto break2_;
+                            /*else*/ {
+                                if((s.ref.contains(first) && !(s.ref.last()==first && i==first+1)) ||
+                                        (s.direction && ((((s.direction==1?s.min:s.max)<x)?1:-1)!=s.direction))) { //stem cut by contour loop seam
+                                    if(!s.direction){ assert(s.size()==1);
+                                        s.tn.insertAt(0,n); s.ref.insertAt(0,i);
+                                        s.direction = s.tn.first().x<s.tn.last().x?1:-1;
+                                        //log(pass,s.direction,s.tn,s.ref);
+                                        int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
+                                    } else {
+                                        int j=0; for(;j<s.size() && (x<s.tn[j].x?1:-1)!=s.direction;j++) //log(x,s.tn[j].x,s.direction, (n<s.tn[j]?1:-1)!=s.direction);
+                                        //log(n,s.tn[j],(n<s.tn[j]?1:-1),j<s.size(),(n<s.tn[j]?1:-1)!=s.direction);
+                                        s.tn.insertAt(j,n); s.ref.insertAt(j,i); //log(s.tn);
+                                        int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { //assert monotonic
+                                            assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn,j);
+                                            a=b;
+                                        }
+                                    }
+                                } else if(x<s.min || x>s.max) {
+                                    assert(!s.direction || (s.tn[0].x<x?1:-1)==s.direction,s.tn,n,s.ref[0],first,i,last); //assert new is extremum
+                                    s.tn<<n; s.ref<<i;
+                                    if(!s.direction){
+                                        s.direction = s.tn.first().x<s.tn.last().x?1:-1;
+                                        int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
+                                    }
+                                    //log(pass,s.direction,s.tn,s.ref);
+                                    int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn,s.ref,first,last); a=b; }  //assert monotonic
+                                }
+                                s.min=min(s.min,x); s.max=max(s.max,x); s.pos+=y;
+                                goto break3_;
+                            }break2_:;
+                        } /*else*/ {
+                            Stem s; s.tn<<n; s.ref<<i; s.min=s.max=x; s.pos=y; stems<<move(s);
+                        }break3_:;
+                    }
+                }
+
+                for(uint i=0;i<stems.size();) { Stem& s=stems[i];
+                    if(s.size()==1) { stems.removeAt(i); continue; } else i++;
+                    s.pos/=s.size(); //TODO: weighted mean
+                }
+
+                while(stems) { //fit stems
+                    uint best[2]={uint(-1),uint(-1)}; uint min=-1;
+                    for(uint i=0;i<stems.size();i++) for(uint j=0;j<i;j++) { Stem& a = stems[i]; Stem& b=stems[j];
+                        assert(a.direction); assert(b.direction); assert(a.pos!=b.pos || a.direction != b.direction,a.tn," - ",b.tn);
+                        //assert(a.direction==b.direction || (b.pos-a.pos>0)==b.direction,pass,a.direction,a.tn,b.direction,b.tn);
+                        if(a.direction != b.direction && ((a.pos-b.pos)>0)==(a.direction==1) && uint(abs(a.pos-b.pos))<min) min=abs(a.pos-b.pos), best[0]=i, best[1]=j;
+                        //else if(a.direction != b.direction) log("miss",pass,a.direction,a.tn,b.direction,b.tn,a.pos-b.pos,a.max-a.min,b.max-b.min);
+                    }
+                    if(best[0]==uint(-1)) {
+                        if(stems.size()>=2) {
+                            if(stems.size()==2) { Stem& a=stems[0], &b=stems[1];
+                                log("X",pass,"\t","A",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t","B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max);
+                            } else { log("X",pass);
+                                for(Stem& a: stems) log(a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t",a.tn);
+                            }
+                        }
+                        for(Stem& a: stems) {
+                            for(uint i=0;i<a.tn.size();i++) {
+                                int2 p=a.tn[i]; p.y = clip(0,::round(I,p.y)/*-(a.direction==-1)*/,M-1); //iff end point
+                                P[a.ref[i]]=xy(p);
+                            }
+                        }
+                        break;
+                    }
+                    Stem a=stems.take(best[0]);
+                    assert(best[0]>best[1]);
+                    Stem b=stems.take(best[1]);
+                    if(a.pos>b.pos) swap(a,b);
+
+                    int m = ::round(I,(a.pos+b.pos)/2+I/2)-I/2; //round to nearest %I==I/2 step
+                    int w = ::round(I,(b.pos-a.pos)/2+I/2)-I/2; //round to nearest %I==I/2 step
+                    int t1=m-w, t2=m+w;
+                    log(pass,"\t","A",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t","B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max);
+                    assert(t1<t2,t1,t2);
+                    assert(t1%I==0,m,w,t1,t2);
+                    assert((t2)%I==0);
+                    t1=clip(0,t1,M-1); t2=clip(0,t2,M-1);
+
+                    for(uint i=0;i<a.tn.size();i++) {
+                        int2 p=a.tn[i]; p.y = t1;
+                        P[a.ref[i]]=xy(p);
+                    }
+                    for(uint i=0;i<b.tn.size();i++) {
+                        int2 p=b.tn[i]; p.y = t2;
+                        P[b.ref[i]]=xy(p);
+                    }
                 }
             }
         }
@@ -277,7 +359,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
 }
 
 const Glyph& Font::glyph(uint16 index, int fx) {
-    if(fit) fx=0; else fx=fx&(16-1);
+    if(fit || nofilter) fx=0; else fx=fx&(16-1);
     // Lookup glyph in cache
     Glyph& glyph = index<128 ? cacheASCII[fx][index] : cacheUnicode[fx][index];
     if(glyph.valid) return glyph;
@@ -299,25 +381,31 @@ const Glyph& Font::glyph(uint16 index, int fx) {
             for(uint c=0; c<3; c++) {
                 int sum=0;
                 for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
-                    sum += acc[j]>0;
                     int idx=-fx*3+(x*3+c)*16+i; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
+                    sum += acc[j]>0;
                 }
                 line[x*3+c]=sum; assert(sum<=256);
             }
         }
         for(uint x=0; x<width; x++) { //LCD subpixel filtering
-            uint8 filter[5] = {1, 4, 6, 4, 1}; if(fit) clear(filter,5), filter[2]=16;
-            uint16 pixel[3]={};
+            uint16 filter[5] = {1, 4, 6, 4, 1}; if(nofilter) clear(filter,5), filter[2]=16;
+            uint16 pixel[3] = {0,0,0};
             for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)width*3) pixel[c]+=filter[i]*line[idx]; }
-            glyph.image(x,y) = byte4(255-gamma[pixel[2]/16],255-gamma[pixel[1]/16],255-gamma[pixel[0]/16],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
+            int r=16*256-pixel[0],g=16*256-pixel[1],b=16*256-pixel[2];
+            if(r||g||b) {
+                int l = (66*r+129*g+25*b); /*standard perceived luminance (also depends on display calibration and lighting condition)*/
+                int v = (85*r+86*g+85*b)/16; /*target luminance (from coverage)*/
+                if(correct) r = min(256,r*v/l), g=min(256,g*v/l), b=min(256,b*v/l); //scale all components to match perceptual intensity to target value
+                else r = r/16, g=g/16, b=b/16;
+                glyph.image(x,y) = byte4(sRGB[b],sRGB[g],sRGB[r],min(255,v)); //sRGB
+            } else glyph.image(x,y) = byte4(0,0,0,255); //full coverage
+            //correct for different color intensity perception (r~0.3,g~0.5,b~0.2), i.e: lighten blue, darken green
+            //const int r=3/*0.3~1/3*/, g=2/*0.5~1/2*/, b=5/*0.2~1/5*/;
+            //glyph.image(x,y) = byte4(255-gamma[pixel[2]/(16*b)],255-gamma[pixel[1]/(16*g)],255-gamma[pixel[0]/(16*r)],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
         }
     }
     if(up){
-        Image image = Image(width*2,height*2);
-        for(uint y=0; y<height; y++) for(uint x=0; x<width; x++) {
-            image(x*2+0,y*2+0)=image(x*2+0,y*2+1)=image(x*2+1,y*2+0)=image(x*2+1,y*2+1)= glyph.image(x,y);
-        }
-        glyph.image=move(image); glyph.offset*=2;
+        glyph.image=resize(glyph.image,up*glyph.image.width,up*glyph.image.height); glyph.offset*=up;
     }
     return glyph;
 }

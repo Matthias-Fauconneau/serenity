@@ -53,14 +53,6 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { return (offset + (width - 1)) & ~(width - 1); }
-
-/// Floating point primitives
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
-
 /// compile \a statements in executable only if \a DEBUG flag is set
 #ifdef DEBUG
 #define debug( statements... ) statements
@@ -76,6 +68,14 @@ void exit_(int) __attribute((noreturn));
 #define error_(message) ({ trace(0,-1); log_(message); exit_(-1); })
 /// Aborts if \a expr evaluates to false and display \a expr
 #define assert_(expr) ({debug( if(!(expr)) error_(#expr); )})
+
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert_((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
+/// Floating point primitives
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
 
 /// initializer_list
 namespace std {

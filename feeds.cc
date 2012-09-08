@@ -5,7 +5,7 @@
 #include "html.h"
 #include "interface.h"
 
-ICON(network) ICON(refresh)
+ICON(network) ICON(feeds)
 
 Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),true)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
     array::reserve(48);
@@ -16,7 +16,7 @@ Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),tr
 
 void Feeds::load() {
     clear(); favicons.clear();
-    *this<<Entry(string(),string(":refresh"_),::resize(refreshIcon(),16,16),string());
+    *this<<Entry(string(),string(":refresh"_),::resize(feedsIcon(),16,16),string("Feeds"_));
     for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
 }
 
@@ -94,5 +94,5 @@ void Feeds::readNext() {
             return;
         }
     }
-    load(); pageChanged(""_,""_,Image()); //return to desktop
+    if(focus==this) focus=0; load(); pageChanged(""_,""_,Image()); //return to desktop
 }

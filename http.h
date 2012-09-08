@@ -14,7 +14,7 @@ struct Socket : virtual Stream, Poll {
     /// Reads /a size bytes from network socket
     virtual array<byte> receive(uint size);
     /// Writes /a buffer to network socket
-    virtual void write(const ref<byte>& buffer);
+    virtual bool write(const ref<byte>& buffer);
     /// Stream
     uint available(uint need) override;
 };
@@ -25,7 +25,7 @@ struct SSLSocket : Socket {
     SSL* ssl=0;
     bool connect(const ref<byte>& host, const ref<byte>& service);
     array<byte> receive(uint size) override;
-    void write(const ref<byte>& buffer) override;
+    bool write(const ref<byte>& buffer) override;
 };
 
 /// Encodes \a input to Base64 to transfer binary data through text protocol

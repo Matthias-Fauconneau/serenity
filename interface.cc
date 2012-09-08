@@ -6,7 +6,7 @@
 
 void ScrollArea::render(int2 position, int2 size) {
     int2 hint = abs(widget().sizeHint());
-    delta = min(int2(0), max(size-hint, delta));
+    delta = min(int2(0,0), max(size-hint, delta));
     widget().render(position+delta, max(hint,size));
 }
 
@@ -14,14 +14,14 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, MouseButton but
     int2 hint = abs(widget().sizeHint());
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
         delta.y += button==WheelUp?-64:64;
-        delta = min(int2(0), max(size-hint, delta));
+        delta = min(int2(0,0), max(size-hint, delta));
         return true;
     }
     if(event==Press && button==LeftButton) { dragStart=cursor, flickStart=delta; }
     if(widget().mouseEvent(cursor-delta,max(hint,size),event,button)) return true;
     if(event==Motion && button==LeftButton && size.y<hint.y) {
         drag=this;
-        delta = min(int2(0), max(size-hint, flickStart+cursor-dragStart));
+        delta = min(int2(0,0), max(size-hint, flickStart+cursor-dragStart));
         return true;
     }
     return false;
@@ -36,8 +36,8 @@ int2 Slider::sizeHint() { return int2(-height,height); }
 void Slider::render(int2 position, int2 size) {
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = size.x*uint(value-minimum)/uint(maximum-minimum);
-        fill(position+Rect(0, int2(x,size.y)), darken);
-        fill(position+Rect(int2(x,0), size), lighten);
+        fill(position+Rect(int2(0,1), int2(x,size.y-2)), lighten);
+        fill(position+Rect(int2(x,1), int2(size.x,size.y-2)), darken);
     } else {
         fill(position+Rect(0, size), darken);
     }

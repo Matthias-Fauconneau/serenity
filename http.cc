@@ -76,12 +76,14 @@ bool Socket::connect(const ref<byte>& host, const ref<byte>& service) {
 void Socket::disconnect() {if(fd) close(fd); unregisterPoll(); }
 
 array<byte> Socket::receive(uint size) { return readUpTo(fd,size); }
-void Socket::write(const ref<byte>& buffer) { ::write(fd,buffer); }
+bool Socket::write(const ref<byte>& buffer) { return ::write(fd,buffer); }
 
 uint Socket::available(uint need) {
     while(need>Stream::available(need)) {
-        if(!poll(this,1,2000)) { warn("wait for",need,"bytes timed out"); break; }
-        (array<byte>&)buffer<<this->receive(max(4096u,need-Stream::available(need)));
+        if(!(poll(this,1,1000) && revents&POLLIN && !(revents&POLLHUP))) { log(revents,"Connection broken"); break; }
+        array<byte> packet=this->receive(max(4096u,need-Stream::available(need)));
+        if(!packet) { log("Empty packet",Stream::available(need),need); break; }
+        (array<byte>&)buffer<<packet;
     }
     return Stream::available(need);
 }
@@ -118,9 +120,9 @@ array<byte> SSLSocket::receive(uint size) {
     buffer.setSize(size);
     return buffer;
 }
-void SSLSocket::write(const ref<byte>& buffer) {
+bool SSLSocket::write(const ref<byte>& buffer) {
     if(!ssl) return Socket::write(buffer);
-    SSL_write(ssl,buffer.data,buffer.size);
+    return SSL_write(ssl,buffer.data,buffer.size)==(int)buffer.size;
 }
 
 /// Base64
@@ -199,13 +201,13 @@ void HTTP::request() {
     assert(state==Connect); state=Request; events=POLLIN|POLLHUP;
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;
-    write( string(request+"\r\n"_) );log("Request",url);
+    if(!write(string(request+"\r\n"_))) {log("Connection broken",url); state=Done; free(this); return; }
 }
 void HTTP::header() {
     string file = cacheFile(url);
     assert(state==Request); state=Header;
     // Status
-    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer); warn("No HTTP",url); state=Done; free(this); return; }
+    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer); log("No HTTP",url); state=Done; free(this); return; }
     int status = toInteger(until(" "_));
     until("\r\n"_);
     if(status==200||status==301||status==302) {}
@@ -243,7 +245,7 @@ void HTTP::header() {
     state = Data;
 }
 void HTTP::event() {
-    if(revents==POLLHUP && state <= Data) { log("Connection broken",url); state=Done; free(this); return; } //TODO: also cleanup never established connections
+    if((revents&POLLHUP) && state <= Data) { log("Connection broken",url); state=Done; free(this); return; } //TODO: also cleanup never established connections
     if(state == Connect) {
         fcntl(fd,F_SETFL,0);
         request();

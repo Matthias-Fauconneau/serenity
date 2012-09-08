@@ -1,24 +1,34 @@
+#include "display.h"
 #include "window.h"
-
-#include "text.h"
 #include "font.h"
+#include "text.h"
 struct FontTest : Application, Widget {
-    Window window __(this,int2(512,512),"Font Test"_);
-    FontTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.bgCenter=window.bgOuter=0xFF; window.show(); }
-    void render(int2 position, int2 size) {
-        static const array< ref<byte> > lines = split(
-                    "The quick brown fox jumps over the lazy dog\n"
+    Image image[2]; int2 size __(5*4*16,2*4*16);
+    Window window __(this,size,"Font Test"_);
+    FontTest(){
+        ref<byte> line =
+                    "G"//"BDGPUI"
+                    //"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    //"The quick brown fox jumps over the lazy dog\n"
                     //"I know that a lot of you are passionate about the civil war\n"
                     //"La Poste Mobile a gagné 4000 clients en six mois\n"
                     //"Fixed subpixel font layout (was broken by justification\n"
-                    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"_,'\n');
-        int i=1; for(ref<byte> line: lines) {
-            int y=(i++)*size.y/(lines.size()+1);
-            extern bool up; up=1; extern bool fit; extern map<int,Font> defaultSans;
-            fit=0; Text(string(line)).render(position+int2(0,y),int2(size.x,up?32:16));
-            defaultSans.clear(); fit=1; Text(string(line)).render(position+int2(0,y+(up?32:16)),int2(size.x,up?32:16));
+                    //"IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
+                    ""_;
+        for(int i=0;i<1;i++) {
+            image[i]=Image(size.x,size.y);
+            framebuffer=share(image[i]); currentClip=Rect(size);
+            fill(Rect(size),white);
+            extern int fit,nofilter,nodown,up,correct; extern map<int,Font> defaultSans;
+            defaultSans.clear(); fit=0; nofilter=1; nodown=0; up=nodown?16:4; correct=i; Text(string(line)).render(int2(0,0*(up*16)),int2(size.x,0));
+            defaultSans.clear(); fit=1; nofilter=1; nodown=0; up=nodown?16:4; correct=i; Text(string(line)).render(int2(0,1*(up*16)),int2(size.x,0));
         }
+        if(!image[1]) image[1]=share(image[0]);
+        window.localShortcut(Escape).connect(this,&Application::quit); window.bgCenter=window.bgOuter=0xFF; window.show();
     }
+    bool toggle=false;
+    void render(int2 position, int2) { blit(position,image[toggle]); }
+    bool mouseEvent(int2, int2, Event event, MouseButton) { if(event==Enter) { toggle=true; return true;} if(event==Leave) {toggle=false; return true;} return false; }
 };Application(FontTest)
 
 /*#include "html.h"

@@ -1,8 +1,11 @@
+player: 16bit flac
 font: grid fit
+pdf,ebook -> touchbook
+IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion
 music: score, auto rt_decay, auto volume, reverb, auto tune
 fibermesh
-own: midi, inflate, jpeg, mp3, ssl
-apps: text editor, file manager, search, imap, pdf, shell, monitor, torrent, video, irc
-parser: attributes (L+S), scoped symbols, GLR
-IDE: build driver (+frepo), syntax highlighting, navigation, completion, git, debugger, profiler, static analyzer, interpreter, compiler
+apps: file manager, search, imap, shell, monitor, torrent, video, irc
+own: make, midi, inflate, jpeg, mp3, ssl
+IDE: git, debugger
 touchbook: hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait
+IDE: static analyzer, interpreter, compiler, profiler

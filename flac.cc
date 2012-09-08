@@ -72,7 +72,7 @@ void FLAC::start(const ref<byte>& buffer) {
             int unused sampleRate = binary(20); assert(sampleRate==48000);
             int unused channels = binary(3)+1; assert(channels==2);
             int unused bitsPerSample = binary(5)+1; assert(bitsPerSample==24);
-            time = (binary(36-24)<<24) | binary(24); //time = binary(36);
+            duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
             skip(128); //MD5
         } else skip(size*8);
         if(last) break;
@@ -112,7 +112,11 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
         {//filter using aligned context for odd samples
             double2 sum = {0,0};
             for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(odd+2*i); //unrolled loop (for odd samples)
+#if __clang__
+            int sample = (int64(sum[0]+sum[1])>>shift) + *out; //add residual to prediction
+#else
             int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
+#endif
             context[2*unroll]=odd[2*unroll]= (double)sample; context++; odd++; //write out context (align context, misalign odd)
             *out = sample; out++; //write out decoded sample
         }
@@ -129,19 +133,17 @@ template<int unroll> void unroll_predictor(uint order, double* predictor, double
 }
 
 uint64 rice=0, predict=0, order=0;
-void FLAC::readFrame() {
-    position=0; //used by sampler
-    //Frame
+void FLAC::readBlock() {
     int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync));
     bool unused variable = bit();
     int blockSize_[16] = {0, 192, 576,1152,2304,4608, -8,-16, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768};
-    blockSize = blockSize_[binary(4)];
+    int blockSize = blockSize_[binary(4)];
     int sampleRate_[16] = {0, 88200, 176400, 192000, 8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, -1, -2, -20 };
     int unused sampleRate = sampleRate_[binary(4)]; assert(sampleRate==48000);
     enum { Independent=1, LeftSide=8, RightSide=9, MidSide=10 };
     int channels = binary(4); assert(channels==Independent||channels==LeftSide||channels==MidSide||channels==RightSide,channels);
     int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
-    int sampleSize = sampleSize_[binary(3)]; assert(sampleSize==24);
+    int sampleSize = sampleSize_[binary(3)]; assert(sampleSize==24); //FIXME
     int unused zero = bit(); assert(zero==0);
     int unused frameNumber = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;
@@ -252,9 +254,10 @@ void FLAC::readFrame() {
     skip(16);
     for(int i=0;i<blockSize;i++) {
         int a=block[0][i], b=block[1][i];
-        if(channels==Independent) buffer[i] = int2(a,b);
-        if(channels==LeftSide) buffer[i] = int2(a,a-b);
-        if(channels==MidSide) a-=b>>1, buffer[i] = int2(a + b, a);
-        if(channels==RightSide) buffer[i] = int2(a+b,b);
+        if(channels==Independent) buffer[2*i+0]=a, buffer[2*i+1]=b;
+        if(channels==LeftSide) buffer[2*i+0]=a, buffer[2*i+1]=a-b;
+        if(channels==MidSide) a-=b>>1, buffer[2*i+0]=a+b, buffer[2*i+1]=a;
+        if(channels==RightSide) buffer[2*i+0]=a+b, buffer[2*i+1]=b;
     }
+    this->blockSize=blockSize;
 }

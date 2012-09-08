@@ -5,7 +5,7 @@
 
 void exit_(int code) { exit(code); }
 void log_(const char* expr) { log(expr); }
-void write(int fd, const ref<byte>& s) { int unused r=write(fd,s.data,s.size); assert(r==(int)s.size,r); }
+bool write(int fd, const ref<byte>& s) { int unused r=check(write(fd,s.data,s.size)); assert(r==(int)s.size,r); return r==(int)s.size; }
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };

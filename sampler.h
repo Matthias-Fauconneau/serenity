@@ -10,10 +10,17 @@ struct Sample {
     int16 pitch_keycenter=60; int32 release=48000; int16 amp_veltrack=100; int16 rt_decay=0; int16 volume=1; //Performance Parameters
 };
 
-struct Note : FLAC { int remaining; int release; int key; int layer; int velocity; float level; };
+struct Note : FLAC {
+    float* block; //current position in FLAC::buffer (last decoded FLAC block)
+    int remaining; // remaining frames before release or decay
+    int release; int key; int layer; int velocity; float level; // \sa Sample
+    template<bool mix> void Note::read(float* out, int size);
+};
 
 struct Sampler {
-    static constexpr uint period = 256;
+    //FIXME: resampling is rounded to feed same input size for each period (causing a tuning relative error of 1/period)
+    //FIXME: on the other hand, samples can only begin at the start of each period
+    static constexpr uint period = 512; // every 11ms (94Hz), 3 cents error
 
     array<Sample> samples; //88*16
     array<Note> active;

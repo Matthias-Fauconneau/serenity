@@ -76,7 +76,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
-        r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
+        r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
@@ -125,15 +125,11 @@ void Window::event() {
         assert(!clipStack);
 
         //feather edges //TODO: client side shadow
+        const bool corner = 1;
         if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-        if(position.x>0) for(int y=0;y<size.y;y++) framebuffer(0,y) /= 2;
-        if(position.x+size.x<display.x-1) for(int y=0;y<size.y;y++) framebuffer(size.x-1,y) /= 2;
+        if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+        if(position.x+size.x<display.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
         if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-        /*//feather corners
-        if(position.x>0 && position.y>0) framebuffer(0,0) /= 2;
-        if(position.x+size.x<display.x-1 && position.y>0) framebuffer(size.x-1,0) /= 2;
-        if(position.x>0 && position.y+size.y<display.y-1) framebuffer(0,size.y-1) /= 2;
-        if(position.x+size.x<display.x-1 && position.y+size.y<display.y-1) framebuffer(size.x-1,size.y-1) /= 2;*/
 
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;

@@ -27,17 +27,16 @@ struct BitReader : array<byte> {
 
 struct FLAC : BitReader {
     FLAC(){}
-    const int sampleRate = 48000;
-    const int channels = 2;
-    const int bitsPerSample = 24;
-    uint time=0;
-    int2 buffer[8192]; //64K
-    int blockSize=0;
-    int position=0;
-    /// Read header and prepare to read frames
+    const uint rate = 48000;
+    const uint channels = 2;
+    uint duration=0;
+    float* buffer = allocate<float>(2*8192); //64K
+    ~FLAC(){unallocate<float>(buffer,2*8192);}
+    uint blockSize=0;
+    /// Reads header and prepare to read frames
     void start(const ref<byte>& buffer);
-    /// Decode next FLAC frame
-    void readFrame();
+    /// Decodes next FLAC block
+    void readBlock();
 };
 
 extern uint64 rice, predict, order;

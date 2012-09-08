@@ -17,15 +17,15 @@ FLAGS_release := -O3 -fomit-frame-pointer
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button
-ICONS_desktop := refresh network shutdown
+ICONS_desktop := feeds network shutdown
 ICONS_player := play pause next
 ICONS_music := music
 SRCS += $(ICONS:%=icons/%)
 
-LIBS_mpg123 = mpg123
+LIBS_player = mpg123
 LIBS_ffmpeg = avformat avcodec
 LIBS_http = ssl
-LIBS_music = asound
+LIBS_sequencer = asound
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

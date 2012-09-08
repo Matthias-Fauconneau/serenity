@@ -35,11 +35,11 @@ template<class R, class... Args> struct function<R(Args...)> {
         static_assert(sizeof(lambda<F,R(Args...)>)<=sizeof(any),"");
         new (any) lambda<F,R(Args...)>(move(f));
     }
-    template<class O> function(O* object, void (O::*pmf)(Args...)) {
+    template<class O> function(O* object, R (O::*pmf)(Args...)) {
         static_assert(sizeof(method<O,R(Args...)>)<=sizeof(any),"");
         new (any) method<O,R(Args...)>(object, pmf);
     }
-    template<class O> function(const O* object, void (O::*pmf)(Args...) const) {
+    template<class O> function(const O* object, R (O::*pmf)(Args...) const) {
         static_assert(sizeof(const_method<O,R(Args...)>)<=sizeof(any),"");
         new (any) const_method<O,R(Args...)>(object, pmf);
     }

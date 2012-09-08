@@ -6,6 +6,7 @@
 map<int,Font> defaultSans;
 map<int,Font> defaultBold;
 map<int,Font> defaultItalic;
+map<int,Font> defaultMono;
 
 /// Layouts formatted text with wrapping, justification and links
 /// \note Characters are positioned with .4 subpixel precision
@@ -42,9 +43,11 @@ struct TextLayout {
         pen.x=0; pen.y+=size;
     }
 
-    TextLayout(const ref<byte>& text, int size, int wrap):size(size<<4),wrap(wrap<<4) {
-        if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
-        Font* font = &defaultSans.at(size);
+    TextLayout(const ref<byte>& text, int size, int wrap, Font* font=0):size(size<<4),wrap(wrap<<4) {
+        if(!font) {
+            if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
+            font = &defaultSans.at(size);
+        }
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->advance(spaceIndex); assert(spaceAdvance);
         uint16 previous=spaceIndex;
@@ -80,6 +83,9 @@ struct TextLayout {
                 } else if(format&Italic) {
                     if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font("dejavu/DejaVuSans-Oblique.ttf"_, size));
                     font = &defaultItalic.at(size);
+                } else if(format&Mono) {
+                    if(!defaultMono.contains(size)) defaultMono.insert(size,Font("dejavu/DejaVuSansMono.ttf"_, size));
+                    font = &defaultMono.at(size);
                 } else {
                     if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
                     font = &defaultSans.at(size);
@@ -173,7 +179,7 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, MouseButton) {
 bool TextInput::mouseEvent(int2 position, int2 size, Event event, MouseButton button) {
     if(event!=Press) return false;
     focus=this;
-    position -= max<int2>(0,(size-textSize)/2);
+    position -= max(int2(0,0),(size-textSize)/2);
     for(cursor=0;cursor<characters.size() && position.x>characters[cursor].pos.x+(int)characters[cursor].image.width/2;cursor++) {}
     if(button==MiddleButton) { string selection=getSelection(); cursor+=selection.size(); text<<move(selection); textSize=0; }
     return true;
