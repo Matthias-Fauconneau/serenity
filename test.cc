@@ -3,25 +3,28 @@
 #include "font.h"
 #include "text.h"
 struct FontTest : Application, Widget {
-    Image image[2]; int2 size __(5*4*16,2*4*16);
+    Image image[2]; int2 size __(8*4*16,8*4*16);
     Window window __(this,size,"Font Test"_);
     FontTest(){
         ref<byte> line =
-                    "G"//"BDGPUI"
-                    //"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                    //"The quick brown fox jumps over the lazy dog\n"
-                    //"I know that a lot of you are passionate about the civil war\n"
-                    //"La Poste Mobile a gagné 4000 clients en six mois\n"
-                    //"Fixed subpixel font layout (was broken by justification\n"
-                    //"IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
-                    ""_;
+                "G"
+                //"PUGR"
+                //"BDGPUI"
+                //"ABCDEFG"
+                //"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                //"The quick brown fox jumps over the lazy dog\n"
+                //"I know that a lot of you are passionate about the civil war\n"
+                //"La Poste Mobile a gagné 4000 clients en six mois\n"
+                //"Fixed subpixel font layout (was broken by justification\n"
+                //"IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
+                ""_;
         for(int i=0;i<1;i++) {
             image[i]=Image(size.x,size.y);
             framebuffer=share(image[i]); currentClip=Rect(size);
             fill(Rect(size),white);
-            extern int fit,nofilter,nodown,up,correct; extern map<int,Font> defaultSans;
-            defaultSans.clear(); fit=0; nofilter=1; nodown=0; up=nodown?16:4; correct=i; Text(string(line)).render(int2(0,0*(up*16)),int2(size.x,0));
-            defaultSans.clear(); fit=1; nofilter=1; nodown=0; up=nodown?16:4; correct=i; Text(string(line)).render(int2(0,1*(up*16)),int2(size.x,0));
+            extern int fit,subpixel,filter,correct,down,up; extern map<int,Font> defaultSans;
+            defaultSans.clear(); fit=0; subpixel=i?3:1; filter=0; correct=0; down=1; up=1; Text(string(line)).render(int2(0,0*(up*16*16/down)),int2(size.x,0));
+            defaultSans.clear(); fit=1; subpixel=i?3:1; filter=0; correct=0; down=1; up=1; Text(string(line)).render(int2(0,1*(up*16*16/down)),int2(size.x,0));
         }
         if(!image[1]) image[1]=share(image[0]);
         window.localShortcut(Escape).connect(this,&Application::quit); window.bgCenter=window.bgOuter=0xFF; window.show();

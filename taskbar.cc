@@ -154,7 +154,6 @@ struct Taskbar : Application, Poll {
     int addWindow(uint id) {
         assert(!tasks.contains(id));
         GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
-        if(wa.overrideRedirect) return -1;
         if(!windows.contains(id)) {
             windows << id;
             {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask|FocusChangeMask; send(raw(r));}

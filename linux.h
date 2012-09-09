@@ -64,9 +64,10 @@
     inline attribute type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) r(r5, arg5) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5))}
 
+//#include "asm/unistd_64.h"
 enum class sys : long {
 #if __x86_64
-    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, madvise=28, shmget, shmat, shmctl,
+    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, shmget=29, shmat, shmctl,
     socket=41, connect, fork=57, vfork, execve, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, setrlimit=160, clock_gettime=228,
     openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283, timerfd_settime=286
 #else
@@ -117,8 +118,13 @@ enum {SOCK_STREAM=1, SOCK_DGRAM};
 enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
-enum {MADV_RANDOM=1,MADV_SEQUENTIAL,MADV_WILLNEED,MADV_DONTNEED};
 enum {TFD_CLOEXEC = 02000000};
+enum {SIGABRT=6, SIGBUS, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM};
+
+constexpr uint IO(uint major, uint minor) { return major<<8 | minor; }
+template<class T> constexpr uint IOW(uint major, uint minor) { return 1<<30 | sizeof(T)<<16 | major<<8 | minor; }
+template<class T> constexpr uint IOR(uint major, uint minor) { return 2<<30 | sizeof(T)<<16 | major<<8 | minor; }
+template<class T> constexpr uint IOWR(uint major, uint minor) { return 3<<30 | sizeof(T)<<16 | major<<8 | minor; }
 
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
@@ -126,14 +132,14 @@ syscall3(int, open, const char*,name, int,oflag, int,perms)
 syscall1(int, close, int,fd)
 syscall2(int, fstat, int,fd, stat*,buf)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
+syscall3(int, lseek, int,fd, long,offset, int,whence)
 
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, munmap, void*,addr, long,len)
 syscall1(void*, brk, void*,new_brk)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
 
-syscall3(int, ioctl, int,fd, long,request, void*,buf)
-syscall3(int, madvise, void*,addr, long,length, int,advice)
+syscall3(int, ioctl, int,fd, long,request, void*,arguments)
 
 #if __i386
 syscall6(int, ipc, uint,call, long,first, long,second, long,third, const void*,ptr, long,fifth)
@@ -152,6 +158,7 @@ syscall0(int, fork)
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
 inline __attribute((noreturn)) int exit(int code) {r(r0,code) volatile register long n asm(rN) = (long)sys::exit; asm volatile(kernel:: "r"(n), "r"(r0)); __builtin_unreachable();}
 syscall4(int, wait4, int,pid, int*,status, int,options, struct rusage*, rusage)
+syscall2(int, kill, int,pid, int,sig)
 
 syscall3(int, fcntl, int,fd, int,cmd, int,param)
 syscall3(int, getdents, int,fd, void*,entry, long,size)

@@ -142,13 +142,13 @@ stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return
 
 template<int base> string utoa(uint n, int pad) {
     assert(base>=2 && base<=16,"Unsupported base"_,base);
-    byte buf[32]; int i=32;
+    byte buf[64]; int i=64;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    while(32-i<pad) buf[--i] = '0';
-    return string(ref<byte>(buf+i,32-i));
+    while(64-i<pad) buf[--i] = '0';
+    return string(ref<byte>(buf+i,64-i));
 }
 template string utoa<2>(uint,int);
 template string utoa<16>(uint,int);

@@ -4,7 +4,9 @@
 #include "file.h"
 #include "stream.h"
 
-enum { SIGABRT=6, SIGIOT, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM };
+void abort() { /*kill(0,SIGABRT); __builtin_unreachable();*/ exit(-1); }
+void write(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
+
 struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
 struct ucontext {
     long flags; ucontext *link; void* ss_sp; int ss_flags; long ss_size;
@@ -14,21 +16,26 @@ struct ucontext {
     long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,eip,cs,efl,uesp,ss;
 #endif
 };
-
 Application* app;
 static void handler(int sig, siginfo* info, ucontext* ctx) {
+    ::write(1,"SIGNAL",6);
+    log("SIGNAL"_);
+    if(sig==SIGFPE) log("Floating-point exception");
     trace(1);
     {Symbol s = findNearestLine((void*)ctx->eip); log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
-    if(sig==SIGSEGV) log("Segmentation fault at "_+str(ptr(info->fault.addr)));
     if(sig==SIGABRT) log("Abort");
+    if(sig==SIGSEGV) log("Segmentation fault at "_+str(ptr(info->fault.addr)));
     if(sig==SIGPIPE) log("Broken pipe");
     if(sig==SIGTERM) { log("Terminated"); app->running=false; return; }
     exit(-1);
 }
 
+#include "fenv.h"
 #undef Application
 Application::Application () {
     assert(!app); app=this;
+    /// Limit stack size to avoid locking system by exhausting memory with recusive calls
+    rlimit limit = {2<<20,2<<20}; setrlimit(RLIMIT_STACK,&limit); //2 MB
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
@@ -37,25 +44,31 @@ Application::Application () {
         uint mask[2] = {0,0};
     } sa;
     sigaction(SIGABRT, &sa, 0, 8);
+    sigaction(SIGFPE, &sa, 0, 8);
     sigaction(SIGSEGV, &sa, 0, 8);
-    sigaction(SIGTERM, &sa, 0, 8);
     sigaction(SIGPIPE, &sa, 0, 8);
-    //rlimit limit = {2<<20,2<<20}; setrlimit(RLIMIT_STACK,&limit); //2 MB
+    sigaction(SIGTERM, &sa, 0, 8);
+    feenableexcept(FE_DIVBYZERO|FE_INVALID);
 }
 
 static array<Poll*> polls;
-void Poll::registerPoll(int fd, int events) { assert(!polls.contains(this)); this->fd=fd; this->events=events; polls << this; }
+void Poll::registerPoll(int fd, int events) { assert(!polls.contains(this)); assert(fd); this->fd=fd; assert(events); this->events=events; polls << this; }
 static array<Poll*> unregistered;
 void Poll::unregisterPoll() { events=revents=0; if(polls.removeAll(this)) unregistered<<this; }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
 
+int pollEvents(pollfd* pollfds, uint& size, int timeout){size=min(size,polls.size()); for(uint i=0;i<size;i++) copy((byte*)&pollfds[i],(byte*)&polls[i],sizeof(pollfd)); return ::poll(pollfds,size,timeout);}
 int dispatchEvents() {
     if(!polls) return 0;
     uint size=polls.size();
-    pollfd pollfds[size]; for(uint i=0;i<size;i++) { pollfds[i]=*polls[i];  assert(polls[i]->fd==pollfds[i].fd); }
-    while(queue){ Poll* poll=queue.take(0); poll->revents=IDLE; poll->event(); assert(size==polls.size()); if(::poll(pollfds,size,0)) goto break_; }
-    /*else*/ ::poll(pollfds,size,-1);
+#if __clang__
+    byte pollfds_[size*sizeof(pollfd)]; clear(pollfds_,sizeof(pollfds_)); pollfd* pollfds=(pollfd*)pollfds_;
+#else
+    pollfd pollfds[size];
+#endif
+    while(queue){Poll* poll=queue.take(0); poll->revents=IDLE; poll->event(); if(pollEvents(pollfds,size,0)) goto break_;}
+    /*else*/ pollEvents(pollfds,size,-1);
     break_:;
     Poll* polls[size]; copy(polls,::polls.data(),size);
     for(uint i=0;i<size;i++) {
@@ -79,8 +92,8 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     argv[args0.size()]=0;
 
     array< ref<byte> > env0;
-    static string environ = ::readUpTo(openFile("proc/self/environ"_),4096);
-    for(TextStream s(environ);s;) env0<<s.until('\0');
+    static string environ = File("proc/self/environ"_).readUpTo(4096);
+    for(TextData s(environ);s;) env0<<s.until('\0');
 
     const char* envp[env0.size()+1];
     for(uint i=0;i<env0.size();i++) envp[i]=env0[i].data;
@@ -94,8 +107,8 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
 void setPriority(int priority) { check_(setpriority(0,0,priority)); }
 
 ref<byte> getenv(const ref<byte>& name) {
-    static string environ = ::readUpTo(openFile("proc/self/environ"_),4096);
-    for(TextStream s(environ);s;) {
+    static string environ = File("proc/self/environ"_).readUpTo(4096);
+    for(TextData s(environ);s;) {
         ref<byte> key=s.until('='); ref<byte> value=s.until('\0');
         if(key==name) return value;
     }
@@ -104,6 +117,10 @@ ref<byte> getenv(const ref<byte>& name) {
 }
 
 array< ref<byte> > arguments() {
-    static string arguments = ::readUpTo(openFile("proc/self/cmdline"_),4096);
+    static string arguments = File("proc/self/cmdline"_).readUpTo(4096);
     return split(section(arguments,0,1,-1),0);
 }
+
+const Folder& home() { static Folder home=getenv("HOME"_); return home; }
+const Folder& config() { static Folder config=Folder(".config"_,home(),true); return config; }
+const Folder& cache() { static Folder cache=Folder(".cache"_,home(),true); return cache; }

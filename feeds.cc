@@ -7,7 +7,7 @@
 
 ICON(network) ICON(feeds)
 
-Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),true)), readConfig(appendFile("read"_,config)), readMap(mapFile(readConfig)) {
+Feeds::Feeds() : readConfig("read"_,config(),File::WriteOnly|File::Create|File::Append), readMap(readConfig) {
     array::reserve(48);
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
@@ -17,12 +17,12 @@ Feeds::Feeds() : config(openFolder(string(getenv("HOME"_)+"/.config"_),root(),tr
 void Feeds::load() {
     clear(); favicons.clear();
     *this<<Entry(string(),string(":refresh"_),::resize(feedsIcon(),16,16),string("Feeds"_));
-    for(TextStream s=readFile("feeds"_,config);s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
+    for(TextData s=readFile("feeds"_,config());s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
 }
 
 bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
     assert(!guid.contains('\n') && !link.contains('\n'));
-    for(TextStream s(readMap);s;s.until('\n')) {
+    for(TextData s(readMap);s;s.until('\n')) {
         if(s.match(guid) && s.match(' ') && s.match(link)) return true;
     }
     return false;
@@ -75,7 +75,7 @@ void Feeds::setRead(uint index) {
     Entry& entry = array::at(index);
     if(isRead(entry)) return;
     ::write(readConfig,string(entry.guid+" "_+entry.link+"\n"_));
-    readMap = mapFile(readConfig); //remap
+    readMap = readConfig; //remap
     entry.text.setSize(12);
 }
 

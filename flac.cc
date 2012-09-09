@@ -3,10 +3,10 @@
 #include "debug.h"
 
 typedef double double2 __attribute__ ((vector_size(16)));
-#ifndef __clang__
-/*#define loadu_ps __builtin_ia32_loadups
-#define loadu_pd __builtin_ia32_loadupd*/
-#define extract_d __builtin_ia32_vec_ext_v2df
+#if __clang__
+#define extract(vec, i) vec[i]
+#else
+#define extract(vec, i) __builtin_ia32_vec_ext_v2df(vec,i)
 #endif
 
 #define swap64 __builtin_bswap64
@@ -36,10 +36,16 @@ int BitReader::sbinary(int size) {
 static uint8 log2[256];
 static_this { int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); }
 uint BitReader::unary() {
+    assert(index<bsize);
+    // 64bit word optimization of "uint size=0; while(!bit()) size++; assert(size<(64-8)+64);"
     uint64 w = swap64(*(uint64*)(data+index/8)) << (index&7);
+    uint size=0;
+    if(!w) {
+        size+=64-(index&7);
+        w = swap64(*(uint64*)(data+index/8+8));
+    }
     assert(w);
     uint8 b=w>>(64-8);
-    uint size=0;
     while(!b) size+=8, w<<=8, b=w>>(64-8);
     size += log2[b];
     index += size+1;
@@ -58,9 +64,9 @@ uint BitReader::utf8() {
     error("");
 }
 
-void FLAC::start(const ref<byte>& buffer) {
-    BitReader::setData(buffer);
-    assert(startsWith(buffer,"fLaC"_)); skip(32);
+void FLAC::start(const ref<byte>& data) {
+    BitReader::setData(data);
+    assert(startsWith(data,"fLaC"_)); skip(32);
     for(;;) { //METADATA_BLOCK*
         bool last=bit();
         enum BlockType { STREAMINFO, PADDING, APPLICATION, SEEKTABLE, VORBIS_COMMENT, CUESHEET, PICTURE };
@@ -68,72 +74,71 @@ void FLAC::start(const ref<byte>& buffer) {
         int size = binary(24);
         if(blockType==STREAMINFO) {
             assert(size=0x22);
-            skip(16+16+24+24);
-            rate = binary(20); assert(rate == 44100 || rate==48000);
+            uint unused minBlockSize = binary(16); assert(minBlockSize>=16);
+            maxBlockSize = binary(16); assert(minBlockSize<=maxBlockSize && maxBlockSize<=32768);
+            int unused minFrameSize = binary(24), unused maxFrameSize = binary(24);
+            rate = binary(20); assert(rate == 44100 || rate==48000,rate);
             int unused channels = binary(3)+1; assert(channels==2);
-            sampleSize = binary(5)+1; assert(sampleSize==16);
+            sampleSize = binary(5)+1; assert(sampleSize==16 || sampleSize==24);
             duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
             skip(128); //MD5
         } else skip(size*8);
         if(last) break;
     };
+    buffer = allocate<float>(channels*maxBlockSize);
+    frame = 0;
 }
 
-//FIXME: clang spills the predictor
-template<int unroll> void unroll_predictor(uint order, double* predictor, double* context, double* odd, int* out, int* end, int shift) {
+inline uint log2_(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+
+//FIXME: clang doesn't seem to keep the predictor in registers
+template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* even, double* odd, int* signal, int* end, int shift) {
     assert(order<=2*unroll,order,unroll);
     //ensure enough warmup before using unrolled version
-    for(uint i=order;i<2*unroll;i++) { //actually executed once (only for odd order) if specializing for every even order
+    for(uint i=order;i<2*unroll;i++) { //scalar compute first sample for odd orders
         double sum=0;
-        for(uint i=0;i<order;i++) sum += predictor[i] * context[i]; //"slow" loop
-        int sample = (int64(sum)>>shift) + *out; //add residual to prediction
-        context[i]=odd[i]= (double)sample; //write out context
-        *out = sample; out++; //write out decoded sample
+        for(uint i=0;i<order;i++) sum += predictor[i] * even[i];
+        int sample = (int64(sum)>>shift) + *signal; //add residual to prediction
+        even[i]=odd[i]= (double)sample; //write out context
+        *signal = sample; signal++; //write out decoded sample
+        assert(sample >= -(1<<24));
+        assert(sample <= (1<<24)-1, sample, sample-((1<<23)-1));
     }
     for(int i=order-1;i>=0;i--) predictor[2*unroll-order+i]=predictor[i]; //move predictors to right place for unrolled loop
     for(uint i=0;i<2*unroll-order;i++) predictor[i]=0; //clear extra predictors used because of unrolling
     double2 kernel[unroll];
-    for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
-    for(;out<end;) {
-#define ALIGN 1
-#if ALIGN
-        {//filter using aligned context for even samples
-            double2 sum = {0,0};
-            for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(context+2*i); //unrolled loop (for even samples)
-#if __clang__
-            int sample = (int64(sum[0]+sum[1])>>shift) + *out; //add residual to prediction
+    for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i] /*/(1<<shift)*/; //load predictor in registers
+    for(;signal<end;) {
+#define INTEGER 1
+#if INTEGER
+#define FILTER(aligned, misaligned) /*TODO: check if an inline function would also keep predictor in registers*/ ({ \
+    double2 sum = {0,0}; \
+    for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); /*unrolled loop in registers*/ \
+    /*int sample = *signal + int(extract(sum,0)+extract(sum,1));*/ /*add residual to prediction SD2SI=10*/\
+    int sample = (int64(extract(sum,0)+extract(sum,1))>>shift) + *signal; /*add residual to prediction*/\
+    assert(sample >= -(1<<24)); \
+    assert(sample <= (1<<24)-1, log2_(sample)); \
+    aligned[2*unroll]= misaligned[2*unroll]= double(sample); aligned++; misaligned++; /*SI2SD=9, write out contexts, misalign align, align misalign*/\
+    *signal = sample; signal++; /*write out decoded sample*/ })
 #else
-            int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
+#define FILTER(aligned, misaligned) /*TODO: check if an inline function would also keep predictor in registers*/ ({ \
+    double2 sum = {0,0}; \
+    for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); /*unrolled loop in registers*/ \
+    /*const float c = 3*2^(24-1); FIXME: force integer truncation*/ \
+    //double sample = (extract(sum,0)+extract(sum,1)) + double(*signal); /*add residual to prediction SI2SD=12*/
+        float sample = float(*signal) + float(extract(sum,0)+extract(sum,1)); /*add residual to prediction SD2SS=8, SI2SS=14*/
+        /*OPTI: convert signal to single right after decoding (SI2SD=12 | SI2SS=14 -> SS2SD=2)*/ \
+        aligned[2*unroll]= misaligned[2*unroll]= sample; even++; odd++; /*write out contexts, misalign align, align misalign*/\
+        *signal = int(sample); signal++; /*write out decoded sample SD2SI=10*//*16bit audio could keep float (full 24bit audio would need 25bit)*/\
+    })
 #endif
-            context[2*unroll]= odd[2*unroll]= (double)sample; context++; odd++; //write out context (misalign context, align odd)
-            *out = sample; out++; //write out decoded sample
-        }
-
-        {//filter using aligned context for odd samples
-            double2 sum = {0,0};
-            for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(odd+2*i); //unrolled loop (for odd samples)
-#if __clang__
-            int sample = (int64(sum[0]+sum[1])>>shift) + *out; //add residual to prediction
-#else
-            int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
-#endif
-            context[2*unroll]=odd[2*unroll]= (double)sample; context++; odd++; //write out context (align context, misalign odd)
-            *out = sample; out++; //write out decoded sample
-        }
-#else
-        {//filter using unaligned context
-            double2 sum = {0,0};
-            for(uint i=0;i<unroll;i++) sum += kernel[i] * loadu_pd(context+2*i); //unrolled loop
-            int sample = (int64(extract_d(sum,0)+extract_d(sum,1))>>shift) + *out; //add residual to prediction
-            context[2*unroll]= (double)sample; context++; odd++; //write out context (misalign context, align odd)
-            *out = sample; out++; //write out decoded sample
-        }
-#endif
-    }
+    FILTER(even, odd);
+    FILTER(odd, even);
+}
 }
 
 uint64 rice=0, predict=0, order=0;
-void FLAC::readBlock() {
+void FLAC::readFrame() {
     int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync));
     bool unused variable = bit();
     int blockSize_[16] = {0, 192, 576,1152,2304,4608, -8,-16, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768};
@@ -145,30 +150,35 @@ void FLAC::readBlock() {
     int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
     uint sampleSize = sampleSize_[binary(3)]; assert(sampleSize==this->sampleSize);
     int unused zero = bit(); assert(zero==0);
-    int unused frameNumber = utf8();
+    uint unused frame = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;
     assert(blockSize>0&&uint(blockSize)<=maxBlockSize,blockSize);
+    assert(variable ? frame==({uint t=this->frame;this->frame+=blockSize; t;}) : frame==(this->frame++),frame,this->frame,blockSize);
     skip(8);
 
     int block[2][blockSize];
     for(int channel=0;channel<2;channel++) {
-        int* out = block[channel];
-        int* end = out;
-        double buffer1[blockSize]; double* context = buffer1;
+        int* signal = block[channel];
+        int* end = signal;
+        double buffer1[blockSize]; double* even = buffer1;
         double buffer2[blockSize+1]; double* odd = buffer2+1;
-        if(ptr(context)%16) odd=buffer1, context=buffer2+1;
+        if(ptr(even)%16) odd=buffer1, even=buffer2+1;
 
-        int rawSampleSize = sampleSize;
+        int rawSampleSize = sampleSize; //might need one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
         if(channel == 0) { if(channels==RightSide) rawSampleSize++; }
-        else if(channels==LeftSide || channels == MidSide) rawSampleSize++;
+        if(channel == 1) { if(channels==LeftSide || channels == MidSide) rawSampleSize++; }
 
         //Subframe
         int unused zero = bit(); assert(zero==0);
         int type = binary(6);
         int unused wasted = bit(); assert(wasted==0);
         if (type == 0) { //constant
-            int constant = binary(rawSampleSize);
-            for(int i = 0;i<blockSize;i++) *out++ = constant;
+            int constant = sbinary(rawSampleSize); //sbinary?
+            for(int i = 0;i<blockSize;i++) *signal++ = constant;
+            continue;
+        }
+        if (type == 1) { //verbatim
+            error("TODO");
             continue;
         }
 
@@ -179,13 +189,14 @@ void FLAC::readBlock() {
 
         if (type >= 32) { //LPC
             order = (type&~0x20)+1; assert(order>0 && order<=32,order);
-            for(;i<order;i++) context[i]=odd[i]= *out++ = sbinary(rawSampleSize);
+            for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
             int precision = binary(4)+1; assert(precision<=15,precision);
             shift = sbinary(5); assert(shift>=0);
-            for(uint i=0;i<order;i++) predictor[order-1-i]= sbinary(precision);
+            for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision)); //FIXME: we should be able to fold the shift in the float exponent
+            log("LPC",order);
         } else if(type>=8 && type <=12) { //Fixed
             order = type & ~0x8; assert(order>=0 && order<=4,order);
-            for(;i<order;i++) context[i]=odd[i]= *out++ = sbinary(rawSampleSize);
+            for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
             if(order==1) predictor[0]=1;
             else if(order==2) predictor[0]=-1, predictor[1]=2;
             else if(order==3) predictor[0]=1, predictor[1]=-3, predictor[2]=3;
@@ -200,51 +211,53 @@ void FLAC::readBlock() {
         int partitionOrder = binary(4);
         uint size = blockSize >> partitionOrder;
         int partitionCount = 1<<partitionOrder;
+        log(parameterSize,partitionCount,size,blockSize);
 
         tsc rice;
         for(int p=0;p<partitionCount;p++) {
             end += size;
-            int k = binary( parameterSize );
-            // 5 registers [out, end, k, data, index]
+            int k = binary( parameterSize ); log("k",k);
+            // 5 registers [signal, end, k, data, index]
             if(k==0) {
-                for(;out<end;) {
+                for(;signal<end;) {
                     uint u = unary() << k;
-                    *out++ = (u >> 1) ^ (-(u & 1));
+                    *signal++ = (u >> 1) ^ (-(u & 1));
                 }
             } else if(k < escapeCode) { //TODO: static dispatch on k?
                 //disasm(
-                for(;out<end;) {
+                for(;signal<end;) {
                     uint u = unary() << k;
                     u |= binary(k);
-                    *out++ = (u >> 1) ^ (-(u & 1));
+                    *signal++ = (u >> 1) ^ (-(u & 1));
                 }
                 //)
             } else {
                 int n = binary(5); assert(n<=16,n);
-                for(;out<end;) {
+                for(;signal<end;) {
                     int u = binary(n);
-                    *out++ = (u >> 1) ^ (-(u & 1));
+                    *signal++ = (u >> 1) ^ (-(u & 1));
                 }
             }
         }
         ::rice += rice;
 
         tsc predict;
-        out=block[channel]+order;
+        signal=block[channel]+order;
 #define UNROLL 1
 #if UNROLL
-#define o(n) case n: unroll_predictor<n>(order,predictor,context,odd,out,end,shift); break;
+#define o(n) case n: unroll_predictor<n>(order,predictor,even,odd,signal,end,shift); break;
         switch((order+1)/2) {
          o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14) //keep predictor in 14 SSE registers until order=28
          o(15)o(16) //order>28 will spill the predictor out of registers
         }
 #else
-        for(;out<end;) {
+        double* context = even;
+        for(;signal<end;) {
             double sum=0;
             for(uint i=0;i<order;i++) sum += predictor[i] * context[i];
-            int sample = (int64(sum)>>shift) + *out; //add residual to prediction
+            int sample = int(sum) + *signal; //add residual to prediction
             context[order] = (double)sample; context++;  //write out context
-            *out = sample; out++; //write out decoded sample
+            *signal = sample; signal++; //write out decoded sample
         }
 #endif
         ::predict += predict;

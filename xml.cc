@@ -5,7 +5,7 @@
 
 static Element parse(const ref<byte>& document, bool html) {
     assert(document);
-    TextStream s(document);
+    TextData s(document);
     s.match("\xEF\xBB\xBF"_); //spurious BOM
     Element root;
     while(s) {
@@ -21,7 +21,7 @@ static Element parse(const ref<byte>& document, bool html) {
 Element parseXML(const ref<byte>& document) { return parse(document,false); }
 Element parseHTML(const ref<byte>& document) { return parse(document,true); }
 
-Element::Element(TextStream& s, bool html) {
+Element::Element(TextData& s, bool html) {
     uint begin = s.index;
     if(s.match("!DOCTYPE"_)||s.match("!doctype"_)) { s.until('>'); return; }
     else if(s.match("?xml"_)) { s.until("?>"_); return; }
@@ -154,7 +154,7 @@ string unescape(const ref<byte>& xml) {
         for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
     string out;
-    for(TextStream s(xml);s;) {
+    for(TextData s(xml);s;) {
         out << s.until('&');
         if(!s) break;
 

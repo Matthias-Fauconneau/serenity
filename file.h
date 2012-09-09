@@ -1,77 +1,97 @@
 #pragma once
 #include "array.h"
 
-/// Returns a file descriptor to the root folder
-int root();
-
-/// Reads exactly \a size bytes from \a fd
-array<byte> read(int fd, uint size);
-/// Reads up to \a capacity bytes from \a fd
-array<byte> readUpTo(int fd, uint capacity);
-
-/// File is a file descriptor which closes itself in the destructor
-struct File {
-    no_copy(File)
+/// Handle is a Unix file descriptor
+struct Handle {
+    no_copy(Handle)
     int fd;
-    explicit File(int fd):fd(fd){}
-    File(File&& o):fd(o.fd){ o.fd=0; }
-    File& operator=(File&& o) { this->~File(); fd=o.fd; o.fd=0; return *this; }
-    ~File();
-    operator int() { return fd; }
+    Handle(int fd):fd(fd){}
+    Handle(Handle&& o):fd(o.fd){ o.fd=0; }
+    Handle& operator=(Handle&& o) { this->~Handle(); fd=o.fd; o.fd=0; return *this; }
+    /// Closes the descriptor
+    ~Handle();
+    explicit operator bool() { return fd; }
 };
-typedef File Folder;
 
-/// Returns wether \a file exists (as a file)
-bool existsFile(const ref<byte>& file, int at=root());
-/// Opens \a file for reading, fails if not existing
-File openFile(const ref<byte>& file, int at=root());
-/// Reads \a file content into an heap buffer
-array<byte> readFile(const ref<byte>& file, int at=root());
+struct Folder;
+///// Returns a file descriptor to the root folder
+const Folder& root();
 
-struct Map {
+struct Folder : Handle {
+    /// Opens \a folder
+    Folder(const ref<byte>& folder, const Folder& at=root(), bool create=false);
+};
+/// Returns whether this \a folder exists (as a folder)
+bool existsFolder(const ref<byte>& folder, const Folder& at=root());
+
+/// Stream is an handle to an Unix I/O stream
+struct Stream : Handle {
+    Stream(int fd):Handle(fd){}
+    /// Reads exactly \a size bytes into \a buffer
+    void read(void* buffer, uint size);
+    /// Reads up to \a size bytes into \a buffer
+    int readUpTo(void* buffer, uint size);
+    /// Reads exactly \a size bytes
+    array<byte> read(uint size);
+    /// Reads up to \a size bytes
+    array<byte> readUpTo(uint size);
+    /// Reads a raw value
+    template<class T> T read() { T t; read((byte*)&t,sizeof(T)); return t; }
+    /// Reads \a size raw values
+    template<class T> array<T> read(uint size) {
+        array<T> buffer(size); buffer.setSize(size); uint byteSize=size*sizeof(T);
+        for(uint i=0;i<byteSize;) i+=readUpTo(buffer.data()+i, byteSize-i);
+        return buffer;
+    }
+    /// Writes \a buffer
+    void write(const ref<byte>& buffer);
+// Device
+    /// Sends \a request with \a arguments
+    int ioctl(uint request, void* arguments);
+// Socket
+    /// Reads up to /a size bytes
+    array<byte> receive(uint size) { return readUpTo(size); }
+    /// Sends /a buffer
+    void send(const ref<byte>& buffer) { return write(buffer); }
+};
+typedef Stream Device;
+typedef Stream Socket;
+
+struct File : Stream {
+    enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000};
+    /// Opens \a file
+    /// If read only, fails if not existing
+    /// If write only, fails if existing
+    File(const ref<byte>& file, const Folder& at=root(), Flags flags=ReadOnly);
+    /// Returns file size
+    int size() const;
+    /// Seeks to \a index
+    void seek(int index);
+};
+/// Returns whether \a file exists (as a file)
+bool existsFile(const ref<byte>& file, const Folder& at=root());
+/// Reads whole \a file content
+array<byte> readFile(const ref<byte>& file, const Folder& at=root());
+/// Writes \a content into \a file (overwrites any existing file)
+void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at=root());
+
+struct Map : ref<byte> {
     no_copy(Map)
-    const byte* data=0; uint size=0;
     Map(){}
-    Map(const byte* data, uint size):data(data),size(size){}
-    Map(Map&& o):data(o.data),size(o.size){o.data=0,o.size=0;}
+    Map(const File& file);
+    Map(const ref<byte>& file, const Folder& at=root()):Map(File(file,at)){}
+    Map(Map&& o):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
     Map& operator=(Map&& o){this->~Map();data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
     ~Map();
-    /// Returns a reference to the map, valid only while the map exists.
-    operator const ref<byte>() const { return ref<byte>(data,size); } //TODO: escape analysis
     explicit operator bool() { return data && size; }
 };
 
-/// Maps \a file as read-only memory pages
-Map mapFile(const ref<byte>& file, int at=root());
-/// Maps \a fd as read-only memory pages
-Map mapFile(int fd);
-
-/// Opens \a file for writing
-/// \note if \a overwrite is set, any existing file will be truncated
-File createFile(const ref<byte>& file, int at=root(), bool overwrite=false);
-/// Opens \a file for writing, append if existing
-File appendFile(const ref<byte>& file, int at=root());
-/// Writes \a content into \a file
-/// \note if \a overwrite is set, any existing file will be replaced
-void writeFile(const ref<byte>& file, const ref<byte>& content, int at=root(), bool overwrite=true);
-
-// File system
-
-/// Returns whether \a folder exists (as a folder)
-bool existsFolder(const ref<byte>& folder, int at=root());
-/// Opens \a folder
-Folder openFolder(const ref<byte>& folder, int at=root(), bool create=false);
-/// Creates a new \a folder
-void createFolder(const ref<byte>& folder, int at=root());
-/// Returns whether \a path is a folder
-bool isFolder(const ref<byte>& path, int at=root());
-
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
-void symlink(const ref<byte>& target,const ref<byte>& name, int at=root());
+void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=root());
 /// Returns the last modified time for \a path
-long modifiedTime(const ref<byte>& path, int at=root());
+long modifiedTime(const ref<byte>& path, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
-void touchFile(const ref<byte>& path, int at=root());
+void touchFile(const ref<byte>& path, const Folder& at=root());
 
-enum Flags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline Flags operator |(Flags a, Flags b) { return Flags(int(a)|int(b)); }
-array<string> listFiles(const ref<byte>& folder, Flags flags, int at=root());
+enum ListFlags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline ListFlags operator |(ListFlags a, ListFlags b) { return ListFlags(int(a)|int(b)); }
+array<string> listFiles(const ref<byte>& folder, ListFlags flags, const Folder& at=root());

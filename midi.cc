@@ -2,7 +2,7 @@
 #include "file.h"
 
 void MidiFile::open(const ref<byte>& path) { /// parse MIDI header
-    DataStream s( readFile(path) );
+    BinaryData s=readFile(path);
     s.advance(10);
     uint16 nofChunks = s.read();
     midiClock = 48*60000/120/(uint16)s.read(); //48Khz clock
@@ -17,7 +17,7 @@ void MidiFile::open(const ref<byte>& path) { /// parse MIDI header
 }
 
 void MidiFile::read(Track& track, int time, State state) {
-    DataStream& s = track.stream;
+    BinaryData& s = track.stream;
     if(!s) return;
     while(track.time < time) {
         uint8 type=track.type, vel=0,key=s.read();

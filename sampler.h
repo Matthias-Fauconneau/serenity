@@ -15,7 +15,6 @@ struct Note : FLAC {
     float* block; //current position in FLAC::buffer (last decoded FLAC block)
     uint remaining; // remaining frames before release or decay
     uint release; int key; int layer; int velocity; float level; // \sa Sample
-    Note(const ref<byte>& buffer):FLAC(buffer){}
     template<bool mix> void read(float* out, uint size);
 };
 
@@ -28,7 +27,7 @@ struct Sampler : Poll {
     array<Note> active;
     struct Event { int key,velocity; }; array<Event> queue; //starting all release samples at once when releasing pedal might trigger an overrun
     struct Layer { float* buffer=0; uint size=0; bool active=false; Resampler resampler; } layers[3];
-    File record __(0);
+    File record;
     int16* pcm = 0; int time = 0;
     signal<int> timeChanged;
     operator bool() const { return samples.size(); }

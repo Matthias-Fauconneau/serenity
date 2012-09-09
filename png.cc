@@ -13,7 +13,11 @@ typedef vector<rgb,uint8,3> rgb3;
 template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
     typedef vector<T,uint8,N> S;
     typedef vector<T,int,N> V;
-    byte buffer[width*sizeof(S)]; S* prior = (S*)buffer; clear(prior,width,S(0));
+#if __clang__
+    byte prior_[width*sizeof(S)]; clear(prior_,sizeof(prior_)); S* prior = (S*)prior_;
+#else
+    S prior[width];
+#endif
     for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);
         S* src = (S*)raw;
@@ -41,7 +45,7 @@ template void unfilter<rgb,3>(byte4* dst, const byte* raw, int width, int height
 template void unfilter<rgba,4>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
 
 Image decodePNG(const ref<byte>& file) {
-    DataStream s(array<byte>(file.data,file.size), true);
+    BinaryData s(array<byte>(file.data,file.size), true);
     assert(s.get(8)=="\x89PNG\r\n\x1A\n"_);
     s.advance(8);
     array<byte> buffer;

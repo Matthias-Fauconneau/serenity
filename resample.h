@@ -11,7 +11,7 @@ struct Resampler {
     /// \note \a sourceSize should be lesser or equal to \a sourceRate given in constructor
     template<bool mix=false> void filter(const float* source, uint sourceSize, float* target, uint targetSize);
 
-    operator bool() const;
+    explicit operator bool() const { return kernel; }
     ~Resampler();
 
     static constexpr int channelCount=2;

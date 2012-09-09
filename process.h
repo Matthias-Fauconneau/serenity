@@ -1,19 +1,20 @@
 #pragma once
 #include "array.h"
+#include "file.h"
 
-struct pollfd { int fd; short events, revents; };
+struct pollfd : Stream { pollfd(int fd):Stream(fd){} short events=0, revents=0; };
 enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64};
 
 /// Poll is a convenient interface to participate in the process-wide event loop
 struct Poll : pollfd {
-    no_copy(Poll) Poll(){fd=events=revents=0;}
+    no_copy(Poll) Poll(int fd=0, int events=POLLIN):pollfd(fd){ if(fd) registerPoll(fd,events);}
     virtual ~Poll() { unregisterPoll(); }
     /// Registers this file descriptor to be polled in the process-wide event loop
     /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
     void registerPoll(int fd, int events=POLLIN);
     /// Removes this file descriptor from the process-wide event poll loop
     void unregisterPoll();
-    /// Schedules an \a event call after all process-wide outstanding poll events have beem processed
+    /// Schedules an \a event call after all process-wide outstanding poll events have been processed
     void wait();
     /// Callback on new poll events (or after a \a wait)
     virtual void event() =0;
@@ -56,3 +57,8 @@ ref<byte> getenv(const ref<byte>& name);
 
 /// Returns command line arguments
 array< ref<byte> > arguments();
+
+/// Returns standard folders
+const Folder& home(); //$HOME
+const Folder& config(); //$HOME/.config
+const Folder& cache(); //$HOME/.cache

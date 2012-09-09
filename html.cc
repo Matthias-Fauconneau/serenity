@@ -34,7 +34,7 @@ void HTML::load(const URL& url, Map&& document) {
     if(!ignoreElement)
         ignoreElement = split("html body iframe noscript option select nav hgroup time fieldset footer base form script style title head meta link"
                               " header label input textarea td tt font tr table left area map button sup param embed object noindex optgroup basefont"
-                              " tbody tfoot thead acronym del video figure section source noembed caption tag figcaption"_);
+                              " tbody tfoot thead acronym del video figure section source noembed caption tag figcaption canvas"_);
     const Element* best = &html; int max=0,second=0;
     //find node with most direct content
     html.mayVisit([&url,&best,&max,&second](const Element& e)->bool{
@@ -86,7 +86,7 @@ void HTML::parse(const URL& url, const Element &e) {
         images << url.relative(e["src"_]);
     }
     else if(e.name=="div"_ && startsWith(e["style"_],"background-image:url("_)) {
-        TextStream s(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
+        TextData s(e["style"_]); s.match("background-image:url("_); ref<byte> src=s.until(')');
         flushText();
         images << url.relative(src);
     }

@@ -16,7 +16,7 @@
 struct Music : Application, Widget {
     ICON(music) Window window __(this,0,"Music"_,musicIcon());
     Sampler sampler;
-    AudioOutput audio __( __(&sampler, &Sampler::read) );
+    //AudioOutput audio __( __(&sampler, &Sampler::read) );
     Sequencer seq;
 
 #if MIDI
@@ -31,7 +31,8 @@ struct Music : Application, Widget {
     Music() {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         window.localShortcut(Escape).connect(this,&Application::quit);
-        for(ref<byte> path : arguments()) {
+        auto args = arguments(); //if(!args) args<<"/Samples/Salamander.sfz"_;
+        for(ref<byte> path : args) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
                 sampler.open(path);
@@ -50,7 +51,7 @@ struct Music : Application, Widget {
             }
 #endif
 #if PDF
-            else if(endsWith(path, ".pdf"_) && exists(path)) {
+            else if(endsWith(path, ".pdf"_) && existsFile(path)) {
                 //sheet.onGlyph.connect(&score,&Score::onGlyph);
                 //sheet.onPath.connect(&score,&Score::onPath);
                 sheet.open(path);
@@ -66,16 +67,17 @@ struct Music : Application, Widget {
                 foreach(int tick,sort.keys()) foreach(int note,sort[tick].keys()) {
                     toScore[sort[tick][note]]=notes.count(); notes << events[sort[tick][note]].note;
                 }*/
-            } /*else if(path.endsWith(".wav"_)) && !exists(path) && sampler) {
-                sampler->recordWAV(path);
+            } /*else if(path.endsWith(".wav"_)) && !existsFile(path) && sampler) {
+                sampler->recordWAV(File(path,root(),Write));
             }*/
 #endif
             else error("Unsupported"_,path);
         }
-        if(!sampler) error("Usage: music instrument.sfz [music.mid] [sheet.pdf] [output.wav]"_);
-        window.show();
+        //assert(sampler);
         sampler.lock();
-        audio.start(true);
+        //audio.start(true);
+        //sampler.queueEvent(64,127);
+        window.show();
     }
     int current=0,count=0;
     void render(int2 position, int2 size){ if(current!=count) Progress(0,count,current).render(position,size); }

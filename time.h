@@ -40,7 +40,7 @@ string str(Date date, const ref<byte>& format="dddd, dd MMMM yyyy hh:mm"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy
-Date parse(TextStream& s);
+Date parse(TextData& s);
 
 struct Timer : Poll {
     Timer();

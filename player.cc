@@ -13,16 +13,16 @@ enum mpg123_flags { MPG123_ADD_FLAGS=2, MPG123_FORCE_FLOAT  = 0x400 };
 struct mpg123;
 int mpg123_init();
 mpg123* mpg123_new(const char* decoder, int* error);
-int mpg123_param(mpg123 *mh, enum mpg123_flags type, long value, double fvalue);
-int mpg123_open_fd(mpg123 *mh, int fd);
-int mpg123_getformat(mpg123 *mh, long *rate, int *channels, int *encoding);
-int mpg123_read(mpg123 *mh, float* buffer, long bufferSizeInBytes, long* decodedSizeInBytes);
-long mpg123_tell(mpg123 *mh);
-long mpg123_length(mpg123 *mh);
-long mpg123_timeframe(mpg123 *mh, double sec);
-long mpg123_seek_frame(mpg123 *mh, long frameoff, int whence);
-int mpg123_close(mpg123 *mh);
-void mpg123_delete(mpg123 *mh);
+int mpg123_param(mpg123* mh, enum mpg123_flags type, long value, double fvalue);
+int mpg123_open_fd(mpg123* mh, int fd);
+int mpg123_getformat(mpg123* mh, long* rate, int* channels, int* encoding);
+int mpg123_read(mpg123* mh, float* buffer, long bufferSizeInBytes, long* decodedSizeInBytes);
+long mpg123_tell(mpg123* mh);
+long mpg123_length(mpg123* mh);
+long mpg123_timeframe(mpg123* mh, double sec);
+long mpg123_seek_frame(mpg123* mh, long frameoff, int whence);
+int mpg123_close(mpg123* mh);
+void mpg123_delete(mpg123* mh);
 }
 
 /// Virtual audio decoder interface
@@ -41,46 +41,47 @@ struct AudioMedia {
 
 /// MP3 audio decoder (using mpg123)
 struct MP3Media : AudioMedia {
-    mpg123* file = 0;
+    Handle file = 0;
+    mpg123* mh = 0;
     MP3Media(){}
-    MP3Media(int fd) {
+    MP3Media(Handle&& file):file(move(file)){
         static int unused once=mpg123_init();
-        file = mpg123_new(0,0);
-        mpg123_param(file, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.);
-        if(mpg123_open_fd(file,fd)) { log("mpg123_open_fd failed"); file=0; return; }
+        mh = mpg123_new(0,0);
+        mpg123_param(mh, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.);
+        if(mpg123_open_fd(mh,file.fd)) { log("mpg123_open_fd failed"); mh=0; return; }
         long rate; int channels,encoding;
-        if(mpg123_getformat(file,&rate,&channels,&encoding)) { log("mpg123_getformat failed"); file=0; return; }
+        if(mpg123_getformat(mh,&rate,&channels,&encoding)) { log("mpg123_getformat failed"); mh=0; return; }
         this->rate=rate; this->channels=channels;
     }
-    int position() { return int(mpg123_tell(file)/rate); }
-    int duration() { return int(mpg123_length(file)/rate); }
-    void seek(int position) { mpg123_seek_frame(file,mpg123_timeframe(file,position),0); }
-    bool read(float* output, uint size) { long done; return !mpg123_read(file,output,size*channels*sizeof(float),&done) && done==size*channels*sizeof(float); }
-    ~MP3Media() { mpg123_close(file); mpg123_delete(file); file=0; }
+    int position() { return int(mpg123_tell(mh)/rate); }
+    int duration() { return int(mpg123_length(mh)/rate); }
+    void seek(int position) { mpg123_seek_frame(mh,mpg123_timeframe(mh,position),0); }
+    bool read(float* output, uint size) { long done; return !mpg123_read(mh,output,size*channels*sizeof(float),&done) && done==size*channels*sizeof(float); }
+    ~MP3Media() { mpg123_close(mh); mpg123_delete(mh); }
 };
 
 /// FLAC audio decoder
 struct FLACMedia : AudioMedia, FLAC {
-    Map file;
+    Map map;
     uint blockPosition=0; //position of next FLAC block in samples
     float* block=0;
     FLACMedia(){}
-    FLACMedia(int fd) { file=mapFile(fd); start(file); AudioMedia::rate=FLAC::rate; AudioMedia::channels=FLAC::channels; }
+    FLACMedia(File&& file):map(file){ start(map); AudioMedia::rate=FLAC::rate; AudioMedia::channels=FLAC::channels; }
     int position() { return blockPosition/FLAC::rate; }
     int duration() { return FLAC::duration/FLAC::rate; }
-    void seek(int position) {
+    void seek(int unused position) {
         blockSize=0;
-        if(position<this->position()) start(file), blockPosition=0;
-        while(position>this->position()) readBlock(), block=buffer, blockPosition+=blockSize;
+        /*if(position<this->position()) start(file), blockPosition=0;
+        while(position>this->position()) readFrame(), block=buffer, blockPosition+=blockSize;*/
     }
     bool read(float* out, uint size) {
         while(size > blockSize) {
-            for(float* end=out+2*blockSize; out<end; block++, out++) out[0]=block[0];
+            for(float* end=out+FLAC::channels*blockSize; out<end; block++, out++) out[0]=block[0];
             size -= blockSize;
             if(blockPosition >= FLAC::duration) return false;
-            readBlock(); block=buffer; blockPosition+=blockSize;
+            readFrame(); block=buffer; blockPosition+=blockSize;
         }
-        for(float* end=out+2*size; out<end; block++, out++) out[0]=block[0];
+        for(float* end=out+FLAC::channels*size; out<end; block++, out++) out[0]=block[0];
         blockSize -= size;
         return true;
     }
@@ -89,7 +90,6 @@ struct FLACMedia : AudioMedia, FLAC {
 struct Player : Application {
 /// Pipeline: File -> AudioMedia -> [Resampler] -> AudioOutput
     static const int channels=2;
-    File file=File(0);
     AudioMedia* media=0; MP3Media mp3; FLACMedia flac;
     Resampler resampler;
     AudioOutput audio __({this,&Player::read});
@@ -153,13 +153,13 @@ struct Player : Application {
             albums.index = folders.indexOf(folder);
             array<string> files = listFiles(folder,Recursive|Sort|Files);
             uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
-            for(;i<files.size();i++) appendFile(move(files[i]));
+            for(;i<files.size();i++) queueFile(move(files[i]));
         }
         window.setSize(int2(-512,-512)); window.show();
         if(files) next();
         if(time) seek(time);
     }
-    void appendFile(string&& path) {
+    void queueFile(string&& path) {
         string title = string(section(section(path,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size() && title[i]>='0'&&title[i]<='9') i++; //skip track number
@@ -168,9 +168,9 @@ struct Player : Application {
         files << move(path);
     }
     void play(const string& path) {
-        assert(isFolder(path));
+        assert(existsFolder(path));
         array<string> files = listFiles(path,Recursive|Sort|Files);
-        for(string& file: files) appendFile(move(file));
+        for(string& file: files) queueFile(move(file));
         window.setSize(int2(-512,-512));
         next();
     }
@@ -182,10 +182,9 @@ struct Player : Application {
     void playTitle(uint index) {
         window.setTitle(titles[index].text);
         ref<byte> path = files[index];
-        file=openFile(path);
         if(media) media->~AudioMedia(), media=0;
-        if(endsWith(path,".mp3"_)) media=new (&mp3) MP3Media(file);
-        else if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(file);
+        if(endsWith(path,".mp3"_)) media=new (&mp3) MP3Media(File(path));
+        else if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path));
         else warn("Unsupported format",path);
         audio.start();
         assert(audio.channels==media->channels);

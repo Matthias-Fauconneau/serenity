@@ -35,9 +35,9 @@ template<class T> struct array {
     array() {}
 
     /// Move constructor
-    array(array&& o) { if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy(*this,o); o.tag=0; }
+    array(array&& o) { if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(array)); o.tag=0; }
     /// Move assignment
-    array& operator=(array&& o) { this->~array(); if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy(*this,o); o.tag=0; return *this; }
+    array& operator=(array&& o) { this->~array(); if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(array)); o.tag=0; return *this; }
     /// Allocates a new uninitialized array for \a capacity elements
     explicit array(uint capacity){reserve(capacity); }
     /// Moves elements from a reference
@@ -133,7 +133,7 @@ template<class T> struct array {
     /// Inserts elements
     T& insertAt(int index, T&& e) {
         reserve(size()+1); setSize(size()+1);
-        for(int i=size()-2;i>=index;i--) copy(at(i+1),at(i));
+        for(int i=size()-2;i>=index;i--) copy((byte*)&at(i+1),(const byte*)&at(i),sizeof(T));
         new (&at(index)) T(move(e));
         return at(index);
     }
@@ -165,5 +165,5 @@ template<class T> array<T> replace(array<T>&& a, const T& before, const T& after
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 
-/// string is an array of unsigned bytes (char is either signed/unsigned and would instanciate an incompatible template)
+/// string is an array of bytes
 typedef array<byte> string;

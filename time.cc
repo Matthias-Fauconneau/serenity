@@ -67,7 +67,7 @@ Date date(long time) {
 
 string str(Date date, const ref<byte>& format) {
     string r;
-    for(TextStream s(format);s;) {
+    for(TextData s(format);s;) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(' '); }
         else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); else s.until(' '); }
         else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); else s.until(' '); }
@@ -86,7 +86,7 @@ string str(Date date, const ref<byte>& format) {
     return r;
 }
 
-Date parse(TextStream& s) {
+Date parse(TextData& s) {
     Date date;
 
     for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }

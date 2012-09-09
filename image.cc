@@ -27,8 +27,7 @@ Image resize(const Image& image, uint width, uint height) {
         for(uint y=0; y<height; y++) {
             for(uint x=0; x<width; x++) {
                 *dst = src[(y*image.height/height)*image.stride+x*image.width/width];
-                dst++;
-            }
+                dst++; }
         }
     }
     return target;

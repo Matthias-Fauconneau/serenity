@@ -5,22 +5,18 @@
 #include "file.h"
 
 /// \a Socket is a network socket
-struct Socket : virtual Stream, Poll {
-    Socket(){}
-    ~Socket() { disconnect(); }
+struct TCPSocket : virtual InputData, Poll {
+    TCPSocket(){}
+    ~TCPSocket() { disconnect(); }
     /// Connects to \a service on \a host
     bool connect(const ref<byte>& host, const ref<byte>& service);
     void disconnect();
-    /// Reads /a size bytes from network socket
-    virtual array<byte> receive(uint size);
-    /// Writes /a buffer to network socket
-    virtual bool write(const ref<byte>& buffer);
-    /// Stream
+    /// Waits until \a need bytes are available (or timeout after 1 second)
     uint available(uint need) override;
 };
 
 typedef struct ssl_st SSL;
-struct SSLSocket : Socket {
+struct SSLSocket : TCPSocket {
     ~SSLSocket();
     SSL* ssl=0;
     bool connect(const ref<byte>& host, const ref<byte>& service);
@@ -45,7 +41,7 @@ inline bool operator ==(const URL& a, const URL& b) {
 
 typedef function<void(const URL&, Map&&)> Handler;
 
-struct HTTP : TextStream, SSLSocket {
+struct HTTP : TextData, SSLSocket {
     URL url;
     array<string> headers;
     ref<byte> method;

@@ -39,7 +39,7 @@ bool Command::mouseEvent(int2, int2, Event event, MouseButton button) {
 map<string,string> readSettings(const ref<byte>& path) {
     map<string,string> entries;
     if(!existsFile(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
-    for(TextStream s=readFile(path);s;) {
+    for(TextData s=readFile(path);s;) {
         if(s.matchAny("[#"_)) s.until('\n');
         else {
             ref<byte> key = s.until('='), value=s.until('\n');
@@ -62,10 +62,9 @@ struct Desktop : Application {
     Window browser __(&page.area(),0,"Browser"_);
     ICON(shutdown)
     Desktop() {
-        static Folder config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
-        if(!existsFile("launcher"_,config)) warn("No launcher settings [config/launcher]");
+        if(!existsFile("launcher"_,config())) warn("No launcher settings [.config/launcher]");
         else {
-            auto apps = readFile("launcher"_,config);
+            auto apps = readFile("launcher"_,config());
             for(const ref<byte>& desktop: split(apps,'\n')) {
                 if(startsWith(desktop,"#"_)) continue;
                 map<string,string> entries = readSettings(desktop);

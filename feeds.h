@@ -12,7 +12,6 @@ struct Entry : Item {
 /// Feeds is a list of entries fetched from RSS/Atom feeds
 /// \note .config/feeds contains the list of feeds to fetch, .config/read contains the list of read articles
 struct Feeds : List<Entry> {
-    Folder config;
     File readConfig;
     Map readMap;
     signal<> listChanged;

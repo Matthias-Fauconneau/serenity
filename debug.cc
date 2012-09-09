@@ -3,10 +3,6 @@
 #include "stream.h"
 #include "linux.h"
 
-void exit_(int code) { exit(code); }
-void log_(const char* expr) { log(expr); }
-bool write(int fd, const ref<byte>& s) { int unused r=check(write(fd,s.data,s.size)); assert(r==(int)s.size,r); return r==(int)s.size; }
-
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };
 #if __x86_64
@@ -16,14 +12,14 @@ struct Sym { uint	name; byte* value; uint size; byte info,other; uint16 shndx; }
 #endif
 
 /// Reads a little endian variable size integer
-static int readLEV(DataStream& s, bool sign=false) {
+static int readLEV(BinaryData& s, bool sign=false) {
     int result=0; int shift=0; byte b;
     do { b = s.read(); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
     if(sign && (shift < 32) && (b & 0x40)) result |= -1 << shift;
     return result;
 }
 
-string demangle(TextStream& s, bool function=true) {
+string demangle(TextData& s, bool function=true) {
     string r;
     bool rvalue=false,ref=false; int pointer=0;
     for(;;) {
@@ -109,24 +105,23 @@ string demangle(TextStream& s, bool function=true) {
     if(ref) r<<'&';
     return r;
 }
-string demangle(const ref<byte>& symbol) { TextStream s(symbol); return s.match('_')&&s.peek()=='Z'? demangle(s) : string(s.untilEnd()); }
+string demangle(const ref<byte>& symbol) { TextData s(symbol); return s.match('_')&&s.peek()=='Z'? demangle(s) : string(s.untilEnd()); }
 
 Symbol findNearestLine(void* find) {
-    static Map map = mapFile("proc/self/exe"_);
-    const byte* elf = map.data;
-    const Ehdr& hdr = *(Ehdr*)elf;
-
-    ref<Shdr> sections = ref<Shdr>((Shdr*)(elf+hdr.shoff),hdr.shnum);
-    const char* shstrtab = (char*)elf+sections[hdr.shstrndx].offset;
-    const char* strtab = 0; ref<Sym> symtab; DataStream debug_line;
+    static Map exe = "/proc/self/exe"_;
+    const byte* elf = exe.data;
+    const Ehdr& hdr = *(const Ehdr*)elf;
+    ref<Shdr> sections = ref<Shdr>((const Shdr*)(elf+hdr.shoff),hdr.shnum);
+    const char* shstrtab = elf+sections[hdr.shstrndx].offset;
+    const char* strtab = 0; ref<Sym> symtab; BinaryData debug_line;
     for(const Shdr& s: sections)  {
-        if(str(shstrtab+s.name)==".debug_line"_) debug_line=DataStream(ref<byte>(elf+s.offset,s.size));
+        if(str(shstrtab+s.name)==".debug_line"_) debug_line=BinaryData(ref<byte>(elf+s.offset,s.size));
         else if(str(shstrtab+s.name)==".strtab"_) strtab=(const char*)elf+s.offset;
         else if(str(shstrtab+s.name)==".symtab"_) symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
     for(const Sym& sym: symtab) if(find >= sym.value && find < sym.value+sym.size) symbol.function = demangle(str(strtab+sym.name));
-    for(DataStream& s = debug_line;s.index<s.buffer.size();) {
+    for(BinaryData& s = debug_line;s.index<s.buffer.size();) {
         uint begin = s.index;
         struct CU { uint size; ushort version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
@@ -194,8 +189,8 @@ Symbol findNearestLine(void* find) {
 
 int recurse;
 void trace(int skip, uint size) {
-    if(recurse>1) {write(1,"Debugger error\n"_); void**p=0;*p=0; } recurse++;
-    void* stack[16]; clear(stack);
+    if(recurse>1) {log("Debugger error"_); void**p=0;*p=0; } recurse++;
+    void* stack[16]; clear((byte*)stack,sizeof(stack));
     stack[0] = __builtin_return_address(0);
     #define bra(i) if(ptr(stack[i-1])>0x100000 && ptr(stack[i-1])<0x1000000) stack[i] = __builtin_return_address(i)
     bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);

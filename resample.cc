@@ -128,7 +128,6 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate) {
     kernel = allocate_aligned<float>(targetRate*N);
     for(uint i=0;i<targetRate;i++) for(uint j=0;j<N;j++) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+(float(j)-(N/2+1)), N);
 }
-Resampler::operator bool() const { return kernel; }
 Resampler::~Resampler() {
     for(int i=0;i<channelCount;i++) if(buffer[i]) unallocate(buffer[i],channelCount*bufferSize);
     if(kernel) unallocate(kernel,N*targetRate);

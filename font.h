@@ -14,7 +14,7 @@ struct Glyph {
 /// Truetype font renderer stub
 struct Font {
     Map keep;
-    DataStream cmap, kern;
+    BinaryData cmap, kern;
     uint16* hmtx;
     const void* loca; uint16 indexToLocFormat; int ascent, descent, lineGap;
     const byte* glyf; uint scale; int round, size;

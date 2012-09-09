@@ -28,12 +28,12 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
         else send(raw(r)); }
     uint visual=0;
-    {ConnectionSetupReply r=read<ConnectionSetupReply>(fd); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
-        read(fd,align(4,r.vendorLength));
-        read<XFormat>(fd,r.numFormats);
-        for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>(fd);
-            for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>(fd);
-                if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(fd,depth.numVisualTypes)) {
+    {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
+        read(align(4,r.vendorLength));
+        read<XFormat>(r.numFormats);
+        for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>();
+            for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>();
+                if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(depth.numVisualTypes)) {
                     if(!visual && depth.depth==32) { display=int2(screen.width,screen.height); root = screen.root; visual=visualType.id; }
                 }
             }
@@ -51,15 +51,15 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     {Render::QueryVersion r; send(raw(r)); readReply<Render::QueryVersionReply>();}
     {QueryPictFormats r; send(raw(r));}
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>();
-        array<PictFormInfo> formats = read<PictFormInfo>(fd, r.numFormats);
-        for(uint i=0;i<r.numScreens;i++){ PictScreen screen = read<PictScreen>(fd);
-            for(uint i=0;i<screen.numDepths;i++){ PictDepth depth = read<PictDepth>(fd);
-                array<PictVisual> visuals = read<PictVisual>(fd,depth.numPictVisuals);
+        array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
+        for(uint i=0;i<r.numScreens;i++){ PictScreen screen = read<PictScreen>();
+            for(uint i=0;i<screen.numDepths;i++){ PictDepth depth = read<PictDepth>();
+                array<PictVisual> visuals = read<PictVisual>(depth.numPictVisuals);
                 if(depth.depth==32) for(PictVisual pictVisual: visuals) if(pictVisual.visual==visual) format=pictVisual.format;
             }
         }
         assert(format);
-        read<uint>(fd,r.numSubpixels);
+        read<uint>(r.numSubpixels);
     }
 
     // Creates X window
@@ -84,7 +84,6 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     setIcon(icon);
     setType(type);
 }
-Window::~Window() { close(fd); }
 
 void Window::event() {
     current=this;
@@ -134,8 +133,8 @@ void Window::event() {
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;
     } else {
-        uint8 type = read<uint8>(fd);
-        processEvent(type, read<XEvent>(fd));
+        uint8 type = read<uint8>();
+        processEvent(type, read<XEvent>());
         while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
     }
     current=0;
@@ -237,44 +236,17 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     }
 }
 
-void Window::send(const ref<byte>& request) { write(fd, request); sequence++; }
+void Window::send(const ref<byte>& request) { write( request); sequence++; }
 
 template<class T> T Window::readReply() {
-    for(;;) { uint8 type = read<uint8>(fd);
-        if(type==0){Error e=read<Error>(fd); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; clear(t); return t; }}
-        else if(type==1) return read<T>(fd);
-        else queue << QEvent __(type, read<XEvent>(fd)); //queue events to avoid reentrance
+    for(;;) { uint8 type = read<uint8>();
+        if(type==0){Error e=read<Error>(); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; return t; }}
+        else if(type==1) return read<T>();
+        else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }
 }
 
-uint Window::Atom(const ref<byte>& name) {
-    {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; send(string(raw(r)+name+pad(4,r.length)));}
-    {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
-}
-string Window::AtomName(uint atom) {
-    {GetAtomName r; r.atom=atom; send(raw(r));}
-    {GetAtomNameReply r=readReply<GetAtomNameReply>(); string name=read(fd,r.size); read(fd,align(4,r.size)-r.size); return name;}
-}
-uint Window::KeySym(uint8 code) {
-    {GetKeyboardMapping r; r.keycode=code; send(raw(r));}
-    {GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>();
-        array<uint> keysyms = read<uint>(fd,r.numKeySymsPerKeyCode);
-        return keysyms?keysyms.first():0;
-    }
-}
-uint Window::KeyCode(Key sym) {
-    uint keycode=0;
-    for(uint i=minKeyCode;i<=maxKeyCode;i++) if(KeySym(i)==sym) { keycode=i; break;  }
-    if(!keycode) warn("Unknown KeySym",int(sym));
-    return keycode;
-}
-template<class T> array<T> Window::getProperty(uint window, const ref<byte>& name, uint size) {
-    {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
-    {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
-        array<T> a; if(size) a=read<T>(fd,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(fd,pad); return a; }
-}
-template array<uint> Window::getProperty(uint window, const ref<byte>& name, uint size);
-template array<byte> Window::getProperty(uint window, const ref<byte>& name, uint size);
+/// Configuration
 
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;
@@ -302,6 +274,49 @@ void Window::setGeometry(int2 position, int2 size) {
     else if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
     else if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
 }
+void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}{RaiseWindow r; r.id=id; send(raw(r));}}
+void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
+void Window::render() { if(mapped) Poll::wait(); }
+
+/// Keyboard
+
+uint Window::KeySym(uint8 code) {
+    {GetKeyboardMapping r; r.keycode=code; send(raw(r));}
+    {GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>();
+        array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
+        return keysyms?keysyms.first():0;
+    }
+}
+uint Window::KeyCode(Key sym) {
+    uint keycode=0;
+    for(uint i=minKeyCode;i<=maxKeyCode;i++) if(KeySym(i)==sym) { keycode=i; break;  }
+    if(!keycode) warn("Unknown KeySym",int(sym));
+    return keycode;
+}
+signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
+signal<>& Window::globalShortcut(Key key) {
+    uint code = KeyCode(key);
+    if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
+    return shortcuts.insert((uint16)key);
+}
+
+/// Properties
+
+uint Window::Atom(const ref<byte>& name) {
+    {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; send(string(raw(r)+name+pad(4,r.length)));}
+    {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
+}
+string Window::AtomName(uint atom) {
+    {GetAtomName r; r.atom=atom; send(raw(r));}
+    {GetAtomNameReply r=readReply<GetAtomNameReply>(); string name=read(r.size); read(align(4,r.size)-r.size); return name;}
+}
+template<class T> array<T> Window::getProperty(uint window, const ref<byte>& name, uint size) {
+    {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
+    {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
+        array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
+}
+template array<uint> Window::getProperty(uint window, const ref<byte>& name, uint size);
+template array<byte> Window::getProperty(uint window, const ref<byte>& name, uint size);
 
 void Window::setType(const ref<byte>& type) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_WINDOW_TYPE"_); r.type=Atom("ATOM"_); r.format=32;
@@ -316,50 +331,24 @@ void Window::setIcon(const Image& icon) {
     r.length=2+icon.width*icon.height; r.size+=r.length; send(string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }
 
-void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}{RaiseWindow r; r.id=id; send(raw(r));}}
-void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
-void Window::render() { if(mapped) Poll::wait(); }
-
-signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
-signal<>& Window::globalShortcut(Key key) {
-    uint code = KeyCode(key);
-    if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
-    return shortcuts.insert((uint16)key);
-}
-
 string Window::getSelection() {
     send(raw(GetSelectionOwner())); uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();
     {ConvertSelection r; r.requestor=id; r.target=Atom("UTF8_STRING"_); send(raw(r));}
-    for(;;) { uint8 type = read<uint8>(fd);
-        if((type&0b01111111)==SelectionNotify) { read<XEvent>(fd); return getProperty<byte>(id,"UTF8_STRING"_); }
-        else queue << QEvent __(type, read<XEvent>(fd)); //queue events to avoid reentrance
+    for(;;) { uint8 type = read<uint8>();
+        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); return getProperty<byte>(id,"UTF8_STRING"_); }
+        else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }
 }
 
-ICON(arrow)
-ICON(horizontal)
-ICON(vertical)
-ICON(fdiagonal)
-ICON(bdiagonal)
-ICON(move)
+/// Cursor
+
+ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move)
 
 const Image& Window::cursorIcon(Window::Cursor cursor) {
-    if(cursor==Arrow) return arrowIcon();
-    if(cursor==Horizontal) return horizontalIcon();
-    if(cursor==Vertical) return verticalIcon();
-    if(cursor==FDiagonal) return fdiagonalIcon();
-    if(cursor==BDiagonal) return bdiagonalIcon();
-    if(cursor==Move) return moveIcon();
-    error("");
+    static constexpr const Image& (*icons[])() = { arrowIcon, horizontalIcon, verticalIcon, fdiagonalIcon, bdiagonalIcon, moveIcon }; return icons[cursor]();
 }
 int2 Window::cursorHotspot(Window::Cursor cursor) {
-    if(cursor==Arrow) return int2(5,0);
-    if(cursor==Horizontal) return int2(11,11);
-    if(cursor==Vertical) return int2(11,11);
-    if(cursor==FDiagonal) return int2(11,11);
-    if(cursor==BDiagonal) return int2(11,11);
-    if(cursor==Move) return int2(16,15);
-    error("");
+    static constexpr const int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15) }; return hotspots[cursor];
 }
 
 void Window::setCursor(Cursor cursor, uint window) {

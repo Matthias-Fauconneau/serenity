@@ -6,7 +6,7 @@ struct Entry { uint8 width, height, colorCount, reserved; uint16 planeCount, dep
 struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
 
 Image decodeICO(const ref<byte>& file) {
-    DataStream s(array<byte>(file.data,file.size));
+    BinaryData s(array<byte>(file.data,file.size));
 
     Directory unused directory = s.read<Directory>();
     assert(directory.reserved==0);

@@ -2,94 +2,21 @@
 #include "linux.h"
 #include "debug.h"
 
-/// Input/Output
+/// Handle
 
-array<byte> read(int fd, uint capacity) {
-    array<byte> buffer(capacity);
-    int size = check( read(fd,buffer.data(),capacity) );
-    assert((uint)size==capacity,size,capacity);
-    buffer.setSize(size);
-    return buffer;
+Handle::~Handle() { if(fd>0) close(fd); }
+
+/// Folder
+
+const Folder& root() { const int AT_FDCWD=-100; static const Folder root = Folder("/"_,(const Folder&)AT_FDCWD); return root; }
+Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0){
+    if(create && !existsFolder(folder,at))  check_(mkdirat(at.fd, strz(folder), 0666), folder);
+    fd=check( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder);
 }
-
-array<byte> readUpTo(int fd, uint capacity) {
-    array<byte> buffer(capacity);
-    int size = check( read(fd,buffer.data(),capacity) );
-    if(size) { buffer.setCapacity(size); buffer.setSize(size); }
-    return buffer;
-}
-
-int read_(int fd, void* buf, long size) { return read(fd, buf, size); }
-
-/// File
-
-File::~File() { if(fd>0) close(fd); }
-
-bool existsFile(const ref<byte>& file, int at) { return File( openat(at, strz(file), O_RDONLY, 0) ).fd > 0; }
-
-File openFile(const ref<byte>& file, int at) {
-    return File( check( openat(at, strz(file), O_RDONLY, 0), file) );
-}
-File createFile(const ref<byte>& file, int at, bool overwrite) {
-    if(!overwrite && existsFile(file,at)) error("File already exists",file);
-    return File( check( openat(at, strz(file),O_CREAT|O_WRONLY|O_TRUNC,0666), file ) );
-}
-File appendFile(const ref<byte>& file, int at) {
-    return File( check( openat(at, strz(file),O_CREAT|O_RDWR|O_APPEND,0666), file ) );
-}
-
-array<byte> readFile(const ref<byte>& file, int at) {
-    File fd = openFile(file,at);
-    struct stat sb; fstat(fd, &sb);
-    array<byte> content = read(fd,sb.size);
-    if(content.size()>1<<16) { trace(); log("use mapFile to avoid copying "_+dec(content.size()>>10)+"KB"_); }
-    return content;
-}
-
-void writeFile(const ref<byte>& file, const ref<byte>& content, int at, bool overwrite) {
-    File fd = createFile(file,at,overwrite);
-    uint unused wrote = write(fd,content.data,content.size);
-    assert(wrote==content.size);
-}
-
-Map mapFile(const ref<byte>& file, int at) { File fd=openFile(file,at); Map map=mapFile(fd); return map; }
-Map mapFile(int fd) {
-    stat sb; check_( fstat(fd, &sb) );
-    if(sb.size==0) return Map(0,0);
-    const byte* data = (byte*)mmap(0,sb.size,PROT_READ,MAP_PRIVATE,fd,0);
-    assert(data);
-    return Map(data,(int)sb.size);
-}
-Map::~Map() { if(data) munmap((void*)data,size); }
-
-/// File system
-
-int root() { static Folder root = openFolder("/"_,-100); return root.fd; }
-
-bool existsFolder(const ref<byte>& folder, int at) { return File( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
-Folder openFolder(const ref<byte>& folder, int at, bool create) {
-    if(create && !existsFolder(folder,at)) createFolder(folder,at);
-    return Folder( check( openat(at, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder) );
-}
-void createFolder(const ref<byte>& folder, int at) { check_(mkdirat(at, strz(folder), 0666), folder); }
-
-void symlink(const ref<byte>& target,const ref<byte>& name, int at) {
-    assert(target!=name);
-    unlinkat(at,strz(name),0);
-    check_(symlinkat(strz(target),at,strz(name)), name,"->",target);
-}
-
-stat statFile(const ref<byte>& path, int at) { File fd = openFile(path,at); stat file; check_( fstat(fd, &file) ); return file; }
-enum { S_IFDIR=0040000 };
-bool isFolder(const ref<byte>& path, int at) { return statFile(path,at).mode&S_IFDIR; }
-long modifiedTime(const ref<byte>& path, int at) { return statFile(path,at).mtime.sec; }
-void touchFile(const ref<byte>& path, int at) { utimensat(at, strz(path), 0, 0); }
-
-array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
-    Folder fd = openFolder(folder,at);
-    assert(fd, "Folder not found"_, folder);
+array<string> listFiles(const ref<byte>& folder, ListFlags flags, const Folder& at) {
+    Folder fd(folder,at);
     array<string> list; byte buffer[0x1000];
-    for(int size;(size=check(getdents(fd,&buffer,sizeof(buffer))))>0;) {
+    for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
             ref<byte> name = str(entry.name);
             if(name=="."_||name==".."_) continue;
@@ -107,3 +34,58 @@ array<string> listFiles(const ref<byte>& folder, Flags flags, int at) {
     }
     return list;
 }
+bool existsFolder(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
+
+/// Stream
+
+void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
+int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size) ); }
+
+array<byte> Stream::read(uint capacity) {
+    array<byte> buffer(capacity);
+    int size = check( ::read(fd,buffer.data(),capacity) );
+    assert((uint)size==capacity,size,capacity);
+    buffer.setSize(size);
+    return buffer;
+}
+
+array<byte> Stream::readUpTo(uint capacity) {
+    array<byte> buffer(capacity);
+    int size = check( ::read(fd,buffer.data(),capacity) );
+    if(size) { buffer.setCapacity(size); buffer.setSize(size); }
+    return buffer;
+}
+
+void Stream::write(const ref<byte>& buffer) { int unused wrote=check( ::write(fd,buffer.data,buffer.size) ); assert(wrote==(int)buffer.size); }
+
+int Stream::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
+
+/// File
+
+File::File(const ref<byte>& file, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
+int File::size() const { stat sb; fstat(fd, &sb); return sb.size; }
+void File::seek(int index) { check_(::lseek(fd,index,0)); }
+
+bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
+array<byte> readFile(const ref<byte>& path, const Folder& at) {
+    File file(path,at);
+    debug(if(file.size()>1<<16) { trace(); warn("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_); })
+    return file.read(file.size());
+}
+void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at) { File(file,at,File::Truncate).write(content); }
+
+/// Map
+
+Map::Map(const File& file) { data = (byte*)mmap(0,size=file.size(),PROT_READ,MAP_PRIVATE,file.fd,0); assert(data); }
+Map::~Map() { log("unmap",data); if(data) munmap((void*)data,size); }
+
+/// File system
+
+void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at) {
+    assert(target!=name);
+    unlinkat(at.fd,strz(name),0);
+    check_(symlinkat(strz(target),at.fd,strz(name)), name,"->",target);
+}
+stat statFile(const ref<byte>& path, const Folder& at) { stat file; check_( fstat(File(path,at).fd, &file) ); return file; }
+long modifiedTime(const ref<byte>& path, const Folder& at) { return statFile(path,at).mtime.sec; }
+void touchFile(const ref<byte>& path, const Folder& at) { utimensat(at.fd, strz(path), 0, 0); }

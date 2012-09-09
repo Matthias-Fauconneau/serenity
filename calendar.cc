@@ -3,13 +3,12 @@
 #include "map.h"
 
 array<Event> getEvents(Date query) {
-    static Folder config = openFolder(string(getenv("HOME"_)+"/.config"_),root(),true);
     array<Event> events;
-    if(!existsFile("events"_,config)) {warn("No events settings [$HOME/.config/events]"); return events; }
-    string file = readFile("events"_,config);
+    if(!existsFile("events"_,config())) {warn("No events settings [$HOME/.config/events]"); return events; }
+    string file = readFile("events"_,config());
 
     map<string, array<Date>> exceptions; //Exceptions for recurring events
-    for(TextStream s(file);s;) { //first parse all exceptions (may occur after recurrence definitions)
+    for(TextData s(file);s;) { //first parse all exceptions (may occur after recurrence definitions)
         if(s.match("except "_)) {
             Date except=parse(s); s.skip(); string title=string(s.until('\n'));
             exceptions[move(title)] << except;
@@ -17,7 +16,7 @@ array<Event> getEvents(Date query) {
     }
 
     Date until; //End date for recurring events
-    for(TextStream s(file);s.skip(), s;) {
+    for(TextData s(file);s.skip(), s;) {
         if(s.match("#"_)) s.until('\n'); //comment
         else if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
         else if(s.match("except "_)) s.until('\n'); //already parsed

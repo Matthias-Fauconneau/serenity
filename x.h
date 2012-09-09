@@ -129,22 +129,3 @@ constexpr ref<byte> requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPi
 constexpr ref<byte> errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
-
-#include "debug.h"
-int read_(int fd, void* buf, long size);
-/// Reads a raw value from \a fd
-template<class T> T read(int fd) {
-    T t;
-    int unused size = read_(fd,(byte*)&t,sizeof(T));
-    assert(size==sizeof(T),size,sizeof(T));
-    return t;
-}
-/// Reads \a size raw values from \a fd
-template<class T> array<T> read(int fd, uint capacity) {
-    array<T> buffer(capacity); buffer.setSize(capacity);
-    for(uint i=0;i<capacity*sizeof(T);) {
-        int read = check( read_(fd,(byte*)buffer.data()+i,capacity*sizeof(T)-i) );
-        i+=read; assert(i<=capacity*sizeof(T),i,read,capacity);
-    }
-    return buffer;
-}

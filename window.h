@@ -20,7 +20,6 @@ struct Window : Poll {
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
            const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_);
-    ~Window();
 
     /// Event handler
     void event();
@@ -77,7 +76,7 @@ struct Window : Poll {
     /// \note The selection owner might lock this process if it fails to notify
     string getSelection();
 
-    enum Cursor { Cross, Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move } cursor=Cross;
+    enum Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Cross } cursor=Cross;
     /// Returns cursor icon for \a cursor
     const Image& cursorIcon(Cursor cursor);
     /// Returns cursor hotspot for \a cursor

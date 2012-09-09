@@ -16,8 +16,9 @@ template<typename T> struct remove_reference<T&> { typedef T type; };
 template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
 template<class T> nodebug constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
+template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(o) o(const o&)=delete; o& operator=(const o&)=delete;
-/// base template for explicit copy (may be overriden for not implicitly copyable types using template specialization)
+/// base template for explicit copy (overriden by explicitly copyable types)
 template<class T> T copy(const T& t) { return t; }
 
 /// Forward
@@ -28,7 +29,6 @@ typedef integral_constant<bool, false> false_type;
 template<typename> struct is_lvalue_reference : public false_type { };
 template<typename T> struct is_lvalue_reference<T&> : public true_type { };
 #define is_lvalue_reference(T) is_lvalue_reference<T>::value
-
 template<class T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
 template<class T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
 
@@ -39,7 +39,7 @@ template<> struct predicate<true> { typedef void* type; };
 #define predicate(E) typename predicate<E>::type& condition = enabler
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
 
-/// Primitives
+/// Primitive types
 typedef char byte;
 typedef signed char int8;
 typedef unsigned char uint8;
@@ -53,6 +53,26 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 
+/// Works around missing support for some C++11 features in QtCreator code model
+#ifndef __GXX_EXPERIMENTAL_CXX0X__
+#define override //explicit virtual method override
+template<class T> struct ref; //templated typedef using
+#define _ //string literal operator _""
+#define __( args... ) //member initialization constructor {}
+#define ___ //variadic template arguments unpack operator ...
+#define ____( ignore... ) //=default, static_assert, constructor{} initializer
+#else
+/// \a ref is a const typed bounded memory reference (i.e fat pointer)
+/// \note As \a data is not owned, ref should be used carefully (only as argument, never as field)
+namespace std { template<class T> struct initializer_list; }
+template<class T> using ref = std::initializer_list<T>;
+/// Returns reference to string literals
+inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
+#define __( args... ) { args }
+#define ___ ...
+#define ____( ignore... ) ignore
+#endif
+
 /// compile \a statements in executable only if \a DEBUG flag is set
 #ifdef DEBUG
 #define debug( statements... ) statements
@@ -62,20 +82,12 @@ typedef unsigned long long uint64;
 /// Logs current stack trace skipping /a skip last frames
 void trace(int skip=0, uint size=-1);
 /// Simplified debug methods (avoid header dependencies on debug.h/string.h/array.h/memory.h)
-void log_(const char*);
-void exit_(int) __attribute((noreturn));
+void write(const ref<byte>& message);
+void abort() __attribute((noreturn));
 /// Aborts unconditionally and display \a message
-#define error_(message) ({ trace(0,-1); log_(message); exit_(-1); })
+#define error_(message) ({ trace(0,-1); write(message "\n"_); abort(); })
 /// Aborts if \a expr evaluates to false and display \a expr
 #define assert_(expr) ({debug( if(!(expr)) error_(#expr); )})
-
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { assert_((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
-
-/// Floating point primitives
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
 
 /// initializer_list
 namespace std {
@@ -110,27 +122,13 @@ template<class T> struct initializer_list {
 };
 }
 
-/// Missing C++11 IDE support workarounds
-#ifndef __GXX_EXPERIMENTAL_CXX0X__
-#define override
-template<class T> struct ref;
-#define _
-#define __( args... )
-#define ___
-#define ____( ignore... )
-#else
-/// \a ref is a const typed bounded memory reference (i.e fat pointer)
-/// \note As \a data is not owned, ref should be used carefully (only as argument, never as field)
-template<class T> using ref = std::initializer_list<T>;
+/// Works around missing support for some C++11 features in QtCreator code model
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, unsigned long size) { return ref<byte>((byte*)data,size); }
-#define __( args... ) { args }
-#define ___ ...
-#define ____( ignore... ) ignore
 #endif
 
 /// Basic operations
-template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 template<class T> constexpr T min(T a, T b) { return a<b ? a : b; }
 template<class T> constexpr T max(T a, T b) { return a>b ? a : b; }
 template<class T> constexpr T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
@@ -138,16 +136,10 @@ template<class T> constexpr T abs(T x) { return x>=0 ? x : -x; }
 template<class A, class B> bool operator !=(const A& a, const B& b) { return !(a==b); }
 template<class A, class B> bool operator >(const A& a, const B& b) { return b<a; }
 
-/// Raw buffer zero initialization
-inline void clear(byte* dst, int size) { for(int i=0;i<size;i++) dst[i]=0; }
-/// Unsafe (ignoring constructors) raw value zero initialization
-template<class T> void clear(T& dst) { static_assert(sizeof(T)>8,""); clear((byte*)&dst,sizeof(T)); }
-/// Safe buffer default initialization
-template<class T> void clear(T* data, int size, const T& value=T()) { for(int i=0;i<size;i++) data[i]=value; }
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert_((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 
-/// Raw buffer copy
-inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
-/// Unsafe (ignoring constructors) raw value copy
-template<class T> void copy(T& dst,const T& src) { copy((byte*)&dst,(byte*)&src,sizeof(T)); }
-/// Safe buffer copy
-template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
+/// Floating point operations
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }

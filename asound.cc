@@ -42,13 +42,13 @@ struct SWParams {
 struct Status { int state, pad; ptr hwPointer; timespec tstamp; int suspended_state; };
 struct Control { ptr swPointer; long availableMinimum; };
 
-#define IO(major,minor) major<<8 | minor
-#define IOWR(major,minor,type) 3<<30 | sizeof(type)<<16 | major<<8 | minor
-#define IOCTL_HW_PARAMS IOWR('A', 0x11, HWParams)
-#define IOCTL_SW_PARAMS IOWR('A', 0x13, SWParams)
-#define IOCTL_PREPARE IO('A', 0x40)
-#define IOCTL_START IO('A', 0x42)
-#define IOCTL_DRAIN IO('A', 0x44)
+enum IOCTL {
+    HW_PARAMS = IOWR<HWParams>('A', 0x11),
+    SW_PARAMS =IOWR<SWParams>('A', 0x13),
+    PREPARE = IO('A', 0x40),
+    START = IO('A', 0x42),
+    DRAIN = IO('A', 0x44)
+};
 
 void AudioOutput::start(bool realtime) {
     if(fd) return;
@@ -65,7 +65,7 @@ void AudioOutput::start(bool realtime) {
     hparams.interval(Rate) = rate;
     if(realtime) hparams.interval(PeriodSize)=512, hparams.interval(Periods).max=2;
     else hparams.interval(PeriodSize).min=1024, hparams.interval(Periods).min=2;
-    check_(ioctl(fd, IOCTL_HW_PARAMS, &hparams));
+    ioctl(HW_PARAMS, &hparams);
     periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * periodSize;
     debug(log("period="_+dec((int)periodSize)+" ("_+dec(1000*periodSize/rate)+"ms), buffer="_+dec(bufferSize)+" ("_+dec(1000*bufferSize/rate)+"ms)"_);)
@@ -75,16 +75,16 @@ void AudioOutput::start(bool realtime) {
     SWParams sparams;
     sparams.avail_min = hparams.interval(PeriodSize);
     sparams.stop_threshold = sparams.boundary = bufferSize;
-    check_(ioctl(fd, IOCTL_SW_PARAMS, &sparams));
+    ioctl(SW_PARAMS, &sparams);
 
     status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset) );
     control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset) );
-    check_(ioctl(fd, IOCTL_PREPARE, 0),fd);
+    ioctl(PREPARE, 0);
     registerPoll(fd, POLLOUT|POLLERR|POLLNVAL);
 }
 void AudioOutput::stop() {
     if(!fd) return; unregisterPoll();
-    if(status->state == Running) ioctl(fd, IOCTL_DRAIN,0);
+    if(status->state == Running) ioctl(DRAIN,0);
     munmap((void*)status, 0x1000); status=0;
     munmap(control, 0x1000); control=0;
     munmap(buffer, bufferSize * channels * 2); buffer=0; bufferSize=0;
@@ -92,13 +92,13 @@ void AudioOutput::stop() {
 }
 void AudioOutput::event() {
     assert(revents!=POLLNVAL);
-    if(status->state == XRun) { log("XRun"_); check_(ioctl(fd, IOCTL_PREPARE, 0)); }
+    if(status->state == XRun) { log("XRun"_); ioctl(PREPARE, 0); }
     for(;;){
         int available = status->hwPointer + bufferSize - control->swPointer;
         if(!available) break; assert(available>=int(periodSize));
         uint offset = control->swPointer % bufferSize;  assert(bufferSize-offset>=periodSize);
         if(!read(buffer+offset*channels, periodSize)) {stop(); return;}
         control->swPointer += periodSize;
-        if(status->state == Prepared) { check_(ioctl(fd, IOCTL_START, 0)); }
+        if(status->state == Prepared) { ioctl(START, 0); }
     }
 }

@@ -14,22 +14,27 @@ inline float sRGB(float c) { if(c>=0.0031308f) return 1.055f*pow(c,1/2.4f)-0.055
 int main() {  for(int i=0;i<=256;i++) write(1,string(str(min(255,int(255*sRGB(i/255.f))))+", "_));  }
 #endif
 
-static int fonts() { static Folder fd = openFolder("usr/share/fonts"_); return fd; }
+static const Folder& fonts() { static Folder folder = "usr/share/fonts"_; return folder; }
 
-/// Enable automatic grid fitting
+/// Automatic grid fitting
 int fit=0;
-/// Disable LCD filtering
-int nofilter=0;
-/// 2x nearest upsample for debugging
-int up=0;
-/// enable luminance correction
+/// RGB subpixel rendering
+int subpixel=1; //=3 to enable
+/// LCD filtering
+int filter=0;
+/// Luminance perception correction
 int correct=0;
 
-Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(size) {
-    DataStream s = DataStream(keep, true);
+/// Supersampling (normal=16, =1 to debug)
+int down=16;
+/// Nearest upsampling (normal=1, >1 to debug)
+int up=1;
+
+Font::Font(const ref<byte>& name, int size) : keep(Map(name,fonts())), size(size) {
+    BinaryData s = BinaryData(keep, true);
     uint32 unused scaler=s.read();
     uint16 numTables=s.read(), unused searchRange=s.read(), unused numSelector=s.read(), unused rangeShift=s.read();
-    DataStream head, hhea;
+    BinaryData head, hhea;
     for(int i=0;i<numTables;i++) {
         uint32 tag=s.read<uint32>()/*no swap*/, unused checksum=s.read(), offset=s.read(), unused size=s.read();
         if(tag==raw<uint32>("head"_)) head=s.slice(offset,size);
@@ -40,22 +45,22 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
         if(tag==raw<uint32>("loca"_)) loca=s.buffer.data()+offset;
         if(tag==raw<uint32>("glyf"_)) glyf=s.buffer.data()+offset;
     }
-    {DataStream& s = head;
+    {BinaryData& s = head;
        uint32 unused version=s.read(), unused revision=s.read();
        uint32 unused checksum=s.read(), unused magic=s.read();
        uint16 unused flags=s.read(), unitsPerEm=s.read();
        s.advance(8+8+4*2+2+2+2); //created, modified, bbox[4], maxStyle, lowestRec, direction
        indexToLocFormat=s.read();
        // parameters for scale from design (FUnits) to device (.4 pixel)
-#define scaleX(p) ((3*size*int64(p)+round)>>scale)
+#define scaleX(p) ((subpixel*size*int64(p)+round)>>scale)
 #define scaleY(p) ((size*int64(p)+round)>>scale)
 #define scale(p) scaleY(p)
 #define unscale(p) (((p)<<scale)/size)
-#define unscaleX(p) (((p)<<scale)/(size*3))
+#define unscaleX(p) (((p)<<scale)/(size*subpixel))
        scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4; assert(scale<32);
        round = (1<<scale)/2; //round to nearest not down
     }
-    {DataStream& s = hhea;
+    {BinaryData& s = hhea;
         uint32 unused version=s.read();
         ascent=ceil(16,scale(s.read16())), descent=scale(s.read16()), lineGap=scale(s.read16());
         //uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();*/
@@ -63,7 +68,7 @@ Font::Font(const ref<byte>& name, int size) : keep(mapFile(name,fonts())), size(
 }
 
 uint16 Font::index(uint16 code) {
-    cmap.seek(0); DataStream& s = cmap;
+    cmap.seek(0); BinaryData& s = cmap;
     uint16 unused version=s.read(), numTables=s.read();
     for(int i=0;i<numTables;i++) {
         uint16 unused platformID=s.read(), unused platformSpecificID=s.read(); uint32 offset=s.read();
@@ -97,10 +102,10 @@ uint16 Font::index(uint16 code) {
     error("Not Found"_);
 }
 
-int Font::advance(uint16 index) { return (up?:1)*scale(big16(hmtx[2*index])); }
+int Font::advance(uint16 index) { return up*scale(big16(hmtx[2*index])); }
 
 int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
-    kern.seek(0); DataStream& s = kern;
+    kern.seek(0); BinaryData& s = kern;
     uint16 unused version=s.read(), numTables=s.read();
     for(uint i=0;i<numTables;i++) {
         uint16 unused version=s.read(), unused length = s.read(); uint8 unused coverage = s.read(), unused format = s.read();
@@ -109,7 +114,7 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
         assert(14+nPairs*6==length);
         for(uint i=0;i<nPairs;i++) {
             uint16 left=s.read(), right=s.read(); int16 value=s.read();
-            if(left==leftIndex && right==rightIndex) return (up?:1)*scale(value);
+            if(left==leftIndex && right==rightIndex) return up*scale(value);
         }
     }
     return 0;
@@ -157,17 +162,17 @@ void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
 void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
     int pointer = ( indexToLocFormat? big32(((uint32*)loca)[index]) : 2*big16(((uint16*)loca)[index]) );
     int length = ( indexToLocFormat? big32(((uint32*)loca)[index+1]) : 2*big16(((uint16*)loca)[index+1]) ) - pointer;
-    DataStream s=DataStream(ref<byte>(glyf +pointer, length), true);
+    BinaryData s=BinaryData(ref<byte>(glyf +pointer, length), true);
     if(!s) return;
 
     int16 numContours = s.read();
     if(!raster.data) {
         xMin= s.read16(), yMin= s.read16(), xMax= s.read16(), yMax= s.read16();
-        xMin  = unscaleX(floor(48,scaleX(xMin))); xMax = unscaleX(ceil(48,scaleX(xMax))); //align canvas to integer pixels
+        xMin  = unscaleX(floor(subpixel*16,scaleX(xMin))); xMax = unscaleX(ceil(subpixel*16,scaleX(xMax))); //align canvas to integer pixels
         yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
         int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin); assert(width>0,xMax,xMin); assert(height>0,yMax,yMin);
-        if(fit) new (&raster) Bitmap(width+2*48,height+3*16); //new (&raster) Bitmap(width+48,height+16);
+        if(fit) new (&raster) Bitmap(width+2*subpixel*16,height+3*16); //new (&raster) Bitmap(width+48,height+16);
         else new (&raster) Bitmap(width+1,height+1);
     } else s.advance(4*2); //TODO: resize as needed
 
@@ -219,10 +224,10 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
                 array<int2> tn; //array of points in (tangent, normal) coordinates
                 array<int> ref; //array of original references to the points
                 int pos=0,min=1<<30,max=0; int direction=0;
-                int size() {assert(tn.size()==ref.size()); return tn.size(); }
+                int size() {assert(tn.size()==ref.size(),tn,ref); return tn.size(); }
             };
             for(int pass=0;pass<2;pass++) { //vertically fit horizontal stems (then horizontally fit vertical stems)
-                int I = pass?48:16;
+                int I = pass?16:16; //TODO: fit to subpixel ?
                 int M = pass?raster.width:raster.height;
 #define xy(p) (pass?int2(p.y,p.x):p)
                 array<Stem> stems;
@@ -232,19 +237,21 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
                     for(; i<=last; i++) {
                         int2 n=xy(P[i]); int x=n.x,y=n.y;
                         for(Stem& s: stems) {
-                            for(int2 a: s.tn) if(12*abs(a.y-y)>abs(a.x-x)) goto break2_;
+                            for(int2 a: s.tn) if(16*abs(a.y-y)>=abs(a.x-x)) goto break2_;
                             /*else*/ {
                                 if((s.ref.contains(first) && !(s.ref.last()==first && i==first+1)) ||
                                         (s.direction && ((((s.direction==1?s.min:s.max)<x)?1:-1)!=s.direction))) { //stem cut by contour loop seam
                                     if(!s.direction){ assert(s.size()==1);
-                                        s.tn.insertAt(0,n); s.ref.insertAt(0,i);
+                                        s.tn.insertAt(0,n); s.ref.insertAt(0,i); assert(s.tn.size()==s.ref.size());
                                         s.direction = s.tn.first().x<s.tn.last().x?1:-1;
                                         //log(pass,s.direction,s.tn,s.ref);
                                         int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
                                     } else {
-                                        int j=0; for(;j<s.size() && (x<s.tn[j].x?1:-1)!=s.direction;j++) //log(x,s.tn[j].x,s.direction, (n<s.tn[j]?1:-1)!=s.direction);
+                                        int j=0; for(;j<s.size() && (x<s.tn[j].x?1:-1)!=s.direction;j++) {} //log(x,s.tn[j].x,s.direction, (n<s.tn[j]?1:-1)!=s.direction);
                                         //log(n,s.tn[j],(n<s.tn[j]?1:-1),j<s.size(),(n<s.tn[j]?1:-1)!=s.direction);
-                                        s.tn.insertAt(j,n); s.ref.insertAt(j,i); //log(s.tn);
+                                            assert(s.tn.size()==s.ref.size());
+                                        s.tn.insertAt(j,n); s.ref.insertAt(j,i);
+                                        assert(s.tn.size()==s.ref.size()); //log(s.tn);
                                         int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { //assert monotonic
                                             assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn,j);
                                             a=b;
@@ -252,7 +259,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
                                     }
                                 } else if(x<s.min || x>s.max) {
                                     assert(!s.direction || (s.tn[0].x<x?1:-1)==s.direction,s.tn,n,s.ref[0],first,i,last); //assert new is extremum
-                                    s.tn<<n; s.ref<<i;
+                                    s.tn<<n; s.ref<<i; assert(s.tn.size()==s.ref.size());
                                     if(!s.direction){
                                         s.direction = s.tn.first().x<s.tn.last().x?1:-1;
                                         int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
@@ -266,26 +273,33 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
                         } /*else*/ {
                             Stem s; s.tn<<n; s.ref<<i; s.min=s.max=x; s.pos=y; stems<<move(s);
                         }break3_:;
+                        for(uint i=0;i<stems.size();i++) assert(stems[i].size());
                     }
                 }
 
-                for(uint i=0;i<stems.size();) { Stem& s=stems[i];
-                    if(s.size()==1) { stems.removeAt(i); continue; } else i++;
-                    s.pos/=s.size(); //TODO: weighted mean
+                for(uint i=0;i<stems.size();i++) { Stem& s=stems[i];
+                    if(s.size()==1) { stems.removeAt(i); i--; } else s.pos/=s.size(); //TODO: weighted mean
                 }
 
                 while(stems) { //fit stems
-                    uint best[2]={uint(-1),uint(-1)}; uint min=-1;
+                    uint best[2]={uint(-1),uint(-1)}; int bestScore=256*I;
                     for(uint i=0;i<stems.size();i++) for(uint j=0;j<i;j++) { Stem& a = stems[i]; Stem& b=stems[j];
                         assert(a.direction); assert(b.direction); assert(a.pos!=b.pos || a.direction != b.direction,a.tn," - ",b.tn);
                         //assert(a.direction==b.direction || (b.pos-a.pos>0)==b.direction,pass,a.direction,a.tn,b.direction,b.tn);
-                        if(a.direction != b.direction && ((a.pos-b.pos)>0)==(a.direction==1) && uint(abs(a.pos-b.pos))<min) min=abs(a.pos-b.pos), best[0]=i, best[1]=j;
+                        if(a.direction != b.direction && ((a.pos-b.pos)>0)==(a.direction!=1)) {
+                            int min=::max(a.min,b.min), max=::min(a.max,b.max); int len=max-min;
+                            if(len>=8*I) {
+                                int dist = abs(b.pos-a.pos);
+                                int score = dist + 3000/len; log(dist,len,score);
+                                if(score<bestScore) bestScore=score, best[0]=i, best[1]=j;
+                            }
+                        }
                         //else if(a.direction != b.direction) log("miss",pass,a.direction,a.tn,b.direction,b.tn,a.pos-b.pos,a.max-a.min,b.max-b.min);
                     }
                     if(best[0]==uint(-1)) {
                         if(stems.size()>=2) {
                             if(stems.size()==2) { Stem& a=stems[0], &b=stems[1];
-                                log("X",pass,"\t","A",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t","B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max);
+                                log("X",pass,b.pos-a.pos,"\tA",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t","B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max);
                             } else { log("X",pass);
                                 for(Stem& a: stems) log(a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t",a.tn);
                             }
@@ -305,12 +319,15 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
 
                     int m = ::round(I,(a.pos+b.pos)/2+I/2)-I/2; //round to nearest %I==I/2 step
                     int w = ::round(I,(b.pos-a.pos)/2+I/2)-I/2; //round to nearest %I==I/2 step
-                    int t1=m-w, t2=m+w;
-                    log(pass,"\t","A",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t","B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max);
+                    int t1=m-w, t2=m+w-1;
+                    log("O",pass,"(a+b)/2",(a.pos+b.pos)/2,"(a+b)%2",(a.pos+b.pos)%2,"m",m,"(b-a)/2",(b.pos-a.pos)/2,"w",w,"t1",t1,"t2",t2);
+                    log("A",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t",a.tn);
+                    log("B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max,"\t",b.tn);
                     assert(t1<t2,t1,t2);
                     assert(t1%I==0,m,w,t1,t2);
-                    assert((t2)%I==0);
-                    t1=clip(0,t1,M-1); t2=clip(0,t2,M-1);
+                    assert((t2+1)%I==0);
+                    if(t1>M-1) log("clip",t1,M); t1=clip(0,t1,M-1);
+                    if(t2>M-1) log("clip",t2,M); t2=clip(0,t2,M-1);
 
                     for(uint i=0;i<a.tn.size();i++) {
                         int2 p=a.tn[i]; p.y = t1;
@@ -359,7 +376,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
 }
 
 const Glyph& Font::glyph(uint16 index, int fx) {
-    if(fit || nofilter) fx=0; else fx=fx&(16-1);
+    if(fit || !filter) fx=0; else fx=fx&(16-1);
     // Lookup glyph in cache
     Glyph& glyph = index<128 ? cacheASCII[fx][index] : cacheUnicode[fx][index];
     if(glyph.valid) return glyph;
@@ -372,39 +389,53 @@ const Glyph& Font::glyph(uint16 index, int fx) {
     assert(glyph.offset.x%16==0); assert(glyph.offset.y%16==0,glyph.offset.y);
     glyph.offset /= 16;
 
-    uint width=ceil(48,raster.width)/48+1, height=raster.height/16; //add 1px for filtering
-    glyph.image = Image(width, height);
-    for(uint y=0; y<height; y++) {
-        uint16 line[width*3];
-        int acc[16]={};
-        for(uint x=0; x<width; x++) { //Supersampled rasterization
-            for(uint c=0; c<3; c++) {
-                int sum=0;
-                for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
-                    int idx=-fx*3+(x*3+c)*16+i; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
-                    sum += acc[j]>0;
-                }
-                line[x*3+c]=sum; assert(sum<=256);
+    if(down!=16) {
+        uint width=raster.width, height=raster.height;
+        glyph.image = Image(width, height);
+        for(uint y=0; y<height; y++) {
+            int acc=0;
+            for(uint x=0; x<width; x++) { //Supersampled rasterization
+                glyph.image(x,y)= acc>0? byte4(0,0,0,255) : byte4(255,255,255,0);
+                acc += raster(x,y);
             }
         }
-        for(uint x=0; x<width; x++) { //LCD subpixel filtering
-            uint16 filter[5] = {1, 4, 6, 4, 1}; if(nofilter) clear(filter,5), filter[2]=16;
-            uint16 pixel[3] = {0,0,0};
-            for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)width*3) pixel[c]+=filter[i]*line[idx]; }
-            int r=16*256-pixel[0],g=16*256-pixel[1],b=16*256-pixel[2];
-            if(r||g||b) {
-                int l = (66*r+129*g+25*b); /*standard perceived luminance (also depends on display calibration and lighting condition)*/
-                int v = (85*r+86*g+85*b)/16; /*target luminance (from coverage)*/
-                if(correct) r = min(256,r*v/l), g=min(256,g*v/l), b=min(256,b*v/l); //scale all components to match perceptual intensity to target value
-                else r = r/16, g=g/16, b=b/16;
-                glyph.image(x,y) = byte4(sRGB[b],sRGB[g],sRGB[r],min(255,v)); //sRGB
-            } else glyph.image(x,y) = byte4(0,0,0,255); //full coverage
-            //correct for different color intensity perception (r~0.3,g~0.5,b~0.2), i.e: lighten blue, darken green
-            //const int r=3/*0.3~1/3*/, g=2/*0.5~1/2*/, b=5/*0.2~1/5*/;
-            //glyph.image(x,y) = byte4(255-gamma[pixel[2]/(16*b)],255-gamma[pixel[1]/(16*g)],255-gamma[pixel[0]/(16*r)],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
+    } else {
+        uint width=ceil(subpixel*down,raster.width)/(subpixel*down)+1, height=raster.height/down; //add 1px for filtering
+        glyph.image = Image(width, height);
+        for(uint y=0; y<height; y++) {
+            uint16 line[width*subpixel];
+            int acc[16]={};
+            for(uint x=0; x<width; x++) { //Supersampled rasterization
+                for(int c=0; c<subpixel; c++) {
+                    int sum=0;
+                    for(int j=0; j<16; j++) for(int i=0; i<16; i++) {
+                        int idx=-fx*subpixel+(x*subpixel+c)*16+i; if(idx>=0 && idx<(int)raster.width) acc[j] += raster(idx,y*16+j);
+                        sum += acc[j]>0;
+                    }
+                    line[x*subpixel+c]=sum; assert(sum<=256);
+                }
+            }
+            if(subpixel==1) {
+                for(uint x=0; x<width; x++) { int v=line[x], l=sRGB[256-v]; assert(v>=0 && v<=256,v); glyph.image(x,y)=byte4(l,l,l,min(255,v)); }
+            } else for(uint x=0; x<width; x++) { //LCD subpixel filtering
+                uint16 filter[5] = {1, 4, 6, 4, 1}; if(!::filter) filter[0]=filter[1]=0, filter[2]=16, filter[3]=filter[4]=0;
+                uint16 pixel[3] = {0,0,0};
+                for(uint c=0; c<3; c++) for(int i=0;i<5;i++) { int idx=x*3+c+i-2; if(idx>=0 && idx<(int)width*3) pixel[c]+=filter[i]*line[idx]; }
+                int r=16*256-pixel[0],g=16*256-pixel[1],b=16*256-pixel[2];
+                if(r||g||b) {
+                    int l = (66*r+129*g+25*b); /*standard perceived luminance (also depends on display calibration and lighting condition)*/
+                    int v = (85*r+86*g+85*b)/16; /*target luminance (from coverage)*/
+                    if(correct) r = min(256,r*v/l), g=min(256,g*v/l), b=min(256,b*v/l); //scale all components to match perceptual intensity to target value
+                    else r = r/16, g=g/16, b=b/16;
+                    glyph.image(x,y) = byte4(sRGB[b],sRGB[g],sRGB[r],min(255,pixel[0]+pixel[1]+pixel[2])); //sRGB
+                } else glyph.image(x,y) = byte4(0,0,0,255); //full coverage
+                //correct for different color intensity perception (r~0.3,g~0.5,b~0.2), i.e: lighten blue, darken green
+                //const int r=3/*0.3~1/3*/, g=2/*0.5~1/2*/, b=5/*0.2~1/5*/;
+                //glyph.image(x,y) = byte4(255-gamma[pixel[2]/(16*b)],255-gamma[pixel[1]/(16*g)],255-gamma[pixel[0]/(16*r)],min(255,pixel[0]+pixel[1]+pixel[2])); //vertical RGB pixels
+            }
         }
     }
-    if(up){
+    if(up>1){
         glyph.image=resize(glyph.image,up*glyph.image.width,up*glyph.image.height); glyph.offset*=up;
     }
     return glyph;

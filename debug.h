@@ -5,11 +5,8 @@ struct Symbol { ref<byte> file; string function; uint line=0; };
 /// Returns debug symbol nearest to address
 Symbol findNearestLine(void* address);
 
-/// Writes /a data to /a fd
-bool write(int fd, const ref<byte>& data);
-
 /// Logs to standard output using str(...) serialization
-template<class ___ Args> void log(const Args& ___ args) { write(1,string(str(args ___)+"\n"_)); }
+template<class ___ Args> void log(const Args& ___ args) { write(string(str(args ___)+"\n"_)); }
 
 /// Critical error in debug mode, log in release mode
 #if DEBUG
@@ -19,7 +16,7 @@ template<class ___ Args> void log(const Args& ___ args) { write(1,string(str(arg
 #endif
 
 /// Aborts unconditionally and logs \a message
-#define error(message...) ({ trace(); log(message); exit_(-1); })
+#define error(message...) ({ trace(); log(message); abort(); })
 
 /// Logs \a expr name and value
 #define eval(expr) log(#expr ":",expr)

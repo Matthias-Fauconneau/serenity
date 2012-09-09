@@ -1,6 +1,15 @@
 #pragma once
 #include "core.h"
 
+/// Raw zero initialization
+inline void clear(byte* buffer, int size) { for(int i=0;i<size;i++) buffer[i]=0; }
+/// Buffer default initialization
+template<class T> void clear(T* buffer, int size, const T& value=T()) { for(int i=0;i<size;i++) buffer[i]=value; }
+/// Raw memory copy
+inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
+/// Buffer explicit copy
+template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
+
 extern "C" void* malloc(unsigned long size);
 extern "C" void* realloc(void* buffer, unsigned long size);
 extern "C" void free(void* buffer);

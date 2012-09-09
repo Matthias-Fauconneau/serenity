@@ -26,21 +26,25 @@ struct BitReader {
 };
 
 struct FLAC : BitReader {
+    uint maxBlockSize = 0;
     uint rate = 0;
     const uint channels = 2;
     uint sampleSize = 0;
+    uint duration = 0;
 
-    uint duration=0;
-    static const uint maxBlockSize = 8192;
-    float* buffer = allocate<float>(channels*maxBlockSize); //64K
+    float* buffer = 0;
     uint blockSize=0;
+    uint frame=0;
 
-    ~FLAC(){unallocate<float>(buffer,channels*maxBlockSize);}
+    no_copy(FLAC)
+    FLAC(){}
+    FLAC(FLAC&& o){copy((byte*)this,(byte*)&o,sizeof(FLAC)); o.buffer=0;}
+    ~FLAC(){if(buffer) unallocate<float>(buffer,channels*maxBlockSize);}
 
     /// Reads header and prepare to read frames
     void start(const ref<byte>& buffer);
     /// Decodes next FLAC block
-    void readBlock();
+    void readFrame();
 };
 
 extern uint64 rice, predict, order;

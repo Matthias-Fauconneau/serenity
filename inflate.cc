@@ -72,13 +72,13 @@ struct decompressor_tag
 
 #define MZ_MAX(a,b) (((a)>(b))?(a):(b))
 #define MZ_MIN(a,b) (((a)<(b))?(a):(b))
-#define MZ_CLEAR_OBJ(obj) clear(obj)
+#define MZ_CLEAR_OBJ(obj) __builtin_memset(obj,0,sizeof(obj))
 
   #define MZ_READ_LE16(p) *((const uint16 *)(p))
   #define MZ_READ_LE32(p) *((const uint32 *)(p))
 
 #define MEMCPY(d, s, l) copy((byte*)(d), (byte*)(s), l)
-#define MEMSET(p, c, l) clear((byte*)(p), l, (byte)(c))
+#define MEMSET(p, c, l) __builtin_memset((byte*)(p), (byte)(c), l)
 
 #define CR_BEGIN switch(r->m_state) { case 0:
 #define CR_RETURN(state_index, result) do { status = result; r->m_state = state_index; goto common_exit; case state_index:; } while (0)

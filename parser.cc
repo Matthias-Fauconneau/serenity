@@ -18,7 +18,7 @@ struct Parser : Application {
     bool isNonTerminal(word w) { return contains(nonterminal,w); }
 
     /// Parses rule expressions and generate rules from EBNF as needed
-    array<word> parseRuleExpression(TextStream& s) {
+    array<word> parseRuleExpression(TextData& s) {
         array<word> tokens;
         for(;;) {
             while(s.available(1) && s.match(' ')) {}
@@ -169,9 +169,9 @@ struct Parser : Application {
 
     Parser() {
         /// Parses grammar
-        TextStream s=readFile("serenity/math.g"_);
-        //TextStream s=readFile("serenity/url.g"_);
-        //TextStream s=readFile("serenity/grammar.g"_);
+        TextData s=readFile("serenity/math.g"_);
+        //TextData s=readFile("serenity/url.g"_);
+        //TextData s=readFile("serenity/grammar.g"_);
         while(s.match('#')) s.until('\n');
         ref<byte> text = s.until('\n');
         word firstRule=""_;
