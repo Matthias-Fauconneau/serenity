@@ -27,6 +27,7 @@ bool existsFolder(const ref<byte>& folder, const Folder& at=root());
 /// Stream is an handle to an Unix I/O stream
 struct Stream : Handle {
     Stream(int fd):Handle(fd){}
+    Stream(Handle&& fd):Handle(move(fd)){}
     /// Reads exactly \a size bytes into \a buffer
     void read(void* buffer, uint size);
     /// Reads up to \a size bytes into \a buffer
@@ -45,19 +46,16 @@ struct Stream : Handle {
     }
     /// Writes \a buffer
     void write(const ref<byte>& buffer);
-// Device
     /// Sends \a request with \a arguments
     int ioctl(uint request, void* arguments);
-// Socket
-    /// Reads up to /a size bytes
-    array<byte> receive(uint size) { return readUpTo(size); }
-    /// Sends /a buffer
-    void send(const ref<byte>& buffer) { return write(buffer); }
 };
-typedef Stream Device;
-typedef Stream Socket;
+
+struct Socket : Stream {
+    Socket(int domain, int type);
+};
 
 struct File : Stream {
+    File(int fd):Stream(fd){}
     enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000};
     /// Opens \a file
     /// If read only, fails if not existing
@@ -68,12 +66,19 @@ struct File : Stream {
     /// Seeks to \a index
     void seek(int index);
 };
+inline File::Flags operator |(File::Flags a, File::Flags b) { return File::Flags(int(a)|int(b)); }
 /// Returns whether \a file exists (as a file)
 bool existsFile(const ref<byte>& file, const Folder& at=root());
 /// Reads whole \a file content
 array<byte> readFile(const ref<byte>& file, const Folder& at=root());
 /// Writes \a content into \a file (overwrites any existing file)
 void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at=root());
+
+typedef File Device;
+constexpr uint IO(uint major, uint minor) { return major<<8 | minor; }
+template<class T> constexpr uint IOW(uint major, uint minor) { return 1<<30 | sizeof(T)<<16 | major<<8 | minor; }
+template<class T> constexpr uint IOR(uint major, uint minor) { return 2<<30 | sizeof(T)<<16 | major<<8 | minor; }
+template<class T> constexpr uint IOWR(uint major, uint minor) { return 3<<30 | sizeof(T)<<16 | major<<8 | minor; }
 
 struct Map : ref<byte> {
     no_copy(Map)
@@ -84,6 +89,8 @@ struct Map : ref<byte> {
     Map& operator=(Map&& o){this->~Map();data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
     ~Map();
     explicit operator bool() { return data && size; }
+    /// Locks memory map in RAM
+    void lock(uint size) const;
 };
 
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links

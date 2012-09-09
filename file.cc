@@ -10,7 +10,7 @@ Handle::~Handle() { if(fd>0) close(fd); }
 
 const Folder& root() { const int AT_FDCWD=-100; static const Folder root = Folder("/"_,(const Folder&)AT_FDCWD); return root; }
 Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0){
-    if(create && !existsFolder(folder,at))  check_(mkdirat(at.fd, strz(folder), 0666), folder);
+    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0666), folder);
     fd=check( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0), folder);
 }
 array<string> listFiles(const ref<byte>& folder, ListFlags flags, const Folder& at) {
@@ -40,7 +40,6 @@ bool existsFolder(const ref<byte>& folder, const Folder& at) { return Handle( op
 
 void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
 int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size) ); }
-
 array<byte> Stream::read(uint capacity) {
     array<byte> buffer(capacity);
     int size = check( ::read(fd,buffer.data(),capacity) );
@@ -48,37 +47,35 @@ array<byte> Stream::read(uint capacity) {
     buffer.setSize(size);
     return buffer;
 }
-
 array<byte> Stream::readUpTo(uint capacity) {
     array<byte> buffer(capacity);
     int size = check( ::read(fd,buffer.data(),capacity) );
     if(size) { buffer.setCapacity(size); buffer.setSize(size); }
     return buffer;
 }
-
 void Stream::write(const ref<byte>& buffer) { int unused wrote=check( ::write(fd,buffer.data,buffer.size) ); assert(wrote==(int)buffer.size); }
-
 int Stream::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
+
+Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 /// File
 
 File::File(const ref<byte>& file, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
-int File::size() const { stat sb; fstat(fd, &sb); return sb.size; }
+int File::size() const { stat sb; check_(fstat(fd, &sb)); return sb.size; }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
-
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
 array<byte> readFile(const ref<byte>& path, const Folder& at) {
     File file(path,at);
     debug(if(file.size()>1<<16) { trace(); warn("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_); })
     return file.read(file.size());
 }
-void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at) { File(file,at,File::Truncate).write(content); }
+void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at) { File(file,at,File::WriteOnly|File::Create|File::Truncate).write(content); }
 
 /// Map
 
-Map::Map(const File& file) { data = (byte*)mmap(0,size=file.size(),PROT_READ,MAP_PRIVATE,file.fd,0); assert(data); }
-Map::~Map() { log("unmap",data); if(data) munmap((void*)data,size); }
-
+Map::Map(const File& file) { data = (byte*)check(mmap(0,size=file.size(),PROT_READ,MAP_PRIVATE,file.fd,0)); assert(data); }
+Map::~Map() { if(data) munmap((void*)data,size); }
+void Map::lock(uint size) const { assert(size<=this->size); check_(mlock(data, size)); }
 /// File system
 
 void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at) {

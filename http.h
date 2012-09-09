@@ -20,8 +20,8 @@ struct SSLSocket : TCPSocket {
     ~SSLSocket();
     SSL* ssl=0;
     bool connect(const ref<byte>& host, const ref<byte>& service);
-    array<byte> receive(uint size) override;
-    bool write(const ref<byte>& buffer) override;
+    uint available(uint need) override;
+    void write(const ref<byte>& buffer);
 };
 
 /// Encodes \a input to Base64 to transfer binary data through text protocol
@@ -69,6 +69,3 @@ void getURL(const URL &url, Handler handler=[](const URL&, Map&&){}, int maximum
 
 /// Returns path to cache file for \a url
 string cacheFile(const URL& url);
-
-/// descriptor to cache folder
-extern Folder cache;

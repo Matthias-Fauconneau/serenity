@@ -121,11 +121,6 @@ enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 enum {TFD_CLOEXEC = 02000000};
 enum {SIGABRT=6, SIGBUS, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM};
 
-constexpr uint IO(uint major, uint minor) { return major<<8 | minor; }
-template<class T> constexpr uint IOW(uint major, uint minor) { return 1<<30 | sizeof(T)<<16 | major<<8 | minor; }
-template<class T> constexpr uint IOR(uint major, uint minor) { return 2<<30 | sizeof(T)<<16 | major<<8 | minor; }
-template<class T> constexpr uint IOWR(uint major, uint minor) { return 3<<30 | sizeof(T)<<16 | major<<8 | minor; }
-
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
 syscall3(int, open, const char*,name, int,oflag, int,perms)

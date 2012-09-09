@@ -39,7 +39,7 @@ struct SWParams {
  long avail_min=0, xfer_align=0, start_threshold=0, stop_threshold=0, silence_threshold=0, silence_size=0, boundary=0;
  byte reserved[64];
 };
-struct Status { int state, pad; ptr hwPointer; timespec tstamp; int suspended_state; };
+struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
 struct Control { ptr swPointer; long availableMinimum; };
 
 enum IOCTL {
@@ -50,11 +50,9 @@ enum IOCTL {
     DRAIN = IO('A', 0x44)
 };
 
-void AudioOutput::start(bool realtime) {
-    if(fd) return;
-    fd = open("/dev/snd/pcmC0D0p", O_RDWR|O_NONBLOCK, 0);
-    if(fd<0) { log(errno[-fd]); fd=0; return; }
+AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read) : Poll(Device("/dev/snd/pcmC0D0p"_)), read(read) {}
 
+void AudioOutput::start(bool realtime) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(S16_LE);
@@ -80,7 +78,7 @@ void AudioOutput::start(bool realtime) {
     status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset) );
     control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset) );
     ioctl(PREPARE, 0);
-    registerPoll(fd, POLLOUT|POLLERR|POLLNVAL);
+    registerPoll(POLLOUT|POLLERR|POLLNVAL);
 }
 void AudioOutput::stop() {
     if(!fd) return; unregisterPoll();

@@ -7,7 +7,7 @@
 
 ICON(network) ICON(feeds)
 
-Feeds::Feeds() : readConfig("read"_,config(),File::WriteOnly|File::Create|File::Append), readMap(readConfig) {
+Feeds::Feeds() : readConfig("read"_,config(),File::ReadWrite|File::Create|File::Append), readMap(readConfig) {
     array::reserve(48);
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
@@ -43,7 +43,7 @@ void Feeds::loadFeed(const URL&, Map&& document) {
             URL url = URL(link);
             favicon = &favicons[copy(url.host)];
             string faviconFile = cacheFile(url.relative("/favicon.ico"_));
-            if(existsFile(faviconFile,cache)) *favicon = ::resize(decodeImage(readFile(faviconFile,cache)),16,16);
+            if(existsFile(faviconFile,cache())) *favicon = ::resize(decodeImage(readFile(faviconFile,cache())),16,16);
             else { *favicon = ::resize(networkIcon(),16,16); getURL(url, Handler(this, &Feeds::getFavicon), 7*24*60); }
         }
         if(!isRead(guid, link)) entries<< Entry(move(guid),move(link),share(*favicon),move(title)); //display all unread entries
@@ -61,7 +61,7 @@ void Feeds::getFavicon(const URL& url, Map&& document) {
     ref<byte> icon=""_;
     page.xpath("html/head/link"_, [&icon](const Element& e){ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
     if(!icon) icon="/favicon.ico"_;
-    if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink(string("../"_+cacheFile(url.relative(icon))), cacheFile(url.relative("/favicon.ico"_)),cache);
+    if(url.relative(icon).path!=url.relative("/favicon.ico"_).path) symlink(string("../"_+cacheFile(url.relative(icon))), cacheFile(url.relative("/favicon.ico"_)),cache());
     heap<ImageLoader>(url.relative(icon), &favicons[copy(url.host)], function<void()>(this, &Feeds::resetFavicons), int2(16,16), 7*24*60*60);
 }
 
@@ -74,7 +74,7 @@ void Feeds::setRead(uint index) {
     if(index==0) return; //:refresh
     Entry& entry = array::at(index);
     if(isRead(entry)) return;
-    ::write(readConfig,string(entry.guid+" "_+entry.link+"\n"_));
+    readConfig.write(string(entry.guid+" "_+entry.link+"\n"_));
     readMap = readConfig; //remap
     entry.text.setSize(12);
 }

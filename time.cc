@@ -113,6 +113,6 @@ Date parse(TextData& s) {
     return date;
 }
 
-Timer::Timer(){ registerPoll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)); }
+Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){}
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(uint date) { static timespec time[2]; time[1].sec=date; timerfd_settime(fd,1,time,0); }

@@ -9,17 +9,18 @@
 #include "time.h"
 #include "png.h"
 
+/// Globals
 namespace Shm { int EXT, event, error; } using namespace Shm;
 namespace Render { int EXT, event, error; } using namespace Render;
 int2 display;
 Widget* focus;
 Widget* drag;
 Window* current;
-
 string getSelection() { assert(current); return current->getSelection(); }
 
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : widget(widget), overrideRedirect(title.size?false:true) {
-    registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
+/// Creates window
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Poll(check(socket(PF_LOCAL, SOCK_STREAM, 0))),
+    widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
     if(check(connect(fd,(sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
@@ -85,6 +86,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     setType(type);
 }
 
+/// Render
 void Window::event() {
     current=this;
     if(revents==IDLE) {
@@ -140,6 +142,7 @@ void Window::event() {
     current=0;
 }
 
+/// Events
 void Window::processEvent(uint8 type, const XEvent& event) {
     if(type==0) { const Error& e=(const Error&)event; uint8 code=e.code;
         if(e.major==Render::EXT) {
@@ -211,7 +214,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             }
         }
         else if(type==EnterNotify || type==LeaveNotify) {
-            if(hideOnLeave) hide();
+            if(type==LeaveNotify && hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
             if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None)) wait();
@@ -235,12 +238,10 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
 }
-
-void Window::send(const ref<byte>& request) { write( request); sequence++; }
-
+void Window::send(const ref<byte>& request) { write(request); sequence++; }
 template<class T> T Window::readReply() {
     for(;;) { uint8 type = read<uint8>();
-        if(type==0){Error e=read<Error>(); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; return t; }}
+        if(type==0){Error e=read<Error>(); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
         else if(type==1) return read<T>();
         else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }

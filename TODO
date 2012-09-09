@@ -1,8 +1,8 @@
-update player, music, desktop, taskbar
-font: line sampling, grid fit
+player: flac
+font: grid fit, line sampling?
 pdf,ebook -> touchbook
 IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion
-music: rt midi, score, auto rt_decay, auto volume, reverb, auto tune
+music: realtime midi signal, score, auto rt_decay, auto volume, reverb, auto tune
 fibermesh
 apps: file manager, search, imap, shell, monitor, torrent, video, irc
 own: make, midi, inflate, jpeg, mp3, ssl

@@ -36,10 +36,9 @@ struct Taskbar : Application, Poll {
     uint desktop=0;
     uint escapeCode = window.KeyCode(Escape);
 
-    Taskbar() {
+    Taskbar() : Poll(socket(PF_LOCAL, SOCK_STREAM, 0)) {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
-        registerPoll(socket(PF_LOCAL, SOCK_STREAM, 0));
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
         sockaddr_un addr; copy(addr.path,path.data(),path.size());
         check_(connect(fd,(sockaddr*)&addr,2+path.size()),path);
@@ -47,8 +46,8 @@ struct Taskbar : Application, Poll {
             string authority = getenv("HOME"_)+"/.Xauthority"_;
             if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
             else send(raw(r)); }
-        {ConnectionSetupReply r=read<ConnectionSetupReply>(fd); assert(r.status==1);
-            read(fd,r.additionnal*4-(sizeof(ConnectionSetupReply)-8)); }
+        {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1);
+            read(r.additionnal*4-(sizeof(ConnectionSetupReply)-8)); }
 
         {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask; send(raw(r));}
         {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask|SubstructureRedirectMask; send(raw(r));}
@@ -56,7 +55,7 @@ struct Taskbar : Application, Poll {
 
         array<uint> windows;
         {QueryTree r; r.id=root; send(raw(r));}
-        {QueryTreeReply r = readReply<QueryTreeReply>(); windows=read<uint>(fd, r.count);}
+        {QueryTreeReply r = readReply<QueryTreeReply>(); windows=read<uint>( r.count);}
         for(uint id: windows) {
             addWindow(id);
             GetWindowAttributes r; r.window=id; send(raw(r)); GetWindowAttributesReply wa = readReply<GetWindowAttributesReply>();
@@ -195,7 +194,7 @@ struct Taskbar : Application, Poll {
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=128*128+2) {
         {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
         {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
-            array<T> a; if(size) a=read<T>(fd,size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(fd, pad); return a; }
+            array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read( pad); return a; }
     }
 
     void raiseTask(uint index) { raise(tasks[index].id); {GrabKey r; r.window=tasks[index].id; r.keycode=escapeCode; r.keyboardMode=0; send(raw(r));}}
@@ -220,22 +219,22 @@ struct Taskbar : Application, Poll {
     }
 
     uint16 sequence=-1;
-    void send(const ref<byte>& request) { write(fd, request); sequence++; }
+    void send(const ref<byte>& request) { write( request); sequence++; }
 
     struct QEvent { uint8 type; XEvent event; } packed;
     array<QEvent> queue;
 
     template<class T> T readReply() {
-        for(;;) { uint8 type = read<uint8>(fd);
-            if(type==0){Error e=read<Error>(fd); if(e.code!=3) window.processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear(t); return t; }}
-            else if(type==1) return read<T>(fd);
-            else queue << QEvent __(type, read<XEvent>(fd)); //queue events to avoid reentrance
+        for(;;) { uint8 type = read<uint8>();
+            if(type==0){Error e=read<Error>(); if(e.code!=3) window.processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
+            else if(type==1) return read<T>();
+            else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
         }
     }
 
     void event() {
-        uint8 type = read<uint8>(fd);
-        processEvent(type, read<XEvent>(fd));
+        uint8 type = read<uint8>();
+        processEvent(type, read<XEvent>());
         while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
     }
 };

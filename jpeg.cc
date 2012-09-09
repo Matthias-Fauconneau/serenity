@@ -1094,7 +1094,7 @@ void jpeg_decoder::stop_decoding(jpgd_status status)
 {
     m_error_code = status;
     free_all_blocks();
-    exit_(-1);
+    abort();
 }
 
 void *jpeg_decoder::alloc(int nSize, bool zero)
@@ -1592,7 +1592,7 @@ int jpeg_decoder::locate_sos_marker()
 // Reset everything to default/uninitialized state.
 void jpeg_decoder::init(jpeg_decoder_stream *pStream)
 {
-    clear(*this);
+    clear((byte*)this,sizeof(jpeg_decoder));
     m_pStream = pStream;
 
     // Ready the input buffer.
@@ -1890,7 +1890,7 @@ void jpeg_decoder::process_restart()
         stop_decoding(JPGD_BAD_RESTART_MARKER);
 
     // Reset each component's DC prediction values.
-    clear(m_last_dc_val);
+    clear(m_last_dc_val,max_COMPONENTS);
 
     m_eob_run = 0;
 
@@ -2398,7 +2398,7 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
         si++;
     }
 
-    clear(*pH);
+    clear((byte*)pH,sizeof(*pH));
     pH->ac_table = m_huff_ac[index] != 0;
 
     nextfreeentry = -1;

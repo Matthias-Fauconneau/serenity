@@ -11,7 +11,7 @@ struct AudioOutput : Poll {
 
     /// Configures default PCM output
     /// \note If \a realtime is set, the lowest latency will be used (most wakeups)
-    AudioOutput(function<bool(int16* output, uint size)> read) : read(read) {}
+    AudioOutput(function<bool(int16* output, uint size)> read);
     ~AudioOutput() { stop(); }
     void event();
     void start(bool realtime=false);

@@ -35,7 +35,7 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
 Application::Application () {
     assert(!app); app=this;
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
-    rlimit limit = {2<<20,2<<20}; setrlimit(RLIMIT_STACK,&limit); //2 MB
+    rlimit limit = {8<<20,8<<20}; setrlimit(RLIMIT_STACK,&limit); //8 MB
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
@@ -52,13 +52,14 @@ Application::Application () {
 }
 
 static array<Poll*> polls;
-void Poll::registerPoll(int fd, int events) { assert(!polls.contains(this)); assert(fd); this->fd=fd; assert(events); this->events=events; polls << this; }
+void Poll::registerPoll(int events) { assert(!polls.contains(this)); assert(events); this->events=events; polls << this; }
 static array<Poll*> unregistered;
 void Poll::unregisterPoll() { events=revents=0; if(polls.removeAll(this)) unregistered<<this; }
 static array<Poll*> queue;
 void Poll::wait() { queue+= this; }
+bool Poll::poll() { return ::poll(this,1,0)==1 && events; }
 
-int pollEvents(pollfd* pollfds, uint& size, int timeout){size=min(size,polls.size()); for(uint i=0;i<size;i++) copy((byte*)&pollfds[i],(byte*)&polls[i],sizeof(pollfd)); return ::poll(pollfds,size,timeout);}
+int pollEvents(pollfd* pollfds, uint& size, int timeout){size=min(size,polls.size()); for(uint i=0;i<size;i++) copy((byte*)&pollfds[i],(byte*)(pollfd*)polls[i],sizeof(pollfd)); return ::poll(pollfds,size,timeout);}
 int dispatchEvents() {
     if(!polls) return 0;
     uint size=polls.size();

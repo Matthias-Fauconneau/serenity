@@ -48,7 +48,7 @@ struct MP3Media : AudioMedia {
         static int unused once=mpg123_init();
         mh = mpg123_new(0,0);
         mpg123_param(mh, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.);
-        if(mpg123_open_fd(mh,file.fd)) { log("mpg123_open_fd failed"); mh=0; return; }
+        if(mpg123_open_fd(mh,this->file.fd)) { log("mpg123_open_fd failed"); mh=0; return; }
         long rate; int channels,encoding;
         if(mpg123_getformat(mh,&rate,&channels,&encoding)) { log("mpg123_getformat failed"); mh=0; return; }
         this->rate=rate; this->channels=channels;
@@ -150,14 +150,17 @@ struct Player : Application {
             ref<byte> last = section(mark,0);
             time = toInteger(section(mark,0,1,2));
             string folder = string(section(last,'/',0,2));
-            albums.index = folders.indexOf(folder);
-            array<string> files = listFiles(folder,Recursive|Sort|Files);
-            uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
-            for(;i<files.size();i++) queueFile(move(files[i]));
+            if(existsFolder(folder)) {
+                albums.index = folders.indexOf(folder);
+                array<string> files = listFiles(folder,Recursive|Sort|Files);
+                uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
+                for(;i<files.size();i++) queueFile(move(files[i]));
+            }
         }
-        window.setSize(int2(-512,-512)); window.show();
+        window.setSize(int2(-512,-512));
         if(files) next();
         if(time) seek(time);
+        window.show();
     }
     void queueFile(string&& path) {
         string title = string(section(section(path,'/',-2,-1),'.',0,-2));

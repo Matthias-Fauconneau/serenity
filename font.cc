@@ -19,9 +19,9 @@ static const Folder& fonts() { static Folder folder = "usr/share/fonts"_; return
 /// Automatic grid fitting
 int fit=0;
 /// RGB subpixel rendering
-int subpixel=1; //=3 to enable
+int subpixel=3; //=3 to enable
 /// LCD filtering
-int filter=0;
+int filter=1;
 /// Luminance perception correction
 int correct=0;
 

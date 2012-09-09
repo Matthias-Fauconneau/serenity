@@ -2,22 +2,24 @@
 #include "array.h"
 #include "file.h"
 
-struct pollfd : Stream { pollfd(int fd):Stream(fd){} short events=0, revents=0; };
 enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64};
+struct pollfd : Stream { short events, revents=0; pollfd(Handle&& fd, int events=POLLIN):Stream(move(fd)),events(events){} };
 
 /// Poll is a convenient interface to participate in the process-wide event loop
 struct Poll : pollfd {
-    no_copy(Poll) Poll(int fd=0, int events=POLLIN):pollfd(fd){ if(fd) registerPoll(fd,events);}
+    no_copy(Poll) Poll(Handle&& fd=0, int events=POLLIN):pollfd(move(fd)){ if(this->fd) registerPoll(events);}
     virtual ~Poll() { unregisterPoll(); }
     /// Registers this file descriptor to be polled in the process-wide event loop
     /// \note Objects should not move while registered (i.e allocated directly on heap and not as a an array value)
-    void registerPoll(int fd, int events=POLLIN);
+    void registerPoll(int events=POLLIN);
     /// Removes this file descriptor from the process-wide event poll loop
     void unregisterPoll();
     /// Schedules an \a event call after all process-wide outstanding poll events have been processed
     void wait();
     /// Callback on new poll events (or after a \a wait)
     virtual void event() =0;
+    /// Returns whether any data can be read or written without blocking
+    bool poll();
 };
 
 /// Dispatches events to registered Poll objects
