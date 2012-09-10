@@ -30,7 +30,7 @@ long toInteger(const ref<byte>& str, int base=10 );
 /// Forwards ref<byte>
 inline const ref<byte>& str(const ref<byte>& s) { return s; }
 /// Returns a bounded reference to the null-terminated string pointer
-ref<byte> str(const char* s); //TODO: escape analysis
+ref<byte> str(const char* s);
 /// Returns boolean as "true"/"false"
 inline ref<byte> str(const bool& b) { return b?"true"_:"false"_; }
 /// Returns a reference to the character

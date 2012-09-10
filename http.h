@@ -1,31 +1,30 @@
 #pragma once
-#include "stream.h"
+#include "data.h"
 #include "process.h"
 #include "function.h"
 #include "file.h"
 
 /// \a Socket is a network socket
-struct TCPSocket : virtual InputData, Poll {
-    TCPSocket(){}
-    ~TCPSocket() { disconnect(); }
-    /// Connects to \a service on \a host
-    bool connect(const ref<byte>& host, const ref<byte>& service);
-    void disconnect();
-    /// Waits until \a need bytes are available (or timeout after 1 second)
-    uint available(uint need) override;
+struct TCPSocket : Socket {
+    /// Connects to \a port on \a host
+    TCPSocket(uint host, uint16 port);
 };
 
-typedef struct ssl_st SSL;
 struct SSLSocket : TCPSocket {
+    SSLSocket(uint host, uint16 port, bool secure=false);
+    SSLSocket(SSLSocket&& o):TCPSocket(move(o)),ssl(o.ssl){o.ssl=0;}
+    default_move_operator(SSLSocket)
     ~SSLSocket();
-    SSL* ssl=0;
-    bool connect(const ref<byte>& host, const ref<byte>& service);
-    uint available(uint need) override;
+    struct SSL* ssl=0;
+    array<byte> readUpTo(int size);
     void write(const ref<byte>& buffer);
 };
 
-/// Encodes \a input to Base64 to transfer binary data through text protocol
-string base64(const string& input);
+template<class T/*: Stream*/> struct DataStream : T, virtual Data {
+    template<class... Args> DataStream(Args... args):T(args ___){} //workaround lack of constructor inheritance support
+    /// Feeds Data buffer using T::readUpTo
+    uint available(uint need) override;
+};
 
 struct URL {
     string scheme,authorization,host,path,fragment;
@@ -40,24 +39,20 @@ inline bool operator ==(const URL& a, const URL& b) {
 }
 
 typedef function<void(const URL&, Map&&)> Handler;
-
-struct HTTP : TextData, SSLSocket {
+struct HTTP : DataStream<SSLSocket>, Poll, TextData {
     URL url;
-    array<string> headers;
-    ref<byte> method;
-    array<string> redirect;
-    uint contentLength=0;
-    bool chunked=false;
-    array<byte> content;
+    array<string> headers; ref<byte> method; //Request
+    uint contentLength=0; bool chunked=false; array<string> redirect; //Header
+    int chunkSize=0; array<byte> content; //Data
     Handler handler;
 
 /// Connects to \a host and requests \a path using \a method.
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(const URL& url, Handler handler, array<string>&& headers =__(), const ref<byte>& method="GET"_);
+    HTTP(URL&& url, Handler handler, array<string>&& headers =__(), const ref<byte>& method="GET"_);
 
-   enum { Connect, Request, Header, Data, Cache, Handle, Done } state = Connect;
+   enum { Request, Header, Content, Cache, Handle, Done } state = Request;
     void request();
     void header();
     void event() override;
@@ -65,7 +60,7 @@ struct HTTP : TextData, SSLSocket {
 
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge minutes
-void getURL(const URL &url, Handler handler=[](const URL&, Map&&){}, int maximumAge=24*60);
+void getURL(URL&& url, Handler handler=[](const URL&, Map&&){}, int maximumAge=24*60);
 
 /// Returns path to cache file for \a url
 string cacheFile(const URL& url);

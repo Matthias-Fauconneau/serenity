@@ -17,7 +17,7 @@ void MidiFile::open(const ref<byte>& path) { /// parse MIDI header
 }
 
 void MidiFile::read(Track& track, int time, State state) {
-    BinaryData& s = track.stream;
+    BinaryData& s = track.data;
     if(!s) return;
     while(track.time < time) {
         uint8 type=track.type, vel=0,key=s.read();
@@ -47,7 +47,7 @@ void MidiFile::read(Track& track, int time, State state) {
 
 void MidiFile::seek(int time) {
     for(Track& track: tracks) {
-        if(time < track.time) { track.time=0; track.stream.index=0; }
+        if(time < track.time) { track.time=0; track.data.index=0; }
         read(track,time,Seek);
         track.time -= time;
     }

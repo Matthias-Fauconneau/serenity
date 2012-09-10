@@ -1,6 +1,7 @@
 #include "display.h"
 #include "window.h"
-#include "font.h"
+
+/*#include "font.h"
 #include "text.h"
 struct FontTest : Application, Widget {
     Image image[2]; int2 size __(8*4*16,8*4*16);
@@ -32,9 +33,9 @@ struct FontTest : Application, Widget {
     bool toggle=false;
     void render(int2 position, int2) { blit(position,image[toggle]); }
     bool mouseEvent(int2, int2, Event event, MouseButton) { if(event==Enter) { toggle=true; return true;} if(event==Leave) {toggle=false; return true;} return false; }
-};Application(FontTest)
+};Application(FontTest)*/
 
-/*#include "html.h"
+#include "html.h"
 struct HTMLTest : Application {
     Scroll<HTML> page;
     Window window __(&page.area(),0,"Browser"_);
@@ -42,10 +43,10 @@ struct HTMLTest : Application {
     HTMLTest() {
         window.localShortcut(Escape).connect(this, &Application::quit);
         page.contentChanged.connect(&window, &Window::render);
-        page.go("http://feedproxy.google.com/~r/Phoronix/~3/tLzs7apkEps/vr.php"_);
+        page.go("http://questionablecontent.net/view.php?comic=2271"_);
         window.show();
     }
-};Application(HTMLTest)*/
+};Application(HTMLTest)
 
 /*
 #include "display.h"
@@ -59,15 +60,6 @@ struct KeyTest : Application, Text {
     Window window __(this,int2(640,480),"KeyTest"_);
     KeyTest(){ window.globalShortcut(Play).connect(this,&Application::quit); focus=this; window.localShortcut(Escape).connect(this,&Application::quit); window.show(); }
     bool keyPress(Key key) { setText(str(dec(int(key)),hex(int(key)))); return true; }
-};
-
-#include "png.h"
-struct PNGTest : Application, ImageView {
-    Window window __(this,int2(16,16),"PNGTest"_);
-    ICON(arrow) PNGTest(){
-        image=decodeImage(encodePNG(arrowIcon()));
-        window.localShortcut(Escape).connect(this,&Application::quit); window.show();
-    }
 };
 
 #include "calendar.h"

@@ -1,5 +1,4 @@
 #include "string.h"
-#include "debug.h"
 
 /// ref<byte>
 
@@ -55,7 +54,7 @@ ref<byte> section(const ref<byte>& s, byte separator, int begin, int end, bool i
             }
         }
     }
-    assert(e>=b,"'"_+s+"'"_,separator,begin,end,includeSeparator,e,b);
+    assert_(e>=b);
     return ref<byte>(s.data+b,e-b);
 }
 
@@ -69,18 +68,17 @@ ref<byte> trim(const ref<byte>& s) {
 bool isInteger(const ref<byte>& s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
 
 long toInteger(const ref<byte>& number, int base) {
-    assert(base>=2 && base<=16,"Unsupported base"_,base);
+    assert_(base>=2 && base<=16);
     int sign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
     long value=0;
     for(;i!=number.end();++i) {
-        if(*i==' ') break;
         int n;
         if(*i>='0' && *i<='9') n = *i-'0';
         else if(*i>='a' && *i<='f') n = *i+10-'a';
         else if(*i>='A' && *i<='F') n = *i+10-'A';
-        else { warn("Invalid input '"_+number+"'"_); break; }
+        else break;
         value *= base;
         value += n;
     }
@@ -141,7 +139,7 @@ string simplify(string&& s) {
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return r; }
 
 template<int base> string utoa(uint n, int pad) {
-    assert(base>=2 && base<=16,"Unsupported base"_,base);
+    assert_(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
@@ -156,7 +154,7 @@ template string utoa<16>(uint,int);
 /// Integer conversions
 
 template<int base> string itoa(int number, int pad) {
-    assert(base>=2 && base<=16,"Unsupported base"_,base);
+    assert_(base>=2 && base<=16);
     byte buf[32]; int i=32;
     uint n=abs(number);
     do {

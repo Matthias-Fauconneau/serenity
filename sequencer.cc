@@ -1,8 +1,7 @@
 #include "sequencer.h"
-#include "stream.h"
+#include "data.h"
 #include "file.h"
 #include "time.h"
-#include "debug.h"
 #include "midi.h"
 
 Sequencer::Sequencer() : Poll(Device("/dev/snd/midiC1D0"_),POLLIN) {}
@@ -13,8 +12,8 @@ void Sequencer::event() {
         if(key & 0x80) { type=key>>4; key=read<uint8>(); }
         uint8 value=0;
         if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value=read<uint8>();
-        else warn("Unhandled MIDI event",type);
-        log(key,value);
+        else error_("Unhandled MIDI event");
+
         if(type == NoteOn) {
             if(value == 0 ) {
                 assert(pressed.contains(key));
@@ -48,7 +47,7 @@ void Sequencer::event() {
                 }
             }
         }
-    } while(poll());
+    } while(poll(fd));
 }
 
 void Sequencer::recordMID(const ref<byte>& path) { record=File(path,root(),File::WriteOnly); }

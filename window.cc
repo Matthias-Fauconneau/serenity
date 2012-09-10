@@ -3,7 +3,7 @@
 #include "display.h"
 #include "widget.h"
 #include "file.h"
-#include "stream.h"
+#include "data.h"
 #include "linux.h"
 #include "debug.h"
 #include "time.h"
@@ -19,11 +19,11 @@ Window* current;
 string getSelection() { assert(current); return current->getSelection(); }
 
 /// Creates window
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Poll(check(socket(PF_LOCAL, SOCK_STREAM, 0))),
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd),
     widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
-    if(check(connect(fd,(sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
+    if(check(connect(Socket::fd,&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;
         string authority = getenv("HOME"_)+"/.Xauthority"_;
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
@@ -144,29 +144,29 @@ void Window::event() {
 
 /// Events
 void Window::processEvent(uint8 type, const XEvent& event) {
-    if(type==0) { const Error& e=(const Error&)event; uint8 code=e.code;
+    if(type==0) { const XError& e=(const XError&)event; uint8 code=e.code;
         if(e.major==Render::EXT) {
             int reqSize=sizeof(Render::requests)/sizeof(*Render::requests);
             if(code>=Render::error && code<=Render::error+Render::errorCount) { code-=Render::error;
                 assert(code<sizeof(Render::errors)/sizeof(*Render::errors));
-                log("Error",Render::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+                log("XError",Render::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             }
         } else if(e.major==Shm::EXT) {
             int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
             if(code>=Shm::error && code<=Shm::error+Shm::errorCount) { code-=Shm::error;
                 assert(code<sizeof(Shm::errors)/sizeof(*Shm::errors));
-                log("Error",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+                log("XError",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
             }
         } else {
             assert(code<sizeof(::errors)/sizeof(*::errors),code,e.major);
             int reqSize=sizeof(::requests)/sizeof(*::requests);
-            log("Error",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
+            log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
     }
     else if(type==1) error("Unexpected reply");
@@ -241,7 +241,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
 void Window::send(const ref<byte>& request) { write(request); sequence++; }
 template<class T> T Window::readReply() {
     for(;;) { uint8 type = read<uint8>();
-        if(type==0){Error e=read<Error>(); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
+        if(type==0){XError e=read<XError>(); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
         else if(type==1) return read<T>();
         else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }

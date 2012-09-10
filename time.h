@@ -1,6 +1,6 @@
 #pragma once
 #include "process.h"
-#include "stream.h"
+#include "data.h"
 
 /// Returns Unix real-time in seconds
 long currentTime();

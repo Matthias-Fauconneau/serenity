@@ -18,8 +18,8 @@ file.h
 file.cc
 http.h
 http.cc
-stream.h
-stream.cc
+data.h
+data.cc
 xml.h
 xml.cc
 image.h

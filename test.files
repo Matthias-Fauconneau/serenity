@@ -9,14 +9,24 @@ string.h
 string.cc
 debug.h
 debug.cc
+process.h
+process.cc
 
-font.h
-font.cc
+widget.h
 display.h
 display.cc
-widget.h
+font.h
+font.cc
 text.h
 text.cc
 window.h
 window.cc
+
+http.h
+http.cc
+xml.h
+xm.cc
+html.h
+htm.cc
+
 test.cc

@@ -1,9 +1,11 @@
 #include "time.h"
 #include "linux.h"
-#include "stream.h"
+#include "data.h"
 #include "string.h"
 #include "debug.h"
 
+struct timespec { long sec,nsec; };
+enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 long currentTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
 long realTime() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec+ts.nsec/1000000; }
 long cpuTime() { struct timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
@@ -82,37 +84,38 @@ string str(Date date, const ref<byte>& format) {
         else r << s.next();
     }
     if(endsWith(r,","_)) r.pop(); //prevent dangling comma when last valid part is week day
-    assert(r,date.year,date.month,date.day,date.hours,date.minutes,date.seconds,date.weekDay,format);
     return r;
 }
 
 Date parse(TextData& s) {
     Date date;
-
     for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }
-
-    s.whileAny(" ,\t"_);
     {
+        s.whileAny(" ,\t"_);
         int number = s.number();
-        if(number<0) return date;
-        if(s.match(":"_)) date.hours=number, date.minutes=s.number();
-        else date.day = number-1;
+        if(number>=0) {
+            if(s.match(":"_)) date.hours=number, date.minutes=s.number();
+            else if(date.day==-1) date.day=number;
+        }
     }
-
-    s.whileAny(" ,\t"_);
-    for(int i=0;i<12;i++) if(s.match(str(months[i]))) date.month=i;
-
-    s.whileAny(" ,\t"_);
     {
-        int number = s.number();
-        if(number>=0 && s.match(":"_)) date.hours=number, date.minutes=s.number();
+        s.whileAny(" ,\t"_);
+        for(int i=0;i<12;i++) if(s.match(str(months[i]))) date.month=i;
     }
-
+    {
+        s.whileAny(" ,\t"_);
+        int number = s.number();
+        if(number>=0) {
+            if(s.match(":"_)) date.hours=number, date.minutes=s.number();
+            else if(date.day==-1) date.day=number-1;
+        }
+    }
     if(date.year==-1 && date.month>=0) date.year=::date().year;
-    debug(date.invariant();)
+    debug(date.invariant();) assert(date.hours>=0 || date.year>=0,date,s.buffer);
     return date;
 }
 
+enum {TFD_CLOEXEC = 02000000};
 Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){}
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(uint date) { static timespec time[2]; time[1].sec=date; timerfd_settime(fd,1,time,0); }

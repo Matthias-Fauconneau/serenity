@@ -1,5 +1,5 @@
 #pragma once
-#include "stream.h"
+#include "data.h"
 #include "vector.h"
 #include "image.h"
 #include "file.h"
@@ -15,9 +15,11 @@ struct Glyph {
 struct Font {
     Map keep;
     BinaryData cmap, kern;
-    uint16* hmtx;
-    const void* loca; uint16 indexToLocFormat; int ascent, descent, lineGap;
-    const byte* glyf; uint scale; int round, size;
+    ref<uint16> hmtx;
+    ref<byte> loca;
+    ref<byte> glyf;
+    uint16 indexToLocFormat; int ascent, descent, lineGap;
+    uint scale; int round, size;
     Glyph cacheASCII[16][128];
     map<uint16, Glyph> cacheUnicode[16];
 

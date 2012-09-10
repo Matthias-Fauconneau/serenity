@@ -1,6 +1,9 @@
 #pragma once
 #include "core.h"
 
+struct sockaddr_un { uint16 family=1; char path[108]; };
+enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
+
 #define fixed(T) packed ____(; static_assert(sizeof(T)==31,""))
 
 enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, Cursor=1<<14 };
@@ -13,7 +16,7 @@ enum MapState { IsUnmapped, IsUnviewable, IsViewable };
 enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
 enum StackMode { Above,Below,TopIf,BottomIf,Opposite };
 
-struct Error { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(Error);
+struct XError { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(XError);
 union XEvent {
     struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed;
     struct { byte detail; uint16 seq; uint window; uint8 mode; } packed focus;

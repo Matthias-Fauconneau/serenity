@@ -45,7 +45,7 @@ template<class T> struct array {
     /// Copies elements from a reference
     explicit array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
     /// References \a size elements from read-only \a data pointer
-    array(const T* data, uint size) : tag(-1), buffer(data, size, 0) {} //TODO: escape analysis
+    array(const T* data, uint size) : tag(-1), buffer(data, size, 0) {}
     /// Initializes array with a writable buffer of \a capacity elements
     array(const T* data, uint size, uint capacity) : tag(-3), buffer(data, size, capacity) { assert_(capacity>inline_capacity()); }
 
@@ -94,7 +94,7 @@ template<class T> struct array {
     /// Returns true if not empty
     explicit operator bool() const { return size(); }
     /// Returns a reference to the elements contained in this array
-    operator ref<T>() const { return ref<T>(data(),size()); } //TODO: escape analysis
+    operator ref<T>() const { return ref<T>(data(),size()); }
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
     /// Compares to single value
@@ -148,7 +148,7 @@ template<class T> struct array {
     /// Removes one matching element and returns an index to its successor
     int removeOne(const T& v) { int i=indexOf(v); if(i>=0) removeAt(i); return i; }
     /// Removes all matching elements
-    bool removeAll(const T& v) { bool any=false; for(uint i=0;i<size();i++) if(at(i)==v) { removeAt(i); i--; any=true; } return any; }
+    bool removeAll(const T& v) { int count=0; for(uint i=0;i<size();i++) if(at(i)==v) { removeAt(i); i--; count++; } return count; }
 
     /// Iterators
     const T* begin() const { return data(); }

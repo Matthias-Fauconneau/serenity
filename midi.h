@@ -1,10 +1,10 @@
 #pragma once
 #include "function.h"
-#include "stream.h"
+#include "data.h"
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 
-struct Track { int time=0; int type=0; BinaryData stream; Track(BinaryData&& stream):stream(move(stream)){} };
+struct Track { int time=0; int type=0; BinaryData data; Track(BinaryData&& data):data(move(data)){} };
 
 struct MidiFile {
     enum { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,

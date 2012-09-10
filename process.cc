@@ -1,12 +1,11 @@
 #include "process.h"
 #include "linux.h"
-#include "debug.h"
 #include "file.h"
-#include "stream.h"
+#include "data.h"
+#include "debug.h"
 
-void abort() { /*kill(0,SIGABRT); __builtin_unreachable();*/ exit(-1); }
-void write(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
-
+struct rlimit { long cur,max; };
+enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
 struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
 struct ucontext {
     long flags; ucontext *link; void* ss_sp; int ss_flags; long ss_size;
@@ -16,6 +15,10 @@ struct ucontext {
     long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,eip,cs,efl,uesp,ss;
 #endif
 };
+
+void abort() { /*kill(0,SIGABRT); __builtin_unreachable();*/ exit(-1); }
+void write(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
+
 Application* app;
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     ::write(1,"SIGNAL",6);
@@ -33,7 +36,7 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
 #include "fenv.h"
 #undef Application
 Application::Application () {
-    assert(!app); app=this;
+    assert_(!app); app=this;
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
     rlimit limit = {8<<20,8<<20}; setrlimit(RLIMIT_STACK,&limit); //8 MB
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
@@ -52,31 +55,24 @@ Application::Application () {
 }
 
 static array<Poll*> polls;
-void Poll::registerPoll(int events) { assert(!polls.contains(this)); assert(events); this->events=events; polls << this; }
-static array<Poll*> unregistered;
-void Poll::unregisterPoll() { events=revents=0; if(polls.removeAll(this)) unregistered<<this; }
 static array<Poll*> queue;
+static array<Poll*> unregistered;
+Poll::Poll(int fd, int events) { assert_(fd); this->fd=fd; assert_(events); this->events=events; polls << this; }
+Poll::~Poll() { polls.removeOne(this); unregistered<<this; assert_(!queue.contains(this)); }
 void Poll::wait() { queue+= this; }
-bool Poll::poll() { return ::poll(this,1,0)==1 && events; }
 
-int pollEvents(pollfd* pollfds, uint& size, int timeout){size=min(size,polls.size()); for(uint i=0;i<size;i++) copy((byte*)&pollfds[i],(byte*)(pollfd*)polls[i],sizeof(pollfd)); return ::poll(pollfds,size,timeout);}
+int pollEvents(pollfd* pollfds, uint& size, int timeout){size=min(size,polls.size()); for(uint i=0;i<size;i++) pollfds[i]=*polls[i]; return ::poll(pollfds,size,timeout);}
 int dispatchEvents() {
     if(!polls) return 0;
     uint size=polls.size();
-#if __clang__
-    byte pollfds_[size*sizeof(pollfd)]; clear(pollfds_,sizeof(pollfds_)); pollfd* pollfds=(pollfd*)pollfds_;
-#else
     pollfd pollfds[size];
-#endif
     while(queue){Poll* poll=queue.take(0); poll->revents=IDLE; poll->event(); if(pollEvents(pollfds,size,0)) goto break_;}
     /*else*/ pollEvents(pollfds,size,-1);
     break_:;
     Poll* polls[size]; copy(polls,::polls.data(),size);
     for(uint i=0;i<size;i++) {
-        Poll* poll=polls[i];
-        if(!unregistered.contains(poll) && (poll->revents = pollfds[i].revents)) {
-            poll->event();
-        }
+        Poll* poll=polls[i]; int revents=pollfds[i].revents;
+        if(revents && !unregistered.contains(poll)) { poll->revents = revents; poll->event(); }
     }
     unregistered.clear();
     return ::polls.size();

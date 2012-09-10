@@ -28,7 +28,6 @@
 */
 #include "resample.h"
 #include "memory.h"
-#include "debug.h"
 
 template<class T> T sq(const T& x) { return x*x; }
 template<class T> T cb(const T& x) { return x*x*x; }
@@ -135,10 +134,10 @@ Resampler::~Resampler() {
 
 template<bool mix>
 void Resampler::filter(const float* source, uint sourceSize, float* target, uint targetSize) {
-    assert_(kernel); assert_(buffer); assert_(source); assert_(target); assert(sourceSize==bufferSize-(N-1),sourceSize,bufferSize-(N-1));
-    assert(sourceSize%sourceRate==0,sourceSize,sourceRate);
-    assert(targetSize%targetRate==0,targetSize,targetRate);
-    assert(sourceSize/sourceRate*targetRate==targetSize);
+    assert_(kernel); assert_(buffer); assert_(source); assert_(target); assert_(sourceSize==bufferSize-(N-1));
+    assert_(sourceSize%sourceRate==0);
+    assert_(targetSize%targetRate==0);
+    assert_(sourceSize/sourceRate*targetRate==targetSize);
     for(uint channel=0;channel<channelCount;channel++) {
         // Copies interleaved signal into aligned planar buffer
         for(uint j=0;j<sourceSize;j++) buffer[channel][j+N-1]=source[j*channelCount+channel];
@@ -155,7 +154,7 @@ void Resampler::filter(const float* source, uint sourceSize, float* target, uint
                 integerIndex++;
             }
         }
-        assert(integerIndex == sourceSize,integerIndex,sourceSize,targetSize); assert_(fractionalIndex == 0);
+        assert_(integerIndex == sourceSize); assert_(fractionalIndex == 0);
 
         // Copies the last samples for next period (TODO: ring buffer)
         for(uint j=0;j<N-1;++j) buffer[channel][j] = buffer[channel][j+sourceSize];

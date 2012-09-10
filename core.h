@@ -18,6 +18,9 @@ template<typename T> struct remove_reference<T&&> { typedef T type; };
 template<class T> nodebug constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(o) o(const o&)=delete; o& operator=(const o&)=delete;
+#define default(o) o()____(=default);
+#define default_move_operator(o) o& operator=(o&&)____(=default);
+#define default_move(o) default(o) no_copy(o) o(o&&)____(=default); default_move_operator(o)
 /// base template for explicit copy (overriden by explicitly copyable types)
 template<class T> T copy(const T& t) { return t; }
 

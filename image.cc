@@ -1,5 +1,5 @@
 #include "image.h"
-#include "stream.h"
+#include "data.h"
 #include "vector.h"
 
 Image resize(const Image& image, uint width, uint height) {

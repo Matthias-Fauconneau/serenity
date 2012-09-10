@@ -7,7 +7,7 @@
 #include "window.h"
 #include "calendar.h"
 
-struct Taskbar : Application, Poll {
+struct Taskbar : Application, Socket, Poll {
     bool hasFocus; // for Escape key
     struct Task : Item {
         Taskbar* parent=0;
@@ -36,12 +36,12 @@ struct Taskbar : Application, Poll {
     uint desktop=0;
     uint escapeCode = window.KeyCode(Escape);
 
-    Taskbar() : Poll(socket(PF_LOCAL, SOCK_STREAM, 0)) {
+    Taskbar() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd) {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
         sockaddr_un addr; copy(addr.path,path.data(),path.size());
-        check_(connect(fd,(sockaddr*)&addr,2+path.size()),path);
+        check_(connect(Socket::fd,&addr,2+path.size()),path);
         {ConnectionSetup r;
             string authority = getenv("HOME"_)+"/.Xauthority"_;
             if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
@@ -82,7 +82,6 @@ struct Taskbar : Application, Poll {
         popup.anchor = TopRight;
         window.show();
     }
-    ~Taskbar() { {SetWindowEventMask r; r.window=root; r.eventMask=0; send(raw(r));}/*<- shouldn't be needed*/ close(fd); }
 
     void processEvent(uint8 type, const XEvent& e) {
         if(type==0) return;
@@ -226,7 +225,7 @@ struct Taskbar : Application, Poll {
 
     template<class T> T readReply() {
         for(;;) { uint8 type = read<uint8>();
-            if(type==0){Error e=read<Error>(); if(e.code!=3) window.processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
+            if(type==0){XError e=read<XError>(); if(e.code!=3) window.processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
             else if(type==1) return read<T>();
             else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
         }

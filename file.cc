@@ -2,6 +2,25 @@
 #include "linux.h"
 #include "debug.h"
 
+struct timespec { long sec,nsec; };
+#if __x86_64
+struct stat { long dev; long ino; long nlink; int mode,uid,gid; long rdev,size,blksize,blocks; timespec atime,mtime,ctime; long pad[3]; };
+#else
+typedef unsigned short uint16;
+typedef unsigned long long uint64;
+struct stat { uint64 dev; int pad1; int ino; int mode; uint16 nlink; int uid,gid; uint64 rdev; int pad2;
+              uint64 size; int blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
+#endif
+struct dirent { long ino, off; short len; char name[]; };
+enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000,
+#if __arm
+      O_DIRECTORY=040000
+#else
+      O_DIRECTORY=0200000
+#endif
+};
+enum {DT_DIR=4, DT_REG=8};
+
 /// Handle
 
 Handle::~Handle() { if(fd>0) close(fd); }
@@ -53,9 +72,8 @@ array<byte> Stream::readUpTo(uint capacity) {
     if(size) { buffer.setCapacity(size); buffer.setSize(size); }
     return buffer;
 }
-void Stream::write(const ref<byte>& buffer) { int unused wrote=check( ::write(fd,buffer.data,buffer.size) ); assert(wrote==(int)buffer.size); }
-int Stream::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
-
+bool Stream::poll() { pollfd pollfd __(fd,POLLIN); return ::poll(&pollfd,1,0)==1 && (pollfd.revents&POLLIN); }
+void Stream::write(const ref<byte>& buffer) { int unused wrote=check(::write(fd,buffer.data,buffer.size)); assert(wrote==(int)buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 /// File
@@ -63,6 +81,7 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 File::File(const ref<byte>& file, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
 int File::size() const { stat sb; check_(fstat(fd, &sb)); return sb.size; }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
+int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
 array<byte> readFile(const ref<byte>& path, const Folder& at) {
     File file(path,at);

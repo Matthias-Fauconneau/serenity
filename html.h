@@ -5,7 +5,7 @@
 
 /// Asynchronously load an image, sending a signal if the image was not cached
 struct ImageLoader {
-    ImageLoader(const URL& url, Image* target, function<void()>&& imageLoaded, int2 size=0, uint maximumAge=24*60);
+    ImageLoader(URL&& url, Image* target, function<void()>&& imageLoaded, int2 size=0, uint maximumAge=24*60);
     /// Reference to target to load (need to stay valid)
     Image* target;
     /// function to call on load if the image was not cached.

@@ -1,6 +1,6 @@
 #pragma once
 #include "map.h"
-#include "stream.h"
+#include "data.h"
 #include "memory.h"
 #include "function.h"
 
@@ -11,10 +11,10 @@ struct Element {
     array< unique<Element> > children; //inline array of heap Element instead of heap array of inline Element (faster resize)
     Element(){}
     /// Creates a content element from \a content
-    Element(string&& content):content(move(content)){} //TODO: escape analysis
-    /// Parses XML stream to construct a DOM tree of \a Elements
+    Element(string&& content):content(move(content)){}
+    /// Parses XML data to construct a DOM tree of \a Elements
     /// \note As all name, content and attribute strings are referenced, the input document should live as long as the parsed elements.
-    Element(TextData& stream, bool html=false); //TODO: escape analysis
+    Element(TextData& data, bool html=false);
     explicit operator bool() { return name||content; }
     /// Returns value for \a attribute (fail if missing)
     ref<byte> attribute(const ref<byte>& attribute) const;

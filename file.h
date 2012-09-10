@@ -25,8 +25,9 @@ struct Folder : Handle {
 bool existsFolder(const ref<byte>& folder, const Folder& at=root());
 
 /// Stream is an handle to an Unix I/O stream
+enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64};
+struct pollfd { int fd; short events, revents; };
 struct Stream : Handle {
-    Stream(int fd):Handle(fd){}
     Stream(Handle&& fd):Handle(move(fd)){}
     /// Reads exactly \a size bytes into \a buffer
     void read(void* buffer, uint size);
@@ -44,13 +45,16 @@ struct Stream : Handle {
         for(uint i=0;i<byteSize;) i+=readUpTo(buffer.data()+i, byteSize-i);
         return buffer;
     }
+    /// Polls whether reading would block
+    bool poll();
     /// Writes \a buffer
     void write(const ref<byte>& buffer);
-    /// Sends \a request with \a arguments
-    int ioctl(uint request, void* arguments);
 };
 
 struct Socket : Stream {
+    Socket(Handle&& fd):Stream(move(fd)){}
+    enum {PF_LOCAL=1, PF_INET};
+    enum {SOCK_STREAM=1, SOCK_DGRAM, O_NONBLOCK=04000};
     Socket(int domain, int type);
 };
 
@@ -74,11 +78,22 @@ array<byte> readFile(const ref<byte>& file, const Folder& at=root());
 /// Writes \a content into \a file (overwrites any existing file)
 void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at=root());
 
-typedef File Device;
-constexpr uint IO(uint major, uint minor) { return major<<8 | minor; }
-template<class T> constexpr uint IOW(uint major, uint minor) { return 1<<30 | sizeof(T)<<16 | major<<8 | minor; }
-template<class T> constexpr uint IOR(uint major, uint minor) { return 2<<30 | sizeof(T)<<16 | major<<8 | minor; }
-template<class T> constexpr uint IOWR(uint major, uint minor) { return 3<<30 | sizeof(T)<<16 | major<<8 | minor; }
+template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
+template<uint major, uint minor, class T> struct IOW { typedef T Type; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, class T> struct IOR { typedef T Type; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, class T> struct IOWR { typedef T Type; static constexpr uint iowr = 3<<30 | sizeof(T)<<16 | major<<8 | minor; };
+struct Device : File {
+    /// Sends ioctl \a request with untyped \a arguments
+    int ioctl(uint request, void* arguments);
+    /// Sends ioctl request with neither input/outputs arguments
+    template<class IO> int io() { return ioctl(IO::io, 0); }
+    /// Sends ioctl request with \a input arguments
+    template<class IOW> int iow(const typename IOW::Type& input) { return ioctl(IOW::iow, &input); }
+    /// Sends ioctl request with output arguments
+    template<class IOR> typename IOR::Type ior() { typename IOR::Type output; ioctl(IOR::ior, &output); return output; }
+    /// Sends ioctl request with \a reference argument
+    template<class IOWR> int iowr(typename IOWR::Type& reference) { ioctl(IOWR::iowr, &reference); }
+};
 
 struct Map : ref<byte> {
     no_copy(Map)

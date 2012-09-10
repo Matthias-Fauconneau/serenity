@@ -41,9 +41,9 @@ Font::Font(const ref<byte>& name, int size) : keep(Map(name,fonts())), size(size
         if(tag==raw<uint32>("hhea"_)) hhea=s.slice(offset,size);
         if(tag==raw<uint32>("cmap"_)) cmap=s.slice(offset,size);
         if(tag==raw<uint32>("kern"_)) kern=s.slice(offset,size);
-        if(tag==raw<uint32>("hmtx"_)) hmtx=(uint16*)(s.buffer.data()+offset);
-        if(tag==raw<uint32>("loca"_)) loca=s.buffer.data()+offset;
-        if(tag==raw<uint32>("glyf"_)) glyf=s.buffer.data()+offset;
+        if(tag==raw<uint32>("hmtx"_)) hmtx=cast<uint16>(s.Data::slice(offset,size));
+        if(tag==raw<uint32>("loca"_)) loca=s.Data::slice(offset,size);
+        if(tag==raw<uint32>("glyf"_)) glyf=s.Data::slice(offset,size);
     }
     {BinaryData& s = head;
        uint32 unused version=s.read(), unused revision=s.read();
@@ -160,9 +160,9 @@ void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
 }
 
 void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy){
-    int pointer = ( indexToLocFormat? big32(((uint32*)loca)[index]) : 2*big16(((uint16*)loca)[index]) );
-    int length = ( indexToLocFormat? big32(((uint32*)loca)[index+1]) : 2*big16(((uint16*)loca)[index+1]) ) - pointer;
-    BinaryData s=BinaryData(ref<byte>(glyf +pointer, length), true);
+    int pointer = ( indexToLocFormat? big32(((uint32*)loca.data)[index]) : 2*big16(((uint16*)loca.data)[index]) );
+    int length = ( indexToLocFormat? big32(((uint32*)loca.data)[index+1]) : 2*big16(((uint16*)loca.data)[index+1]) ) - pointer;
+    BinaryData s=BinaryData(ref<byte>(glyf.data +pointer, length), true);
     if(!s) return;
 
     int16 numContours = s.read();

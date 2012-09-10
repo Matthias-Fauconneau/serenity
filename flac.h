@@ -9,7 +9,7 @@ struct BitReader {
     uint index=0;
     BitReader(){}
     BitReader(const ref<byte>& buffer){setData(buffer);}
-    /// Skip \a count bits in stream
+    /// Skip \a count bits
     void skip(int count);
     /// Reads one bit in MSB msb encoding
     uint bit();
@@ -32,14 +32,14 @@ struct FLAC : BitReader {
     uint sampleSize = 0;
     uint duration = 0;
 
-    float* buffer = 0;
+    struct Buffer {
+        float* buffer = 0;
+        ~Buffer(){if(buffer)unallocate<float>(buffer);}
+    };
     uint blockSize=0;
     uint frame=0;
 
     no_copy(FLAC)
-    FLAC(){}
-    FLAC(FLAC&& o){copy((byte*)this,(byte*)&o,sizeof(FLAC)); o.buffer=0;}
-    ~FLAC(){if(buffer) unallocate<float>(buffer,channels*maxBlockSize);}
 
     /// Reads header and prepare to read frames
     void start(const ref<byte>& buffer);

@@ -86,49 +86,17 @@ enum class sys : long {
 #endif
 };
 
-typedef unsigned short uint16;
-typedef unsigned int uint;
-struct sockaddr { uint16 family; uint16 port; uint ip; int pad[2]; };
-struct sockaddr_un { uint16 family=1; char path[108]; };
-struct timespec { long sec,nsec; };
-struct rlimit { long cur,max; };
-#if __x86_64
-struct stat { long dev; long ino; long nlink; uint mode,uid,gid; long rdev,size,blksize,blocks; timespec atime,mtime,ctime; long pad[3]; };
-#else
-typedef unsigned long long uint64;
-struct stat { uint64 dev; uint pad1; uint ino; uint mode; uint16 nlink; uint uid,gid; uint64 rdev; uint pad2;
-              uint64 size; uint blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
-#endif
-
-struct dirent { long ino, off; short len; char name[]; };
-
-enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000, O_NONBLOCK=04000,
-#if __arm
-      O_DIRECTORY=040000
-#else
-      O_DIRECTORY=0200000
-#endif
-    };
-enum {PROT_READ=1, PROT_WRITE=2};
-enum {MAP_FILE, MAP_SHARED, MAP_PRIVATE};
-enum {DT_DIR=4, DT_REG=8};
-enum {F_SETFL=4};
-enum {PF_LOCAL=1, PF_INET};
-enum {SOCK_STREAM=1, SOCK_DGRAM};
-enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
-enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
-enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
-enum {TFD_CLOEXEC = 02000000};
 enum {SIGABRT=6, SIGBUS, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM};
 
 syscall3(int, read, int,fd, void*,buf, long,size)
 syscall3(int, write, int,fd, const void*,buf, long,size)
 syscall3(int, open, const char*,name, int,oflag, int,perms)
 syscall1(int, close, int,fd)
-syscall2(int, fstat, int,fd, stat*,buf)
+syscall2(int, fstat, int,fd, struct stat*,buf)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
 syscall3(int, lseek, int,fd, long,offset, int,whence)
 
+enum {PROT_READ=1, PROT_WRITE=2}; enum {MAP_FILE, MAP_SHARED, MAP_PRIVATE};
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, munmap, void*,addr, long,len)
 syscall1(void*, brk, void*,new_brk)
@@ -137,7 +105,7 @@ syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
 syscall3(int, ioctl, int,fd, long,request, void*,arguments)
 
 #if __i386
-syscall6(int, ipc, uint,call, long,first, long,second, long,third, const void*,ptr, long,fifth)
+syscall6(int, ipc, int,call, long,first, long,second, long,third, const void*,ptr, long,fifth)
 inline long shmat(int id, const void* ptr, int flag) { long addr; return ipc(21,id,flag,(long)&addr,ptr,0)<0 ?: addr; }
 inline int shmdt(const void* ptr) { return ipc(22,0,0,0,ptr,0); }
 inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,0); }
@@ -166,7 +134,7 @@ syscall4(int, utimensat, int,fd, const char*,name, const struct timespec*,times,
 
 syscall3(int, setpriority, int,which, int,who, int,prio)
 syscall2(int, mlock,const void*,addr, long,len)
-syscall2(int, setrlimit, int,resource, rlimit*,limit)
+syscall2(int, setrlimit, int,resource, struct rlimit*,limit)
 syscall2(int, clock_gettime, int,type, timespec*,ts)
 syscall2(int, timerfd_create, int,clock_id, int,flags)
 syscall4(int, timerfd_settime, int,ufd, int,flags, const timespec*,utmr, timespec*,otmr)
@@ -177,7 +145,7 @@ inline int socket(int domain, int type, int protocol) { long a[]={domain,type,pr
 inline int connect(int fd, struct sockaddr* addr, int len) { long a[]={fd,(long)addr,len}; return socketcall(3,a); }
 #else
 syscall3(int, socket, int,domain, int,type, int,protocol)
-syscall3(int, connect, int,fd, struct sockaddr*,addr, int,len)
+syscall3(int, connect, int,fd, void*,addr, int,len)
 #endif
 
 #undef str

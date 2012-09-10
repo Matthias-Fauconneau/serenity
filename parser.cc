@@ -1,7 +1,7 @@
 #include "parser.h"
 #include "process.h"
 #include "file.h"
-#include "stream.h"
+#include "data.h"
 
 
 array<string> pool;

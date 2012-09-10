@@ -1,4 +1,5 @@
 player: flac
+desktop: previous, scrollbar
 font: grid fit, line sampling?
 pdf,ebook -> touchbook
 IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion

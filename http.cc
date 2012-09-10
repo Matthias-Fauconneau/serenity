@@ -8,30 +8,65 @@
 #include "debug.h"
 #include "process.h"
 
-/// TCPSocket
+struct sockaddr { uint16 family; uint16 port; uint host; int pad[2]; };
 
-uint32 ip(TextData& s) {
-    int a=s.number(), b=(s.match('.'),s.number()), c=(s.match('.'),s.number()), d=(s.match('.'),s.number());
-    return (d<<24)|(c<<16)|(b<<8)|a;
+/// UDPSocket
+struct UDPSocket : Socket {
+    UDPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_DGRAM) { sockaddr addr = {PF_INET, big16(port), host}; check_(::connect(fd, &addr, sizeof(addr))); }
+};
+/// TCPSocket
+TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|O_NONBLOCK) {
+    assert(host!=uint(-1));
+    sockaddr addr = {PF_INET,big16(port),host}; connect(Socket::fd, &addr, sizeof(addr));
+    enum {F_SETFL=4}; fcntl(Socket::fd,F_SETFL,0);
+}
+/// SSLSocket
+extern "C" {
+ struct SSL;
+ int SSL_library_init();
+ struct SSLContext* SSL_CTX_new(const struct SSLMethod* method);
+ const SSLMethod* TLSv1_client_method();
+ SSL* SSL_new(SSLContext *ctx);
+ int SSL_set_fd(SSL*, int fd);
+ int SSL_connect(SSL*);
+ int SSL_shutdown(SSL*);
+ int SSL_read(SSL*,void *buf,int num);
+ int SSL_write(SSL*,const void *buf,int num);
+}
+SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port) {
+    assert(host!=uint(-1));
+    if(secure) {
+        static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
+        ssl = SSL_new(ctx);
+        SSL_set_fd(ssl,Socket::fd);
+        SSL_connect(ssl);
+    }
+}
+SSLSocket::~SSLSocket() { if(ssl) SSL_shutdown(ssl); }
+array<byte> SSLSocket::readUpTo(int size) {
+    if(!ssl) return TCPSocket::readUpTo(size);
+    array<byte> buffer(size);
+    size=SSL_read(ssl, buffer.data(), size);
+    if(size>=0) buffer.setSize(size); else warn("SSL error",size);
+    return buffer;
+}
+void SSLSocket::write(const ref<byte>& buffer) {
+    if(!ssl) return TCPSocket::write(buffer);
+    int size=SSL_write(ssl,buffer.data,buffer.size); if(size!=(int)buffer.size) log("SSL write error",fd,ptr(ssl),size,buffer.size);
 }
 
-bool TCPSocket::connect(const ref<byte>& host, const ref<byte>& service) {
-    disconnect();
+/// DNS
+
+uint ip(TextData& s) { int a=s.number(), b=(s.match('.'),s.number()), c=(s.match('.'),s.number()), d=(s.match('.'),s.number()); return (d<<24)|(c<<16)|(b<<8)|a; }
+uint nameserver() { TextData s=readFile("/etc/resolv.conf"_); s.until("nameserver "_); return ip(s); }
+uint resolve(const ref<byte>& host) {
     static File dnsCache = File("dns"_,cache(),File::ReadWrite|File::Create|File::Append);
     static Map dnsMap = dnsCache;
     uint ip=-1;
     for(TextData s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
     if(!ip) ip=-1;//return false; //negative entry
     if(ip==uint(-1)) {
-        static Socket dns=0;
-        if(!dns) {
-            dns = Socket(PF_INET,SOCK_DGRAM);
-            TextData s=readFile("etc/resolv.conf"_);
-            s.until("nameserver "_);
-            uint a=s.number(), b=(s.match("."_),s.number()), c=(s.match("."_),s.number()), d=(s.match("."_),s.number());
-            sockaddr addr = {PF_INET, big16(53), (d<<24)|(c<<16)|(b<<8)|a};
-            check_( ::connect(dns.fd, &addr, sizeof(addr)) );
-        }
+        static UDPSocket dns = UDPSocket(nameserver(), 53);
         array<byte> query;
         struct Header { uint16 id=big16(currentTime()); uint16 flags=1; uint16 qd=big16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
@@ -41,8 +76,8 @@ bool TCPSocket::connect(const ref<byte>& host, const ref<byte>& service) {
         }
         query << 0 << 0 << 1 << 0 << 1;
         dns.write(query);
-        ::write(string(host+" "_));
-        pollfd fd(dns.fd,POLLIN); if(!::poll(&fd,1,1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!::poll(&fd,1,1000)){log("giving up"); return false; } }
+        log_(host+" "_);
+        pollfd fd __(dns.fd,POLLIN); if(!::poll(&fd,1,1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!::poll(&fd,1,1000)){log("giving up"); return false; } }
         BinaryData s(dns.readUpTo(4096), true);
         header = s.read<Header>();
         for(int i=0;i<big16(header.qd);i++) { for(uint8 n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
@@ -62,127 +97,55 @@ bool TCPSocket::connect(const ref<byte>& host, const ref<byte>& service) {
             log("unknown");
             dnsCache.write(string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = dnsCache; //remap cache
-            return false;
         }
     }
-
-    fd = socket(PF_INET,SOCK_STREAM|O_NONBLOCK);
-    sockaddr addr = {PF_INET,big16(service=="https"_?443:80),ip};
-    ::connect(fd, &addr, sizeof(addr));
-    fcntl(fd,F_SETFL,0);
-    registerPoll(POLLOUT);
-    return true;
-}
-void TCPSocket::disconnect() { unregisterPoll(); }
-
-uint TCPSocket::available(uint need) {
-    while(need>InputData::available(need) && poll()) {
-        array<byte> packet=readUpTo(max(4096u,need-InputData::available(need)));
-        if(!packet) { warn("Empty packet",InputData::available(need),need); break; }
-        (array<byte>&)buffer<<packet;
-    }
-    return InputData::available(need);
-}
-
-/// SSLSocket
-
-extern "C" {
- int SSL_library_init();
- struct SSLContext* SSL_CTX_new(const struct SSLMethod* method);
- const SSLMethod* TLSv1_client_method();
- SSL* SSL_new(SSLContext *ctx);
- int SSL_set_fd(SSL*, int fd);
- int SSL_connect(SSL*);
- int SSL_shutdown(SSL*);
- int SSL_read(SSL*,void *buf,int num);
- int SSL_write(SSL*,const void *buf,int num);
-}
-bool SSLSocket::connect(const ref<byte>& host, const ref<byte>& service) {
-    if(!TCPSocket::connect(host,service)) return false;
-    if(service=="https"_) {
-        static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
-        ssl = SSL_new(ctx);
-        SSL_set_fd(ssl,fd);
-        SSL_connect(ssl);
-    }
-    return true;
-}
-SSLSocket::~SSLSocket() { if(ssl) SSL_shutdown(ssl); }
-uint SSLSocket::available(uint need) {
-    if(!ssl) return TCPSocket::available(need);
-    while(need>InputData::available(need)) {
-        if(poll(this,1,10)!=1 || !(revents&POLLIN)) { log(revents&POLLHUP?"Connection broken":"Waiting for more data"); break; }
-        uint size = max(4096u,need-InputData::available(need));
-        array<byte> packet(size);
-        if(ssl) size=SSL_read(ssl, packet.data(), size);
-        if(int(size)<0) { warn("SSL error"); break; }
-        packet.setSize(size);
-        if(!packet) { warn("Empty packet",InputData::available(need),need); break; }
-        (array<byte>&)buffer<<packet;
-    }
-    return InputData::available(need);
-}
-void SSLSocket::write(const ref<byte>& buffer) {
-    if(!ssl) return TCPSocket::write(buffer);
-    assert(SSL_write(ssl,buffer.data,buffer.size)==(int)buffer.size);
-}
-
-/// Base64
-
-string base64(const ref<byte>& input) {
-    string output(input.size*4/3+1);
-    for(uint j=0;j<input.size;) {
-        byte block[3]={};
-        uint i=0; while(i<3 && j<input.size) block[i++] = input[j++];
-        assert(i);
-        //encode 3 8-bit binary bytes as 4 '6-bit' characters
-        const char cb64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        output
-                << cb64[ block[0] >> 2 ]
-                << cb64[ ((block[0] & 0x03) << 4) | ((block[1] & 0xf0) >> 4) ]
-                << (i > 1 ? cb64[ ((block[1] & 0x0f) << 2) | ((block[2] & 0xc0) >> 6) ] : '=')
-                << (i > 2 ? cb64[ block[2] & 0x3f ] : '=');
-    }
-    return output;
+    return ip;
 }
 
 /// URL
 
+string base64(const ref<byte>& input) {
+    string output(input.size*4/3+1);
+    for(uint j=0;j<input.size;) {
+        byte block[3]={}; uint i=0; while(i<3 && j<input.size) block[i++] = input[j++];
+        const char cb64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        output << cb64[ block[0] >> 2 ] << cb64[ ((block[0] & 0x03) << 4) | ((block[1] & 0xf0) >> 4) ]
+               << (i > 1 ? cb64[ ((block[1] & 0x0f) << 2) | ((block[2] & 0xc0) >> 6) ] : '=') << (i > 2 ? cb64[ block[2] & 0x3f ] : '=');
+    }
+    return output;
+}
 URL::URL(const ref<byte>& url) {
     if(!url) { warn("Empty URL"); return; }
     TextData s(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
-    ref<byte> domain = s.untilAny("/?"_); if(s.buffer[s.index-1]=='?') s.index--;
+    ref<byte> domain = s.untilAny("/?"_); if(s.slice(s.index-1,1)=="?"_) s.index--;
     host = string(section(domain,'@',-2,-1));
     if(domain.contains('@')) authorization = base64(section(domain,'@'));
-    if(!host.contains('.')) { path=move(host); path<<"/"_; }
-    else if(host=="."_) host.clear();
     path << s.until('#');
+    if(!scheme) { path=host+"/"_+path; host.clear(); }
     fragment = string(s.untilEnd());
 }
 URL URL::relative(URL&& url) const {
-    if(url.scheme) { assert(url.host.size()>1); return move(url); } //already complete URL
-    if(url.host && url.path) { assert(url.host.size()>1); url.scheme=copy(scheme); return move(url); } //missing only scheme
-    if(url.host) { //relative path URLs could be misparsed into host field if first path element contains dots
-        swap(url.path,url.host);
-        if(url.host) {
-            if(!startsWith(url.host,"/"_)) url.path<<"/"_;
-            url.path << move(url.host);
-        }
-    }
+    if(!url.scheme) url.scheme=copy(scheme);
     if(!url.host) url.host=copy(host);
-    if(!url.host.contains('.') || url.host=="."_) error(host,path,url.host,url.path);
     if(startsWith(url.path,"."_)) url.path.removeAt(0);
     while(startsWith(url.path,"/"_)) url.path.removeAt(0);
     return move(url);
 }
 string str(const URL& url) {
-    return url.scheme+(url.scheme?"://"_:""_)
-            +url.authorization+(url.authorization?"@"_:""_)
-            +url.host+"/"_+url.path
-            +(url.fragment?"#"_:""_)+url.fragment;
+    return url.scheme+(url.scheme?"://"_:""_)+url.authorization+(url.authorization?"@"_:""_)+url.host+"/"_+url.path+(url.fragment?"#"_:""_)+url.fragment;
 }
+
+template<class T> uint DataStream<T>::available(uint need) {
+    while(need>Data::available(need) && T::poll()) {
+        array<byte> chunk = T::readUpTo(max(4096u,need-Data::available(need)));
+        if(!chunk) { log("Empty chunk",Data::available(need),need); break; }
+        buffer << chunk;
+    }
+    return Data::available(need);
+}
+
 
 /// HTTP
 
@@ -193,10 +156,9 @@ string cacheFile(const URL& url) {
     return url.host+"/"_+name;
 }
 
-HTTP::HTTP(const URL& url, Handler handler, array<string>&& headers, const ref<byte>& method)
-    : url(str(url)), headers(move(headers)), method(method), handler(handler) {
-    if(!connect(url.host, url.scheme)) { free(this); return; } state=Request;
-}
+HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>& method)
+    : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
+      url(move(url)), headers(move(headers)), method(method), handler(handler) {}
 void HTTP::request() {
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;
@@ -205,7 +167,7 @@ void HTTP::request() {
 void HTTP::header() {
     string file = cacheFile(url);
     // Status
-    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log((string&)buffer); log("No HTTP",url); state=Done; free(this); return; }
+    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log(buffer); log("No HTTP",url); state=Done; free(this); return; }
     int status = toInteger(until(" "_));
     until("\r\n"_);
     if(status==200||status==301||status==302) {}
@@ -220,50 +182,54 @@ void HTTP::header() {
     else if(status==404) log("Not Found"_,url);
     else if(status==408) log("Request timeout"_);
     else if(status==504) log("Gateway timeout"_);
-    else { log((string&)buffer); warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
+    else { log(buffer); warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
 
     // Headers
-    for(;;) {
-        if(match("\r\n"_)) break;
+    while(!match("\r\n"_)) {
         ref<byte> key = until(": "_); assert(key,buffer);
         ref<byte> value=until("\r\n"_);
         if(key=="Content-Length"_) contentLength=toInteger(value);
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
         else if((key=="Location"_ && (status==301||status==302)) || key=="Refresh"_) {
             if(startsWith(value,"0;URL="_)) value=value.slice(6);
-            URL next = url.relative(value);
-            assert(!url.host.contains('/') && !next.host.contains('/'),url,next);
-            redirect << file;
-            ((array<byte>&)buffer).clear(); index=0; contentLength=0; chunked=false; disconnect(); //state=Connect;
-            url=move(next);
-            if(!connect(url.host, url.scheme)) { free(this); return; } state=Connect;
+            url = url.relative(value);
+            uint ip = resolve(url.host);
+            if(ip==uint(-1)) { log("Unknown host",url); free(this); return; }
+            SSLSocket::operator=(SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_));
+            Poll::fd=SSLSocket::fd;
+            TextData::operator=(move(TextData()));
+            assert(index==0); assert(buffer.tag==0); assert(buffer.buffer.capacity==0); assert(buffer.buffer.data==0); assert(buffer.size()==0);
+            contentLength=chunked=0; redirect << file;
+            state=Request; events=POLLOUT;
             return;
         }
     }
-    state = Data;
+    state = Content;
 }
 void HTTP::event() {
-    if((revents&POLLHUP) && state <= Data) { log("Connection broken",url); state=Done; free(this); return; } //TODO: also cleanup never established connections
-    if(state == Request) { fcntl(fd,F_SETFL,0); events=POLLIN|POLLHUP; request(); return; }
+    if((revents&POLLHUP) && state <= Content) { log("Connection broken",url); state=Done; free(this); return; }
+    if(state == Request) { events=POLLIN; request(); return; }
     if(state == Header) { header(); }
-    if(state == Data) {
+    if(state == Content) {
         if(contentLength) {
             if(available(contentLength)<contentLength) return;
-            content << InputData::read(contentLength);
+            content << Data::read(contentLength);
             state=Cache;
         }
         else if(chunked) {
             do {
-                uint chunkSize = number(16); match("\r\n"_);
+                if(!chunkSize) { chunkSize = number(16); match("\r\n"_); } //else already parsed
                 if(chunkSize==0) { state=Cache; break; }
-                uint unused packetSize=available(chunkSize); assert(packetSize>=chunkSize);
-                content << InputData::read(chunkSize); match("\r\n"_);
-            } while(InputData::available(3)>=3);
+                assert(chunkSize>0,chunkSize,buffer);
+                if(available(chunkSize+2)<uint(chunkSize+2)) return;
+                content << Data::read(chunkSize); match("\r\n"_);
+                chunkSize=0;
+            } while(Data::available(3)>=3);
         }
         else state=Cache;
     }
     if(state == Cache) {
-        if(!content) log("Missing content",(string&)buffer);
+        if(!content) log("Missing content",buffer);
         if(content.size()>1024) log("Downloaded",url,content.size()/1024,"KB"); else log("Downloaded",url,content.size(),"B");
         redirect << cacheFile(url);
         for(const string& file: redirect) writeFile(file,content,cache());
@@ -277,7 +243,7 @@ void HTTP::event() {
     }
 }
 
-void getURL(const URL &url, Handler handler, int maximumAge) {
+void getURL(URL&& url, Handler handler, int maximumAge) {
     string file = cacheFile(url);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;
@@ -291,5 +257,5 @@ void getURL(const URL &url, Handler handler, int maximumAge) {
         }
         headers<< "If-Modified-Since: "_+str(date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
-    heap<HTTP>(url,handler,move(headers));
+    heap<HTTP>(move(url),handler,move(headers));
 }

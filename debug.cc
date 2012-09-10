@@ -1,6 +1,6 @@
 #include "debug.h"
 #include "file.h"
-#include "stream.h"
+#include "data.h"
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };

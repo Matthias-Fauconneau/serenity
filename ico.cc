@@ -1,5 +1,5 @@
 #include "image.h"
-#include "stream.h"
+#include "data.h"
 
 struct Directory { uint16 reserved, type, count; };
 struct Entry { uint8 width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };

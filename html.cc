@@ -3,9 +3,8 @@
 #include "jpeg.h"
 #include "ico.h"
 
-ImageLoader::ImageLoader(const URL& url, Image* target, function<void()>&& imageLoaded, int2 size, uint maximumAge)
-    : target(target), imageLoaded(imageLoaded), size(size) {
-    getURL(url, Handler(this, &ImageLoader::load), maximumAge);
+ImageLoader::ImageLoader(URL&& url, Image* target, function<void()>&& imageLoaded, int2 size, uint maximumAge) : target(target), imageLoaded(imageLoaded), size(size) {
+    getURL(move(url), Handler(this, &ImageLoader::load), maximumAge);
 }
 
 void ImageLoader::load(const URL&, Map&& file) {
@@ -128,7 +127,7 @@ void HTML::flushImages() {
     if(!images) return;
     UniformGrid<ImageView>& grid = heap<UniformGrid<ImageView> >();
     grid.resize(images.size());
-    for(URL& image: images) heap<ImageLoader>(image, &grid.last().image, contentChanged);
+    for(URL& image: images) heap<ImageLoader>(move(image), &grid.last().image, contentChanged);
     VBox::operator<<(&grid);
     images.clear();
 }

@@ -1,5 +1,5 @@
 #include "sampler.h"
-#include "stream.h"
+#include "data.h"
 #include "file.h"
 #include "flac.h"
 #include "time.h"
@@ -107,7 +107,7 @@ void Sampler::processEvent(Event e) { int key=e.key, velocity=e.velocity;
             note.remaining=note.duration;
             note.release=s.release?4096:0; //TODO: reverb
             note.key=key;
-            int shift = key-s.pitch_keycenter; assert(shift>=-1 && shift<=1,"unsupported pitch shift"_,shift);
+            int shift = key-s.pitch_keycenter; assert_(shift>=-1 && shift<=1);
             note.layer=1+shift;
             note.velocity=velocity;
             note.level=level;
@@ -148,7 +148,7 @@ template<bool mix> void Note::read(float* out, uint size) {
 }
 
 bool Sampler::read(int16 *output, uint unused size) {
-    assert(size==period,"Sampler supports only fixed size period of", period,"frames, trying to read",size,"frames");
+    assert_(size==period);
     if(queue) processEvent(queue.take(0));
     timeChanged(time);
     for(Layer& layer : layers) layer.active=false;

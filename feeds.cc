@@ -44,7 +44,7 @@ void Feeds::loadFeed(const URL&, Map&& document) {
             favicon = &favicons[copy(url.host)];
             string faviconFile = cacheFile(url.relative("/favicon.ico"_));
             if(existsFile(faviconFile,cache())) *favicon = ::resize(decodeImage(readFile(faviconFile,cache())),16,16);
-            else { *favicon = ::resize(networkIcon(),16,16); getURL(url, Handler(this, &Feeds::getFavicon), 7*24*60); }
+            else { *favicon = ::resize(networkIcon(),16,16); getURL(move(url), Handler(this, &Feeds::getFavicon), 7*24*60); }
         }
         if(!isRead(guid, link)) entries<< Entry(move(guid),move(link),share(*favicon),move(title)); //display all unread entries
         else if(count==0) entries<< Entry(move(guid),move(link),share(*favicon),move(title),12); //display last read entry

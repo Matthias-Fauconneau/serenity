@@ -15,7 +15,6 @@ inline Format format(uint f) { assert_(f<32); return Format(f); }
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(string&& text=string(), int size=16, uint8 opacity=255, uint wrap=0);
-    Text(Text&&)____(=default);
 
     void setText(string&& text) { this->text=move(text); textSize=0; }
     void setSize(int size) { this->size=size; textSize=0; }
