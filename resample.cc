@@ -35,7 +35,6 @@ template<class T> T cb(const T& x) { return x*x*x; }
 /// Trigonometric primitives
 const float PI = 3.14159265358979323846;
 inline float sin(float t) { return __builtin_sinf(t); }
-inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline float atan(float f) { return __builtin_atanf(f); }
 
 /// SIMD
@@ -52,7 +51,7 @@ inline float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v;
 #define shuffle_ps __builtin_ia32_shufps
 #endif
 extern "C" int posix_memalign(byte** buffer, long alignment, long size);
-template<class T> T* allocate_aligned(int size) { byte* buffer; check_(posix_memalign(&buffer,16,size*sizeof(T))); return (T*)buffer; }
+template<class T> T* allocate_aligned(int size) { byte* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
 
 //TODO: store filter in 15x4 registers
 inline float product(const float* kernel, const float* signal, int len) {

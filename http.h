@@ -13,7 +13,7 @@ struct TCPSocket : Socket {
 struct SSLSocket : TCPSocket {
     SSLSocket(uint host, uint16 port, bool secure=false);
     SSLSocket(SSLSocket&& o):TCPSocket(move(o)),ssl(o.ssl){o.ssl=0;}
-    default_move_operator(SSLSocket)
+    move_operator(SSLSocket)
     ~SSLSocket();
     struct SSL* ssl=0;
     array<byte> readUpTo(int size);

@@ -1,7 +1,7 @@
 Makefile
 core.h
 array.h
-memory.cc
+memory.h
 vector.h
 map.h
 string.h

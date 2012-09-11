@@ -1,7 +1,7 @@
 #pragma once
 #include "string.h"
 
-struct Symbol { ref<byte> file; string function; uint line=0; };
+struct Symbol { string function; ref<byte> file; uint line=0; };
 /// Returns debug symbol nearest to address
 Symbol findNearestLine(void* address);
 

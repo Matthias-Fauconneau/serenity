@@ -1,6 +1,5 @@
 #pragma once
 #include "array.h"
-#include "vector.h"
 
 /// Decodes packed bitstreams
 struct BitReader {
@@ -25,24 +24,30 @@ struct BitReader {
     void setData(const ref<byte>& buffer);
 };
 
+typedef float float2 __attribute((vector_size(8)));
 struct FLAC : BitReader {
-    uint maxBlockSize = 0;
+    static constexpr uint channels = 2;
     uint rate = 0;
-    const uint channels = 2;
-    uint sampleSize = 0;
     uint duration = 0;
 
     struct Buffer {
-        float* buffer = 0;
-        ~Buffer(){if(buffer)unallocate<float>(buffer);}
-    };
-    uint blockSize=0;
-    uint frame=0;
+        float2* buffer = 0;
+        uint capacity = 0;
+        Buffer(){}
+        Buffer(uint capacity):buffer(allocate<float2>(capacity)),capacity(capacity){}
+        Buffer(Buffer&& o):buffer(o.buffer),capacity(o.capacity){o.buffer=0;}
+        move_operator(Buffer)
+        ~Buffer(){if(buffer)unallocate<float2>(buffer,capacity);}
+        operator float2*(){return buffer;}
+    } buffer;
 
-    no_copy(FLAC)
+    uint blockSize = 0;
+    float2* blockIndex = 0; // pointer to start of unread block data (may be modified by consumer)
+    float2* blockEnd = 0; // pointer to end of unread block data (call readFrame to read next block)
 
-    /// Reads header and prepare to read frames
-    void start(const ref<byte>& buffer);
+    FLAC(){}
+    /// Reads header and decode first frame to buffer
+    FLAC(const ref<byte>& buffer);
     /// Decodes next FLAC block
     void readFrame();
 };

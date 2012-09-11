@@ -77,7 +77,7 @@ uint resolve(const ref<byte>& host) {
         query << 0 << 0 << 1 << 0 << 1;
         dns.write(query);
         log_(host+" "_);
-        pollfd fd __(dns.fd,POLLIN); if(!::poll(&fd,1,1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!::poll(&fd,1,1000)){log("giving up"); return false; } }
+        if(!dns.poll(1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!dns.poll(1000)){log("giving up"); return false; }}
         BinaryData s(dns.readUpTo(4096), true);
         header = s.read<Header>();
         for(int i=0;i<big16(header.qd);i++) { for(uint8 n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers

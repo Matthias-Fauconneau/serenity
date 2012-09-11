@@ -8,7 +8,10 @@ typedef double double2 __attribute__ ((vector_size(16)));
 #else
 #define extract(vec, i) __builtin_ia32_vec_ext_v2df(vec,i)
 #endif
-
+enum Round { Even, Down, Up, Zero };
+void setRoundMode(Round round) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r &= ~(0b11<<13); r |= (round&0b11) << 13; asm volatile("ldmxcsr %0" : : "m" (*&r)); }
+enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
+void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #define swap64 __builtin_bswap64
 
 void BitReader::setData(const ref<byte>& buffer) { data=buffer.data; bsize=8*buffer.size; index=0; }
@@ -64,7 +67,7 @@ uint BitReader::utf8() {
     error("");
 }
 
-void FLAC::start(const ref<byte>& data) {
+FLAC::FLAC(const ref<byte>& data) {
     BitReader::setData(data);
     assert(startsWith(data,"fLaC"_)); skip(32);
     for(;;) { //METADATA_BLOCK*
@@ -75,21 +78,20 @@ void FLAC::start(const ref<byte>& data) {
         if(blockType==STREAMINFO) {
             assert(size=0x22);
             uint unused minBlockSize = binary(16); assert(minBlockSize>=16);
-            maxBlockSize = binary(16); assert(minBlockSize<=maxBlockSize && maxBlockSize<=32768);
+            uint maxBlockSize = binary(16); assert(minBlockSize<=maxBlockSize && maxBlockSize<=32768);
             int unused minFrameSize = binary(24), unused maxFrameSize = binary(24);
             rate = binary(20); assert(rate == 44100 || rate==48000,rate);
-            int unused channels = binary(3)+1; assert(channels==2);
-            sampleSize = binary(5)+1; assert(sampleSize==16 || sampleSize==24);
+            uint channels = binary(3)+1; assert(channels==2);
+            uint unused sampleSize = binary(5)+1; assert(sampleSize==16 || sampleSize==24);
             duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
             skip(128); //MD5
+
+            buffer = Buffer(channels*maxBlockSize);
         } else skip(size*8);
         if(last) break;
     };
-    buffer = allocate<float>(channels*maxBlockSize);
-    frame = 0;
+    readFrame();
 }
-
-inline uint log2_(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
 //FIXME: clang doesn't seem to keep the predictor in registers
 template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* even, double* odd, int* signal, int* end, int shift) {
@@ -101,8 +103,6 @@ template<int unroll> inline void unroll_predictor(uint order, double* predictor,
         int sample = (int64(sum)>>shift) + *signal; //add residual to prediction
         even[i]=odd[i]= (double)sample; //write out context
         *signal = sample; signal++; //write out decoded sample
-        assert(sample >= -(1<<24));
-        assert(sample <= (1<<24)-1, sample, sample-((1<<23)-1));
     }
     for(int i=order-1;i>=0;i--) predictor[2*unroll-order+i]=predictor[i]; //move predictors to right place for unrolled loop
     for(uint i=0;i<2*unroll-order;i++) predictor[i]=0; //clear extra predictors used because of unrolling
@@ -114,10 +114,11 @@ template<int unroll> inline void unroll_predictor(uint order, double* predictor,
 #define FILTER(aligned, misaligned) /*TODO: check if an inline function would also keep predictor in registers*/ ({ \
     double2 sum = {0,0}; \
     for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); /*unrolled loop in registers*/ \
-    /*int sample = *signal + int(extract(sum,0)+extract(sum,1));*/ /*add residual to prediction SD2SI=10*/\
-    int sample = (int64(extract(sum,0)+extract(sum,1))>>shift) + *signal; /*add residual to prediction*/\
-    assert(sample >= -(1<<24)); \
-    assert(sample <= (1<<24)-1, log2_(sample)); \
+    int sample = (int64(extract(sum,0)+extract(sum,1))>>shift); /*add residual to prediction SD2SI=10*/\
+    const double c = 0x1.0p52f; \
+    int unused sample2 = int32(((((extract(sum,0)+extract(sum,1))/(1<<shift))-c)+c));\
+    assert((sample2-sample)==0, sample2-sample, sample2, sample, int32(2*((extract(sum,0)+extract(sum,1))/(1<<shift))));\
+    sample += *signal;\
     aligned[2*unroll]= misaligned[2*unroll]= double(sample); aligned++; misaligned++; /*SI2SD=9, write out contexts, misalign align, align misalign*/\
     *signal = sample; signal++; /*write out decoded sample*/ })
 #else
@@ -148,15 +149,14 @@ void FLAC::readFrame() {
     enum { Independent=1, LeftSide=8, RightSide=9, MidSide=10 };
     int channels = binary(4); assert(channels==Independent||channels==LeftSide||channels==MidSide||channels==RightSide,channels);
     int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
-    uint sampleSize = sampleSize_[binary(3)]; assert(sampleSize==this->sampleSize);
+    uint sampleSize = sampleSize_[binary(3)];
     int unused zero = bit(); assert(zero==0);
     uint unused frame = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;
-    assert(blockSize>0&&uint(blockSize)<=maxBlockSize,blockSize);
-    assert(variable ? frame==({uint t=this->frame;this->frame+=blockSize; t;}) : frame==(this->frame++),frame,this->frame,blockSize);
     skip(8);
 
     int block[2][blockSize];
+    setRoundMode(Down); setExceptions(Invalid|Denormal|Overflow|Underflow|DivisionByZero);
     for(int channel=0;channel<2;channel++) {
         int* signal = block[channel];
         int* end = signal;
@@ -192,8 +192,7 @@ void FLAC::readFrame() {
             for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
             int precision = binary(4)+1; assert(precision<=15,precision);
             shift = sbinary(5); assert(shift>=0);
-            for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision)); //FIXME: we should be able to fold the shift in the float exponent
-            log("LPC",order);
+            for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision));
         } else if(type>=8 && type <=12) { //Fixed
             order = type & ~0x8; assert(order>=0 && order<=4,order);
             for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
@@ -211,12 +210,11 @@ void FLAC::readFrame() {
         int partitionOrder = binary(4);
         uint size = blockSize >> partitionOrder;
         int partitionCount = 1<<partitionOrder;
-        log(parameterSize,partitionCount,size,blockSize);
 
         tsc rice;
         for(int p=0;p<partitionCount;p++) {
             end += size;
-            int k = binary( parameterSize ); log("k",k);
+            int k = binary( parameterSize );
             // 5 registers [signal, end, k, data, index]
             if(k==0) {
                 for(;signal<end;) {
@@ -263,14 +261,16 @@ void FLAC::readFrame() {
         ::predict += predict;
         ::order += order*blockSize;
     }
+    setRoundMode(Even);
     index=align(8,index);
     skip(16);
     for(int i=0;i<blockSize;i++) {
         int a=block[0][i], b=block[1][i];
-        if(channels==Independent) buffer[2*i+0]=a, buffer[2*i+1]=b;
-        if(channels==LeftSide) buffer[2*i+0]=a, buffer[2*i+1]=a-b;
-        if(channels==MidSide) a-=b>>1, buffer[2*i+0]=a+b, buffer[2*i+1]=a;
-        if(channels==RightSide) buffer[2*i+0]=a+b, buffer[2*i+1]=b;
+        if(channels==Independent) buffer[i]=__(float(a),float(b));
+        if(channels==LeftSide) buffer[i]=__(float(a),float(a-b));
+        if(channels==MidSide) a-=b>>1, buffer[i]=__(float(a+b),float(a));
+        if(channels==RightSide) buffer[i]=__(float(a+b), float(b));
     }
-    this->blockSize=blockSize;
+    this->blockSize=blockSize; blockIndex=buffer, blockEnd=buffer+blockSize;
+    setExceptions(Overflow|DivisionByZero); //-Invalid,-Underflow,-Denormal
 }

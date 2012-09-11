@@ -138,7 +138,9 @@ string simplify(string&& s) {
 
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return r; }
 
-template<int base> string utoa(uint n, int pad) {
+/// Number conversions
+
+template<int base> string utoa(uint64 n, int pad) {
     assert_(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
@@ -148,21 +150,27 @@ template<int base> string utoa(uint n, int pad) {
     while(64-i<pad) buf[--i] = '0';
     return string(ref<byte>(buf+i,64-i));
 }
-template string utoa<2>(uint,int);
-template string utoa<16>(uint,int);
+template string utoa<2>(uint64,int);
+template string utoa<16>(uint64,int);
 
-/// Integer conversions
-
-template<int base> string itoa(int number, int pad) {
+template<int base> string itoa(int64 number, int pad) {
     assert_(base>=2 && base<=16);
-    byte buf[32]; int i=32;
+    byte buf[64]; int i=64;
     uint n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    while(32-i<pad) buf[--i] = '0';
+    while(64-i<pad) buf[--i] = '0';
     if(number<0) buf[--i]='-';
-    return string(ref<byte>(buf+i,32-i));
+    return string(ref<byte>(buf+i,64-i));
 }
-template string itoa<10>(int,int);
+template string itoa<10>(int64,int);
+
+string ftoa(float n, int precision, int base) {
+    if(__builtin_isnan(n)) return string("NaN"_);
+    if(n==__builtin_inff()) return string("∞"_);
+    if(n==-__builtin_inff()) return string("-∞"_);
+    uint m=1; for(int i=0;i<precision;i++) m*=base;
+    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint(m*abs(n))%m,precision);
+}

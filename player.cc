@@ -66,7 +66,7 @@ struct FLACMedia : AudioMedia, FLAC {
     uint blockPosition=0; //position of next FLAC block in samples
     float* block=0;
     FLACMedia(){}
-    FLACMedia(File&& file):map(file){ start(map); AudioMedia::rate=FLAC::rate; AudioMedia::channels=FLAC::channels; }
+    FLACMedia(Map&& file):FLAC(file),map(move(file)){ AudioMedia::rate=FLAC::rate; AudioMedia::channels=FLAC::channels; }
     int position() { return blockPosition/FLAC::rate; }
     int duration() { return FLAC::duration/FLAC::rate; }
     void seek(int unused position) {

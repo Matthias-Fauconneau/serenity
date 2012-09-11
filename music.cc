@@ -16,7 +16,7 @@
 struct Music : Application, Widget {
     ICON(music) Window window __(this,0,"Music"_,musicIcon());
     Sampler sampler;
-    //AudioOutput audio __( __(&sampler, &Sampler::read) );
+    AudioOutput audio __({&sampler, &Sampler::read}, true);
     Sequencer seq;
 
 #if MIDI
@@ -31,7 +31,7 @@ struct Music : Application, Widget {
     Music() {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         window.localShortcut(Escape).connect(this,&Application::quit);
-        auto args = arguments(); //if(!args) args<<"/Samples/Salamander.sfz"_;
+        auto args = arguments(); if(!args) args<<"/Samples/Salamander.sfz"_;
         for(ref<byte> path : args) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
@@ -73,22 +73,17 @@ struct Music : Application, Widget {
 #endif
             else error("Unsupported"_,path);
         }
-        //assert(sampler);
+        assert(sampler);
+        //sampler.queueEvent(64,64); sampler.queueEvent(64,0);
         sampler.lock();
-        //audio.start(true);
-        //sampler.queueEvent(64,127);
-        window.show();
+        audio.start();
+        window.backgroundCenter=window.backgroundColor; window.show();
     }
     int current=0,count=0;
     void render(int2 position, int2 size){ if(current!=count) Progress(0,count,current).render(position,size); }
     void showProgress(int current, int count) {
-        log(current,count);
         this->current=current; this->count=count; window.render(); //display loading progress
-        if(current==count) { //loading completed
-            //window.bgCenter=window.bgOuter=0; //set black background
-            //window.bgCenter=window.bgOuter=0xFF; //set white background
-            setPriority(-20); //raise priority
-        }
+        if(current==count) setPriority(-20); //raise priority after loading
     }
 };
 Application(Music)

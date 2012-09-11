@@ -1,5 +1,6 @@
 #include "asound.h"
 #include "linux.h"
+#include "debug.h"
 
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
@@ -47,7 +48,7 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read) : Device("/dev/snd/pcmC0D0p"_), Poll(fd,POLLOUT|POLLERR|POLLNVAL), read(read) {
+AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, bool realtime) : Device("/dev/snd/pcmC0D0p"_), Poll(Device::fd,POLLOUT), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(S16_LE);
@@ -62,7 +63,7 @@ AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read) : Device
     periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * periodSize;
     debug(log("period="_+dec((int)periodSize)+" ("_+dec(1000*periodSize/rate)+"ms), buffer="_+dec(bufferSize)+" ("_+dec(1000*bufferSize/rate)+"ms)"_);)
-    buffer= (int16*)mmap(0, bufferSize * channels * sizeof(int16), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    buffer= (int16*)mmap(0, bufferSize * channels * sizeof(int16), PROT_READ | PROT_WRITE, MAP_SHARED, Device::fd, 0);
     assert_(buffer);
 
     SWParams sparams;
@@ -70,8 +71,8 @@ AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read) : Device
     sparams.stop_threshold = sparams.boundary = bufferSize;
     iowr<SW_PARAMS>(sparams);
 
-    status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, fd, StatusOffset) );
-    control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, ControlOffset) );
+    status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, Device::fd, StatusOffset) );
+    control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, ControlOffset) );
 }
 AudioOutput::~AudioOutput() {
     munmap((void*)status, 0x1000); status=0;

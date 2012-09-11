@@ -1,7 +1,6 @@
 #include "display.h"
 #include "window.h"
-
-/*#include "font.h"
+#include "font.h"
 #include "text.h"
 struct FontTest : Application, Widget {
     Image image[2]; int2 size __(8*4*16,8*4*16);
@@ -28,14 +27,14 @@ struct FontTest : Application, Widget {
             defaultSans.clear(); fit=1; subpixel=i?3:1; filter=0; correct=0; down=1; up=1; Text(string(line)).render(int2(0,1*(up*16*16/down)),int2(size.x,0));
         }
         if(!image[1]) image[1]=share(image[0]);
-        window.localShortcut(Escape).connect(this,&Application::quit); window.bgCenter=window.bgOuter=0xFF; window.show();
+        window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();
     }
     bool toggle=false;
     void render(int2 position, int2) { blit(position,image[toggle]); }
     bool mouseEvent(int2, int2, Event event, MouseButton) { if(event==Enter) { toggle=true; return true;} if(event==Leave) {toggle=false; return true;} return false; }
-};Application(FontTest)*/
+};Application(FontTest)
 
-#include "html.h"
+/*#include "html.h"
 struct HTMLTest : Application {
     Scroll<HTML> page;
     Window window __(&page.area(),0,"Browser"_);
@@ -46,7 +45,7 @@ struct HTMLTest : Application {
         page.go("http://questionablecontent.net/view.php?comic=2271"_);
         window.show();
     }
-};Application(HTMLTest)
+};Application(HTMLTest)*/
 
 /*
 #include "display.h"
@@ -100,7 +99,7 @@ struct WeekViewTest : Application, Widget {
     WeekViewTest(){
         renderPage();
         //writeFile(string(getenv("HOME"_)+"/week.png"_),encodePNG(page));
-        window.localShortcut(Escape).connect(this,&Application::quit); window.bgCenter=window.bgOuter=0xFF; window.show();
+        window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();
     }
     void renderPage() {
         framebuffer=share(page); currentClip = Rect(page.size());

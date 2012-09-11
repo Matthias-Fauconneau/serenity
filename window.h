@@ -99,7 +99,7 @@ struct Window : Socket, Poll {
     /// Window position and size
     int2 position, size;
     /// Window background intensity and opacity
-    int bgCenter=0xF0,bgOuter=0xE0,opacity=0xFF;
+    int backgroundColor=0xE0,backgroundCenter=0xF0,backgroundOpacity=0xFF;
 
     /// Root window
     uint root = 0;

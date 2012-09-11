@@ -7,7 +7,7 @@ struct Handle {
     int fd;
     Handle(int fd):fd(fd){}
     Handle(Handle&& o):fd(o.fd){ o.fd=0; }
-    Handle& operator=(Handle&& o) { this->~Handle(); fd=o.fd; o.fd=0; return *this; }
+    move_operator(Handle)
     /// Closes the descriptor
     ~Handle();
     explicit operator bool() { return fd; }
@@ -46,7 +46,7 @@ struct Stream : Handle {
         return buffer;
     }
     /// Polls whether reading would block
-    bool poll();
+    bool poll(int timeout=0);
     /// Writes \a buffer
     void write(const ref<byte>& buffer);
 };
@@ -60,17 +60,16 @@ struct Socket : Stream {
 
 struct File : Stream {
     File(int fd):Stream(fd){}
-    enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000};
+    enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000};
     /// Opens \a file
     /// If read only, fails if not existing
     /// If write only, fails if existing
-    File(const ref<byte>& file, const Folder& at=root(), Flags flags=ReadOnly);
+    File(const ref<byte>& file, const Folder& at=root(), int flags=ReadOnly);
     /// Returns file size
     int size() const;
     /// Seeks to \a index
     void seek(int index);
 };
-inline File::Flags operator |(File::Flags a, File::Flags b) { return File::Flags(int(a)|int(b)); }
 /// Returns whether \a file exists (as a file)
 bool existsFile(const ref<byte>& file, const Folder& at=root());
 /// Reads whole \a file content
@@ -83,6 +82,7 @@ template<uint major, uint minor, class T> struct IOW { typedef T Type; static co
 template<uint major, uint minor, class T> struct IOR { typedef T Type; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
 template<uint major, uint minor, class T> struct IOWR { typedef T Type; static constexpr uint iowr = 3<<30 | sizeof(T)<<16 | major<<8 | minor; };
 struct Device : File {
+    Device(const ref<byte>& file, int flags=ReadWrite):File(file,root(),flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);
     /// Sends ioctl request with neither input/outputs arguments
@@ -92,7 +92,7 @@ struct Device : File {
     /// Sends ioctl request with output arguments
     template<class IOR> typename IOR::Type ior() { typename IOR::Type output; ioctl(IOR::ior, &output); return output; }
     /// Sends ioctl request with \a reference argument
-    template<class IOWR> int iowr(typename IOWR::Type& reference) { ioctl(IOWR::iowr, &reference); }
+    template<class IOWR> int iowr(typename IOWR::Type& reference) { return ioctl(IOWR::iowr, &reference); }
 };
 
 struct Map : ref<byte> {
@@ -101,7 +101,7 @@ struct Map : ref<byte> {
     Map(const File& file);
     Map(const ref<byte>& file, const Folder& at=root()):Map(File(file,at)){}
     Map(Map&& o):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
-    Map& operator=(Map&& o){this->~Map();data=o.data,size=o.size;o.data=0,o.size=0;return*this;}
+    move_operator(Map)
     ~Map();
     explicit operator bool() { return data && size; }
     /// Locks memory map in RAM
@@ -115,5 +115,5 @@ long modifiedTime(const ref<byte>& path, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
 void touchFile(const ref<byte>& path, const Folder& at=root());
 
-enum ListFlags { Recursive=1, Sort=2, Folders=4, Files=8 }; inline ListFlags operator |(ListFlags a, ListFlags b) { return ListFlags(int(a)|int(b)); }
-array<string> listFiles(const ref<byte>& folder, ListFlags flags, const Folder& at=root());
+enum { Recursive=1, Sort=2, Folders=4, Files=8 };
+array<string> listFiles(const ref<byte>& folder, int flags, const Folder& at=root());

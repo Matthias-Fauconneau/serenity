@@ -6,6 +6,9 @@
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 typedef vector<bgra,uint,4> int4;
+//TODO
+//typedef uint8 byte4 __attribute((vector_size(4)));
+//typedef uint int4 __attribute((vector_size(16)));
 
 struct Image {
     const byte4* data=0;
@@ -14,8 +17,7 @@ struct Image {
 
     no_copy(Image)
     Image(Image&& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
-    Image& operator =(Image&& o) {  this->~Image(); data=o.data; o.data=0;
-        width=o.width; height=o.height; stride=o.stride;  own=o.own; alpha=o.alpha; return *this; }
+    move_operator(Image)
 
     Image(){}
     Image(byte4* data, int width, int height, int stride, bool own, bool alpha) :

@@ -104,7 +104,7 @@ Image decodePNG(const ref<byte>& file) {
     if(type==3) {
         assert(palette);
         rgb3* lookup = (rgb3*)palette.data();
-        for(uint i=0;i<width*height;i++) image[i]=lookup[image[i].r];
+        for(uint i=0;i<width*height;i++) image[i]=lookup[image[i][0]];
     }
     return Image(image,width,height,width,true,depth==2||depth==4);
 }

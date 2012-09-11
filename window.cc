@@ -109,16 +109,17 @@ void Window::event() {
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
         framebuffer=share(buffer);
-        currentClip=Rect(framebuffer.size());
+        currentClip=Rect(size);
 
-        if(bgCenter==bgOuter) fill(Rect(framebuffer.size()),byte4(bgCenter));
-        else {
-            // Oxygen like radial gradient background
-            int2 center = int2(size.x/2,0); int radius=256;
-            for(uint y=0;y<framebuffer.height;y++) for(uint x=0;x<framebuffer.width;x++) {
-                int2 pos = int2(x,y);
-                int g = mix(bgOuter,bgCenter,min(1.f,length(pos-center)/radius))*opacity/255;
-                framebuffer(x,y) = byte4(g,g,g,opacity);
+        if(backgroundCenter==backgroundColor) fill(Rect(size),byte4(backgroundColor));
+        else { // Oxygen-like radial gradient background
+            constexpr int radius=256;
+            int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y), a=backgroundOpacity, scale = (radius*radius)/a;
+            if(x0>0 || x1<w || h<size.y) fill(Rect(size),byte4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+            uint* dst=(uint*)framebuffer.data;
+            for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (backgroundColor*t+backgroundCenter*(0xFF-t))/0xFF;
+                dst[y*w+x]= a<<24 | g<<16 | g<<8 | g;
             }
         }
 

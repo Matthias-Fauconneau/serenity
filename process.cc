@@ -4,54 +4,54 @@
 #include "data.h"
 #include "debug.h"
 
-struct rlimit { long cur,max; };
-enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
-struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
-struct ucontext {
-    long flags; ucontext *link; void* ss_sp; int ss_flags; long ss_size;
-#if __arm__
-    long trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,eip,cpsr,fault;
-#elif __x86_64__ || __i386__
-    long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,eip,cs,efl,uesp,ss;
-#endif
-};
-
 void abort() { /*kill(0,SIGABRT); __builtin_unreachable();*/ exit(-1); }
 void write(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
 
+struct rlimit { long cur,max; };
+enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
+
+struct siginfo { int signo,errno,code; struct { void *addr; } fault; };
+struct ucontext {
+    long flags; ucontext *link; struct { void* sp; int flags; long size; } stack;
+#if __x86_64__
+    long r8,r9,r10,r11,r12,r13,r14,r15,rdi,rsi,rbp,rbx,rdx,rax,rcx,rsp,ip,efl,csgsfs,err,trap,oldmask,cr2;
+#elif __arm__
+    long trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,ip,cpsr,fault;
+#elif  || __i386__
+    long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,ip,cs,efl,uesp,ss;
+#endif
+};
+
+static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 Application* app;
 static void handler(int sig, siginfo* info, ucontext* ctx) {
-    ::write(1,"SIGNAL",6);
-    log("SIGNAL"_);
-    if(sig==SIGFPE) log("Floating-point exception");
     trace(1);
-    {Symbol s = findNearestLine((void*)ctx->eip); log(s.file+":"_+str(s.line)+"     \t"_+s.function);}
+    {Symbol s = findNearestLine((void*)ctx->ip); if(s.function||s.file||s.line) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr((void*)ctx->ip)); }
     if(sig==SIGABRT) log("Abort");
+    if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr);
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(ptr(info->fault.addr)));
     if(sig==SIGPIPE) log("Broken pipe");
     if(sig==SIGTERM) { log("Terminated"); app->running=false; return; }
     exit(-1);
 }
 
-#include "fenv.h"
 #undef Application
 Application::Application () {
     assert_(!app); app=this;
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
-    rlimit limit = {8<<20,8<<20}; setrlimit(RLIMIT_STACK,&limit); //8 MB
+    rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
-        enum { SA_SIGINFO=4 } flags = SA_SIGINFO;
+        enum { SA_SIGINFO=4, SA_RESTORER=0x4000000 }; long flags = SA_SIGINFO|SA_RESTORER;
         void (*restorer) (void) = 0;
         uint mask[2] = {0,0};
     } sa;
-    sigaction(SIGABRT, &sa, 0, 8);
-    sigaction(SIGFPE, &sa, 0, 8);
-    sigaction(SIGSEGV, &sa, 0, 8);
-    sigaction(SIGPIPE, &sa, 0, 8);
-    sigaction(SIGTERM, &sa, 0, 8);
-    feenableexcept(FE_DIVBYZERO|FE_INVALID);
+    check_(sigaction(SIGABRT, &sa, 0, 8));
+    check_(sigaction(SIGFPE, &sa, 0, 8));
+    check_(sigaction(SIGSEGV, &sa, 0, 8));
+    check_(sigaction(SIGPIPE, &sa, 0, 8));
+    check_(sigaction(SIGTERM, &sa, 0, 8));
 }
 
 static array<Poll*> polls;

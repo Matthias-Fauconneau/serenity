@@ -2,7 +2,7 @@
 #include "process.h"
 #include "function.h"
 
-struct Sequencer : Poll {
+struct Sequencer : Device, Poll {
     static const int latency = 1024;
     uint8 type=0;
     array<uint8> pressed;

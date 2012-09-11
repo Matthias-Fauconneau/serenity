@@ -3,8 +3,9 @@
 #include "file.h"
 #include "time.h"
 #include "midi.h"
+#include "debug.h"
 
-Sequencer::Sequencer() : Poll(Device("/dev/snd/midiC1D0"_),POLLIN) {}
+Sequencer::Sequencer() : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll(Device::fd) {}
 
 void Sequencer::event() {
     do {
@@ -16,7 +17,7 @@ void Sequencer::event() {
 
         if(type == NoteOn) {
             if(value == 0 ) {
-                assert(pressed.contains(key));
+                assert_(pressed.contains(key));
                 pressed.removeAll(key);
                 if(sustain) sustained+= key;
                 else {
@@ -29,7 +30,7 @@ void Sequencer::event() {
                 }
             } else {
                 sustained.removeAll(key);
-                assert(!pressed.contains(key));
+                assert_(!pressed.contains(key));
                 pressed << key;
                 noteEvent(key, min(127,value*3/2)); //x3/2 to use reach maximum velocity without destroying the keyboard
                 if(record) {
@@ -42,12 +43,12 @@ void Sequencer::event() {
             if(key==64) {
                 sustain = (value != 0);
                 if(!sustain) {
-                    for(int key : sustained) { noteEvent(key,0); assert(!pressed.contains(key)); }
+                    for(int key : sustained) { noteEvent(key,0); assert_(!pressed.contains(key)); }
                     sustained.clear();
                 }
             }
         }
-    } while(poll(fd));
+    } while(poll());
 }
 
 void Sequencer::recordMID(const ref<byte>& path) { record=File(path,root(),File::WriteOnly); }

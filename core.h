@@ -17,10 +17,10 @@ template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
 template<class T> nodebug constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
-#define no_copy(o) o(const o&)=delete; o& operator=(const o&)=delete;
-#define default(o) o()____(=default);
-#define default_move_operator(o) o& operator=(o&&)____(=default);
-#define default_move(o) default(o) no_copy(o) o(o&&)____(=default); default_move_operator(o)
+#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete;
+#define default(T) T()____(=default);
+#define default_move(T) default(T) no_copy(T) T(T&&)____(=default); T& operator=(T&&)____(=default);
+#define move_operator(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;}
 /// base template for explicit copy (overriden by explicitly copyable types)
 template<class T> T copy(const T& t) { return t; }
 
@@ -146,3 +146,4 @@ inline uint align(uint width, uint offset) { assert_((width&(width-1))==0); retu
 inline int floor(float f) { return __builtin_floorf(f); }
 inline int round(float f) { return __builtin_roundf(f); }
 inline int ceil(float f) { return __builtin_ceilf(f); }
+inline float sqrt(float f) { return __builtin_sqrtf(f); }

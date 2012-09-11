@@ -2,12 +2,14 @@
 #include "array.h"
 #include "file.h"
 
-/// Poll is a convenient interface to participate in the process-wide event loop
+/// Poll is a convenient interface to participate in the event loop
 struct Poll : pollfd {
     no_copy(Poll)
-    /// Registers this file descriptor to be polled in the process-wide event loop
+    /// Allows to queue using \a wait method and \a event callback
+    Poll(){}
+    /// Registers \a fd to be polled in the event loop
     Poll(int fd, int events=POLLIN);
-    /// Removes this file descriptor from the process-wide event poll loop
+    /// Removes \a fd from the event loop
     ~Poll();
     /// Schedules an \a event call after all process-wide outstanding poll events have been processed
     void wait();

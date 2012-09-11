@@ -2,7 +2,7 @@
 #include "array.h"
 
 // Enforces exact match for overload resolution
-template<class T> void str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); }
+template<class T> ref<byte> str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); }
 
 /// Lexically compare strings
 bool operator <(const ref<byte>& a, const ref<byte>& b);
@@ -52,8 +52,8 @@ stringz strz(const ref<byte>& s);
 /// Forwards string
 inline const string& str(const string& s) { return s; }
 /// Converts integers
-template<int base=10> string utoa(uint number, int pad=0);
-template<int base=10> string itoa(int number, int pad=0);
+template<int base=10> string utoa(uint64 number, int pad=0);
+template<int base=10> string itoa(int64 number, int pad=0);
 inline string bin(uint n, int pad=0) { return utoa<2>(n,pad); }
 inline string dec(int n, int pad=0) { return itoa<10>(n,pad); }
 inline string str(const uint8& n) { return dec(n); }
@@ -62,9 +62,16 @@ inline string str(const uint16& n) { return dec(n); }
 inline string str(const int16& n) { return dec(n); }
 inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
+inline string str(const uint64& n) { return dec(n); }
+inline string str(const int64& n) { return dec(n); }
 inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
 inline string str(const long& n) { string s("0x"_); s<<hex(n); return s; }
 inline string str(const ptr& n) { string s("0x"_); s<<hex(n); return s; }
+
+/// Converts a floating point number to its human-readable representation
+string ftoa(float number, int precision=2, int base=10);
+inline string str(const float& n) { return ftoa(n); }
+inline string str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
 template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }

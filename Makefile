@@ -1,7 +1,7 @@
 PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= fast
-#CC = g++ -pipe -march=native
+#CC = g++ -pipe -march=native -mfpmath=sse
 CC = clang++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
 #debug: include debug symbols, keep all assertions

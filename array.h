@@ -37,7 +37,7 @@ template<class T> struct array {
     /// Move constructor
     array(array&& o) { if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(array)); o.tag=0; }
     /// Move assignment
-    array& operator=(array&& o) { this->~array(); if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(array)); o.tag=0; return *this; }
+    move_operator(array)
     /// Allocates a new uninitialized array for \a capacity elements
     explicit array(uint capacity){reserve(capacity); }
     /// Moves elements from a reference
