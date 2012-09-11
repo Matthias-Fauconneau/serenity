@@ -93,33 +93,38 @@ FLAC::FLAC(const ref<byte>& data) {
     readFrame();
 }
 
-const double lead = 0x1.0p52f+0x1.0p51f; //add leading bit 2**(52-16) to force rounding towards negative infinity //+p51 to also force negative number
+inline double round(double x) { //setRoundMode(Down) to round towards negative infinity
+    const double lead = 0x1.0p52f+0x1.0p51f; //add leading bit 2**(52-16) to force rounding //+p51 to also force negative numbers
+    return x+lead-lead;
+}
 
 //FIXME: clang doesn't seem to keep the predictor in registers
-template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* even, double* odd, int* signal, int* end) {
+template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned, double*& misaligned, float*& signal) {
+    double2 sum = {0,0};
+    for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers (check if inline doesn't break it)
+    double sample = round(extract(sum,0)+extract(sum,1))+double(*signal); //add residue to prediction [SS2SD=2]
+    aligned[2*unroll]= misaligned[2*unroll]= sample; aligned++; misaligned++; //write out contexts, misalign align, align misalign
+    *signal = sample; signal++; //write out decoded sample SD2SS=8
+}
+
+template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* even, double* odd, float* signal, float* end) {
     assert(order<=2*unroll,order,unroll);
     //ensure enough warmup before using unrolled version
     for(uint i=order;i<2*unroll;i++) { //scalar compute first sample for odd orders
         double sum=0;
         for(uint i=0;i<order;i++) sum += predictor[i] * even[i];
-        double sample = (((sum)+lead)-lead)+*signal;
+        double sample = round(sum)+*signal;
         even[i]=odd[i]= sample; //write out context
-        *signal = int(sample); signal++; //write out decoded sample //TODO: float
+        *signal = sample; signal++; //write out decoded sample //TODO: float
     }
     for(int i=order-1;i>=0;i--) predictor[2*unroll-order+i]=predictor[i]; //move predictors to right place for unrolled loop
     for(uint i=0;i<2*unroll-order;i++) predictor[i]=0; //clear extra predictors used because of unrolling
     double2 kernel[unroll];
     for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
     for(;signal<end;) {
-#define FILTER(aligned, misaligned) /*TODO: check if an inline function would also keep predictor in registers*/ ({ \
-    double2 sum = {0,0};  \
-    for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); /*unrolled loop in registers*/ \
-    double sample = ((((extract(sum,0)+extract(sum,1)))+lead)-lead)+double(*signal); /*SI2SD=12 TODO: SS2SD=2*/\
-    aligned[2*unroll]= misaligned[2*unroll]= double(sample); aligned++; misaligned++; /*write out contexts, misalign align, align misalign*/\
-    *signal = int(sample); signal++; /*write out decoded sample*//*SD2SI=10 + {S|P}I2{S|P}S={14|4} TODO: SD2SS=8*/ })
-    FILTER(even, odd);
-    FILTER(odd, even);
-}
+        filter<unroll>(kernel, even, odd, signal);
+        filter<unroll>(kernel, odd, even, signal);
+    }
 }
 
 uint64 rice=0, predict=0, order=0;
@@ -139,12 +144,12 @@ void FLAC::readFrame() {
     if(blockSize<0) blockSize = binary(-blockSize)+1;
     skip(8);
 
-    int block[2][blockSize];
-    debug(setExceptions(Invalid|Denormal|Overflow|Underflow|DivisionByZero);)
+    float block[2][blockSize];
+    debug(setExceptions(Invalid|Overflow|DivisionByZero);)
     setRoundMode(Down);
     for(int channel=0;channel<2;channel++) {
-        int* signal = block[channel];
-        int* end = signal;
+        float* signal = block[channel];
+        float* end = signal;
         double buffer1[blockSize]; double* even = buffer1;
         double buffer2[blockSize+1]; double* odd = buffer2+1;
         if(ptr(even)%16) odd=buffer1, even=buffer2+1;
@@ -204,21 +209,27 @@ void FLAC::readFrame() {
             if(k==0) {
                 for(;signal<end;) {
                     uint u = unary() << k;
-                    *signal++ = (u >> 1) ^ (-(u & 1));
+                    int s = (u >> 1) ^ (-(u & 1));
+                    assert(s>=-(1<<24) && s<=(1<<24),s);
+                    *signal++ = s;
                 }
             } else if(k < escapeCode) { //TODO: static dispatch on k?
                 //disasm(
                 for(;signal<end;) {
                     uint u = unary() << k;
                     u |= binary(k);
-                    *signal++ = (u >> 1) ^ (-(u & 1));
+                    int s = (u >> 1) ^ (-(u & 1));
+                    assert(s>=-(1<<24) && s<=(1<<24),s);
+                    *signal++ = s;
                 }
                 //)
             } else {
                 int n = binary(5); assert(n<=16,n);
                 for(;signal<end;) {
-                    int u = binary(n);
-                    *signal++ = (u >> 1) ^ (-(u & 1));
+                    uint u = binary(n);
+                    int s = (u >> 1) ^ (-(u & 1));
+                    assert(s>=-(1<<24) && s<=(1<<24),s);
+                    *signal++ = s;
                 }
             }
         }
@@ -226,36 +237,25 @@ void FLAC::readFrame() {
 
         tsc predict;
         signal=block[channel]+order;
-#define UNROLL 1
-#if UNROLL
 #define o(n) case n: unroll_predictor<n>(order,predictor,even,odd,signal,end); break;
         switch((order+1)/2) {
          o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14) //keep predictor in 14 SSE registers until order=28
          o(15)o(16) //order>28 will spill the predictor out of registers
         }
-#else
-        double* context = even;
-        for(;signal<end;) {
-            double sum=0;
-            for(uint i=0;i<order;i++) sum += predictor[i] * context[i];
-            int sample = int(sum) + *signal; //add residual to prediction
-            context[order] = (double)sample; context++;  //write out context
-            *signal = sample; signal++; //write out decoded sample
-        }
-#endif
         ::predict += predict;
         ::order += order*blockSize;
     }
-    setRoundMode(Even);
-    debug(setExceptions(Overflow|DivisionByZero);) //-Invalid,-Underflow,-Denormal
     index=align(8,index);
     skip(16);
     for(int i=0;i<blockSize;i++) {
-        int a=block[0][i], b=block[1][i];
-        if(channels==Independent) buffer[i]=__(float(a),float(b));
-        if(channels==LeftSide) buffer[i]=__(float(a),float(a-b));
-        if(channels==MidSide) a-=b>>1, buffer[i]=__(float(a+b),float(a));
-        if(channels==RightSide) buffer[i]=__(float(a+b), float(b));
+        float a=block[0][i], b=block[1][i];
+        if(channels==Independent) buffer[i]=__(a,b);
+        if(channels==LeftSide) buffer[i]=__(a,a-b);
+        if(channels==MidSide) a-=b/2, buffer[i]=__(a+b,a);
+        if(channels==RightSide) buffer[i]=__(a+b, b);
     }
     this->blockSize=blockSize; blockIndex=buffer, blockEnd=buffer+blockSize;
+
+    setRoundMode(Even);
+    debug(setExceptions(Overflow|DivisionByZero);) //-Invalid,-Underflow,-Denormal
 }
