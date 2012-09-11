@@ -4,7 +4,7 @@
 #include "data.h"
 #include "debug.h"
 
-void abort() { /*kill(0,SIGABRT); __builtin_unreachable();*/ exit(-1); }
+void abort() { exit(-1); }
 void write(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
 
 struct rlimit { long cur,max; };
@@ -23,10 +23,13 @@ struct ucontext {
 };
 
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
-Application* app;
+static Application* app;
+static int idle;
 static void handler(int sig, siginfo* info, ucontext* ctx) {
-    trace(1);
-    {Symbol s = findNearestLine((void*)ctx->ip); if(s.function||s.file||s.line) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr((void*)ctx->ip)); }
+    if(!idle) {
+        trace(1);
+        {Symbol s = findNearestLine((void*)ctx->ip); if(s.function||s.file||s.line) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr((void*)ctx->ip)); }
+    }
     if(sig==SIGABRT) log("Abort");
     if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr);
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(ptr(info->fault.addr)));
@@ -36,6 +39,7 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
 }
 
 #undef Application
+extern void restore_rt (void) asm ("__restore_rt");
 Application::Application () {
     assert_(!app); app=this;
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
@@ -44,7 +48,7 @@ Application::Application () {
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
         enum { SA_SIGINFO=4, SA_RESTORER=0x4000000 }; long flags = SA_SIGINFO|SA_RESTORER;
-        void (*restorer) (void) = 0;
+        void (*restorer)() = &restore_rt;
         uint mask[2] = {0,0};
     } sa;
     check_(sigaction(SIGABRT, &sa, 0, 8));
@@ -67,7 +71,7 @@ int dispatchEvents() {
     uint size=polls.size();
     pollfd pollfds[size];
     while(queue){Poll* poll=queue.take(0); poll->revents=IDLE; poll->event(); if(pollEvents(pollfds,size,0)) goto break_;}
-    /*else*/ pollEvents(pollfds,size,-1);
+    /*else*/{idle=1; pollEvents(pollfds,size,-1); idle=0;}
     break_:;
     Poll* polls[size]; copy(polls,::polls.data(),size);
     for(uint i=0;i<size;i++) {
@@ -121,3 +125,5 @@ array< ref<byte> > arguments() {
 const Folder& home() { static Folder home=getenv("HOME"_); return home; }
 const Folder& config() { static Folder config=Folder(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache=Folder(".cache"_,home(),true); return cache; }
+
+asm(".text\n.align 16\n__restore_rt:\nmovq $15, %rax\nsyscall\n");

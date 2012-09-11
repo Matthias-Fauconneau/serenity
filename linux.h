@@ -66,7 +66,7 @@
 
 enum class sys : long {
 #if __x86_64
-    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, shmget=29, shmat, shmctl,
+    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, ioctl=16, shmget=29, shmat, shmctl, getpid=39,
     socket=41, connect, fork=57, vfork, execve, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, setrlimit=160, clock_gettime=228,
     openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283, timerfd_settime=286
 #else
@@ -100,7 +100,6 @@ syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,of
 syscall2(int, munmap, void*,addr, long,len)
 syscall1(void*, brk, void*,new_brk)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
-
 syscall3(int, ioctl, int,fd, long,request, void*,arguments)
 
 #if __i386
@@ -116,6 +115,7 @@ syscall3(int, shmget, int,key, long,size, int,flag)
 syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)
 #endif
 
+syscall0(int, getpid)
 syscall0(int, fork)
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
 inline __attribute((noreturn)) int exit(int code) {r(r0,code) volatile register long n asm(rN) = (long)sys::exit; asm volatile(kernel:: "r"(n), "r"(r0)); __builtin_unreachable();}

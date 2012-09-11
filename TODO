@@ -1,12 +1,10 @@
-player: flac
+player: flac, realtime
 desktop: previous, scrollbar
 font: grid fit, line sampling?
 pdf,ebook -> touchbook
-IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion
-music: realtime midi signal, score, auto rt_decay, auto volume, reverb, auto tune
+touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
+music: auto volume, score, reverb, auto tune
+IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion, git
 fibermesh
-apps: file manager, search, imap, shell, monitor, torrent, video, irc
-own: make, midi, inflate, jpeg, mp3, ssl
-IDE: git, debugger
-touchbook: hardware scroll, onscreen keyboard/handwriting recognition, better touchscreen, accelerometer trigger, portrait
-IDE: static analyzer, interpreter, compiler, profiler
+own: inflate, jpeg, mp3, ssl
+apps: file manager, search, imap, shell, monitor, torrent, video, irc, debugger, static analyzer, interpreter, profiler, compiler

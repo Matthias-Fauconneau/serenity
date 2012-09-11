@@ -7,9 +7,10 @@ Rect currentClip=Rect(0);
 /// Render
 Image framebuffer;
 
-void fill(Rect rect, byte4 color) { //TODO: blend
+void fill(Rect rect, byte4 color, bool blend) {
     rect = rect & currentClip;
-    for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+    if(!blend) for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = color;
+    else for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
         byte4& d = framebuffer(x,y);
         d = byte4((int4(d)*(255-color.a) + int4(color)*color.a)/255);
     }

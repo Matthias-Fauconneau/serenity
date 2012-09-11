@@ -148,6 +148,7 @@ void Sampler::processEvent(Event e) { int key=e.key, velocity=e.velocity;
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
             float level = (1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
+            log(key,velocity);
             active << Note(s.map);
             Note& note = active.last();
             note.layer=1+key-s.pitch_keycenter; assert_(note.layer<3);
@@ -155,7 +156,7 @@ void Sampler::processEvent(Event e) { int key=e.key, velocity=e.velocity;
             else { //rt_decay is unreliable, matching levels works better
                 level=current->rootMeanSquare(32768)/note.rootMeanSquare(2048);
                 level *= current->level[0];
-                if(level>8) level=8;
+                log(dB(level)); if(level>8) level=8;
             }
             note.level=__(level,level);
             note.releaseStart=note.duration;

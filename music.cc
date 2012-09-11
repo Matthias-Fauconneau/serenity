@@ -13,8 +13,10 @@
 #include "window.h"
 #include "interface.h"
 
+#include "linux.h"
+
 struct Music : Application, Widget {
-    ICON(music) Window window __(this,0,"Music"_,musicIcon());
+    ICON(music) Window window __(this,int2(256,256),"Music"_,musicIcon());
     Sampler sampler;
     AudioOutput audio __({&sampler, &Sampler::read}, true);
     Sequencer seq;
@@ -74,10 +76,9 @@ struct Music : Application, Widget {
             else error("Unsupported"_,path);
         }
         assert(sampler);
-        //sampler.queueEvent(64,64); sampler.queueEvent(64,0);
-        sampler.lock();
-        audio.start();
-        window.backgroundCenter=window.backgroundColor; window.show();
+        sampler.queueEvent(39,127); sampler.queueEvent(39,0);
+        sampler.queueEvent(45,127); sampler.queueEvent(45,0);
+        audio.start(); sampler.lock(); window.backgroundCenter=window.backgroundColor; window.show();
     }
     int current=0,count=0;
     void render(int2 position, int2 size){ if(current!=count) Progress(0,count,current).render(position,size); }

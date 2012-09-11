@@ -93,31 +93,30 @@ FLAC::FLAC(const ref<byte>& data) {
     readFrame();
 }
 
+const double c = 0x1.0p52f;
+
 //FIXME: clang doesn't seem to keep the predictor in registers
-template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* even, double* odd, int* signal, int* end, int shift) {
+template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* even, double* odd, int* signal, int* end) {
     assert(order<=2*unroll,order,unroll);
     //ensure enough warmup before using unrolled version
     for(uint i=order;i<2*unroll;i++) { //scalar compute first sample for odd orders
         double sum=0;
         for(uint i=0;i<order;i++) sum += predictor[i] * even[i];
-        int sample = (int64(sum)>>shift) + *signal; //add residual to prediction
+        int sample = (int64(((sum)-c)+c)) + *signal; //add residual to prediction
         even[i]=odd[i]= (double)sample; //write out context
         *signal = sample; signal++; //write out decoded sample
     }
     for(int i=order-1;i>=0;i--) predictor[2*unroll-order+i]=predictor[i]; //move predictors to right place for unrolled loop
     for(uint i=0;i<2*unroll-order;i++) predictor[i]=0; //clear extra predictors used because of unrolling
     double2 kernel[unroll];
-    for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i] /*/(1<<shift)*/; //load predictor in registers
+    for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i]/*/scale*/; //load predictor in registers
     for(;signal<end;) {
 #define INTEGER 1
 #if INTEGER
 #define FILTER(aligned, misaligned) /*TODO: check if an inline function would also keep predictor in registers*/ ({ \
-    double2 sum = {0,0}; \
+    double2 sum = {0,0};  \
     for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); /*unrolled loop in registers*/ \
-    int sample = (int64(extract(sum,0)+extract(sum,1))>>shift); /*add residual to prediction SD2SI=10*/\
-    const double c = 0x1.0p52f; \
-    int unused sample2 = int32(((((extract(sum,0)+extract(sum,1))/(1<<shift))-c)+c));\
-    assert((sample2-sample)==0, sample2-sample, sample2, sample, int32(2*((extract(sum,0)+extract(sum,1))/(1<<shift))));\
+    int sample = int32(((((extract(sum,0)+extract(sum,1)))-c)+c)); /*SD2SI=10*/\
     sample += *signal;\
     aligned[2*unroll]= misaligned[2*unroll]= double(sample); aligned++; misaligned++; /*SI2SD=9, write out contexts, misalign align, align misalign*/\
     *signal = sample; signal++; /*write out decoded sample*/ })
@@ -192,7 +191,7 @@ void FLAC::readFrame() {
             for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
             int precision = binary(4)+1; assert(precision<=15,precision);
             shift = sbinary(5); assert(shift>=0);
-            for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision));
+            for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision))/(1<<shift);
         } else if(type>=8 && type <=12) { //Fixed
             order = type & ~0x8; assert(order>=0 && order<=4,order);
             for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
@@ -243,7 +242,7 @@ void FLAC::readFrame() {
         signal=block[channel]+order;
 #define UNROLL 1
 #if UNROLL
-#define o(n) case n: unroll_predictor<n>(order,predictor,even,odd,signal,end,shift); break;
+#define o(n) case n: unroll_predictor<n>(order,predictor,even,odd,signal,end); break;
         switch((order+1)/2) {
          o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14) //keep predictor in 14 SSE registers until order=28
          o(15)o(16) //order>28 will spill the predictor out of registers

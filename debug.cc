@@ -65,7 +65,8 @@ string demangle(TextData& s, bool function=true) {
     else if(s.match("St"_)) r<<"std"_;
     else if(s.match('S')) { r<<'S'; s.number(); s.match('_'); }
     else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
-    else if(s.match("Li"_)) r<<s.number();
+    else if(s.match("Li"_)) r<<dec(s.number());
+    else if(s.match("Lj"_)) r<<dec(s.number());
     else if(s.match('L')) r<<"extern "_<<demangle(s);
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<string> args;
@@ -92,13 +93,10 @@ string demangle(TextData& s, bool function=true) {
         }
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
-    }
-    else if((l=uint(s.number()))!=uint(-1)) {
-        assert(l<=s.available(l),l,r,s.untilEnd(),move(s.buffer));
+    } else if((l=uint(s.number()))<=s.available(l)) {
         r<<s.read(l); //struct
         if(s && s.peek()=='I') r<< demangle(s);
-    }
-    else r<<s.untilEnd();
+    } else r<<s.untilEnd();
     for(int i=0;i<pointer;i++) r<<'*';
     if(rvalue) r<<"&&"_;
     if(ref) r<<'&';
