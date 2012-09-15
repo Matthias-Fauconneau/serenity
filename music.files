@@ -6,7 +6,8 @@ vector.h
 map.h
 string.h
 string.cc
-stream.h
+data.h
+data.cc
 process.h
 process.cc
 file.h
@@ -39,3 +40,4 @@ pdf.h
 pdf.cc
 
 music.cc
+simd.h

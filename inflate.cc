@@ -410,7 +410,7 @@ array<byte> inflate(const ref<byte>& source, bool zlib) {
     for(;;) {
       uint src_buf_size = source.size - src_buf_ofs, dst_buf_size = out_buf_capacity - pOut_len, new_out_buf_capacity;
       int status = decompress(&decomp, (const uint8*)source.data + src_buf_ofs, &src_buf_size, buffer, buffer ? buffer + pOut_len : 0, &dst_buf_size, zlib);
-      if(status<0 || status==STATUS_NEEDS_MORE_INPUT) error_("inflate error");
+      if(status<0 || status==STATUS_NEEDS_MORE_INPUT) error("inflate error"_);
       src_buf_ofs += src_buf_size;
       pOut_len += dst_buf_size;
       if (status == STATUS_DONE) break;

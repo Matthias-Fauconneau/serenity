@@ -2,8 +2,10 @@
 #include "string.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
-/// \note statically inheriting the data type allows to provide vector operations to new types and to access components directly
+/// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, class T, int N> struct vector : V<T> {
+    ____(static_assert(sizeof(V<T>)==N*sizeof(T),"");)
+
     vector(){}
     /// Initializes all components to the same value \a v
     vector(T v){ for(int i=0;i<N;i++) at(i)=v; }
@@ -13,6 +15,7 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     }
     /// Copies each component from another vector \a o casting from \a T2 to \a T
     template<class F> explicit vector(const vector<V,F,N>& o) { for(int i=0;i<N;i++) at(i)=(T)o[i]; }
+    //TODO operator T __attribute((vector_size(N*sizeof(T))));
     /// Accessors (always unchecked)
     const T& at(int i) const { return ((T*)this)[i]; }
     T& at(int i) { return ((T*)this)[i]; }

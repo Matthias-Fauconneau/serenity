@@ -99,7 +99,7 @@ constexpr ref<byte> errors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Ato
                                   "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
 
 namespace Shm {
-extern int EXT, event, error;
+extern int EXT, event, errorBase;
 struct QueryVersion { int8 ext=EXT, req=0; uint16 size=1; };
 struct QueryVersionReply { int8 sharedPixmaps; uint16 seq; uint length; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
 struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]; };
@@ -119,7 +119,7 @@ struct PictVisual { uint visual, format; };
 struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ };
 struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ };
 
-extern int EXT, event, error;
+extern int EXT, event, errorBase;
 struct QueryVersion { int8 ext=EXT,req=0; uint16 size=3; uint major=0,minor=11; };
 struct QueryVersionReply { int8 pad; uint16 seq; uint length; uint major,minor,pad2[4]; } fixed(QueryVersionReply);
 struct QueryPictFormats{ int8 ext=EXT,req=1; uint16 size=1; };
@@ -132,3 +132,6 @@ constexpr ref<byte> requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPi
 constexpr ref<byte> errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
+
+/// Returns padding zeroes to append in order to align an array of \a size bytes to \a width
+inline ref<byte> pad(uint width, uint size){ static byte zero[4]={}; assert_(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }

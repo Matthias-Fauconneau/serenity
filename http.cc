@@ -233,7 +233,7 @@ void HTTP::event() {
         if(content.size()>1024) log("Downloaded",url,content.size()/1024,"KB"); else log("Downloaded",url,content.size(),"B");
         redirect << cacheFile(url);
         for(const string& file: redirect) writeFile(file,content,cache());
-        state=Handle; wait(); return;  //Cache other outstanding requests before handling this one
+        state=Handle; queue(); return;  //Cache other outstanding requests before handling this one
     }
     if(state==Handle) {
         handler(url,Map(cacheFile(url),cache()));

@@ -193,7 +193,7 @@ struct Taskbar : Application, Socket, Poll {
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=128*128+2) {
         {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
         {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
-            array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read( pad); return a; }
+            array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
     }
 
     void raiseTask(uint index) { raise(tasks[index].id); {GrabKey r; r.window=tasks[index].id; r.keycode=escapeCode; r.keyboardMode=0; send(raw(r));}}

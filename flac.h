@@ -1,5 +1,5 @@
 #pragma once
-#include "array.h"
+#include "memory.h"
 
 /// Decodes packed bitstreams
 struct BitReader {
@@ -24,32 +24,30 @@ struct BitReader {
     void setData(const ref<byte>& buffer);
 };
 
-typedef float float2 __attribute((vector_size(8)));
-struct FLAC : BitReader {
-    static constexpr uint channels = 2;
-    uint rate = 0;
-    uint duration = 0;
-
-    struct Buffer {
-        float2* buffer = 0;
-        uint capacity = 0;
-        Buffer(){}
-        Buffer(uint capacity):buffer(allocate<float2>(capacity)),capacity(capacity){}
-        Buffer(Buffer&& o):buffer(o.buffer),capacity(o.capacity){o.buffer=0;}
-        move_operator(Buffer)
-        ~Buffer(){if(buffer)unallocate<float2>(buffer,capacity);}
-        operator float2*(){return buffer;}
-    } buffer;
-
-    uint blockSize = 0;
-    float2* blockIndex = 0; // pointer to start of unread block data (may be modified by consumer)
-    float2* blockEnd = 0; // pointer to end of unread block data (call readFrame to read next block)
-
-    FLAC(){}
-    /// Reads header and decode first frame to buffer
-    FLAC(const ref<byte>& buffer);
-    /// Decodes next FLAC block
-    void readFrame();
+template<class T> struct Buffer {
+    T* data;
+    uint capacity;
+    Buffer(uint capacity):data(allocate<T>(capacity)),capacity(capacity){}
+    Buffer(const Buffer& o):Buffer(o.capacity){copy(data,o.data,capacity);}
+    Buffer(Buffer&& o):data(o.data),capacity(o.capacity){o.data=0;}
+    move_operator(Buffer)
+    ~Buffer(){if(data){unallocate(data,capacity);}}
+    operator T*() { return data; }
 };
 
-extern uint64 rice, predict, order;
+typedef float float2 __attribute((vector_size(8)));
+struct FLAC : BitReader {
+    Buffer<float2> buffer __(1<<16); //64K samples ~ 512K bytes
+    uint16 writeIndex = 0, readIndex = 0;
+    uint16 blockSize = 0, rate = 0;
+    uint16 channels = 0, sampleSize = 0;
+    uint duration = 0;
+
+    default(FLAC)
+    /// Reads header and decode first frame from data
+    FLAC(const ref<byte>& data);
+    /// Parses frame header to get next block size (called automatically)
+    void parseFrame();
+    /// Decodes next FLAC frame
+    void decodeFrame();
+};

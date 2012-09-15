@@ -1,8 +1,14 @@
 #include "flac.h"
-#include "process.h"
 #include "debug.h"
 
-typedef double double2 __attribute__ ((vector_size(16)));
+#if __x86_64__
+inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
+/// Returns the number of cycles used to execute \a statements
+#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
+struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
+#endif
+
+typedef double double2 __attribute((vector_size(16)));
 #if __clang__
 #define extract(vec, i) vec[i]
 #else
@@ -78,19 +84,35 @@ FLAC::FLAC(const ref<byte>& data) {
         if(blockType==STREAMINFO) {
             assert(size=0x22);
             uint unused minBlockSize = binary(16); assert(minBlockSize>=16);
-            uint maxBlockSize = binary(16); assert(minBlockSize<=maxBlockSize && maxBlockSize<=32768);
+            uint unused maxBlockSize = binary(16); assert(minBlockSize<=maxBlockSize && maxBlockSize<=32768);
             int unused minFrameSize = binary(24), unused maxFrameSize = binary(24);
             rate = binary(20); assert(rate == 44100 || rate==48000,rate);
-            uint channels = binary(3)+1; assert(channels==2);
+            uint unused channels = binary(3)+1; assert(channels==2);
             uint unused sampleSize = binary(5)+1; assert(sampleSize==16 || sampleSize==24);
             duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
             skip(128); //MD5
-
-            buffer = Buffer(channels*maxBlockSize);
         } else skip(size*8);
         if(last) break;
     };
-    readFrame();
+    parseFrame();
+}
+
+enum { Independent=1, LeftSide=8, RightSide=9, MidSide=10 };
+void FLAC::parseFrame() {
+    int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync));
+    bool unused variable = bit();
+    int blockSize_[16] = {0, 192, 576,1152,2304,4608, -8,-16, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768};
+    int blockSize = blockSize_[binary(4)];
+    int sampleRate_[16] = {0, 88200, 176400, 192000, 8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, -1, -2, -20 };
+    uint unused rate = sampleRate_[binary(4)]; assert(rate==this->rate);
+    channels = binary(4); assert(channels==Independent||channels==LeftSide||channels==MidSide||channels==RightSide,channels);
+    int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
+    sampleSize = sampleSize_[binary(3)]; assert(sampleSize==16 || sampleSize==24);
+    int unused zero = bit(); assert(zero==0);
+    uint unused frameNumber = utf8();
+    if(blockSize<0) blockSize = binary(-blockSize)+1;
+    skip(8);
+    this->blockSize = blockSize;
 }
 
 inline double round(double x) { //setRoundMode(Down) to round towards negative infinity
@@ -107,18 +129,7 @@ template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned
     *signal = sample; signal++; //write out decoded sample SD2SS=8
 }
 
-template<int unroll> inline void unroll_predictor(uint order, double* predictor, double* even, double* odd, float* signal, float* end) {
-    assert(order<=2*unroll,order,unroll);
-    //ensure enough warmup before using unrolled version
-    for(uint i=order;i<2*unroll;i++) { //scalar compute first sample for odd orders
-        double sum=0;
-        for(uint i=0;i<order;i++) sum += predictor[i] * even[i];
-        double sample = round(sum)+*signal;
-        even[i]=odd[i]= sample; //write out context
-        *signal = sample; signal++; //write out decoded sample //TODO: float
-    }
-    for(int i=order-1;i>=0;i--) predictor[2*unroll-order+i]=predictor[i]; //move predictors to right place for unrolled loop
-    for(uint i=0;i<2*unroll-order;i++) predictor[i]=0; //clear extra predictors used because of unrolling
+template<int unroll> inline void unroll_predictor(double* predictor, double* even, double* odd, float* signal, float* end) {
     double2 kernel[unroll];
     for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
     for(;signal<end;) {
@@ -128,70 +139,50 @@ template<int unroll> inline void unroll_predictor(uint order, double* predictor,
 }
 
 uint64 rice=0, predict=0, order=0;
-void FLAC::readFrame() {
-    int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync));
-    bool unused variable = bit();
-    int blockSize_[16] = {0, 192, 576,1152,2304,4608, -8,-16, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768};
-    int blockSize = blockSize_[binary(4)];
-    int sampleRate_[16] = {0, 88200, 176400, 192000, 8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, -1, -2, -20 };
-    uint unused rate = sampleRate_[binary(4)]; assert(rate==this->rate);
-    enum { Independent=1, LeftSide=8, RightSide=9, MidSide=10 };
-    int channels = binary(4); assert(channels==Independent||channels==LeftSide||channels==MidSide||channels==RightSide,channels);
-    int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
-    uint sampleSize = sampleSize_[binary(3)];
-    int unused zero = bit(); assert(zero==0);
-    uint unused frame = utf8();
-    if(blockSize<0) blockSize = binary(-blockSize)+1;
-    skip(8);
-
-    float block[2][blockSize];
-    debug(setExceptions(Invalid|Overflow|DivisionByZero);)
+void FLAC::decodeFrame() {
+    assert(blockSize && blockSize<1<<15);
+    int allocSize = align(4096,blockSize);
+    float* block[2] = {allocate16<float>(allocSize),allocate16<float>(allocSize)};
     setRoundMode(Down);
     for(int channel=0;channel<2;channel++) {
-        float* signal = block[channel];
-        float* end = signal;
-        double buffer1[blockSize]; double* even = buffer1;
-        double buffer2[blockSize+1]; double* odd = buffer2+1;
-        if(ptr(even)%16) odd=buffer1, even=buffer2+1;
-
         int rawSampleSize = sampleSize; //might need one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
         if(channel == 0) { if(channels==RightSide) rawSampleSize++; }
         if(channel == 1) { if(channels==LeftSide || channels == MidSide) rawSampleSize++; }
 
         //Subframe
-        int unused zero = bit(); assert(zero==0);
-        int type = binary(6);
-        int unused wasted = bit(); assert(wasted==0);
+        int unused zero = bit(); assert(zero==0,channel,blockSize,index,bsize);
+        uint type = binary(6);
+        int unused wasted = bit(); assert(wasted==0,type);
         if (type == 0) { //constant
             int constant = sbinary(rawSampleSize); //sbinary?
-            for(int i = 0;i<blockSize;i++) *signal++ = constant;
+            for(int i = 0;i<blockSize;i++) block[channel][i] = constant;
             continue;
-        }
-        if (type == 1) { //verbatim
+        } else if (type == 1) { //verbatim
             error("TODO");
             continue;
         }
 
-        uint i=0;
-        uint order;
-        int shift;
-        double predictor[32];
+        double predictor[32]; uint order;
+        double* even = allocate16<double>(allocSize);
+        double* odd = allocate16<double>(allocSize+1)+1;
+        float* signal = block[channel];
 
         if (type >= 32) { //LPC
             order = (type&~0x20)+1; assert(order>0 && order<=32,order);
-            for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
+            for(uint i=0;i<order;i++) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
             int precision = binary(4)+1; assert(precision<=15,precision);
-            shift = sbinary(5); assert(shift>=0);
-            for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision))/(1<<shift);
+            int shift = sbinary(5); assert(shift>=0);
+            if(order%2) { predictor[0]=0; for(uint i=0;i<order;i++) predictor[order-i]= double(sbinary(precision))/(1<<shift); } //right align odd order
+            else { for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision))/(1<<shift); }
         } else if(type>=8 && type <=12) { //Fixed
-            order = type & ~0x8; assert(order>=0 && order<=4,order);
-            for(;i<order;i++) even[i]=odd[i]= *signal++ = sbinary(rawSampleSize);
-            if(order==1) predictor[0]=1;
+            order = type & ~0x8; assert(order<=4,order);
+            for(uint i=0;i<order;i++) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
+            if(order==1) predictor[0]=0, predictor[1]=1;
             else if(order==2) predictor[0]=-1, predictor[1]=2;
-            else if(order==3) predictor[0]=1, predictor[1]=-3, predictor[2]=3;
+            else if(order==3) predictor[0]=0, predictor[1]=1, predictor[2]=-3, predictor[3]=3;
             else if(order==4) predictor[0]=-1, predictor[1]=4, predictor[2]=-6, predictor[3]=4;
-            shift=0;
-        } else error("Unknown type");
+        } else error("Unknown type",channel,blockSize,index,bsize);
+        float* end=signal; signal += order;
 
         //Residual
         int method = binary(2); assert(method<=1,method);
@@ -210,7 +201,6 @@ void FLAC::readFrame() {
                 for(;signal<end;) {
                     uint u = unary() << k;
                     int s = (u >> 1) ^ (-(u & 1));
-                    assert(s>=-(1<<24) && s<=(1<<24),s);
                     *signal++ = s;
                 }
             } else if(k < escapeCode) { //TODO: static dispatch on k?
@@ -219,7 +209,6 @@ void FLAC::readFrame() {
                     uint u = unary() << k;
                     u |= binary(k);
                     int s = (u >> 1) ^ (-(u & 1));
-                    assert(s>=-(1<<24) && s<=(1<<24),s);
                     *signal++ = s;
                 }
                 //)
@@ -228,34 +217,39 @@ void FLAC::readFrame() {
                 for(;signal<end;) {
                     uint u = binary(n);
                     int s = (u >> 1) ^ (-(u & 1));
-                    assert(s>=-(1<<24) && s<=(1<<24),s);
                     *signal++ = s;
                 }
             }
         }
         ::rice += rice;
-
         tsc predict;
         signal=block[channel]+order;
-#define o(n) case n: unroll_predictor<n>(order,predictor,even,odd,signal,end); break;
-        switch((order+1)/2) {
-         o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14) //keep predictor in 14 SSE registers until order=28
-         o(15)o(16) //order>28 will spill the predictor out of registers
+        if(order%2) { //for odd order: compute first sample with 'right' predictor without advancing context to begin unrolled loops with even context
+            double sum=0;
+            for(uint i=0;i<order;i++) sum += predictor[i+1] * even[i];
+            double sample = round(sum)+*signal;
+            even[order]=odd[order]= sample; //write out context
+            *signal = sample; signal++; //write out decoded sample //TODO: float
         }
-        ::predict += predict;
-        ::order += order*blockSize;
+        #define o(n) case n: unroll_predictor<n>(predictor,even,odd,signal,end); break;
+        switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
+        ::predict += predict, ::order += order*blockSize;
+        unallocate(even,allocSize);
+        odd-=1; unallocate(odd,allocSize+1);
     }
+    setRoundMode(Even);
     index=align(8,index);
     skip(16);
+    assert(readIndex+buffer.capacity-writeIndex>=blockSize); //assume decodeFrame is not called on full buffer
     for(int i=0;i<blockSize;i++) {
-        float a=block[0][i], b=block[1][i];
-        if(channels==Independent) buffer[i]=__(a,b);
-        if(channels==LeftSide) buffer[i]=__(a,a-b);
-        if(channels==MidSide) a-=b/2, buffer[i]=__(a+b,a);
-        if(channels==RightSide) buffer[i]=__(a+b, b);
+        float a=block[0][i], b=block[1][i]; float2 c;
+        if(channels==Independent) c=(float2)__(a,b);
+        else if(channels==LeftSide) c=(float2)__(a,a-b);
+        else if(channels==MidSide) a-=b/2, c=(float2)__(a+b,a);
+        else if(channels==RightSide) c=(float2)__(a+b, b);
+        else error(channels);
+        buffer[writeIndex++]=c;
     }
-    this->blockSize=blockSize; blockIndex=buffer, blockEnd=buffer+blockSize;
-
-    setRoundMode(Even);
-    debug(setExceptions(Overflow|DivisionByZero);) //-Invalid,-Underflow,-Denormal
+    unallocate(block[0],allocSize); unallocate(block[1],allocSize);
+    if(index<bsize) parseFrame(); else blockSize=0;
 }

@@ -24,9 +24,11 @@ struct Folder : Handle {
 /// Returns whether this \a folder exists (as a folder)
 bool existsFolder(const ref<byte>& folder, const Folder& at=root());
 
-/// Stream is an handle to an Unix I/O stream
+/// poll
 enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64};
 struct pollfd { int fd; short events, revents; };
+
+/// Stream is an handle to an Unix I/O stream
 struct Stream : Handle {
     Stream(Handle&& fd):Handle(move(fd)){}
     /// Reads exactly \a size bytes into \a buffer
@@ -42,7 +44,7 @@ struct Stream : Handle {
     /// Reads \a size raw values
     template<class T> array<T> read(uint size) {
         array<T> buffer(size); buffer.setSize(size); uint byteSize=size*sizeof(T);
-        for(uint i=0;i<byteSize;) i+=readUpTo(buffer.data()+i, byteSize-i);
+        for(uint i=0;i<byteSize;) i+=readUpTo((byte*)buffer.data()+i, byteSize-i);
         return buffer;
     }
     /// Polls whether reading would block
@@ -60,7 +62,7 @@ struct Socket : Stream {
 
 struct File : Stream {
     File(int fd):Stream(fd){}
-    enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000};
+    enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, Asynchronous=020000};
     /// Opens \a file
     /// If read only, fails if not existing
     /// If write only, fails if existing
@@ -80,7 +82,7 @@ void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
 template<uint major, uint minor, class T> struct IOW { typedef T Type; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
 template<uint major, uint minor, class T> struct IOR { typedef T Type; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
-template<uint major, uint minor, class T> struct IOWR { typedef T Type; static constexpr uint iowr = 3<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, class T> struct IOWR { typedef T Type; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 struct Device : File {
     Device(const ref<byte>& file, int flags=ReadWrite):File(file,root(),flags){}
     /// Sends ioctl \a request with untyped \a arguments

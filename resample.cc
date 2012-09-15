@@ -28,43 +28,35 @@
 */
 #include "resample.h"
 #include "memory.h"
+#include "debug.h"
+#include "simd.h"
 
 template<class T> T sq(const T& x) { return x*x; }
 template<class T> T cb(const T& x) { return x*x*x; }
 
 /// Trigonometric primitives
-const float PI = 3.14159265358979323846;
-inline float sin(float t) { return __builtin_sinf(t); }
-inline float atan(float f) { return __builtin_atanf(f); }
+const double PI = 3.14159265358979323846;
+inline double sin(double t) { return __builtin_sin(t); }
+inline double atan(double f) { return __builtin_atan(f); }
 
 /// SIMD
-typedef float float4 __attribute__ ((vector_size(16)));
-inline float4 nodebug alignedLoad(const float *p) { return *(float4*)p; }
 #if __clang__
-#define shuffle __builtin_shufflevector
-#define moveHighToLow(a,b) shuffle(a, b, 6, 7, 2, 3);
-inline float4 nodebug unalignedLoad(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
+inline float4 nodebug loadu(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
 #else
-#define unalignedLoad __builtin_ia32_loadups
-#define extract_s __builtin_ia32_vec_ext_v4sf
-#define moveHighToLow(a,b) __builtin_ia32_movhlps(a,b)
+#define loadu __builtin_ia32_loadups
+#define movhlps __builtin_ia32_movhlps
 #define shuffle_ps __builtin_ia32_shufps
 #endif
-extern "C" int posix_memalign(byte** buffer, long alignment, long size);
-template<class T> T* allocate_aligned(int size) { byte* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
 
-//TODO: store filter in 15x4 registers
 inline float product(const float* kernel, const float* signal, int len) {
-    assert_(kernel); assert_(signal); assert_(ptr(kernel)%16==0);
     float4 sum = {0,0,0,0};
-    for(int i=0;i<len;i+=4) sum += alignedLoad(kernel+i) * unalignedLoad(signal+i); //TODO: align signal
-    sum += moveHighToLow(sum, sum);
+    for(int i=0;i<len;i+=4) sum += load(kernel+i) * loadu(signal+i);
 #if __clang__
-    sum += shuffle(sum, sum, 1,1,5,5);
-    return sum[0];
+    return sum[0]+sum[1]+sum[2]+sum[3];
 #else
+    sum += movhlps(sum,sum);
     sum += shuffle_ps(sum, sum, 0x55);
-    return extract_s(sum, 0);
+    return extract(sum, 0);
 #endif
 }
 
@@ -76,7 +68,7 @@ static double kaiser12[68] = { 0.99859849, 1.00000000, 0.99859849, 0.99440475, 0
 
 static double window(float x) {
     float y = x*windowOversample;
-    int i = floor(y);
+    int i = y;
     float t = (y-i);
     double interp[4];
     interp[3] =  -t/6 + (t*t*t)/6;
@@ -85,7 +77,7 @@ static double window(float x) {
     interp[1] = 1-interp[3]-interp[2]-interp[0];
     return interp[0]*kaiser12[i] + interp[1]*kaiser12[i+1] + interp[2]*kaiser12[i+2] + interp[3]*kaiser12[i+3];
 }
-static float sinc(double cutoff, double x, int N) {
+static double sinc(double cutoff, double x, int N) {
     if (abs(x)<1e-6) return cutoff;
     else if (abs(x) > N/2.0) return 0;
     double xx = x * cutoff;
@@ -97,9 +89,10 @@ inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } re
 
 Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate) {
     assert_(channelCount==this->channelCount);
+    assert_(sourceRate%1024==0); //allow to eventually use an mmap ring buffer for source samples
 
     // Computes filter size and cutoff
-    float cutoff;
+    double cutoff;
     if (sourceRate > targetRate) { //downsampling
         cutoff = bandwidth * targetRate / sourceRate;
         N = filterSize * sourceRate / targetRate;
@@ -112,52 +105,80 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate) {
     // Allocates and clears aligned planar signal buffers
     bufferSize = sourceRate+N-1;
     for(uint i=0;i<channelCount;i++) {
-        buffer[i] = allocate_aligned<float>(bufferSize);
+        buffer[i] = allocate16<float>(bufferSize);
         clear(buffer[i],bufferSize,0.f);
     }
 
     // Factorize rates if possible to reduce filter bank size
     int factor = gcd(sourceRate,targetRate);
     this->sourceRate=sourceRate/=factor; this->targetRate=targetRate/=factor;
+    assert(sourceRate); assert(targetRate);
     integerAdvance = sourceRate/targetRate;
     fractionalAdvance = sourceRate%targetRate;
 
     // Generates an N tap filter for each fractionnal position
-    kernel = allocate_aligned<float>(targetRate*N);
-    for(uint i=0;i<targetRate;i++) for(uint j=0;j<N;j++) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+(float(j)-(N/2+1)), N);
+    kernel = allocate16<float>(targetRate*N);
+    for(uint i=0;i<targetRate;i++) for(uint j=0;j<N;j++) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+j-N/2-1, N);
 }
 Resampler::~Resampler() {
-    for(int i=0;i<channelCount;i++) if(buffer[i]) unallocate(buffer[i],channelCount*bufferSize);
+    for(uint i=0;i<channelCount;i++) if(buffer[i]) unallocate(buffer[i],channelCount*bufferSize);
     if(kernel) unallocate(kernel,N*targetRate);
 }
 
-template<bool mix>
-void Resampler::filter(const float* source, uint sourceSize, float* target, uint targetSize) {
-    assert_(kernel); assert_(buffer); assert_(source); assert_(target); assert_(sourceSize==bufferSize-(N-1));
-    assert_(sourceSize%sourceRate==0);
-    assert_(targetSize%targetRate==0);
-    assert_(sourceSize/sourceRate*targetRate==targetSize);
-    for(uint channel=0;channel<channelCount;channel++) {
-        // Copies interleaved signal into aligned planar buffer
-        for(uint j=0;j<sourceSize;j++) buffer[channel][j+N-1]=source[j*channelCount+channel];
-
-        // Convolves the signal with the kernel
-        uint integerIndex=0,fractionalIndex=0;
-        for(uint i=0;i<targetSize;i++) {
-            if(mix) target[i*channelCount+channel] += product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
-            else     target[i*channelCount+channel]   = product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
-            integerIndex += integerAdvance;
-            fractionalIndex += fractionalAdvance;
-            if(fractionalIndex >= targetRate) {
-                fractionalIndex -= targetRate;
-                integerIndex++;
-            }
-        }
-        assert_(integerIndex == sourceSize); assert_(fractionalIndex == 0);
-
-        // Copies the last samples for next period (TODO: ring buffer)
-        for(uint j=0;j<N-1;++j) buffer[channel][j] = buffer[channel][j+sourceSize];
-    }
+template<bool mix> void Resampler::filter(const float* source, uint sourceSize, float* target, uint targetSize) {
+    write(source,sourceSize); read<mix>(target,targetSize);
 }
 template void Resampler::filter<false>(const float* source, uint sourceSize, float* target, uint targetSize);
 template void Resampler::filter<true>(const float* source, uint sourceSize, float* target, uint targetSize);
+
+int Resampler::need(uint targetSize) {
+    uint integerIndex=this->integerIndex, fractionalIndex=this->fractionalIndex;
+    for(uint i=0;i<targetSize;i++) {
+        integerIndex += integerAdvance;
+        fractionalIndex += fractionalAdvance;
+        if(fractionalIndex >= targetRate) {
+            fractionalIndex -= targetRate;
+            integerIndex++;
+        }
+    }
+    return integerIndex+1-writeIndex;
+}
+
+void Resampler::write(const float* source, uint size) {
+    assert(size<=sourceRate,size,sourceRate); //doesn't fit buffer
+    if(writeIndex+size>sourceRate) { // Wraps buffer (TODO: map ring buffer)
+        writeIndex -= integerIndex;
+        assert(writeIndex+integerIndex<sourceRate);
+        for(uint channel=0;channel<channelCount;channel++) {
+            for(uint i=0;i<N-1+writeIndex;++i) buffer[channel][i] = buffer[channel][integerIndex+i];
+        }
+        integerIndex = 0;
+    }
+    for(uint j=0;j<size;j++) { // Deinterleaves source to buffers
+        buffer[0][N-1+writeIndex+j]=source[j*channelCount+0];
+        buffer[1][N-1+writeIndex+j]=source[j*channelCount+1];
+    }
+     writeIndex+=size;
+     assert(sourceRate);
+}
+
+template<bool mix> void Resampler::read(float* target, uint targetSize) {
+    assert(sourceRate);
+    for(uint i=0;i<targetSize;i++) {
+        assert(integerIndex<sourceRate);
+        for(uint channel=0;channel<channelCount;channel++) {
+            assert(integerIndex<writeIndex,writeIndex,integerIndex,fractionalIndex,integerAdvance,fractionalAdvance,targetRate,targetSize);
+            if(mix) target[i*channelCount+channel] += product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
+            else target[i*channelCount+channel] = product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
+        }
+        integerIndex += integerAdvance;
+        fractionalIndex += fractionalAdvance;
+        if(fractionalIndex >= targetRate) {
+            fractionalIndex -= targetRate;
+            integerIndex++;
+        }
+    }
+    assert(sourceRate);
+}
+template void Resampler::read<false>(float* target, uint targetSize);
+template void Resampler::read<true>(float* target, uint targetSize);

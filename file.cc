@@ -58,7 +58,7 @@ bool existsFolder(const ref<byte>& folder, const Folder& at) { return Handle( op
 /// Stream
 
 void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
-int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size) ); }
+int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), fd, ptr(buffer), size); }
 array<byte> Stream::read(uint capacity) {
     array<byte> buffer(capacity);
     int size = check( ::read(fd,buffer.data(),capacity) );
@@ -85,14 +85,14 @@ int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, requ
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
 array<byte> readFile(const ref<byte>& path, const Folder& at) {
     File file(path,at);
-    debug(if(file.size()>1<<16) { trace(); warn("use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_); })
+    debug(if(file.size()>1<<16) {warn(path,"use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_);})
     return file.read(file.size());
 }
 void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at) { File(file,at,File::WriteOnly|File::Create|File::Truncate).write(content); }
 
 /// Map
 
-Map::Map(const File& file) { data = (byte*)check(mmap(0,size=file.size(),PROT_READ,MAP_PRIVATE,file.fd,0)); assert(data); }
+Map::Map(const File& file) { size=file.size(); data = size?(byte*)check(mmap(0,size,PROT_READ,MAP_PRIVATE,file.fd,0)):0; }
 Map::~Map() { if(data) munmap((void*)data,size); }
 void Map::lock(uint size) const { assert(size<=this->size); check_(mlock(data, size)); }
 /// File system

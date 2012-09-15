@@ -109,5 +109,5 @@ char TextData::character() {
     else if(match('"')) return '"';
     else if(match('\'')) return '\'';
     else if(match('\\')) return '\\';
-    else error_("Invalid escape character"_); //(char)peek()
+    else { warn("Invalid escape character"_); return '?'; }
 }

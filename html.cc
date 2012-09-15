@@ -126,8 +126,8 @@ void HTML::flushText() {
 void HTML::flushImages() {
     if(!images) return;
     UniformGrid<ImageView>& grid = heap<UniformGrid<ImageView> >();
-    grid.resize(images.size());
-    for(URL& image: images) heap<ImageLoader>(move(image), &grid.last().image, contentChanged);
+    grid.reserve(images.size());
+    for(URL& image: images) { grid<<ImageView(); heap<ImageLoader>(move(image), &grid.last().image, contentChanged); }
     VBox::operator<<(&grid);
     images.clear();
 }

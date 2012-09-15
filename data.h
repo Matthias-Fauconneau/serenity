@@ -1,11 +1,6 @@
 #pragma once
 #include "array.h"
 
-/// Returns padding zeroes to append in order to align an array of \a size bytes to \a width
-inline ref<byte> pad(uint width, uint size){ static byte zero[4]={}; assert_(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }
-
-/// References raw memory representation of \a t
-template<class T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 /// Casts raw memory to \a T
 template<class T> const T& raw(const ref<byte>& a) { assert_(a.size==sizeof(T)); return *(T*)a.data; }
 /// Casts between element types
@@ -52,6 +47,7 @@ inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
 /// \a BinaryData provides a convenient interface to parse binary inputs
 struct BinaryData : virtual Data {
     default_move(BinaryData)
+    move_operator(BinaryData)
     bool isBigEndian = false;
     /// Creates a BinaryData interface to an \a array
     BinaryData(array<byte>&& array, bool isBigEndian=false) : Data(move(array)), isBigEndian(isBigEndian) {}

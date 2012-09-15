@@ -3,23 +3,24 @@
 /// Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define nodebug __attribute((always_inline))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
 #define notrace __attribute((no_instrument_function))
 inline void* operator new(unsigned long, void* p) { return p; } //placement new
 #define static_this void __attribute((constructor)) static_this()
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
 
 /// Move
 template<typename T> struct remove_reference { typedef T type; };
 template<typename T> struct remove_reference<T&> { typedef T type; };
 template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
-template<class T> nodebug constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
+template<class T> __attribute((always_inline)) constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete;
 #define default(T) T()____(=default);
-#define default_move(T) default(T) no_copy(T) T(T&&)____(=default); T& operator=(T&&)____(=default);
+#define default_move(T) default(T) no_copy(T) T(T&&)____(=default);
 #define move_operator(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;}
 /// base template for explicit copy (overriden by explicitly copyable types)
 template<class T> T copy(const T& t) { return t; }
@@ -65,8 +66,7 @@ template<class T> struct ref; //templated typedef using
 #define ___ //variadic template arguments unpack operator ...
 #define ____( ignore... ) //=default, static_assert, constructor{} initializer
 #else
-/// \a ref is a const typed bounded memory reference (i.e fat pointer)
-/// \note As \a data is not owned, ref should be used carefully (only as argument, never as field)
+/// \a ref is an unmanaged const memory reference (used in method arguments)
 namespace std { template<class T> struct initializer_list; }
 template<class T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
@@ -79,18 +79,20 @@ inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
 /// compile \a statements in executable only if \a DEBUG flag is set
 #ifdef DEBUG
 #define debug( statements... ) statements
+#define warn error
 #else
 #define debug( statements... )
+#define warn log
 #endif
-/// Logs current stack trace skipping /a skip last frames
-void trace(int skip=0, uint size=-1);
-/// Simplified debug methods (avoid header dependencies on debug.h/string.h/array.h/memory.h)
-void write(const ref<byte>& message);
-void abort() __attribute((noreturn));
+// Simplified debug methods (avoid header dependencies on debug.h/string.h/array.h/memory.h)
+/// Logs to standard output
+template<class ___ Args> void log(const Args& ___ args);
+template<> void log(const ref<byte>& message);
 /// Aborts unconditionally and display \a message
-#define error_(message) ({ trace(0,-1); write(message "\n"_); abort(); })
+template<class ___ Args> void error(const Args& ___ args)  __attribute((noreturn));
+template<> void error(const ref<byte>& message) __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and display \a expr
-#define assert_(expr) ({debug( if(!(expr)) error_(#expr); )})
+#define assert_(expr) ({debug( if(!(expr)) error(#expr "\n"_); )})
 
 /// initializer_list
 namespace std {
@@ -141,9 +143,3 @@ template<class A, class B> bool operator >(const A& a, const B& b) { return b<a;
 
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert_((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
-
-/// Floating point operations
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
-inline float sqrt(float f) { return __builtin_sqrtf(f); }

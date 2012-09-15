@@ -8,12 +8,18 @@ struct AudioOutput : Device, Poll {
     const struct Status* status = 0;
     struct Control* control = 0;
     function<bool(int16* output, uint size)> read;
+    signal<> written; //signal each time audio buffers were written
 
     /// Configures PCM output
-    /// \note If \a realtime is set, the lowest latency will be used (most wakeups)
-    AudioOutput(function<bool(int16* output, uint size)> read, bool realtime=false);
+    /// \note read will be called back periodically to fill \a output with \a size samples
+    /// \note if \a realtime is set, \a read will be called from a separate thread
+    AudioOutput(function<bool(int16* output, uint size)> read, Thread& thread=defaultThread, bool realtime=false);
+    /// Unmaps buffers, unregisters Poll and closes device
     ~AudioOutput();
-    void event();
+    /// Starts audio output, will require data periodically from \a read callback
     void start();
+    /// Drains audio output and stop requiring data from \a read callback
     void stop();
+    /// Callback for poll events
+    void event();
 };

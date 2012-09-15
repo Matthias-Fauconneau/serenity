@@ -10,8 +10,8 @@
 #include "png.h"
 
 /// Globals
-namespace Shm { int EXT, event, error; } using namespace Shm;
-namespace Render { int EXT, event, error; } using namespace Render;
+namespace Shm { int EXT, event, errorBase; } using namespace Shm;
+namespace Render { int EXT, event, errorBase; } using namespace Render;
 int2 display;
 Widget* focus;
 Widget* drag;
@@ -45,10 +45,10 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     assert(visual);
 
     {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; send(string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::error=r.firstError;}
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
 
     {QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; send(string(raw(r)+"RENDER"_+pad(4,r.length)));}
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Render::EXT=r.major; Render::event=r.firstEvent; Render::error=r.firstError; }
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Render::EXT=r.major; Render::event=r.firstEvent; Render::errorBase=r.firstError; }
     {Render::QueryVersion r; send(raw(r)); readReply<Render::QueryVersionReply>();}
     {QueryPictFormats r; send(raw(r));}
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>();
@@ -138,7 +138,7 @@ void Window::event() {
     } else {
         uint8 type = read<uint8>();
         processEvent(type, read<XEvent>());
-        while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
+        while(eventQueue) { QEvent e=eventQueue.take(0); processEvent(e.type, e.event); }
     }
     current=0;
 }
@@ -148,7 +148,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     if(type==0) { const XError& e=(const XError&)event; uint8 code=e.code;
         if(e.major==Render::EXT) {
             int reqSize=sizeof(Render::requests)/sizeof(*Render::requests);
-            if(code>=Render::error && code<=Render::error+Render::errorCount) { code-=Render::error;
+            if(code>=Render::errorBase && code<=Render::errorBase+Render::errorCount) { code-=Render::errorBase;
                 assert(code<sizeof(Render::errors)/sizeof(*Render::errors));
                 log("XError",Render::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
             } else {
@@ -157,7 +157,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             }
         } else if(e.major==Shm::EXT) {
             int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
-            if(code>=Shm::error && code<=Shm::error+Shm::errorCount) { code-=Shm::error;
+            if(code>=Shm::errorBase && code<=Shm::errorBase+Shm::errorCount) { code-=Shm::errorBase;
                 assert(code<sizeof(Shm::errors)/sizeof(*Shm::errors));
                 log("XError",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
             } else {
@@ -173,8 +173,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     else if(type==1) error("Unexpected reply");
     else { const XEvent& e=event; type&=0b01111111; //msb set if sent by SendEvent
         /**/ if(type==MotionNotify) {
-            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, LeftButton)) wait();
-            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) wait();
+            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, LeftButton)) queue();
+            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) queue();
             else if(anchor==Float) {
                 if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; } //to reuse border intersection checks
                 bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
@@ -203,12 +203,12 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonPress) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (MouseButton)e.key)) wait();
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (MouseButton)e.key)) queue();
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
             uint key = KeySym(e.key);
-            if(focus && focus->keyPress((Key)key) ) wait(); //normal keyPress event
+            if(focus && focus->keyPress((Key)key) ) queue(); //normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
                 if(shortcut) (*shortcut)(); //local window shortcut
@@ -218,15 +218,15 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(type==LeaveNotify && hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
-            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None)) wait();
+            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None)) queue();
         }
-        else if(type==Expose) { if(!e.expose.count) wait(); }
+        else if(type==Expose) { if(!e.expose.count) queue(); }
         else if(type==UnmapNotify) mapped=false;
         else if(type==MapNotify) mapped=true;
         else if(type==ReparentNotify) {}
         else if(type==ConfigureNotify) {
             position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
-            if(this->size!=size) { this->size=size; if(mapped) wait(); }
+            if(this->size!=size) { this->size=size; if(mapped) queue(); }
         }
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
@@ -234,7 +234,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
         }
-        else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) wait(); state=Idle; }
+        else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) queue(); state=Idle; }
         else if(type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
@@ -244,7 +244,7 @@ template<class T> T Window::readReply() {
     for(;;) { uint8 type = read<uint8>();
         if(type==0){XError e=read<XError>(); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
         else if(type==1) return read<T>();
-        else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
+        else eventQueue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }
 }
 
@@ -278,7 +278,7 @@ void Window::setGeometry(int2 position, int2 size) {
 }
 void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}{RaiseWindow r; r.id=id; send(raw(r));}}
 void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
-void Window::render() { if(mapped) Poll::wait(); }
+void Window::render() { if(mapped) queue(); }
 
 /// Keyboard
 
@@ -338,7 +338,7 @@ string Window::getSelection() {
     {ConvertSelection r; r.requestor=id; r.target=Atom("UTF8_STRING"_); send(raw(r));}
     for(;;) { uint8 type = read<uint8>();
         if((type&0b01111111)==SelectionNotify) { read<XEvent>(); return getProperty<byte>(id,"UTF8_STRING"_); }
-        else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
+        else eventQueue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }
 }
 
@@ -350,7 +350,7 @@ const Image& Window::cursorIcon(Window::Cursor cursor) {
     static constexpr const Image& (*icons[])() = { arrowIcon, horizontalIcon, verticalIcon, fdiagonalIcon, bdiagonalIcon, moveIcon }; return icons[cursor]();
 }
 int2 Window::cursorHotspot(Window::Cursor cursor) {
-    static constexpr const int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15) }; return hotspots[cursor];
+    static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15) }; return hotspots[cursor];
 }
 
 void Window::setCursor(Cursor cursor, uint window) {

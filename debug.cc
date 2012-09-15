@@ -35,6 +35,7 @@ string demangle(TextData& s, bool function=true) {
     else if(s.match("C2"_)) r<< "this"_;
     else if(s.match("D1"_)) r<< "~this"_;
     else if(s.match("D2"_)) r<< "~this"_;
+    else if(s.match("Dv"_)){int size=s.number(); s.match('_'); r<<demangle(s)+dec(size);}
     else if(s.match("eq"_)) r<<"operator =="_;
     else if(s.match("ix"_)) r<<"operator []"_;
     else if(s.match("cl"_)) r<<"operator ()"_;
@@ -93,10 +94,13 @@ string demangle(TextData& s, bool function=true) {
         }
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
-    } else if((l=uint(s.number()))<=s.available(l)) {
-        r<<s.read(l); //struct
-        if(s && s.peek()=='I') r<< demangle(s);
-    } else r<<s.untilEnd();
+    } else {
+        l=uint(s.number());
+        if(l<=s.available(l)) {
+            r<<s.read(l); //struct
+            if(s && s.peek()=='I') r<< demangle(s);
+        } else r<<s.untilEnd();
+    }
     for(int i=0;i<pointer;i++) r<<'*';
     if(rvalue) r<<"&&"_;
     if(ref) r<<'&';
@@ -184,16 +188,27 @@ Symbol findNearestLine(void* find) {
     return symbol;
 }
 
-int recurse;
-void trace(int skip, uint size) {
-    if(recurse>1) {log("Debugger error"_); void**p=0;*p=0; } recurse++;
+#if __x86_64__ || __i386__
+void* caller_frame(void* fp) { return *(void**)fp; }
+void* return_address(void* fp) { return *((void**)fp+1); }
+#elif __arm__ // Assumes APCS stack layout (i.e works only when compiled with GCC's -mapcs flag)
+void* caller_frame(void* fp) { return *((void**)fp-3); }
+void* return_address(void* fp) { return *((void**)fp-1); }
+#endif
+
+string trace(int skip, void* ip) {
     void* stack[16]; clear((byte*)stack,sizeof(stack));
-    stack[0] = __builtin_return_address(0);
-    #define bra(i) if(ptr(stack[i-1])>0x100000 && ptr(stack[i-1])<0x1000000) stack[i] = __builtin_return_address(i)
-    bra(1);bra(2);bra(3);bra(4);bra(5);bra(6);bra(7);bra(8);bra(9);bra(10);bra(11);bra(12);bra(13);bra(14);bra(15);
-    for(int i=min(15u,skip+size-1);i>=skip;i--) if(ptr(stack[i])>0x100000 && ptr(stack[i])<0x1000000) {
-        Symbol s = findNearestLine(stack[i]);
-        if(s.function||s.file||s.line) log(s.file+":"_+str(s.line)+"     \t"_+s.function); else log(ptr(stack[i]));
+    void* frame = __builtin_frame_address(0);
+    int i=0;
+    for(;i<8;i++) {
+        if(ptr(frame)==0) break;
+        stack[i]=return_address(frame);
+        frame=caller_frame(frame);
     }
-    recurse--;
+    string r;
+    for(i--; i>=skip; i--) {
+        Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<(hex(ptr(stack[i]))+"\n"_);
+    }
+    if(ip) {  Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<(hex(ptr(ip))+"\n"_); }
+    return r;
 }

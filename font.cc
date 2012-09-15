@@ -96,7 +96,7 @@ uint16 Font::index(uint16 code) {
                 uint32 first=s.read(), last=s.read(), firstIndex=s.read();
                 if(code>=first && code<=last) return firstIndex+code-first;
             }
-        } else { trace(); warn("Unsupported"_,format,code); return this->index('?'); }
+        } else {warn("Unsupported"_,format,code); return this->index('?');}
         s.index=index;
     }
     error("Not Found"_);

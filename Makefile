@@ -1,8 +1,8 @@
 PREFIX ?= /usr
 TARGET ?= taskbar
-BUILD ?= fast
-#CC = g++ -pipe -march=native -mfpmath=sse
-CC = clang++ -pipe -march=native
+BUILD ?= release
+CC = g++ -fabi-version=0 -pipe -march=native -mfpmath=sse
+#CC = clang++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
 #debug: include debug symbols, keep all assertions
 FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer -fno-optimize-sibling-calls
@@ -10,17 +10,15 @@ FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer -fno-optimize-sibling-calls
 FLAGS_fast := -g -O2 -fno-omit-frame-pointer -fno-optimize-sibling-calls
 #profile: include debug symbols, disable all assertions, use medium optimizations, instrument functions
 FLAGS_profile := -g -O3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -finstrument-functions
-SRCS = $(SRCS_$(BUILD))
 SRCS_profile := profile
 #release: strip debug symbols, disable all assertions, use heavy optimizations
-FLAGS_release := -O3 -fomit-frame-pointer
+FLAGS_release := -g -O3 -fomit-frame-pointer
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button
 ICONS_desktop := feeds network shutdown
 ICONS_player := play pause next
 ICONS_music := music
-SRCS += $(ICONS:%=icons/%)
 
 LIBS_player = mpg123
 LIBS_ffmpeg = avformat avcodec
@@ -32,25 +30,27 @@ INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_feeds = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_music = icons/$(TARGET).png $(TARGET).desktop
 
-all: prepare $(BUILD)/$(TARGET)
+clean:
+	@rm -f $(BUILD)/*.l
+	@rm -f $(BUILD)/*.d
+	@rm -f $(BUILD)/*.o
+	@rm -f $(BUILD)/$(TARGET)
+	@rm -fR $(BUILD)/icons
+	@rmdir $(BUILD)
+
+prepare:
+	@ln -sf $(TARGET).files serenity.files
 
 %.l: %.d
 	@python dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
 
-$(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
-	$(eval LIBS= $(filter %.o, $^))
-	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
-	$(eval LIBS= $(LIBS:%=$$(%)))
-	@$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
-	@echo $(BUILD)/$(TARGET)
+ifneq ($(MAKECMDGOALS),clean)
+-include $(BUILD)/$(TARGET).l
+endif
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@$(CC) $(FLAGS) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
-
-ifneq ($(MAKECMDGOALS),clean)
--include $(BUILD)/$(TARGET).l
-endif
 
 $(BUILD)/%.o : %.cc
 	@echo $<
@@ -62,16 +62,15 @@ $(BUILD)/%.o: %.png
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<
 
-prepare:
-	@ln -sf $(TARGET).files serenity.files
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%)
+$(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
+	$(eval LIBS= $(filter %.o, $^))
+	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
+	$(eval LIBS= $(LIBS:%=$$(%)))
+	@$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	@echo $(BUILD)/$(TARGET)
 
-clean:
-	@rm -f $(BUILD)/*.l
-	@rm -f $(BUILD)/*.d
-	@rm -f $(BUILD)/*.o
-	@rm -f $(BUILD)/$(TARGET)
-	@rm -fR $(BUILD)/icons
-	@rmdir $(BUILD)
+all: prepare $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
 	cp $< $(PREFIX)/share/icons/hicolor/32x32/apps

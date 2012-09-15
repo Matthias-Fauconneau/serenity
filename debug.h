@@ -6,28 +6,22 @@ struct Symbol { string function; ref<byte> file; uint line=0; };
 Symbol findNearestLine(void* address);
 
 /// Logs to standard output using str(...) serialization without a newline
-template<class ___ Args> void log_(const Args& ___ args) { write(string(str(args ___))); }
+template<class ___ Args> void log_(const Args& ___ args) { log_((ref<byte>)string(str(args ___))); }
+/// Logs to standard output without a newline
+template<> void log_(const ref<byte>& buffer);
 /// Logs to standard output using str(...) serialization
-template<class ___ Args> void log(const Args& ___ args) { write(string(str(args ___)+"\n"_)); }
-
-/// Critical error in debug mode, log in release mode
-#if DEBUG
-#define warn error
-#else
-#define warn log
-#endif
-
-/// Aborts unconditionally and logs \a message
-#define error(message...) ({ trace(); log(message); abort(); })
-
-/// Logs \a expr name and value
-#define eval(expr) log(#expr ":",expr)
+template<class ___ Args> void log(const Args& ___ args) { log_((ref<byte>)string(str(args ___)+"\n"_)); }
+/// Aborts unconditionally and logs to standard output using str(...) serialization
+template<class ___ Args> void __attribute((noreturn)) error(const Args& ___ args) { error((ref<byte>)string(str(args ___))); }
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) ({debug( if(!(expr)) error(#expr, ##message);)})
 /// Aborts if \a expr is negative and logs corresponding error code
 #define check(expr, message...) ({ long e=(long)expr; if(e<0 && -e<LAST) warn(#expr##_, errno[-e], ##message); e; })
+/// Aborts if \a expr is negative and logs corresponding error code (unused result)
 #define check_(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) warn(#expr##_, errno[-e], ##message); })
+/// Aborts if \a expr is negative and logs corresponding error code (unless EINTR or EAGAIN)
+#define check__(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST && -e!=INTR) warn(#expr##_, errno[-e], ##message); e; })
 
 /// Linux error code names
 enum Error {OK, PERM, NOENT, SRCH, INTR, EIO, NXIO, TOOBIG, NOEXEC, BADF, CHILD, AGAIN, NOMEM, ACCES, FAULT, NOTBLK, BUSY, EXIST, XDEV, NODEV, NOTDIR, ISDIR, INVAL, NFILE, MFILE, NOTTY, TXTBSY, FBIG, NOSPC, SPIPE, ROFS, MLINK, PIPE, DOM, RANGE, DEADLK, NAMETOOLONG, NOLCK, NOSYS, NOTEMPTY, LOOP, WOULDBLOCK, NOMSG, IDRM, CHRNG, L2NSYNC, L3HLT, L3RST, LNRNG, UNATCH, NOCSI, L2HLT, BADE, BADR, XFULL, NOANO, BADRQC, BADSLT, DEADLOCK, EBFONT, NOSTR, NODATA, TIME, NOSR, NONET, NOPKG, REMOTE, NOLINK, ADV, SRMNT, COMM, PROTO, MULTIHO, DOTDOT, BADMSG, OVERFLOW, NOTUNIQ, BADFD, REMCHG, LIBACC, LIBBAD, LIBSCN, LIBMAX, LIBEXEC, ILSEQ, RESTART, STRPIPE, USERS, NOTSOCK, DESTADDRREQ, MSGSIZE, PROTOTYPE, NOPROTOOPT, PROTONOSUPPORT, SOCKTNOSUPPORT, OPNOTSUPP, PFNOSUPPORT, AFNOSUPPORT, ADDRINUSE, ADDRNOTAVAIL, NETDOWN, NETUNREACH, NETRESET, CONNABORTED, CONNRESET, NOBUFS, ISCONN, NOTCONN, SHUTDOWN, TOOMANYREFS, TIMEDOUT, CONNREFUSED, HOSTDOWN, HOSTUNREACH, ALREADY, INPROGRESS, STALE, UCLEAN, NOTNAM, NAVAIL, ISNAM, REMOTEIO, DQUOT, NOMEDIUM, MEDIUMTYPE, CANCELED, NOKEY, KEYEXPIRED, KEYREVOKED, KEYREJECTED, OWNERDEAD, NOTRECOVERABLE, RFKILL, HWPOISON, LAST};

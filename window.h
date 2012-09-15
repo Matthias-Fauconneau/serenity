@@ -40,8 +40,8 @@ struct Window : Socket, Poll {
     void send(const ref<byte>& request);
 
     struct QEvent { uint8 type; XEvent event; } packed;
-    array<QEvent> queue;
-    /// Reads an X reply while checking pending errors and processing queued events
+    array<QEvent> eventQueue;
+    /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply();
 
     /// Shows window.

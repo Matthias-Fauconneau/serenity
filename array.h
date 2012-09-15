@@ -2,19 +2,16 @@
 #include "core.h"
 #include "memory.h"
 
-/// \a array is a typed bounded mutable growable memory region
-/// \note array uses move semantics to avoid reference counting when holding an heap buffer
+/// References raw memory representation of \a t
+template<class T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
+
+/// \a array is a polyvalent memory reference (const/mutable, own/reference, inline/heap)
+/// \note array uses move semantics to avoid reference counting when managing an heap buffer
 /// \note array stores small arrays inline (<=31bytes)
-/// \note array copies to an heap buffer when modifying a reference
 template<class T> struct array {
-    int8 tag = 0; //0: empty, >0: inline, -1 = reference, -2 = heap buffer, -3 = static buffer
-    struct Buffer {
-        const T* data;
-        uint size;
-        uint capacity;
-        Buffer(const T* data, uint size, uint capacity):data(data),size(size),capacity(capacity){}
-    } buffer = {0,0,0};
-    int pad[2]; //1+7+8+4+4+2*4=32 Pads to fill half a cache line (31 inline bytes)
+    int8 tag = 0; //0: empty, >0: inline, -1 = reference, -2 = heap buffer
+    struct{const T* data; uint size; uint capacity;} buffer = {0,0,0};
+    int pad[2]; //Pads to fill half a cache line (tag:1+7+data:8+size:4+capacity:4+2*4 = 31 bytes inline capacity)
     /// Number of elements fitting inline
     static constexpr uint inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
     /// Data pointer valid while the array is not reallocated (resize or inline array move)
@@ -40,14 +37,10 @@ template<class T> struct array {
     move_operator(array)
     /// Allocates a new uninitialized array for \a capacity elements
     explicit array(uint capacity){reserve(capacity); }
-    /// Moves elements from a reference
-    explicit array(ref<T>&& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(move((T&)ref[i]));}
     /// Copies elements from a reference
-    explicit array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(copy(ref[i]));}
+    explicit array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i=0;i<ref.size;i++) new (&at(i)) T(ref[i]);}
     /// References \a size elements from read-only \a data pointer
-    array(const T* data, uint size) : tag(-1), buffer(data, size, 0) {}
-    /// Initializes array with a writable buffer of \a capacity elements
-    array(const T* data, uint size, uint capacity) : tag(-3), buffer(data, size, capacity) { assert_(capacity>inline_capacity()); }
+    array(const T* data, uint size) : tag(-1) ____(, buffer{data, size, 0}) {}
 
     /// If the array own the data, destroys all initialized elements and frees the buffer
     ~array() { if(tag!=-1) { for(uint i=0,size=this->size();i<size;i++) data()[i].~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); } }
@@ -158,7 +151,7 @@ template<class T> struct array {
 };
 
 /// Copies all elements in a new array
-template<class T> array<T> copy(const array<T>& a) { return array<T>((ref<T>)a); }
+template<class T> array<T> copy(const array<T>& o) { return array<T>((ref<T>)o); }
 
 /// Replaces in \a array every occurence of \a before with \a after
 template<class T> array<T> replace(array<T>&& a, const T& before, const T& after) {

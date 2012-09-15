@@ -4,61 +4,22 @@
 #include "flac.h"
 #include "time.h"
 #include "debug.h"
+#include "linux.h"
+#include "simd.h"
 
-double exp2(double x) { return __builtin_exp2(x); }
-double log2(double x) { return __builtin_log2(x); }
-double exp10(double x) { return exp2(x*log2(10)); }
-double log10(double x) { return log2(x)/log2(10); }
-double dB(double x) { return 10*log10(x); }
+/// Floating point operations
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
+inline float sqrt(float f) { return __builtin_sqrtf(f); }
+float exp2(float x) { return __builtin_exp2f(x); }
+float log2(float x) { return __builtin_log2f(x); }
+float exp10(float x) { return exp2(x*log2(10)); }
+float log10(float x) { return log2(x)/log2(10); }
+float dB(float x) { return 10*log10(x); }
 #define pow __builtin_pow
 
-template<bool mix> bool Note::read(float2* out, uint size) {
-    float2* blockIndex=this->blockIndex; float2 *blockEnd=this->blockEnd; float2* frameEnd=blockIndex+size; float2* releaseStart=blockIndex+this->releaseStart-position;
-    for(;;) {
-        float2* end=min(frameEnd,blockEnd);
-        if(end>=releaseStart) { //release
-            float2 level=this->level, step=this->step;
-            if(mix) for(;blockIndex<end; blockIndex++, out++, level*=step) out[0]+=level*blockIndex[0];
-            else for(;blockIndex<end; blockIndex++, out++, level*=step) out[0]=level*blockIndex[0];
-            this->level=level;
-            if(level[0]<=1.0f/(1<<24)) return false;
-        } else { //sustain
-            end = min(end, releaseStart);
-            if(mix) for(;blockIndex<end; blockIndex++, out++) out[0]+=level*blockIndex[0];
-            else for(;blockIndex<end; blockIndex++, out++) out[0]=level*blockIndex[0];
-        }
-        if(blockIndex==frameEnd) break;
-        else if(blockIndex==blockEnd) {
-            position+=blockSize;
-            if(position==duration) {
-                if(!mix) for(float2* end=out+ptr(frameEnd-blockIndex); out<end; out++) out[0]=__(0,0);
-                return false;
-            }
-            size=frameEnd-blockEnd; readFrame(); blockIndex=this->blockIndex; blockEnd=this->blockEnd;
-            frameEnd=blockIndex+size; releaseStart=blockIndex+this->releaseStart-position;
-        }
-    }
-    this->blockIndex=blockIndex; this->blockEnd=blockEnd;
-    return true;
-}
-float Note::rootMeanSquare(uint size) {
-    // Saves stream state
-    uint unread=blockEnd-blockIndex; float2 buffer[unread];
-    uint index=this->index, blockSize=this->blockSize; float2* blockIndex=this->blockIndex, *blockEnd=this->blockEnd; copy(buffer,blockIndex,unread);
-
-    float2 sum={0,0};
-    for(uint i=0;i<size;) {
-        for(float2* in=this->buffer; i<size && in<this->buffer+this->blockSize; i++, in++) sum += (*in) * (*in);
-        if(i<size) readFrame();
-    }
-    float level = sqrt(sum[0]+sum[1])/size/(1<<24);
-
-    // Restores stream state
-    this->index=index, this->blockSize=blockSize, this->blockIndex=blockIndex, this->blockEnd=blockEnd; copy(blockIndex,buffer,unread);
-    return level;
-}
-
-constexpr uint Sampler::period;
+/// SFZ
 
 void Sampler::open(const ref<byte>& path) {
     // parse sfz and map samples
@@ -81,6 +42,12 @@ void Sampler::open(const ref<byte>& path) {
             if(key=="sample"_) {
                 ref<byte> path = replace(value,"\\"_,"/"_);
                 sample->map = Map(path,folder);
+                sample->cache = sample->map;
+#if !DEBUG
+                sample->cache.decode(1<<16);
+#else
+                sample->cache.decode(1<<8);
+#endif
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -88,82 +55,62 @@ void Sampler::open(const ref<byte>& path) {
             else if(key=="lokey"_) sample->lokey=toInteger(value);
             else if(key=="hikey"_) sample->hikey=toInteger(value);
             else if(key=="pitch_keycenter"_) sample->pitch_keycenter=toInteger(value);
-            else if(key=="ampeg_release"_) sample->releaseTime=48000*toInteger(value);
+            else if(key=="ampeg_release"_) sample->releaseTime=toInteger(value);
             else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
-            else if(key=="rt_decay"_) sample->rt_decay=toInteger(value);
+            else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);
             else if(key=="volume"_) sample->volume=toInteger(value);
             else error("Unknown opcode"_,key);
         }
     }
 
-    //setup layers and pitch shifting
-    for(int i=0;i<3;i++) { Layer& layer=layers[i];
-        layer.size = round(period*exp2((i-1)/12.0));
-        layer.buffer = allocate<float2>(layer.size);
-        if(layer.size!=period) new (&layer.resampler) Resampler(2, layer.size, period);
-    }
+    // Generates pitch shifting (resampling) filter banks
+    new (&resampler[0]) Resampler(2, 1024, round(1024*exp2((1)/12.0)));
+    new (&resampler[1]) Resampler(2, 1024, round(1024*exp2((-1)/12.0)));
+    for(int i=0;i<3;i++) notes[i].reserve(128);
 }
 
-#include "map.h"
-uint availableMemory() {
-    map<string, uint> info;
-    for(TextData s = File("/proc/meminfo"_).readUpTo(4096);s;) {
-        ref<byte> key=s.until(':'); s.skip();
-        uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
-        info.insert(string(key), value);
-    }
-    return info.at(string("MemFree"_))+info.at(string("Inactive"_));
-}
+/// Input events (realtime thread)
 
-int K(int size) { return (size+4095)/4096*4; } //size rounded up to page in KiB
-void Sampler::lock() {
-    full=0; for(const Sample& s : samples) full += K(s.map.size);
-    debug(log("Not locking in debug mode (",full/1024,"MiB)"); return;)
-    available = availableMemory();
-    if(full>available) {
-        uint lock=0; for(const Sample& s : samples) lock += min(s.map.size/4096*4,available*1024/samples.size()/4096*4);
-        log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB");
+float Note::rootMeanSquare(uint size) {
+    float4 sum={0,0,0,0};
+    if(readCount<(int)size) log((int)readCount,size);
+    size=min<int>(size,readCount);
+    uint16 readIndex=this->readIndex;
+    for(uint i=0;i<size/2;i++) {
+        float4 s=*(float4*)&buffer[readIndex+=2]; sum+=s*s;
     }
-    current=0; wait();
+    return sqrt(extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/size/(1<<24);
 }
-void Sampler::event() {
-    const Sample& s=samples[current++];
-    uint size = s.map.size;
-    if(full>available) size=min(size, available*1024/samples.size());
-    s.map.lock(size);
-    progressChanged(current,samples.size());
-    if(current<samples.size()) wait();
-}
-
-void Sampler::queueEvent(int key, int velocity) { queue<<Event __(key,velocity); }
-void Sampler::processEvent(Event e) { int key=e.key, velocity=e.velocity;
+void Sampler::noteEvent(int key, int velocity) {
+    Locker lock(noteReadLock);
     Note* current=0;
     if(velocity==0) {
-        for(Note& note : active) if(note.key==key) {
+        for(int i=0;i<3;i++) for(Note& note: notes[i]) if(note.key==key) {
             current=&note; //schedule release sample
-            note.releaseStart = note.position; //schedule active sample fade out
+            if(note.releaseTime) { //release fade out current note
+                float step = pow(1.0/(1<<24),(/*2samples/step*/2.0/(48000*note.releaseTime)));
+                note.step=(float4)__(step,step,step,step);
+            }
         }
         if(!current) return; //already fully decayed
     }
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
-            float level = (1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
-            log(key,velocity);
-            active << Note(s.map);
-            Note& note = active.last();
-            note.layer=1+key-s.pitch_keycenter; assert_(note.layer<3);
-            if(!current) note.key=key;
+            Note note = s.cache;
+            float level;
+            if(!current) note.key=key, level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
             else { //rt_decay is unreliable, matching levels works better
-                level=current->rootMeanSquare(32768)/note.rootMeanSquare(2048);
-                level *= current->level[0];
-                log(dB(level)); if(level>8) level=8;
+                level = current->rootMeanSquare(1<<14) / note.rootMeanSquare(1<<11); //WARN: notes need to have 2K preloaded to avoid deadlock (TODO: preintegrate)
+                level *= extract(current->level,0);
+                if(level>8) level=8;
             }
-            note.level=__(level,level);
-            note.releaseStart=note.duration;
-            if(s.releaseTime) {
-                float step = pow(1.0/(1<<24),(1.0/s.releaseTime));
-                note.step=__(step,step);
-            }
+            note.level=(float4)__(level,level,level,level);
+            note.step=(float4)__(1,1,1,1);
+            note.releaseTime=s.releaseTime;
+            array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
+            if(notes.size()==notes.capacity()) {Locker lock(noteWriteLock); notes.reserve(notes.capacity()+1); log("size",notes.capacity());}
+            notes << move(note);
+            queue(); //buffer the new note if not predecoded
             return;
         }
     }
@@ -171,33 +118,64 @@ void Sampler::processEvent(Event e) { int key=e.key, velocity=e.velocity;
     error("Missing sample"_,key,velocity);
 }
 
-bool Sampler::read(int16 *output, uint unused size) {
-    assert_(size==period);
-    if(queue) processEvent(queue.take(0));
-    timeChanged(time);
-    for(Layer& layer : layers) layer.active=false;
-    for(uint i=0;i<active.size();) { Note& n = active[i];
-        Layer& layer = layers[n.layer];
-        if(!(layer.active?n.read<true>(layer.buffer,layer.size):n.read<false>(layer.buffer,layer.size))) active.removeAt(i); else i++;
-        layer.active = true;
+/// Background decoder (background thread)
+
+void Note::decode(uint need) {
+    assert(need<=buffer.capacity);
+    while(readCount<=int(need) && blockSize && (int)writeCount>=blockSize) {
+        int size=blockSize; writeCount.acquire(size); FLAC::decodeFrame(); readCount.release(size);
     }
-    bool anyActive = layers[1].active;
-    for(int i=0;i<=2;i+=2) { if(!layers[i].active) continue;
-        if(anyActive) layers[i].resampler.filter<true>((float*)layers[i].buffer, layers[i].size, (float*)layers[1].buffer, period);
-        else layers[i].resampler.filter<false>((float*)layers[i].buffer, layers[i].size, (float*)layers[1].buffer, period);
-        anyActive=true; //directly mix if unresampled layer or any previous layer is active
+}
+void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
+    //timeChanged(time); //UI
+    if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
+        for(int i=0;i<3;i++) for(uint j=0;j<notes[i].size();) { Note& note=notes[i][j];
+            if((note.blockSize==0 && note.readCount<512/*period*/) || extract(note.level,0)<=1.0f/(1<<24)) notes[i].removeAt(j); else j++;
+        }
+        noteReadLock.unlock();
     }
-    if(anyActive) {
-        float* in = (float*)layers[1].buffer;
-        uint clip=0;
-        for(uint i=0;i<period*2;i++) {
-            float f = in[i];
-            int o=int(f)>>9; //2x 24bit -> 16bit
-            if(o<-32768 || o>32767) clip++; output[i] = ::clip(-32768,o,32767);}
-        if(clip>64) log("clip",clip);
-    } else { if(record || true/*TODO: noteEvent->audio.start*/) clear(output,period*2); else return false; }
-    if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16)));
-    time+=period;
+    //uint minSize=1<<16; for(int i=0;i<3;i++) for(Note& note: notes[i]) minSize=min(minSize,(uint)note.available);
+    Locker lock(noteWriteLock);
+    for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(1<<16); //Predecode all notes
+}
+
+/// Audio mixer (realtime thread)
+
+void Note::read(float4* out, uint size) {
+    if(blockSize==0 && readCount<int(size*2)) return; // end of stream
+    readCount.acquire(size*2); //ensure decoder follows
+    for(uint i=0;i<size;i++) out[i]+= level * load(&buffer[readIndex+=2]), level*=step;
+    writeCount.release(size*2); //allow decoder to continue
+}
+bool Sampler::read(int16* output, uint size) { // Audio thread
+    Locker lock(noteReadLock);
+    const uint period=size/2;//4; //4 float4 = 8 frames = 16 samples = 64 bytes
+    assert(size%2==0); //assert(size%period==0);
+    /*for(uint i=0;i<size/period;i++)*/ {
+        float4* buffer = allocate16<float4>(period); clear(buffer, period);
+        // Mix notes which don't need any resampling
+        for(Note& note: notes[1]) note.read(buffer, period);
+        // Mix pitch shifting layers
+        for(int i=0;i<2;i++) {
+            uint inSize=align(2,resampler[i].need(2*period))/2;
+            float4* layer = allocate16<float4>(inSize); clear(layer, inSize);
+            for(Note& note: notes[i*2]) note.read(layer, inSize);
+            resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, period*2);
+            unallocate(layer,inSize);
+        }
+
+        for(uint i=0;i<period/2;i++) {
+            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),9), sra(cvtps(buffer[i*2+1]),9) ); //8 samples = 4 frames
+        }
+        /* period == 8
+         static constexpr int4 shift = {9,9,9,9};
+        ((half8*)output)[i*2+0] = packs(cvtps(((float4*)buffer)[0])>>shift, cvtps(((float4*)buffer)[1])>>shift); //8 samples = 4 frames
+        ((half8*)output)[i*2+1] = packs(cvtps(((float4*)buffer)[2])>>shift, cvtps(((float4*)buffer)[3])>>shift); //8 samples = 4 frames*/
+        unallocate(buffer,period);
+    }
+
+    //if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16))); time+=period;
+    queue(); //queue background decoder in main thread
     return true;
 }
 

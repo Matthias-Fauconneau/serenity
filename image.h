@@ -1,14 +1,10 @@
 #pragma once
-#include "array.h"
 #include "vector.h"
 #include "debug.h"
 
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 typedef vector<bgra,uint,4> int4;
-//TODO
-//typedef uint8 byte4 __attribute((vector_size(4)));
-//typedef uint int4 __attribute((vector_size(16)));
 
 struct Image {
     const byte4* data=0;
@@ -44,7 +40,7 @@ inline string str(const Image& o) { return str(o.width,"x"_,o.height); }
 inline Image share(const Image& o) { return Image((byte4*)o.data,o.width,o.height,o.stride,false,o.alpha); }
 /// Copies the image buffer
 inline void copy(Image& dst, const Image& src) {assert(dst.size()==src.size() && dst.stride==src.stride); ::copy((byte4*)dst.data,src.data,src.height*src.stride); }
-inline Image copy(const Image& src) {Image dst(src.width,src.height,src.alpha); ::copy(dst,src); return dst;}
+template<> inline Image copy(const Image& src) {Image dst(src.width,src.height,src.alpha); ::copy(dst,src); return dst;}
 /// Returns a copy of the image resized to \a width x \a height
 Image resize(const Image& image, uint width, uint height);
 /// Flip the image around the horizontal axis in place

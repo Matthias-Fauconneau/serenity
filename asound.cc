@@ -48,7 +48,8 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, bool realtime) : Device("/dev/snd/pcmC0D0p"_), Poll(Device::fd,POLLOUT), read(read) {
+AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, Thread& thread, bool realtime)
+    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(S16_LE);
@@ -57,40 +58,31 @@ AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, bool rea
     hparams.interval(FrameBits) = 16*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=512, hparams.interval(Periods).max=2;
-    else hparams.interval(PeriodSize).min=1024, hparams.interval(Periods).min=2;
+    if(realtime) hparams.interval(PeriodSize)=512/*~2x resampler latency*/, hparams.interval(Periods).max=2;
+    else hparams.interval(PeriodSize).min=8192, hparams.interval(Periods).min=2;
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * periodSize;
-    debug(log("period="_+dec((int)periodSize)+" ("_+dec(1000*periodSize/rate)+"ms), buffer="_+dec(bufferSize)+" ("_+dec(1000*bufferSize/rate)+"ms)"_);)
-    buffer= (int16*)mmap(0, bufferSize * channels * sizeof(int16), PROT_READ | PROT_WRITE, MAP_SHARED, Device::fd, 0);
-    assert_(buffer);
-
-    SWParams sparams;
-    sparams.avail_min = hparams.interval(PeriodSize);
-    sparams.stop_threshold = sparams.boundary = bufferSize;
-    iowr<SW_PARAMS>(sparams);
-
+    buffer= (int16*)check( mmap(0, bufferSize * channels * sizeof(int16), PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, 0) );
     status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, Device::fd, StatusOffset) );
     control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, ControlOffset) );
+    debug(log("period="_+dec((int)periodSize)+" ("_+dec(1000000*periodSize/rate)+"μs), buffer="_+dec(bufferSize)+" ("_+dec(1000000*bufferSize/rate)+"μs)"_);)
 }
 AudioOutput::~AudioOutput() {
-    munmap((void*)status, 0x1000); status=0;
-    munmap(control, 0x1000); control=0;
-    munmap(buffer, bufferSize * channels * 2); buffer=0; bufferSize=0;
+    munmap((void*)status, 0x1000);
+    munmap(control, 0x1000);
+    munmap(buffer, bufferSize * channels * 2);
 }
 void AudioOutput::start() { io<PREPARE>(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); }
-
 void AudioOutput::event() {
     assert_(revents!=POLLNVAL);
     if(status->state == XRun) { log("XRun"_); io<PREPARE>(); }
     for(;;){
         int available = status->hwPointer + bufferSize - control->swPointer;
-        if(!available) break; assert_(available>=int(periodSize));
-        uint offset = control->swPointer % bufferSize;  assert_(bufferSize-offset>=periodSize);
-        if(!read(buffer+offset*channels, periodSize)) {stop(); return;}
-        control->swPointer += periodSize;
+        if(!available) break;
+        if(!read(buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
+        control->swPointer += available;
         if(status->state == Prepared) { io<START>(); }
     }
 }

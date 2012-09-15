@@ -13,13 +13,12 @@
 #include "window.h"
 #include "interface.h"
 
-#include "linux.h"
-
 struct Music : Application, Widget {
-    ICON(music) Window window __(this,int2(256,256),"Music"_,musicIcon());
+    ICON(music) Window window __(this,int2(0,0),"Music"_,musicIcon());
     Sampler sampler;
-    AudioOutput audio __({&sampler, &Sampler::read}, true);
-    Sequencer seq;
+    Thread thread;
+    AudioOutput audio __({&sampler, &Sampler::read},thread,true);
+    Sequencer input __(thread);
 
 #if MIDI
     MidiFile midi;
@@ -30,16 +29,17 @@ struct Music : Application, Widget {
     map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
 #endif
     ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
-    Music() {
+    Music(){
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         window.localShortcut(Escape).connect(this,&Application::quit);
+        window.backgroundCenter=window.backgroundColor=0; window.show();
         auto args = arguments(); if(!args) args<<"/Samples/Salamander.sfz"_;
         for(ref<byte> path : args) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
                 sampler.open(path);
                 sampler.progressChanged.connect(this,&Music::showProgress);
-                seq.noteEvent.connect(&sampler,&Sampler::queueEvent);
+                input.noteEvent.connect(&sampler,&Sampler::noteEvent);
             }
 #if MIDI
             else if(endsWith(path, ".mid"_)) {
@@ -75,16 +75,12 @@ struct Music : Application, Widget {
 #endif
             else error("Unsupported"_,path);
         }
-        assert(sampler);
-        sampler.queueEvent(39,127); sampler.queueEvent(39,0);
-        sampler.queueEvent(45,127); sampler.queueEvent(45,0);
-        audio.start(); sampler.lock(); window.backgroundCenter=window.backgroundColor; window.show();
+        audio.start(); thread.spawn(-20); log("Ready");
     }
     int current=0,count=0;
     void render(int2 position, int2 size){ if(current!=count) Progress(0,count,current).render(position,size); }
     void showProgress(int current, int count) {
         this->current=current; this->count=count; window.render(); //display loading progress
-        if(current==count) setPriority(-20); //raise priority after loading
     }
 };
 Application(Music)

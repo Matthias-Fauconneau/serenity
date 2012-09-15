@@ -1,10 +1,11 @@
-player: flac, realtime
+music: check FLAC decoder asm, precompute level
+player: flac
 desktop: previous, scrollbar
 font: grid fit, line sampling?
 pdf,ebook -> touchbook
 touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
-music: auto volume, score, reverb, auto tune
+music: ptrace multithread stack trace, auto volume, score, reverb, auto tune
 IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion, git
 fibermesh
 own: inflate, jpeg, mp3, ssl
-apps: file manager, search, imap, shell, monitor, torrent, video, irc, debugger, static analyzer, interpreter, profiler, compiler
+apps: file manager, search, imap, shell, monitor, torrent, video, irc, debugger, static analyzer (memory, thread), interpreter, profiler, compiler
