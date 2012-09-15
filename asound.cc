@@ -58,7 +58,7 @@ AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, Thread& 
     hparams.interval(FrameBits) = 16*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=512/*~2x resampler latency*/, hparams.interval(Periods).max=2;
+    if(realtime) hparams.interval(PeriodSize)=512/*~4x resampler latency*/, hparams.interval(Periods).max=2;
     else hparams.interval(PeriodSize).min=8192, hparams.interval(Periods).min=2;
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);
@@ -66,7 +66,7 @@ AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, Thread& 
     buffer= (int16*)check( mmap(0, bufferSize * channels * sizeof(int16), PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, 0) );
     status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, Device::fd, StatusOffset) );
     control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, ControlOffset) );
-    debug(log("period="_+dec((int)periodSize)+" ("_+dec(1000000*periodSize/rate)+"μs), buffer="_+dec(bufferSize)+" ("_+dec(1000000*bufferSize/rate)+"μs)"_);)
+    debug(log("period="_+dec((int)periodSize)+" ("_+dec(1000*periodSize/rate)+"ms), buffer="_+dec(bufferSize)+" ("_+dec(1000*bufferSize/rate)+"ms)"_);)
 }
 AudioOutput::~AudioOutput() {
     munmap((void*)status, 0x1000);

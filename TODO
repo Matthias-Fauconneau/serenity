@@ -1,10 +1,10 @@
-music: check FLAC decoder asm, precompute level
+music: precompute level
 player: flac
-desktop: previous, scrollbar
 font: grid fit, line sampling?
 pdf,ebook -> touchbook
 touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
-music: ptrace multithread stack trace, auto volume, score, reverb, auto tune
+desktop: previous, scrollbar
+music: score, reverb, auto level/tune
 IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion, git
 fibermesh
 own: inflate, jpeg, mp3, ssl

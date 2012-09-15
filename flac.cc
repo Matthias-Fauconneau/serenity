@@ -8,6 +8,10 @@ inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (h
 struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
 #endif
 
+/// Logs message followed by a disassembly of \a statements
+#include "disasm.h"
+#define disasm(message, statements) { begin: statements; end: static unused bool once=({log(message);disasm(ref<byte>((byte*)&&begin,(byte*)&&end));true;}); }
+
 typedef double double2 __attribute((vector_size(16)));
 #if __clang__
 #define extract(vec, i) vec[i]
@@ -120,22 +124,23 @@ inline double round(double x) { //setRoundMode(Down) to round towards negative i
     return x+lead-lead;
 }
 
-//FIXME: clang doesn't seem to keep the predictor in registers
 template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned, double*& misaligned, float*& signal) {
     double2 sum = {0,0};
-    for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers (check if inline doesn't break it)
+    for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers
     double sample = round(extract(sum,0)+extract(sum,1))+double(*signal); //add residue to prediction [SS2SD=2]
     aligned[2*unroll]= misaligned[2*unroll]= sample; aligned++; misaligned++; //write out contexts, misalign align, align misalign
     *signal = sample; signal++; //write out decoded sample SD2SS=8
 }
 
-template<int unroll> inline void unroll_predictor(double* predictor, double* even, double* odd, float* signal, float* end) {
+template<int unroll> inline void convolve(double* predictor, double* even, double* odd, float* signal, float* end) {
+    //disasm("convolve "_+dec(unroll),
     double2 kernel[unroll];
     for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
     for(;signal<end;) {
         filter<unroll>(kernel, even, odd, signal);
         filter<unroll>(kernel, odd, even, signal);
     }
+    //)
 }
 
 uint64 rice=0, predict=0, order=0;
@@ -145,7 +150,7 @@ void FLAC::decodeFrame() {
     float* block[2] = {allocate16<float>(allocSize),allocate16<float>(allocSize)};
     setRoundMode(Down);
     for(int channel=0;channel<2;channel++) {
-        int rawSampleSize = sampleSize; //might need one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
+        int rawSampleSize = sampleSize; //one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
         if(channel == 0) { if(channels==RightSide) rawSampleSize++; }
         if(channel == 1) { if(channels==LeftSide || channels == MidSide) rawSampleSize++; }
 
@@ -203,15 +208,13 @@ void FLAC::decodeFrame() {
                     int s = (u >> 1) ^ (-(u & 1));
                     *signal++ = s;
                 }
-            } else if(k < escapeCode) { //TODO: static dispatch on k?
-                //disasm(
+            } else if(k < escapeCode) {
                 for(;signal<end;) {
                     uint u = unary() << k;
                     u |= binary(k);
                     int s = (u >> 1) ^ (-(u & 1));
                     *signal++ = s;
                 }
-                //)
             } else {
                 int n = binary(5); assert(n<=16,n);
                 for(;signal<end;) {
@@ -231,7 +234,7 @@ void FLAC::decodeFrame() {
             even[order]=odd[order]= sample; //write out context
             *signal = sample; signal++; //write out decoded sample //TODO: float
         }
-        #define o(n) case n: unroll_predictor<n>(predictor,even,odd,signal,end); break;
+        #define o(n) case n: convolve<n>(predictor,even,odd,signal,end); break;
         switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
         ::predict += predict, ::order += order*blockSize;
         unallocate(even,allocSize);
@@ -252,4 +255,5 @@ void FLAC::decodeFrame() {
     }
     unallocate(block[0],allocSize); unallocate(block[1],allocSize);
     if(index<bsize) parseFrame(); else blockSize=0;
+    log(::predict/::order); // GCC~6 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }

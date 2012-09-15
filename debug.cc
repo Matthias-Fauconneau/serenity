@@ -201,7 +201,7 @@ string trace(int skip, void* ip) {
     void* frame = __builtin_frame_address(0);
     int i=0;
     for(;i<8;i++) {
-        if(ptr(frame)==0) break;
+        if(ptr(frame)<0x10) break;
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }

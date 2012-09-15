@@ -41,3 +41,4 @@ pdf.cc
 
 music.cc
 simd.h
+disasm.h

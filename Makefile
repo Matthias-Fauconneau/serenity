@@ -12,7 +12,7 @@ FLAGS_fast := -g -O2 -fno-omit-frame-pointer -fno-optimize-sibling-calls
 FLAGS_profile := -g -O3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -finstrument-functions
 SRCS_profile := profile
 #release: strip debug symbols, disable all assertions, use heavy optimizations
-FLAGS_release := -g -O3 -fomit-frame-pointer
+FLAGS_release := -g -DEBUG -O3 -fomit-frame-pointer
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button
