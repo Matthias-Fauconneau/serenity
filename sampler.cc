@@ -178,33 +178,29 @@ void Note::read(float4* out, uint size) {
     writeCount.release(size*2); //allow decoder to continue
     position+=size*2; //keep track of position for release sample level matching
 }
-bool Sampler::read(int16* output, uint size) { // Audio thread
+bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
     Locker lock(noteReadLock);
-    const uint period=size/2;//4; //4 float4 = 8 frames = 16 samples = 64 bytes
-    assert(size%2==0); //assert(size%period==0);
-    /*for(uint i=0;i<size/period;i++)*/ {
-        float4* buffer = allocate16<float4>(period); clear(buffer, period);
-        // Mix notes which don't need any resampling
-        for(Note& note: notes[1]) note.read(buffer, period);
-        // Mix pitch shifting layers
-        for(int i=0;i<2;i++) {
-            uint inSize=align(2,resampler[i].need(2*period))/2;
-            float4* layer = allocate16<float4>(inSize); clear(layer, inSize);
-            for(Note& note: notes[i*2]) note.read(layer, inSize);
-            resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, period*2);
-            unallocate(layer,inSize);
-        }
+    const uint period=size/2;
+    assert(size%2==0);
 
-        for(uint i=0;i<period/2;i++) {
-            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),9), sra(cvtps(buffer[i*2+1]),9) ); //8 samples = 4 frames
-        }
-        /* period == 8
-         static constexpr int4 shift = {9,9,9,9};
-        ((half8*)output)[i*2+0] = packs(cvtps(((float4*)buffer)[0])>>shift, cvtps(((float4*)buffer)[1])>>shift); //8 samples = 4 frames
-        ((half8*)output)[i*2+1] = packs(cvtps(((float4*)buffer)[2])>>shift, cvtps(((float4*)buffer)[3])>>shift); //8 samples = 4 frames*/
-        unallocate(buffer,period);
+    float4* buffer = allocate16<float4>(period); clear(buffer, period);
+    // Mix notes which don't need any resampling
+    for(Note& note: notes[1]) note.read(buffer, period);
+    // Mix pitch shifting layers
+    for(int i=0;i<2;i++) {
+        uint inSize=align(2,resampler[i].need(2*period))/2;
+        float4* layer = allocate16<float4>(inSize); clear(layer, inSize);
+        for(Note& note: notes[i*2]) note.read(layer, inSize);
+        resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, period*2);
+        unallocate(layer,inSize);
     }
 
+    for(uint i=0;i<period/2;i++) {
+        ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),9), sra(cvtps(buffer[i*2+1]),9) ); //8 samples = 4 frames
+    }
+    unallocate(buffer,period);
+
+    swPointer += size;
     //if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16))); time+=period;
     queue(); //queue background decoder in main thread
     return true;

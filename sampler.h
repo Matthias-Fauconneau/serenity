@@ -48,7 +48,7 @@ struct Sampler : Poll {
     void event();
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer (TODO: reverb)
-    bool read(int16* output, uint size);
+    bool read(ptr& swPointer, int16* output, uint size);
     Resampler resampler[2];
 
     /// Emits period time to update the interface

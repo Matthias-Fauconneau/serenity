@@ -48,9 +48,7 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-enum{MCL_CURRENT=1,MCL_FUTURE=2};
-
-AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, Thread& thread, bool realtime)
+AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)> read, Thread& thread, bool realtime)
     : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
@@ -60,7 +58,7 @@ AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, Thread& 
     hparams.interval(FrameBits) = 16*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=256/*~2x resampler latency*/, hparams.interval(Periods).max=2, mlockall(MCL_CURRENT|MCL_FUTURE);
+    if(realtime) hparams.interval(PeriodSize)=256/*~2x resampler latency*/, hparams.interval(Periods).max=2;
     else hparams.interval(PeriodSize).min=8192, hparams.interval(Periods).min=2;
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);
@@ -78,13 +76,10 @@ AudioOutput::~AudioOutput() {
 void AudioOutput::start() { io<PREPARE>(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); }
 void AudioOutput::event() {
-    assert_(revents!=POLLNVAL);
-    if(status->state == XRun) { log("XRun"_); io<PREPARE>(); }
     for(;;){
-        int available = status->hwPointer + bufferSize - control->swPointer;
-        if(!available) break;
-        if(!read(buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
-        control->swPointer += available;
+        if(status->state == XRun) { log("XRun"_); io<PREPARE>(); }
+        int available = status->hwPointer + bufferSize - control->swPointer; if(available<(int)periodSize) break;
+        if(!read(control->swPointer, buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
         if(status->state == Prepared) { io<START>(); }
     }
 }
