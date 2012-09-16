@@ -40,9 +40,21 @@ void Sampler::open(const ref<byte>& path) {
             ref<byte> key = s.until('=');
             ref<byte> value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
-                ref<byte> path = replace(value,"\\"_,"/"_);
+                string path = replace(value,"\\"_,"/"_);
                 sample->map = Map(path,folder);
                 sample->cache = sample->map;
+                if(!existsFile(string(path+".env"_),folder)) {
+                    Note copy = sample->cache;
+                    array<float> envelope; uint size=0;
+                    while(copy.blockSize!=0) {
+                        const uint period=1<<8;
+                        while(copy.blockSize!=0 && size<period) { size+=copy.blockSize; copy.decodeFrame(); }
+                        if(size>=period) { envelope << copy.sumOfSquares(period); copy.readIndex+=period; size-=period; }
+                    }
+                    log(string(path+".env"_),envelope.size());
+                    writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
+                }
+                sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
 #if !DEBUG
                 sample->cache.decode(1<<16);
 #else
@@ -71,16 +83,34 @@ void Sampler::open(const ref<byte>& path) {
 
 /// Input events (realtime thread)
 
-float Note::rootMeanSquare(uint size) {
-    float4 sum={0,0,0,0};
-    if(readCount<(int)size) log((int)readCount,size);
-    size=min<int>(size,readCount);
-    uint16 readIndex=this->readIndex;
-    for(uint i=0;i<size/2;i++) {
-        float4 s=*(float4*)&buffer[readIndex+=2]; sum+=s*s;
+template<int unroll> inline void accumulate(float4 accumulators[unroll], const float4* ptr, const float4* end) {
+    for(;ptr<end;ptr+=unroll) {
+        __builtin_prefetch(ptr+32,0,0);
+        for(uint i=0;i<unroll;i++) accumulators[i]+=ptr[i]*ptr[i];
     }
-    return sqrt(extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/size/(1<<24);
 }
+float Note::sumOfSquares(uint size) {
+    size =size/2; uint index = readIndex/2, capacity = buffer.capacity/2; //align to float4
+    uint beforeWrap = capacity-index;
+    const float4* buffer = (float4*)this->buffer.data;
+    constexpr uint unroll=4; //4*4*4~64bytes: 1 prefetch/line
+    float4 accumulators[unroll]={}; //breaks dependency chain to pipeline the unrolled loops
+    if(size>beforeWrap) { //wrap
+        accumulate<unroll>(accumulators, buffer+index,buffer+capacity); //accumulate until end of buffer
+        accumulate<unroll>(accumulators, buffer,buffer+(size-beforeWrap)); //accumulate remaining wrapped part
+    } else {
+        accumulate<unroll>(accumulators, buffer+index,buffer+(index+size));
+    }
+    float4 sum={}; for(uint i=0;i<unroll;i++) sum+=accumulators[i];
+    return (extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/(1<<24)/(1<<24);
+}
+float Note::actualLevel(uint size) const {
+    const int count = size>>8;
+    if((position>>8)+count>envelope.size) return 0; //fully decayed
+    float sum=0; for(int i=0;i<count;i++) sum+=envelope[(position>>8)+count]; //precomputed sum
+    return sqrt(sum)/size;
+}
+
 void Sampler::noteEvent(int key, int velocity) {
     Locker lock(noteReadLock);
     Note* current=0;
@@ -88,7 +118,7 @@ void Sampler::noteEvent(int key, int velocity) {
         for(int i=0;i<3;i++) for(Note& note: notes[i]) if(note.key==key) {
             current=&note; //schedule release sample
             if(note.releaseTime) { //release fade out current note
-                float step = pow(1.0/(1<<24),(/*2samples/step*/2.0/(48000*note.releaseTime)));
+                float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(48000*note.releaseTime)));
                 note.step=(float4)__(step,step,step,step);
             }
         }
@@ -97,16 +127,17 @@ void Sampler::noteEvent(int key, int velocity) {
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
             Note note = s.cache;
+            note.step=(float4)__(1,1,1,1);
+            note.releaseTime=s.releaseTime;
+            note.envelope=s.envelope;
             float level;
             if(!current) note.key=key, level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
             else { //rt_decay is unreliable, matching levels works better
-                level = current->rootMeanSquare(1<<14) / note.rootMeanSquare(1<<11); //WARN: notes need to have 2K preloaded to avoid deadlock (TODO: preintegrate)
+                level = current->actualLevel(1<<14) / note.actualLevel(1<<11);
                 level *= extract(current->level,0);
                 if(level>8) level=8;
             }
             note.level=(float4)__(level,level,level,level);
-            note.step=(float4)__(1,1,1,1);
-            note.releaseTime=s.releaseTime;
             array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
             if(notes.size()==notes.capacity()) {Locker lock(noteWriteLock); notes.reserve(notes.capacity()+1); log("size",notes.capacity());}
             notes << move(note);
@@ -134,7 +165,6 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         }
         noteReadLock.unlock();
     }
-    //uint minSize=1<<16; for(int i=0;i<3;i++) for(Note& note: notes[i]) minSize=min(minSize,(uint)note.available);
     Locker lock(noteWriteLock);
     for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(1<<16); //Predecode all notes
 }
@@ -146,6 +176,7 @@ void Note::read(float4* out, uint size) {
     readCount.acquire(size*2); //ensure decoder follows
     for(uint i=0;i<size;i++) out[i]+= level * load(&buffer[readIndex+=2]), level*=step;
     writeCount.release(size*2); //allow decoder to continue
+    position+=size*2; //keep track of position for release sample level matching
 }
 bool Sampler::read(int16* output, uint size) { // Audio thread
     Locker lock(noteReadLock);

@@ -41,7 +41,7 @@ struct FLAC : BitReader {
     uint16 writeIndex = 0, readIndex = 0;
     uint16 blockSize = 0, rate = 0;
     uint16 channels = 0, sampleSize = 0;
-    uint duration = 0;
+    uint position=0, duration = 0;
 
     default(FLAC)
     /// Reads header and decode first frame from data

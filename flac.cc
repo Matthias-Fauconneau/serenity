@@ -1,17 +1,6 @@
 #include "flac.h"
 #include "debug.h"
 
-#if __x86_64__
-inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
-/// Returns the number of cycles used to execute \a statements
-#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
-struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
-#endif
-
-/// Logs message followed by a disassembly of \a statements
-#include "disasm.h"
-#define disasm(message, statements) { begin: statements; end: static unused bool once=({log(message);disasm(ref<byte>((byte*)&&begin,(byte*)&&end));true;}); }
-
 typedef double double2 __attribute((vector_size(16)));
 #if __clang__
 #define extract(vec, i) vec[i]
@@ -186,7 +175,7 @@ void FLAC::decodeFrame() {
             else if(order==2) predictor[0]=-1, predictor[1]=2;
             else if(order==3) predictor[0]=0, predictor[1]=1, predictor[2]=-3, predictor[3]=3;
             else if(order==4) predictor[0]=-1, predictor[1]=4, predictor[2]=-6, predictor[3]=4;
-        } else error("Unknown type",channel,blockSize,index,bsize);
+        } else error("Unknown type",type,channel,blockSize,index,bsize);
         float* end=signal; signal += order;
 
         //Residual
@@ -197,7 +186,7 @@ void FLAC::decodeFrame() {
         uint size = blockSize >> partitionOrder;
         int partitionCount = 1<<partitionOrder;
 
-        tsc rice;
+        //tsc rice;
         for(int p=0;p<partitionCount;p++) {
             end += size;
             int k = binary( parameterSize );
@@ -224,8 +213,7 @@ void FLAC::decodeFrame() {
                 }
             }
         }
-        ::rice += rice;
-        tsc predict;
+        //::rice += rice; tsc predict;
         signal=block[channel]+order;
         if(order%2) { //for odd order: compute first sample with 'right' predictor without advancing context to begin unrolled loops with even context
             double sum=0;
@@ -236,7 +224,7 @@ void FLAC::decodeFrame() {
         }
         #define o(n) case n: convolve<n>(predictor,even,odd,signal,end); break;
         switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
-        ::predict += predict, ::order += order*blockSize;
+        //::predict += predict, ::order += order*blockSize;
         unallocate(even,allocSize);
         odd-=1; unallocate(odd,allocSize+1);
     }
@@ -255,5 +243,5 @@ void FLAC::decodeFrame() {
     }
     unallocate(block[0],allocSize); unallocate(block[1],allocSize);
     if(index<bsize) parseFrame(); else blockSize=0;
-    log(::predict/::order); // GCC~6 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
+    //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }

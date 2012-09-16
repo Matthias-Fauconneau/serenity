@@ -32,7 +32,7 @@ struct Music : Application, Widget {
     Music(){
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         window.localShortcut(Escape).connect(this,&Application::quit);
-        //window.backgroundCenter=window.backgroundColor=0; window.show();
+        window.backgroundCenter=window.backgroundColor=0; window.show();
         auto args = arguments(); if(!args) args<<"/Samples/Salamander.sfz"_;
         for(ref<byte> path : args) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {

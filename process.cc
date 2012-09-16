@@ -67,7 +67,7 @@ static array<Thread*> threads; static Lock threadsLock;
 Thread defaultThread;
 int Thread::run() {
     tid=gettid();
-    if(priority) setpriority(0,0,priority);
+    if(priority) check_(setpriority(0,0,priority));
     {Locker lock(threadsLock); threads<<this;}
     while(!terminate) {
         uint size=this->size(); pollfd pollfds[size]; for(uint i=0;i<size;i++) pollfds[i]=*at(i);

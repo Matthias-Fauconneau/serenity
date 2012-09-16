@@ -67,8 +67,8 @@
 enum class sys : long {
 #if __x86_64
     read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, sigprocmask, ioctl=16, shmget=29, shmat, shmctl, pause=34, getpid=39,
-    socket=41, connect, clone=56, fork, execve=59, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, setrlimit=160, gettid=186, futex=202,
-    clock_gettime=228, exit_group=231, tgkill=234, openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283, timerfd_settime=286,
+    socket=41, connect, clone=56, fork, execve=59, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, mlockall=151, setrlimit=160, gettid=186,
+    futex=202, clock_gettime=228, exit_group=231, tgkill=234, openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283, timerfd_settime=286,
     eventfd2=290
 #else
     exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
@@ -121,6 +121,7 @@ syscall3(int, fcntl, int,fd, int,cmd, int,param)
 syscall3(int, getdents, int,fd, void*,entry, long,size)
 syscall3(int, setpriority, int,which, int,who, int,prio)
 syscall2(int, mlock,const void*,addr, long,len)
+syscall1(int, mlockall, int,flags)
 syscall2(int, setrlimit, int,resource, struct rlimit*,limit)
 syscall0(int, gettid)
 syscall6(int, futex, int*,uaddr, int,op, int,val, const struct timespec*,timeout, int*,uaddr2, int,val3)

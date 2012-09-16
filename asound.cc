@@ -48,6 +48,8 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
+enum{MCL_CURRENT=1,MCL_FUTURE=2};
+
 AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, Thread& thread, bool realtime)
     : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
     HWParams hparams;
@@ -58,7 +60,7 @@ AudioOutput::AudioOutput(function<bool(int16* output, uint size)> read, Thread& 
     hparams.interval(FrameBits) = 16*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=512/*~4x resampler latency*/, hparams.interval(Periods).max=2;
+    if(realtime) hparams.interval(PeriodSize)=256/*~2x resampler latency*/, hparams.interval(Periods).max=2, mlockall(MCL_CURRENT|MCL_FUTURE);
     else hparams.interval(PeriodSize).min=8192, hparams.interval(Periods).min=2;
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);

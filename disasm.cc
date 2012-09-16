@@ -25,7 +25,6 @@ string gpr(uint r, uint size) {
 string xmm(int r, int) { return "xmm"_+str(r); }
 string reg(int r, int size, int sse) { return sse ? xmm(r,size) : gpr(r,size); }
 
-//enum Op { add, or, adc, sbb, and, sub, not, cmp };
 static constexpr ref<byte> ops[] = {"add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_};
 static constexpr ref<byte> ccs[] = { "o"_,"no"_,"c"_,"nc"_,"e"_,"ne"_,"na"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_};
 static constexpr ref<byte> shs[] = {"rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_};
@@ -35,7 +34,7 @@ int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
     uint8 modrm = *c++;
     int mod = modrm>>6;
     int r = (modrm>>3)&0b111; if(rex&4) r+=8; //REX.r
-    int rm = modrm&0b111; if(rex&1) rm+=8; //REX.b
+    int rm = modrm&0b111; int b=rex&1;
     if(rm== rSP) { //SIB
         int sib = *c++;
         int scale = sib>>6;
@@ -49,14 +48,14 @@ int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
     } else { //mod r/m
         if(mod == 0) {
             if(rm == rBP) s<<hex(imm(c,2),8); //[imm32]
-            else s<< gpr(rm,size); //[reg]
+            else s<< gpr(rm +(b?8:0),3); //[reg]
         }
         if(mod == 1 || mod == 2) { //[reg+imm]
             int i = imm(c,mod==1?0:2);
-            s<< gpr(rm,size)<<(i>0?"+"_:"-"_)+hex(abs(i),2<<(mod==1?0:2));
+            s<< gpr(rm +(b?8:0),size)<<(i>0?"+"_:"-"_)+hex(abs(i),2<<(mod==1?0:2));
         }
         if(mod == 3) { //reg
-            s=copy(reg(rm,size,sse));
+            s=copy(reg(rm +(b?8:0),size,sse));
             return r; //avoid []
         }
     }
@@ -64,9 +63,9 @@ int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
     return r;
 }
 
-void disasm(const ref<byte>& code) {
+void disassemble(const ref<byte>& code) {
     for(const byte* c=code.begin(), *end=code.end();c<end;) {
-        log_(hex(int(c-code.begin()),2)+":\t"_/*+hex(ref<byte>(c,5))+"\t"_*/);
+        log_(hex(int(c-code.begin()),2)+":\t"_ /*+hex(ref<byte>(c,5))+"\t"_*/);
         uint8 op = *c++;
         int size=2/*operand size*//*, asize=3*//*address size*/, scalar=0;
         if(op==0x66) size=1, op = *c++; //for SSE size=2 -> float (ps), size=1 -> double (pd)
@@ -88,6 +87,9 @@ void disasm(const ref<byte>& code) {
             } else if(op==0x15) { //unpckhp xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
                 log( "unpckhp"_+string("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+            } else if(op==0x18) { //prefetch
+                string src; int r=modrm(rex,2,c,src,1);
+                log("prefetch"_+(r==0?string("nta"_):dec(r-1))+" "_+src);
             } else if(op==0x1F) { //nop
                 string src; modrm(rex,2,c,src,1);
                 log( "nop"_ );
@@ -147,9 +149,8 @@ void disasm(const ref<byte>& code) {
         } else if(op==0x80 || op==0x81) { //op imm8, r/m
             if(!(op&1)) size=0;
             string src; int r=modrm(rex,size,c,src); r&=7;
-            log( ops[r]+string("bwlq"[size])+" "_+hex(imm(c,0),2)+", "_+src );
-        } else if(op==0x82 || op==0x83) { //op r/m, imm8
-            if(!(op&1)) size=0;
+            log( ops[r]+string("bwlq"[size])+" "_+hex(imm(c,size==3?2:size),1<<size)+", "_+src );
+        } else if(op==0x83) { //op r/m, imm8
             string src; int r=modrm(rex,size,c,src); r&=7;
             log( ops[r]+string("bwlq"[size])+" "_+src+", "_+hex(imm(c,0),2) );
         } else if(op==0x84 || op==0x85) { //test r, r/m
@@ -167,6 +168,8 @@ void disasm(const ref<byte>& code) {
         } else if(op==0x8D) { //lea r, m
             string m; int r = modrm(rex,size,c,m);
             log( "lea   "_+gpr(r,size)+", "_+m );
+        } else if((op&0xF0)==0x90) { //xchg r, m
+            log( "xchg   "_+gpr((op&0xF)+(rex&4?8:0), size)+", "_+gpr(0, size) );
         } else if(op==0x98) { //sign extend
             if(rex&0xC) log("cdqe rax, eax"_);
             else log("cwde eax, ax"_);
@@ -202,6 +205,8 @@ void disasm(const ref<byte>& code) {
             else if(r==2) log("not "_+s);
             else if(r==3) log("neg "_+s);
             else error("F7"_,r);
+        } else if(op==0xF8) {
+            log("clc");
         } else if(op==0xFC) {
             log("cld");
         } else if(op==0xFF) {
