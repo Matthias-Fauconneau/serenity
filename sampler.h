@@ -12,10 +12,10 @@ struct Note : FLAC {
     float4 level; //current note attenuation
     float4 step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
     Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
-    Semaphore writeCount __(1<<16); //audio thread release free samples, decoder thread acquires
+    Semaphore writeCount __((int)buffer.capacity); //audio thread release free samples, decoder thread acquires
     uint16 releaseTime; //to compute step
     uint8 key=0; //to match release sample
-    ref<float> envelope; //to level release sample
+    uint position=0; ref<float> envelope; //to level release sample
     /// Decodes frames until \a available samples is over \a need
     void decode(uint need);
     /// Reads \a size samples to be mixed into \a out and returns true when decayed
@@ -36,7 +36,7 @@ struct Sampler : Poll {
     /// Opens a .sfz instrument and maps all its samples
     void open(const ref<byte>& path);
     array<Sample> samples;
-    uint predecode=0; signal<int, int> progressChanged; //decode start buffer for all samples
+    uint full,available,lock,current; signal<int, int> progressChanged; //decode start buffer for all samples
 
     /// Receives MIDI note events
     void noteEvent(int key, int velocity);

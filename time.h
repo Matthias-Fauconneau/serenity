@@ -2,6 +2,13 @@
 #include "process.h"
 #include "data.h"
 
+#if __x86_64__
+inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
+/// Returns the number of cycles used to execute \a statements
+#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
+struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
+#endif
+
 /// Returns Unix real-time in seconds
 long currentTime();
 /// Returns Unix real-time in milliseconds

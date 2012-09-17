@@ -12,9 +12,10 @@
 
 #include "window.h"
 #include "interface.h"
+#include "time.h"
 
-struct Music : Application, Widget {
-    ICON(music) Window window __(this,int2(0,0),"Music"_,musicIcon());
+struct Music : Application, Widget/*, Timer*/ {
+    ICON(music) Window window __(this,int2(64,64),"Music"_,musicIcon());
     Sampler sampler;
     Thread thread;
     AudioOutput audio __({&sampler, &Sampler::read},thread,true);
@@ -31,8 +32,8 @@ struct Music : Application, Widget {
     ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
     Music(){
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
+        //audio.underrun.connect(this,&Music::underrun);
         window.localShortcut(Escape).connect(this,&Application::quit);
-        window.backgroundCenter=window.backgroundColor=0; window.show();
         auto args = arguments(); if(!args) args<<"/Samples/Salamander.sfz"_;
         for(ref<byte> path : args) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
@@ -75,12 +76,21 @@ struct Music : Application, Widget {
 #endif
             else error("Unsupported"_,path);
         }
-        audio.start(); thread.spawn(-20); log("Ready");
+        window.show();
+        audio.start();
+        thread.spawn(-20);
     }
     int current=0,count=0;
-    void render(int2 position, int2 size){ if(current!=count) Progress(0,count,current).render(position,size); }
     void showProgress(int current, int count) {
-        this->current=current; this->count=count; window.render(); //display loading progress
+        this->current=current; this->count=count;
+        if(current==count) { window.backgroundCenter=window.backgroundColor=0; /*underrunCount=0;*/ }
+        window.render();
+    }
+    //uint underrunCount=0; void underrun() { underrunCount++; setAbsolute(currentTime()+2); }
+    //void event() { window.render(); }
+    void render(int2 position, int2 size) {
+        if(current!=count) { Progress(0,count,current).render(position,size); Text(string(dec(100*sampler.lock/sampler.full)+"%"_)).render(position,size); }
+        //else { Text(string(dec(underrunCount))).render(position,size); }
     }
 };
 Application(Music)

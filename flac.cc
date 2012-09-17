@@ -134,7 +134,7 @@ template<int unroll> inline void convolve(double* predictor, double* even, doubl
 
 uint64 rice=0, predict=0, order=0;
 void FLAC::decodeFrame() {
-    assert(blockSize && blockSize<1<<15);
+    assert(blockSize && blockSize<buffer.capacity);
     int allocSize = align(4096,blockSize);
     float* block[2] = {allocate16<float>(allocSize),allocate16<float>(allocSize)};
     setRoundMode(Down);
@@ -231,7 +231,7 @@ void FLAC::decodeFrame() {
     setRoundMode(Even);
     index=align(8,index);
     skip(16);
-    assert(readIndex+buffer.capacity-writeIndex>=blockSize); //assume decodeFrame is not called on full buffer
+    assert(blockSize<=readIndex+buffer.capacity-writeIndex); buffer.size+=blockSize;
     for(int i=0;i<blockSize;i++) {
         float a=block[0][i], b=block[1][i]; float2 c;
         if(channels==Independent) c=(float2)__(a,b);
@@ -239,7 +239,8 @@ void FLAC::decodeFrame() {
         else if(channels==MidSide) a-=b/2, c=(float2)__(a+b,a);
         else if(channels==RightSide) c=(float2)__(a+b, b);
         else error(channels);
-        buffer[writeIndex++]=c;
+        buffer[writeIndex]=c;
+        writeIndex=(writeIndex+1)%buffer.capacity;
     }
     unallocate(block[0],allocSize); unallocate(block[1],allocSize);
     if(index<bsize) parseFrame(); else blockSize=0;

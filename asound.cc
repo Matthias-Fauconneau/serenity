@@ -58,7 +58,7 @@ AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)
     hparams.interval(FrameBits) = 16*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=256/*~2x resampler latency*/, hparams.interval(Periods).max=2;
+    if(realtime) hparams.interval(PeriodSize)=128/*~1x resampler latency*/, hparams.interval(Periods).max=2;
     else hparams.interval(PeriodSize).min=8192, hparams.interval(Periods).min=2;
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);
@@ -77,9 +77,11 @@ void AudioOutput::start() { io<PREPARE>(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); }
 void AudioOutput::event() {
     for(;;){
-        if(status->state == XRun) { log("XRun"_); io<PREPARE>(); }
+        if(status->state == XRun) { underrun(); log("Underrun"); io<PREPARE>(); }
         int available = status->hwPointer + bufferSize - control->swPointer; if(available<(int)periodSize) break;
+        //log(cycles(
         if(!read(control->swPointer, buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
+        //)*48000/(2*1000*1000*1000));
         if(status->state == Prepared) { io<START>(); }
     }
 }

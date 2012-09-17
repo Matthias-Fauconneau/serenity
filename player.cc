@@ -7,6 +7,7 @@
 #include "layout.h"
 #include "window.h"
 #include "text.h"
+#include "simd.h"
 
 extern "C" {
 enum mpg123_flags { MPG123_ADD_FLAGS=2, MPG123_FORCE_FLOAT  = 0x400 };
@@ -29,13 +30,13 @@ void mpg123_delete(mpg123* mh);
 struct AudioMedia {
     uint rate=0,channels=0;
     /// Returns elapsed time in seconds
-    virtual int position()=0;
+    virtual uint position()=0;
     /// Returns media duration in seconds
-    virtual int duration()=0;
+    virtual uint duration()=0;
     /// Seeks media to \a position (in seconds)
     virtual void seek(int position)=0;
     /// Reads \a size frames into \a output
-    virtual bool read(float* output, uint size)=0;
+    virtual bool read(float2* output, uint size)=0;
     virtual ~AudioMedia(){}
 };
 
@@ -51,57 +52,53 @@ struct MP3Media : AudioMedia {
         if(mpg123_open_fd(mh,this->file.fd)) { log("mpg123_open_fd failed"); mh=0; return; }
         long rate; int channels,encoding;
         if(mpg123_getformat(mh,&rate,&channels,&encoding)) { log("mpg123_getformat failed"); mh=0; return; }
-        this->rate=rate; this->channels=channels;
+        this->rate=rate; this->channels=channels; assert(channels==2);
     }
-    int position() { return int(mpg123_tell(mh)/rate); }
-    int duration() { return int(mpg123_length(mh)/rate); }
+    uint position() { return int(mpg123_tell(mh)/rate); }
+    uint duration() { return int(mpg123_length(mh)/rate); }
     void seek(int position) { mpg123_seek_frame(mh,mpg123_timeframe(mh,position),0); }
-    bool read(float* output, uint size) { long done; return !mpg123_read(mh,output,size*channels*sizeof(float),&done) && done==size*channels*sizeof(float); }
+    bool read(float2* output, uint size) { long done; return !mpg123_read(mh,(float*)output,size*sizeof(float2),&done) && done==int(size*channels*sizeof(float)); }
     ~MP3Media() { mpg123_close(mh); mpg123_delete(mh); }
 };
 
 /// FLAC audio decoder
-struct FLACMedia : AudioMedia, FLAC {
+struct FLACMedia : AudioMedia {
     Map map;
-    uint blockPosition=0; //position of next FLAC block in samples
-    float* block=0;
+    FLAC flac;
+    uint flacPosition=0;
     FLACMedia(){}
-    FLACMedia(Map&& file):FLAC(file),map(move(file)){ AudioMedia::rate=FLAC::rate; AudioMedia::channels=FLAC::channels; }
-    int position() { return blockPosition/FLAC::rate; }
-    int duration() { return FLAC::duration/FLAC::rate; }
+    FLACMedia(File&& file):map(file),flac(map){ AudioMedia::rate=flac.rate; AudioMedia::channels=2; }
+    uint position() { return flacPosition/rate; }
+    uint duration() { return flac.duration/rate; }
     void seek(int unused position) {
-        blockSize=0;
-        /*if(position<this->position()) start(file), blockPosition=0;
-        while(position>this->position()) readFrame(), block=buffer, blockPosition+=blockSize;*/
+        if(position<this->position()) { flac.~FLAC(); flac=FLAC(map); }
+        while(this->position()<position) { flacPosition+=flac.blockSize; flac.decodeFrame(); }
     }
-    bool read(float* out, uint size) {
-        while(size > blockSize) {
-            for(float* end=out+FLAC::channels*blockSize; out<end; block++, out++) out[0]=block[0];
-            size -= blockSize;
-            if(blockPosition >= FLAC::duration) return false;
-            readFrame(); block=buffer; blockPosition+=blockSize;
-        }
-        for(float* end=out+FLAC::channels*size; out<end; block++, out++) out[0]=block[0];
-        blockSize -= size;
+    uint bufferSize=0;
+    bool read(float2* out, uint size) {
+        for(;flac.blockSize!=0 && bufferSize<size;) { bufferSize+=flac.blockSize; flac.decodeFrame(); }
+        for(uint i=0;i<size;i++) { out[i]= flac.buffer[flac.readIndex]; flac.readIndex=(flac.readIndex+1)%flac.buffer.capacity; } bufferSize-=size; flacPosition+=size;
         return true;
     }
 };
 
 struct Player : Application {
 /// Pipeline: File -> AudioMedia -> [Resampler] -> AudioOutput
-    static const int channels=2;
+    static constexpr int channels=2;
     AudioMedia* media=0; MP3Media mp3; FLACMedia flac;
     Resampler resampler;
     AudioOutput audio __({this,&Player::read});
-    bool read(int16* output, uint size) {
-        float buffer[size*channels];
-        uint inputSize = size*media->rate/audio.rate; assert(size>=inputSize);
+    bool read(ptr& swPointer, int16* output, uint size) {
+        float2 buffer[size];
+        uint inputSize = resampler?resampler.need(size):size;
         if(!media || !media->read(buffer,inputSize)) {
             next();
             if(!media || !media->read(buffer,inputSize)) return false;
         }
-        if(resampler) resampler.filter(buffer,inputSize,buffer,size);
-        for(uint i=0;i<size*channels;i++) output[i] = clip(-32768,int(buffer[i]*32768),32767);
+        if(resampler) resampler.filter<false>((float*)buffer,inputSize,(float*)buffer,size);
+        assert(size%4==0);
+        for(uint i=0;i<size/4;i++) ((half8*)output)[i] = packs(cvtps(load(buffer+i*4+0)), cvtps(load(buffer+i*4+2))); //8 samples = 4 frames
+        swPointer += size;
         update(media->position(),media->duration());
         return true;
     }
@@ -191,7 +188,7 @@ struct Player : Application {
         else warn("Unsupported format",path);
         audio.start();
         assert(audio.channels==media->channels);
-        if(audio.rate!=media->rate) new (&resampler) Resampler(audio.channels,audio.periodSize*media->rate/audio.rate,audio.periodSize);
+        if(audio.rate!=media->rate) new (&resampler) Resampler(audio.channels, media->rate, audio.rate, audio.periodSize);
         setPlaying(true);
         writeFile("/Music/.last"_,string(files[index]+"\0"_+dec(0)));
     }

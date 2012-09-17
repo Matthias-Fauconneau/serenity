@@ -81,7 +81,7 @@ struct BinaryData : virtual Data {
         /// Reads an int8
         operator uint8() { return s->read<uint8>(); }
         operator int8() { return s->read<int8>(); }
-        operator byte() { return s->read<byte>(); }
+        operator byte() { return s->next(); }
     };
     ReadOperator read() { return __(this); }
 

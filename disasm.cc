@@ -65,7 +65,7 @@ int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
 
 void disassemble(const ref<byte>& code) {
     for(const byte* c=code.begin(), *end=code.end();c<end;) {
-        log_(hex(int(c-code.begin()),2)+":\t"_ /*+hex(ref<byte>(c,5))+"\t"_*/);
+        log_(hex(int(c-code.begin()),2)+":\t"_  /*+hex(ref<byte>(c,5))+"\t"_*/);
         uint8 op = *c++;
         int size=2/*operand size*//*, asize=3*//*address size*/, scalar=0;
         if(op==0x66) size=1, op = *c++; //for SSE size=2 -> float (ps), size=1 -> double (pd)
@@ -77,16 +77,16 @@ void disassemble(const ref<byte>& code) {
             uint8 op = *c++;
             if(op==0x10 || op==0x28) { //mov[ua]p xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
-                log( (op==0x10?"movup"_:"movap"_)+string("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+                log( (op==0x10?"movup"_:"movap"_)+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
             } else if(op==0x11) { //mov[ua]p xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
-                log( (op==0x10?"movup"_:"movap"_)+string("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
+                log( (op==0x10?"movup"_:"movap"_)+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
             } else if(op==0x12) { //movhlps xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
-                log("movhlp"_+string("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
+                log("movhlp"_+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
             } else if(op==0x15) { //unpckhp xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
-                log( "unpckhp"_+string("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+                log( "unpckhp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
             } else if(op==0x18) { //prefetch
                 string src; int r=modrm(rex,2,c,src,1);
                 log("prefetch"_+(r==0?string("nta"_):dec(r-1))+" "_+src);
@@ -95,19 +95,23 @@ void disassemble(const ref<byte>& code) {
                 log( "nop"_ );
             } else if(op==0x29) { //movap xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
-                log( "movap"_+string("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
+                log( "movap"_+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
             }  else if(op==0x2A || op==0x2C || op==0x2D) { //cvt r, xmm/m
                 string src; int r=modrm(rex,2,c,src,!scalar);
                 static constexpr ref<byte> lookup[] = {"cvti2f"_,"?"_,"cvttf2i"_,"cvtf2i"_};
                 log( replace(replace(lookup[op-0x2A],"i"_,scalar?"si"_:"pi"_),"f"_,string((scalar?"s"_:"p"_)+(size==1?"d"_:"s"_)))+" "_+src+", "_+xmm(r,size) );
-            } else if(op>=0x51&&op<=0x6D) { //op xmm, xmm/m
+            } else if(op==0x31) {
+                log( "rdtsc" );
+            } else if(op>=0x51&&op<=0x6F) { //op xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
                 const ref<byte> lookup[] = {"sqrt"_,"rsqrt"_,"rcp"_,"and"_,"andn"_,"or"_,"xor"_,"add"_,"mul"_,
                                             size==1?"cvtpd2ps"_:"cvtps2pd"_,size==1?"cvtps2dq"_:"cvtdq2ps"_,
                                             "sub"_,"min"_,"div"_,"max"_,"punpcklbw"_,"punpcklwd"_,"punpckldq"_,"packsswb"_,
                                             "pcmpgtb"_,"pcmpgtw"_,"pcmpgtd"_,"packuswb"_,"punpckhbw"_,"punpckhwd"_,"punpckhdq"_,
-                                            "packssdw"_,"punpcklqdq"_};
-                log(lookup[op-0x51]+((op<=0x59||(op>=0x5C&&op<=0x5F))?string(str("ps"[scalar])+str("?sd?"[size])):string())+" "_+xmm(r,size)+", "_+src);
+                                            "packssdw"_,"punpcklqdq"_,"punpckhqdq"_,"movq"_,"movq"_};
+                log_(lookup[op-0x51]);
+                if(op<=0x59||(op>=0x5C&&op<=0x5F)) log_(str("ps"[scalar])+str("?sd?"[size]));
+                log(" "_+xmm(r,size)+", "_+src);
             } else if((op&0xF0)==0x80) { //jcc imm16/32
                 int disp = imm(c,size);
                 log("j"_+ccs[op&0xF]+" "_+ hex(int(c-code.begin())+disp,2<<size));
@@ -121,25 +125,25 @@ void disassemble(const ref<byte>& code) {
             } else if(op==0xB6||op==0xB7) {
                 if(!(op&1)) size=0;
                 string src; int r=modrm(rex,size,c,src);
-                log("movzx"_+string("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+                log("movzx"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
             } else error("0F"_+hex(op));
         } else if(op<0x40 && (op&0x7)<=5) { //binary operator
             if(!(op&1)) size=0;
             if(op&4) { //op ax, imm
                 int i=imm(c,size);
-                log(ops[op>>3]+string("bwlq"[size])+" "_+gpr(0,size)+", "_+hex(i,2<<size) );
+                log(ops[op>>3]+str("bwlq"[size])+" "_+gpr(0,size)+", "_+hex(i,2<<size) );
             } else {
                 if(op&2) { //op r, r/m
                     string src; int r = modrm(rex,size,c,src);
-                    log(ops[op>>3]+string("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+                    log(ops[op>>3]+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
                 } else { //op r/m, r
                     string dst; int r = modrm(rex,size,c,dst);
-                    log(ops[op>>3]+string("bwlq"[size])+" "_+dst+", "_+gpr(r,size) );
+                    log(ops[op>>3]+str("bwlq"[size])+" "_+dst+", "_+gpr(r,size) );
                 }
             }
         } else if(op>=0x50&&op<0x60) {
             int r = op&7;
-            log( "push"_+string("bwlq"[size])+" "_+gpr(r,size));
+            log( "push"_+str("bwlq"[size])+" "_+gpr(r,size));
         } else if(op==0x63) { //movsxd r, r/m
             string src; int r=modrm(rex,size,c,src);
             log( "movsxd"_+" "_+gpr(r,size)+", "_+src );
@@ -149,22 +153,22 @@ void disassemble(const ref<byte>& code) {
         } else if(op==0x80 || op==0x81) { //op imm8, r/m
             if(!(op&1)) size=0;
             string src; int r=modrm(rex,size,c,src); r&=7;
-            log( ops[r]+string("bwlq"[size])+" "_+hex(imm(c,size==3?2:size),1<<size)+", "_+src );
+            log( ops[r]+str("bwlq"[size])+" "_+hex(imm(c,size==3?2:size),1<<size)+", "_+src );
         } else if(op==0x83) { //op r/m, imm8
             string src; int r=modrm(rex,size,c,src); r&=7;
-            log( ops[r]+string("bwlq"[size])+" "_+src+", "_+hex(imm(c,0),2) );
+            log( ops[r]+str("bwlq"[size])+" "_+src+", "_+hex(imm(c,0),2) );
         } else if(op==0x84 || op==0x85) { //test r, r/m
             if(!(op&1)) size=0;
             string src; int r=modrm(rex,size,c,src);
-            log( "test"_+string("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+            log( "test"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
         } else if(op==0x88 || op==0x89) { //mov r/m, r
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst);
-            log( "mov"_+string("bwlq"[size])+" "_+dst+", "_+gpr(r,size) );
+            log( "mov"_+str("bwlq"[size])+" "_+dst+", "_+gpr(r,size) );
         } else if(op==0x8A || op==0x8B) { //mov r, r/m
             if(!(op&1)) size=0;
             string src; int r=modrm(rex,size,c,src);
-            log( "mov"_+string("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+            log( "mov"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
         } else if(op==0x8D) { //lea r, m
             string m; int r = modrm(rex,size,c,m);
             log( "lea   "_+gpr(r,size)+", "_+m );
@@ -180,7 +184,7 @@ void disassemble(const ref<byte>& code) {
         } else if(op==0xC6 || op==0xC7) { //mov r/m, imm
             if(!(op&1)) size=0;
             string dst; int r = modrm(rex,size,c,dst); if(r&7) error(r);
-            log( "mov"_+string("bwlq"[size])+" "_+ dst + " , "_ + hex(imm(c,size),2<<size) );
+            log( "mov"_+str("bwlq"[size])+" "_+ dst + " , "_ + hex(imm(c,size),2<<size) );
         } else if(op==0xD0 || op==0xD1) { //shx r/m, 1
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst); r&=7;

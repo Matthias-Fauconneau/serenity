@@ -7,6 +7,8 @@ inline void clear(byte* buffer, int size) { for(int i=0;i<size;i++) buffer[i]=0;
 template<class T> void clear(T* buffer, int size, const T& value=T()) { for(int i=0;i<size;i++) buffer[i]=value; }
 /// Raw memory copy
 inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
+/// Aligned raw memory copy
+void copy16(void* dst,const void* src, int size);
 /// Buffer explicit copy
 template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
 

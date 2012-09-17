@@ -7,50 +7,46 @@
 
 Sequencer::Sequencer(Thread& thread) : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll(Device::fd,POLLIN,thread) {}
 
-void Sequencer::event() { //TODO: poll signal to active notes while predecoding
-    do {
-        uint8 key=read<uint8>();
-        if(key & 0x80) { type=key>>4; key=read<uint8>(); }
-        uint8 value=0;
-        if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value=read<uint8>();
-        else error("Unhandled MIDI event");
+void Sequencer::event() {
+    uint8 key=read<uint8>();
+    if(key & 0x80) { type=key>>4; key=read<uint8>(); }
+    uint8 value=0;
+    if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value=read<uint8>();
+    else error("Unhandled MIDI event");
 
-        if(type == NoteOn) {
-            if(value == 0 ) {
-                if(!pressed.contains(key)) continue; //pressed even before the device was opened
-                pressed.removeAll(key);
-                if(sustain) sustained+= key;
-                else {
-                    noteEvent(key,0);
-                    midiEvent();
-                    if(record) {
-                        int tick = realTime();
-                        events << Event((int16)(tick-lastTick), (uint8)key, (uint8)0);
-                        lastTick = tick;
-                    }
-                }
-            } else {
-                sustained.removeAll(key);
-                assert_(!pressed.contains(key));
-                pressed << key;
-                noteEvent(key, min(127,value*3/2)); //x3/2 to use reach maximum velocity without destroying the keyboard
-                midiEvent();
+    if(type == NoteOn) {
+        if(value == 0 ) {
+            if(!pressed.contains(key)) return; //pressed even before the device was opened
+            pressed.removeAll(key);
+            if(sustain) sustained+= key;
+            else {
+                noteEvent(key,0);
                 if(record) {
                     int tick = realTime();
-                    events << Event((int16)(tick-lastTick), (uint8)key, (uint8)value);
+                    events << Event((int16)(tick-lastTick), (uint8)key, (uint8)0);
                     lastTick = tick;
                 }
             }
-        } else if(type == Controller) {
-            if(key==64) {
-                sustain = (value != 0);
-                if(!sustain) {
-                    for(int key : sustained) { noteEvent(key,0); midiEvent(); assert_(!pressed.contains(key)); }
-                    sustained.clear();
-                }
+        } else {
+            sustained.removeAll(key);
+            assert_(!pressed.contains(key));
+            pressed << key;
+            noteEvent(key, min(127,value*3/2)); //x3/2 to use reach maximum velocity without destroying the keyboard
+            if(record) {
+                int tick = realTime();
+                events << Event((int16)(tick-lastTick), (uint8)key, (uint8)value);
+                lastTick = tick;
             }
         }
-    } while(poll());
+    } else if(type == Controller) {
+        if(key==64) {
+            sustain = (value != 0);
+            if(!sustain) {
+                for(int key : sustained) { noteEvent(key,0); assert_(!pressed.contains(key)); }
+                sustained.clear();
+            }
+        }
+    }
 }
 
 void Sequencer::recordMID(const ref<byte>& path) { record=File(path,root(),File::WriteOnly); }

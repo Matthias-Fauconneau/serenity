@@ -38,7 +38,7 @@ template<> void __attribute((noreturn)) error(const ref<byte>& buffer) { message
 
 /// Semaphore
 void Semaphore::wait(int& futex, int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0))) || (val=futex)<0)log(errno[-e]); }
-void Semaphore::wake(int& futex) { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0)); }
+void Semaphore::wake(int& futex) { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
 
 /// Lock
 debug(void Lock::setOwner(){assert(!owner,owner); owner=gettid();})
@@ -59,11 +59,12 @@ Thread::Thread():Poll(EventFD::fd,POLLIN,*this){}
 static int run(void* thread) { return ((Thread*)thread)->run(); }
 void Thread::spawn(int unused priority) {
     this->priority=priority;
-    static constexpr int stackSize = 8<<20;
-    void* stack = (byte*)check(mmap(0,stackSize,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0))+stackSize;
-    clone(::run,stack,CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
+    static constexpr int stackSize = 1<<20;
+    void* stack = (void*)check(mmap(0,stackSize,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0));
+    mprotect(stack,4096,0);
+    clone(::run,(byte*)stack+stackSize,CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
 }
-static array<Thread*> threads; static Lock threadsLock;
+static array<Thread*> threads; static Lock threadsLock; static Lock sequentialLock;
 Thread defaultThread;
 int Thread::run() {
     tid=gettid();
@@ -73,7 +74,11 @@ int Thread::run() {
         uint size=this->size(); pollfd pollfds[size]; for(uint i=0;i<size;i++) pollfds[i]=*at(i);
         if(check__(::poll(pollfds,size,-1))!=INTR) for(uint i=0;i<size;i++) {
             Poll* poll=at(i); int revents=pollfds[i].revents;
-            if(revents && !unregistered.contains(poll)) { poll->revents = revents; poll->event(); }
+            if(revents && !unregistered.contains(poll)) {
+                poll->revents = revents;
+                //poll->event();
+                {Locker lock(sequentialLock); poll->event();}//DEBUG
+            }
         }
         {Locker lock(thread.lock); while(unregistered){Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}}
     }
@@ -100,8 +105,8 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
         Locker lock(threadsLock);
         for(Thread* thread: threads) {thread->terminate=true; if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP);}
     }
-    if(sig==SIGABRT) { if(message) log(message); else log("Abort"); exit(0); } //Abort doesn't let thread terminate cleanly
-    if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); } //
+    if(sig==SIGABRT) { log("Abort",message); exit(0); } //Abort doesn't let thread terminate cleanly
+    if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); }
     if(sig==SIGSEGV) { log("Segmentation fault at "_+str(ptr(info->fault.addr))); exit(0); } //Segfault kills the threads to prevent further corruption
     if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads
 }
@@ -122,7 +127,7 @@ void init() {
     check_(sigaction(SIGTERM, &sa, 0, 8));
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 }
-void exit() { for(Thread* thread: threads) thread->terminate=true; exit(0); /*allow each thread to terminate properly instead of killing with exit_group*/ }
+void exit() { for(Thread* thread: threads) thread->terminate=true; exit_group(0); /*TODO: allow each thread to terminate properly instead of killing with exit_group*/ }
 
 /// Environment
 

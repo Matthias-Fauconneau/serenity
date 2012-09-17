@@ -12,8 +12,6 @@ process.h
 process.cc
 file.h
 file.cc
-signal.h
-signal.cc
 time.h
 time.cc
 

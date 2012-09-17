@@ -25,11 +25,11 @@ struct BitReader {
 };
 
 template<class T> struct Buffer {
-    T* data;
-    uint capacity;
-    Buffer(uint capacity):data(allocate<T>(capacity)),capacity(capacity){}
-    Buffer(const Buffer& o):Buffer(o.capacity){copy(data,o.data,capacity);}
-    Buffer(Buffer&& o):data(o.data),capacity(o.capacity){o.data=0;}
+    T* data=0;
+    uint capacity=0,size=0;
+    Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
+    Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy16(data,o.data,size*sizeof(T)/16);}
+    Buffer(Buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     move_operator(Buffer)
     ~Buffer(){if(data){unallocate(data,capacity);}}
     operator T*() { return data; }
@@ -37,11 +37,12 @@ template<class T> struct Buffer {
 
 typedef float float2 __attribute((vector_size(8)));
 struct FLAC : BitReader {
-    Buffer<float2> buffer __(1<<16); //64K samples ~ 512K bytes
-    uint16 writeIndex = 0, readIndex = 0;
+    Buffer<float2> buffer __(1<<16);
+    uint writeIndex = 0;
+    uint readIndex = 0;
     uint16 blockSize = 0, rate = 0;
     uint16 channels = 0, sampleSize = 0;
-    uint position=0, duration = 0;
+    uint duration = 0;
 
     default(FLAC)
     /// Reads header and decode first frame from data

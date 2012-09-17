@@ -68,6 +68,7 @@ string demangle(TextData& s, bool function=true) {
     else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
     else if(s.match("Li"_)) r<<dec(s.number());
     else if(s.match("Lj"_)) r<<dec(s.number());
+    else if(s.match("Lb"_)) r<<str((bool)s.number());
     else if(s.match('L')) r<<"extern "_<<demangle(s);
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<string> args;
@@ -200,7 +201,7 @@ string trace(int skip, void* ip) {
     void* stack[16]; clear((byte*)stack,sizeof(stack));
     void* frame = __builtin_frame_address(0);
     int i=0;
-    for(;i<8;i++) {
+    for(;i<16;i++) {
         if(ptr(frame)<0x10) break;
         stack[i]=return_address(frame);
         frame=caller_frame(frame);

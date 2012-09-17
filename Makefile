@@ -1,18 +1,14 @@
 PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
-CC = g++ -fabi-version=0 -pipe -march=native -mfpmath=sse
+CC = g++ -fabi-version=0 -pipe -march=native
 #CC = clang++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
-#debug: include debug symbols, keep all assertions
-FLAGS_debug := -g -DDEBUG -fno-omit-frame-pointer -fno-optimize-sibling-calls
-#fast: include debug symbols, disable all assertions, use medium optimizations
-FLAGS_fast := -g -O2 -fno-omit-frame-pointer -fno-optimize-sibling-calls
-#profile: include debug symbols, disable all assertions, use medium optimizations, instrument functions
-FLAGS_profile := -g -O3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -finstrument-functions
+FLAGS_debug := -g -fno-omit-frame-pointer -DDEBUG
+FLAGS_fast := -g -O2 -fno-omit-frame-pointer
+FLAGS_profile := -g -O3 -finstrument-functions
 SRCS_profile := profile
-#release: strip debug symbols, disable all assertions, use heavy optimizations
-FLAGS_release := -g -DEBUG -O3 -fomit-frame-pointer
+FLAGS_release := -O3
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button

@@ -87,23 +87,22 @@ static double sinc(double cutoff, double x, int N) {
 /// Returns the largest positive integer that divides the numbers without a remainder
 inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 
-Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate) {
+Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint bufferSize) {
     assert_(channelCount==this->channelCount);
-    assert_(sourceRate%1024==0); //allow to eventually use an mmap ring buffer for source samples
 
     // Computes filter size and cutoff
     double cutoff;
     if (sourceRate > targetRate) { //downsampling
         cutoff = bandwidth * targetRate / sourceRate;
         N = filterSize * sourceRate / targetRate;
-        N &= (~0x3); // Round down to make sure we have a multiple of 4
+        N &= ~3; // Round down to make sure we have a multiple of 4
     } else { //upsampling
         cutoff = bandwidth;
         N = filterSize;
     }
 
     // Allocates and clears aligned planar signal buffers
-    bufferSize = sourceRate+N-1;
+    this->bufferSize = bufferSize = max(bufferSize,sourceRate)+N-1;
     for(uint i=0;i<channelCount;i++) {
         buffer[i] = allocate16<float>(bufferSize);
         clear(buffer[i],bufferSize,0.f);
@@ -132,23 +131,13 @@ template void Resampler::filter<false>(const float* source, uint sourceSize, flo
 template void Resampler::filter<true>(const float* source, uint sourceSize, float* target, uint targetSize);
 
 int Resampler::need(uint targetSize) {
-    uint integerIndex=this->integerIndex, fractionalIndex=this->fractionalIndex;
-    for(uint i=0;i<targetSize;i++) {
-        integerIndex += integerAdvance;
-        fractionalIndex += fractionalAdvance;
-        if(fractionalIndex >= targetRate) {
-            fractionalIndex -= targetRate;
-            integerIndex++;
-        }
-    }
-    return integerIndex+1-writeIndex;
+    return (targetSize*integerAdvance+(fractionalIndex+targetSize*fractionalAdvance)/targetRate)+1-(writeIndex-integerIndex);
 }
 
 void Resampler::write(const float* source, uint size) {
-    assert(size<=sourceRate,size,sourceRate); //doesn't fit buffer
-    if(writeIndex+size>sourceRate) { // Wraps buffer (TODO: map ring buffer)
+    if(writeIndex+size>bufferSize-N-1) { // Wraps buffer (TODO: map ring buffer)
         writeIndex -= integerIndex;
-        assert(writeIndex+integerIndex<sourceRate);
+        assert(writeIndex+size<bufferSize-N-1);
         for(uint channel=0;channel<channelCount;channel++) {
             for(uint i=0;i<N-1+writeIndex;++i) buffer[channel][i] = buffer[channel][integerIndex+i];
         }
@@ -159,15 +148,12 @@ void Resampler::write(const float* source, uint size) {
         buffer[1][N-1+writeIndex+j]=source[j*channelCount+1];
     }
      writeIndex+=size;
-     assert(sourceRate);
+     assert(writeIndex<bufferSize);
 }
 
 template<bool mix> void Resampler::read(float* target, uint targetSize) {
-    assert(sourceRate);
     for(uint i=0;i<targetSize;i++) {
-        assert(integerIndex<sourceRate);
         for(uint channel=0;channel<channelCount;channel++) {
-            assert(integerIndex<writeIndex,writeIndex,integerIndex,fractionalIndex,integerAdvance,fractionalAdvance,targetRate,targetSize);
             if(mix) target[i*channelCount+channel] += product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
             else target[i*channelCount+channel] = product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
         }
@@ -177,8 +163,10 @@ template<bool mix> void Resampler::read(float* target, uint targetSize) {
             fractionalIndex -= targetRate;
             integerIndex++;
         }
+        assert(integerIndex<writeIndex);
+        assert(fractionalIndex<targetRate);
     }
-    assert(sourceRate);
+    assert(integerIndex>=writeIndex-2,integerIndex,writeIndex);
 }
 template void Resampler::read<false>(float* target, uint targetSize);
 template void Resampler::read<true>(float* target, uint targetSize);

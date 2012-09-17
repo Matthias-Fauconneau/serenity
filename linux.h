@@ -96,6 +96,7 @@ syscall3(int, lseek, int,fd, long,offset, int,whence)
 enum {PROT_READ=1, PROT_WRITE=2}; enum {MAP_FILE, MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS=0x20}; //FIXME
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, munmap, void*,addr, long,len)
+syscall3(int, mprotect, void*,addr, long,len, int,prot)
 syscall1(void*, brk, void*,new_brk)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
 syscall3(int, ioctl, int,fd, long,request, void*,arguments)
@@ -141,18 +142,13 @@ inline __attribute((noreturn)) int exit(int status) {r(r0,status) r(rN,sys::exit
 inline __attribute((noreturn)) int exit_group(int status) {r(r0,status)  r(rN,sys::exit_group); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noinline)) long clone(int (*fn)(void*), void* stack, int flags, void* arg) {
     r(r0,flags) r(r1,0) r(r2,0) r(r3,0) r(r4,0) r(rN,sys::clone);
-#if DEBUG
-    asm volatile(
-                "syscall;"
-                "test %%eax, %%eax; je run; leave; ret;"
-                "run: movq %0, %%rsp; movq $0, %%rbp; movq %1, %%rdi; call *%2; movq %%rax, %%rdi; call exit"
-                : : "r" (stack), "r"(arg),"r"(fn), "r"(rN), "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4) : "rcx", "r9", "r11");
-#else
+    register long r13 asm("r13")=(long)stack;
+    register long r14 asm("r14")=(long)arg;
+    register long r15 asm("r15")=(long)fn;
     register long r asm(rR);
     asm volatile("syscall": "=r"(r): "r"(arg),"r"(fn), "r"(rN), "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4) : "rcx", "r9", "r11");
-    if(rax!=0) return rax;
-    asm("movq %0, %%rsp; movq $0, %%rbp; movq %1, %%rdi; call *%2; movq %%rax, %%rdi; call exit":: "r" (stack), "r"(arg),"r"(fn):"rbp","rsp","rdi","rax");
-#endif
+    if(r!=0) return r;
+    asm("movq %0, %%rsp; movq $0, %%rbp; movq %1, %%rdi; call *%2; movq %%rax, %%rdi; call exit":: "r"(r13), "r"(r14),"r"(r15):/*"rbp",*/"rsp","rdi","rax");
     __builtin_unreachable();
 }
 #if __i386
