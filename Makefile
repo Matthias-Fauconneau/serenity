@@ -26,6 +26,8 @@ INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_feeds = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_music = icons/$(TARGET).png $(TARGET).desktop
 
+all: prepare $(BUILD)/$(TARGET)
+
 clean:
 	@rm -f $(BUILD)/*.l
 	@rm -f $(BUILD)/*.d
@@ -65,8 +67,6 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(LIBS:%=$$(%)))
 	@$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
-
-all: prepare $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
 	cp $< $(PREFIX)/share/icons/hicolor/32x32/apps

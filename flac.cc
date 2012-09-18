@@ -99,7 +99,7 @@ void FLAC::parseFrame() {
     int blockSize = blockSize_[binary(4)];
     int sampleRate_[16] = {0, 88200, 176400, 192000, 8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, -1, -2, -20 };
     uint unused rate = sampleRate_[binary(4)]; assert(rate==this->rate);
-    channels = binary(4); assert(channels==Independent||channels==LeftSide||channels==MidSide||channels==RightSide,channels);
+    channelMode = binary(4); assert(channelMode==Independent||channelMode==LeftSide||channelMode==MidSide||channelMode==RightSide,channelMode);
     int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
     sampleSize = sampleSize_[binary(3)]; assert(sampleSize==16 || sampleSize==24);
     int unused zero = bit(); assert(zero==0);
@@ -131,6 +131,27 @@ template<int unroll> inline void convolve(double* predictor, double* even, doubl
     }
 }
 
+template<int unroll,int channelMode> inline void interleave(const float* A, const float* B, float2* ptr, float2* end) {
+    for(;ptr<end;) {
+        __builtin_prefetch(A+32,0,0);
+        __builtin_prefetch(B+32,0,0);
+        __builtin_prefetch(ptr+32,0,0);
+        for(uint i=0;i<unroll;i++) {
+            float a=A[i], b=B[i];
+            if(channelMode==Independent) ptr[i]=(float2)__(a,b);
+            else if(channelMode==LeftSide) ptr[i]=(float2)__(a,a-b);
+            else if(channelMode==MidSide) a-=b/2, ptr[i]=(float2)__(a+b,a);
+            else if(channelMode==RightSide) ptr[i]=(float2)__(a+b, b);
+        }
+        A+=unroll; B+=unroll; ptr+=unroll;
+    }
+}
+template<int unroll> inline void interleave(const int channelMode,const float* A, const float* B, float2* ptr, float2* end) {
+    #define o(n) case n: interleave<unroll,n>(A,B,ptr,end); break;
+    switch(channelMode) { o(Independent) o(LeftSide) o(MidSide) o(RightSide) }
+    #undef o
+}
+
 uint64 rice=0, predict=0, order=0;
 void FLAC::decodeFrame() {
     assert(blockSize && blockSize<buffer.capacity);
@@ -139,8 +160,8 @@ void FLAC::decodeFrame() {
     setRoundMode(Down);
     for(int channel=0;channel<2;channel++) {
         int rawSampleSize = sampleSize; //one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
-        if(channel == 0) { if(channels==RightSide) rawSampleSize++; }
-        if(channel == 1) { if(channels==LeftSide || channels == MidSide) rawSampleSize++; }
+        if(channel == 0) { if(channelMode==RightSide) rawSampleSize++; }
+        if(channel == 1) { if(channelMode==LeftSide || channelMode == MidSide) rawSampleSize++; }
 
         //Subframe
         int unused zero = bit(); assert(zero==0,channel,blockSize,index,bsize);
@@ -223,6 +244,7 @@ void FLAC::decodeFrame() {
         }
         #define o(n) case n: convolve<n>(predictor,even,odd,signal,end); break;
         switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
+        #undef o
         int t=rice*48000/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
         unallocate(even,allocSize);
         odd-=1; unallocate(odd,allocSize+1);
@@ -231,17 +253,31 @@ void FLAC::decodeFrame() {
     index=align(8,index);
     skip(16);
     assert(blockSize<=readIndex+buffer.capacity-writeIndex); buffer.size+=blockSize;
-    for(int i=0;i<blockSize;i++) {
-        float a=block[0][i], b=block[1][i]; float2 c;
-        if(channels==Independent) c=(float2)__(a,b);
-        else if(channels==LeftSide) c=(float2)__(a,a-b);
-        else if(channels==MidSide) a-=b/2, c=(float2)__(a+b,a);
-        else if(channels==RightSide) c=(float2)__(a+b, b);
-        else error(channels);
-        buffer[writeIndex]=c;
-        writeIndex=(writeIndex+1)%buffer.capacity;
+    uint beforeWrap=buffer.capacity-writeIndex;
+    if(blockSize>beforeWrap) {
+        interleave<4>(channelMode,block[0],block[1],buffer+writeIndex,buffer+buffer.capacity);
+        interleave<4>(channelMode,block[0]+beforeWrap,block[1]+beforeWrap,buffer,buffer+blockSize-beforeWrap);
+        writeIndex = blockSize-beforeWrap;
+    } else {
+        interleave<4>(channelMode,block[0],block[1],buffer+writeIndex,buffer+writeIndex+blockSize);
+        writeIndex += blockSize;
     }
     unallocate(block[0],allocSize); unallocate(block[1],allocSize);
     if(index<bsize) parseFrame(); else blockSize=0;
     //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
+}
+
+bool FLAC::read(float2 *out, uint size) {
+    while(buffer.size<size){ if(blockSize==0) return false; decodeFrame(); }
+    uint beforeWrap = buffer.capacity-readIndex;
+    if(size>beforeWrap) {
+        copy(out,buffer+readIndex,beforeWrap);
+        copy(out+beforeWrap,buffer+0,size-beforeWrap);
+        readIndex=size-beforeWrap;
+    } else {
+        copy(out,buffer+readIndex,size);
+        readIndex+=size;
+    }
+    buffer.size-=size; position+=size;
+    return true;
 }

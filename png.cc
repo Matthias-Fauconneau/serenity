@@ -16,18 +16,18 @@ template<template<typename> class T, int N> void unfilter(byte4* dst, const byte
 #if __clang__
     byte prior_[width*sizeof(S)]; clear(prior_,sizeof(prior_)); S* prior = (S*)prior_;
 #else
-    S prior[width];
+    S prior[width]; clear(prior,width,S(0));
 #endif
     for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);
         S* src = (S*)raw;
-        S a(0);
+        S a=0;
         if(filter==0) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]=      src[i];
         if(filter==1) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]= a= a+src[i];
         if(filter==2) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]=      prior[i]+src[i];
         if(filter==3) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]= a= S((V(prior[i])+V(a))/2)+src[i];
         if(filter==4) {
-            V b(0);
+            V b=0;
             for(int i=0;i<width;i++) {
                 V c = b;
                 b = V(prior[i]);

@@ -70,21 +70,16 @@ struct MP3Media : AudioMedia {
 struct FLACMedia : AudioMedia {
     Map map;
     FLAC flac;
-    uint flacPosition=0;
     FLACMedia(){}
     FLACMedia(File&& file):map(file),flac(map){ AudioMedia::rate=flac.rate; AudioMedia::channels=2; }
-    uint position() { return flacPosition/rate; }
+    uint position() { return flac.position/rate; }
     uint duration() { return flac.duration/rate; }
     void seek(uint position) {
+        if(position>=duration()) return;
         if(position<this->position()) { flac.~FLAC(); flac=FLAC(map); }
-        while(this->position()<position) { flacPosition+=flac.blockSize; flac.decodeFrame(); }
+        while(this->position()<position) { flac.decodeFrame(); flac.position+=flac.buffer.size; flac.readIndex=(flac.readIndex+flac.buffer.size)%flac.buffer.capacity; flac.buffer.size=0; }
     }
-    uint bufferSize=0;
-    bool read(float2* out, uint size) {
-        for(;flac.blockSize!=0 && bufferSize<size;) { bufferSize+=flac.blockSize; flac.decodeFrame(); }
-        for(uint i=0;i<size;i++) { out[i]= flac.buffer[flac.readIndex]; flac.readIndex=(flac.readIndex+1)%flac.buffer.capacity; } bufferSize-=size; flacPosition+=size;
-        return true;
-    }
+    bool read(float2* out, uint size) { return flac.read(out,size); }
 };
 
 struct Player : Application {

@@ -78,12 +78,18 @@ void disassemble(const ref<byte>& code) {
             if(op==0x10 || op==0x28) { //mov[ua]p xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
                 log( (op==0x10?"movup"_:"movap"_)+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
-            } else if(op==0x11) { //mov[ua]p xmm/m, xmm
+            } else if(op==0x11 || op==0x29) { //mov[ua]p xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
-                log( (op==0x10?"movup"_:"movap"_)+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
+                log( (op==0x11?"movup"_:"movup"_)+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
             } else if(op==0x12) { //movhlps xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
                 log("movhlp"_+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
+            } else if(op==0x13) { //movhlps xmm/m, xmm
+                string src; int r=modrm(rex,2,c,src,1);
+                log("movlp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+            } else if(op==0x14) { //unpcklp xmm, xmm/m
+                string src; int r=modrm(rex,2,c,src,1);
+                log( "unpcklp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
             } else if(op==0x15) { //unpckhp xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
                 log( "unpckhp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
@@ -93,10 +99,7 @@ void disassemble(const ref<byte>& code) {
             } else if(op==0x1F) { //nop
                 string src; modrm(rex,2,c,src,1);
                 log( "nop"_ );
-            } else if(op==0x29) { //movap xmm/m, xmm
-                string src; int r=modrm(rex,2,c,src,1);
-                log( "movap"_+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
-            }  else if(op==0x2A || op==0x2C || op==0x2D) { //cvt r, xmm/m
+            } else if(op==0x2A || op==0x2C || op==0x2D) { //cvt r, xmm/m
                 string src; int r=modrm(rex,2,c,src,!scalar);
                 static constexpr ref<byte> lookup[] = {"cvti2f"_,"?"_,"cvttf2i"_,"cvtf2i"_};
                 log( replace(replace(lookup[op-0x2A],"i"_,scalar?"si"_:"pi"_),"f"_,string((scalar?"s"_:"p"_)+(size==1?"d"_:"s"_)))+" "_+src+", "_+xmm(r,size) );

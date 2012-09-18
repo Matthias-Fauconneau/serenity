@@ -72,7 +72,7 @@ array<byte> Stream::readUpTo(uint capacity) {
     if(size) { buffer.setCapacity(size); buffer.setSize(size); }
     return buffer;
 }
-bool Stream::poll(int timeout) { pollfd pollfd __(fd,POLLIN); return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
+bool Stream::poll(int timeout) { assert(fd); pollfd pollfd __(fd,POLLIN); return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 void Stream::write(const ref<byte>& buffer) { int unused wrote=check(::write(fd,buffer.data,buffer.size)); assert(wrote==(int)buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 

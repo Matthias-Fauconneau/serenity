@@ -24,6 +24,7 @@ struct BitReader {
     void setData(const ref<byte>& buffer);
 };
 
+/// Simple writable fixed-capacity memory reference
 template<class T> struct Buffer {
     T* data=0;
     uint capacity=0,size=0;
@@ -41,8 +42,8 @@ struct FLAC : BitReader {
     uint writeIndex = 0;
     uint readIndex = 0;
     uint16 blockSize = 0, rate = 0;
-    uint16 channels = 0, sampleSize = 0;
-    uint duration = 0;
+    uint16 channelMode = 0, sampleSize = 0;
+    uint position = 0, duration = 0;
 
     default(FLAC)
     /// Reads header and decode first frame from data
@@ -51,4 +52,6 @@ struct FLAC : BitReader {
     void parseFrame();
     /// Decodes next FLAC frame
     void decodeFrame();
+    /// Reads \a size samples synchronously buffering new frames as needed
+    bool read(float2* out, uint size);
 };

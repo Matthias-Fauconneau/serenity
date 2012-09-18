@@ -39,7 +39,7 @@
 #define syscall(type, name, args ...) \
     r(rN,sys::name); \
     register long r asm(rR); \
-    asm volatile(kernel: "=r" (r): "r"(rN), ## args : clobber); \
+    asm volatile(kernel: "=r" (r): "r"(rN), ## args : clobber, "memory"); \
     return (type)r;
 
 #define syscall0(type,name) \

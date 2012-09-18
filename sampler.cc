@@ -213,11 +213,19 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 }
 
 /// Audio mixer (realtime thread)
-
+inline void mix(float4& level, float4 step, float4* out, float4* in, uint size) { for(uint i=0;i<size;i++) { out[i] += level * in[i]; level*=step; } }
 void Note::read(float4* out, uint size) {
     if(blockSize==0 && readCount<int(size*2)) return; // end of stream
     if(readCount.acquire(size*2)) log("underrun"); //ensure decoder follows
-    for(uint i=0;i<size;i++) out[i]+= level * load(buffer+readIndex), readIndex=(readIndex+2)%buffer.capacity, level*=step;
+    uint beforeWrap = (buffer.capacity-readIndex)/2;
+    if(size>beforeWrap) {
+        mix(level,step,out,(float4*)(buffer+readIndex),beforeWrap);
+        mix(level,step,out+beforeWrap,(float4*)(buffer+0),size-beforeWrap);
+        readIndex = (size-beforeWrap)*2;
+    } else {
+        mix(level,step,out,(float4*)(buffer+readIndex),size);
+        readIndex += size*2;
+    }
     buffer.size-=size*2; writeCount.release(size*2); //allow decoder to continue
     position+=size*2; //keep track of position for release sample level matching
 }

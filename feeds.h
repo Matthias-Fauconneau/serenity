@@ -2,6 +2,7 @@
 #include "interface.h"
 #include "html.h"
 #include "file.h"
+#include "ico.h"
 
 /// Entry is an \a Item with a \a link to an article
 struct Entry : Item {

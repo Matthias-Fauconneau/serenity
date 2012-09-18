@@ -15,7 +15,7 @@ struct Note : FLAC {
     Semaphore writeCount __((int)buffer.capacity); //audio thread release free samples, decoder thread acquires
     uint16 releaseTime; //to compute step
     uint8 key=0; //to match release sample
-    uint position=0; ref<float> envelope; //to level release sample
+    ref<float> envelope; //to level release sample
     /// Decodes frames until \a available samples is over \a need
     void decode(uint need);
     /// Reads \a size samples to be mixed into \a out and returns true when decayed

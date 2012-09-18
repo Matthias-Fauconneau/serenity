@@ -125,12 +125,14 @@ URL::URL(const ref<byte>& url) {
     path << s.until('#');
     if(!scheme) { path=host+"/"_+path; host.clear(); }
     fragment = string(s.untilEnd());
+    assert(!host.contains('/'));
 }
 URL URL::relative(URL&& url) const {
     if(!url.scheme) url.scheme=copy(scheme);
     if(!url.host) url.host=copy(host);
     if(startsWith(url.path,"."_)) url.path.removeAt(0);
     while(startsWith(url.path,"/"_)) url.path.removeAt(0);
+    assert(!host.contains('/'));
     return move(url);
 }
 string str(const URL& url) {
@@ -145,7 +147,6 @@ template<class T> uint DataStream<T>::available(uint need) {
     }
     return Data::available(need);
 }
-
 
 /// HTTP
 
@@ -230,7 +231,7 @@ void HTTP::event() {
         if(!content) log("Missing content",buffer);
         if(content.size()>1024) log("Downloaded",url,content.size()/1024,"KB"); else log("Downloaded",url,content.size(),"B");
         redirect << cacheFile(url);
-        for(const string& file: redirect) writeFile(file,content,cache());
+        for(const string& file: redirect) {Folder(section(file,'/'),cache(),true); writeFile(file,content,cache());}
         state=Handle; queue(); return;  //Cache other outstanding requests before handling this one
     }
     if(state==Handle) {
