@@ -7,7 +7,8 @@
 struct timespec { long sec,nsec; };
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
-long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec+ts.nsec/1000000; }
+long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec*1000+ts.nsec/1000000; }
+long microseconds() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec*1000000+ts.nsec/1000; }
 long cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
 
 int daysInMonth(int month, int year=0) {

@@ -8,7 +8,7 @@ struct AudioOutput : Device, Poll {
     const struct Status* status = 0;
     struct Control* control = 0;
     function<bool(ptr& swPointer, int16* output, uint size)> read;
-    signal<> underrun; //signal underruns
+    int underrunCount=0; signal<> underrun; //signal underruns
 
     /// Configures PCM output
     /// \note read will be called back periodically to fill \a output with \a size samples

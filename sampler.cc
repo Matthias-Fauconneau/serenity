@@ -40,7 +40,7 @@ uint availableMemory() {
         uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
         info.insert(string(key), value);
     }
-    return info.at(string("MemFree"_))+info.at(string("Inactive"_));
+    return info.at(string("MemFree"_))+info.at(string("Inactive"_))+info.at(string("Active(file)"_));
 }
 
 /// SFZ
@@ -79,7 +79,7 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->cache.decode(1<<15);
+                sample->cache.decode(1<<16); //first frames
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -156,6 +156,8 @@ void Sampler::noteEvent(int key, int velocity) {
     }
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
+            float currentActualLevel=0;
+            if(current && (currentActualLevel=current->actualLevel(1<<14))<1.f/(1<<15)) return;
             Note note = s.cache;
             note.step=(float4)__(1,1,1,1);
             note.releaseTime=s.releaseTime;
@@ -163,7 +165,7 @@ void Sampler::noteEvent(int key, int velocity) {
             float level;
             if(!current) note.key=key, level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
             else { //rt_decay is unreliable, matching levels works better
-                level = current->actualLevel(1<<14) / note.actualLevel(1<<11);
+                level = currentActualLevel / note.actualLevel(1<<11);
                 level *= extract(current->level,0);
                 if(level>8) level=8;
             }
@@ -182,7 +184,7 @@ void Sampler::noteEvent(int key, int velocity) {
 
 void Note::decode(uint need) {
     assert(need<=buffer.capacity);
-    while(readCount<=int(need) && blockSize && (int)writeCount>=blockSize) {
+    if(readCount<=int(need) && blockSize && (int)writeCount>=blockSize) {
         int size=blockSize; writeCount.acquire(size); FLAC::decodeFrame(); readCount.release(size);
     }
 }
@@ -190,12 +192,15 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     //timeChanged(time); //UI
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
         for(int i=0;i<3;i++) for(uint j=0;j<notes[i].size();) { Note& note=notes[i][j];
-            if((note.blockSize==0 && note.readCount<128/*period*/) || extract(note.level,0)<=1.0f/(1<<24)) notes[i].removeAt(j); else j++;
+            if((note.blockSize==0 && note.readCount<128/*period*/) || extract(note.level,0)<=1.f/(1<<16)) notes[i].removeAt(j); else j++;
         }
         noteReadLock.unlock();
     }
     Locker lock(noteWriteLock);
-    for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(note.buffer.capacity); //Predecode all notes
+    uint size=1<<16; // up to full buffer
+    for(int i=0;i<3;i++) for(Note& note: notes[i]) size=min(size,note.buffer.size); //only predecode the least buffered notes
+    size = max(size,1u<<10); //minimum in case all notes are nearly on underrun
+    for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(size); //predecode all notes with buffer under size
 
     if(current<samples.size()) {
         const Sample& s=samples[current++];
@@ -211,7 +216,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 
 void Note::read(float4* out, uint size) {
     if(blockSize==0 && readCount<int(size*2)) return; // end of stream
-    readCount.acquire(size*2); //ensure decoder follows
+    if(readCount.acquire(size*2)) log("underrun"); //ensure decoder follows
     for(uint i=0;i<size;i++) out[i]+= level * load(buffer+readIndex), readIndex=(readIndex+2)%buffer.capacity, level*=step;
     buffer.size-=size*2; writeCount.release(size*2); //allow decoder to continue
     position+=size*2; //keep track of position for release sample level matching

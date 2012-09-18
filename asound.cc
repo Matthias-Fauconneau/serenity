@@ -75,13 +75,16 @@ AudioOutput::~AudioOutput() {
 }
 void AudioOutput::start() { io<PREPARE>(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); }
+#include "time.h"
 void AudioOutput::event() {
-    for(;;){
-        if(status->state == XRun) { underrun(); log("Underrun"); io<PREPARE>(); }
-        int available = status->hwPointer + bufferSize - control->swPointer; if(available<(int)periodSize) break;
-        //log(cycles(
+    long time=microseconds(); static long lastTime=time;     int sched_delta = (time-lastTime)*48/1000-periodSize;  //in samples
+    if(status->state == XRun) { underrun(); log("Underrun",sched_delta,underrunCount++); io<PREPARE>(); }
+    int available = status->hwPointer + bufferSize - control->swPointer;
+    if(available>=(int)periodSize) {
         if(!read(control->swPointer, buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
-        //)*48000/(2*1000*1000*1000));
-        if(status->state == Prepared) { io<START>(); }
     }
+    if(status->state == Prepared) { io<START>(); }
+    int mix_time = (microseconds()-time)*48/1000; //in samples
+    if(sched_delta>128 || mix_time>64) log(sched_delta,mix_time);
+    lastTime=time;
 }

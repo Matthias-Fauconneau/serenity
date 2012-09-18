@@ -37,7 +37,7 @@ static ref<byte> message;
 template<> void __attribute((noreturn)) error(const ref<byte>& buffer) { message=buffer; tgkill(getpid(),gettid(),SIGABRT); for(;;) pause(); }
 
 /// Semaphore
-void Semaphore::wait(int& futex, int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0))) || (val=futex)<0)log(errno[-e]); }
+void Semaphore::wait(int& futex, int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0))) /*|| (val=futex)<0*/)log(errno[-e]); }
 void Semaphore::wake(int& futex) { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
 
 /// Lock
@@ -64,7 +64,7 @@ void Thread::spawn(int unused priority) {
     mprotect(stack,4096,0);
     clone(::run,(byte*)stack+stackSize,CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
 }
-static array<Thread*> threads; static Lock threadsLock; static Lock sequentialLock;
+static array<Thread*> threads; static Lock threadsLock;
 Thread defaultThread;
 int Thread::run() {
     tid=gettid();
@@ -74,11 +74,7 @@ int Thread::run() {
         uint size=this->size(); pollfd pollfds[size]; for(uint i=0;i<size;i++) pollfds[i]=*at(i);
         if(check__(::poll(pollfds,size,-1))!=INTR) for(uint i=0;i<size;i++) {
             Poll* poll=at(i); int revents=pollfds[i].revents;
-            if(revents && !unregistered.contains(poll)) {
-                poll->revents = revents;
-                //poll->event();
-                {Locker lock(sequentialLock); poll->event();}//DEBUG
-            }
+            if(revents && !unregistered.contains(poll)) { poll->revents = revents; poll->event(); }
         }
         {Locker lock(thread.lock); while(unregistered){Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}}
     }
@@ -100,7 +96,8 @@ void Thread::event(){
 /// Signal handler
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     extern string trace(int skip, void* ip);
-    log_("Thread #"_+dec(gettid())+":\n"_+trace(sig==SIGABRT?3:2,sig==SIGABRT?0:(void*)ctx->ip));
+    string s = trace(sig==SIGABRT?3:2,sig==SIGABRT?0:(void*)ctx->ip);
+    if(threads.size()>1) log_("Thread #"_+dec(gettid())+":\n"_+s); else log(s);
     if(sig!=SIGTRAP){
         Locker lock(threadsLock);
         for(Thread* thread: threads) {thread->terminate=true; if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP);}
@@ -128,6 +125,9 @@ void init() {
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 }
 void exit() { for(Thread* thread: threads) thread->terminate=true; exit_group(0); /*TODO: allow each thread to terminate properly instead of killing with exit_group*/ }
+
+/// Scheduler
+void yield() { sched_yield(); }
 
 /// Environment
 

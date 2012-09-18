@@ -36,7 +36,7 @@ struct Sampler : Poll {
     /// Opens a .sfz instrument and maps all its samples
     void open(const ref<byte>& path);
     array<Sample> samples;
-    uint full,available,lock,current; signal<int, int> progressChanged; //decode start buffer for all samples
+    uint full=0,available=0,lock=0,current=0; signal<int, int> progressChanged; //decode start buffer for all samples
 
     /// Receives MIDI note events
     void noteEvent(int key, int velocity);

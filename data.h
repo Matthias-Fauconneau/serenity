@@ -12,9 +12,9 @@ template<class T, class O> ref<T> cast(const ref<O>& o) {
 /// \a Data is an interface to read structured data (\sa BinaryData TextData)
 /// \note \a available can be overriden to feed \a buffer as needed (\sa DataStream)
 struct Data {
-    default(Data)
     array<byte> buffer;
     uint index=0;
+    default(Data)
     /// Creates a Data interface to an \a array
     Data(array<byte>&& array) : buffer(move(array)) {}
     /// Creates a Data interface to a \a reference
@@ -46,9 +46,8 @@ inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
 
 /// \a BinaryData provides a convenient interface to parse binary inputs
 struct BinaryData : virtual Data {
-    default_move(BinaryData)
-    move_operator(BinaryData)
     bool isBigEndian = false;
+    default_move(BinaryData) move_operator(BinaryData)
     /// Creates a BinaryData interface to an \a array
     BinaryData(array<byte>&& array, bool isBigEndian=false) : Data(move(array)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to a \a reference
@@ -101,7 +100,7 @@ struct BinaryData : virtual Data {
 
 /// \a TextData provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-    default_move(TextData)
+    default_move(TextData) move_operator(TextData)
     /// Creates a TextData interface to an \a array
     TextData(array<byte>&& array) : Data(move(array)){}
     /// Creates a TextData interface to a \a reference

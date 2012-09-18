@@ -66,10 +66,10 @@
 
 enum class sys : long {
 #if __x86_64
-    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, sigprocmask, ioctl=16, shmget=29, shmat, shmctl, pause=34, getpid=39,
-    socket=41, connect, clone=56, fork, execve=59, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, mlockall=151, setrlimit=160, gettid=186,
-    futex=202, clock_gettime=228, exit_group=231, tgkill=234, openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283, timerfd_settime=286,
-    eventfd2=290
+    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, sigprocmask, ioctl=16, sched_yield=24, shmget=29, shmat, shmctl, pause=34,
+    getpid=39, socket=41, connect, clone=56, fork, execve=59, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, mlockall=151, setrlimit=160,
+    gettid=186, futex=202, clock_gettime=228, exit_group=231, tgkill=234, openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283,
+    timerfd_settime=286, eventfd2=290
 #else
     exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
     ipc = 117, socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197,
@@ -100,6 +100,7 @@ syscall3(int, mprotect, void*,addr, long,len, int,prot)
 syscall1(void*, brk, void*,new_brk)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
 syscall3(int, ioctl, int,fd, long,request, void*,arguments)
+syscall0(int, sched_yield)
 #if !__i386__
 syscall3(int, shmget, int,key, long,size, int,flag)
 syscall3(long, shmat, int,id, const void*,ptr, int,flag)

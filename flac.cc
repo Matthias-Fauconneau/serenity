@@ -1,5 +1,6 @@
 #include "flac.h"
 #include "debug.h"
+#include "process.h"
 
 typedef double double2 __attribute((vector_size(16)));
 #if __clang__
@@ -122,14 +123,12 @@ template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned
 }
 
 template<int unroll> inline void convolve(double* predictor, double* even, double* odd, float* signal, float* end) {
-    //disasm("convolve "_+dec(unroll),
     double2 kernel[unroll];
     for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
     for(;signal<end;) {
         filter<unroll>(kernel, even, odd, signal);
         filter<unroll>(kernel, odd, even, signal);
     }
-    //)
 }
 
 uint64 rice=0, predict=0, order=0;
@@ -186,7 +185,7 @@ void FLAC::decodeFrame() {
         uint size = blockSize >> partitionOrder;
         int partitionCount = 1<<partitionOrder;
 
-        //tsc rice;
+        //yield(); tsc rice;
         for(int p=0;p<partitionCount;p++) {
             end += size;
             int k = binary( parameterSize );
@@ -213,7 +212,7 @@ void FLAC::decodeFrame() {
                 }
             }
         }
-        //::rice += rice; tsc predict;
+        //::rice += rice; yield(); tsc predict;
         signal=block[channel]+order;
         if(order%2) { //for odd order: compute first sample with 'right' predictor without advancing context to begin unrolled loops with even context
             double sum=0;
@@ -224,7 +223,7 @@ void FLAC::decodeFrame() {
         }
         #define o(n) case n: convolve<n>(predictor,even,odd,signal,end); break;
         switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
-        //::predict += predict, ::order += order*blockSize;
+        int t=rice*48000/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
         unallocate(even,allocSize);
         odd-=1; unallocate(odd,allocSize+1);
     }

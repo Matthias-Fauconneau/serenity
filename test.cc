@@ -1,3 +1,4 @@
+#if 0
 #include "display.h"
 #include "window.h"
 #include "font.h"
@@ -33,8 +34,10 @@ struct FontTest : Application, Widget {
     void render(int2 position, int2) { blit(position,image[toggle]); }
     bool mouseEvent(int2, int2, Event event, MouseButton) { if(event==Enter) { toggle=true; return true;} if(event==Leave) {toggle=false; return true;} return false; }
 };Application(FontTest)
+#endif
 
-/*#include "html.h"
+#include "window.h"
+#include "html.h"
 struct HTMLTest : Application {
     Scroll<HTML> page;
     Window window __(&page.area(),0,"Browser"_);
@@ -42,10 +45,10 @@ struct HTMLTest : Application {
     HTMLTest() {
         window.localShortcut(Escape).connect(this, &Application::quit);
         page.contentChanged.connect(&window, &Window::render);
-        page.go("http://questionablecontent.net/view.php?comic=2271"_);
+        page.go("http://www.girlgeniusonline.com/comic.php?date=20120917"_);
         window.show();
     }
-};Application(HTMLTest)*/
+};Application(HTMLTest)
 
 /*
 #include "display.h"

@@ -43,7 +43,7 @@ Element::Element(TextData& s, bool html) {
             s.skip();
             if(s.match('"')) value=unescape(s.until('"'));
             else if(s.match('\'')) value=unescape(s.until('\''));
-            else { value=string(s.untilAny(" \t\n>"_)); if(s.buffer[s.index-1]=='>') s.index--; }
+            else { value=string(s.untilAny(" \t\n>"_)); if(s.slice(s.index-1,1)==">"_) s.index--; }
             s.match("\""_); //duplicate "
         }
         attributes.insertMulti(move(key), move(value));

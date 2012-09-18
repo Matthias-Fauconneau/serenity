@@ -9,7 +9,7 @@ struct Semaphore {
     /// Creates a semaphore with \a count initial ressources
     Semaphore(int count=0):futex(count){}
     /// Acquires \a count ressources
-    inline void acquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) wait(futex,val); }
+    inline bool acquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) { wait(futex,val); return true; } else return false; }
     /// Atomically tries to acquires \a count ressources only if available
     inline bool tryAcquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) { __sync_fetch_and_add(&futex,count); return false; } else return true; }
     /// Waits for the semaphore
@@ -86,6 +86,9 @@ struct Thread : array<Poll*>, EventFD, Poll {
 struct Application { void quit() { defaultThread.terminate=true; } };
 /// Macro to compile an executable entry point running an Application
 #define Application(Application) int main() {extern void init(); init(); {Application app; defaultThread.run();} extern void exit(); exit();}
+
+/// Allows kernel scheduler to preempt this thread
+void yield();
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);

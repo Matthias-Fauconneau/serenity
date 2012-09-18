@@ -37,7 +37,7 @@ void Feeds::loadFeed(const URL&, Map&& document) {
         if(count>=16) return; //limit history
         if(array::size()+entries.size()>=array::capacity()) return; //limit total entry count
         string title = e("title"_).text(); //RSS&Atom
-        string guid = e("guid"_).text()?:e("pubDate"_).text(); //RSS
+        string guid = e("guid"_).text(); if(!guid) guid=e("pubDate"_).text(); //RSS
         string link = string(e("link"_)["href"_]); if(!link) link=e("link"_).text(); //Atom ?: RSS
         if(!favicon) {
             URL url = URL(link);

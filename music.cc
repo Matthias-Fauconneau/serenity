@@ -89,7 +89,10 @@ struct Music : Application, Widget/*, Timer*/ {
     //uint underrunCount=0; void underrun() { underrunCount++; setAbsolute(currentTime()+2); }
     //void event() { window.render(); }
     void render(int2 position, int2 size) {
-        if(current!=count) { Progress(0,count,current).render(position,size); Text(string(dec(100*sampler.lock/sampler.full)+"%"_)).render(position,size); }
+        if(current!=count) {
+            Progress(0,count,current).render(position,size);
+            if(sampler.lock && sampler.lock<sampler.full) Text(string(dec(100*sampler.lock/sampler.full)+"%"_)).render(position,size);
+        }
         //else { Text(string(dec(underrunCount))).render(position,size); }
     }
 };

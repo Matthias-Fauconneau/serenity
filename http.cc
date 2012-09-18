@@ -195,11 +195,9 @@ void HTTP::header() {
             url = url.relative(value);
             uint ip = resolve(url.host);
             if(ip==uint(-1)) { log("Unknown host",url); free(this); return; }
-            SSLSocket::operator=(SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_));
-            Poll::fd=SSLSocket::fd;
-            TextData::operator=(move(TextData()));
-            assert(index==0); assert(buffer.tag==0); assert(buffer.buffer.capacity==0); assert(buffer.buffer.data==0); assert(buffer.size()==0);
-            contentLength=chunked=0; redirect << file;
+            SSLSocket::operator=(SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_)); Poll::fd=SSLSocket::fd;
+            index=0; buffer=array<byte>(); contentLength=chunked=0;
+            redirect << file;
             state=Request; events=POLLOUT;
             return;
         }
