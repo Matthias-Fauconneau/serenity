@@ -34,7 +34,7 @@ struct AudioMedia {
     /// Returns media duration in seconds
     virtual uint duration()=0;
     /// Seeks media to \a position (in seconds)
-    virtual void seek(int position)=0;
+    virtual void seek(uint position)=0;
     /// Reads \a size frames into \a output
     virtual bool read(float2* output, uint size)=0;
     virtual ~AudioMedia(){}
@@ -56,8 +56,13 @@ struct MP3Media : AudioMedia {
     }
     uint position() { return int(mpg123_tell(mh)/rate); }
     uint duration() { return int(mpg123_length(mh)/rate); }
-    void seek(int position) { mpg123_seek_frame(mh,mpg123_timeframe(mh,position),0); }
-    bool read(float2* output, uint size) { long done; return !mpg123_read(mh,(float*)output,size*sizeof(float2),&done) && done==int(size*channels*sizeof(float)); }
+    void seek(uint unused position) { mpg123_seek_frame(mh,mpg123_timeframe(mh,position),0); }
+    bool read(float2* output, uint size) {
+        long done;
+        if(mpg123_read(mh,(float*)output,size*sizeof(float2),&done) || done!=int(size*channels*sizeof(float))) return false;
+        for(uint i=0;i<size;i++) output[i] *= (float2){32768,32768};
+        return true;
+    }
     ~MP3Media() { mpg123_close(mh); mpg123_delete(mh); }
 };
 
@@ -70,7 +75,7 @@ struct FLACMedia : AudioMedia {
     FLACMedia(File&& file):map(file),flac(map){ AudioMedia::rate=flac.rate; AudioMedia::channels=2; }
     uint position() { return flacPosition/rate; }
     uint duration() { return flac.duration/rate; }
-    void seek(int unused position) {
+    void seek(uint position) {
         if(position<this->position()) { flac.~FLAC(); flac=FLAC(map); }
         while(this->position()<position) { flacPosition+=flac.blockSize; flac.decodeFrame(); }
     }

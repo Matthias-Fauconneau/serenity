@@ -155,7 +155,7 @@ template<bool mix> void Resampler::read(float* target, uint targetSize) {
     for(uint i=0;i<targetSize;i++) {
         for(uint channel=0;channel<channelCount;channel++) {
             if(mix) target[i*channelCount+channel] += product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
-            else target[i*channelCount+channel] = product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
+            else    target[i*channelCount+channel]    = product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
         }
         integerIndex += integerAdvance;
         fractionalIndex += fractionalAdvance;
