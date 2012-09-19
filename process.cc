@@ -70,7 +70,7 @@ int Thread::run() {
     tid=gettid();
     if(priority) check_(setpriority(0,0,priority));
     {Locker lock(threadsLock); threads<<this;}
-    while(!terminate) {
+    while(!terminate && size()>1/*Thread always register itself to handle queue events*/) {
         uint size=this->size(); pollfd pollfds[size]; for(uint i=0;i<size;i++) pollfds[i]=*at(i);
         if(check__(::poll(pollfds,size,-1))!=INTR) for(uint i=0;i<size;i++) {
             Poll* poll=at(i); int revents=pollfds[i].revents;

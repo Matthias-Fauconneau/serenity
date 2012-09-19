@@ -1,8 +1,8 @@
 PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
-CC = g++ -fabi-version=0 -pipe -march=native
-#CC = clang++ -pipe -march=native
+#CC= g++ -fabi-version=0 -pipe -march=native
+CC= clang++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
 FLAGS_debug := -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast := -g -O2 -fno-omit-frame-pointer

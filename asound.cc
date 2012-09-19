@@ -75,7 +75,6 @@ AudioOutput::~AudioOutput() {
 }
 void AudioOutput::start() { io<PREPARE>(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); }
-#include "time.h"
 void AudioOutput::event() {
     if(status->state == XRun) { underrun(); log("Underrun",underrunCount++); io<PREPARE>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;

@@ -214,6 +214,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                 if(shortcut) (*shortcut)(); //local window shortcut
             }
         }
+        else if(type==KeyRelease) {}
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);

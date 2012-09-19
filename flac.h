@@ -53,5 +53,5 @@ struct FLAC : BitReader {
     /// Decodes next FLAC frame
     void decodeFrame();
     /// Reads \a size samples synchronously buffering new frames as needed
-    bool read(float2* out, uint size);
+    int read(float2* out, uint size);
 };

@@ -267,8 +267,8 @@ void FLAC::decodeFrame() {
     //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }
 
-bool FLAC::read(float2 *out, uint size) {
-    while(buffer.size<size){ if(blockSize==0) return false; decodeFrame(); }
+int FLAC::read(float2 *out, uint size) {
+    while(buffer.size<size){ if(blockSize==0) { size=buffer.size; break; } decodeFrame(); }
     uint beforeWrap = buffer.capacity-readIndex;
     if(size>beforeWrap) {
         copy(out,buffer+readIndex,beforeWrap);
@@ -279,5 +279,5 @@ bool FLAC::read(float2 *out, uint size) {
         readIndex+=size;
     }
     buffer.size-=size; position+=size;
-    return true;
+    return size;
 }

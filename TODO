@@ -1,9 +1,7 @@
-font: grid fit, line sampling?
 pdf,ebook -> touchbook
+music: score, reverb
 touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
-desktop: previous, scrollbar
-music: score, reverb, auto level/tune
 IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion, git
 fibermesh
-own: inflate, jpeg, mp3, ssl
-apps: file manager, search, imap, shell, monitor, torrent, video, irc, debugger, static analyzer (memory, thread), interpreter, profiler, compiler
+own: font, inflate, jpeg, mp3, ssl
+apps: shell, file manager, search, imap, torrent, irc, video, monitor, debugger, static analyzer (memory, thread), interpreter, profiler, compiler

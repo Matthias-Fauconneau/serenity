@@ -208,8 +208,9 @@ string trace(int skip, void* ip) {
     }
     string r;
     for(i--; i>=skip; i--) {
-        Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<(hex(ptr(stack[i]))+"\n"_);
+        Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function); else r<<hex(ptr(stack[i]));
+        if(i>skip) r<<'\n';
     }
-    if(ip) {  Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<(hex(ptr(ip))+"\n"_); }
+    if(ip) {  Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function); else r<<hex(ptr(ip)); }
     return r;
 }

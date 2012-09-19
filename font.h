@@ -19,7 +19,7 @@ struct Font {
     ref<byte> loca;
     ref<byte> glyf;
     uint16 indexToLocFormat; int ascent, descent, lineGap;
-    uint scale; int round, size;
+    uint shift; int round, size;
     Glyph cacheASCII[16][128];
     map<uint16, Glyph> cacheUnicode[16];
 
@@ -36,4 +36,13 @@ struct Font {
     const Glyph& glyph(uint16 index, int x=0);
     /// Renders glyph \a index with transformation matrix \a xx, xy, yx, yy, dx, dy into \a raster
     void render(struct Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
+
+    inline int scaleX(int p);
+    inline int scaleY(int p);
+    inline int scale(int p);
+    inline int unscaleX(int p);
+    inline int unscaleY(int p);
+    inline int unscale(int p);
+    inline void line(Bitmap& raster, int2 p0, int2 p1);
+    inline void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2);
 };

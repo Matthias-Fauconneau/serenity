@@ -1,18 +1,14 @@
-#if 0
+#if 1
 #include "display.h"
 #include "window.h"
 #include "font.h"
 #include "text.h"
 struct FontTest : Application, Widget {
-    Image image[2]; int2 size __(8*4*16,8*4*16);
+    Image image[2]; int2 size __(1280,8*4*16);
     Window window __(this,size,"Font Test"_);
     FontTest(){
         ref<byte> line =
-                "G"
-                //"PUGR"
-                //"BDGPUI"
-                //"ABCDEFG"
-                //"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                 //"The quick brown fox jumps over the lazy dog\n"
                 //"I know that a lot of you are passionate about the civil war\n"
                 //"La Poste Mobile a gagné 4000 clients en six mois\n"
@@ -24,8 +20,9 @@ struct FontTest : Application, Widget {
             framebuffer=share(image[i]); currentClip=Rect(size);
             fill(Rect(size),white);
             extern int fit,subpixel,filter,correct,down,up; extern map<int,Font> defaultSans;
-            defaultSans.clear(); fit=0; subpixel=i?3:1; filter=0; correct=0; down=1; up=1; Text(string(line)).render(int2(0,0*(up*16*16/down)),int2(size.x,0));
-            defaultSans.clear(); fit=1; subpixel=i?3:1; filter=0; correct=0; down=1; up=1; Text(string(line)).render(int2(0,1*(up*16*16/down)),int2(size.x,0));
+            bool hint=0;
+            defaultSans.clear(); fit=0; subpixel=i?3:1; filter=0; correct=0; down=hint?16:16; up=hint?16:1; Text(string(line)).render(int2(0,0*(up*16*16/down)),int2(0,0));
+            defaultSans.clear(); fit=1; subpixel=i?3:1; filter=0; correct=0; down=hint?16:16; up=hint?16:1; Text(string(line)).render(int2(0,1*(up*16*16/down)),int2(0,0));
         }
         if(!image[1]) image[1]=share(image[0]);
         window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();
@@ -36,6 +33,21 @@ struct FontTest : Application, Widget {
 };Application(FontTest)
 #endif
 
+#if 0
+#include "process.h"
+struct MonitorTest : Application {
+    MonitorTest() {
+        Folder procfs("proc"_);
+        for(string& pid: listFiles(""_,Folders,procfs)) if(isInteger(pid)) {
+            Folder process(pid,procfs);
+            string cmdline = string(section(replace(File("cmdline"_,process).readUpTo(4096),'\0',' '),' '));
+            if(cmdline) log(cmdline);
+        }
+    }
+};Application(MonitorTest)
+#endif
+
+#if 0
 #include "window.h"
 #include "html.h"
 struct HTMLTest : Application {
@@ -49,21 +61,26 @@ struct HTMLTest : Application {
         window.show();
     }
 };Application(HTMLTest)
+#endif
 
-/*
+#if 0
 #include "display.h"
 struct VSyncTest : Application, Widget {
     Window window __(this,0,"VSyncTest"_);
     VSyncTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.show(); }
     void render(int2 position, int2 size) {static bool odd; fill(position+Rect(size),(odd=!odd)?black:white); window.render();}
 };
+#endif
 
+#if 0
 struct KeyTest : Application, Text {
     Window window __(this,int2(640,480),"KeyTest"_);
     KeyTest(){ window.globalShortcut(Play).connect(this,&Application::quit); focus=this; window.localShortcut(Escape).connect(this,&Application::quit); window.show(); }
     bool keyPress(Key key) { setText(str(dec(int(key)),hex(int(key)))); return true; }
 };
+#endif
 
+#if 0
 #include "calendar.h"
 struct WeekViewTest : Application, Widget {
     struct WeekView : Widget {
@@ -112,7 +129,4 @@ struct WeekViewTest : Application, Widget {
     }
     void render(int2 position, int2 size) { blit(position,resize(page,page.width*size.y/page.height,size.y)); }
 };
-
-#include "calendar.h"
-struct ClockTest : Application, Clock { Window window __(this,int2(-1,-1),"Clock"_); };
-*/
+#endif

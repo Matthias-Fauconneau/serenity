@@ -41,7 +41,7 @@ inline double atan(double f) { return __builtin_atan(f); }
 
 /// SIMD
 #if __clang__
-inline float4 nodebug loadu(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
+inline float4 loadu(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }
 #else
 #define loadu __builtin_ia32_loadups
 #define movhlps __builtin_ia32_movhlps

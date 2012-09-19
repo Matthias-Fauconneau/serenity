@@ -36,7 +36,7 @@ struct AudioMedia {
     /// Seeks media to \a position (in seconds)
     virtual void seek(uint position)=0;
     /// Reads \a size frames into \a output
-    virtual bool read(float2* output, uint size)=0;
+    virtual int read(float2* output, uint size)=0;
     virtual ~AudioMedia(){}
 };
 
@@ -57,11 +57,11 @@ struct MP3Media : AudioMedia {
     uint position() { return int(mpg123_tell(mh)/rate); }
     uint duration() { return int(mpg123_length(mh)/rate); }
     void seek(uint unused position) { mpg123_seek_frame(mh,mpg123_timeframe(mh,position),0); }
-    bool read(float2* output, uint size) {
+    int read(float2* output, uint size) {
         long done;
-        if(mpg123_read(mh,(float*)output,size*sizeof(float2),&done) || done!=int(size*channels*sizeof(float))) return false;
+        mpg123_read(mh,(float*)output,size*sizeof(float2),&done);
         for(uint i=0;i<size;i++) output[i] *= (float2){32768,32768};
-        return true;
+        return done>0?done/(channels*sizeof(float)):done;
     }
     ~MP3Media() { mpg123_close(mh); mpg123_delete(mh); }
 };
@@ -79,7 +79,7 @@ struct FLACMedia : AudioMedia {
         if(position<this->position()) { flac.~FLAC(); flac=FLAC(map); }
         while(this->position()<position) { flac.decodeFrame(); flac.position+=flac.buffer.size; flac.readIndex=(flac.readIndex+flac.buffer.size)%flac.buffer.capacity; flac.buffer.size=0; }
     }
-    bool read(float2* out, uint size) { return flac.read(out,size); }
+    int read(float2* out, uint size) { return flac.read(out,size); }
 };
 
 struct Player : Application {
@@ -91,10 +91,14 @@ struct Player : Application {
     bool read(ptr& swPointer, int16* output, uint size) {
         float2 buffer[size];
         uint inputSize = resampler?resampler.need(size):size;
-        if(!media || !media->read(buffer,inputSize)) {
+        {int size=inputSize; for(float2* input=buffer;;) {
+            if(!media) return false;
+            int read=media->read(input,size);
+            if(read==size) break;
+            assert(read<size);
+            if(read>0) input+=read, size-=read;
             next();
-            if(!media || !media->read(buffer,inputSize)) return false;
-        }
+        }}
         if(resampler) resampler.filter<false>((float*)buffer,inputSize,(float*)buffer,size);
         assert(size%4==0);
         for(uint i=0;i<size/4;i++) ((half8*)output)[i] = packs(cvtps(load(buffer+i*4+0)), cvtps(load(buffer+i*4+2))); //8 samples = 4 frames
@@ -158,6 +162,7 @@ struct Player : Application {
         if(files) next();
         if(time) seek(time);
         window.show();
+        defaultThread.priority=-19;
     }
     void queueFile(string&& path) {
         string title = string(section(section(path,'/',-2,-1),'.',0,-2));
@@ -193,10 +198,13 @@ struct Player : Application {
         writeFile("/Music/.last"_,string(files[index]+"\0"_+dec(0)));
     }
     void next() {
-        if(!titles.count()) return;
-        if(!playButton.enabled) setPlaying(true);
         if(titles.index+1<titles.count()) playTitle(++titles.index);
-        else if(albums.index<albums.count()) window.setTitle(albums.active().text);
+        else if(albums.index+1<albums.count()) playAlbum(++albums.index);
+        else {
+            if(albums.index<albums.count()) window.setTitle(albums.active().text);
+            stop(); return;
+        }
+        if(!playButton.enabled) setPlaying(true);
         //titles.ensureVisible(titles.active());
     }
     void togglePlay() { setPlaying(!playButton.enabled); }

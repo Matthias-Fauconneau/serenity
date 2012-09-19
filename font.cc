@@ -52,20 +52,26 @@ Font::Font(const ref<byte>& name, int size) : keep(Map(name,fonts())), size(size
        s.advance(8+8+4*2+2+2+2); //created, modified, bbox[4], maxStyle, lowestRec, direction
        indexToLocFormat=s.read();
        // parameters for scale from design (FUnits) to device (.4 pixel)
-#define scaleX(p) ((subpixel*size*int64(p)+round)>>scale)
-#define scaleY(p) ((size*int64(p)+round)>>scale)
-#define scale(p) scaleY(p)
-#define unscale(p) (((p)<<scale)/size)
-#define unscaleX(p) (((p)<<scale)/(size*subpixel))
-       scale=0; for(int v=unitsPerEm;v>>=1;) scale++; scale-=4; assert(scale<32);
-       round = (1<<scale)/2; //round to nearest not down
+       shift=0; for(int v=unitsPerEm;v>>=1;) shift++; shift-=4; assert(shift<32);
+       round = (1<<shift)/2; //round to nearest not down
     }
     {BinaryData& s = hhea;
         uint32 unused version=s.read();
-        ascent=ceil(16,scale(s.read16())), descent=scale(s.read16()), lineGap=scale(s.read16());
+        ascent=ceil(16,scaleY(s.read16())), descent=scaleY(s.read16()), lineGap=scaleY(s.read16());
         //uint16 unused maxAdvance=s.read(), unused minLeft=s.read(), unused minRight=s.read(), unused maxExtent=s.read();*/
     }
 }
+
+inline int Font::scaleX(int p) { /*log(((subpixel*size*int64(p))%(1<<shift))/size);*/ return (subpixel*size*int64(p)+round)>>shift; }
+//inline int Font::scaleX(int p) { return (subpixel*size*int64(p)/*+round*/)>>shift; }
+//inline int Font::scaleX(int p) { int64 s=(subpixel*size*int64(p)+round); int r=s>>shift; return ((s%(1<<shift)==0) && r%2)?r-1:r; } //Tie to even
+//inline int Font::scaleY(int p) { return (size*int64(p)+round)>>shift; }
+//inline int Font::scaleY(int p) { return (size*int64(p)/*+round*/)>>shift; }
+inline int Font::scaleY(int p) { int64 s=(size*int64(p)+round); int r=s>>shift; return ((s%(1<<shift)==0) && r%2)?r-1:r; } //Tie to even
+inline int Font::scale(int p) { return scaleY(p); }
+inline int Font::unscaleX(int p) { return (p<<shift)/(size*subpixel); }
+inline int Font::unscaleY(int p) { return (p<<shift)/size; }
+inline int Font::unscale(int p) { return unscaleY(p); }
 
 uint16 Font::index(uint16 code) {
     cmap.seek(0); BinaryData& s = cmap;
@@ -102,7 +108,7 @@ uint16 Font::index(uint16 code) {
     error("Not Found"_);
 }
 
-int Font::advance(uint16 index) { return up*scale(big16(hmtx[2*index])); }
+int Font::advance(uint16 index) { return up*16/down*scale(big16(hmtx[2*index])); }
 
 int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     kern.seek(0); BinaryData& s = kern;
@@ -114,7 +120,7 @@ int Font::kerning(uint16 leftIndex, uint16 rightIndex) {
         assert(14+nPairs*6==length);
         for(uint i=0;i<nPairs;i++) {
             uint16 left=s.read(), right=s.read(); int16 value=s.read();
-            if(left==leftIndex && right==rightIndex) return up*scale(value);
+            if(left==leftIndex && right==rightIndex) return up*16/down*scale(value);
         }
     }
     return 0;
@@ -131,9 +137,8 @@ struct Bitmap {
 };
 
 static int lastStepY; //dont flag first/last point twice but cancel on direction changes
-void line(Bitmap& raster, int2 p0, int2 p1) {
+inline void Font::line(Bitmap& raster, int2 p0, int2 p1) {
     int x0=p0.x, y0=p0.y, x1=p1.x, y1=p1.y;
-    if(y0==y1) return;
     int dx = abs(x1-x0);
     int dy = abs(y1-y0);
     int sx = (x0 < x1) ? 1 : -1;
@@ -149,7 +154,8 @@ void line(Bitmap& raster, int2 p0, int2 p1) {
     lastStepY=sy;
 }
 
-void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
+inline void Font::curve(Bitmap& raster, int2 p0, int2 p1, int2 p2) {
+    //line(raster,p0,p1); line(raster,p1,p2); return;
     const int N=3;
     int2 a = p0;
     for(int t=1;t<=N;t++) {
@@ -169,7 +175,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
     if(!raster.data) {
         xMin= s.read16(), yMin= s.read16(), xMax= s.read16(), yMax= s.read16();
         xMin  = unscaleX(floor(subpixel*16,scaleX(xMin))); xMax = unscaleX(ceil(subpixel*16,scaleX(xMax))); //align canvas to integer pixels
-        yMin = unscale(floor(16,scaleY(yMin))); yMax = unscale(ceil(16,scaleY(yMax))); //align canvas to integer pixels
+        yMin = unscaleY(floor(16,scaleY(yMin))); yMax = unscaleY(ceil(16,scaleY(yMax))); //align canvas to integer pixels
 
         int width=scaleX(xMax-xMin), height=scaleY(yMax-yMin); assert(width>0,xMax,xMin); assert(height>0,yMax,yMin);
         if(fit) new (&raster) Bitmap(width+2*subpixel*16,height+3*16); //new (&raster) Bitmap(width+48,height+16);
@@ -212,133 +218,172 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
             } else if(!flags.same_sign_y) last+= (int16)s.read();
             P[i].y= -last; //flip to downward y
         }
+        //for(int n=0,i=0; n<numContours; n++) { for(last= big16(endPtsOfContours[n]), prev=last; i<=last; i++) { log_(P[i]-P[prev]); prev=i; } log(""); }
         for(int i=0;i<nofPoints;i++) { int2& p=P[i];
-            p.x=scaleX(xx*p.x/16384+yx*p.y/16384+dx);
-            p.y=scaleY(xy*p.x/16384+yy*p.y/16384+dy);
+            p.x=scaleX(xx*p.x/16384+yx*p.y/16384+dx), p.y=scaleY(xy*p.x/16384+yy*p.y/16384+dy);
+            //p.x=xx*p.x/16384+yx*p.y/16384+dx, p.y=xy*p.x/16384+yy*p.y/16384+dy;
         }
+        //for(int n=0,i=0; n<numContours; n++) { for(last= big16(endPtsOfContours[n]), prev=last; i<=last; i++) { log_(P[i]-P[prev]); prev=i; } log(""); }
 
-        // Fit
+        // Fit (TODO: keep consistent baseline and x-height, vertical: subpixel position hint | only width hint)
         if(fit) {
-            // Fit (TODO: align baseline and x-height to avoid overshoot (blue zone = xzroesc), align horizontal stems, align vertical stems width)
             struct Stem {
                 array<int2> tn; //array of points in (tangent, normal) coordinates
                 array<int> ref; //array of original references to the points
                 int pos=0,min=1<<30,max=0; int direction=0;
                 int size() {assert(tn.size()==ref.size(),tn,ref); return tn.size(); }
             };
+
             for(int pass=0;pass<2;pass++) { //vertically fit horizontal stems (then horizontally fit vertical stems)
                 int I = pass?16:16; //TODO: fit to subpixel ?
                 int M = pass?raster.width:raster.height;
 #define xy(p) (pass?int2(p.y,p.x):p)
                 array<Stem> stems;
+                /*array< array<int2> > contours; //for debugging;
                 for(int n=0,i=0; n<numContours; n++) { //create stems from points
-                    int first=i;
                     int last= big16(endPtsOfContours[n]);
-                    for(; i<=last; i++) {
+                    array<int2> contour;
+                    for(; i<=last; i++) contour << P[i];
+                }*/
+                for(int n=0,i=0; n<numContours; n++) { //create stems from points
+                    for(int first=i, last= big16(endPtsOfContours[n]); i<=last; i++) {
                         int2 n=xy(P[i]); int x=n.x,y=n.y;
+                        Stem* best=0;
                         for(Stem& s: stems) {
-                            for(int2 a: s.tn) if(16*abs(a.y-y)>=abs(a.x-x)) goto break2_;
-                            /*else*/ {
-                                if((s.ref.contains(first) && !(s.ref.last()==first && i==first+1)) ||
-                                        (s.direction && ((((s.direction==1?s.min:s.max)<x)?1:-1)!=s.direction))) { //stem cut by contour loop seam
-                                    if(!s.direction){ assert(s.size()==1);
-                                        s.tn.insertAt(0,n); s.ref.insertAt(0,i); assert(s.tn.size()==s.ref.size());
-                                        s.direction = s.tn.first().x<s.tn.last().x?1:-1;
-                                        //log(pass,s.direction,s.tn,s.ref);
-                                        int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
-                                    } else {
-                                        int j=0; for(;j<s.size() && (x<s.tn[j].x?1:-1)!=s.direction;j++) {} //log(x,s.tn[j].x,s.direction, (n<s.tn[j]?1:-1)!=s.direction);
-                                        //log(n,s.tn[j],(n<s.tn[j]?1:-1),j<s.size(),(n<s.tn[j]?1:-1)!=s.direction);
-                                            assert(s.tn.size()==s.ref.size());
-                                        s.tn.insertAt(j,n); s.ref.insertAt(j,i);
-                                        assert(s.tn.size()==s.ref.size()); //log(s.tn);
-                                        int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { //assert monotonic
-                                            assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn,j);
-                                            a=b;
-                                        }
-                                    }
-                                } else if(x<s.min || x>s.max) {
-                                    assert(!s.direction || (s.tn[0].x<x?1:-1)==s.direction,s.tn,n,s.ref[0],first,i,last); //assert new is extremum
-                                    s.tn<<n; s.ref<<i; assert(s.tn.size()==s.ref.size());
-                                    if(!s.direction){
-                                        s.direction = s.tn.first().x<s.tn.last().x?1:-1;
-                                        int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
-                                    }
+                            for(int2 a: s.tn) if(12*abs(a.y-y)>abs(a.x-x)) goto compareNextStem; //point too far from this stem
+                            if(((s.ref.contains(first) && !(s.ref.last()==first && i==first+1)) || (s.direction && ((((s.direction==1?s.min:s.max)<x)?1:-1)!=s.direction))) ||
+                                    (x<s.min || x>s.max)) { /*assert(!best);*/ best=&s; }
+                            compareNextStem:;
+                        }
+                        if(best) {
+                            Stem& s=*best;
+                            int oldSize=s.size();
+                            if((s.ref.contains(first) && !(s.ref.last()==first && i==first+1)) ||
+                                    (s.direction && ((((s.direction==1?s.min:s.max)<x)?1:-1)!=s.direction))) { //stem cut by contour loop seam
+                                if(!s.direction){ assert(s.size()==1);
+                                    s.tn.insertAt(0,n); s.ref.insertAt(0,i); assert(s.tn.size()==s.ref.size());
+                                    s.direction = s.tn.first().x<s.tn.last().x?1:-1;
                                     //log(pass,s.direction,s.tn,s.ref);
-                                    int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn,s.ref,first,last); a=b; }  //assert monotonic
+                                    int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
+                                } else {
+                                    int j=0; for(;j<s.size() && (x<s.tn[j].x?1:-1)!=s.direction;j++) {} //log(x,s.tn[j].x,s.direction, (n<s.tn[j]?1:-1)!=s.direction);
+                                    //log(n,s.tn[j],(n<s.tn[j]?1:-1),j<s.size(),(n<s.tn[j]?1:-1)!=s.direction);
+                                    assert(s.tn.size()==s.ref.size());
+                                    s.tn.insertAt(j,n); s.ref.insertAt(j,i);
+                                    assert(s.tn.size()==s.ref.size()); //log(s.tn);
+                                    int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { //assert monotonic
+                                        assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn,j);
+                                        a=b;
+                                    }
                                 }
-                                s.min=min(s.min,x); s.max=max(s.max,x); s.pos+=y;
-                                goto break3_;
-                            }break2_:;
-                        } /*else*/ {
+                            } else if(x<s.min || x>s.max) {
+                                assert(!s.direction || (s.tn[0].x<x?1:-1)==s.direction,s.tn,n,s.ref[0],first,i,last); //assert new is extremum
+                                s.tn<<n; s.ref<<i; assert(s.tn.size()==s.ref.size());
+                                if(!s.direction){
+                                    s.direction = s.tn.first().x<s.tn.last().x?1:-1;
+                                    int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn); a=b; }  //assert monotonic
+                                }
+                                //log(pass,s.direction,s.tn,s.ref);
+                                int2 a=s.tn[0]; for(int2 b:s.tn.slice(1)) { assert(s.direction==(a.x<b.x?1:-1),pass,s.direction,s.tn,s.ref,first,last); a=b; }  //assert monotonic
+                            } else continue;
+                            if(y>M) log("1: pos",y,"/",M);
+                            assert(s.size()==oldSize+1,oldSize,s.tn); s.min=min(s.min,x); s.max=max(s.max,x); s.pos+=y;
+                        } else {
+                            if(y>M) log("2: pos",y,"/",M);
                             Stem s; s.tn<<n; s.ref<<i; s.min=s.max=x; s.pos=y; stems<<move(s);
-                        }break3_:;
-                        for(uint i=0;i<stems.size();i++) assert(stems[i].size());
+                        }
                     }
                 }
 
                 for(uint i=0;i<stems.size();i++) { Stem& s=stems[i];
-                    if(s.size()==1) { stems.removeAt(i); i--; } else s.pos/=s.size(); //TODO: weighted mean
+                    if(s.size()==1) { stems.removeAt(i); i--; } else { s.pos/=s.size(); assert(s.pos<M,s.pos,s.size(),M); } //TODO: weighted mean
                 }
 
+                int H[nofPoints]; constexpr int unhinted=1<<30; clear(H,nofPoints,unhinted);
+
                 while(stems) { //fit stems
-                    uint best[2]={uint(-1),uint(-1)}; int bestScore=256*I;
+                    uint best[2]={uint(-1),uint(-1)}; uint bestScore=-1;
                     for(uint i=0;i<stems.size();i++) for(uint j=0;j<i;j++) { Stem& a = stems[i]; Stem& b=stems[j];
                         assert(a.direction); assert(b.direction); assert(a.pos!=b.pos || a.direction != b.direction,a.tn," - ",b.tn);
                         //assert(a.direction==b.direction || (b.pos-a.pos>0)==b.direction,pass,a.direction,a.tn,b.direction,b.tn);
-                        if(a.direction != b.direction && ((a.pos-b.pos)>0)==(a.direction!=1)) {
+                        //different condition because image coordinates system (downwards Y) is not right-handed
+                        if(a.direction != b.direction && ((a.pos-b.pos)>0)==(a.direction!=(pass?-1:1))) {
                             int min=::max(a.min,b.min), max=::min(a.max,b.max); int len=max-min;
-                            if(len>=8*I) {
-                                int dist = abs(b.pos-a.pos);
-                                int score = dist + 3000/len; log(dist,len,score);
+                            if(len>=I) {
+                                uint dist = abs(b.pos-a.pos);
+                                uint score = dist + 3000/len;
                                 if(score<bestScore) bestScore=score, best[0]=i, best[1]=j;
-                            }
-                        }
+                                //else  log("score",score,bestScore,a.min,a.max,b.min,b.max,len);
+                            }// else log(a.min,a.max,b.min,b.max,"len",len);
+                        } //else log("!stem","\tA",a.pos,"\tdir",a.direction,a.tn,"\tB",b.pos,"\tdir",b.direction,b.tn);
                         //else if(a.direction != b.direction) log("miss",pass,a.direction,a.tn,b.direction,b.tn,a.pos-b.pos,a.max-a.min,b.max-b.min);
                     }
                     if(best[0]==uint(-1)) {
                         if(stems.size()>=2) {
                             if(stems.size()==2) { Stem& a=stems[0], &b=stems[1];
-                                log("X",pass,b.pos-a.pos,"\tA",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t","B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max);
-                            } else { log("X",pass);
+                                int min=::max(a.min,b.min), max=::min(a.max,b.max); int len=max-min;
+                                log("X",pass,b.pos-a.pos,"\tA",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t","B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max,abs(b.pos-a.pos),len);
+                            } else {
+                                log("X",pass);
                                 for(Stem& a: stems) log(a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t",a.tn);
                             }
                         }
-                        for(Stem& a: stems) {
-                            for(uint i=0;i<a.tn.size();i++) {
-                                int2 p=a.tn[i]; p.y = clip(0,::round(I,p.y)/*-(a.direction==-1)*/,M-1); //iff end point
-                                P[a.ref[i]]=xy(p);
-                            }
-                        }
+                        for(Stem& a: stems) for(int i: a.ref) H[i]=clip(0,::round(I,a.pos),M-1); //iff end point
                         break;
                     }
                     Stem a=stems.take(best[0]);
                     assert(best[0]>best[1]);
                     Stem b=stems.take(best[1]);
                     if(a.pos>b.pos) swap(a,b);
-
                     int m = ::round(I,(a.pos+b.pos)/2+I/2)-I/2; //round to nearest %I==I/2 step
                     int w = ::round(I,(b.pos-a.pos)/2+I/2)-I/2; //round to nearest %I==I/2 step
-                    int t1=m-w, t2=m+w-1;
-                    log("O",pass,"(a+b)/2",(a.pos+b.pos)/2,"(a+b)%2",(a.pos+b.pos)%2,"m",m,"(b-a)/2",(b.pos-a.pos)/2,"w",w,"t1",t1,"t2",t2);
+                    int t1=m-w, t2=m+w;
+                    int min=::max(a.min,b.min), max=::min(a.max,b.max); int len=max-min;
+                    log("O",pass,"(a+b)/2",(a.pos+b.pos)/2,"(a+b)%2",(a.pos+b.pos)%2,"m",m,"(b-a)/2",(b.pos-a.pos)/2,"w",w,"t1",t1,"t2",t2,"d",abs(b.pos-a.pos),"l",len);
                     log("A",a.direction,a.size(),"\t",a.pos,"\t",a.min,"\t",a.max,"\t",a.tn);
                     log("B",b.direction,b.size(),"\t",b.pos,"\t",b.min,"\t",b.max,"\t",b.tn);
                     assert(t1<t2,t1,t2);
                     assert(t1%I==0,m,w,t1,t2);
-                    assert((t2+1)%I==0);
-                    if(t1>M-1) log("clip",t1,M); t1=clip(0,t1,M-1);
-                    if(t2>M-1) log("clip",t2,M); t2=clip(0,t2,M-1);
+                    assert((t2)%I==0);
+                    if(t1<0 || t1>M-1) log("clip",t1,M); //t1=clip(0,t1,M-1);
+                    if(t2<0 || t2>M-1) log("clip",t2,M); //t2=clip(0,t2,M-1);
 
-                    for(uint i=0;i<a.tn.size();i++) {
-                        int2 p=a.tn[i]; p.y = t1;
-                        P[a.ref[i]]=xy(p);
+                    for(int i: a.ref) H[i]=t1;
+                    for(int i: b.ref) H[i]=t2;
+                }
+
+                for(int n=0,i=0; n<numContours; n++) for(int last= big16(endPtsOfContours[n]); i<=last; i++) assert(H[i]>=0,i,H[i]);
+
+#if 0
+                // Fix unhinted points to keep relative offset with nearest hinted point
+                for(int n=0,i=0; n<numContours; n++) {
+                    for(int first=i, last= big16(endPtsOfContours[n]), prev=last; i<=last; i++) {
+                        int next = (i==last?first:i+1);
+                        int py=xy(P[prev]).y, y = xy(P[i]).y, ny=xy(P[next]).y;
+                        if(H[i]==unhinted) {
+                            if(H[prev]) { log(P[i],y,H[prev]-py); H[i]=y+H[prev]-py; }
+                            else if(H[next]) { log(P[i],y,H[next]-ny); H[i]=y+H[next]-ny; }
+                            else error(H[prev],H[next],py,ny);
+                            H[i]=clip(0,H[i],M-1);
+                            //assert(H[i]>=0,pass,H[prev],H[i],H[next],P[prev],P[i],P[next]);
+                        }
+                        //assert(H[i]>=0,i,H[i]);
+                        prev=i;
                     }
-                    for(uint i=0;i<b.tn.size();i++) {
-                        int2 p=b.tn[i]; p.y = t2;
-                        P[b.ref[i]]=xy(p);
+                }
+#else
+                for(int n=0,i=0; n<numContours; n++) for(int last= big16(endPtsOfContours[n]); i<=last; i++) if(H[i]==unhinted) H[i]=xy(P[i]).y;
+#endif
+                //for(int n=0,i=0; n<numContours; n++) for(int last= big16(endPtsOfContours[n]); i<=last; i++) assert(H[i]>=0,i,H[i]);
+
+                // Overwrites original position with hinted positions
+                for(int n=0,i=0; n<numContours; n++) {
+                    for(int last= big16(endPtsOfContours[n]); i<=last; i++) {
+                        if(pass) P[i].x = H[i]; else P[i].y=H[i];
                     }
                 }
             }
+            //for(int n=0,i=0; n<numContours; n++) for(int last= big16(endPtsOfContours[n]); i<=last; i++) assert(P[i]>=int2(0,0) && P[i]<int2(raster.width,raster.height),i,P[i]);
         }
         // Render
         for(int n=0,i=0; n<numContours; n++) {
@@ -347,7 +392,7 @@ void Font::render(Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, in
             if(flagsArray[last].on_curve) p=P[last];
             else if(flagsArray[last-1].on_curve) p=P[last-1];
             else p=(P[last-1]+P[last])/2;
-            for(int i=last;i>0;i--) if(P[i-1].y != P[i].y) { lastStepY = (P[i-1].y < P[i].y) ? 1 : -1; break; }
+            for(int i=last;i>0;i--) if(/*P[i-1].y != P[i].y*/true) { lastStepY = (P[i-1].y < P[i].y) ? 1 : -1; break; }
             for(int prev=last; i<=last; i++) {
                 if(flagsArray[prev].on_curve && flagsArray[i].on_curve) { line(raster, P[prev], P[i]); p=P[i]; } //on-on
                 else if(flagsArray[prev].on_curve && !flagsArray[i].on_curve) { p=P[prev]; } //on-off (next step draws as on-off-on or on-off-off))
@@ -395,8 +440,11 @@ const Glyph& Font::glyph(uint16 index, int fx) {
         for(uint y=0; y<height; y++) {
             int acc=0;
             for(uint x=0; x<width; x++) { //Supersampled rasterization
-                glyph.image(x,y)= acc>0? byte4(0,0,0,255) : byte4(255,255,255,0);
-                acc += raster(x,y);
+                acc+=raster(x,y);
+                //acc = abs(raster(x,y)); //contour
+                //glyph.image(x,y)= acc>0? byte4(x%16*15,y%16*15,0,255) : byte4(255,255,255,0);
+                //glyph.image(x,y)= acc>0? byte4(0,0,0,255) : byte4(255,255,255,0);
+                glyph.image(x,y)= acc!=0? byte4(x%16*15,y%16*15,128+acc*63,255) : byte4(255,255,255,0);
             }
         }
     } else {
