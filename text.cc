@@ -56,6 +56,7 @@ struct TextLayout {
         uint underlineBegin=0;
         uint glyphCount=0;
         Word word;
+        pen.y = font->ascender;
         for(utf8_iterator it=text.begin();it!=text.end();++it) {
             uint c = *it;
             if(c==' '||c=='\t'||c=='\n') {//next word/line
@@ -141,10 +142,10 @@ void Text::layout() {
     for(TextLayout::Line l: layout.lines) {
         Line line;
         TextLayout::Character c = layout.text[l.begin];
-        line.min = c.pos/16 + int2(0,size);
+        line.min = c.pos/16 + int2(0,2);
         for(uint i=l.begin;i<l.end;i++) {
             TextLayout::Character c = layout.text[i];
-            int2 p = c.pos/16 + int2(0,size);
+            int2 p = c.pos/16 + int2(0,2);
             if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.font->advance(c.index)/16,0);
         }
         if(line.max != line.min) lines<< move(line);

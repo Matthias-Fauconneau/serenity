@@ -30,6 +30,7 @@ struct Image {
     explicit operator bool() const { return data; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
 
+    byte4 get(uint x, uint y) const { if(x>=width||y>=height) return 0; return data[y*stride+x]; }
     byte4 operator()(uint x, uint y) const {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
     byte4& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return (byte4&)data[y*stride+x]; }
     int2 size() const { return int2(width,height); }

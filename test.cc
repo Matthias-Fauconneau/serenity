@@ -19,10 +19,7 @@ struct FontTest : Application, Widget {
             image[i]=Image(size.x,size.y);
             framebuffer=share(image[i]); currentClip=Rect(size);
             fill(Rect(size),white);
-            extern int fit,subpixel,filter,correct,down,up; extern map<int,Font> defaultSans;
-            bool hint=0;
-            defaultSans.clear(); fit=0; subpixel=i?3:1; filter=0; correct=0; down=hint?16:16; up=hint?16:1; Text(string(line)).render(int2(0,0*(up*16*16/down)),int2(0,0));
-            defaultSans.clear(); fit=1; subpixel=i?3:1; filter=0; correct=0; down=hint?16:16; up=hint?16:1; Text(string(line)).render(int2(0,1*(up*16*16/down)),int2(0,0));
+            Text(string(line)).render(int2(0,0),int2(0,0));
         }
         if(!image[1]) image[1]=share(image[0]);
         window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();

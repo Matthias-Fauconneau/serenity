@@ -11,17 +11,13 @@ struct Glyph {
     Image image; //not owned
 };
 
-/// Truetype font renderer stub
+/// Freetype wrapper
 struct Font {
-    Map keep;
-    BinaryData cmap, kern;
-    ref<uint16> hmtx;
-    ref<byte> loca;
-    ref<byte> glyf;
-    uint16 indexToLocFormat; int ascent, descent, lineGap;
-    uint shift; int round, size;
-    Glyph cacheASCII[16][128];
-    map<uint16, Glyph> cacheUnicode[16];
+    Map file;
+    struct FT_FaceRec_*  face;
+    int descender, ascender, height;
+    Glyph cacheASCII[128];
+    map<uint16, Glyph> cacheUnicode;
 
     /// Opens font at /a path scaled to /a size pixels high
     Font(const ref<byte>& path, int size);

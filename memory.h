@@ -13,12 +13,12 @@ void copy16(void* dst,const void* src, int size);
 template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
 
 extern "C" void* malloc(unsigned long size);
-extern "C" int posix_memalign(byte** buffer, long alignment, long size);
+extern "C" int posix_memalign(void** buffer, unsigned long alignment, unsigned long size);
 extern "C" void* realloc(void* buffer, unsigned long size);
 extern "C" void free(void* buffer);
 
 template<class T> T* allocate(int size) { assert_(size); return (T*)malloc(size*sizeof(T)); }
-template<class T> T* allocate16(int size) { byte* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
+template<class T> T* allocate16(int size) { void* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
 template<class T> void reallocate(T*& buffer, int unused size, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
 template<class T> void unallocate(T*& buffer, int unused size) { assert_(buffer); free((void*)buffer); buffer=0; }
 

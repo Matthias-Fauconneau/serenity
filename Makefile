@@ -10,12 +10,15 @@ FLAGS_profile := -g -O3 -finstrument-functions
 SRCS_profile := profile
 FLAGS_release := -O3
 
+FLAGS_font = -I/usr/include/freetype2
+
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
 ICONS_taskbar := button
 ICONS_desktop := feeds network shutdown
 ICONS_player := play pause next
 ICONS_music := music
 
+LIBS_font = freetype
 LIBS_player = mpg123
 LIBS_ffmpeg = avformat avcodec
 LIBS_http = ssl
@@ -48,12 +51,12 @@ endif
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) $(FLAGS) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+	@$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 $(BUILD)/%.o : %.cc
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) $(FLAGS) -c -o $@ $<
+	@$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
 
 $(BUILD)/%.o: %.png
 	@echo $<
