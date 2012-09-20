@@ -12,7 +12,7 @@ struct Sym { uint	name; byte* value; uint size; byte info,other; uint16 shndx; }
 
 /// Reads a little endian variable size integer
 static int readLEV(BinaryData& s, bool sign=false) {
-    int result=0; int shift=0; byte b;
+    int result=0; int shift=0; uint8 b;
     do { b = s.read(); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
     if(sign && (shift < 32) && (b & 0x40)) result |= -1 << shift;
     return result;
@@ -35,7 +35,7 @@ string demangle(TextData& s, bool function=true) {
     else if(s.match("C2"_)) r<< "this"_;
     else if(s.match("D1"_)) r<< "~this"_;
     else if(s.match("D2"_)) r<< "~this"_;
-    else if(s.match("Dv"_)){int size=s.number(); s.match('_'); r<<demangle(s)+dec(size);}
+    else if(s.match("Dv"_)){int size=s.integer(); s.match('_'); r<<demangle(s)+dec(size);}
     else if(s.match("eq"_)) r<<"operator =="_;
     else if(s.match("ix"_)) r<<"operator []"_;
     else if(s.match("cl"_)) r<<"operator ()"_;
@@ -59,16 +59,16 @@ string demangle(TextData& s, bool function=true) {
     else if(s.match('t')) r<<"ushort"_;
     else if(s.match('x')) r<<"int64"_;
     else if(s.match('y')) r<<"uint64"_;
-    else if(s.match('A')) { r<<"[]"_; s.number(); s.match('_'); }
+    else if(s.match('A')) { r<<"[]"_; s.integer(); s.match('_'); }
     else if(s.match('M')) { r<<demangle(s)<<"::"_<<demangle(s); }
-    else if(s.match("Tv"_)) { r<<"thunk "_; s.number(); s.match('_'); if(s.match("n"_)) { s.number(); s.match('_'); r<<demangle(s); } }
-    else if(s.match('T')) { r<<'T'; s.number(); s.match('_'); }
+    else if(s.match("Tv"_)) { r<<"thunk "_; s.integer(); s.match('_'); if(s.match("n"_)) { s.integer(); s.match('_'); r<<demangle(s); } }
+    else if(s.match('T')) { r<<'T'; s.integer(); s.match('_'); }
     else if(s.match("St"_)) r<<"std"_;
-    else if(s.match('S')) { r<<'S'; s.number(); s.match('_'); }
+    else if(s.match('S')) { r<<'S'; s.integer(); s.match('_'); }
     else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
-    else if(s.match("Li"_)) r<<dec(s.number());
-    else if(s.match("Lj"_)) r<<dec(s.number());
-    else if(s.match("Lb"_)) r<<str((bool)s.number());
+    else if(s.match("Li"_)) r<<dec(s.integer());
+    else if(s.match("Lj"_)) r<<dec(s.integer());
+    else if(s.match("Lb"_)) r<<str((bool)s.integer());
     else if(s.match('L')) r<<"extern "_<<demangle(s);
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<string> args;
@@ -96,7 +96,7 @@ string demangle(TextData& s, bool function=true) {
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
     } else {
-        l=uint(s.number());
+        l=uint(s.integer());
         if(l<=s.available(l)) {
             r<<s.read(l); //struct
             if(s && s.peek()=='I') r<< demangle(s);
@@ -138,7 +138,7 @@ Symbol findNearestLine(void* find) {
         byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;
 
         while(s.index<begin+cu.size+4) {
-            byte opcode = s.read();
+            uint8 opcode = s.read();
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
                          fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };
             /**/ if(opcode >= cu.opcode_base) {

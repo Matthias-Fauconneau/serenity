@@ -49,7 +49,7 @@ typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
 AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)> read, Thread& thread, bool realtime)
-    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
+    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll("AudioOutput"_,Device::fd,POLLOUT,thread), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(S16_LE);
@@ -76,7 +76,7 @@ AudioOutput::~AudioOutput() {
 void AudioOutput::start() { io<PREPARE>(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); }
 void AudioOutput::event() {
-    if(status->state == XRun) { underrun(); log("Underrun",underrunCount++); io<PREPARE>(); }
+    if(status->state == XRun) { log("Underrun",underrunCount++); io<PREPARE>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         if(!read(control->swPointer, buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}

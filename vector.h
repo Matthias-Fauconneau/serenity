@@ -4,7 +4,7 @@
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, class T, int N> struct vector : V<T> {
-    ____(static_assert(sizeof(V<T>)==N*sizeof(T),"");)
+    static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
     vector(){}
     /// Initializes all components to the same value \a v
@@ -59,6 +59,7 @@ generic string str(const vector& v) { string s = string("("_); for(int i=0;i<N;i
 
 template<class T> struct xy { T x,y; };
 typedef vector<xy,int,2> int2;
+typedef vector<xy,float,2> vec2;
 
 /// Rect
 struct Rect {

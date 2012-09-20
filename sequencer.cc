@@ -5,10 +5,9 @@
 #include "midi.h"
 #include "debug.h"
 #include "time.h"
-Sequencer::Sequencer(Thread& thread) : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll(Device::fd,POLLIN,thread) {}
+Sequencer::Sequencer(Thread& thread) : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll("Sequencer"_,Device::fd,POLLIN,thread) {}
 
 void Sequencer::event() {
-    long time=microseconds();
     uint8 key=read<uint8>();
     if(key & 0x80) { type=key>>4; key=read<uint8>(); }
     uint8 value=0;
@@ -48,7 +47,6 @@ void Sequencer::event() {
             }
         }
     }
-    time=(microseconds()-time)*48/1000; if(time>16) log(time);
 }
 
 void Sequencer::recordMID(const ref<byte>& path) { record=File(path,root(),File::WriteOnly); }

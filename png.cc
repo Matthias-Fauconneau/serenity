@@ -46,30 +46,29 @@ template void unfilter<rgba,4>(byte4* dst, const byte* raw, int width, int heigh
 
 Image decodePNG(const ref<byte>& file) {
     BinaryData s(array<byte>(file.data,file.size), true);
-    assert(s.get(8)=="\x89PNG\r\n\x1A\n"_);
-    s.advance(8);
+    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { warn("Invalid PNG"); return Image(); }
     array<byte> buffer;
     uint width=0,height=0,depth=0; uint8 type=0, interlace=0;
-    array<byte> palette;
+    ref<byte> palette;
     for(;;) {
         uint32 size = s.read();
-        array<byte> name = s.read(4);
-        if(name == "IHDR"_) {
+        uint32 tag = s.read<uint32>();
+        if(tag == raw<uint32>("IHDR"_)) {
             width = s.read(), height = s.read();
             uint8 unused bitDepth = s.read();
-            if(bitDepth!=8){ warn("Unsupported PNG bitdepth"_,bitDepth,width,height); return Image(); }
+            if(bitDepth!=8){ warn("Unsupported PNG bit depth"_,bitDepth,width,height); return Image(); }
             type = s.read(); depth = (int[])__(1,0,3,1,2,0,4)[type]; assert(depth>0&&depth<=4,type);
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
             interlace = s.read();
-        } else if(name == "IDAT"_) {
-            buffer << s.read(size);
-        } else if(name=="IEND"_) {
+        } else if(tag == raw<uint32>("IDAT"_)) {
+            buffer << s.read<byte>(size);
+        } else if(tag == raw<uint32>("IEND"_)) {
             assert(size==0);
             s.advance(4); //CRC
             break;
-        } else if(name == "PLTE"_) {
-            palette = s.read(size);
+        } else if(tag == raw<uint32>("PLTE"_)) {
+            palette = s.read<byte>(size);
         } else {
             s.advance(size);
         }
@@ -103,7 +102,7 @@ Image decodePNG(const ref<byte>& file) {
     }
     if(type==3) {
         assert(palette);
-        rgb3* lookup = (rgb3*)palette.data();
+        rgb3* lookup = (rgb3*)palette.data;
         for(uint i=0;i<width*height;i++) image[i]=lookup[image[i][0]];
     }
     return Image(image,width,height,width,true,depth==2||depth==4);

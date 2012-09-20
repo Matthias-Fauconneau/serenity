@@ -13,9 +13,7 @@ struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
 long currentTime();
 /// Returns Unix real-time in milliseconds
 long realTime();
-/// Returns Unix real-time in microseconds
-long microseconds();
-/// Returns CPU timestamp in microseconds
+/// Returns current thread CPU time in microseconds
 long cpuTime();
 
 struct Date {

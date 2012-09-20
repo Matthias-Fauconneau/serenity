@@ -1,45 +1,71 @@
 #if 1
-#include "display.h"
 #include "window.h"
-#include "font.h"
-#include "text.h"
-struct FontTest : Application, Widget {
-    Image image[2]; int2 size __(1280,8*4*16);
-    Window window __(this,size,"Font Test"_);
-    FontTest(){
-        ref<byte> line =
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                //"The quick brown fox jumps over the lazy dog\n"
-                //"I know that a lot of you are passionate about the civil war\n"
-                //"La Poste Mobile a gagné 4000 clients en six mois\n"
-                //"Fixed subpixel font layout (was broken by justification\n"
-                //"IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
-                ""_;
-        for(int i=0;i<1;i++) {
-            image[i]=Image(size.x,size.y);
-            framebuffer=share(image[i]); currentClip=Rect(size);
-            fill(Rect(size),white);
-            Text(string(line)).render(int2(0,0),int2(0,0));
-        }
-        if(!image[1]) image[1]=share(image[0]);
-        window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();
-    }
-    bool toggle=false;
-    void render(int2 position, int2) { blit(position,image[toggle]); }
-    bool mouseEvent(int2, int2, Event event, MouseButton) { if(event==Enter) { toggle=true; return true;} if(event==Leave) {toggle=false; return true;} return false; }
-};Application(FontTest)
+#include "pdf.h"
+struct PDFTest : Application {
+    PDF pdf __("3. The Mystery Knight.pdf"_,home());
+    Window window __(&pdf,int2(-1,-1),"PDF Test"_);
+    PDFTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show(); }
+};Application(PDFTest)
 #endif
 
 #if 0
 #include "process.h"
-struct MonitorTest : Application {
-    MonitorTest() {
-        Folder procfs("proc"_);
-        for(string& pid: listFiles(""_,Folders,procfs)) if(isInteger(pid)) {
-            Folder process(pid,procfs);
-            string cmdline = string(section(replace(File("cmdline"_,process).readUpTo(4096),'\0',' '),' '));
-            if(cmdline) log(cmdline);
+#include "time.h"
+#include "map.h"
+/// Convenient partial template specialization to automatically copy ref<byte> keys
+template<class V> struct map<ref<byte>,V> : map<string,V> {
+    V& operator [](ref<byte> key) { return map<string,V>::operator[](string(key)); }
+};
+struct MonitorTest : Application, Timer {
+    Folder procfs __("proc"_);
+    /// Returns system statistics
+    map<ref<byte>,string> stat() {
+        string stat = File("stat"_,procfs).readUpTo(4096);
+        const ref<byte> keys[]={""_,"user"_, "nice"_, "idle"_};
+        array< ref<byte> > fields = split(stat,' ');
+        map< ref<byte>, string> stats;
+        for(uint i=0;i<3;i++) stats[keys[i]]=string(fields[i]);
+        return stats;
+    }
+    /// Returns process statistics
+    map<ref<byte>, string> stat(const ref<byte>& pid) {
+        const ref<byte> keys[]={"pid"_, "name"_, "state"_, "parent"_, "group"_, "session"_, "tty"_, "tpgid"_, "flags"_, "minflt"_, "cminflt"_, "majflt"_, "cmajflt"_, "utime"_, "stime"_, "cutime"_, "cstime"_, "priority"_, "nice"_, "#threads"_, "itrealvalue"_, "starttime"_, "vsize"_, "rss"_};
+        string stat = File("stat"_,Folder(pid,procfs)).readUpTo(4096);
+        array< ref<byte> > fields = split(stat,' ');
+        map< ref<byte>, string> stats;
+        for(uint i=0;i<24;i++) stats[string(keys[i])]=string(fields[i]);
+        return stats;
+    }
+    map<ref<byte>, string> system;
+    map<ref<byte>, map<ref<byte>,string> > process;
+    MonitorTest() { event(); }
+    void event() {
+        map<ref<byte>, uint> memory;
+        for(TextData s = File("/proc/meminfo"_).readUpTo(4096);s;) {
+            ref<byte> key=s.until(':'); s.skip();
+            uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
+            memory[key]=value;
         }
+        map<ref<byte>, string>& o = this->system;
+        map<ref<byte>, string> n = stat();
+        map<ref<byte>, map<ref<byte>, string> > process;
+        for(const string& pid: listFiles(""_,Folders,procfs)) if(isInteger(pid)) process[pid]=stat(pid);
+        if(o) {
+            log("User: "_+dec(toInteger(n["user"_])-toInteger(o["user"_]))+"%"
+                "\tNice: "_+dec(toInteger(n["nice"_])-toInteger(o["nice"_]))+"%"
+                "\tIdle: "_+dec(toInteger(n["idle"_])-toInteger(o["idle"_]))+"%"
+                "\tFree Memory: "_+dec((memory["MemFree"_]+memory["Inactive"_])/1024)+" MB\tDisk Buffer: "_+dec(memory["Active(file)"_]/1024)+" MB"_);
+            log("Name\tState\tRSS (kB)\tCPU (%)");
+            for(string& pid: listFiles(""_,Folders,procfs)) if(isInteger(pid)) {
+                map<ref<byte>,string>& o = this->process[pid];
+                map<ref<byte>,string>& p = process[pid];
+                int cpu = toInteger(p["utime"_])-toInteger(o["utime"_])+toInteger(p["stime"_])-toInteger(o["stime"_]);
+                const ref<byte> state[]={"Running"_, "Sleeping"_, "Waiting for disk"_, "Zombie"_, "Traced/Stopped"_,  "Paging"_};
+                if(p["state"_]=="R"_) log(p["name"_].slice(1,p["name"_].size()-2)+"\t"_+state["RSDZTW"_.indexOf(p["state"_][0])]+"\t"_+dec(toInteger(p["rss"_])/4)+"\t"_+dec(cpu));
+            }
+        }
+        this->system=move(n); this->process=move(process);
+        setAbsolute(currentTime()+1);
     }
 };Application(MonitorTest)
 #endif

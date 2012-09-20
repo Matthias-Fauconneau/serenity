@@ -48,11 +48,12 @@ extern struct Thread defaultThread;
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {
     no_copy(Poll)
-    Thread& thread;
+    string id; /// Identifier for debugging and profiling
+    Thread& thread; /// Thread monitoring this pollfd
     /// Allows to queue using \a wait method and \a event callback
-    Poll(Thread& thread=defaultThread):thread(thread){}
+    Poll(const ref<byte>& id=""_, Thread& thread=defaultThread):id(id),thread(thread){}
     /// Registers \a fd to be polled in the event loop
-    Poll(int fd, int events=POLLIN, Thread& thread=defaultThread);
+    Poll(const ref<byte>& id, int fd, int events=POLLIN, Thread& thread=defaultThread);
     /// Removes \a fd from the event loop
     ~Poll();
     /// Schedules an \a event call from \a thread's next poll iteration

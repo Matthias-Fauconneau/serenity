@@ -36,7 +36,7 @@ struct Taskbar : Application, Socket, Poll {
     uint desktop=0;
     uint escapeCode = window.KeyCode(Escape);
 
-    Taskbar() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd) {
+    Taskbar() : Socket(PF_LOCAL, SOCK_STREAM), Poll("Taskbar"_,Socket::fd) {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
@@ -84,6 +84,7 @@ struct Taskbar : Application, Socket, Poll {
     }
 
     void processEvent(uint8 type, const XEvent& e) {
+        uint previousIndex=tasks.index;
         if(type==0) return;
         if(type==1) error("Unexpected reply");
         type&=0b01111111; //msb set if sent by SendEvent
@@ -145,7 +146,7 @@ struct Taskbar : Application, Socket, Poll {
             } else return;
         } else if(type==CreateNotify||type==DestroyNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify||type==MappingNotify||type==FocusIn) {
         } else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
-        window.render();
+        if(previousIndex!=tasks.index) window.render();
     }
 
     /// Adds \a id to \a windows and to \a tasks if necessary
@@ -232,9 +233,11 @@ struct Taskbar : Application, Socket, Poll {
     }
 
     void event() {
-        uint8 type = read<uint8>();
-        processEvent(type, read<XEvent>());
-        while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
+        while(poll()) {
+            uint8 type = read<uint8>();
+            processEvent(type, read<XEvent>());
+            while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
+        }
     }
 };
 bool operator==(const Taskbar::Task& a,const Taskbar::Task& b){return a.id==b.id;}

@@ -4,7 +4,7 @@
 struct sockaddr_un { uint16 family=1; char path[108]; };
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 
-#define fixed(T) packed ____(; static_assert(sizeof(T)==31,""))
+#define fixed(T) packed ; static_assert(sizeof(T)==31,"")
 
 enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, Cursor=1<<14 };
 enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3,
@@ -47,7 +47,7 @@ struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; 
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
 struct SetWindowCursor { int8 req=2; uint16 size=4; uint window, mask=Cursor; uint cursor; };
 struct GetWindowAttributes { int8 req=3; uint16 size=2; uint window; };
-struct GetWindowAttributesReply { int8 backingStore; uint16 seq; uint length, visual; int16 class_; int8 bit,win; uint planes, pixel; int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; uint colormap, allEventMask, yourEventMask; int16 nopropagate, pad; } packed; ____(static_assert(sizeof(GetWindowAttributesReply)==43,"");)
+struct GetWindowAttributesReply { int8 backingStore; uint16 seq; uint length, visual; int16 class_; int8 bit,win; uint planes, pixel; int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; uint colormap, allEventMask, yourEventMask; int16 nopropagate, pad; } packed;
 struct DestroyWindow { int8 req=4; uint16 size=2; uint id; };
 struct MapWindow { int8 req=8; uint16 size=2; uint id;};
 struct UnmapWindow { int8 req=10; uint16 size=2; uint id;};

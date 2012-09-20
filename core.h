@@ -59,12 +59,11 @@ typedef unsigned long long uint64;
 
 /// Works around missing support for some C++11 features in QtCreator code model
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
-#define override //explicit virtual method override
 template<class T> struct ref; //templated typedef using
 #define _ //string literal operator _""
 #define __( args... ) //member initialization constructor {}
 #define ___ //variadic template arguments unpack operator ...
-#define ____( ignore... ) //=default, static_assert, constructor{} initializer
+#define ____( ignore... ) //=default, constructor{} initializer
 #else
 /// \a ref is an unmanaged const memory reference (used in method arguments)
 namespace std { template<class T> struct initializer_list; }

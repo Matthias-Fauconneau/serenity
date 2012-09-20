@@ -46,16 +46,16 @@ debug(void Lock::checkRecursion(){assert(owner!=gettid(),owner,gettid());})
 debug(void Lock::checkOwner(){assert(owner==gettid(),owner,gettid()); owner=0;})
 
 /// Poll
-Poll::Poll(int fd, int events, Thread& thread):____(pollfd{fd,(short)events},)thread(thread){ if(fd) { thread+=this; thread.post(); } }
+Poll::Poll(const ref<byte>& id, int fd, int events, Thread& thread):____(pollfd{fd,(short)events},)id(id),thread(thread){ if(fd) { thread+=this; thread.post(); } }
 Poll::~Poll() {Locker lock(thread.lock); thread.unregistered<<this;}
-void Poll::queue() {{Locker lock(thread.lock); thread.queue+= this;} thread.post();}
+void Poll::queue() {if(!thread.queue.contains(this)){Locker lock(thread.lock); thread.queue+= this; thread.post();}}
 
 /// EventFD
 enum{EFD_SEMAPHORE=1};
 EventFD::EventFD():Stream(eventfd2(0,0)){}
 
 /// Thread
-Thread::Thread():Poll(EventFD::fd,POLLIN,*this){}
+Thread::Thread():Poll("Queue"_,EventFD::fd,POLLIN,*this){}
 static int run(void* thread) { return ((Thread*)thread)->run(); }
 void Thread::spawn(int unused priority) {
     this->priority=priority;
@@ -74,22 +74,28 @@ int Thread::run() {
         uint size=this->size(); pollfd pollfds[size]; for(uint i=0;i<size;i++) pollfds[i]=*at(i);
         if(check__(::poll(pollfds,size,-1))!=INTR) for(uint i=0;i<size;i++) {
             Poll* poll=at(i); int revents=pollfds[i].revents;
-            if(revents && !unregistered.contains(poll)) { poll->revents = revents; poll->event(); }
+            if(revents && !unregistered.contains(poll)) {
+                poll->revents = revents;
+                poll->event();
+            }
+            //assert(::poll(&pollfds[i],1,0)==0, poll->id, pollfds[i].fd, pollfds[i].events, pollfds[i].revents);
         }
-        {Locker lock(thread.lock); while(unregistered){Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}}
+        while(unregistered){Locker lock(thread.lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
     }
     return 0;
 }
 void Thread::event(){
-    EventFD::read();
-    if(queue){
-        Poll* poll;
-        {Locker lock(thread.lock);
-            poll=queue.take(0);
-            if(unregistered.contains(poll)) return;
+    while(poll()) {
+        EventFD::read();
+        if(queue){
+            Poll* poll;
+            {Locker lock(thread.lock);
+                poll=queue.take(0);
+                if(unregistered.contains(poll)) return;
+            }
+            poll->revents=IDLE;
+            poll->event();
         }
-        poll->revents=IDLE;
-        poll->event();
     }
 }
 

@@ -6,13 +6,13 @@ struct Symbol { string function; ref<byte> file; uint line=0; };
 Symbol findNearestLine(void* address);
 
 /// Logs to standard output using str(...) serialization without a newline
-template<class ___ Args> void log_(const Args& ___ args) { log_((ref<byte>)string(str(args ___))); }
+template<class... Args> void log_(const Args&... args) { log_((ref<byte>)string(str(args ___))); }
 /// Logs to standard output without a newline
 template<> void log_(const ref<byte>& buffer);
 /// Logs to standard output using str(...) serialization
-template<class ___ Args> void log(const Args& ___ args) { log_((ref<byte>)string(str(args ___)+"\n"_)); }
+template<class... Args> void log(const Args&... args) { log_((ref<byte>)string(str(args ___)+"\n"_)); }
 /// Aborts unconditionally and logs to standard output using str(...) serialization
-template<class ___ Args> void __attribute((noreturn)) error(const Args& ___ args) { error((ref<byte>)string(str(args ___))); }
+template<class... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args ___))); }
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) ({debug( if(!(expr)) error(#expr, ##message);)})

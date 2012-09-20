@@ -19,7 +19,7 @@ Window* current;
 string getSelection() { assert(current); return current->getSelection(); }
 
 /// Creates window
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd),
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Socket(PF_LOCAL, SOCK_STREAM), Poll("Window"_,Socket::fd),
     widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
@@ -135,7 +135,7 @@ void Window::event() {
 
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;
-    } else {
+    } else while(poll()) {
         uint8 type = read<uint8>();
         processEvent(type, read<XEvent>());
         while(eventQueue) { QEvent e=eventQueue.take(0); processEvent(e.type, e.event); }

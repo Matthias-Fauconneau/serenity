@@ -10,7 +10,7 @@ template<class T, class O> ref<T> cast(const ref<O>& o) {
 }
 
 /// \a Data is an interface to read structured data (\sa BinaryData TextData)
-/// \note \a available can be overriden to feed \a buffer as needed (\sa DataStream)
+/// \note \a available can be overridden to feed \a buffer as needed (\sa DataStream)
 struct Data {
     array<byte> buffer;
     uint index=0;
@@ -21,23 +21,27 @@ struct Data {
     explicit Data(const ref<byte>& reference) : buffer(reference.data,reference.size) {}
     /// Slices a reference to the buffer from \a pos to \a pos + \a size
     ref<byte> slice(uint pos, uint size) const { return buffer.slice(pos,size); }
+    /// Slices a reference to the buffer from \a pos to the end of the buffer
+    ref<byte> slice(uint pos) const { return buffer.slice(pos); }
 
-    /// Buffers \a need bytes (if overriden) and returns number of bytes available
+    /// Buffers \a need bytes (if overridden) and returns number of bytes available
     virtual uint available(uint /*need*/) { return buffer.size()-index; }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 
     /// Returns next byte without advancing
-    byte peek() const { assert_(index<buffer.size()); return buffer[index]; }
+    byte peek() const { assert_(index<buffer.size()); return buffer[index];}
+    /// Peeks at buffer without advancing
+    byte operator[](int i) const { assert_(index+i<buffer.size()); return buffer[index+i]; }
     /// Returns a reference to the  next \a size bytes
-    ref<byte> get(uint size) const { return slice(index,size); }
+    ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
     void advance(uint count) {assert_(index+count<=buffer.size()); index+=count; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
-    ref<byte> read(uint size) { ref<byte> t = get(size); advance(size); return t; }
+    ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
 };
 
 #define big32 __builtin_bswap32
@@ -80,7 +84,6 @@ struct BinaryData : virtual Data {
         /// Reads an int8
         operator uint8() { return s->read<uint8>(); }
         operator int8() { return s->read<int8>(); }
-        operator byte() { return s->next(); }
     };
     ReadOperator read() { return __(this); }
 
@@ -136,10 +139,12 @@ struct TextData : virtual Data {
     void skip();
     /// Reads a single word
     ref<byte> word();
-    /// Reads a single identifier [a-zA-Z0-9_-:]*
-    ref<byte> identifier();
+    /// Reads a single identifier [a-zA-Z0-9]*
+    ref<byte> identifier(const ref<byte>& special=""_);
+    /// Reads a single integer
+    int integer(uint base=10);
     /// Reads a single number
-    int number(uint base=10);
+    double number(uint base=10);
     /// Reads one possibly escaped character
     char character();
 };

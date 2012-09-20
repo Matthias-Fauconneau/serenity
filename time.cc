@@ -8,7 +8,6 @@ struct timespec { long sec,nsec; };
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
 long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec*1000+ts.nsec/1000000; }
-long microseconds() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec*1000000+ts.nsec/1000; }
 long cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
 
 int daysInMonth(int month, int year=0) {
@@ -71,15 +70,15 @@ Date date(long time) {
 string str(Date date, const ref<byte>& format) {
     string r;
     for(TextData s(format);s;) {
-        /**/ if(s.match("ss"_)){ if(date.seconds>=0)  r << dec(date.seconds,2); else s.until(' '); }
-        else if(s.match("mm"_)){ if(date.minutes>=0)  r << dec(date.minutes,2); else s.until(' '); }
-        else if(s.match("hh"_)){ if(date.hours>=0)  r << dec(date.hours,2); else s.until(' '); }
+        /**/ if(s.match("ss"_)){ if(date.seconds>=0) r << dec(date.seconds,2); else s.until(' '); }
+        else if(s.match("mm"_)){ if(date.minutes>=0) r << dec(date.minutes,2); else s.until(' '); }
+        else if(s.match("hh"_)){ if(date.hours>=0) r << dec(date.hours,2); else s.until(' '); }
         else if(s.match("dddd"_)){ if(date.weekDay>=0) r << days[date.weekDay]; else s.until(' '); }
         else if(s.match("ddd"_)){ if(date.weekDay>=0) r << days[date.weekDay].slice(0,3); else s.until(' '); }
         else if(s.match("dd"_)){ if(date.day>=0) r << dec(date.day+1,2); else s.until(' '); }
-        else if(s.match("MMMM"_)){ if(date.month>=0)  r << months[date.month]; else s.until(' '); }
-        else if(s.match("MMM"_)){ if(date.month>=0)  r << months[date.month].slice(0,3); else s.until(' '); }
-        else if(s.match("MM"_)){ if(date.month>=0)  r << dec(date.month+1,2); else s.until(' '); }
+        else if(s.match("MMMM"_)){ if(date.month>=0) r << months[date.month]; else s.until(' '); }
+        else if(s.match("MMM"_)){ if(date.month>=0) r << months[date.month].slice(0,3); else s.until(' '); }
+        else if(s.match("MM"_)){ if(date.month>=0) r << dec(date.month+1,2); else s.until(' '); }
         else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(' '); }
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
         else r << s.next();
@@ -93,10 +92,10 @@ Date parse(TextData& s) {
     for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }
     {
         s.whileAny(" ,\t"_);
-        int number = s.number();
+        int number = s.integer();
         if(number>=0) {
-            if(s.match(":"_)) date.hours=number, date.minutes=s.number();
-            else if(date.day==-1) date.day=number;
+            if(s.match(":"_)) date.hours=number, date.minutes=s.integer();
+            else if(date.day==-1) date.day=number-1;
         }
     }
     {
@@ -105,9 +104,9 @@ Date parse(TextData& s) {
     }
     {
         s.whileAny(" ,\t"_);
-        int number = s.number();
+        int number = s.integer();
         if(number>=0) {
-            if(s.match(":"_)) date.hours=number, date.minutes=s.number();
+            if(s.match(":"_)) date.hours=number, date.minutes=s.integer();
             else if(date.day==-1) date.day=number-1;
         }
     }
@@ -117,6 +116,6 @@ Date parse(TextData& s) {
 }
 
 enum {TFD_CLOEXEC = 02000000};
-Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){}
+Timer::Timer():Poll("Timer"_,timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){}
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(uint date) { static timespec time[2]; time[1].sec=date; timerfd_settime(fd,1,time,0); }

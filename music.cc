@@ -14,7 +14,7 @@
 #include "interface.h"
 #include "time.h"
 
-struct Music : Application, Widget/*, Timer*/ {
+struct Music : Application, Widget {
     ICON(music) Window window __(this,int2(64,64),"Music"_,musicIcon());
     Sampler sampler;
     Thread thread;
@@ -32,7 +32,6 @@ struct Music : Application, Widget/*, Timer*/ {
     ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
     Music(){
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
-        //audio.underrun.connect(this,&Music::underrun);
         window.localShortcut(Escape).connect(this,&Application::quit);
         auto args = arguments(); if(!args) args<<"/Samples/Salamander.sfz"_;
         for(ref<byte> path : args) {
@@ -86,14 +85,11 @@ struct Music : Application, Widget/*, Timer*/ {
         if(current==count) { window.backgroundCenter=window.backgroundColor=0; /*underrunCount=0;*/ }
         window.render();
     }
-    //uint underrunCount=0; void underrun() { underrunCount++; setAbsolute(currentTime()+2); }
-    //void event() { window.render(); }
     void render(int2 position, int2 size) {
         if(current!=count) {
             Progress(0,count,current).render(position,size);
             if(sampler.lock && sampler.lock<sampler.full) Text(string(dec(100*sampler.lock/sampler.full)+"%"_)).render(position,size);
         }
-        //else { Text(string(dec(underrunCount))).render(position,size); }
     }
 };
 Application(Music)

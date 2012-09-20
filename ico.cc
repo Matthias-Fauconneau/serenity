@@ -34,9 +34,9 @@ Image decodeICO(const ref<byte>& file) {
     if(size>s.available(size)) { warn("Invalid ICO"); return Image(); }
 
     byte4* image = allocate<byte4>(w*h);
-    array<byte> source = s.read(size);
+    ref<byte> source = s.read<byte>(size);
     assert(source,size);
-    byte* src=(byte*)source.data();
+    byte* src=(byte*)source.data;
     if(header.depth==32) { copy((byte*)image,src,size); }
     if(header.depth==24) for(uint i=0;i<w*h;src+=3) image[i++] = byte4(src[0],src[1],src[2],255);
     if(header.depth==8) for(uint i=0;i<w*h;src++) image[i++] = palette[*src];

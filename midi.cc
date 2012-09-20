@@ -7,10 +7,10 @@ void MidiFile::open(const ref<byte>& path) { /// parse MIDI header
     uint16 nofChunks = s.read();
     midiClock = 48*60000/120/(uint16)s.read(); //48Khz clock
     for(int i=0; s && i<nofChunks;i++) {
-        string tag = s.read(4); uint32 length = s.read();
-        if(tag == "MTrk"_) {
+        uint32 tag = s.read<uint32>(); uint32 length = s.read();
+        if(tag == raw<uint32>("MTrk"_)) {
             while(s.read<byte>()&0x80) {} //ignore first time
-            tracks<< Track(string(s.read(length)));
+            tracks<< Track(array<byte>(s.read<byte>(length)));
         }
         s.advance(length);
     }
@@ -26,7 +26,7 @@ void MidiFile::read(Track& track, int time, State state) {
         else if( type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend ) s.advance(1);
         else if( type == ProgramChange || type == ChannelAftertouch ) {}
         else if( type == Meta ) {
-            byte c=s.read(); int len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
+            uint8 c=s.read(); int len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
             s.advance(len);
         }
         track.type = type;
@@ -39,7 +39,7 @@ void MidiFile::read(Track& track, int time, State state) {
         }*/
 
         if(!s) return;
-        byte c=s.read(); int t=c&0x7f;
+        uint8 c=s.read(); int t=c&0x7f;
         if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
         track.time += t*midiClock;
     }

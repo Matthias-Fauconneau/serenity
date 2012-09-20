@@ -57,7 +57,7 @@ void SSLSocket::write(const ref<byte>& buffer) {
 
 /// DNS
 
-uint ip(TextData& s) { int a=s.number(), b=(s.match('.'),s.number()), c=(s.match('.'),s.number()), d=(s.match('.'),s.number()); return (d<<24)|(c<<16)|(b<<8)|a; }
+uint ip(TextData& s) { int a=s.integer(), b=(s.match('.'),s.integer()), c=(s.match('.'),s.integer()), d=(s.match('.'),s.integer()); return (d<<24)|(c<<16)|(b<<8)|a; }
 uint nameserver() { TextData s=readFile("/etc/resolv.conf"_); s.until("nameserver "_); return ip(s); }
 uint resolve(const ref<byte>& host) {
     static File dnsCache = File("dns"_,cache(),File::ReadWrite|File::Create|File::Append);
@@ -119,7 +119,7 @@ URL::URL(const ref<byte>& url) {
     TextData s(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
-    ref<byte> domain = s.untilAny("/?"_); if(s.slice(s.index-1,1)=="?"_) s.index--;
+    ref<byte> domain = s.untilAny("/?"_); if(s[-1]=='?') s.index--;
     host = string(section(domain,'@',-2,-1));
     if(domain.contains('@')) authorization = base64(section(domain,'@'));
     path << s.until('#');
@@ -158,7 +158,7 @@ string cacheFile(const URL& url) {
 }
 
 HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>& method)
-    : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
+    : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(str(url),Socket::fd,POLLOUT),
       url(move(url)), headers(move(headers)), method(method), handler(handler) {}
 void HTTP::request() {
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
@@ -217,7 +217,7 @@ void HTTP::event() {
         }
         else if(chunked) {
             do {
-                if(!chunkSize) { chunkSize = number(16); match("\r\n"_); } //else already parsed
+                if(!chunkSize) { chunkSize = integer(16); match("\r\n"_); } //else already parsed
                 if(chunkSize==0) { state=Cache; break; }
                 assert(chunkSize>0,chunkSize,buffer);
                 if(available(chunkSize+2)<uint(chunkSize+2)) return;
