@@ -188,7 +188,7 @@ struct Player : Application {
         window.setTitle(titles[index].text);
         ref<byte> path = files[index];
         if(media) media->~AudioMedia(), media=0;
-        if(endsWith(path,".mp3"_)) media=new (&mp3) MP3Media(File(path));
+        if(endsWith(path,".mp3"_)||endsWith(path,".MP3"_)) media=new (&mp3) MP3Media(File(path));
         else if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path));
         else warn("Unsupported format",path);
         audio.start();

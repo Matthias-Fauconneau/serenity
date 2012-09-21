@@ -45,7 +45,7 @@ struct TextLayout {
 
     TextLayout(const ref<byte>& text, int size, int wrap, Font* font=0):size(size<<4),wrap(wrap<<4) {
         if(!font) {
-            if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
+            if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("dejavu/DejaVuSans.ttf"_,fonts()), size));
             font = &defaultSans.at(size);
         }
         uint16 spaceIndex = font->index(' ');
@@ -79,16 +79,16 @@ struct TextLayout {
                 if(format&Underline && !(newFormat&Underline) && glyphCount>underlineBegin) lines << Line __(underlineBegin,glyphCount);
                 format=newFormat;
                 if(format&Bold) {
-                    if(!defaultBold.contains(size)) defaultBold.insert(size,Font("dejavu/DejaVuSans-Bold.ttf"_, size));
+                    if(!defaultBold.contains(size)) defaultBold.insert(size,Font(File("dejavu/DejaVuSans-Bold.ttf"_,fonts()), size));
                     font = &defaultBold.at(size);
                 } else if(format&Italic) {
-                    if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font("dejavu/DejaVuSans-Oblique.ttf"_, size));
+                    if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font(File("dejavu/DejaVuSans-Oblique.ttf"_,fonts()), size));
                     font = &defaultItalic.at(size);
                 } else if(format&Mono) {
-                    if(!defaultMono.contains(size)) defaultMono.insert(size,Font("dejavu/DejaVuSansMono.ttf"_, size));
+                    if(!defaultMono.contains(size)) defaultMono.insert(size,Font(File("dejavu/DejaVuSansMono.ttf"_,fonts()), size));
                     font = &defaultMono.at(size);
                 } else {
-                    if(!defaultSans.contains(size)) defaultSans.insert(size,Font("dejavu/DejaVuSans.ttf"_, size));
+                    if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("dejavu/DejaVuSans.ttf"_,fonts()), size));
                     font = &defaultSans.at(size);
                 }
                 if(format&Underline) underlineBegin=glyphCount;
@@ -158,7 +158,7 @@ int2 Text::sizeHint() {
 void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
     int2 offset = position+max(int2(0),(size-textSize)/2);
-    for(const Character& b: characters) multiply(offset+b.pos, b.image, opacity);
+    for(const Character& b: characters) substract(offset+b.pos, b.image, opacity);
     for(const Line& l: lines) fill(offset+Rect(l.min-int2(0,1),l.max), black);
 }
 

@@ -22,11 +22,7 @@ text.cc
 window.h
 window.cc
 
-http.h
-http.cc
-xml.h
-xm.cc
-html.h
-htm.cc
+pdf.h
+pdf.cc
 
 test.cc

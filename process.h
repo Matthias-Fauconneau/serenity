@@ -52,10 +52,12 @@ struct Poll : pollfd {
     Thread& thread; /// Thread monitoring this pollfd
     /// Allows to queue using \a wait method and \a event callback
     Poll(const ref<byte>& id=""_, Thread& thread=defaultThread):id(id),thread(thread){}
+    void registerPoll();
     /// Registers \a fd to be polled in the event loop
-    Poll(const ref<byte>& id, int fd, int events=POLLIN, Thread& thread=defaultThread);
+    Poll(const ref<byte>& id, int fd, int events=POLLIN, Thread& thread=defaultThread):____(pollfd{fd,(short)events},)id(id),thread(thread){ if(fd) registerPoll(); }
     /// Removes \a fd from the event loop
-    ~Poll();
+    void unregisterPoll();
+    ~Poll(){unregisterPoll();}
     /// Schedules an \a event call from \a thread's next poll iteration
     void queue();
     /// Callback on new poll events (or after a \a wait)

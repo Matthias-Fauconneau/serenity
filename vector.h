@@ -15,7 +15,6 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     }
     /// Copies each component from another vector \a o casting from \a T2 to \a T
     template<class F> explicit vector(const vector<V,F,N>& o) { for(int i=0;i<N;i++) at(i)=(T)o[i]; }
-    //TODO operator T __attribute((vector_size(N*sizeof(T))));
     /// Accessors (always unchecked)
     const T& at(int i) const { return ((T*)this)[i]; }
     T& at(int i) { return ((T*)this)[i]; }
@@ -38,9 +37,9 @@ generic vector operator -(const vector& u) { vector r; for(int i=0;i<N;i++) r[i]
 generic vector operator +(const vector& u, const vector& v) { vector r; for(int i=0;i<N;i++) r[i]=u[i]+v[i]; return r; }
 generic vector operator -(const vector& u, const vector& v) { vector r; for(int i=0;i<N;i++) r[i]=u[i]-v[i]; return r; }
 generic vector operator *(const vector& u, const vector& v) { vector r; for(int i=0;i<N;i++) r[i]=u[i]*v[i]; return r; }
-generic vector operator *(const vector& u, int s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]*s; return r; }
-generic vector operator *(int s, const vector& u) { vector r; for(int i=0;i<N;i++) r[i]=s*u[i]; return r; }
-generic vector operator /(const vector& u, int s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]/s; return r; }
+generic vector operator *(const vector& u, T s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]*s; return r; }
+generic vector operator *(T s, const vector& u) { vector r; for(int i=0;i<N;i++) r[i]=s*u[i]; return r; }
+generic vector operator /(const vector& u, T s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]/s; return r; }
 generic bool operator <(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]>=v[i]) return false; return true; }
 generic bool operator <=(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]>v[i]) return false; return true; }
 generic bool operator ==(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]!=v[i]) return false; return true; }
@@ -48,9 +47,9 @@ generic bool operator >=(const vector& u, const vector& v) { for(int i=0;i<N;i++
 generic bool operator >(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
 
 generic vector abs(const vector& v){ vector r; for(int i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
-generic vector min(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=min(a[i],b[i]); return r;  }
-generic vector max(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=max(a[i],b[i]); return r;  }
-generic vector clip(T min, const vector& x, T max){ vector r; for(int i=0;i<N;i++) r[i]=clip(min,x[i],max); return r;  }
+generic vector min(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=min(a[i],b[i]); return r; }
+generic vector max(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=max(a[i],b[i]); return r; }
+generic vector clip(const vector& min, const vector& x, const vector& max){ vector r; for(int i=0;i<N;i++) r[i]=clip(min[i],x[i],max[i]); return r;  }
 
 generic string str(const vector& v) { string s = string("("_); for(int i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
 

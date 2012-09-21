@@ -27,6 +27,7 @@ struct ScrollArea : Widget {
 /// It allows an object to act both as the content (T) and the container (ScrollArea)
 /// \note \a ScrollArea and \a T will be instancied as separate Widget (non-virtual multiple inheritance)
 template<class T> struct Scroll : ScrollArea, T {
+    template<class... Args> Scroll(Args&&... args):T(forward<Args>(args)___){}
     Widget& widget() override { return (T&)*this; }
     /// Returns a reference to \a ScrollArea::Widget. e.g used when adding this widget to a layout
     Widget& area() { return (ScrollArea&)*this; }

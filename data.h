@@ -33,7 +33,7 @@ struct Data {
     byte peek() const { assert_(index<buffer.size()); return buffer[index];}
     /// Peeks at buffer without advancing
     byte operator[](int i) const { assert_(index+i<buffer.size()); return buffer[index+i]; }
-    /// Returns a reference to the  next \a size bytes
+    /// Returns a reference to the next \a size bytes
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
@@ -137,14 +137,14 @@ struct TextData : virtual Data {
     ref<byte> untilEnd();
     /// Skips whitespaces
     void skip();
-    /// Reads a single word
-    ref<byte> word();
-    /// Reads a single identifier [a-zA-Z0-9]*
+    /// Reads a single word [a-zA-Z"special"]*
+    ref<byte> word(const ref<byte>& special=""_);
+    /// Reads a single identifier [a-zA-Z0-9"special"]*
     ref<byte> identifier(const ref<byte>& special=""_);
     /// Reads a single integer
     int integer(uint base=10);
     /// Reads a single number
-    double number(uint base=10);
+    double number();
     /// Reads one possibly escaped character
     char character();
 };

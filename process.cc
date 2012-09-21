@@ -46,8 +46,8 @@ debug(void Lock::checkRecursion(){assert(owner!=gettid(),owner,gettid());})
 debug(void Lock::checkOwner(){assert(owner==gettid(),owner,gettid()); owner=0;})
 
 /// Poll
-Poll::Poll(const ref<byte>& id, int fd, int events, Thread& thread):____(pollfd{fd,(short)events},)id(id),thread(thread){ if(fd) { thread+=this; thread.post(); } }
-Poll::~Poll() {Locker lock(thread.lock); thread.unregistered<<this;}
+void Poll::registerPoll() { thread+=this; thread.post(); }
+void Poll::unregisterPoll() {Locker lock(thread.lock); thread.unregistered<<this;}
 void Poll::queue() {if(!thread.queue.contains(this)){Locker lock(thread.lock); thread.queue+= this; thread.post();}}
 
 /// EventFD
@@ -108,7 +108,7 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
         Locker lock(threadsLock);
         for(Thread* thread: threads) {thread->terminate=true; if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP);}
     }
-    if(sig==SIGABRT) { log("Abort",message); exit(0); } //Abort doesn't let thread terminate cleanly
+    if(sig==SIGABRT) { log(message); exit(0); } //Abort doesn't let thread terminate cleanly
     if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); }
     if(sig==SIGSEGV) { log("Segmentation fault at "_+str(ptr(info->fault.addr))); exit(0); } //Segfault kills the threads to prevent further corruption
     if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads

@@ -31,9 +31,6 @@
 #include "debug.h"
 #include "simd.h"
 
-template<class T> T sq(const T& x) { return x*x; }
-template<class T> T cb(const T& x) { return x*x*x; }
-
 /// Trigonometric primitives
 const double PI = 3.14159265358979323846;
 inline double sin(double t) { return __builtin_sin(t); }

@@ -78,9 +78,9 @@ ref<byte> TextData::untilEnd() { uint size=available(-1); return read(size); }
 
 void TextData::skip() { whileAny(" \t\n\r"_); }
 
-ref<byte> TextData::word() {
+ref<byte> TextData::word(const ref<byte>& special) {
     uint start=index;
-    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z')) break; advance(1); }
+    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
     return slice(start,index-start);
 }
 
@@ -96,9 +96,10 @@ ref<byte> TextData::identifier(const ref<byte>& special) {
 
 char TextData::character() {
     byte c = next();
-    if(c=='\\') return c;
+    if(c!='\\') return c;
+    c = next();
     int i="\'\"nrtbf()\\"_.indexOf(c);
-    if(i<0) { error("Invalid escape sequence"_,c); return '?'; }
+    if(i<0) { error("Invalid escape sequence"_,str(c),peek(16)); return '?'; }
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 
@@ -112,19 +113,19 @@ int TextData::integer(uint base) {
     return toInteger(slice(start,index-start), base);
 }
 
-double TextData::number(uint base) {
-    assert(base>2 && base<16,"Unsupported base"_,base);
+double TextData::number() {
+    assert(".0123456789-+"_.contains(peek()),peek(16));
     int neg=0;
     if(match('-')) neg=1; else match('+');
     int exponent = 1;
     int significand = 0;
     for(bool gotDot=false;available(1);) {
         if(match('.')) { gotDot=true; continue; }
-        int n = "0123456789ABCDEF"_.indexOf(next());
-        if(n < 0) break;
-        significand *= base;
+        int n = "0123456789"_.indexOf(peek());
+        if(n < 0) break; else advance(1);
+        significand *= 10;
         significand += n;
-        if(gotDot) exponent *= base;
+        if(gotDot) exponent *= 10;
     }
     return neg ? -double(significand)/double(exponent) : double(significand)/double(exponent);
 }

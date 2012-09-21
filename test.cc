@@ -2,8 +2,8 @@
 #include "window.h"
 #include "pdf.h"
 struct PDFTest : Application {
-    PDF pdf __("3. The Mystery Knight.pdf"_,home());
-    Window window __(&pdf,int2(-1,-1),"PDF Test"_);
+    Scroll<PDF> pdf __("Documents/Sheets/Where's Hiccup.pdf"_,home());
+    Window window __(&pdf.area(),int2(-1,-1),"PDF Test"_);
     PDFTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show(); }
 };Application(PDFTest)
 #endif

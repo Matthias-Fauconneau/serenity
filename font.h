@@ -5,6 +5,8 @@
 #include "file.h"
 #include "map.h"
 
+const Folder& fonts();
+
 struct Glyph {
     bool valid=false;
     int2 offset; // (left bearing, min.y-baseline) (in .4)
@@ -13,18 +15,26 @@ struct Glyph {
 
 /// Freetype wrapper
 struct Font {
-    Map file;
-    struct FT_FaceRec_*  face;
-    int descender, ascender, height;
+    Map keep; array<byte> data;
+    struct FT_FaceRec_*  face=0;
+    int nominalSize=0, ascender=0;
     Glyph cacheASCII[128];
     map<uint16, Glyph> cacheUnicode;
 
-    /// Opens font at /a path scaled to /a size pixels high
-    Font(const ref<byte>& path, int size);
+    /// Loads font at /a path scaled to /a size pixels high
+    Font(const File& file, int size);
+    /// Loads font /a data scaled to /a size pixels high
+    Font(array<byte>&& data, int size=0);
+    /// Loads font /a data scaled to /a size pixels high
+    void load(const ref<byte>& data, int size);
+    /// Sets font size in .6 pixels
+    void setSize(int size);
     /// Returns font glyph index for Unicode codepoint \a code
     uint16 index(uint16 code);
     /// Returns advance for \a index
     int advance(uint16 index);
+    /// Returns size for \a index
+    vec2 size(uint16 index);
     /// Returns scaled kerning adjustment between \a leftIndex and \a rightIndex
     int kerning(uint16 leftIndex, uint16 rightIndex); //space in .4
     /// Caches and returns glyph for \a index at position \a x (in .4)

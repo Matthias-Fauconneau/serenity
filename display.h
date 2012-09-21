@@ -22,6 +22,5 @@ void fill(Rect rect, byte4 color=black, bool blend=true);
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
 /// \arg opacity multiplies alpha channel by opacity/255, alpha is accumulated in framebuffer
 void blit(int2 target, const Image& source, uint8 opacity=255);
-/// Multiplies pixels at \a target with \a source
-/// \note \a source alpha * opacity/255 is accumulated in framebuffer
-void multiply(int2 target, const Image& source, uint8 opacity=255);
+/// Substracts \a source from \a target
+void substract(int2 target, const Image& source, uint8 opacity=255);

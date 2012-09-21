@@ -4,7 +4,7 @@
 
 template<class T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
-typedef vector<bgra,uint,4> int4;
+typedef vector<bgra,int,4> int4;
 
 struct Image {
     const byte4* data=0;
