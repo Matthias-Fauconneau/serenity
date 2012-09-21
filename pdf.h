@@ -7,7 +7,7 @@
 #include "interface.h"
 
 struct PDF : Widget {
-    PDF(const ref<byte>& path, const Folder& folder);
+    void open(const ref<byte>& path, const Folder& folder);
     int2 sizeHint() override;
     void render(int2 position, int2 size) override;
 

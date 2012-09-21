@@ -85,7 +85,8 @@ static Variant parse(TextData& s) {
 static Variant parse(const ref<byte>& buffer) { assert(buffer.size,buffer.data,buffer.size); TextData s(buffer); return parse(s); }
 static map<ref<byte>,Variant> toDict(const array< ref<byte> >& xref, Variant&& object) { return object.dict ? move(object.dict) : move(parse(xref[object.number]).dict); }
 
-PDF::PDF(const ref<byte>& path, const Folder& folder) : file(path,folder) {
+void PDF::open(const ref<byte>& path, const Folder& folder) {
+    file = Map(path,folder);
     array< ref<byte> > xref; map<ref<byte>,Variant> catalog;
     {
         TextData s(file);
