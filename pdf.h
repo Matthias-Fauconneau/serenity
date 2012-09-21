@@ -23,14 +23,13 @@ struct PDF : Widget {
     array<Line> lines;
 
     void drawText(const ref<byte>& font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data);
+    map<ref<byte>, string> fontNames;
     map<ref<byte>, Font> fonts;
-    map<ref<byte>, array<int> > widths;
-    struct Character { Font& font; float size; uint16 index; vec2 pos; };
+    map<ref<byte>, array<float> > widths;
+    struct Character { string fontName; float size; uint16 index; vec2 pos; uint16 code; };
     array<Character> characters;
-#if 0
-    //signal<int, vec2, float,const string&, int> onGlyph;
-    //signal<const array<vec2>&> onPath;
-    float recognitionScale; //hack to avoid changing scale of recognition values
-    array< array<vec2> > paths; //only for recognition
-#endif
+
+    signal<int, vec2, float,const ref<byte>&, int> onGlyph;
+    signal<const ref<vec2>&> onPath;
+    array< array<vec2> > paths;
 };

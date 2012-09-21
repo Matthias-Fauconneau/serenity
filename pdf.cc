@@ -118,7 +118,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     x1 = +__FLT_MAX__, x2 = -__FLT_MAX__; vec2 pageOffset;
     array<Variant> pages = move(parse(xref[catalog.at("Pages"_).number]).dict.at("Kids"_).list);
     for(const Variant& page : pages) {
-        //uint pageFirstLine = lines.size();//, pageFirstCharacter = characters.size;
+        uint unused pageFirstLine = lines.size(), pageFirstCharacter = characters.size();
         auto dict = parse(xref[page.number]).dict;
         //pages << dict["Kids"_].list;
         Variant empty(0);
@@ -127,6 +127,8 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
             auto fontDict = parse(xref[e.value.number]).dict;
             auto descendant = fontDict.find("DescendantFonts"_);
             if(descendant) fontDict = parse(xref[descendant->list[0].number]).dict;
+            if(!fontDict.contains("FontDescriptor"_)) continue;
+            fontNames.insert(e.key,move(fontDict.at("BaseFont"_).data));
             auto descriptor = parse(xref[fontDict.at("FontDescriptor"_).number]).dict;
             auto fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
             if(fontFile) fonts.insert(e.key, Font(parse(xref[fontFile->number]).data));
@@ -137,9 +139,6 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
         }
         auto contents = dict.find("Contents"_);
         if(contents) {
-            //FIXME: hack to avoid changing scale of recognition distances
-            //const auto& cropBox = (dict.find("CropBox"_)?:dict.find("MediaBox"_)?:&empty)->list;
-            //recognitionScale = 1280/cropBox[2].number;
             y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
             Cm=Tm=mat32(); array<mat32> stack;
             string font; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat32 Tlm;
@@ -151,7 +150,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                 assert(content.type == Variant::Data && content.data);
                 //for(const Variant& dataRef : content.list) data << parse(xref[dataRef.number]).data;
                 for(TextData s(content.data);s.skip(), s;) {
-                    ref<byte> id = s.word("*"_);
+                    ref<byte> id = s.word("'*"_);
                     if(!id) {
                         assert(!((s[0]>='a' && s[0]<='z')||(s[0]>='A' && s[0]<='Z')||s[0]=='\''||s[0]=='"'),s.peek(min(16u,s.buffer.size()-s.index)));
                         args << parse(s);
@@ -227,40 +226,34 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     args.clear();
                 }
             }
-#if 0
             // tighten page bounds
-            pageOffset += vec2(0,y1-y2-16);
-            vec2 offset = pageOffset+vec2(0,-y1);
-            for(uint i=pageFirstLine;i<lines.size();i++) lines[i].a += offset, lines[i].b += offset;
-            for(int i=pageFirstCharacter;i<characters.size;i++) {
-                Character& c = characters[i];
-                c.position += offset;
-                /*onGlyph.emit(i, recognitionScale*vec2(c.position.x,-c.position.y),
-                recognitionScale*glyphs[c.glyph-1].recoScale,
-                glyphs[c.glyph-1].font->name,glyphs[c.glyph-1].charCode);*/
-            }
+            for(uint i=pageFirstLine;i<lines.size();i++) lines[i].a += pageOffset, lines[i].b += pageOffset;
+            for(int i=pageFirstCharacter;i<characters.size();i++) characters[i].pos += pageOffset;
+            pageOffset.y += y2-y1;
+            /*const auto& cropBox = (dict.find("CropBox"_)?:dict.find("MediaBox"_)?:&empty)->list;
+            float scale = 1280/cropBox[2].number; // Normalize width to 1280 for onGlyph/onPath callbacks
+            for(uint i=pageFirstCharacter;i<characters.size();i++) { Character& c = characters[i];
+                onGlyph(i, scale*vec2(c.pos.x-x1,y2-c.pos.y), scale*c.size, fontNames.at(c.fontName), c.code);
+            }*/
             /*for(const auto& path : paths) {
                 array<vec2> scaled; for(vec2 p : path) scaled<<recognitionScale*vec2(p.x,-p.y-pageOffset.y);
                 onPath.emit(scaled);
             }*/
             paths.clear();
-            for(int i=pageFirstIndex;i<vertices.size;i++) vertices[i] += offset;
-#endif
         }
     }
 }
 
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
 void PDF::drawPath(array<array<vec2> >& paths, int flags) {
-    for(const array<vec2>& path : paths) {
+    for(array<vec2>& path : paths) {
         for(vec2 p : path) extend(p);
         array<vec2> polyline;
         for(uint i=0; i < path.size()-3; i+=3) {
             if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
                 polyline << copy(path[i]);
             } else {
-                for(int t=0;t<=8;t++) polyline << cubic(path[i],path[i+1],path[i+2],path[i+3],float(t)/8);
-                //polyline << path[i] << path[i+1] << path[i+2] << path[i+3];
+                for(int t=0;t<=16;t++) polyline << cubic(path[i],path[i+1],path[i+2],path[i+3],float(t)/16);
             }
         }
         polyline << copy(path.last());
@@ -270,8 +263,8 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
             }
             if(flags&Close) lines << Line __( polyline.last(), polyline.first() );
         }
+        if(flags&Trace) this->paths << move(path);
     }
-    //if(flags&Trace) this->paths << move(paths);
     paths.clear();
 }
 
@@ -285,10 +278,10 @@ void PDF::drawText(const ref<byte>& fontName, int fontSize, float spacing, float
         uint16 index = font.index(code);
         vec2 position = vec2(Trm.dx,Trm.dy);
         extend(position); extend(position+Trm.m11*font.size(index));
-        characters << Character __(font, Trm.m11*fontSize, index, position);
+        characters << Character __(string(fontName), Trm.m11*fontSize, index, position, code);
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < widths[fontName].size()) advance += fontSize*widths[fontName][code]/1000;
-        else advance += font.advance(index);
+        else advance += font.advance(index)/16.f;
         Tm = mat32(advance,0) * Tm;
     }
 }
@@ -340,17 +333,18 @@ int2 PDF::sizeHint() { return int2(2*(x2-x1),2*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
     float scale = size.x/(x2-x1); // Fit width
 
-    //for(int i=0;i<lines.size();i+=2){vec2& a=lines[i], &b=lines[i+1]; if(a.x==b.x) a.x=b.x=round(a.x*scale); if(a.y==b.y) a.y=b.y=round(a.y*scale); }
     for(const Line& l: lines) {
         vec2 a = vec2(scale*(l.a.x-x1), scale*(y2-l.a.y));
         vec2 b = vec2(scale*(l.b.x-x1), scale*(y2-l.b.y));
+        if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
         a+=vec2(position), b+=vec2(position);
         if(a!=b) line(a.x,a.y,b.x,b.y);
     }
 
     for(const Character& c: characters) {
-        c.font.setSize(round(scale*c.size*64));
-        const Glyph& glyph = c.font.glyph(c.index);
+        Font& font = fonts.at(c.fontName);
+        font.setSize(round(scale*c.size*64));
+        const Glyph& glyph = font.glyph(c.index);
         if(!glyph.image) continue;
         substract(position+int2(round(scale*(c.pos.x-x1)), round(scale*(y2-c.pos.y)))+glyph.offset,glyph.image);
     }

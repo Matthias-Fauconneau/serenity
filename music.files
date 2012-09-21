@@ -34,9 +34,9 @@ font.cc
 interface.h
 interface.cc
 window.cc
+
 pdf.h
 pdf.cc
-
+score.h
+score.cc
 music.cc
-simd.h
-disasm.h

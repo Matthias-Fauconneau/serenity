@@ -9,6 +9,7 @@
 #include "window.h"
 #include "interface.h"
 #include "pdf.h"
+#include "score.h"
 
 struct Music : Application {
     Sampler sampler;
@@ -19,7 +20,7 @@ struct Music : Application {
     MidiFile midi;
 #endif
     Scroll<PDF> sheet;
-    //Score score;
+    Score score;
     map<int, int> notes; //[midiIndex] = note, indexOf(midiIndex) = scoreIndex
     ICON(music) Window window __(&sheet.area(),int2(-1,-1),"Music"_,musicIcon());
 
@@ -29,7 +30,8 @@ struct Music : Application {
         window.localShortcut(Escape).connect(this,&Application::quit);
         auto args = arguments();
         //args<<"/Samples/Salamander.sfz"_;
-        args<<"Documents/Sheets/Where's Hiccup.pdf"_;
+        //args<<"Documents/Sheets/Where's Hiccup.pdf"_;
+        args<<"Documents/Sheets/Game of Thrones.pdf"_;
         for(ref<byte> path : args) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
@@ -49,8 +51,8 @@ struct Music : Application {
             }
 #endif
             else if(endsWith(path, ".pdf"_) && existsFile(path,home())) {
-                //sheet.onGlyph.connect(&score,&Score::onGlyph);
-                //sheet.onPath.connect(&score,&Score::onPath);
+                sheet.onGlyph.connect(&score,&Score::onGlyph);
+                sheet.onPath.connect(&score,&Score::onPath);
                 sheet.open(path,home());
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
                 //score->synchronize(midi->notes);
