@@ -1,6 +1,6 @@
 #include "file.h"
 #include "linux.h"
-#include "debug.h"
+#include "string.h"
 
 struct timespec { long sec,nsec; };
 #if __x86_64
@@ -58,7 +58,7 @@ bool existsFolder(const ref<byte>& folder, const Folder& at) { return Handle( op
 /// Stream
 
 void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
-int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), fd, ptr(buffer), size); }
+int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), fd, buffer, size); }
 array<byte> Stream::read(uint capacity) {
     array<byte> buffer(capacity);
     int size = check( ::read(fd,buffer.data(),capacity) );

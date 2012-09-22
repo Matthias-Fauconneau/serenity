@@ -2,9 +2,6 @@
 #include "core.h"
 #include "memory.h"
 
-/// References raw memory representation of \a t
-template<class T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
-
 /// \a array is a polyvalent memory reference (const/mutable, own/reference, inline/heap)
 /// \note array uses move semantics to avoid reference counting when managing an heap buffer
 /// \note array stores small arrays inline (<=31bytes)
@@ -15,12 +12,12 @@ template<class T> struct array {
     /// Number of elements fitting inline
     static constexpr uint inline_capacity() { return (sizeof(array)-1)/sizeof(T); }
     /// Data pointer valid while the array is not reallocated (resize or inline array move)
-    T* data() { assert_(tag!=-1); return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
+    T* data() { assert(tag!=-1); return tag>=0? (T*)(&tag+1) : (T*)buffer.data; }
     const T* data() const { return tag>=0? (T*)(&tag+1) : buffer.data; }
     /// Number of elements currently in this array
-    uint size() const { assert_((tag==-1) || ((tag>=0?tag:buffer.size)<=capacity())); return tag>=0?tag:buffer.size; }
+    uint size() const { assert((tag==-1) || ((tag>=0?tag:buffer.size)<=capacity())); return tag>=0?tag:buffer.size; }
     /// Sets size without any construction/destruction. /sa resize
-    void setSize(uint size) { assert_(size<=capacity()); if(tag>=0) tag=size; else buffer.size=size;}
+    void setSize(uint size) { assert(size<=capacity()); if(tag>=0) tag=size; else buffer.size=size;}
     /// Maximum number of elements without reallocation (0 for references)
     uint capacity() const { return tag>=0 ? inline_capacity() : buffer.capacity; }
 
@@ -47,8 +44,8 @@ template<class T> struct array {
 
     /// Allocates strictly enough memory for \a capacity elements
     void setCapacity(uint capacity) {
-        assert_(tag!=-1);
-        assert_(capacity>=size());
+        assert(tag!=-1);
+        assert(capacity>=size());
         if(tag==-2 && buffer.capacity) { //already on heap: reallocate
             reallocate<T>((T*&)buffer.data,buffer.capacity,capacity);
             buffer.capacity=capacity;
@@ -70,13 +67,13 @@ template<class T> struct array {
 
     /// Sets the array size to \a size and destroys removed elements
     void shrink(uint size) {
-        assert_(size<=this->size());
+        assert(size<=this->size());
         if(tag!=-1) for(uint i=size;i<this->size();i++) at(i).~T();
         setSize(size);
     }
     /// Sets the array size to 0, destroying any contained elements
     void clear() { if(size()) shrink(0); }
-    void grow(uint size) { uint old=this->size(); assert_(size>old); reserve(size); setSize(size); for(uint i=old;i<size;i++) new (&at(i)) T(); }
+    void grow(uint size) { uint old=this->size(); assert(size>old); reserve(size); setSize(size); for(uint i=old;i<size;i++) new (&at(i)) T(); }
     void resize(uint size) { if(size<this->size()) shrink(size); else if(size>this->size()) grow(size); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
@@ -95,8 +92,8 @@ template<class T> struct array {
 
     /// Accessors
     /// \note Use \a ref to avoid inline checking or \a data() to avoid bound checking in performance critical code
-    const T& at(uint i) const { assert_(i<size()); return data()[i]; }
-    T& at(uint i) { assert_(i<size()); return (T&)data()[i]; }
+    const T& at(uint i) const { assert(i<size()); return data()[i]; }
+    T& at(uint i) { assert(i<size()); return (T&)data()[i]; }
     const T& operator [](uint i) const { return at(i); }
     T& operator [](uint i) { return at(i); }
     const T& first() const { return at(0); }

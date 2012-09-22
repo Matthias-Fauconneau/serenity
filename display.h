@@ -16,6 +16,9 @@ constexpr byte4 darken __(0x00, 0x00, 0x00, 0x40);
 constexpr byte4 lighten __(0xFF, 0xFF, 0xFF, 0x40);
 constexpr byte4 highlight __(0xE0, 0xC0, 0x80, 0xFF);
 constexpr byte4 white __(0xFF, 0xFF, 0xFF, 0xFF);
+constexpr byte4 blue __(0xFF, 0, 0, 0xFF);
+constexpr byte4 green __(0, 0xFF, 0, 0xFF);
+constexpr byte4 red __(0, 0, 0xFF, 0xFF);
 
 /// Fills pixels inside \a rect with \a color
 void fill(Rect rect, byte4 color=black, bool blend=true);
@@ -23,4 +26,4 @@ void fill(Rect rect, byte4 color=black, bool blend=true);
 /// \arg opacity multiplies alpha channel by opacity/255, alpha is accumulated in framebuffer
 void blit(int2 target, const Image& source, uint8 opacity=255);
 /// Substracts \a source from \a target
-void substract(int2 target, const Image& source, uint8 opacity=255);
+void substract(int2 target, const Image& source, byte4 color=black);

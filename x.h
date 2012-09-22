@@ -75,7 +75,8 @@ struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 even
 struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
 struct GrabKey { int8 req=33,owner=0; uint16 size=4; uint window; uint16 modifiers=AnyModifier; uint8 keycode, pointerMode=1,keyboardMode=1, pad[3]; };
 struct UngrabKey { int8 req=34; uint8 keycode; uint16 size=3; uint window; uint16 modifiers=AnyModifier; uint16 pad; };
-struct AllowEvents { int8 req=35, mode=2; uint16 size=2; uint time=0; };
+struct ReplayKeyboard { int8 req=35, mode=5; uint16 size=2; uint time=0; };
+struct ReplayPointer { int8 req=35, mode=2; uint16 size=2; uint time=0; };
 struct SetInputFocus { int8 req=42,revertTo=1; uint16 size=3; uint window=1; uint time=0; };
 struct CreatePixmap { int8 req=53,depth=32; uint16 size=4; uint pixmap,window; int16 w,h; };
 struct FreePixmap { int8 req=54,pad; uint16 size=2; uint pixmap; };
@@ -134,4 +135,4 @@ constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 
 /// Returns padding zeroes to append in order to align an array of \a size bytes to \a width
-inline ref<byte> pad(uint width, uint size){ static byte zero[4]={}; assert_(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }
+inline ref<byte> pad(uint width, uint size){ static byte zero[4]={}; assert(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }

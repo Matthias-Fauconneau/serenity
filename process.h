@@ -1,7 +1,6 @@
 #pragma once
 #include "array.h"
 #include "file.h"
-#include "debug.h"
 
 /// A simple semaphore using futex
 struct Semaphore {
@@ -89,9 +88,6 @@ struct Thread : array<Poll*>, EventFD, Poll {
 struct Application { void quit() { defaultThread.terminate=true; } };
 /// Macro to compile an executable entry point running an Application
 #define Application(Application) int main() {extern void init(); init(); {Application app; defaultThread.run();} extern void exit(); exit();}
-
-/// Allows kernel scheduler to preempt this thread
-void yield();
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);

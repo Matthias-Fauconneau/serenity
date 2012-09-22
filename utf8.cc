@@ -29,7 +29,7 @@ const utf8_iterator& utf8_iterator::operator--() {
             else if(i==3) { if((code&0b11111000)!=0b11110000) pointer+=3; }
             else if(i==4) { if((code&0b11111100)!=0b11111000) pointer+=4; }
             else if(i==5) { if((code&0b11111110)!=0b11111100) pointer+=5; }
-            else assert_(0);
+            else assert(0);
         }
     }
     return *this;
@@ -40,6 +40,6 @@ string utf8(uint c) {
     /**/  if(c<(1<<7)) utf8 << c;
     else if(c<(1<<(7+6))) utf8 << (0b11000000|(c>>6)) << (0b10000000|(c&0b111111));
     else if(c<(1<<(7+6+6))) utf8 << (0b11100000|(c>>12)) << (0b10000000|((c>>6)&0b111111)) << (0b10000000|(c&0b111111));
-    else assert_(0);
+    else assert(0);
     return utf8;
 }

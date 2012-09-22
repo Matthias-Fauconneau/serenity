@@ -5,7 +5,6 @@
 #include "file.h"
 #include "data.h"
 #include "linux.h"
-#include "debug.h"
 #include "time.h"
 #include "png.h"
 

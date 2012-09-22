@@ -28,7 +28,6 @@
 */
 #include "resample.h"
 #include "memory.h"
-#include "debug.h"
 #include "simd.h"
 
 /// Trigonometric primitives
@@ -85,7 +84,7 @@ static double sinc(double cutoff, double x, int N) {
 inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 
 Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint bufferSize) {
-    assert_(channelCount==this->channelCount);
+    assert(channelCount==this->channelCount);
 
     // Computes filter size and cutoff
     double cutoff;
@@ -163,7 +162,7 @@ template<bool mix> void Resampler::read(float* target, uint targetSize) {
         assert(integerIndex<writeIndex);
         assert(fractionalIndex<targetRate);
     }
-    assert(integerIndex>=writeIndex-2,integerIndex,writeIndex);
+    assert(integerIndex>=writeIndex-2);
 }
 template void Resampler::read<false>(float* target, uint targetSize);
 template void Resampler::read<true>(float* target, uint targetSize);

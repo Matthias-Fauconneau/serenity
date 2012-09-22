@@ -1,6 +1,5 @@
 Makefile
 core.h
-core.cc
 array.h
 signal.h
 map.h
@@ -8,8 +7,6 @@ string.h
 string.cc
 process.h
 process.cc
-debug.h
-debug.cc
 file.h
 file.cc
 

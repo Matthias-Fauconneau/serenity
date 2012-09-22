@@ -1,6 +1,6 @@
 #pragma once
-#include "process.h"
 #include "data.h"
+#include "process.h"
 
 #if __x86_64__
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }

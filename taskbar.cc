@@ -84,7 +84,7 @@ struct Taskbar : Application, Socket, Poll {
     }
 
     void processEvent(uint8 type, const XEvent& e) {
-        uint previousIndex=tasks.index;
+        uint previousIndex=tasks.index, previousSize=tasks.size();
         if(type==0) return;
         if(type==1) error("Unexpected reply");
         type&=0b01111111; //msb set if sent by SendEvent
@@ -92,12 +92,13 @@ struct Taskbar : Application, Socket, Poll {
             SendEvent r; r.window=id; r.type=ClientMessage;
             auto& e=r.event.client; e.format=32; e.window=id; e.type=Atom("WM_PROTOCOLS"_); clear(e.data,5); e.data[0]=Atom("WM_DELETE_WINDOW"_);
             send(raw(r));
+        } else if(type == KeyRelease) {
         } else if(type == ButtonPress) { uint id = e.event;
             hasFocus=false;
+            {ReplayPointer r; send(raw(r));}
             {UngrabButton r; r.window=id; send(raw(r));}
             {UngrabKey r; r.window=id; r.keycode=escapeCode; send(raw(r));}
             raise(id);
-            send(raw(AllowEvents()));
             int i = tasks.indexOf(id);
             if(i>=0) tasks.index=i;
         } else if(type==FocusOut) {
@@ -136,9 +137,11 @@ struct Taskbar : Application, Socket, Poll {
             if(e.property.atom==Atom("_NET_WM_NAME"_)) {
                 int i = tasks.indexOf(id); if(i<0) i=addWindow(id); if(i<0) return;
                 tasks[i].text.setText( getTitle(id) );
+                window.render();
             } else if(e.property.atom==Atom("_NET_WM_ICON"_)) {
                 int i = tasks.indexOf(id); if(i<0) i=addWindow(id); if(i<0) return;
                 tasks[i].icon.image = getIcon(id);
+                window.render();
             } else if(e.property.atom==Atom("_NET_WM_WINDOW_TYPE"_)) {
                 int i = tasks.indexOf(id); if(i<0) i=addWindow(id);
                 if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
@@ -146,7 +149,7 @@ struct Taskbar : Application, Socket, Poll {
             } else return;
         } else if(type==CreateNotify||type==DestroyNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify||type==MappingNotify||type==FocusIn) {
         } else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
-        if(previousIndex!=tasks.index) window.render();
+        if(previousIndex!=tasks.index || previousSize!=tasks.size()) window.render();
     }
 
     /// Adds \a id to \a windows and to \a tasks if necessary
@@ -156,7 +159,7 @@ struct Taskbar : Application, Socket, Poll {
         if(!windows.contains(id)) {
             windows << id;
             {SetWindowEventMask r; r.window=id; r.eventMask=StructureNotifyMask|SubstructureNotifyMask|PropertyChangeMask|FocusChangeMask; send(raw(r));}
-            if(!wa.overrideRedirect) {{GrabButton r; r.window=id; send(raw(r));}{GrabKey r; r.window=id; r.keycode=escapeCode; r.keyboardMode=0; send(raw(r));}}
+            if(!wa.overrideRedirect) {{GrabButton r; r.window=id; send(raw(r));}{GrabKey r; r.window=id; r.keycode=escapeCode; send(raw(r));}}
         }
         if(wa.mapState!=IsViewable) return -1;
         array<uint> type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
@@ -197,7 +200,7 @@ struct Taskbar : Application, Socket, Poll {
             array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
     }
 
-    void raiseTask(uint index) { raise(tasks[index].id); {GrabKey r; r.window=tasks[index].id; r.keycode=escapeCode; r.keyboardMode=0; send(raw(r));}}
+    void raiseTask(uint index) { raise(tasks[index].id); {GrabKey r; r.window=tasks[index].id; r.keycode=escapeCode; send(raw(r));}}
     void raise(uint id) {
         {RaiseWindow r; r.id=id; send(raw(r));} setFocus(id);
         windows.removeAll(id); windows<<id;

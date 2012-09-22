@@ -1,6 +1,5 @@
 #include "flac.h"
-#include "debug.h"
-#include "process.h"
+#include "string.h"
 
 typedef double double2 __attribute((vector_size(16)));
 #if __clang__
@@ -206,7 +205,7 @@ void FLAC::decodeFrame() {
         uint size = blockSize >> partitionOrder;
         int partitionCount = 1<<partitionOrder;
 
-        //yield(); tsc rice;
+        //tsc rice;
         for(int p=0;p<partitionCount;p++) {
             end += size;
             int k = binary( parameterSize );
@@ -233,7 +232,7 @@ void FLAC::decodeFrame() {
                 }
             }
         }
-        //::rice += rice; yield(); tsc predict;
+        //::rice += rice; tsc predict;
         signal=block[channel]+order;
         if(order%2) { //for odd order: compute first sample with 'right' predictor without advancing context to begin unrolled loops with even context
             double sum=0;

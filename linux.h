@@ -142,14 +142,11 @@ syscall2(int, eventfd2, int,val, int,flags)
 inline __attribute((noreturn)) int exit(int status) {r(r0,status) r(rN,sys::exit); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noreturn)) int exit_group(int status) {r(r0,status)  r(rN,sys::exit_group); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noinline)) long clone(int (*fn)(void*), void* stack, int flags, void* arg) {
-    r(r0,flags) r(r1,0) r(r2,0) r(r3,0) r(r4,0) r(rN,sys::clone);
-    register long r13 asm("r13")=(long)stack;
-    register long r14 asm("r14")=(long)arg;
-    register long r15 asm("r15")=(long)fn;
-    register long r asm(rR);
-    asm volatile("syscall": "=r"(r): "r"(arg),"r"(fn), "r"(rN), "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4) : "rcx", "r9", "r11");
+    r(rN,sys::clone) r(r0,flags) r(r1,stack) r(r2,0) r(r3,0) r(r4,0) register long r asm(rR);
+    asm volatile("mov %0, %%r14; mov %1, %%r15"::"r"(arg), "r"(fn));
+    asm volatile("syscall": "=r"(r):"r"(rN), "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4) : "rsp", "rcx", "r9", "r11");
     if(r!=0) return r;
-    asm("movq %0, %%rsp; movq $0, %%rbp; movq %1, %%rdi; call *%2; movq %%rax, %%rdi; call exit":: "r"(r13), "r"(r14),"r"(r15):/*"rbp",*/"rsp","rdi","rax");
+    asm("movq $0, %%rbp; movq %%r14, %%rdi; call *%%r15; movq %%rax, %%rdi; call exit":::/*"rbp",*/"rsp","rdi","rax");
     __builtin_unreachable();
 }
 #if __i386
@@ -184,3 +181,13 @@ inline int connect(int fd, struct sockaddr* addr, int len) { long a[]={fd,(long)
 #undef syscall4
 #undef syscall5
 #undef syscall6
+
+/// Linux error code names
+enum Error {OK, PERM, NOENT, SRCH, INTR, EIO, NXIO, TOOBIG, NOEXEC, BADF, CHILD, AGAIN, NOMEM, ACCES, FAULT, NOTBLK, BUSY, EXIST, XDEV, NODEV, NOTDIR, ISDIR, INVAL, NFILE, MFILE, NOTTY, TXTBSY, FBIG, NOSPC, SPIPE, ROFS, MLINK, PIPE, DOM, RANGE, DEADLK, NAMETOOLONG, NOLCK, NOSYS, NOTEMPTY, LOOP, WOULDBLOCK, NOMSG, IDRM, CHRNG, L2NSYNC, L3HLT, L3RST, LNRNG, UNATCH, NOCSI, L2HLT, BADE, BADR, XFULL, NOANO, BADRQC, BADSLT, DEADLOCK, EBFONT, NOSTR, NODATA, TIME, NOSR, NONET, NOPKG, REMOTE, NOLINK, ADV, SRMNT, COMM, PROTO, MULTIHO, DOTDOT, BADMSG, OVERFLOW, NOTUNIQ, BADFD, REMCHG, LIBACC, LIBBAD, LIBSCN, LIBMAX, LIBEXEC, ILSEQ, RESTART, STRPIPE, USERS, NOTSOCK, DESTADDRREQ, MSGSIZE, PROTOTYPE, NOPROTOOPT, PROTONOSUPPORT, SOCKTNOSUPPORT, OPNOTSUPP, PFNOSUPPORT, AFNOSUPPORT, ADDRINUSE, ADDRNOTAVAIL, NETDOWN, NETUNREACH, NETRESET, CONNABORTED, CONNRESET, NOBUFS, ISCONN, NOTCONN, SHUTDOWN, TOOMANYREFS, TIMEDOUT, CONNREFUSED, HOSTDOWN, HOSTUNREACH, ALREADY, INPROGRESS, STALE, UCLEAN, NOTNAM, NAVAIL, ISNAM, REMOTEIO, DQUOT, NOMEDIUM, MEDIUMTYPE, CANCELED, NOKEY, KEYEXPIRED, KEYREVOKED, KEYREJECTED, OWNERDEAD, NOTRECOVERABLE, RFKILL, HWPOISON, LAST};
+constexpr ref<byte> errno[] = {"OK"_, "PERM"_, "NOENT"_, "SRCH"_, "INTR"_, "IO"_, "NXIO"_, "TOOBIG"_, "NOEXEC"_, "BADF"_, "CHILD"_, "AGAIN"_, "NOMEM"_, "ACCES"_, "FAULT"_, "NOTBLK"_, "BUSY"_, "EXIST"_, "XDEV"_, "NODEV"_, "NOTDIR"_, "ISDIR"_, "INVAL"_, "NFILE"_, "MFILE"_, "NOTTY"_, "TXTBSY"_, "FBIG"_, "NOSPC"_, "SPIPE"_, "ROFS"_, "MLINK"_, "PIPE"_, "DOM"_, "RANGE"_, "DEADLK"_, "NAMETOOLONG"_, "NOLCK"_, "NOSYS"_, "NOTEMPTY"_, "LOOP"_, "WOULDBLOCK"_, "NOMSG"_, "IDRM"_, "CHRNG"_, "L2NSYNC"_, "L3HLT"_, "L3RST"_, "LNRNG"_, "UNATCH"_, "NOCSI"_, "L2HLT"_, "BADE"_, "BADR"_, "XFULL"_, "NOANO"_, "BADRQC"_, "BADSLT"_, "DEADLOCK"_, "EBFONT"_, "NOSTR"_, "NODATA"_, "TIME"_, "NOSR"_, "NONET"_, "NOPKG"_, "REMOTE"_, "NOLINK"_, "ADV"_, "SRMNT"_, "COMM"_, "PROTO"_, "MULTIHO"_, "DOTDOT"_, "BADMSG"_, "OVERFLOW"_, "NOTUNIQ"_, "BADFD"_, "REMCHG"_, "LIBACC"_, "LIBBAD"_, "LIBSCN"_, "LIBMAX"_, "LIBEXEC"_, "ILSEQ"_, "RESTART"_, "STRPIPE"_, "USERS"_, "NOTSOCK"_, "DESTADDRREQ"_, "MSGSIZE"_, "PROTOTYPE"_, "NOPROTOOPT"_, "PROTONOSUPPORT"_, "SOCKTNOSUPPORT"_, "OPNOTSUPP"_, "PFNOSUPPORT"_, "AFNOSUPPORT"_, "ADDRINUSE"_, "ADDRNOTAVAIL"_, "NETDOWN"_, "NETUNREACH"_, "NETRESET"_, "CONNABORTED"_, "CONNRESET"_, "NOBUFS"_, "ISCONN"_, "NOTCONN"_, "SHUTDOWN"_, "TOOMANYREFS"_, "TIMEDOUT"_, "CONNREFUSED"_, "HOSTDOWN"_, "HOSTUNREACH"_, "ALREADY"_, "INPROGRESS"_, "STALE"_, "UCLEAN"_, "NOTNAM"_, "NAVAIL"_, "ISNAM"_, "REMOTEIO"_, "DQUOT"_, "NOMEDIUM"_, "MEDIUMTYPE"_, "CANCELED"_, "NOKEY"_, "KEYEXPIRED"_, "KEYREVOKED"_, "KEYREJECTED"_, "OWNERDEAD"_, "NOTRECOVERABLE"_, "RFKILL"_, "HWPOISON"_};
+/// Aborts if \a expr is negative and logs corresponding error code
+#define check(expr, message...) ({ long e=(long)expr; if(e<0 && -e<LAST) warn(#expr ""_, errno[-e], ##message); e; })
+/// Aborts if \a expr is negative and logs corresponding error code (unused result)
+#define check_(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) warn(#expr ""_, errno[-e], ##message); })
+/// Aborts if \a expr is negative and logs corresponding error code (unless EINTR or EAGAIN)
+#define check__(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST && -e!=INTR) warn(#expr ""_, errno[-e], ##message); e; })

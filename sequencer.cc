@@ -3,8 +3,8 @@
 #include "file.h"
 #include "time.h"
 #include "midi.h"
-#include "debug.h"
 #include "time.h"
+
 Sequencer::Sequencer(Thread& thread) : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll("Sequencer"_,Device::fd,POLLIN,thread) {}
 
 void Sequencer::event() {
@@ -12,7 +12,7 @@ void Sequencer::event() {
     if(key & 0x80) { type=key>>4; key=read<uint8>(); }
     uint8 value=0;
     if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value=read<uint8>();
-    else error("Unhandled MIDI event");
+    else error("Unhandled MIDI event"_);
 
     if(type == NoteOn) {
         if(value == 0 ) {
@@ -29,7 +29,7 @@ void Sequencer::event() {
             }
         } else {
             sustained.removeAll(key);
-            assert_(!pressed.contains(key));
+            assert(!pressed.contains(key));
             pressed << key;
             noteEvent(key, min(127,value*3/2)); //x3/2 to use reach maximum velocity without destroying the keyboard
             if(record) {
@@ -42,14 +42,14 @@ void Sequencer::event() {
         if(key==64) {
             sustain = (value != 0);
             if(!sustain) {
-                for(int key : sustained) { noteEvent(key,0); assert_(!pressed.contains(key)); }
+                for(int key : sustained) { noteEvent(key,0); assert(!pressed.contains(key)); }
                 sustained.clear();
             }
         }
     }
 }
 
-void Sequencer::recordMID(const ref<byte>& path) { record=File(path,root(),File::WriteOnly); }
+void Sequencer::recordMID(const ref<byte>& path) { record=File(path,home(),File::WriteOnly); }
 Sequencer::~Sequencer() {
     if(!record) return;
     array<byte> track;

@@ -9,7 +9,7 @@ bool operator <(const ref<byte>& a, const ref<byte>& b);
 
 /// Returns a reference to the string between the \a{begin}th and \a{end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
-ref<byte> section(const ref<byte>& str, byte separator, int begin=0, int end=1, bool includeSeparator=false);
+ref<byte> section(const ref<byte>& str, byte separator, int begin=0, int end=1);
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array< ref<byte> > split(const ref<byte>& str, byte separator=' ');
 /// Returns a reference with heading and trailing whitespace removed
@@ -25,7 +25,7 @@ bool find(const ref<byte>& str, const ref<byte>& substring);
 /// Returns true if s contains only [0-9]
 bool isInteger(const ref<byte>& s);
 /// Parses an integer value
-long toInteger(const ref<byte>& str, int base=10 );
+long toInteger(const ref<byte>& str, int base=10);
 
 /// Forwards ref<byte>
 inline const ref<byte>& str(const ref<byte>& s) { return s; }
@@ -46,7 +46,7 @@ string toLower(const ref<byte>& s);
 string simplify(string&& s);
 
 struct stringz : string { operator const char*(){return (char*)data();}};
-/// Copies the reference and appends null byte
+/// Copies the reference and appends a null byte
 stringz strz(const ref<byte>& s);
 
 /// Forwards string
@@ -64,18 +64,17 @@ inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
 inline string str(const uint64& n) { return dec(n); }
 inline string str(const int64& n) { return dec(n); }
-inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
-inline string str(const long& n) { string s("0x"_); s<<hex(n); return s; }
-inline string str(const ptr& n) { string s("0x"_); s<<hex(n); return s; }
+inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
+template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 
-/// Converts a floating point number to its human-readable representation
+/// Converts floating-point numbers
 string ftoa(float number, int precision=2, int base=10);
 inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
-template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<class T> string str(const array<T>& a, char separator=' ') { return str(ref<T>(a),separator); }
+template<class T> string str(const ref<T>& a) { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
+template<class T> string str(const array<T>& a) { return str(ref<T>(a)); }
 template<class T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string dec(const array<T>& a, char separator=' ') { return dec(ref<T>(a),separator); }
 template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
@@ -115,3 +114,8 @@ template<class A, class B> const cat<A,B>& str(const cat<A,B>& s) { return s; }
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
 template<class A, class ___ Args> string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }
+
+/// Logs to standard output using str(...) serialization
+template<class... Args> void log(const Args&... args) { log((ref<byte>)string(str(args ___))); }
+/// Logs to standard output using str(...) serialization and terminate all threads
+template<class... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args ___))); }

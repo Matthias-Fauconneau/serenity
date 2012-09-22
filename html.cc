@@ -50,7 +50,7 @@ void HTML::load(const URL& url, Map&& document) {
                      find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(e["width"_])&&isInteger(e["height"_])) size = toInteger(e["width"_])*toInteger(e["height"_]);
-                score += size?: find(e["alt"_],"Comic"_)||find(e["alt"_],"Page"_)? 16800: 0;
+                score += size?: find(e["alt"_],"Comic"_)||find(e["alt"_],"Page"_)||find(e["alt"_],"Chapter"_)? 16800: 0;
             }
         } else if(!e.children) return false;
         e.mayVisit([&score](const Element& e)->bool{

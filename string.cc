@@ -10,9 +10,14 @@ bool operator <(const ref<byte>& a, const ref<byte>& b) {
     return a.size > b.size;
 }
 
-ref<byte> str(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return ref<byte>((byte*)s,i); }
+ref<byte> str(const char* s) {
+    if(!s) return "null"_; int i=0; while(s[i]) i++; return ref<byte>((byte*)s,i);
+}
 
-bool startsWith(const ref<byte>& s, const ref<byte>& a) { return a.size<=s.size && ref<byte>(s.data,a.size)==a; }
+bool startsWith(const ref<byte>& s, const ref<byte>& a) {
+    return a.size<=s.size && ref<byte>(s.data,a.size)==a;
+}
+
 bool find(const ref<byte>& s, const ref<byte>& a) {
     if(a.size>s.size) return false;
     for(uint i=0;i<=s.size-a.size;i++) {
@@ -20,11 +25,12 @@ bool find(const ref<byte>& s, const ref<byte>& a) {
     }
     return false;
 }
+
 bool endsWith(const ref<byte>& s, const ref<byte>& a) {
     return a.size<=s.size && ref<byte>(s.data+s.size-a.size,a.size)==a;
 }
 
-ref<byte> section(const ref<byte>& s, byte separator, int begin, int end, bool includeSeparator) {
+ref<byte> section(const ref<byte>& s, byte separator, int begin, int end) {
     if(!s) return ""_;
     uint b,e;
     if(begin>=0) {
@@ -35,7 +41,7 @@ ref<byte> section(const ref<byte>& s, byte separator, int begin, int end, bool i
         if(begin!=-1) {
             auto it=s.end(); --it; --b;
             for(uint i=0;;--it,--b) {
-                if(*it==separator) { i++; if(i>=uint(-begin-1)) { if(!includeSeparator) b++; break; } }
+                if(*it==separator) { i++; if(i>=uint(-begin-1)) { b++; break; } }
                 if(it == s.begin()) break;
             }
         }
@@ -43,18 +49,18 @@ ref<byte> section(const ref<byte>& s, byte separator, int begin, int end, bool i
     if(end>=0) {
         e=0;
         auto it=s.begin();
-        for(uint i=0;it!=s.end();++it,e++) if(*it==separator) { i++; if(i>=(uint)end) { if(includeSeparator) e++; break; } }
+        for(uint i=0;it!=s.end();++it,e++) if(*it==separator) { i++; if(i>=(uint)end) break; }
     } else {
         e=s.size;
         if(end!=-1) {
             auto it=s.end(); --it; --e;
             for(uint i=0;;--it,--e) {
-                if(*it==separator) { i++; if(i>=uint(-end-1)) { if(includeSeparator) e++; break; } }
+                if(*it==separator) { i++; if(i>=uint(-end-1)) break; }
                 if(it == s.begin()) break;
             }
         }
     }
-    assert_(e>=b);
+    assert(e>=b);
     return ref<byte>(s.data+b,e-b);
 }
 
@@ -65,10 +71,12 @@ ref<byte> trim(const ref<byte>& s) {
     return s.slice(begin, end-begin);
 }
 
-bool isInteger(const ref<byte>& s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
+bool isInteger(const ref<byte>& s) {
+    if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
+}
 
 long toInteger(const ref<byte>& number, int base) {
-    assert_(base>=2 && base<=16);
+    assert(base>=2 && base<=16);
     int sign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
@@ -141,7 +149,7 @@ stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return
 /// Number conversions
 
 template<int base> string utoa(uint64 n, int pad) {
-    assert_(base>=2 && base<=16);
+    assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
@@ -154,7 +162,7 @@ template string utoa<2>(uint64,int);
 template string utoa<16>(uint64,int);
 
 template<int base> string itoa(int64 number, int pad) {
-    assert_(base>=2 && base<=16);
+    assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint n=abs(number);
     do {

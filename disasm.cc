@@ -1,6 +1,5 @@
 #include "disasm.h"
 #include "string.h"
-#include "debug.h"
 
 int imm(const byte*& c, int size) {
     int imm;

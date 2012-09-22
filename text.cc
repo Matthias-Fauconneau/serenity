@@ -158,7 +158,7 @@ int2 Text::sizeHint() {
 void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
     int2 offset = position+max(int2(0),(size-textSize)/2);
-    for(const Character& b: characters) substract(offset+b.pos, b.image, opacity);
+    for(const Character& b: characters) substract(offset+b.pos, b.image, 0xFF-opacity);
     for(const Line& l: lines) fill(offset+Rect(l.min-int2(0,1),l.max), black);
 }
 

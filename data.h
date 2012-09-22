@@ -2,10 +2,10 @@
 #include "array.h"
 
 /// Casts raw memory to \a T
-template<class T> const T& raw(const ref<byte>& a) { assert_(a.size==sizeof(T)); return *(T*)a.data; }
+template<class T> const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
 /// Casts between element types
 template<class T, class O> ref<T> cast(const ref<O>& o) {
-    assert_((o.size*sizeof(O))%sizeof(T) == 0);
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
 
@@ -30,14 +30,14 @@ struct Data {
     explicit operator bool() { return available(1); }
 
     /// Returns next byte without advancing
-    byte peek() const { assert_(index<buffer.size()); return buffer[index];}
+    byte peek() const { assert(index<buffer.size()); return buffer[index];}
     /// Peeks at buffer without advancing
-    byte operator[](int i) const { assert_(index+i<buffer.size()); return buffer[index+i]; }
+    byte operator[](int i) const { assert(index+i<buffer.size()); return buffer[index+i]; }
     /// Returns a reference to the next \a size bytes
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
-    void advance(uint count) {assert_(index+count<=buffer.size()); index+=count; }
+    void advance(uint count) {assert(index+count<=buffer.size()); index+=count; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
@@ -60,7 +60,7 @@ struct BinaryData : virtual Data {
     /// Slices a reference to the buffer from \a pos to \a pos + \a size
     BinaryData slice(uint pos, uint size) { return BinaryData(Data::slice(pos,size),isBigEndian); }
     /// Seeks to /a index
-    void seek(uint index) { assert_(index<buffer.size()); this->index=index; }
+    void seek(uint index) { assert(index<buffer.size()); this->index=index; }
     /// Seeks last match for \a key.
     bool seekLast(const ref<byte>& key);
 

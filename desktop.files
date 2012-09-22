@@ -1,8 +1,5 @@
 Makefile
 core.h
-core.cc
-debug.h
-debug.cc
 memory.h
 memory.cc
 array.h

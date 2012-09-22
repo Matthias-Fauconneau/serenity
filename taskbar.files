@@ -1,6 +1,5 @@
 Makefile
 core.h
-core.cc
 array.h
 signal.h
 vector.h

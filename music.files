@@ -1,11 +1,14 @@
 Makefile
 core.h
-array.h
 memory.h
-vector.h
-map.h
+array.h
+linux.h
 string.h
 string.cc
+trace.h
+trace.cc
+vector.h
+map.h
 data.h
 data.cc
 process.h

@@ -21,33 +21,30 @@ void Font::load(const ref<byte>& data, int size) {
     ascender=face->size->metrics.ascender*16/64;
 }
 void Font::setSize(int size) {
-    if(nominalSize==size) return; nominalSize=size;
-    //for(uint i=0;i<128;i++) cacheASCII[i].valid=0; cacheUnicode.clear();
+    if(fontSize==size) return; fontSize=size;
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,size,size,0,0}; FT_Request_Size(face,&req);
     ascender=face->size->metrics.ascender*16/64;
 }
 
-uint16 Font::index(uint16 code) { uint index = FT_Get_Char_Index(face, code); return index?:code; }
+uint16 Font::index(uint16 code) {
+    for(int i=0;i<face->num_charmaps;i++) {
+        FT_Set_Charmap(face, face->charmaps[i] );
+        uint index = FT_Get_Char_Index(face, code);
+        if(index) return index;
+    }
+    error(code);
+}
 
 int Font::kerning(uint16 leftIndex, uint16 rightIndex) { FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*16/64; }
 
 int Font::advance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD); return face->glyph->advance.x*16/64; }
 vec2 Font::size(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD); return vec2(face->glyph->metrics.width / 64.f, face->glyph->metrics.height / 64.f); }
 
-#if CACHE
-const Glyph&
-#else
-Glyph
-#endif
-Font::glyph(uint16 index, int) {
-#if CACHE
+const Glyph& Font::glyph(uint16 index, int) {
     // Lookup glyph in cache
-    Glyph& glyph = index<128 ? cacheASCII[index] : cacheUnicode[index];
+    Glyph& glyph = cache[fontSize][index];
     if(glyph.valid) return glyph;
     glyph.valid=true;
-#else
-    Glyph glyph;
-#endif
 
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
     //FT_Set_Transform(face, 0, {fx,0});
@@ -74,9 +71,5 @@ Font::glyph(uint16 index, int) {
 #else
     glyph.image = move(image);
 #endif
-#if CACHE
     return glyph;
-#else
-    return move(glyph);
-#endif
 }

@@ -51,11 +51,12 @@ struct Sampler : Poll {
     bool read(ptr& swPointer, int16* output, uint size);
     Resampler resampler[2];
 
-    /// Emits period time to update the interface
-    signal<int> timeChanged;
+    /// Emits period time to trigger MIDI file input and update the interface
+    signal<uint> timeChanged;
+    uint64 time = 0;
 
     /// Records performance to WAV file
-    void recordWAV(const ref<byte>& path); File record=0; int16* pcm = 0; int time = 0; ~Sampler();
+    void recordWAV(const ref<byte>& path); File record=0; int16* pcm = 0; ~Sampler();
 
     operator bool() const { return samples.size(); }
 };

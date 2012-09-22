@@ -17,11 +17,10 @@ struct Glyph {
 struct Font {
     Map keep; array<byte> data;
     struct FT_FaceRec_*  face=0;
-    int nominalSize=0, ascender=0;
-#if CACHE
-    Glyph cacheASCII[128];
-    map<uint16, Glyph> cacheUnicode;
-#endif
+    int fontSize=0, ascender=0;
+    map<uint, map<uint16, Glyph> > cache;
+
+    Font(){}
     /// Loads font at /a path scaled to /a size pixels high
     Font(const File& file, int size);
     /// Loads font /a data scaled to /a size pixels high
@@ -40,12 +39,7 @@ struct Font {
     int kerning(uint16 leftIndex, uint16 rightIndex); //space in .4
     /// Caches and returns glyph for \a index at position \a x (in .4)
     /// \a x fractional part is used to return subpixel positionned images
-#if CACHE
-const Glyph&
-#else
-Glyph
-#endif
-    glyph(uint16 index, int x=0);
+    const Glyph& glyph(uint16 index, int x=0);
     /// Renders glyph \a index with transformation matrix \a xx, xy, yx, yy, dx, dy into \a raster
     void render(struct Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 

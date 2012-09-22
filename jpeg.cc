@@ -482,8 +482,8 @@ static const uint8 s_idct_col_table[] = { 1, 1, 2, 3, 3, 3, 3, 3, 3, 4, 5, 5, 5,
 
 void idct(const jpgd_block_t* pSrc_ptr, uint8* pDst_ptr, int block_max_zag)
 {
-    assert_(block_max_zag >= 1);
-    assert_(block_max_zag <= 64);
+    assert(block_max_zag >= 1);
+    assert(block_max_zag <= 64);
 
     if (block_max_zag == 1)
     {
@@ -682,7 +682,7 @@ inline uint jpeg_decoder::get_bits(int num_bits)
 
         m_bits_left += 16;
 
-        assert_(m_bits_left >= 0);
+        assert(m_bits_left >= 0);
     }
     else
         m_bit_buf <<= num_bits;
@@ -719,7 +719,7 @@ inline uint jpeg_decoder::get_bits_no_markers(int num_bits)
 
         m_bits_left += 16;
 
-        assert_(m_bits_left >= 0);
+        assert(m_bits_left >= 0);
     }
     else
         m_bit_buf <<= num_bits;
@@ -773,7 +773,7 @@ inline int jpeg_decoder::huff_decode(huff_tables *pH, int& extra_bits)
     }
     else
     {
-        assert_(((symbol >> 8) & 31) == pH->code_size[symbol & 255] + ((symbol & 0x8000) ? (symbol & 15) : 0));
+        assert(((symbol >> 8) & 31) == pH->code_size[symbol & 255] + ((symbol & 0x8000) ? (symbol & 15) : 0));
 
         if (symbol & 0x8000)
         {
@@ -1631,7 +1631,7 @@ void jpeg_decoder::create_look_ups()
 void jpeg_decoder::fix_in_buffer()
 {
     // In case any 0xFF's where pulled into the buffer during marker scanning.
-    assert_((m_bits_left & 7) == 0);
+    assert((m_bits_left & 7) == 0);
 
     if (m_bits_left == 16)
         stuff_char( (uint8)(m_bit_buf & 0xFF));
@@ -1689,8 +1689,8 @@ void jpeg_decoder::transform_mcu_expand(int mcu_row)
     {
         DCT_Upsample::Matrix44 P, Q, R, S;
 
-        assert_(m_mcu_block_max_zag[mcu_block] >= 1);
-        assert_(m_mcu_block_max_zag[mcu_block] <= 64);
+        assert(m_mcu_block_max_zag[mcu_block] >= 1);
+        assert(m_mcu_block_max_zag[mcu_block] <= 64);
 
         switch (s_max_rc[m_mcu_block_max_zag[mcu_block++] - 1])
         {
@@ -1755,7 +1755,7 @@ void jpeg_decoder::transform_mcu_expand(int mcu_row)
             DCT_Upsample::R_S<8, 8>::calc(R, S, pSrc_ptr);
             break;
         default:
-            assert_(false);
+            assert(false);
         }
 
         DCT_Upsample::Matrix44 a(P + Q); P -= Q;
@@ -1964,7 +1964,7 @@ void jpeg_decoder::decode_next_row()
 
                     s = HUFF_EXTEND(extra_bits, s);
 
-                    assert_(k < 64);
+                    assert(k < 64);
 
                     p[g_ZAG[k]] = static_cast<jpgd_block_t>(dequantize_ac(s, q[k])); //s * q[k];
                 }
@@ -1981,13 +1981,13 @@ void jpeg_decoder::decode_next_row()
                             int kt = k;
                             while (n--)
                             {
-                                assert_(kt <= 63);
+                                assert(kt <= 63);
                                 p[g_ZAG[kt++]] = 0;
                             }
                         }
 
                         k += 16 - 1; // - 1 because the loop counter is k
-                        assert_(p[g_ZAG[k]] == 0);
+                        assert(p[g_ZAG[k]] == 0);
                     }
                     else
                         break;
@@ -2419,7 +2419,7 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
 
             for (l = 1 << (8 - code_size); l > 0; l--)
             {
-                assert_(i < 256);
+                assert(i < 256);
 
                 pH->look_up[code] = i;
 
@@ -2435,7 +2435,7 @@ void jpeg_decoder::make_huff_table(int index, huff_tables *pH)
                     {
                         has_extrabits = true;
                         extra_bits = ((1 << num_extra_bits) - 1) & (code >> (8 - total_codesize));
-                        assert_(extra_bits <= 0x7FFF);
+                        assert(extra_bits <= 0x7FFF);
                         bits_to_fetch += num_extra_bits;
                     }
                 }
@@ -2726,7 +2726,7 @@ jpeg_decoder::coeff_buf* jpeg_decoder::coeff_buf_open(int block_num_x, int block
 
 inline jpgd_block_t *jpeg_decoder::coeff_buf_getp(coeff_buf *cb, int block_x, int block_y)
 {
-    assert_((block_x < cb->block_num_x) && (block_y < cb->block_num_y));
+    assert((block_x < cb->block_num_x) && (block_y < cb->block_num_y));
     return (jpgd_block_t *)(cb->pData + block_x * cb->block_size + block_y * (cb->block_size * cb->block_num_x));
 }
 

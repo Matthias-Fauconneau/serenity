@@ -2,7 +2,6 @@
 #include "linux.h"
 #include "data.h"
 #include "string.h"
-#include "debug.h"
 
 struct timespec { long sec,nsec; };
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
@@ -11,7 +10,7 @@ long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec
 long cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
 
 int daysInMonth(int month, int year=0) {
-    if(month==1 && leap(year)) { assert_(year!=0); return 29; }
+    if(month==1 && leap(year)) { assert(year!=0); return 29; }
     static constexpr int daysPerMonth[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     return daysPerMonth[month];
 }
@@ -19,11 +18,11 @@ int daysInMonth(int month, int year=0) {
 template<class T> bool inRange(T min, T x, T max) { return x>=min && x<max; }
 debug(void Date::invariant() {
     //Date
-    if(year>=0) { assert_(inRange(2012, year, 2013)); }
-    if(month>=0) { assert_(year>=0); assert_(inRange(0, month, 12)); }
-    if(day>=0) { assert_(month>=0); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
+    if(year>=0) { assert(inRange(2012, year, 2013)); }
+    if(month>=0) { assert(year>=0); assert(inRange(0, month, 12)); }
+    if(day>=0) { assert(month>=0); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
     if(weekDay>=0) {
-        assert_(inRange(0, weekDay, 7));
+        assert(inRange(0, weekDay, 7));
         if(year>=0 && month>=0 && day>=0) {
             int setWeekDay = weekDay;
             setDay(day);
@@ -31,9 +30,9 @@ debug(void Date::invariant() {
         }
     }
     //Hour
-    if(hours>=0) { assert_(inRange(0, hours, 24)); }
-    if(minutes>=0) { assert_(inRange(0, minutes, 60)); assert_(hours>=0); }
-    if(seconds>=0) { assert_(inRange(0, seconds, 60)); assert_(minutes>=0); }
+    if(hours>=0) { assert(inRange(0, hours, 24)); }
+    if(minutes>=0) { assert(inRange(0, minutes, 60)); assert(hours>=0); }
+    if(seconds>=0) { assert(inRange(0, seconds, 60)); assert(minutes>=0); }
 })
 void Date::setDay(int monthDay) {
     assert(year>=0 && month>=0);

@@ -106,7 +106,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
 /// Grid
 
 int2 Grid::sizeHint() {
-    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else h++; }
+    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 max(0,0);
     for(uint i=0;i<count();i++) {
         int2 size=at(i).sizeHint();
@@ -116,7 +116,7 @@ int2 Grid::sizeHint() {
 }
 
 array<Rect> Grid::layout(int2 position, int2 size) {
-    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(w<=h) w++; else h++; }
+    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 elementSize = int2(size.x/w,size.y/h);
     int2 margin = (size - int2(w,h)*elementSize) / 2;
     array<Rect> widgets(count());

@@ -19,8 +19,8 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     const T& at(int i) const { return ((T*)this)[i]; }
     T& at(int i) { return ((T*)this)[i]; }
     /// Accessors (checked in debug build)
-    const T& operator[](uint i) const { assert_(i<N); return at(i); }
-    T& operator[](uint i) { assert_(i<N); return at(i); }
+    const T& operator[](uint i) const { assert(i<N); return at(i); }
+    T& operator[](uint i) { assert(i<N); return at(i); }
     /// Operators
     explicit operator bool() const { for(int i=0;i<N;i++) if(at(i)!=0) return true; return false; }
     vector& operator +=(const vector& v) { for(int i=0;i<N;i++) at(i)+=v[i]; return *this; }

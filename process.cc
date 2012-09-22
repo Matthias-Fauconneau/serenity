@@ -2,7 +2,7 @@
 #include "linux.h"
 #include "file.h"
 #include "data.h"
-#include "debug.h"
+#include "trace.h"
 
 /// Linux
 enum{FUTEX_WAIT,FUTEX_WAKE};
@@ -31,13 +31,13 @@ static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer over
 
 /// Log
 static Lock logLock;
-template<> void log_(const ref<byte>& buffer) {/*Locker lock(logLock);*/ write(1,buffer.data,buffer.size); }
-template<> void log(const ref<byte>& buffer) { log_(buffer+"\n"_); }
+void log_(const ref<byte>& buffer) {Locker lock(logLock); write(1,buffer.data,buffer.size); }
+template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 static ref<byte> message;
 template<> void __attribute((noreturn)) error(const ref<byte>& buffer) { message=buffer; tgkill(getpid(),gettid(),SIGABRT); for(;;) pause(); }
 
 /// Semaphore
-void Semaphore::wait(int& futex, int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0))) /*|| (val=futex)<0*/)log(errno[-e]); }
+void Semaphore::wait(int& futex, int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e]); }
 void Semaphore::wake(int& futex) { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
 
 /// Lock
@@ -48,7 +48,7 @@ debug(void Lock::checkOwner(){assert(owner==gettid(),owner,gettid()); owner=0;})
 /// Poll
 void Poll::registerPoll() { thread+=this; thread.post(); }
 void Poll::unregisterPoll() {Locker lock(thread.lock); thread.unregistered<<this;}
-void Poll::queue() {if(!thread.queue.contains(this)){Locker lock(thread.lock); thread.queue+= this; thread.post();}}
+void Poll::queue() {/*if(!thread.queue.contains(this))*/{Locker lock(thread.lock); thread.queue+= this; thread.post();}}
 
 /// EventFD
 enum{EFD_SEMAPHORE=1};
@@ -78,7 +78,6 @@ int Thread::run() {
                 poll->revents = revents;
                 poll->event();
             }
-            //assert(::poll(&pollfds[i],1,0)==0, poll->id, pollfds[i].fd, pollfds[i].events, pollfds[i].revents);
         }
         while(unregistered){Locker lock(thread.lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
     }
@@ -103,14 +102,14 @@ void Thread::event(){
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     extern string trace(int skip, void* ip);
     string s = trace(sig==SIGABRT?3:2,sig==SIGABRT?0:(void*)ctx->ip);
-    if(threads.size()>1) log_("Thread #"_+dec(gettid())+":\n"_+s); else log(s);
+    if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP){
         Locker lock(threadsLock);
         for(Thread* thread: threads) {thread->terminate=true; if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP);}
     }
     if(sig==SIGABRT) { log(message); exit(0); } //Abort doesn't let thread terminate cleanly
     if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); }
-    if(sig==SIGSEGV) { log("Segmentation fault at "_+str(ptr(info->fault.addr))); exit(0); } //Segfault kills the threads to prevent further corruption
+    if(sig==SIGSEGV) { log("Segmentation fault at "_+str(info->fault.addr)); exit(0); } //Segfault kills the threads to prevent further corruption
     if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads
 }
 extern void restore_rt (void) asm ("__restore_rt"); asm(".text\n.align 16\n__restore_rt:\nmovq $15, %rax\nsyscall\n");
@@ -131,9 +130,6 @@ void init() {
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 }
 void exit() { for(Thread* thread: threads) thread->terminate=true; exit_group(0); /*TODO: allow each thread to terminate properly instead of killing with exit_group*/ }
-
-/// Scheduler
-void yield() { sched_yield(); }
 
 /// Environment
 

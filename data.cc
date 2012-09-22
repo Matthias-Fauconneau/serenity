@@ -1,8 +1,7 @@
 #include "data.h"
 #include "string.h"
-#include "debug.h"
 
-ref<byte> BinaryData::untilNull() { uint start=index; while(available(1) && next()){} assert_(index>start); return Data::slice(start,index-1-start); }
+ref<byte> BinaryData::untilNull() { uint start=index; while(available(1) && next()){} assert(index>start); return Data::slice(start,index-1-start); }
 
 bool BinaryData::seekLast(const ref<byte>& key) {
     peek(-1); //try to completely read source

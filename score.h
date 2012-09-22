@@ -2,16 +2,15 @@
 #include "array.h"
 #include "vector.h"
 #include "map.h"
+#include "function.h"
+#include "display.h"
 
+typedef array<int> Chord;
 struct Score {
-    array<float> staffs;
-    array<vec2> positions;
-    //array<int> noteIndices;
-
-    void onGlyph(int, vec2, float,const ref<byte>&, int);
     void onPath(const ref<vec2>&);
-    void synchronize(array<int> MIDI);
+    void onGlyph(int, vec2, float,const ref<byte>&, int);
 
+    array<float> staffs;
     vec2 lastClef;
     array<vec2> repeats;
 
@@ -32,6 +31,19 @@ struct Score {
     };
     map<int, map<int, map< int, Note> > > notes; //[staff][x][y]
     map<int, array<vec2> > dots;
+
+    void synchronize(map<int,Chord>&& chords);
+    map<int,Chord> chords; // chronological MIDI notes key values
+    array<vec2> positions; // MIDI-synchronized note positions in associated PDF
+    array<int> noteIndices; // MIDI-synchronized glyph indices in associated PDF
+
+    uint chordIndex=-1, noteIndex=0;
+    array<int> currentChord;
+    map<int,int> active;
+    map<int,int> expected;
+    void seek(uint time);
+    void noteEvent(int,int);
+    signal<const map<int,byte4>&> highlight;
 
     /*struct Debug {
       vec2 pos;

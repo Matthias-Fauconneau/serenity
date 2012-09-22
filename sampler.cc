@@ -3,9 +3,9 @@
 #include "file.h"
 #include "flac.h"
 #include "time.h"
-#include "debug.h"
 #include "linux.h"
 #include "simd.h"
+#include "string.h"
 
 /// Floating point operations
 inline int floor(float f) { return __builtin_floorf(f); }
@@ -40,7 +40,8 @@ uint availableMemory() {
         uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
         info.insert(string(key), value);
     }
-    return info.at(string("MemFree"_))+info.at(string("Inactive"_))+info.at(string("Active(file)"_));
+    //return info.at(string("MemFree"_))+info.at(string("Inactive"_))+info.at(string("Active(file)"_));
+    return info.at(string("MemFree"_))+info.at(string("Inactive(file)"_))+info.at(string("Active(file)"_));
 }
 
 /// SFZ
@@ -49,13 +50,13 @@ void Sampler::open(const ref<byte>& path) {
     // parse sfz and map samples
     Sample group;
     TextData s = readFile(path);
-    Folder folder = section(path,'/',0,-2,true);
+    Folder folder = section(path,'/',0,-2);
     Sample* sample=0;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
         if(s.match("<group>"_)) { group=Sample(); sample = &group; }
-        else if(s.match("<region>"_)) { assert_(!group.map.data); samples<<move(group); sample = &samples.last();  }
+        else if(s.match("<region>"_)) { assert(!group.map.data); samples<<move(group); sample = &samples.last();  }
         else if(s.match("//"_)) {
             s.untilAny("\n\r"_);
             s.whileAny("\n\r"_);
@@ -102,7 +103,7 @@ void Sampler::open(const ref<byte>& path) {
 
     // Lock compressed samples in memory
     full=0; for(const Sample& s : samples) full += (s.map.size+4095)/4096*4;
-    debug(log("Not locking in debug mode (",full/1024,"MiB)"); return;)
+    debug(log("Not locking in debug mode ("_+dec(full/1024)+" MiB)"_); return;)
     available = availableMemory();
     if(full>available) {
         lock=0; for(const Sample& s : samples) lock += min(s.map.size/4096*4,available*1024/samples.size()/4096*4);
@@ -189,7 +190,6 @@ void Note::decode(uint need) {
     }
 }
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
-    //timeChanged(time); //UI
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
         for(int i=0;i<3;i++) for(uint j=0;j<notes[i].size();) { Note& note=notes[i][j];
             if((note.blockSize==0 && note.readCount<128/*period*/) || extract(note.level,0)<=1.f/(1<<16)) notes[i].removeAt(j); else j++;
@@ -216,7 +216,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 inline void mix(float4& level, float4 step, float4* out, float4* in, uint size) { for(uint i=0;i<size;i++) { out[i] += level * in[i]; level*=step; } }
 void Note::read(float4* out, uint size) {
     if(blockSize==0 && readCount<int(size*2)) return; // end of stream
-    if(readCount.acquire(size*2)) log("underrun"); //ensure decoder follows
+    readCount.acquire(size*2); //ensure decoder follows
     uint beforeWrap = (buffer.capacity-readIndex)/2;
     if(size>beforeWrap) {
         mix(level,step,out,(float4*)(buffer+readIndex),beforeWrap);
@@ -230,36 +230,38 @@ void Note::read(float4* out, uint size) {
     position+=size*2; //keep track of position for release sample level matching
 }
 bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
-    Locker lock(noteReadLock);
-    const uint period=size/2;
-    assert(size%2==0);
+    {Locker lock(noteReadLock);
+        const uint period=size/2;
+        assert(size%2==0);
 
-    float4* buffer = allocate16<float4>(period); clear(buffer, period);
-    // Mix notes which don't need any resampling
-    for(Note& note: notes[1]) note.read(buffer, period);
-    // Mix pitch shifting layers
-    for(int i=0;i<2;i++) {
-        uint inSize=align(2,resampler[i].need(2*period))/2;
-        float4* layer = allocate16<float4>(inSize); clear(layer, inSize);
-        for(Note& note: notes[i*2]) note.read(layer, inSize);
-        resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, period*2);
-        unallocate(layer,inSize);
+        float4* buffer = allocate16<float4>(period); clear(buffer, period);
+        // Mix notes which don't need any resampling
+        for(Note& note: notes[1]) note.read(buffer, period);
+        // Mix pitch shifting layers
+        for(int i=0;i<2;i++) {
+            uint inSize=align(2,resampler[i].need(2*period))/2;
+            float4* layer = allocate16<float4>(inSize); clear(layer, inSize);
+            for(Note& note: notes[i*2]) note.read(layer, inSize);
+            resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, period*2);
+            unallocate(layer,inSize);
+        }
+
+        for(uint i=0;i<period/2;i++) {
+            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),9), sra(cvtps(buffer[i*2+1]),9) ); //8 samples = 4 frames
+        }
+        unallocate(buffer,period);
+
+        swPointer += size;
     }
-
-    for(uint i=0;i<period/2;i++) {
-        ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),9), sra(cvtps(buffer[i*2+1]),9) ); //8 samples = 4 frames
-    }
-    unallocate(buffer,period);
-
-    swPointer += size;
-    //if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16))); time+=period;
     queue(); //queue background decoder in main thread
+    //if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16))); time+=period;
+    time+=size; timeChanged(time); //read MIDI file / update UI
     return true;
 }
 
 void Sampler::recordWAV(const ref<byte>& path) {
     error("Recording unsupported");
-    record = File(path,root(),File::WriteOnly);
+    record = File(path,home(),File::WriteOnly);
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
         int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=48000; int32 bps=48000*4;
         int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } packed header;

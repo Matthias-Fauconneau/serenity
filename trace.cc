@@ -1,4 +1,4 @@
-#include "debug.h"
+#include "trace.h"
 #include "file.h"
 #include "data.h"
 
@@ -207,10 +207,7 @@ string trace(int skip, void* ip) {
         frame=caller_frame(frame);
     }
     string r;
-    for(i--; i>=skip; i--) {
-        Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function); else r<<hex(ptr(stack[i]));
-        if(i>skip) r<<'\n';
-    }
-    if(ip) {  Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function); else r<<hex(ptr(ip)); }
+    for(i=i-2; i>=skip; i--) { Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<hex(ptr(stack[i]))<<"\n"_; }
+    if(ip) { Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<hex(ptr(ip))<<"\n"_; }
     return r;
 }

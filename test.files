@@ -1,14 +1,11 @@
 Makefile
 core.h
-core.cc
 linux.h
 memory.h
 memory.cc
 array.h
 string.h
 string.cc
-debug.h
-debug.cc
 process.h
 process.cc
 

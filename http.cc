@@ -5,8 +5,8 @@
 #include "linux.h"
 #include "map.h"
 #include "memory.h"
-#include "debug.h"
 #include "process.h"
+#include "string.h"
 
 struct sockaddr { uint16 family; uint16 port; uint host; int pad[2]; };
 
@@ -52,7 +52,7 @@ array<byte> SSLSocket::readUpTo(int size) {
 }
 void SSLSocket::write(const ref<byte>& buffer) {
     if(!ssl) return TCPSocket::write(buffer);
-    int size=SSL_write(ssl,buffer.data,buffer.size); if(size!=(int)buffer.size) log("SSL write error",fd,ptr(ssl),size,buffer.size);
+    int size=SSL_write(ssl,buffer.data,buffer.size); assert(size==(int)buffer.size);
 }
 
 /// DNS
@@ -76,7 +76,6 @@ uint resolve(const ref<byte>& host) {
         }
         query << 0 << 0 << 1 << 0 << 1;
         dns.write(query);
-        log_(host+" "_);
         if(!dns.poll(1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!dns.poll(1000)){log("giving up"); return false; }}
         BinaryData s(dns.readUpTo(4096), true);
         header = s.read<Header>();
@@ -88,13 +87,13 @@ uint resolve(const ref<byte>& host) {
             assert(type=1/*A*/); assert(class_==1/*INET*/);
             ip = s.read<uint>(); //IP (no swap)
             string entry = host+" "_+dec(raw(ip),'.')+"\n"_;
-            log(dec(raw(ip),'.'));
+            log(host,dec(raw(ip),'.'));
             dnsCache.write(entry); //add new entry
             dnsMap = dnsCache; //remap cache
             break;
         }
         if(ip==uint(-1)) {
-            log("unknown");
+            log("unknown",host);
             dnsCache.write(string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = dnsCache; //remap cache
         }
@@ -168,7 +167,7 @@ void HTTP::request() {
 void HTTP::header() {
     string file = cacheFile(url);
     // Status
-    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log(buffer); log("No HTTP",url); state=Done; free(this); return; }
+    if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log("No HTTP",url); state=Done; free(this); return; }
     int status = toInteger(until(" "_));
     until("\r\n"_);
     if(status==200||status==301||status==302) {}
@@ -183,7 +182,7 @@ void HTTP::header() {
     else if(status==404) log("Not Found"_,url);
     else if(status==408) log("Request timeout"_);
     else if(status==504) log("Gateway timeout"_);
-    else { log(buffer); warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
+    else { warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
 
     // Headers
     while(!match("\r\n"_)) {

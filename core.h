@@ -83,15 +83,15 @@ inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
 #define debug( statements... )
 #define warn log
 #endif
-// Simplified debug methods (avoid header dependencies on debug.h/string.h/array.h/memory.h)
+// Forward declarations to allow string literal messages without header dependencies on string.h/array.h/memory.h
 /// Logs to standard output
 template<class ___ Args> void log(const Args& ___ args);
 template<> void log(const ref<byte>& message);
 /// Aborts unconditionally and display \a message
 template<class ___ Args> void error(const Args& ___ args)  __attribute((noreturn));
 template<> void error(const ref<byte>& message) __attribute((noreturn));
-/// Aborts if \a expr evaluates to false and display \a expr
-#define assert_(expr) ({debug( if(!(expr)) error(#expr "\n"_); )})
+/// Aborts if \a expr evaluates to false and logs \a expr and \a message
+#define assert(expr, message...) ({debug( if(!(expr)) error(#expr ""_, ##message);)})
 
 /// initializer_list
 namespace std {
@@ -105,7 +105,7 @@ template<class T> struct initializer_list {
     constexpr initializer_list(const T* begin,const T* end) : data(begin), size(uint(end-begin)) {}
     constexpr const T* begin() const { return data; }
     constexpr const T* end() const { return data+size; }
-    const T& operator [](uint i) const { assert_(i<size); return data[i]; }
+    const T& operator [](uint i) const { assert(i<size); return data[i]; }
     explicit operator bool() const { return size; }
     /// Compares all elements
     bool operator ==(const initializer_list<T>& o) const {
@@ -116,9 +116,9 @@ template<class T> struct initializer_list {
     /// Compares to single value
     bool operator ==(const T& value) const { return size==1 && *data == value; }
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    initializer_list<T> slice(uint pos, uint size) const { assert_(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
+    initializer_list<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
     /// Slices a reference to elements from to the end of the reference
-    initializer_list<T> slice(uint pos) const { assert_(pos<=size); return initializer_list<T>(data+pos,size-pos); }
+    initializer_list<T> slice(uint pos) const { assert(pos<=size); return initializer_list<T>(data+pos,size-pos); }
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
     int indexOf(const T& value) const { for(uint i=0;i<size;i++) { if(data[i]==value) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
@@ -141,4 +141,4 @@ template<class A, class B> bool operator !=(const A& a, const B& b) { return !(a
 template<class A, class B> bool operator >(const A& a, const B& b) { return b<a; }
 
 /// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { assert_((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }

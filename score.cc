@@ -17,7 +17,7 @@ void Score::onPath(const ref<vec2>& p) {
     }
 }
 
-void Score::onGlyph(int unused index, vec2 pos, float unused size,const ref<byte>& font, int unused code) {
+void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int code) {
     uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
     int duration=-1;
     // Opus is Sibelius default font, Emmentaler is Lilypond default font
@@ -73,7 +73,7 @@ void Score::onGlyph(int unused index, vec2 pos, float unused size,const ref<byte
 }
 
 struct Tie { uint li; int lx,ly; int ri,rx,ry; Tie():li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
-void Score::synchronize(array<int> MIDI) {
+void Score::synchronize(map<int,Chord>&& chords) {
     staffs << (lastClef.y+96); //add a last split at the bottom of the last page
 
     /// Detect and remove tied notes
@@ -208,6 +208,8 @@ spurious: ;
     }*/
 
     /// Synchronize notes to MIDI track
+    array<int> MIDI; //flatten chords for robust MIDI synchronization
+    for(const Chord& chord: chords.values) MIDI<<chord;
     if(MIDI.size()) {
         map<int,vec2> lastChord; bool lastSync=true;
         uint n=0;
@@ -233,10 +235,11 @@ spurious: ;
 skip: ;
             }
             positions << chord.values;
-            //noteIndices << noteChord.values;
+            noteIndices << noteChord.values;
             lastChord=move(chord); lastSync=sync;
         }
     }
+    this->chords=move(chords);
 
     /// Detect and explicit repeats
     int startIndex=-1;
@@ -246,8 +249,8 @@ skip: ;
         for(int x : notes[i].keys) { if(x>pos.x) break; index=notes[i][x].values[0].index; }
         if(startIndex < 0) startIndex=index;
         else {
-            array<vec2> cat; cat<<positions.slice(0,index+1)<<positions.slice(startIndex+1); positions = move(cat);
-            //noteIndices = noteIndices.slice(0,index+1)+noteIndices.slice(startIndex+1);
+            {array<vec2> cat; cat<<positions.slice(0,index+1)<<positions.slice(startIndex+1); positions = move(cat);}
+            {array<int> cat; cat<<noteIndices.slice(0,index+1)<<noteIndices.slice(startIndex+1); noteIndices = move(cat);}
             startIndex=-1; }
     }
     //dots.clear(); notes.clear(); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear();
@@ -268,4 +271,28 @@ skip: ;
         drawText(&font,9,0,0,d.text);
     }
 #endif
+}
+
+void Score::seek(uint unused time) {
+    assert(time==0,"TODO");
+    chordIndex=-1; noteIndex=0;
+    noteEvent(0,0);
+}
+
+void Score::noteEvent(int key, int vel) {
+    if(vel) {
+        active.insertMulti(key,noteIndex+expected[key]);
+        expected.remove(key);
+    } else {
+        active.remove(key);
+    }
+    if(!expected && chordIndex<chords.size()) {
+        if(chordIndex!=uint(-1)) noteIndex+=chords[chordIndex].size();
+        chordIndex++;
+        int i=0; for(int key: chords[chordIndex]) expected.insertMulti(key,noteIndex+(i++));
+    }
+    map<int,byte4> h;
+    for(int i: active.values) h.insert(i,red);
+    for(int i: expected.values) h.insert(i,blue);
+    highlight(h);
 }

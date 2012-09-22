@@ -1,6 +1,5 @@
 #include "asound.h"
 #include "linux.h"
-#include "debug.h"
 
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
@@ -15,11 +14,11 @@ struct Interval {
     uint min, max; uint openmin:1, openmax:1, integer:1, empty:1;
     Interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0){}
     Interval(uint exact):min(exact),max(exact),openmin(0),openmax(0),integer(1),empty(0){}
-    operator uint() { assert_(integer); assert_(min==max); return max; }
+    operator uint() { assert(integer); assert(min==max); return max; }
 };
 struct Mask {
     int bits[8] = {~0,~0,0,0,0,0,0,0};
-    void set(uint bit) { assert_(bit < 256); bits[0] = bits[1] = 0; bits[bit >> 5] |= (1 << (bit & 31)); }
+    void set(uint bit) { assert(bit < 256); bits[0] = bits[1] = 0; bits[bit >> 5] |= (1 << (bit & 31)); }
 };
 struct HWParams {
     uint flags = NoResample;
@@ -30,8 +29,8 @@ struct HWParams {
     uint rmask, cmask, info, msbits, rate_num, rate_den;
     long fifo_size;
     byte reserved[64];
-    Interval& interval(int i) { assert_(i<12); return intervals[i]; }
-    Mask& mask(int i) { assert_(i<3); return masks[i]; }
+    Interval& interval(int i) { assert(i<12); return intervals[i]; }
+    Mask& mask(int i) { assert(i<3); return masks[i]; }
 };
 struct SWParams {
  int tstamp_mode=0;
@@ -66,7 +65,6 @@ AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)
     buffer= (int16*)check( mmap(0, bufferSize * channels * sizeof(int16), PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, 0) );
     status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, Device::fd, StatusOffset) );
     control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, ControlOffset) );
-    debug(log("period="_+dec((int)periodSize)+" ("_+dec(1000*periodSize/rate)+"ms), buffer="_+dec(bufferSize)+" ("_+dec(1000*bufferSize/rate)+"ms)"_);)
 }
 AudioOutput::~AudioOutput() {
     munmap((void*)status, 0x1000);
@@ -76,7 +74,7 @@ AudioOutput::~AudioOutput() {
 void AudioOutput::start() { io<PREPARE>(); Poll::fd=Device::fd; registerPoll(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
-    if(status->state == XRun) { log("Underrun",underrunCount++); io<PREPARE>(); }
+    if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         if(!read(control->swPointer, buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}

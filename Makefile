@@ -5,7 +5,8 @@ BUILD ?= release
 CC= clang++ -pipe -march=native
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
 FLAGS_debug := -g -fno-omit-frame-pointer -DDEBUG
-FLAGS_fast := -g -O2 -fno-omit-frame-pointer
+FLAGS_fast := -g -DDEBUG -O3
+#-fno-omit-frame-pointer
 FLAGS_profile := -g -O3 -finstrument-functions
 SRCS_profile := profile
 FLAGS_release := -O3

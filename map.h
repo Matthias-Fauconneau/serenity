@@ -1,7 +1,7 @@
 #pragma once
 #include "array.h"
 #include "meta.h" //perfect forwarding
-#include "debug.h"
+#include "string.h"
 
 template<class K, class V> struct const_pair { const K& key; const V& value; };
 template<class K, class V> struct pair { K& key; V& value; };
@@ -30,12 +30,17 @@ template<class K, class V> struct map {
     template<perfect2(K,V)> void insertMulti(Kf&& key, Vf&& value) {
         keys << forward<Kf>(key); values << forward<Vf>(value);
     }
+    /// Returns value for \a key, inserts a new sorted key with a default value if not existing
+    template<perfect(K)> V& sorted(Kf&& key) {
+        int i = keys.indexOf(key); if(i>=0) return values[i];
+        return values.insertAt(keys.insertSorted(key),V());
+    }
     template<perfect(K)> V& insert(Kf&& key) {
         assert(!contains(key),key);
         keys << forward<Kf>(key); values << V(); return values.last();
     }
     V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
-    void remove(const K& key) { int i=keys.indexOf(key); assert_(i>=0); keys.removeAt(i); values.removeAt(i); }
+    void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
         const K* k; const V* v;

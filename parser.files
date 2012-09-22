@@ -1,9 +1,6 @@
 Makefile
 core.h
-core.cc
 linux.h
-debug.h
-debug.cc
 memory.h
 memory.cc
 array.h

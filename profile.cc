@@ -1,5 +1,6 @@
 #include "map.h"
 #include "time.h"
+#include "trace.h"
 
 static bool profile = 0;
 static int untraced;
