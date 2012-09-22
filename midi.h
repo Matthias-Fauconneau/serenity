@@ -17,7 +17,8 @@ struct MidiFile {
 
     enum State { Seek=0, Play=1, Sort=2 };
     void read(Track& track, uint time, State state);
+    uint time=0;
     void seek(uint time);
-    void update(uint time);
+    void update(uint delta);
 
 };

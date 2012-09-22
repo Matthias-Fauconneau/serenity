@@ -202,12 +202,12 @@ string trace(int skip, void* ip) {
     void* frame = __builtin_frame_address(0);
     int i=0;
     for(;i<16;i++) {
-        if(ptr(frame)<0x10) break;
+        if(ptr(frame)<0x10000) break;
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }
     string r;
-    for(i=i-2; i>=skip; i--) { Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<hex(ptr(stack[i]))<<"\n"_; }
+    for(i=i-3; i>=skip; i--) { Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<hex(ptr(stack[i]))<<"\n"_; }
     if(ip) { Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<hex(ptr(ip))<<"\n"_; }
     return r;
 }

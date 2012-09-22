@@ -30,7 +30,7 @@ template<class O, class R, class... Args> struct const_method<O, R(Args...)> : f
 
 template<class R, class... Args> struct function;
 template<class R, class... Args> struct function<R(Args...)> {
-    long any[6]; //always store functor on stack
+    long any[6]; //always store functor inline
     template<class F> function(F f) {
         static_assert(sizeof(lambda<F,R(Args...)>)<=sizeof(any),"");
         new (any) lambda<F,R(Args...)>(move(f));
@@ -43,7 +43,7 @@ template<class R, class... Args> struct function<R(Args...)> {
         static_assert(sizeof(const_method<O,R(Args...)>)<=sizeof(any),"");
         new (any) const_method<O,R(Args...)>(object, pmf);
     }
-#pragma GCC system_header //-Wstrict-aliasing
+//#pragma GCC system_header //-Wstrict-aliasing
     R operator()(Args... args) const { return ((functor<R(Args...)>&)any)(forward<Args>(args)___); }
 };
 

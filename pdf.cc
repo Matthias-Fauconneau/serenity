@@ -2,6 +2,8 @@
 #include "file.h"
 #include "font.h"
 #include "inflate.h"
+#include "display.h"
+#include "text.h" //annotations
 
 struct Variant { //TODO: union
     enum { Number, Data, List, Dict } type;
@@ -118,7 +120,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     x1 = +__FLT_MAX__, x2 = -__FLT_MAX__; vec2 pageOffset=0;
     array<Variant> pages = move(parse(xref[catalog.at("Pages"_).number]).dict.at("Kids"_).list);
     for(const Variant& page : pages) {
-        uint unused pageFirstLine = lines.size(), pageFirstCharacter = characters.size();
+        uint pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
         auto dict = parse(xref[page.number]).dict;
         Variant empty(0);
         for(auto e : toDict(xref,move(toDict(xref,move(dict.value("Resources"_,empty))).value("Font"_,empty)))) {
@@ -226,26 +228,23 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     args.clear();
                 }
             }
-            // tighten page bounds
-            pageOffset += vec2(0,y1-y2-16);
-            vec2 offset = pageOffset+vec2(0,-y1);
-            for(uint i=pageFirstLine;i<lines.size();i++) lines[i].a += offset, lines[i].b += offset;
-            for(uint i=pageFirstCharacter;i<characters.size();i++) characters[i].pos += offset;
-            const auto& cropBox = (dict.find("CropBox"_)?:dict.find("MediaBox"_)?:&empty)->list;
-            float scale = 1280/cropBox[2].number; // Normalize width to 1280 for onGlyph/onPath callbacks
-            for(uint i=pageFirstCharacter;i<characters.size();i++) { Character& c = characters[i];
-                onGlyph(i, scale*vec2(c.pos.x-x1,-c.pos.y), scale*c.size, c.font->name, c.code);
-            }
-            for(const auto& path : paths) {
-                array<vec2> scaled; for(vec2 p : path) scaled<<scale*vec2(p.x,-p.y-pageOffset.y);
-                onPath(scaled);
-            }
-            paths.clear();
         }
+        // tighten page bounds
+        pageOffset += vec2(0,y1-y2-16);
+        vec2 offset = pageOffset+vec2(0,-y1);
+        for(uint i=pageFirstLine;i<lines.size();i++) lines[i].a += offset, lines[i].b += offset;
+        for(uint i=pageFirstCharacter;i<characters.size();i++) characters[i].pos += offset;
+        for(uint i=pageFirstPath;i<paths.size();i++) for(vec2& pos: paths[i]) pos += offset;
     }
     y2=pageOffset.y;
     for(Line& l: lines) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; assert(l.a!=l.b,l.a,l.b); }
     for(Character& c: characters) c.pos.x-=x1, c.pos.y=-c.pos.y;
+    for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
+
+    float scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
+    for(uint i=0;i<characters.size();i++) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code); }
+    for(const array<vec2>& path : paths) { array<vec2> scaled; for(vec2 pos : path) scaled<<scale*pos; onPath(scaled); }
+    paths.clear();
 }
 
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
@@ -339,16 +338,23 @@ void PDF::render(int2 position, int2 size) {
 
     for(const Line& l: lines) {
         vec2 a = scale*l.a, b = scale*l.b;
-        if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
         a+=vec2(position), b+=vec2(position);
-        if(a!=b) line(a.x,a.y,b.x,b.y);
+        if((a.y < 0 && b.y < 0) || (a.y > size.y && b.y > size.y)) continue;
+        if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
+        line(a.x,a.y,b.x,b.y);
     }
 
     int i=0; for(const Character& c: characters) {
-        c.font->font.setSize(round(scale*c.size*64));
-        const Glyph& glyph = c.font->font.glyph(c.index);
-        if(!glyph.image) continue;
-        substract(position+int2(round(scale*c.pos.x), round(scale*c.pos.y))+glyph.offset,glyph.image,highlight.value(i,black));
+        int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
+        if(pos.y>0 && pos.y<size.y) { //clip without glyph cache lookup
+            c.font->font.setSize(round(scale*c.size*64));
+            const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
+            if(!glyph.image) continue;
+            substract(pos+glyph.offset,glyph.image,colors.value(i,black));
+        }
         i++;
     }
+
+    static Font font __(string(),array<float>(),::Font(File("dejavu/DejaVuSans.ttf"_,::fonts()),10));
+    for(const pair<vec2,string>& text: annotations) Text(copy(text.value)).render(position+int2(text.key*scale/normalizedScale),int2(0,0));
 }

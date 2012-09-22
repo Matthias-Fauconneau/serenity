@@ -41,9 +41,10 @@ void Semaphore::wait(int& futex, int val) { int e; while((e=check__(::futex(&fut
 void Semaphore::wake(int& futex) { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
 
 /// Lock
-debug(void Lock::setOwner(){assert(!owner,owner); owner=gettid();})
-debug(void Lock::checkRecursion(){assert(owner!=gettid(),owner,gettid());})
-debug(void Lock::checkOwner(){assert(owner==gettid(),owner,gettid()); owner=0;})
+debug(
+        void Lock::setOwner() { assert(!owner,owner); owner=gettid(); }
+        void Lock::checkRecursion() { assert(owner!=gettid(),owner,gettid()); }
+        void Lock::checkOwner() { assert(owner==gettid(),owner,gettid()); owner=0; } )
 
 /// Poll
 void Poll::registerPoll() { thread+=this; thread.post(); }
@@ -55,21 +56,21 @@ enum{EFD_SEMAPHORE=1};
 EventFD::EventFD():Stream(eventfd2(0,0)){}
 
 /// Thread
-Thread::Thread():Poll("Queue"_,EventFD::fd,POLLIN,*this){}
+static array<Thread*> threads; /// Process-wide thread list to trace all threads when one fails
+static Lock threadsLock; /// Lock to synchronize thread list edition
+Thread defaultThread; /// Handle for the main thread (group leader)
+Thread::Thread():Poll("Queue"_,EventFD::fd,POLLIN,*this){Locker lock(threadsLock); threads<<this;}
 static int run(void* thread) { return ((Thread*)thread)->run(); }
-void Thread::spawn(int unused priority) {
+Thread::Thread(int priority):Thread(){
     this->priority=priority;
     static constexpr int stackSize = 1<<20;
-    void* stack = (void*)check(mmap(0,stackSize,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0));
-    mprotect(stack,4096,0);
-    clone(::run,(byte*)stack+stackSize,CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
+    stack = Map(0,0,stackSize,Map::Read|Map::Write,Map::Private|Map::Anonymous);
+    mprotect((void*)stack.data,0x1000,0);
+    clone(::run,(void*)(stack.data+stackSize),CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
 }
-static array<Thread*> threads; static Lock threadsLock;
-Thread defaultThread;
 int Thread::run() {
     tid=gettid();
     if(priority) check_(setpriority(0,0,priority));
-    {Locker lock(threadsLock); threads<<this;}
     while(!terminate && size()>1/*Thread always register itself to handle queue events*/) {
         uint size=this->size(); pollfd pollfds[size]; for(uint i=0;i<size;i++) pollfds[i]=*at(i);
         if(check__(::poll(pollfds,size,-1))!=INTR) for(uint i=0;i<size;i++) {

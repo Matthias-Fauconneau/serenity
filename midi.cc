@@ -53,9 +53,10 @@ void MidiFile::seek(uint time) {
     for(Track& track: tracks) {
         if(time < track.time) { track.time=0; track.data.index=0; }
         read(track,time,Seek);
-        track.time -= time;
     }
+    this->time=time;
 }
-void MidiFile::update(uint time) {
+void MidiFile::update(uint delta) {
+    this->time+=delta;
     for(Track& track: tracks) read(track,time,Play);
 }

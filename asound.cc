@@ -1,11 +1,10 @@
 #include "asound.h"
-#include "linux.h"
+#include "string.h"
 
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
 enum Format { S16_LE=2 };
 enum SubFormat { Standard=0 };
-enum MMap { StatusOffset = 0x80000000, ControlOffset = 0x81000000 };
 enum Masks { Access, Format, SubFormat };
 enum Intervals { SampleBits, FrameBits, Channels, Rate, PeriodTime, PeriodSize, PeriodBytes, Periods, BufferTime, BufferSize };
 enum Flags { NoResample=1, ExportBuffer=2, NoPeriodWakeUp=4 };
@@ -62,16 +61,11 @@ AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * periodSize;
-    buffer= (int16*)check( mmap(0, bufferSize * channels * sizeof(int16), PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, 0) );
-    status = (Status*)check( mmap(0, 0x1000, PROT_READ, MAP_SHARED, Device::fd, StatusOffset) );
-    control = (Control*)check( mmap(0, 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, Device::fd, ControlOffset) );
+    buffer= (int16*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * sizeof(int16), Map::Write)).data);
+    status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data);
+    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Read|Map::Write)).data);
 }
-AudioOutput::~AudioOutput() {
-    munmap((void*)status, 0x1000);
-    munmap(control, 0x1000);
-    munmap(buffer, bufferSize * channels * 2);
-}
-void AudioOutput::start() { io<PREPARE>(); Poll::fd=Device::fd; registerPoll(); }
+void AudioOutput::start() { if(status->state != Setup) error(status->state); io<PREPARE>(); Poll::fd=Device::fd; registerPoll(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
     if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }

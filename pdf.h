@@ -4,7 +4,8 @@
 #include "matrix.h"
 #include "map.h"
 #include "font.h"
-#include "interface.h"
+#include "widget.h"
+#include "function.h"
 
 struct PDF : Widget {
     Map file;
@@ -31,11 +32,19 @@ struct PDF : Widget {
     array<Character> characters;
     void drawText(Font* font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data);
 
-    signal<int, vec2, float,const ref<byte>&, int> onGlyph;
+    /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document
+    signal<int /*index*/, vec2 /*position*/, float /*size*/,const ref<byte>& /*font*/, int /*code*/> onGlyph;
     signal<const ref<vec2>&> onPath;
     array< array<vec2> > paths;
+    float normalizedScale; // scale semantic positions to "pixels" (normalize width to 1280)
 
-    map<int,byte4> highlight;
-    void setHighlight(const map<int,byte4>& highlight) { this->highlight=copy(highlight); contentChanged(); }
+    map<int,byte4> colors;
+    /// Overrides color for the given characters
+    void setColors(const map<int,byte4>& colors) { this->colors=copy(colors); contentChanged(); }
+    map<vec2, string> annotations;
+    /// Renders additionnal text annotations
+    void setAnnotations(const map<vec2, string>& annotations) { this->annotations=copy(annotations); contentChanged(); }
+
     signal<> contentChanged;
+    signal<int> hiddenHighlight;
 };

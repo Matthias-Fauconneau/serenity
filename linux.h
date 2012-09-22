@@ -93,7 +93,6 @@ syscall1(int, close, int,fd)
 syscall2(int, fstat, int,fd, struct stat*,buf)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
 syscall3(int, lseek, int,fd, long,offset, int,whence)
-enum {PROT_READ=1, PROT_WRITE=2}; enum {MAP_FILE, MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS=0x20}; //FIXME
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, munmap, void*,addr, long,len)
 syscall3(int, mprotect, void*,addr, long,len, int,prot)
@@ -143,10 +142,10 @@ inline __attribute((noreturn)) int exit(int status) {r(r0,status) r(rN,sys::exit
 inline __attribute((noreturn)) int exit_group(int status) {r(r0,status)  r(rN,sys::exit_group); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noinline)) long clone(int (*fn)(void*), void* stack, int flags, void* arg) {
     r(rN,sys::clone) r(r0,flags) r(r1,stack) r(r2,0) r(r3,0) r(r4,0) register long r asm(rR);
-    asm volatile("mov %0, %%r14; mov %1, %%r15"::"r"(arg), "r"(fn));
+    asm volatile("mov %0, %%r14; mov %1, %%r15"::"r"(arg), "r"(fn): "r14", "r15");
     asm volatile("syscall": "=r"(r):"r"(rN), "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4) : "rsp", "rcx", "r9", "r11");
     if(r!=0) return r;
-    asm("movq $0, %%rbp; movq %%r14, %%rdi; call *%%r15; movq %%rax, %%rdi; call exit":::/*"rbp",*/"rsp","rdi","rax");
+    asm("movq $0, %%rbp; movq %%r14, %%rdi; call *%%r15; movq %%rax, %%rdi; movq $60, %%rax; syscall":::/*"rbp",*/"rsp","rdi","rax");
     __builtin_unreachable();
 }
 #if __i386

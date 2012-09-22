@@ -148,7 +148,7 @@ template<class T> struct array {
 };
 
 /// Copies all elements in a new array
-template<class T> array<T> copy(const array<T>& o) { return array<T>((ref<T>)o); }
+template<class T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; return copy; }
 
 /// Replaces in \a array every occurence of \a before with \a after
 template<class T> array<T> replace(array<T>&& a, const T& before, const T& after) {

@@ -52,7 +52,7 @@ array<byte> SSLSocket::readUpTo(int size) {
 }
 void SSLSocket::write(const ref<byte>& buffer) {
     if(!ssl) return TCPSocket::write(buffer);
-    int size=SSL_write(ssl,buffer.data,buffer.size); assert(size==(int)buffer.size);
+    int unused size=SSL_write(ssl,buffer.data,buffer.size); assert(size==(int)buffer.size);
 }
 
 /// DNS
@@ -60,7 +60,7 @@ void SSLSocket::write(const ref<byte>& buffer) {
 uint ip(TextData& s) { int a=s.integer(), b=(s.match('.'),s.integer()), c=(s.match('.'),s.integer()), d=(s.match('.'),s.integer()); return (d<<24)|(c<<16)|(b<<8)|a; }
 uint nameserver() { TextData s=readFile("/etc/resolv.conf"_); s.until("nameserver "_); return ip(s); }
 uint resolve(const ref<byte>& host) {
-    static File dnsCache = File("dns"_,cache(),File::ReadWrite|File::Create|File::Append);
+    static File dnsCache = File("dns"_,cache(),ReadWrite|Create|Append);
     static Map dnsMap = dnsCache;
     uint ip=-1;
     for(TextData s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)

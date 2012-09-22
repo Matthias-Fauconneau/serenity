@@ -4,10 +4,8 @@
 #include "image.h"
 
 /// Rich text format control code encoded in 00-1F range
-///// \note Strike|Bold (\t) and Strike|Italic (\n) cannot be used
-/// \note Mono|Bold (\t) and Mono|Italic (\n) cannot be used
 /// \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
-enum Format { Regular=0,Bold=1,Italic=2,Underline=4,/*Strike=8,*/Mono=8,Link=16 };
+enum Format { Regular=0,Bold=1,Italic=2,Underline=4, /*8,'\n','\t'*/ Link=16 };
 inline string format(Format f) { assert(f<32); string s; s << (char)f; return s; }
 inline Format format(uint f) { assert(f<32); return Format(f); }
 

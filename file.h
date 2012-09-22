@@ -60,13 +60,13 @@ struct Socket : Stream {
     Socket(int domain, int type);
 };
 
+enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, Asynchronous=020000};
 struct File : Stream {
     File(int fd):Stream(fd){}
-    enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, Asynchronous=020000};
     /// Opens \a file
     /// If read only, fails if not existing
     /// If write only, fails if existing
-    File(const ref<byte>& file, const Folder& at=root(), int flags=ReadOnly);
+    File(const ref<byte>& file, const Folder& at=root(), uint flags=ReadOnly);
     /// Returns file size
     int size() const;
     /// Seeks to \a index
@@ -102,10 +102,11 @@ struct Map : ref<byte> {
     Map(){}
     Map(const File& file);
     Map(const ref<byte>& file, const Folder& at=root()):Map(File(file,at)){}
+    enum {Read=1, Write=2}; enum {Shared=1, Private=2, Anonymous=32};
+    Map(uint fd, uint offset, uint size, uint prot, uint flags=Shared);
     Map(Map&& o):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
     move_operator(Map)
     ~Map();
-    explicit operator bool() { return data && size; }
     /// Locks memory map in RAM
     void lock(uint size) const;
 };
@@ -118,4 +119,4 @@ long modifiedTime(const ref<byte>& path, const Folder& at=root());
 void touchFile(const ref<byte>& path, const Folder& at=root());
 
 enum { Recursive=1, Sort=2, Folders=4, Files=8 };
-array<string> listFiles(const ref<byte>& folder, int flags, const Folder& at=root());
+array<string> listFiles(const ref<byte>& folder, uint flags, const Folder& at=root());

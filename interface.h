@@ -12,8 +12,9 @@ struct ScrollArea : Widget {
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() =0;
     /// Ensures \a target is visible inside the region of the viewport
-    /// \note Assumes \a target is a direct child of the proxied \a widget
-    //void ensureVisible(Widget& target);
+    void ensureVisible(Rect target);
+    /// Centers \a target in the viewport
+    void center(int2 target);
     /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
     int2 delta=0, dragStart, flickStart;
@@ -21,6 +22,7 @@ struct ScrollArea : Widget {
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
     void render(int2 position, int2 size) override;
+    int2 size; // keep last size for ensureVisible
 };
 
 /// Scroll<T> implements a scrollable \a T by proxying it through \a ScrollArea

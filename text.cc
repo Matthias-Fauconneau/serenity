@@ -84,9 +84,6 @@ struct TextLayout {
                 } else if(format&Italic) {
                     if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font(File("dejavu/DejaVuSans-Oblique.ttf"_,fonts()), size));
                     font = &defaultItalic.at(size);
-                } else if(format&Mono) {
-                    if(!defaultMono.contains(size)) defaultMono.insert(size,Font(File("dejavu/DejaVuSansMono.ttf"_,fonts()), size));
-                    font = &defaultMono.at(size);
                 } else {
                     if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("dejavu/DejaVuSans.ttf"_,fonts()), size));
                     font = &defaultSans.at(size);

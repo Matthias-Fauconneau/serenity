@@ -5,6 +5,7 @@
 /// ScrollArea
 
 void ScrollArea::render(int2 position, int2 size) {
+    this->size=size;
     int2 hint = abs(widget().sizeHint());
     delta = min(int2(0,0), max(size-hint, delta));
     widget().render(position+delta, max(hint,size));
@@ -27,7 +28,8 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, MouseButton but
     return false;
 }
 
-//void ScrollArea::ensureVisible(Widget& target) { delta = max(-target.position, min(size-(target.position+target.size), widget().position)); }
+void ScrollArea::ensureVisible(Rect target) { delta = max(-target.min, min(size-target.max, delta)); }
+void ScrollArea::center(int2 target) { delta = size/2-target; }
 
 /// Progress
 

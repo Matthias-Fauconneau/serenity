@@ -52,7 +52,7 @@ struct Sampler : Poll {
     Resampler resampler[2];
 
     /// Emits period time to trigger MIDI file input and update the interface
-    signal<uint> timeChanged;
+    signal<uint /*delta*/> timeChanged;
     uint64 time = 0;
 
     /// Records performance to WAV file

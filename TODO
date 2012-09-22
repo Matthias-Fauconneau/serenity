@@ -1,6 +1,6 @@
-music: score, reverb
+music: scroll score, FIR reverb
 fibermesh
 apps: shell, file manager, search, imap, torrent, irc, video
-own: font, inflate, jpeg, mp3, ssl
+own: inflate, jpeg, mp3, font, ssl
 IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion, git, static analyzer, interpreter, profiler, compiler
 touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

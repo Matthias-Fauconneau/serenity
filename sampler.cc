@@ -3,7 +3,6 @@
 #include "file.h"
 #include "flac.h"
 #include "time.h"
-#include "linux.h"
 #include "simd.h"
 #include "string.h"
 
@@ -103,7 +102,6 @@ void Sampler::open(const ref<byte>& path) {
 
     // Lock compressed samples in memory
     full=0; for(const Sample& s : samples) full += (s.map.size+4095)/4096*4;
-    debug(log("Not locking in debug mode ("_+dec(full/1024)+" MiB)"_); return;)
     available = availableMemory();
     if(full>available) {
         lock=0; for(const Sample& s : samples) lock += min(s.map.size/4096*4,available*1024/samples.size()/4096*4);
@@ -206,7 +204,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         const Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-        s.map.lock(size);
+        debug(if(0)) s.map.lock(size); //not locking in debug mode
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }
@@ -255,13 +253,13 @@ bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
     }
     queue(); //queue background decoder in main thread
     //if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16))); time+=period;
-    time+=size; timeChanged(time); //read MIDI file / update UI
+    time+=size; timeChanged(size); //read MIDI file / update UI
     return true;
 }
 
 void Sampler::recordWAV(const ref<byte>& path) {
     error("Recording unsupported");
-    record = File(path,home(),File::WriteOnly);
+    record = File(path,home(),WriteOnly);
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
         int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=48000; int32 bps=48000*4;
         int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } packed header;

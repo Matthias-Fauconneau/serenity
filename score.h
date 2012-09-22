@@ -11,7 +11,7 @@ struct Score {
     void onGlyph(int, vec2, float,const ref<byte>&, int);
 
     array<float> staffs;
-    vec2 lastClef;
+    vec2 lastClef=vec2(0,0);
     array<vec2> repeats;
 
     struct Line {
@@ -29,27 +29,22 @@ struct Score {
         Note(int index, int duration) : index(index), duration(duration) {}
         int index,duration;
     };
-    map<int, map<int, map< int, Note> > > notes; //[staff][x][y]
+    typedef map<int, map< int, Note> > Staff;
+    array<Staff> notes; //[staff][x][y]
     map<int, array<vec2> > dots;
 
     void synchronize(map<int,Chord>&& chords);
     map<int,Chord> chords; // chronological MIDI notes key values
     array<vec2> positions; // MIDI-synchronized note positions in associated PDF
-    array<int> noteIndices; // MIDI-synchronized glyph indices in associated PDF
+    array<int> indices; // MIDI-synchronized character indices in associated PDF
 
-    uint chordIndex=-1, noteIndex=0;
+    uint chordIndex=-1, noteIndex=0, currentStaff=0;
     array<int> currentChord;
     map<int,int> active;
     map<int,int> expected;
     void seek(uint time);
     void noteEvent(int,int);
-    signal<const map<int,byte4>&> highlight;
-
-    /*struct Debug {
-      vec2 pos;
-      string text;
-      Debug(){}
-      Debug(vec2 pos,string text):pos(pos),text(text){}
-    };
-    array<Debug> debug;*/
+    signal<const map<int,byte4>&> activeNotesChanged;
+    signal<float,float> nextStaff;
+    map<vec2, string> debug;
 };

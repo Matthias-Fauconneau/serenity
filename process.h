@@ -75,9 +75,11 @@ struct Thread : array<Poll*>, EventFD, Poll {
     array<Poll*> queue; // Poll objects queued on this thread
     array<Poll*> unregistered; // Poll objects removed while in event loop
     Lock lock;
+    Map stack;
+    /// Default constructor for main thread
     Thread();
     /// Spawns a thread executing \a run
-    void spawn(int priority=0);
+    Thread(int priority);
     /// Processes all events on \a polls and tasks on \a queue
     int run();
     /// Processes one queued task

@@ -78,7 +78,7 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 /// File
 
-File::File(const ref<byte>& file, const Folder& at, int flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
+File::File(const ref<byte>& file, const Folder& at, uint flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
 int File::size() const { stat sb; check_(fstat(fd, &sb)); return sb.size; }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
@@ -88,11 +88,11 @@ array<byte> readFile(const ref<byte>& path, const Folder& at) {
     debug(if(file.size()>1<<16) {warn(path,"use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_);})
     return file.read(file.size());
 }
-void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at) { File(file,at,File::WriteOnly|File::Create|File::Truncate).write(content); }
+void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at) { File(file,at,WriteOnly|Create|Truncate).write(content); }
 
 /// Map
-
-Map::Map(const File& file) { size=file.size(); data = size?(byte*)check(mmap(0,size,PROT_READ,MAP_PRIVATE,file.fd,0)):0; }
+Map::Map(const File& file) { size=file.size(); data = size?(byte*)check(mmap(0,size,Map::Read,Private,file.fd,0)):0; }
+Map::Map(uint fd, uint offset, uint size, uint prot, uint flags){ this->size=size; data=(byte*)check(mmap(0,size,prot,flags,fd,offset)); }
 Map::~Map() { if(data) munmap((void*)data,size); }
 void Map::lock(uint size) const { assert(size<=this->size); check_(mlock(data, size)); }
 /// File system

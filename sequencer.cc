@@ -49,7 +49,7 @@ void Sequencer::event() {
     }
 }
 
-void Sequencer::recordMID(const ref<byte>& path) { record=File(path,home(),File::WriteOnly); }
+void Sequencer::recordMID(const ref<byte>& path) { record=File(path,home(),WriteOnly); }
 Sequencer::~Sequencer() {
     if(!record) return;
     array<byte> track;
