@@ -73,8 +73,8 @@ inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
-template<class T> string str(const ref<T>& a) { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
-template<class T> string str(const array<T>& a) { return str(ref<T>(a)); }
+template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<class T> string str(const array<T>& a, char separator=' ') { return str(ref<T>(a),separator); }
 template<class T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string dec(const array<T>& a, char separator=' ') { return dec(ref<T>(a),separator); }
 template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
@@ -117,5 +117,7 @@ template<class A, class ___ Args> string str(const A& a, const Args& ___ args) {
 
 /// Logs to standard output using str(...) serialization
 template<class... Args> void log(const Args&... args) { log((ref<byte>)string(str(args ___))); }
+/// Logs to standard output using str(...) serialization
+template<> inline void log(const string& s) { log((ref<byte>)s); }
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<class... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args ___))); }

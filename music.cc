@@ -23,9 +23,9 @@ struct Music : Application, Widget {
     AudioOutput audio __({&sampler, &Sampler::read},thread,true);
     Sequencer input __(thread);
 
-    //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
-    //Music(){ writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
+    ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
     Music(){
+        writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
         window.localShortcut(Escape).connect(this,&Application::quit);
         auto args = arguments();

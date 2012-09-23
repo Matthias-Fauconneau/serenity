@@ -15,8 +15,7 @@ struct Image {
     move_operator(Image)
 
     Image(){}
-    Image(byte4* data, int width, int height, int stride, bool own, bool alpha) :
-        data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
+    Image(byte4* data, int width, int height, int stride, bool own, bool alpha) : data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
     Image(int width, int height, bool alpha=false, int stride=0)
         : data(allocate<byte4>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true), alpha(alpha) {
         assert(width); assert(height);
@@ -45,7 +44,7 @@ template<> inline Image copy(const Image& src) {Image dst(src.width,src.height,s
 Image resize(const Image& image, uint width, uint height);
 /// Flip the image around the horizontal axis in place
 inline Image flip(Image&& image) {
-    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++)  swap(image(x,y),image(x,h-1-y));
+    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) swap(image(x,y),image(x,h-1-y));
     return move(image);
 }
 /// Decodes \a file to an Image

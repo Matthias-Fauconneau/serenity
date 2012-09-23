@@ -33,16 +33,15 @@ Image decodeICO(const ref<byte>& file) {
     uint size = header.depth*w*h/8;
     if(size>s.available(size)) { warn("Invalid ICO"); return Image(); }
 
-    byte4* image = allocate<byte4>(w*h);
-    ref<byte> source = s.read<byte>(size);
-    assert(source,size);
-    byte* src=(byte*)source.data;
-    if(header.depth==32) { copy((byte*)image,src,size); }
-    if(header.depth==24) for(uint i=0;i<w*h;src+=3) image[i++] = byte4(src[0],src[1],src[2],255);
-    if(header.depth==8) for(uint i=0;i<w*h;src++) image[i++] = palette[*src];
+    Image image(w,h,true);
+    byte4* dst = (byte4*)image.data;
+    const byte* src=s.read<byte>(size).data;
+    if(header.depth==32) { copy((byte*)dst,src,size); }
+    if(header.depth==24) for(uint i=0;i<w*h;src+=3) dst[i++] = byte4(src[0],src[1],src[2],255);
+    if(header.depth==8) for(uint i=0;i<w*h;src++) dst[i++] = palette[*src];
     if(header.depth==4) {
         assert(w%8==0); //TODO: pad
-        for(uint i=0;i<w*h;src++){ image[i++] = palette[(*src)>>4]; image[i++] = palette[(*src)&0xF]; }
+        for(uint i=0;i<w*h;src++){ dst[i++] = palette[(*src)>>4]; dst[i++] = palette[(*src)&0xF]; }
     }
     if(header.depth!=32) {
         ref<byte> mask = s.read<byte>(8*align(4,w/8)*h/8); //1-bit transparency
@@ -51,12 +50,12 @@ Image decodeICO(const ref<byte>& file) {
         assert(w%8==0); //TODO: pad
         for(uint i=0,y=0;y<h;y++) {
             uint x=0; for(;x<w;src++) {
-                for(int b=7;b>=0;b--,x++){ if((*src)&(1<<b)) image[i].a=0; i++; }
+                for(int b=7;b>=0;b--,x++){ if((*src)&(1<<b)) dst[i].a=0; i++; }
             }
             assert(x%8==0);
             x/=8;
             while(x%4) x++, src++;
         }
     }
-    return flip(Image(image,w,h,w,true,true));
+    return flip(move(image));
 }

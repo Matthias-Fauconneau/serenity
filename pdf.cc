@@ -54,10 +54,10 @@ static Variant parse(TextData& s) {
             /*Variant* decodeParms = dict.find("DecodeParms"_);
             if(decodeParms) { error("unsupported stream compression"_);
                 assert(decodeParms->dict.size() == 2);
-                int predictor = decodeParms->dict.value("Predictor",Variant(1)).number;
+                int predictor = decodeParms->dict.value("Predictor",1.0).number;
                 if(predictor != 12) fail();
                 int size = data.size;
-                int w = decodeParms->dict.value("Columns",Variant(1)).number;
+                int w = decodeParms->dict.value("Columns",1.0).number;
                 int h = size/(w+1);
                 assert(size == (w+1)*h);
                 const uchar* src = (uchar*)data.constData();
@@ -122,8 +122,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     for(const Variant& page : pages) {
         uint pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
         auto dict = parse(xref[page.number]).dict;
-        Variant empty(0);
-        for(auto e : toDict(xref,move(toDict(xref,move(dict.value("Resources"_,empty))).value("Font"_,empty)))) {
+        for(auto e : toDict(xref,move(toDict(xref,move(dict.value("Resources"_,0))).value("Font"_,0)))) {
             if(fonts.contains(e.key)) continue;
             fonts[e.key]=&heap<Font>();
             auto fontDict = parse(xref[e.value.number]).dict;

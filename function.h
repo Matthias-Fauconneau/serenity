@@ -43,7 +43,7 @@ template<class R, class... Args> struct function<R(Args...)> {
         static_assert(sizeof(const_method<O,R(Args...)>)<=sizeof(any),"");
         new (any) const_method<O,R(Args...)>(object, pmf);
     }
-//#pragma GCC system_header //-Wstrict-aliasing
+#pragma GCC system_header //-Wstrict-aliasing
     R operator()(Args... args) const { return ((functor<R(Args...)>&)any)(forward<Args>(args)___); }
 };
 

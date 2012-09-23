@@ -102,7 +102,7 @@ void Thread::event(){
 /// Signal handler
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     extern string trace(int skip, void* ip);
-    string s = trace(sig==SIGABRT?3:2,sig==SIGABRT?0:(void*)ctx->ip);
+    string s = trace(sig==SIGABRT?2:1,sig==SIGABRT?0:(void*)ctx->ip);
     if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP){
         Locker lock(threadsLock);
@@ -155,6 +155,7 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     int pid = fork();
     if(pid==0) { if(!execve(strz(path),argv,envp)) exit(-1); }
     else if(wait) wait4(pid,0,0,0);
+    else { enum{WNOHANG=1}; wait4(pid,0,WNOHANG,0); }
 }
 
 ref<byte> getenv(const ref<byte>& name) {

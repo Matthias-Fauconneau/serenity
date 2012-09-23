@@ -64,7 +64,7 @@ uint resolve(const ref<byte>& host) {
     static Map dnsMap = dnsCache;
     uint ip=-1;
     for(TextData s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
-    if(!ip) ip=-1;//return false; //negative entry
+    bool negativeEntry=false; if(!ip) ip=-1, negativeEntry=true; //return false; //try to resolve negative entries again
     if(ip==uint(-1)) {
         static UDPSocket dns = UDPSocket(nameserver(), 53);
         array<byte> query;
@@ -92,7 +92,7 @@ uint resolve(const ref<byte>& host) {
             dnsMap = dnsCache; //remap cache
             break;
         }
-        if(ip==uint(-1)) {
+        if(ip==uint(-1) && !negativeEntry) {
             log("unknown",host);
             dnsCache.write(string(host+" 0.0.0.0\n"_)); // add negative entry
             dnsMap = dnsCache; //remap cache
@@ -124,7 +124,6 @@ URL::URL(const ref<byte>& url) {
     path << s.until('#');
     if(!scheme) { path=host+"/"_+path; host.clear(); }
     fragment = string(s.untilEnd());
-    assert(!host.contains('/'));
 }
 URL URL::relative(URL&& url) const {
     if(!url.scheme) url.scheme=copy(scheme);
@@ -242,6 +241,7 @@ void HTTP::event() {
 }
 
 void getURL(URL&& url, Handler handler, int maximumAge) {
+    assert(url.host,url);
     string file = cacheFile(url);
     array<string> headers;
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;
@@ -249,7 +249,6 @@ void getURL(URL&& url, Handler handler, int maximumAge) {
     if(existsFile(file,cache())) {
         long modified = modifiedTime(file,cache());
         if(currentTime()-modified < maximumAge*60) {
-            debug( log("Cached",url); )
             handler(url,Map(file,cache()));
             return;
         }

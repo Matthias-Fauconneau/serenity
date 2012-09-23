@@ -33,9 +33,10 @@ void blit(int2 target, const Image& source, uint8 opacity) {
 }
 
 void substract(int2 target, const Image& source, byte4 color) {
+    int4 invert = int4(0xFF-color.b,0xFF-color.g,0xFF-color.r,color.a);
     Rect rect = (target+Rect(source.size())) & currentClip;
     for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-        int4 s = int4(source(x-target.x,y-target.y))*(int4(0xFF)-int4(color))/0xFF;
+        int4 s = int4(source(x-target.x,y-target.y))*invert/0xFF;
         byte4& d = framebuffer(x,y);
         d=byte4(max(int4(0),int4(d)-s));
     }

@@ -88,7 +88,8 @@ string str(Date date, const ref<byte>& format) {
 
 Date parse(TextData& s) {
     Date date;
-    for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }
+    if(s.match("Today"_)) date=::date(), date.hours=date.minutes=date.seconds=-1;
+    else for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }
     {
         s.whileAny(" ,\t"_);
         int number = s.integer();

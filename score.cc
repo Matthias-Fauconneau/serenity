@@ -212,15 +212,15 @@ spurious: ;
     array<int> MIDI; //flatten chords for robust MIDI synchronization
     for(const Chord& chord: chords.values) MIDI<<chord;
     if(MIDI.size()) {
-        array<vec2> lastChord; bool lastSync=true;
+        array<vec2> lastChord; //bool lastSync=true;
         uint n=0; for(Staff& staff: notes) for(int x : staff.keys) {
-            int note=0; bool sync=true; int lastY=0; array<vec2> chord; //uint noteIndex=n;
+            int note=0; /*bool sync=true;*/ int lastY=0; array<vec2> chord; //uint noteIndex=n;
             for(int y : staff.at(x).keys) {
                 if(!repeats) { //FIXME
                     if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) {
                         chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x][y].index; staff[x][y].duration=n; n++;
                     }
-                    if(n<MIDI.size() && MIDI[n]<=note) { sync=false; }
+                    //if(n<MIDI.size() && MIDI[n]<=note) { sync=false; }
                     note = n>=MIDI.size() ? 0 : MIDI[n];
                     /*if(lastSync && sync && staff[x].size()<3) for(uint j=noteIndex;j<min(MIDI.size(),noteIndex+lastChord.size());j++) {
                         if(abs(lastChord[j-noteIndex].y+y)<=1 && abs(MIDI[j]-note)>2 && note!=MIDI[j]+12) {
@@ -232,7 +232,7 @@ spurious: ;
                 chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x][y].index; staff[x][y].duration=n; n++; lastY=y;
                 //skip: ;
             }
-            lastChord=move(chord); lastSync=sync;
+            lastChord=move(chord); //lastSync=sync;
         }
     }
 
@@ -271,6 +271,7 @@ void Score::noteEvent(int key, int vel) {
         expected.remove(key);
     } else if(key) {
         active.remove(key);
+        return;
     }
     if(!expected && (chordIndex<chords.size() || chordIndex==uint(-1))) {
         if(chordIndex!=uint(-1)) noteIndex+=chords.values[chordIndex].size();
@@ -283,6 +284,6 @@ void Score::noteEvent(int key, int vel) {
     }
     map<int,byte4> activeNotes;
     for(int i: expected.values) activeNotes.insert(indices[i],blue);
-    for(int i: active.values) if(!activeNotes.contains(indices[i])) activeNotes.insert(indices[i],red);
+    //for(int i: active.values) if(!activeNotes.contains(indices[i])) activeNotes.insert(indices[i],red);
     activeNotesChanged(activeNotes);
 }

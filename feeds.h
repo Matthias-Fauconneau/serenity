@@ -10,6 +10,20 @@ struct Entry : Item {
     Entry(string&& guid, string&& link, Image&& icon, string&& text, int size=16):Linear(Left),Item(move(icon),move(text),size),guid(move(guid)),link(move(link)){}
 };
 
+/// FavIcon is an \a Image shared between several \a Entries
+struct FavIcon {
+    const string host;
+    Image image;
+    array<Image*> users;
+    signal<> imageChanged;
+    /// Loads favicon for \a host
+    FavIcon(string&& host);
+    /// Parses HTML link elements to find out favicon location
+    void get(const URL& url, Map&& document);
+    /// Updates shared users when receiving the real favicon
+    void update();
+};
+
 /// Feeds is a list of entries fetched from RSS/Atom feeds
 /// \note .config/feeds contains the list of feeds to fetch, .config/read contains the list of read articles
 struct Feeds : List<Entry> {
@@ -17,7 +31,7 @@ struct Feeds : List<Entry> {
     Map readMap;
     signal<> listChanged;
     signal< const ref<byte>& /*link*/, const ref<byte>& /*title*/, const Image& /*favicon*/ > pageChanged;
-    map<string/*link*/, Image> favicons; //store strong references to favicons weakly referenced by entries
+    array<FavIcon*> favicons; //store strong references to favicons weakly referenced by entries (on heap because of ImageLoader)
 
     Feeds();
     /// Polls all feeds
@@ -28,10 +42,6 @@ struct Feeds : List<Entry> {
     bool isRead(const Entry& entry);
     /// Loads an RSS/Atom feed
     void loadFeed(const URL&, Map&& document);
-    /// Parses HTML link elements to find out favicon location
-    void getFavicon(const URL& url, Map&& document);
-    /// Resets favicons for all entries
-    void resetFavicons();
     /// If unread, appends entry at \a index to config\read
     void setRead(uint index);
     /// Sends pageChanged signal and preload next page

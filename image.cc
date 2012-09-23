@@ -5,7 +5,7 @@
 Image resize(const Image& image, uint width, uint height) {
     if(!image) return Image();
     if(width==image.width && height==image.height) return copy(image);
-    Image target(width,height,image.alpha);
+    Image target(width, height, image.alpha);
     const byte4* src = image.data;
     byte4* dst = (byte4*)target.data;
     if(image.width/width==image.height/height && !(image.width%width) && !(image.height%height)) { //integer box
@@ -27,7 +27,8 @@ Image resize(const Image& image, uint width, uint height) {
         for(uint y=0; y<height; y++) {
             for(uint x=0; x<width; x++) {
                 *dst = src[(y*image.height/height)*image.stride+x*image.width/width];
-                dst++; }
+                dst++;
+            }
         }
     }
     return target;

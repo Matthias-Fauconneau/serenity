@@ -1,3 +1,5 @@
+# PC-104 keyboard with Compose at the Caps Lock key
+# xkbcomp compose.xkb ~/.xkm; xkbcomp ~/.xkm $DISPLAY
 xkb_keymap {
         xkb_keycodes  { include "evdev+aliases(qwerty)" };
         xkb_types     { include "complete"      };

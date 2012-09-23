@@ -18,17 +18,19 @@ template<class K, class V> struct map {
 
     const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
     V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
-    template<perfect(V)> Vf value(const K& key, Vf&& value) {
+    template<class... Args> V value(const K& key, Args&&... args) {
         int i = keys.indexOf(key);
-        return i>=0 ? values[i] : forward<Vf>(value);
+        return i>=0 ? values[i] : V(forward<Args>(args)___);
     }
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
-    template<perfect2(K,V)> void insert(Kf&& key, Vf&& value) {
+    template<perfect2(K,V)>
+    V& insert(Kf&& key, Vf&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {'"_,keys,"}"_);
-        keys << forward<Kf>(key); values << forward<Vf>(value);
+        keys << forward<Kf>(key); values << forward<Vf>(value); return values.last();
     }
-    template<perfect2(K,V)> void insertMulti(Kf&& key, Vf&& value) {
-        keys << forward<Kf>(key); values << forward<Vf>(value);
+    template<perfect2(K,V)>
+    V& insertMulti(Kf&& key, Vf&& value) {
+        keys << forward<Kf>(key); values << forward<Vf>(value); return values.last();
     }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
     template<perfect(K)> V& sorted(Kf&& key) {
