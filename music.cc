@@ -12,14 +12,13 @@
 #include "score.h"
 
 struct Music : Application, Widget {
-    ICON(music) Window window __(this,int2(-1,-1),"Music"_,musicIcon());
+    ICON(music) Window window __(this,int2(256,256),"Music"_,musicIcon());
     Sampler sampler;
     MidiFile midi;
     Scroll<PDF> sheet;
     Score score;
 
-    Thread& thread = heap<Thread>(-20);
-    //Thread& thread = defaultThread;
+    Thread thread __(-20);
     AudioOutput audio __({&sampler, &Sampler::read},thread,true);
     Sequencer input __(thread);
 
@@ -30,8 +29,8 @@ struct Music : Application, Widget {
         window.localShortcut(Escape).connect(this,&Application::quit);
         auto args = arguments();
         args<<"/Samples/Salamander.sfz"_;
-        args<<"Documents/Sheets/Game of Thrones.mid"_;
-        args<<"Documents/Sheets/Game of Thrones.pdf"_;
+        //args<<"Documents/Sheets/Game of Thrones.mid"_;
+        //args<<"Documents/Sheets/Game of Thrones.pdf"_;
         for(ref<byte> path : args) {
             if(endsWith(path, ".sfz"_) && existsFile(path)) {
                 window.setTitle(section(section(path,'/',-2,-1),'.',0,-2));
@@ -70,14 +69,15 @@ struct Music : Application, Widget {
     }
     int current=0,count=0;
     void showProgress(int current, int count) {
-        this->current=current; this->count=count;
         if(current==count) {
-            window.backgroundCenter=window.backgroundColor=0xFF;
-            window.widget=&sheet.area();
-            window.setSize(int2(-1,-1));
+            if(sheet) {
+                window.backgroundCenter=window.backgroundColor=0xFF;
+                window.widget=&sheet.area();
+                window.setSize(int2(-1,-1));
+            }
             audio.start();
-        }
-        window.render();
+        } else if(count!=this->count) window.setSize(int2(count,256));
+        this->current=current; this->count=count; window.render();
     }
     void render(int2 position, int2 size) {
         if(current!=count) {

@@ -10,6 +10,7 @@
 struct PDF : Widget {
     Map file;
     void open(const ref<byte>& path, const Folder& folder);
+    explicit operator bool() { return (bool)file; }
     int2 sizeHint() override;
     void render(int2 position, int2 size) override;
 

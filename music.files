@@ -43,3 +43,4 @@ pdf.cc
 score.h
 score.cc
 music.cc
+monitor.cc

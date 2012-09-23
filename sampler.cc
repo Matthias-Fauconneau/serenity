@@ -39,8 +39,7 @@ uint availableMemory() {
         uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
         info.insert(string(key), value);
     }
-    //return info.at(string("MemFree"_))+info.at(string("Inactive"_))+info.at(string("Active(file)"_));
-    return info.at(string("MemFree"_))+info.at(string("Inactive(file)"_))+info.at(string("Active(file)"_));
+    return info.at(string("MemFree"_))+info.at(string("Inactive"_))+info.at(string("Active(file)"_));
 }
 
 /// SFZ
@@ -190,7 +189,7 @@ void Note::decode(uint need) {
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
         for(int i=0;i<3;i++) for(uint j=0;j<notes[i].size();) { Note& note=notes[i][j];
-            if((note.blockSize==0 && note.readCount<128/*period*/) || extract(note.level,0)<=1.f/(1<<16)) notes[i].removeAt(j); else j++;
+            if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<=1.f/(1<<16)) notes[i].removeAt(j); else j++;
         }
         noteReadLock.unlock();
     }

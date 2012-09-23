@@ -6,8 +6,9 @@
 #include "text.h" //annotations
 
 struct Variant { //TODO: union
-    enum { Number, Data, List, Dict } type;
+    enum { Empty, Number, Data, List, Dict } type;
     double number=0; string data; array<Variant> list; map<ref<byte>,Variant> dict;
+    Variant():type(Empty){}
     Variant(double number) : type(Number), number(number) {}
     Variant(string&& data) : type(Data), data(move(data)) {}
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
@@ -122,21 +123,24 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     for(const Variant& page : pages) {
         uint pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
         auto dict = parse(xref[page.number]).dict;
-        for(auto e : toDict(xref,move(toDict(xref,move(dict.value("Resources"_,0))).value("Font"_,0)))) {
-            if(fonts.contains(e.key)) continue;
-            fonts[e.key]=&heap<Font>();
-            auto fontDict = parse(xref[e.value.number]).dict;
-            auto descendant = fontDict.find("DescendantFonts"_);
-            if(descendant) fontDict = parse(xref[descendant->list[0].number]).dict;
-            if(!fontDict.contains("FontDescriptor"_)) continue;
-            fonts[e.key]->name = move(fontDict.at("BaseFont"_).data);
-            auto descriptor = parse(xref[fontDict.at("FontDescriptor"_).number]).dict;
-            auto fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
-            if(fontFile) fonts[e.key]->font = ::Font(parse(xref[fontFile->number]).data);
-            Variant* firstChar = fontDict.find("FirstChar"_);
-            if(firstChar) fonts[e.key]->widths.resize(firstChar->number);
-            Variant* widths = fontDict.find("Widths"_);
-            if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.number;
+        if(dict.contains("Resources"_)) {
+            auto resources = toDict(xref,move(dict.at("Resources"_)));
+            if(resources.contains("Font"_)) for(auto e : toDict(xref,move(resources.at("Font"_)))) {
+                if(fonts.contains(e.key)) continue;
+                fonts[e.key]=&heap<Font>();
+                auto fontDict = parse(xref[e.value.number]).dict;
+                auto descendant = fontDict.find("DescendantFonts"_);
+                if(descendant) fontDict = parse(xref[descendant->list[0].number]).dict;
+                if(!fontDict.contains("FontDescriptor"_)) continue;
+                fonts[e.key]->name = move(fontDict.at("BaseFont"_).data);
+                auto descriptor = parse(xref[fontDict.at("FontDescriptor"_).number]).dict;
+                auto fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
+                if(fontFile) fonts[e.key]->font = ::Font(parse(xref[fontFile->number]).data);
+                Variant* firstChar = fontDict.find("FirstChar"_);
+                if(firstChar) fonts[e.key]->widths.resize(firstChar->number);
+                Variant* widths = fontDict.find("Widths"_);
+                if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.number;
+            }
         }
         auto contents = dict.find("Contents"_);
         if(contents) {

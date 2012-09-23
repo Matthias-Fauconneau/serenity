@@ -49,11 +49,11 @@ debug(
 /// Poll
 void Poll::registerPoll() { thread+=this; thread.post(); }
 void Poll::unregisterPoll() {Locker lock(thread.lock); thread.unregistered<<this;}
-void Poll::queue() {/*if(!thread.queue.contains(this))*/{Locker lock(thread.lock); thread.queue+= this; thread.post();}}
+void Poll::queue() {Locker lock(thread.lock); thread.queue+= this; thread.post();}
 
 /// EventFD
 enum{EFD_SEMAPHORE=1};
-EventFD::EventFD():Stream(eventfd2(0,0)){}
+EventFD::EventFD():Stream(eventfd2(0,EFD_SEMAPHORE)){}
 
 /// Thread
 static array<Thread*> threads; /// Process-wide thread list to trace all threads when one fails
@@ -84,18 +84,16 @@ int Thread::run() {
     }
     return 0;
 }
-void Thread::event(){
-    while(poll()) {
-        EventFD::read();
-        if(queue){
-            Poll* poll;
-            {Locker lock(thread.lock);
-                poll=queue.take(0);
-                if(unregistered.contains(poll)) return;
-            }
-            poll->revents=IDLE;
-            poll->event();
+void Thread::event() {
+    EventFD::read();
+    if(queue){
+        Poll* poll;
+        {Locker lock(thread.lock);
+            poll=queue.take(0);
+            if(unregistered.contains(poll)) return;
         }
+        poll->revents=IDLE;
+        poll->event();
     }
 }
 

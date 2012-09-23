@@ -267,10 +267,11 @@ void Score::seek(uint unused time) {
 
 void Score::noteEvent(int key, int vel) {
     if(vel) {
+        if(!expected.contains(key)) return;
         active.insertMulti(key,expected[key]);
         expected.remove(key);
     } else if(key) {
-        active.remove(key);
+        if(active.contains(key)) active.remove(key);
         return;
     }
     if(!expected && (chordIndex<chords.size() || chordIndex==uint(-1))) {
