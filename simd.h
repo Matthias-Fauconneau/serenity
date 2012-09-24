@@ -1,4 +1,5 @@
 #pragma once
+/// \file simd.h SIMD types and intrinsics
 #include "core.h"
 
 typedef short half8 __attribute((vector_size(16)));

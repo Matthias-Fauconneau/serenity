@@ -1,4 +1,5 @@
 #pragma once
+/// \file widget.h Widget interface to compose user interfaces
 #include "vector.h"
 
 enum MouseButton { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };

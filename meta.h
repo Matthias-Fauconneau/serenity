@@ -1,4 +1,5 @@
 #pragma once
+/// \file meta.h Perfect forwarding
 #include "core.h"
 
 template<bool Cond, typename Iftrue, typename Iffalse> struct conditional { typedef Iftrue type; };
@@ -50,7 +51,6 @@ template<typename From, typename To> struct is_convertible_helper<From, To, fals
 };
 template<typename F, typename T> struct is_convertible : public integral_constant<bool, is_convertible_helper<F, T>::value> {};
 
-/// Perfect forwarding
 #define is_convertible(F, T) is_convertible<F, T>::value
 #define can_forward(T) is_convertible(remove_reference(T), remove_reference(T##f))
 #define perfect(T) class T##f, predicate(can_forward(T))

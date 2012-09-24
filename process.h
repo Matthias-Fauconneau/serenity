@@ -1,4 +1,5 @@
 #pragma once
+/// \file process.h \link Thread threaded event loops\endlink, \link synchronization Semaphore\endlink, execute, process environment and arguments
 #include "array.h"
 #include "file.h"
 

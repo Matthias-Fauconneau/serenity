@@ -1,4 +1,5 @@
 #pragma once
+/// \file x.h X11 protocol
 #include "core.h"
 
 struct sockaddr_un { uint16 family=1; char path[108]; };

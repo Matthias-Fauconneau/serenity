@@ -1,4 +1,5 @@
 #pragma once
+/// \file sequencer.h ALSA MIDI input interface
 #include "process.h"
 #include "function.h"
 

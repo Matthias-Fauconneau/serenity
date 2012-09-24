@@ -1,10 +1,11 @@
 #pragma once
+/// \file xml.h XML parser
 #include "map.h"
 #include "data.h"
 #include "memory.h"
 #include "function.h"
 
-/// XML element
+/// XML element providing DOM-like access
 struct Element {
     string name, content;
     map< string, string > attributes;

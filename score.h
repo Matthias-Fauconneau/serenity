@@ -1,4 +1,5 @@
 #pragma once
+/// \file score.h Sheet music notation recognition from PDF files (with MIDI synchronization)
 #include "array.h"
 #include "vector.h"
 #include "map.h"

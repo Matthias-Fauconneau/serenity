@@ -1,4 +1,5 @@
 #pragma once
+/// \file sampler.h High performance, low latency SFZ sound font sampler
 #include "function.h"
 #include "file.h"
 #include "resample.h"

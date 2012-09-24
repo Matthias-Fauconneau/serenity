@@ -1,4 +1,5 @@
 #pragma once
+/// \file trace.h stack trace using ELF/DWARF debug informations
 #include "string.h"
 
 struct Symbol { string function; ref<byte> file; uint line=0; };

@@ -1,4 +1,5 @@
 #pragma once
+/// \file window.h X11 window display and input
 #include "process.h"
 #include "function.h"
 #include "image.h"
@@ -12,7 +13,7 @@ extern int2 display;
 enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
               Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
 
-/// Binds \a widget to an X window
+/// Interfaces \a widget as a window on an X11 display server
 struct Window : Socket, Poll {
     no_copy(Window);
 

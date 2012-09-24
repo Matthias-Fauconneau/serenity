@@ -1,4 +1,5 @@
 #pragma once
+/// \file memory.h Memory operations (clear, copy, heap allocate, unique heap reference)
 #include "core.h"
 
 /// References raw memory representation of \a t

@@ -1,4 +1,5 @@
 #pragma once
+/// \file String manipulations (using lightweight ref<byte> when possible)
 #include "array.h"
 
 // Enforces exact match for overload resolution

@@ -1,11 +1,13 @@
 #pragma once
+/// \file midi.h Standard MIDI file player
 #include "function.h"
 #include "data.h"
 #include "map.h"
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
-
 struct Track { uint time=0; int type=0; BinaryData data; Track(uint time, BinaryData&& data):time(time),data(move(data)){} };
+
+/// Standard MIDI file player
 struct MidiFile {
     array<Track> tracks;
     int trackCount=0;

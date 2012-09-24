@@ -1,4 +1,5 @@
 #pragma once
+/// \file utf8.h UTF-8 iterator and encoder
 #include "array.h"
 
 /// Iterates UTF-8 encoded strings

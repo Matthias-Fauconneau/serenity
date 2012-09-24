@@ -1,4 +1,5 @@
 #pragma once
+/// \file text.h Rich text label/paragraph widget
 #include "widget.h"
 #include "function.h"
 #include "image.h"
