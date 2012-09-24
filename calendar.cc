@@ -50,7 +50,7 @@ array<Event> getEvents(Date query) {
 void Calendar::setActive(Date active) {
     clear(); dates.clear();
     todayIndex=-1; this->active=active;
-    static const ref<byte> days[7] = {"Mon"_,"Tue"_,"Wed"_,"Thu"_,"Fri"_,"Sat"_,"Sun"_};
+    constexpr ref<byte> days[7] = {"Mon"_,"Tue"_,"Wed"_,"Thu"_,"Fri"_,"Sat"_,"Sun"_};
     for(int i=0;i<7;i++) {
         *this<< string(days[i]);
         dates << Date(i,-1,active.month,active.year);

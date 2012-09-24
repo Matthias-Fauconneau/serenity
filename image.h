@@ -10,9 +10,8 @@ struct Image {
     uint width=0, height=0, stride=0;
     bool own=false, alpha=false;
 
-    no_copy(Image)
-    Image(Image&& o) : data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
-    move_operator(Image)
+    no_copy(Image);
+    move_operator(Image):data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
 
     Image(){}
     Image(byte4* data, int width, int height, int stride, bool own, bool alpha) : data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
@@ -28,7 +27,6 @@ struct Image {
     explicit operator bool() const { return data; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
 
-    byte4 get(uint x, uint y) const { if(x>=width||y>=height) return 0; return data[y*stride+x]; }
     byte4 operator()(uint x, uint y) const {assert(x<width && y<height,int(x),int(y),width,height); return data[y*stride+x]; }
     byte4& operator()(uint x, uint y) {assert(x<width && y<height,int(x),int(y),width,height); return (byte4&)data[y*stride+x]; }
     int2 size() const { return int2(width,height); }
@@ -40,13 +38,10 @@ inline Image share(const Image& o) { return Image((byte4*)o.data,o.width,o.heigh
 /// Copies the image buffer
 inline void copy(Image& dst, const Image& src) {assert(dst.size()==src.size() && dst.stride==src.stride); ::copy((byte4*)dst.data,src.data,src.height*src.stride); }
 template<> inline Image copy(const Image& src) {Image dst(src.width,src.height,src.alpha); ::copy(dst,src); return dst;}
+/// Flip the image around the horizontal axis in place
+Image flip(Image&& image);
 /// Returns a copy of the image resized to \a width x \a height
 Image resize(const Image& image, uint width, uint height);
-/// Flip the image around the horizontal axis in place
-inline Image flip(Image&& image) {
-    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) swap(image(x,y),image(x,h-1-y));
-    return move(image);
-}
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 

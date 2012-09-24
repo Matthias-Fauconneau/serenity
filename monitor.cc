@@ -9,7 +9,7 @@ template<class V> struct map<ref<byte>,V> : map<string,V> {
     V& operator [](ref<byte> key) { return map<string,V>::operator[](string(key)); }
 };
 
-struct Monitor : Application, Timer {
+struct Monitor : Timer {
     UniformGrid<Text> layout;
     Window window __(&layout,int2(-1,-1),"Monitor"_);
     Folder procfs __("proc"_);
@@ -19,7 +19,7 @@ struct Monitor : Application, Timer {
         const ref<byte> keys[]={""_,"user"_, "nice"_, "idle"_};
         array< ref<byte> > fields = split(stat,' ');
         map< ref<byte>, string> stats;
-        for(uint i=0;i<3;i++) stats[keys[i]]=string(fields[i]);
+        for(uint i: range(3)) stats[keys[i]]=string(fields[i]);
         return stats;
     }
     /// Returns process statistics
@@ -29,12 +29,12 @@ struct Monitor : Application, Timer {
         if(!existsFolder(pid,procfs)) return stats;
         string stat = File("stat"_,Folder(pid,procfs)).readUpTo(4096);
         array< ref<byte> > fields = split(stat,' ');
-        for(uint i=0;i<24;i++) stats[string(keys[i])]=string(fields[i]);
+        for(uint i: range(24)) stats[string(keys[i])]=string(fields[i]);
         return stats;
     }
     map<ref<byte>, string> system;
     map<ref<byte>, map<ref<byte>,string> > process;
-    Monitor() { window.localShortcut(Escape).connect(this,&Application::quit); layout.width=3;  event(); }
+    Monitor() { window.localShortcut(Escape).connect(&exit); layout.width=3;  event(); }
     void event() {
         map<ref<byte>, uint> memory;
         for(TextData s = File("/proc/meminfo"_).readUpTo(4096);s;) {
@@ -75,5 +75,4 @@ struct Monitor : Application, Timer {
         this->system=move(n); this->process=move(process);
         setAbsolute(currentTime()+1);
     }
-};
-Application(Monitor)
+} monitor;

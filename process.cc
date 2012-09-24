@@ -30,15 +30,14 @@ struct ucontext {
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 
 /// Log
-static Lock logLock;
-void log_(const ref<byte>& buffer) {Locker lock(logLock); write(1,buffer.data,buffer.size); }
+void log_(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 static ref<byte> message;
 template<> void __attribute((noreturn)) error(const ref<byte>& buffer) { message=buffer; tgkill(getpid(),gettid(),SIGABRT); for(;;) pause(); }
 
 /// Semaphore
-void Semaphore::wait(int& futex, int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e]); }
-void Semaphore::wake(int& futex) { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
+void Semaphore::wait(int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e]); }
+void Semaphore::wake() { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
 
 /// Lock
 debug(
@@ -56,33 +55,52 @@ enum{EFD_SEMAPHORE=1};
 EventFD::EventFD():Stream(eventfd2(0,EFD_SEMAPHORE)){}
 
 /// Thread
-static array<Thread*> threads; /// Process-wide thread list to trace all threads when one fails
-static Lock threadsLock; /// Lock to synchronize thread list edition
-Thread defaultThread; /// Handle for the main thread (group leader)
-Thread::Thread():Poll("Queue"_,EventFD::fd,POLLIN,*this){Locker lock(threadsLock); threads<<this;}
-static int run(void* thread) { return ((Thread*)thread)->run(); }
+
+// Process-wide structures initialized on first usage
+// Lock access to thread list
+static Lock& threadsLock() { static Lock threadsLock; return threadsLock; }
+// Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
+static array<Thread*>& threads() { static array<Thread*> threads; return threads; }
+// Handle for the main thread (group leader)
+Thread& mainThread() { static Thread mainThread; return mainThread; }
+
+int main() {
+    mainThread().run();
+    if(threads().size()>1) sched_yield(); // Yields to let auxiliary threads cleanly terminate themselves
+    Locker lock(threadsLock());
+    for(Thread* thread: threads()) if(thread!=&mainThread()) tgkill(getpid(),thread->tid,SIGKILL); // Kills any remaining thread
+    return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+}
+Thread::Thread():Poll("Queue"_,EventFD::fd,POLLIN,*this){tid=gettid(); Locker lock(threadsLock()); threads()<<this;}
+static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
 Thread::Thread(int priority):Thread(){
     this->priority=priority;
-    static constexpr int stackSize = 1<<20;
+    const int stackSize = 1<<20;
     stack = Map(0,0,stackSize,Map::Read|Map::Write,Map::Private|Map::Anonymous);
     mprotect((void*)stack.data,0x1000,0);
     clone(::run,(void*)(stack.data+stackSize),CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
 }
-int Thread::run() {
+void Thread::run() {
     tid=gettid();
     if(priority) check_(setpriority(0,0,priority));
-    while(!terminate && size()>1/*Thread always register itself to handle queue events*/) {
-        uint size=this->size(); pollfd pollfds[size]; for(uint i=0;i<size;i++) pollfds[i]=*at(i);
-        if(check__(::poll(pollfds,size,-1))!=INTR) for(uint i=0;i<size;i++) {
-            Poll* poll=at(i); int revents=pollfds[i].revents;
-            if(revents && !unregistered.contains(poll)) {
-                poll->revents = revents;
-                poll->event();
+    while(!terminate) {
+        uint size=this->size();
+        if(size==1) return;
+
+        pollfd pollfds[size];
+        for(uint i: range(size)) pollfds[i]=*at(i);
+        if(check__( ::poll(pollfds,size,-1) ) != INTR) {
+            for(uint i: range(size)) {
+                if(terminate) return;
+                Poll* poll=at(i); int revents=pollfds[i].revents;
+                if(revents && !unregistered.contains(poll)) {
+                    poll->revents = revents;
+                    poll->event();
+                }
             }
         }
         while(unregistered){Locker lock(thread.lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
     }
-    return 0;
 }
 void Thread::event() {
     EventFD::read();
@@ -101,18 +119,21 @@ void Thread::event() {
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     extern string trace(int skip, void* ip);
     string s = trace(sig==SIGABRT?2:1,sig==SIGABRT?0:(void*)ctx->ip);
-    if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP){
-        Locker lock(threadsLock);
-        for(Thread* thread: threads) {thread->terminate=true; if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP);}
+        Locker lock(threadsLock());
+        for(Thread* thread: threads()) {
+            thread->terminate=true; // Tries to terminate all other threads cleanly
+            if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
+        }
     }
-    if(sig==SIGABRT) { log(message); exit(0); } //Abort doesn't let thread terminate cleanly
+    if(sig==SIGABRT) { log(message); exit_thread(0); } //Abort doesn't let thread terminate cleanly
     if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); }
-    if(sig==SIGSEGV) { log("Segmentation fault at "_+str(info->fault.addr)); exit(0); } //Segfault kills the threads to prevent further corruption
+    if(sig==SIGSEGV) { log("Segmentation fault at "_+str(info->fault.addr)); exit_thread(0); } //Segfault kills the threads to prevent further corruption
     if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads
 }
 extern void restore_rt (void) asm ("__restore_rt"); asm(".text\n.align 16\n__restore_rt:\nmovq $15, %rax\nsyscall\n");
-void init() {
+constructor() {
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
@@ -128,7 +149,11 @@ void init() {
     check_(sigaction(SIGTERM, &sa, 0, 8));
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 }
-void exit() { for(Thread* thread: threads) thread->terminate=true; exit_group(0); /*TODO: allow each thread to terminate properly instead of killing with exit_group*/ }
+
+void exit() {
+    Locker lock(threadsLock());
+    for(Thread* thread: threads()) thread->terminate=true; // Tries to terminate all threads cleanly (triggers return from mainThread::run)
+}
 
 /// Environment
 
@@ -137,9 +162,9 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
 
     array<stringz> args0(1+args.size);
     args0 << strz(path);
-    for(uint i=0;i<args.size;i++) args0 << strz(args[i]);
+    for(const auto& arg: args) args0 << strz(arg);
     const char* argv[args0.size()+1];
-    for(uint i=0;i<args0.size();i++) argv[i]=args0[i];
+    for(uint i: range(args0.size())) argv[i]=args0[i];
     argv[args0.size()]=0;
 
     array< ref<byte> > env0;
@@ -147,11 +172,11 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     for(TextData s(environ);s;) env0<<s.until('\0');
 
     const char* envp[env0.size()+1];
-    for(uint i=0;i<env0.size();i++) envp[i]=env0[i].data;
+    for(uint i: range(env0.size())) envp[i]=env0[i].data;
     envp[env0.size()]=0;
 
     int pid = fork();
-    if(pid==0) { if(!execve(strz(path),argv,envp)) exit(-1); }
+    if(pid==0) { if(!execve(strz(path),argv,envp)) exit_group(-1); }
     else if(wait) wait4(pid,0,0,0);
     else { enum{WNOHANG=1}; wait4(pid,0,WNOHANG,0); }
 }

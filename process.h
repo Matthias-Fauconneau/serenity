@@ -8,15 +8,15 @@ struct Semaphore {
     /// Creates a semaphore with \a count initial ressources
     Semaphore(int count=0):futex(count){}
     /// Acquires \a count ressources
-    inline bool acquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) { wait(futex,val); return true; } else return false; }
+    inline bool acquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) { wait(val); return true; } else return false; }
     /// Atomically tries to acquires \a count ressources only if available
     inline bool tryAcquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) { __sync_fetch_and_add(&futex,count); return false; } else return true; }
     /// Waits for the semaphore
-    static void wait(int& futex, int val);
+    void wait(int val);
     /// Releases \a count ressources
-    inline void release(int count) { int val=__sync_fetch_and_add(&futex, count); if(val<0) wake(futex); }
+    inline void release(int count) { int val=__sync_fetch_and_add(&futex, count); if(val<0) wake(); }
     /// Wakes any thread waiting for the semaphore
-    static void wake(int& futex);
+    void wake();
     /// Returns available ressources \a count
     operator int() { return futex; }
 };
@@ -41,19 +41,19 @@ struct Locker {
     ~Locker(){lock.unlock();}
 };
 
-/// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
-extern struct Thread defaultThread;
+/// Returns original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
+struct Thread& mainThread();
 
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {
-    no_copy(Poll)
+    no_copy(Poll);
     string id; /// Identifier for debugging and profiling
     Thread& thread; /// Thread monitoring this pollfd
     /// Allows to queue using \a wait method and \a event callback
-    Poll(const ref<byte>& id=""_, Thread& thread=defaultThread):id(id),thread(thread){}
+    Poll(const ref<byte>& id=""_, Thread& thread=mainThread()):id(id),thread(thread){}
     void registerPoll();
     /// Registers \a fd to be polled in the event loop
-    Poll(const ref<byte>& id, int fd, int events=POLLIN, Thread& thread=defaultThread):____(pollfd{fd,(short)events},)id(id),thread(thread){ if(fd) registerPoll(); }
+    Poll(const ref<byte>& id, int fd, int events=POLLIN, Thread& thread=mainThread()):____(pollfd{fd,(short)events},)id(id),thread(thread){ if(fd) registerPoll(); }
     /// Removes \a fd from the event loop
     void unregisterPoll();
     ~Poll(){unregisterPoll();}
@@ -81,15 +81,13 @@ struct Thread : array<Poll*>, EventFD, Poll {
     /// Spawns a thread executing \a run
     Thread(int priority);
     /// Processes all events on \a polls and tasks on \a queue
-    int run();
+    void run();
     /// Processes one queued task
     void event();
 };
 
-/// Application provides a \a quit slot to cleanly terminate the default thread
-struct Application { void quit() { defaultThread.terminate=true; } };
-/// Macro to compile an executable entry point running an Application
-#define Application(Application) int main() {extern void init(); init(); {Application app; defaultThread.run();} extern void exit(); exit();}
+/// Terminates all auxiliary threads, destroys all file-scope objects and exits process.
+void exit();
 
 /// Execute binary at \a path with command line arguments \a args
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);

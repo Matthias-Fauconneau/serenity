@@ -8,7 +8,7 @@ array<string> pool;
 //const ref<byte> all = "12134567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~-=\\!@#$%^&*()_+|\t\n[]{}';\":/.,?><"_;
 const ref<byte> all = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"_;
 
-struct Parser : Application {
+struct Parser {
     const word e = "epsilon"_;
     array<Rule> rules;
     array<Rule> extended;
@@ -153,7 +153,7 @@ struct Parser : Application {
         if(X=="0-1"_) followX+= "end"_;
         else if(isTerminal(X)) {}
         else for(const Rule& rule: extended) {
-            for(uint i=0;i<rule.size();i++) {
+            for(uint i: range(rule.size())) {
                 if(rule[i]!=X) continue;
                 if(i+1<rule.size()) { //R → a*Xbc*: add First(b) to Follow(X)
                     array<word> firstB = first(rule[i+1]);
@@ -198,7 +198,7 @@ struct Parser : Application {
         State start; start.items<<Item(rules, 0, 0);
         computeItemSet(start.items,0);
         states << move(start);
-        for(uint i=0;i<states.size();i++) { //no foreach as states is growing
+        for(uint i: range(states.size())) { //no foreach as states is growing
             for(word token: terminal) computeTransitions(i,token);
             for(word token: nonterminal) computeTransitions(i,token);
         }
@@ -238,11 +238,11 @@ struct Parser : Application {
 
         /// Compute follow sets before merging
         //TODO: check if there are recursive rules which would fail
-        for(uint i=1; i<extended.size(); i++) { Rule& a = extended[i]; a.followSet = copy(follow(a.extended)); }
+        for(uint i: range(1,extended.size()) { Rule& a = extended[i]; a.followSet = copy(follow(a.extended)); }
 
         /// Merges rules with same original rule and end state
         for(uint i=0; i<extended.size(); i++) { const Rule& a = extended[i];
-            for(uint j=0; j<i; j++) { Rule& b = extended[j];
+            for(uint j: range(i)) { Rule& b = extended[j];
                 if(a.original == b.original && a.end==b.end) {
                     b.followSet+= a.followSet; // merge follow sets
                     extended.removeAt(i), i--;
@@ -326,5 +326,4 @@ struct Parser : Application {
         Node root = nodeStack.pop();
         log(root);
     }
-};
-Application(Parser)
+} parser;

@@ -1,28 +1,60 @@
 #if 0
+template<class... Args> void function(Args... args){ function(args...); }
+int main() {
+    int a=0,b=0;
+    function();
+    function(a);
+    function(a, b);
+}
+#endif
+
+#if 0
+#include "process.h"
+#include "window.h"
+#include "interface.h"
+#include "png.h"
+struct SnapshotTest : TriggerButton {
+    Window window __(this,0,"SnapshotTest"_);
+    SnapshotTest(){ writeFile("snapshot.png"_,encodePNG(window.snapshot()),home()); exit();}
+} test;
+#endif
+
+#if 0
+#include "process.h"
+#include "window.h"
+#include "text.h"
+struct KeyTest : Text {
+    Window window __(this,int2(640,480),"KeyTest"_);
+    KeyTest(){ focus=this; window.localShortcut(Escape).connect(&exit); window.show(); }
+    bool keyPress(Key key) { setText(str("'"_+str((char)key)+"'"_,dec(int(key)),"0x"_+hex(int(key)))); return true; }
+} test;
+#endif
+
+#if 0
 #include "process.h"
 #include "widget.h"
 #include "display.h"
 #include "window.h"
-struct VSyncTest : Application, Widget {
+struct VSyncTest : Widget {
     Window window __(this,0,"VSync"_);
-    VSyncTest(){ window.localShortcut(Escape).connect(this,&Application::quit); window.show(); }
-    void render(int2 position, int2 size) {static bool odd; fill(position+Rect(size),(odd=!odd)?black:white); window.render();}
-};Application(VSyncTest)
+    VSyncTest(){ window.localShortcut(Escape).connect(&exit); window.show(); }
+    bool odd; void render(int2 position, int2 size) {fill(position+Rect(size),(odd=!odd)?black:white); window.render();}
+} test;
 #endif
 
-#if 1
+#if 0
 #include "window.h"
 #include "interface.h"
 #include "ico.h"
-struct ImageTest : Application, ImageView {
+struct ImageTest : ImageView {
     Window window __(this,0,"Image"_);
 
     ImageTest():ImageView(resize(decodeImage(readFile("feedproxy.google.com/favicon.ico"_,cache())),16,16)) {
         assert(image.own);
-        window.localShortcut(Escape).connect(this, &Application::quit);
+        window.localShortcut(Escape).connect(&exit);
         window.show();
     }
-};Application(ImageTest)
+} test;
 #endif
 
 #if 0
@@ -33,12 +65,12 @@ struct HTMLTest : Application {
     Window window __(&page.area(),0,"HTML"_);
 
     HTMLTest() {
-        window.localShortcut(Escape).connect(this, &Application::quit);
+        window.localShortcut(Escape).connect(&exit);
         page.contentChanged.connect(&window, &Window::render);
         page.go("http://www.girlgeniusonline.com/comic.php?date=20120917"_);
         window.show();
     }
-};Application(HTMLTest)
+} test;
 #endif
 
 #if 0
@@ -81,8 +113,8 @@ struct WeekViewTest : Application, Widget {
     Image page __(2480,3508);
     WeekViewTest(){
         renderPage();
-        writeFile(string(getenv("HOME"_)+"/week.png"_),encodePNG(page));
-        window.localShortcut(Escape).connect(this,&Application::quit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();
+        writeFile("week.png"_,encodePNG(page),home());
+        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();
     }
     void renderPage() {
         framebuffer=share(page); currentClip = Rect(page.size());
@@ -91,5 +123,5 @@ struct WeekViewTest : Application, Widget {
         WeekView().render(int2(16,framebuffer.size().y/2+16),int2(framebuffer.size().x-32,framebuffer.size().y/2-32));
     }
     void render(int2 position, int2 unused size) { blit(position,resize(page,page.width/2,page.height/2)); }
-};Application(WeekViewTest)
+} test;
 #endif

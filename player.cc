@@ -60,13 +60,13 @@ struct MP3Media : AudioMedia {
     int read(float2* output, uint size) {
         long done;
         mpg123_read(mh,(float*)output,size*sizeof(float2),&done);
-        for(uint i=0;i<size;i++) output[i] *= (float2){32768,32768};
+        for(uint i: range(size)) output[i] *= (float2){32768,32768};
         return done>0?done/(channels*sizeof(float)):done;
     }
     ~MP3Media() { mpg123_close(mh); mpg123_delete(mh); }
 };
 
-/// FLAC audio decoder
+/// FLAC audio decoder (using \a FLAC)
 struct FLACMedia : AudioMedia {
     Map map;
     FLAC flac;
@@ -82,8 +82,9 @@ struct FLACMedia : AudioMedia {
     int read(float2* out, uint size) { return flac.read(out,size); }
 };
 
-struct Player : Application {
-/// Pipeline: File -> AudioMedia -> [Resampler] -> AudioOutput
+/// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
+struct Player {
+// Pipeline: File -> AudioMedia -> [Resampler] -> AudioOutput
     static constexpr int channels=2;
     AudioMedia* media=0; MP3Media mp3; FLACMedia flac;
     Resampler resampler;
@@ -101,13 +102,13 @@ struct Player : Application {
         }}
         if(resampler) resampler.filter<false>((float*)buffer,inputSize,(float*)buffer,size);
         assert(size%4==0);
-        for(uint i=0;i<size/4;i++) ((half8*)output)[i] = packs(cvtps(load(buffer+i*4+0)), cvtps(load(buffer+i*4+2))); //8 samples = 4 frames
+        for(uint i: range(size/4)) ((half8*)output)[i] = packs(cvtps(load(buffer+i*4+0)), cvtps(load(buffer+i*4+2))); //8 samples = 4 frames
         swPointer += size;
         update(media->position(),media->duration());
         return true;
     }
 
-/// Interface
+// Interface
     ICON(play) ICON(pause) ToggleButton playButton __(share(playIcon()), share(pauseIcon()));
     ICON(next) TriggerButton nextButton __(share(nextIcon()));
     Text elapsed __(string("00:00"_));
@@ -120,7 +121,7 @@ struct Player : Application {
     VBox layout;// __( &toolbar, &main );
     Window window __(&layout, int2(-512,-512), "Player"_, pauseIcon());
 
-/// Content
+// Content
     array<string> folders;
     array<string> files;
 
@@ -132,7 +133,7 @@ struct Player : Application {
         layout<<&toolbar<<&main;
 
         albums.expanding=true; titles.main=Linear::Center;
-        window.localShortcut(Escape).connect(this, &Player::quit);
+        window.localShortcut(Escape).connect(&exit);
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
         window.globalShortcut(Play).connect(this, &Player::togglePlay);
         playButton.toggled.connect(this, &Player::setPlaying);
@@ -143,7 +144,7 @@ struct Player : Application {
 
         folders = listFiles("Music"_,Sort|Folders);
         assert(folders);
-        for(string& folder : folders) albums << Text(string(section(folder,'/',-2,-1)), 16);
+        for(string& folder : folders) albums << string(section(folder,'/',-2,-1));
 
         int time=0;
         if(!files && existsFile("Music/.last"_)) {
@@ -162,7 +163,7 @@ struct Player : Application {
         if(files) next();
         if(time) seek(time);
         window.show();
-        defaultThread.priority=-19;
+        mainThread().priority=-19;
     }
     void queueFile(string&& path) {
         string title = string(section(section(path,'/',-2,-1),'.',0,-2));
@@ -191,7 +192,6 @@ struct Player : Application {
         if(endsWith(path,".mp3"_)||endsWith(path,".MP3"_)) media=new (&mp3) MP3Media(File(path));
         else if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path));
         else warn("Unsupported format",path);
-        audio.start();
         assert(audio.channels==media->channels);
         if(audio.rate!=media->rate) new (&resampler) Resampler(audio.channels, media->rate, audio.rate, audio.periodSize);
         setPlaying(true);
@@ -231,5 +231,4 @@ struct Player : Application {
         remaining.setText(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2));
         window.render();
     }
-};
-Application(Player)
+} application;

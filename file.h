@@ -3,11 +3,10 @@
 
 /// Handle is a Unix file descriptor
 struct Handle {
-    no_copy(Handle)
+    no_copy(Handle);
     int fd;
     Handle(int fd):fd(fd){}
-    Handle(Handle&& o):fd(o.fd){ o.fd=0; }
-    move_operator(Handle)
+    move_operator(Handle):fd(o.fd){ o.fd=0; }
     /// Closes the descriptor
     ~Handle();
     explicit operator bool() { return fd; }
@@ -98,14 +97,13 @@ struct Device : File {
 };
 
 struct Map : ref<byte> {
-    no_copy(Map)
+    no_copy(Map);
     Map(){}
     Map(const File& file);
     Map(const ref<byte>& file, const Folder& at=root()):Map(File(file,at)){}
     enum {Read=1, Write=2}; enum {Shared=1, Private=2, Anonymous=32};
     Map(uint fd, uint offset, uint size, uint prot, uint flags=Shared);
-    Map(Map&& o):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
-    move_operator(Map)
+    move_operator(Map):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
     ~Map();
     /// Locks memory map in RAM
     void lock(uint size) const;

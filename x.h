@@ -66,9 +66,9 @@ struct GetAtomName { int8 req=17,pad; uint16 size=2; uint atom; };
 struct GetAtomNameReply { byte pad; uint16 seq; uint length; uint16 size; byte pad2[22]; } fixed(GetAtomNameReply);
 struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint window,property,type; uint8 format; uint length; };
 struct GetProperty { int8 req=20,remove=0; uint16 size=6; uint window,property,type=0; uint offset=0,length=-1; };
-struct GetPropertyReply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length; byte pad2[12]; } fixed(GetPropertyReply);
+struct GetPropertyReply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length,pad[3]; } fixed(GetPropertyReply);
 struct GetSelectionOwner { uint8 req=23,pad; uint16 size=2; uint selection=1; };
-struct GetSelectionOwnerReply { uint8 pad; uint16 seq; uint size; uint owner; byte pad2[20]; } fixed(GetSelectionOwnerReply);
+struct GetSelectionOwnerReply { uint8 pad; uint16 seq; uint size; uint owner, pad2[5]; } fixed(GetSelectionOwnerReply);
 struct ConvertSelection { uint8 req=24,pad; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
 struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; XEvent event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
@@ -107,8 +107,10 @@ struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
 struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 W, H, srcX=0, srcY=0, w, h,
                   dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
+struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0; };
+struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual, size, pad[4]; } fixed(GetImageReply);
 enum { Completion };
-constexpr ref<byte> requests[] = {"QueryVersion"_,"Attach"_,"Detach"_,"PutImage"_};
+constexpr ref<byte> requests[] = {"QueryVersion"_,"Attach"_,"Detach"_,"PutImage"_,"GetImage"_};
 constexpr ref<byte> errors[] = {"BadSeg"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }

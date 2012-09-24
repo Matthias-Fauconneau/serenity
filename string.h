@@ -73,11 +73,11 @@ inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
-template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string str(const array<T>& a, char separator=' ') { return str(ref<T>(a),separator); }
-template<class T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<class T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string dec(const array<T>& a, char separator=' ') { return dec(ref<T>(a),separator); }
-template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i=0;i<a.size;i++) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string hex(const array<T>& a, char separator=' ') { return hex(ref<T>(a),separator); }
 
 /// Expression template to manage recursive concatenation operations

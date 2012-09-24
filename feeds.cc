@@ -95,7 +95,7 @@ void Feeds::readEntry(uint index) {
 
 void Feeds::readNext() {
     if(index>0) setRead(index);
-    for(uint i=index+1;i<count()-1;i++) { //next unread item
+    for(uint i: range(index+1,count())) { //next unread item
         if(!isRead(array::at(i))) {
             setActive(i);
             itemPressed(i);

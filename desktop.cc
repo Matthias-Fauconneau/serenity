@@ -50,7 +50,8 @@ map<string,string> readSettings(const ref<byte>& path) {
     return entries;
 }
 
-struct Desktop : Application {
+/// Desktop displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
+struct Desktop {
     Feeds feeds;
     Scroll<HTML> page;
     Clock clock __( 64 );
@@ -78,7 +79,7 @@ struct Desktop : Application {
                 if(!existsFile(path)) { warn("Executable not found",path); continue; }
                 array<string> arguments;  arguments<<string(section(entries[string("Exec"_)],' ',1,-1));
                 for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries[string("Name"_)]);
-                for(uint i=0;i<arguments.size();) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
+                for(uint i=0; i<arguments.size();) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
                 shortcuts << Command(move(icon),move(entries[string("Name"_)]),move(path),move(arguments));
             }
         }
@@ -102,5 +103,4 @@ struct Desktop : Application {
         page.go(link);
         browser.show();
     }
-};
-Application(Desktop)
+} application;

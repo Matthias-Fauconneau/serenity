@@ -1,7 +1,7 @@
 #include "core.h"
 
 struct Resampler {
-    no_copy(Resampler)
+    no_copy(Resampler);
     Resampler(){}
     /// Allocates buffers and generates filter to resample from \a sourceRate to \a targetRate
     /// \note bufferSize will be the maximum size which can be given at once to filter

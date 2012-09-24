@@ -52,27 +52,6 @@ static Variant parse(TextData& s) {
         if(s.match("stream"_)) { s.skip();
             array<byte> stream = inflate(s.until("endstream"_),true);
             assert(!dict.find("DecodeParms"_));
-            /*Variant* decodeParms = dict.find("DecodeParms"_);
-            if(decodeParms) { error("unsupported stream compression"_);
-                assert(decodeParms->dict.size() == 2);
-                int predictor = decodeParms->dict.value("Predictor",1.0).number;
-                if(predictor != 12) fail();
-                int size = data.size;
-                int w = decodeParms->dict.value("Columns",1.0).number;
-                int h = size/(w+1);
-                assert(size == (w+1)*h);
-                const uchar* src = (uchar*)data.constData();
-                uchar* dst = (uchar*)data.data();
-                for(int y=0;y<h;y++) {
-                    int filter = *src++;
-                    if(filter != 2) fail();
-                    for(int x=0;x<w;x++) {
-                        *dst = (y>0 ? *(dst-w) : 0) + *src;
-                        dst++; src++;
-                    }
-                }
-                data.resize(size-h);
-            }*/
             return move(stream);
         }
         return move(dict);
@@ -101,7 +80,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
             if(!s.match("xref"_)) error("xref"); s.skip();
             uint i=s.integer(); s.skip();
             uint n=s.integer(); s.skip();
-            if(xref.size()<i+n) xref.resize(i+n);
+            if(xref.size()<i+n) xref.grow(i+n);
             for(;n>0;n--,i++) {
                 int offset=s.integer(); s.skip(); s.integer(); s.skip();
                 if(s.match('n'))  xref[i] = s.slice(offset+(i<10?1:(i<100?2:3))+6);
@@ -137,7 +116,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                 auto fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
                 if(fontFile) fonts[e.key]->font = ::Font(parse(xref[fontFile->number]).data);
                 Variant* firstChar = fontDict.find("FirstChar"_);
-                if(firstChar) fonts[e.key]->widths.resize(firstChar->number);
+                if(firstChar) fonts[e.key]->widths.grow(firstChar->number);
                 Variant* widths = fontDict.find("Widths"_);
                 if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.number;
             }
@@ -235,9 +214,9 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
         // tighten page bounds
         pageOffset += vec2(0,y1-y2-16);
         vec2 offset = pageOffset+vec2(0,-y1);
-        for(uint i=pageFirstLine;i<lines.size();i++) lines[i].a += offset, lines[i].b += offset;
-        for(uint i=pageFirstCharacter;i<characters.size();i++) characters[i].pos += offset;
-        for(uint i=pageFirstPath;i<paths.size();i++) for(vec2& pos: paths[i]) pos += offset;
+        for(uint i: range(pageFirstLine,lines.size())) lines[i].a += offset, lines[i].b += offset;
+        for(uint i: range(pageFirstCharacter,characters.size())) characters[i].pos += offset;
+        for(uint i: range(pageFirstPath,paths.size())) for(vec2& pos: paths[i]) pos += offset;
     }
     y2=pageOffset.y;
     for(Line& l: lines) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; assert(l.a!=l.b,l.a,l.b); }
@@ -245,7 +224,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
 
     float scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
-    for(uint i=0;i<characters.size();i++) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code); }
+    for(uint i: range(characters.size())) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code); }
     for(const array<vec2>& path : paths) { array<vec2> scaled; for(vec2 pos : path) scaled<<scale*pos; onPath(scaled); }
     paths.clear();
 }
@@ -255,7 +234,7 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
     for(array<vec2>& path : paths) {
         for(vec2 p : path) extend(p);
         array<vec2> polyline;
-        for(uint i=0; i < path.size()-3; i+=3) {
+        for(uint i=0; i<path.size()-3; i+=3) {
             if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
                 polyline << copy(path[i]);
             } else {
@@ -264,7 +243,7 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
         }
         polyline << copy(path.last());
         if((flags&Stroke) || (flags&Fill) || polyline.size()>16) {
-            for(uint i=0; i < polyline.size()-1; i++) {
+            for(uint i: range(polyline.size()-1)) {
                 assert(polyline[i] != polyline[i+1],polyline,flags);
                 lines << Line __( polyline[i], polyline[i+1] );
             }

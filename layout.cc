@@ -6,13 +6,13 @@
 void Layout::render(int2 position, int2 size) {
     push(position+Rect(size));
     array<Rect> widgets = layout(position,size);
-    for(uint i=0;i<count();i++) at(i).render(widgets[i]);
+    for(uint i: range(count())) at(i).render(widgets[i]);
     pop();
 }
 
 bool Layout::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
     array<Rect> widgets = layout(0, size);
-    for(uint i=0;i<count();i++) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
+    for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
     return false;
 }
 
@@ -21,7 +21,7 @@ bool Layout::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button)
 int2 Linear::sizeHint() {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
-    for(uint i=0;i<count();i++) { Widget& child=at(i); assert(*(void**)&child);
+    for(uint i: range(count())) { Widget& child=at(i); assert(*(void**)&child);
         int2 size=xy(child.sizeHint());
         if(size.y<0) expandingHeight=true;
         height = max(height,abs(size.y));
@@ -44,7 +44,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     int width = size.x /*remaining space*/; int expanding=0, height=0;
     int widths[count], heights[count];
 
-    for(uint i=0;i<count;i++) { Widget& child=at(i); assert(*(void**)&child);
+    for(uint i: range(count)) { Widget& child=at(i); assert(*(void**)&child);
         int2 sizeHint = xy(child.sizeHint());
         width -= abs(widths[i]=sizeHint.x); //commits minimum width for all widgets
         if(sizeHint.x<0) expanding++; //counts expanding widgets
@@ -54,21 +54,21 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     int sharing = expanding ?: (main==Share? count : 0);
     if(sharing && width >= sharing) { //shares extra space evenly between sharing widgets
         int extra = width/sharing;
-        for(uint i=0;i<count;i++) {
+        for(uint i: range(count)) {
             if(!expanding || widths[i]<0) { //if all widgets are sharing or this widget is expanding
                 widths[i] = abs(widths[i])+extra, width -= extra; //commits extra space
             }
         }
         //width%sharing space remains as extra is rounded down
     } else {
-        for(uint i=0;i<count;i++) widths[i]=abs(widths[i]); //converts all expanding widgets to fixed
+        for(uint i: range(count)) widths[i]=abs(widths[i]); //converts all expanding widgets to fixed
         while(width<=-int(count)) { //while layout is overcommited
-            uint best=0; for(uint i=0;i<count;i++) if(widths[i]>widths[best]) best=i;
+            uint best=0; for(uint i: range(count)) if(widths[i]>widths[best]) best=i;
             int& first = widths[best]; //largest size
             int next=0; for(int size: widths) if(size>next && size<first) next=size; //next largest widget size
             int delta = min(-width, first-next);
             if(delta!=0) { first -= delta; width += delta; } //cap size to next largest
-            else { int delta=-width/count; for(uint i=0;i<count;i++) widths[i]-=delta, width+=delta; } //all widgets already have the same size
+            else { int delta=-width/count; for(uint i: range(count)) widths[i]-=delta, width+=delta; } //all widgets already have the same size
         }
     }
 
@@ -76,7 +76,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     width -= margin*(count-1); //width%(count-1) space remains as margin is rounded down
 
     if(main==Even) {
-        for(uint i=0;i<count;i++) widths[i]=size.x/count; //converts all expanding widgets to fixed
+        for(uint i: range(count)) widths[i]=size.x/count; //converts all expanding widgets to fixed
         width = size.x-count*size.x/count;
     }
 
@@ -90,7 +90,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     else if(side==AlignRight) pen.y+=size.y-height;
     else height=size.y;
     array<Rect> widgets(count);
-    for(uint i=0;i<count;i++) {
+    for(uint i: range(count)) {
         int y=0;
         if(side==AlignLeft||side==AlignCenter||side==AlignRight||side==Expand) heights[i]=height;
         else if(side==Left) y=0;
@@ -108,10 +108,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
 int2 Grid::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 max(0,0);
-    for(uint i=0;i<count();i++) {
-        int2 size=at(i).sizeHint();
-        max = ::max(max,size);
-    }
+    for(uint i: range(count())) max = ::max(max,at(i).sizeHint());
     return int2(w,h)*(max+margin);
 }
 

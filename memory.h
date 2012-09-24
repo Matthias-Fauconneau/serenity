@@ -34,7 +34,7 @@ template<class T> void free(T* t) { t->~T(); unallocate(t,1); }
 
 /// Unique reference to an heap allocated value
 template<class T> struct unique {
-    no_copy(unique)
+    no_copy(unique);
     T* pointer;
     template<class... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)___)){}
     unique(unique&& o){pointer=o.pointer; o.pointer=0;}

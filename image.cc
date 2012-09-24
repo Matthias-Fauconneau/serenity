@@ -2,6 +2,11 @@
 #include "data.h"
 #include "vector.h"
 
+Image flip(Image&& image) {
+    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) swap(image(x,y),image(x,h-1-y));
+    return move(image);
+}
+
 Image resize(const Image& image, uint width, uint height) {
     if(!image) return Image();
     if(width==image.width && height==image.height) return copy(image);
@@ -10,11 +15,11 @@ Image resize(const Image& image, uint width, uint height) {
     byte4* dst = (byte4*)target.data;
     if(image.width/width==image.height/height && !(image.width%width) && !(image.height%height)) { //integer box
         int scale = image.width/width;
-        for(uint y=0; y<height; y++) {
-            for(uint x=0; x<width; x++) {
+        for(uint unused y: range(height)) {
+            for(uint unused x: range(width)) {
                 int4 s=0; //TODO: alpha blending
-                for(int i=0;i<scale;i++){
-                    for(int j=0;j<scale;j++) {
+                for(uint i: range(scale)) {
+                    for(uint j: range(scale)) {
                         s+= int4(src[i*image.stride+j]);
                     }
                 }
@@ -24,8 +29,8 @@ Image resize(const Image& image, uint width, uint height) {
             src += (scale-1)*image.stride;
         }
     } else { //nearest
-        for(uint y=0; y<height; y++) {
-            for(uint x=0; x<width; x++) {
+        for(uint y: range(height)) {
+            for(uint x: range(width)) {
                 *dst = src[(y*image.height/height)*image.stride+x*image.width/width];
                 dst++;
             }

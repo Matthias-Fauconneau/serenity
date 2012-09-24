@@ -14,7 +14,7 @@ enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom
 
 /// Window binds \a widget to an X window
 struct Window : Socket, Poll {
-    no_copy(Window)
+    no_copy(Window);
 
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
@@ -84,6 +84,9 @@ struct Window : Socket, Poll {
     /// Sets window cursor
     void setCursor(Cursor cursor, uint window=0);
 
+    /// Returns a snapshot of the root window
+    Image getSnapshot();
+
     /// Widget managed by this window
     Widget* widget;
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
@@ -108,7 +111,7 @@ struct Window : Socket, Poll {
     /// This window base resource id
     uint id = 0;
     /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor };
+    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment };
 
     /// System V shared memory
     int shm = 0;

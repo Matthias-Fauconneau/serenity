@@ -30,8 +30,7 @@ template<class T> struct Buffer {
     uint capacity=0,size=0;
     Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
     Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy16(data,o.data,size*sizeof(T)/16);}
-    Buffer(Buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
-    move_operator(Buffer)
+    move_operator(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     ~Buffer(){if(data){unallocate(data,capacity);}}
     operator T*() { return data; }
 };
@@ -45,7 +44,7 @@ struct FLAC : BitReader {
     uint16 channelMode = 0, sampleSize = 0;
     uint position = 0, duration = 0;
 
-    default(FLAC)
+    FLAC(){}
     /// Reads header and decode first frame from data
     FLAC(const ref<byte>& data);
     /// Parses frame header to get next block size (called automatically)

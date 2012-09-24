@@ -26,7 +26,7 @@ void copy16(void* target,const void* source, int size) {
     while(src<end) {
         __builtin_prefetch(src+32,0,0);
         __builtin_prefetch(dst+32,0,0);
-        for(uint i=0; i<unroll; i++) dst[i]=src[i];
+        for(uint i: range(unroll)) dst[i]=src[i];
         src+=unroll; dst+=unroll;
     }
 }
@@ -114,7 +114,7 @@ void Sampler::open(const ref<byte>& path) {
 template<int unroll> inline void accumulate(float4 accumulators[unroll], const float4* ptr, const float4* end) {
     for(;ptr<end;ptr+=unroll) {
         __builtin_prefetch(ptr+32,0,0);
-        for(uint i=0;i<unroll;i++) accumulators[i]+=ptr[i]*ptr[i];
+        for(uint i: range(unroll)) accumulators[i]+=ptr[i]*ptr[i];
     }
 }
 float Note::sumOfSquares(uint size) {
@@ -129,7 +129,7 @@ float Note::sumOfSquares(uint size) {
     } else {
         accumulate<unroll>(accumulators, buffer+index,buffer+(index+size));
     }
-    float4 sum={}; for(uint i=0;i<unroll;i++) sum+=accumulators[i];
+    float4 sum={}; for(uint i: range(unroll)) sum+=accumulators[i];
     return (extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/(1<<24)/(1<<24);
 }
 float Note::actualLevel(uint size) const {
@@ -188,7 +188,7 @@ void Note::decode(uint need) {
 }
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
-        for(int i=0;i<3;i++) for(uint j=0;j<notes[i].size();) { Note& note=notes[i][j];
+        for(uint i: range(3)) for(uint j: range(notes[i].size())) { Note& note=notes[i][j];
             if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<=1.f/(1<<16)) notes[i].removeAt(j); else j++;
         }
         noteReadLock.unlock();
@@ -203,14 +203,14 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         const Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-        debug(if(0)) s.map.lock(size); //not locking in debug mode
+        debug(current=samples.size(); if(0)) s.map.lock(size); //not locking in debug mode
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }
 }
 
 /// Audio mixer (realtime thread)
-inline void mix(float4& level, float4 step, float4* out, float4* in, uint size) { for(uint i=0;i<size;i++) { out[i] += level * in[i]; level*=step; } }
+inline void mix(float4& level, float4 step, float4* out, float4* in, uint size) { for(uint i: range(size)) { out[i] += level * in[i]; level*=step; } }
 void Note::read(float4* out, uint size) {
     if(blockSize==0 && readCount<int(size*2)) return; // end of stream
     readCount.acquire(size*2); //ensure decoder follows
@@ -243,7 +243,7 @@ bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
             unallocate(layer,inSize);
         }
 
-        for(uint i=0;i<period/2;i++) {
+        for(uint i: range(period/2)) {
             ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),9), sra(cvtps(buffer[i*2+1]),9) ); //8 samples = 4 frames
         }
         unallocate(buffer,period);

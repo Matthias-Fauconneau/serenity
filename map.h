@@ -70,5 +70,5 @@ template<class K, class V> map<K,V> copy(const map<K,V>& o) {
 }
 
 template<class K, class V> string str(const map<K,V>& m) {
-    string s; s<<'{'; for(uint i=0;i<m.size();i++) { s<<str(m.keys[i])<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
+    string s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i])<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }

@@ -1,3 +1,4 @@
+xkbcomp ~/.xkm $DISPLAY
 desktop &
 for ((;;)) ; do
 	taskbar

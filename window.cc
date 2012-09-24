@@ -8,7 +8,7 @@
 #include "time.h"
 #include "png.h"
 
-/// Globals
+// Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace Render { int EXT, event, errorBase; } using namespace Render;
 int2 display;
@@ -52,8 +52,8 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     {QueryPictFormats r; send(raw(r));}
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>();
         array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
-        for(uint i=0;i<r.numScreens;i++){ PictScreen screen = read<PictScreen>();
-            for(uint i=0;i<screen.numDepths;i++){ PictDepth depth = read<PictDepth>();
+        for(uint unused i: range(r.numScreens)) { PictScreen screen = read<PictScreen>();
+            for(uint unused i: range(screen.numDepths)) { PictDepth depth = read<PictDepth>();
                 array<PictVisual> visuals = read<PictVisual>(depth.numPictVisuals);
                 if(depth.depth==32) for(PictVisual pictVisual: visuals) if(pictVisual.visual==visual) format=pictVisual.format;
             }
@@ -103,7 +103,7 @@ void Window::event() {
                 shmctl(shm, IPC_RMID, 0);
             }
             buffer.stride=buffer.width=size.x, buffer.height=size.y;
-            shm = check( shmget(IPC_NEW, sizeof(byte4)*buffer.width*buffer.height , IPC_CREAT | 0777) );
+            shm = check( shmget(IPC_NEW, buffer.height*buffer.width*sizeof(byte4) , IPC_CREAT | 0777) );
             buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
@@ -242,7 +242,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
 void Window::send(const ref<byte>& request) { write(request); sequence++; }
 template<class T> T Window::readReply() {
     for(;;) { uint8 type = read<uint8>();
-        if(type==0){XError e=read<XError>(); processEvent(0,(XEvent&)e);  if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
+        if(type==0){XError e=read<XError>(); processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
         else if(type==1) return read<T>();
         else eventQueue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }
@@ -291,7 +291,7 @@ uint Window::KeySym(uint8 code) {
 }
 uint Window::KeyCode(Key sym) {
     uint keycode=0;
-    for(uint i=minKeyCode;i<=maxKeyCode;i++) if(KeySym(i)==sym) { keycode=i; break;  }
+    for(uint i: range(minKeyCode,maxKeyCode)) if(KeySym(i)==sym) { keycode=i; break;  }
     if(!keycode) warn("Unknown KeySym",int(sym));
     return keycode;
 }
@@ -357,7 +357,7 @@ void Window::setCursor(Cursor cursor, uint window) {
     if(cursor==this->cursor) return; this->cursor=cursor;
     const Image& image = cursorIcon(cursor); int2 hotspot = cursorHotspot(cursor);
     Image premultiplied(image.width,image.height);
-    for(uint y=0;y<image.height;y++) for(uint x=0;x<image.height;x++) {
+    for(uint y: range(image.height)) for(uint x: range(image.width)) {
         byte4 p=image(x,y); premultiplied(x,y)=byte4(p.b*p.a/255,p.g*p.a/255,p.r*p.a/255,p.a);
     }
     {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=image.width, r.h=image.height; send(raw(r));}
@@ -369,4 +369,22 @@ void Window::setCursor(Cursor cursor, uint window) {
     {FreeCursor r; r.cursor=id+XCursor; send(raw(r));}
     {FreePicture r; r.picture=id+Picture; send(raw(r));}
     {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}
+}
+
+/// Snapshot
+
+Image Window::getSnapshot() {
+    Image buffer;
+    buffer.stride=buffer.width=display.x, buffer.height=display.y;
+    int shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+    buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+    {Shm::Attach r; r.seg=id+SnapshotSegment; r.shm=shm; send(raw(r));}
+    {Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment; send(raw(r));}
+    readReply<Shm::GetImageReply>();
+    {Shm::Detach r; r.seg=id+SnapshotSegment; send(raw(r));}
+    Image image = copy(buffer);
+    for(uint y: range(image.height)) for(uint x: range(image.width)) {byte4& p=image(x,y); swap(p.r,p.b); p.a=0xFF;}
+    shmdt(buffer.data);
+    shmctl(shm, IPC_RMID, 0);
+    return image;
 }

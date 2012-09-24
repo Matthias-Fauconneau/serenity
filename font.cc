@@ -58,18 +58,6 @@ const Glyph& Font::glyph(uint16 index, int) {
         uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
         image(x,y) = byte4(rgb[2],rgb[1],rgb[0],min(255,rgb[0]+rgb[1]+rgb[2]));
     }
-#if FEATHER
-    glyph.image = Image(width,height,true);
-    for(int y=0;y<height;y++) for(int x=0;x<width;x++) { //feather alpha
-        byte4& d = glyph.image(x,y);
-        d = image(x,y);
-        if(d.a==0) d.a=(
-                    image.get(x-1,y-1).a+image.get(x ,y - 1).a+image.get(x+1,y -1).a+
-                    image.get(x-1,y+0).a+image.get(x,y     ).a+image.get(x+1,y   ).a+
-                    image.get(x-1,y+1).a+image.get(x,y+1).a+image.get(x+1,y+1).a ) / 8;
-    }
-#else
     glyph.image = move(image);
-#endif
     return glyph;
 }

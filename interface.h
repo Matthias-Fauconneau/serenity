@@ -88,7 +88,7 @@ struct Progress : Widget {
     int2 sizeHint();
     void render(int2 position, int2 size) override;
 
-    static const int height = 32;
+    static constexpr int height = 32;
 };
 
 /// Slider is a Widget to show and control a bounded value

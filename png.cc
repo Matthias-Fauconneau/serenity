@@ -103,7 +103,7 @@ Image decodePNG(const ref<byte>& file) {
     if(type==3) {
         assert(palette);
         rgb3* lookup = (rgb3*)palette.data;
-        for(uint i=0;i<width*height;i++) image[i]=lookup[image[i][0]];
+        for(uint i: range(width*height)) image[i]=lookup[image[i][0]];
     }
     return Image(image,width,height,width,true,depth==2||depth==4);
 }
@@ -133,9 +133,10 @@ uint adler32(const ref<byte> data) {
 
 
 array<byte> filter(const Image& image) {
-    array<byte> data(image.width*image.height*4+image.height); data.setSize(data.capacity());
+    uint w=image.width, h=image.height;
+    array<byte> data(w*h*4+h); data.setSize(data.capacity());
     byte* dst = data.data(); const byte* src = (byte*)image.data;
-    for(uint y=0,w=image.width; y<image.height; y++ ) { *dst++ = 0; copy(dst,src,w*4); dst+=w*4, src+=w*4; }
+    for(uint unused y: range(h)) { *dst++ = 0; copy(dst,src,w*4); dst+=w*4, src+=w*4; }
     return data;
 }
 
@@ -147,7 +148,7 @@ array<byte> encodePNG(const Image& image) {
 
     array<byte> IDAT = "IDAT"_+"\x78\x01"_; //zlib header: method=8, window=7, check=0, level=1
     array<byte> data = filter(image);
-    for(uint i=0;i<data.size();) {
+    for(uint i: range(data.size())) {
         uint16 len = min(data.size()-i,65535u), nlen = ~len;
         IDAT << (i+len==data.size()) << raw(len) << raw(nlen) << data.slice(i,len);
         i+=len;

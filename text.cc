@@ -140,7 +140,7 @@ void Text::layout() {
         Line line;
         TextLayout::Character c = layout.text[l.begin];
         line.min = c.pos/16 + int2(0,2);
-        for(uint i=l.begin;i<l.end;i++) {
+        for(uint i: range(l.begin,l.end)) {
             TextLayout::Character c = layout.text[i];
             int2 p = c.pos/16 + int2(0,2);
             if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.font->advance(c.index)/16,0);
@@ -163,7 +163,7 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, MouseButton) {
     if(event!=Press) return false;
     position -= max(int2(0),(size-textSize)/2);
     if(!Rect(textSize).contains(position)) return false;
-    for(uint i=0;i<characters.size();i++) { const Character& b=characters[i];
+    for(uint i: range(characters.size())) { const Character& b=characters[i];
         if((b.pos+Rect(b.image.size())).contains(position)) {
             for(const Link& link: links) if(i>=link.begin&&i<=link.end) { linkActivated(link.identifier); return true; }
         }

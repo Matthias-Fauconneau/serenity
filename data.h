@@ -9,12 +9,12 @@ template<class T, class O> ref<T> cast(const ref<O>& o) {
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
 
-/// \a Data is an interface to read structured data (\sa BinaryData TextData)
-/// \note \a available can be overridden to feed \a buffer as needed (\sa DataStream)
+/// Data is an interface to read structured data. \sa BinaryData TextData
+/// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
     array<byte> buffer;
     uint index=0;
-    default(Data)
+    Data(){}
     /// Creates a Data interface to an \a array
     Data(array<byte>&& array) : buffer(move(array)) {}
     /// Creates a Data interface to a \a reference
@@ -51,7 +51,7 @@ inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
 /// \a BinaryData provides a convenient interface to parse binary inputs
 struct BinaryData : virtual Data {
     bool isBigEndian = false;
-    default_move(BinaryData) move_operator(BinaryData)
+    default_move(BinaryData)
     /// Creates a BinaryData interface to an \a array
     BinaryData(array<byte>&& array, bool isBigEndian=false) : Data(move(array)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to a \a reference
@@ -93,17 +93,17 @@ struct BinaryData : virtual Data {
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {
        BinaryData* s; uint size;
-       template<class T> operator array<T>() { array<T> t; for(uint i=0;i<size;i++) t<<(T)s->read(); return t; }
+       template<class T> operator array<T>() { array<T> t(size); for(uint unused i: range(size)) t<<(T)s->read(); return t; }
    };
    ArrayReadOperator read(uint size) { return __(this,size); }
 
    /// Reads \a size \a T elements (swap as needed)
-   template<class T>  void read(T buffer[], uint size) { for(uint i=0;i<size;i++) buffer[i]=(T)read(); }
+   template<class T>  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
 };
 
 /// \a TextData provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-    default_move(TextData) move_operator(TextData)
+    default_move(TextData)
     /// Creates a TextData interface to an \a array
     TextData(array<byte>&& array) : Data(move(array)){}
     /// Creates a TextData interface to a \a reference
@@ -118,16 +118,14 @@ struct TextData : virtual Data {
     /// If input match none of \a key, advances \a pos
     bool matchNo(const ref<byte>& any);
 
-    /// advances \a pos while input doesn't match \a key
-    /// \sa until
+    /// advances \a pos while input doesn't match \a key. \sa until
     ref<byte> whileNot(char key);
     /// advances \a pos while input match any of \a key
     ref<byte> whileAny(const ref<byte>& key);
     /// advances \a pos while input match none of \a key
     ref<byte> whileNo(const ref<byte>& key);
 
-    /// Reads until input match \a key
-    /// \sa whileNot
+    /// Reads until input match \a key. \sa whileNot
     ref<byte> until(char key);
     /// Reads until input match \a key
     ref<byte> until(const ref<byte>& key);

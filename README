@@ -1,7 +1,12 @@
 Usage: install.sh APPLICATION
 
 Available applications:
-desktop: Background window with integrated feed, events calendar and application launcher (started by .xinitrc and raised by taskbar home button)
-taskbar: Tasks panel with basic integrated window management
-player: Music player
-music: Piano sampling synthesizer
+taskbar: Shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
+desktop: Displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
+player: Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position.
+music: SFZ sampler and PDF renderer (tested with Salamander)
+
+These applications are developed using an elegant C++11 framework including:
+– Runtime support: array, string, log, stack trace, profile, disassembly.
+– Platform abstraction: file/network/thread (Linux), window (X11), sound/MIDI (alsa).
+– GUI system: text (freetype), image (ico,png,jpeg), button, slider, layout (bar,list,grid).

@@ -37,8 +37,8 @@ Image decodeICO(const ref<byte>& file) {
     byte4* dst = (byte4*)image.data;
     const byte* src=s.read<byte>(size).data;
     if(header.depth==32) { copy((byte*)dst,src,size); }
-    if(header.depth==24) for(uint i=0;i<w*h;src+=3) dst[i++] = byte4(src[0],src[1],src[2],255);
-    if(header.depth==8) for(uint i=0;i<w*h;src++) dst[i++] = palette[*src];
+    if(header.depth==24) for(uint i: range(w*h)) dst[i] = byte4(src[i*3+0],src[i*3+1],src[i*3+2],255);
+    if(header.depth==8) for(uint i: range(w*h)) dst[i] = palette[src[i]];
     if(header.depth==4) {
         assert(w%8==0); //TODO: pad
         for(uint i=0;i<w*h;src++){ dst[i++] = palette[(*src)>>4]; dst[i++] = palette[(*src)&0xF]; }

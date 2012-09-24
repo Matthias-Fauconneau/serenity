@@ -138,7 +138,7 @@ syscall2(int, timerfd_create, int,clock_id, int,flags)
 syscall4(int, timerfd_settime, int,ufd, int,flags, const struct timespec*,utmr, struct timespec*,otmr)
 syscall2(int, eventfd2, int,val, int,flags)
 
-inline __attribute((noreturn)) int exit(int status) {r(r0,status) r(rN,sys::exit); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
+inline __attribute((noreturn)) void exit_thread(int status) {r(r0,status) r(rN,sys::exit); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noreturn)) int exit_group(int status) {r(r0,status)  r(rN,sys::exit_group); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noinline)) long clone(int (*fn)(void*), void* stack, int flags, void* arg) {
     r(rN,sys::clone) r(r0,flags) r(r1,stack) r(r2,0) r(r3,0) r(r4,0) register long r asm(rR);

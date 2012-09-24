@@ -1,31 +1,30 @@
 #pragma once
 
-/// Keywords
+// Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define weak(function) function __attribute((weak)); function
 #define offsetof(object, member) __builtin_offsetof (object, member)
 #define notrace __attribute((no_instrument_function))
 inline void* operator new(unsigned long, void* p) { return p; } //placement new
-#define static_this void __attribute((constructor)) static_this()
+#define constructor(id, priority...) void __attribute((constructor(priority))) constructor_ ## id()
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-/// Move
+// Move
 template<typename T> struct remove_reference { typedef T type; };
 template<typename T> struct remove_reference<T&> { typedef T type; };
 template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
 template<class T> __attribute((always_inline)) constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
-#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete;
-#define default(T) T()____(=default);
-#define default_move(T) default(T) no_copy(T) T(T&&)____(=default);
-#define move_operator(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;}
+#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
+#define move_operator(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
+#define default_move(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)=default; T(){}
 /// base template for explicit copy (overriden by explicitly copyable types)
 template<class T> T copy(const T& t) { return t; }
 
-/// Forward
+// Forward
 template<typename T, T v> struct integral_constant { static constexpr T value = v; typedef integral_constant<T, v> type; };
 template<typename T, T v> constexpr T integral_constant<T, v>::value;
 typedef integral_constant<bool, true> true_type;
@@ -36,14 +35,14 @@ template<typename T> struct is_lvalue_reference<T&> : public true_type { };
 template<class T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
 template<class T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
 
-/// Predicate
+// Predicate
 extern void* enabler;
 template<bool> struct predicate {};
 template<> struct predicate<true> { typedef void* type; };
 #define predicate(E) typename predicate<E>::type& condition = enabler
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
 
-/// Primitive types
+// Primitive types
 typedef char byte;
 typedef signed char int8;
 typedef unsigned char uint8;
@@ -57,7 +56,7 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 
-/// Works around missing support for some C++11 features in QtCreator code model
+// Works around missing support for some C++11 features in QtCreator code model
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
 template<class T> struct ref; //templated typedef using
 #define _ //string literal operator _""
@@ -65,8 +64,8 @@ template<class T> struct ref; //templated typedef using
 #define ___ //variadic template arguments unpack operator ...
 #define ____( ignore... ) //=default, constructor{} initializer
 #else
-/// \a ref is an unmanaged const memory reference (used in method arguments)
 namespace std { template<class T> struct initializer_list; }
+/// \a ref is an unmanaged const memory reference
 template<class T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
@@ -75,11 +74,11 @@ inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
 #define ____( ignore... ) ignore
 #endif
 
-/// compile \a statements in executable only if \a DEBUG flag is set
 #ifdef DEBUG
 #define debug( statements... ) statements
 #define warn error
 #else
+/// Compiles \a statements in executable only if \a DEBUG flag is set
 #define debug( statements... )
 #define warn log
 #endif
@@ -93,7 +92,17 @@ template<> void error(const ref<byte>& message) __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) ({debug( if(!(expr)) error(#expr ""_, ##message);)})
 
-/// initializer_list
+/// Numeric range iterations
+struct range {
+    uint start,stop;
+    range(uint start, uint stop):start(start),stop(stop){}
+    range(uint size):range(0,size){}
+    struct iterator { uint i; uint operator*() {return i;} uint operator++(){return i++;} bool operator !=(const iterator& o) const{return i!=o.i;}};
+    iterator begin(){ return __(start); }
+    iterator end(){ return __(stop); }
+};
+
+// initializer_list
 namespace std {
 template<class T> struct initializer_list {
     const T* data;
@@ -110,29 +119,26 @@ template<class T> struct initializer_list {
     /// Compares all elements
     bool operator ==(const initializer_list<T>& o) const {
         if(size != o.size) return false;
-        for(uint i=0;i<size;i++) if(!(data[i]==o.data[i])) return false;
+        for(uint i: range(size)) if(!(data[i]==o.data[i])) return false;
         return true;
     }
-    /// Compares to single value
-    bool operator ==(const T& value) const { return size==1 && *data == value; }
     /// Slices a reference to elements from \a pos to \a pos + \a size
     initializer_list<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
     /// Slices a reference to elements from to the end of the reference
     initializer_list<T> slice(uint pos) const { assert(pos<=size); return initializer_list<T>(data+pos,size-pos); }
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    int indexOf(const T& value) const { for(uint i=0;i<size;i++) { if(data[i]==value) return i; } return -1; }
+    int indexOf(const T& value) const { for(uint i: range(size)) { if(data[i]==value) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& value) const { return indexOf(value)>=0; }
 };
 }
 
-/// Works around missing support for some C++11 features in QtCreator code model
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, unsigned long size) { return ref<byte>((byte*)data,size); }
 #endif
 
-/// Basic operations
+// Basic operations
 template<class T> constexpr T min(T a, T b) { return a<b ? a : b; }
 template<class T> constexpr T max(T a, T b) { return a>b ? a : b; }
 template<class T> constexpr T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }

@@ -24,9 +24,9 @@ string gpr(uint r, uint size) {
 string xmm(int r, int) { return "xmm"_+str(r); }
 string reg(int r, int size, int sse) { return sse ? xmm(r,size) : gpr(r,size); }
 
-static constexpr ref<byte> ops[] = {"add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_};
-static constexpr ref<byte> ccs[] = { "o"_,"no"_,"c"_,"nc"_,"e"_,"ne"_,"na"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_};
-static constexpr ref<byte> shs[] = {"rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_};
+constexpr ref<byte> ops[] = {"add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_};
+constexpr ref<byte> ccs[] = { "o"_,"no"_,"c"_,"nc"_,"e"_,"ne"_,"na"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_};
+constexpr ref<byte> shs[] = {"rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_};
 
 int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
     s<<'[';

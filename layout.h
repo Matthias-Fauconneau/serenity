@@ -4,7 +4,7 @@
 
 /// Layout is a proxy Widget containing multiple widgets.
 struct Layout : Widget {
-    /// Override \a count and \a at to implement widgets storage (\sa Widgets Array Tuple)
+    /// Override \a count and \a at to implement widgets storage. \sa Widgets Array Tuple
     virtual uint count() const =0;
     virtual Widget& at(int) =0;
 
@@ -73,22 +73,22 @@ struct Vertical : virtual Linear {
     int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
 };
 
-/// HBox is a \a Horizontal layout of heterogenous widgets (\sa Widgets)
+/// HBox is a \a Horizontal layout of heterogenous widgets. \sa Widgets
 struct HBox : virtual Horizontal, virtual Widgets {
     HBox(){}
     HBox(const ref<Widget*>& widgets):Widgets(widgets){}
 };
-/// VBox is a \a Vertical layout of heterogenous widgets (\sa Widgets)
+/// VBox is a \a Vertical layout of heterogenous widgets. \sa Widgets
 struct VBox : Vertical, Widgets {
     VBox(){}
     VBox(const ref<Widget*>& widgets):Widgets(widgets){}
 };
-/// HList is a \a Horizontal layout of items (\sa Array)
+/// HList is a \a Horizontal layout of items. \sa Array
 template<class T> struct HList : Horizontal, Array<T> {
     HList(){}
     HList(array<T>&& widgets):Array<T>(move(widgets)){}
 };
-/// VList is a \a Vertical layout of items (\sa Array)
+/// VList is a \a Vertical layout of items. \sa Array
 template<class T> struct VList : Vertical, Array<T> {
     VList(){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
@@ -141,17 +141,17 @@ template<class T> struct ArraySelection : Array<T>, virtual Selection {
     T& active() { return array<T>::at(this->index); }
 };
 
-/// List is a \a Vertical layout of selectable items (\sa ArraySelection)
+/// List is a \a Vertical layout of selectable items. \sa ArraySelection
 template<class T> struct List : Vertical, ArraySelection<T>, HighlightSelection {
     List(){}
     List(array<T>&& items) : ArraySelection<T>(move(items)){}
 };
-/// Bar is a \a Horizontal layout of selectable items (\sa ArraySelection)
+/// Bar is a \a Horizontal layout of selectable items. \sa ArraySelection
 template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
     Bar(){}
     Bar(array<T>&& items) : ArraySelection<T>(move(items)){}
 };
-/// GridSelection is a \a Grid layout of selectable items (\sa ArraySelection)
+/// GridSelection is a \a Grid layout of selectable items. \sa ArraySelection
 template<class T> struct GridSelection : Grid, ArraySelection<T>, HighlightSelection {
     GridSelection(int width=0, int height=0, int margin=0) : Grid(width,height,margin){}
     GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}

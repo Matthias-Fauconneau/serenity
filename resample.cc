@@ -56,13 +56,10 @@ inline float product(const float* kernel, const float* signal, int len) {
 #endif
 }
 
-// Speex Q10 (highest quality)
-const int filterSize = 256;
-const float bandwidth = 0.975;
-const int windowOversample = 32;
-static double kaiser12[68] = { 0.99859849, 1.00000000, 0.99859849, 0.99440475, 0.98745105, 0.97779076, 0.96549770, 0.95066529, 0.93340547, 0.91384741, 0.89213598, 0.86843014, 0.84290116, 0.81573067, 0.78710866, 0.75723148, 0.72629970, 0.69451601, 0.66208321, 0.62920216, 0.59606986, 0.56287762, 0.52980938, 0.49704014, 0.46473455, 0.43304576, 0.40211431, 0.37206735, 0.34301800, 0.31506490, 0.28829195, 0.26276832, 0.23854851, 0.21567274, 0.19416736, 0.17404546, 0.15530766, 0.13794294, 0.12192957, 0.10723616, 0.09382272, 0.08164178, 0.07063950, 0.06075685, 0.05193064, 0.04409466, 0.03718069, 0.03111947, 0.02584161, 0.02127838, 0.01736250, 0.01402878, 0.01121463, 0.00886058, 0.00691064, 0.00531256, 0.00401805, 0.00298291, 0.00216702, 0.00153438, 0.00105297, 0.00069463, 0.00043489, 0.00025272, 0.00013031, 0.0000527734, 0.00001000, 0.00000000 };
-
 static double window(float x) {
+    const int windowOversample = 32;
+    static constexpr double kaiser12[68] = { 0.99859849, 1.00000000, 0.99859849, 0.99440475, 0.98745105, 0.97779076, 0.96549770, 0.95066529, 0.93340547, 0.91384741, 0.89213598, 0.86843014, 0.84290116, 0.81573067, 0.78710866, 0.75723148, 0.72629970, 0.69451601, 0.66208321, 0.62920216, 0.59606986, 0.56287762, 0.52980938, 0.49704014, 0.46473455, 0.43304576, 0.40211431, 0.37206735, 0.34301800, 0.31506490, 0.28829195, 0.26276832, 0.23854851, 0.21567274, 0.19416736, 0.17404546, 0.15530766, 0.13794294, 0.12192957, 0.10723616, 0.09382272, 0.08164178, 0.07063950, 0.06075685, 0.05193064, 0.04409466, 0.03718069, 0.03111947, 0.02584161, 0.02127838, 0.01736250, 0.01402878, 0.01121463, 0.00886058, 0.00691064, 0.00531256, 0.00401805, 0.00298291, 0.00216702, 0.00153438, 0.00105297, 0.00069463, 0.00043489, 0.00025272, 0.00013031, 0.0000527734, 0.00001000, 0.00000000 };
+
     float y = x*windowOversample;
     int i = y;
     float t = (y-i);
@@ -87,6 +84,8 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
     assert(channelCount==this->channelCount);
 
     // Computes filter size and cutoff
+    const int filterSize = 256;
+    const float bandwidth = 0.975;
     double cutoff;
     if (sourceRate > targetRate) { //downsampling
         cutoff = bandwidth * targetRate / sourceRate;
@@ -99,7 +98,7 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
 
     // Allocates and clears aligned planar signal buffers
     this->bufferSize = bufferSize = max(bufferSize,sourceRate)+N-1;
-    for(uint i=0;i<channelCount;i++) {
+    for(uint i: range(channelCount)) {
         buffer[i] = allocate16<float>(bufferSize);
         clear(buffer[i],bufferSize,0.f);
     }
@@ -113,10 +112,10 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
 
     // Generates an N tap filter for each fractionnal position
     kernel = allocate16<float>(targetRate*N);
-    for(uint i=0;i<targetRate;i++) for(uint j=0;j<N;j++) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+j-N/2-1, N);
+    for(uint i: range(targetRate)) for(uint j: range(N)) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+j-N/2-1, N);
 }
 Resampler::~Resampler() {
-    for(uint i=0;i<channelCount;i++) if(buffer[i]) unallocate(buffer[i],channelCount*bufferSize);
+    for(uint i: range(channelCount)) if(buffer[i]) unallocate(buffer[i],channelCount*bufferSize);
     if(kernel) unallocate(kernel,N*targetRate);
 }
 
@@ -135,20 +134,20 @@ void Resampler::write(const float* source, uint size) {
         writeIndex -= integerIndex;
         assert(writeIndex+size<bufferSize-N-1);
         for(uint channel=0;channel<channelCount;channel++) {
-            for(uint i=0;i<N-1+writeIndex;++i) buffer[channel][i] = buffer[channel][integerIndex+i];
+            for(uint i: range(N-1+writeIndex)) buffer[channel][i] = buffer[channel][integerIndex+i];
         }
         integerIndex = 0;
     }
-    for(uint j=0;j<size;j++) { // Deinterleaves source to buffers
-        buffer[0][N-1+writeIndex+j]=source[j*channelCount+0];
-        buffer[1][N-1+writeIndex+j]=source[j*channelCount+1];
+    for(uint i: range(size)) { // Deinterleaves source to buffers
+        buffer[0][N-1+writeIndex+i]=source[i*channelCount+0];
+        buffer[1][N-1+writeIndex+i]=source[i*channelCount+1];
     }
      writeIndex+=size;
      assert(writeIndex<bufferSize);
 }
 
 template<bool mix> void Resampler::read(float* target, uint targetSize) {
-    for(uint i=0;i<targetSize;i++) {
+    for(uint i: range(targetSize)) {
         for(uint channel=0;channel<channelCount;channel++) {
             if(mix) target[i*channelCount+channel] += product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);
             else    target[i*channelCount+channel]    = product(kernel+fractionalIndex*N, buffer[channel]+integerIndex, N);

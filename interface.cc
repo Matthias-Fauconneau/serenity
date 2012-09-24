@@ -60,7 +60,7 @@ bool Slider::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button)
 
 bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, MouseButton button) {
     array<Rect> widgets = layout(0, size);
-    for(uint i=0;i<widgets.size();i++) {
+    for(uint i: range(widgets.size())) {
         if(widgets[i].contains(cursor)) {
             if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
             if(event==Press && button == LeftButton) {
@@ -92,7 +92,7 @@ void Selection::setActive(uint i) {
 
 void HighlightSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
-    for(uint i=0;i<count();i++) {
+    for(uint i: range(count())) {
         if(i==index && (always || focus==this || focus==&at(i))) fill(widgets[i], highlight);
         at(i).render(widgets[i]);
     }
@@ -109,7 +109,7 @@ void TabSelection::render(int2 position, int2 size) {
         //fill(active, lightGray); //light active tab
         if(index<count()-1) fill(Rect(int2(active.max.x,position.y), position+size), darken); //darken inactive tabs after current
     }
-    for(uint i=0;i<count();i++) at(i).render(widgets[i]);
+    for(uint i: range(count()))  at(i).render(widgets[i]);
 }
 
 /// ImageView

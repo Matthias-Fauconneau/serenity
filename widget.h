@@ -3,8 +3,7 @@
 
 enum MouseButton { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
 enum Key {
-    Escape=0xff1b, Return=0xff0d, Delete=0xffff, BackSpace=0xff08,
-    Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57,
+    Escape=0xff1b, BackSpace=0xff08, Return=0xff0d, Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57, PrintScreen=0xff61, Delete=0xffff,
     Play=0x1008ff14, Email=0x1008ff19, WWW=0x1008ff18
 };
 

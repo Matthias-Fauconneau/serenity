@@ -6,8 +6,14 @@
 #include "interface.h"
 #include "window.h"
 #include "calendar.h"
+#include "png.h"
 
-struct Taskbar : Application, Socket, Poll {
+// Compares to single value
+template<class T>  bool operator ==(const ref<T>& r, const T& value) { return r.size==1 && r.data[0] == value; }
+template<class T> bool operator ==(const array<T>& a, const T& value) { return  (ref<T>)a==value; }
+
+/// Taskbar shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
+struct Taskbar : Socket, Poll {
     bool hasFocus; // for Escape key
     struct Task : Item {
         Taskbar* parent=0;
@@ -80,6 +86,7 @@ struct Taskbar : Application, Socket, Poll {
         popup.hideOnLeave = true;
         popup.autoResize=true;
         popup.anchor = TopRight;
+        window.globalShortcut(PrintScreen).connect(this,&Taskbar::saveSnapshot);
         window.show();
     }
 
@@ -221,6 +228,10 @@ struct Taskbar : Application, Socket, Poll {
         {MapWindow r; r.id=desktop; send(raw(r));} raise(desktop);
     }
 
+    void saveSnapshot() {
+        writeFile("snapshot.png"_,encodePNG(window.getSnapshot()),home());
+    }
+
     uint16 sequence=-1;
     void send(const ref<byte>& request) { write( request); sequence++; }
 
@@ -242,6 +253,5 @@ struct Taskbar : Application, Socket, Poll {
             while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
         }
     }
-};
+} application;
 bool operator==(const Taskbar::Task& a,const Taskbar::Task& b){return a.id==b.id;}
-Application(Taskbar)

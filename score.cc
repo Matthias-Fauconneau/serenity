@@ -222,7 +222,7 @@ spurious: ;
                     }
                     //if(n<MIDI.size() && MIDI[n]<=note) { sync=false; }
                     note = n>=MIDI.size() ? 0 : MIDI[n];
-                    /*if(lastSync && sync && staff[x].size()<3) for(uint j=noteIndex;j<min(MIDI.size(),noteIndex+lastChord.size());j++) {
+                    /*if(lastSync && sync && staff[x].size()<3) for(uint i: range(min(MIDI.size(),noteIndex+lastChord.size())) {
                         if(abs(lastChord[j-noteIndex].y+y)<=1 && abs(MIDI[j]-note)>2 && note!=MIDI[j]+12) {
                             debug[vec2(x,-y)]=string("!MIDI"_);
                             goto skip;
@@ -250,7 +250,7 @@ spurious: ;
     }
 
     /// Debug
-    for(uint i=0;i<min(MIDI.size(),positions.size());i++) debug[positions[i]]=dec(MIDI[i]); //dec(positions[i].x)+" "_+
+    for(uint i: range(min(MIDI.size(),positions.size()))) debug[positions[i]]=dec(MIDI[i]); //dec(positions[i].x)+" "_+
     //for(Line l: ties) debug[(l.a+l.b)/2.f]=string("-"_);
     for(float y: staffs) debug[vec2(0,y-16)]=string("___________"_);
 

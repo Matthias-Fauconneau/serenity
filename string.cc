@@ -3,7 +3,7 @@
 /// ref<byte>
 
 bool operator <(const ref<byte>& a, const ref<byte>& b) {
-    for(uint i=0;i<min(a.size,b.size);i++) {
+    for(uint i: range(min(a.size,b.size))) {
         if(a[i] < b[i]) return true;
         if(a[i] > b[i]) return false;
     }
@@ -33,33 +33,10 @@ bool endsWith(const ref<byte>& s, const ref<byte>& a) {
 ref<byte> section(const ref<byte>& s, byte separator, int begin, int end) {
     if(!s) return ""_;
     uint b,e;
-    if(begin>=0) {
-        b=0;
-        auto it=s.begin(); for(uint i=0;i<(uint)begin && it!=s.end();++it,b++) if(*it==separator) i++;
-    } else {
-        b=s.size;
-        if(begin!=-1) {
-            auto it=s.end(); --it; --b;
-            for(uint i=0;;--it,--b) {
-                if(*it==separator) { i++; if(i>=uint(-begin-1)) { b++; break; } }
-                if(it == s.begin()) break;
-            }
-        }
-    }
-    if(end>=0) {
-        e=0;
-        auto it=s.begin();
-        for(uint i=0;it!=s.end();++it,e++) if(*it==separator) { i++; if(i>=(uint)end) break; }
-    } else {
-        e=s.size;
-        if(end!=-1) {
-            auto it=s.end(); --it; --e;
-            for(uint i=0;;--it,--e) {
-                if(*it==separator) { i++; if(i>=uint(-end-1)) break; }
-                if(it == s.begin()) break;
-            }
-        }
-    }
+    if(begin>=0) { b=0; for(uint i=0;i<(uint)begin && b<s.size;b++) if(s[b]==separator) i++; }
+    else { b=s.size; if(begin!=-1) { b--; for(uint i=0;b>0;b--) if(s[b]==separator) { i++; if(i>=uint(-begin-1)) { b++; break; } } } }
+    if(end>=0) { e=0; for(uint i=0;e<s.size;e++) if(s[e]==separator) { i++; if(i>=(uint)end) break; } }
+    else { e=s.size; if(end!=-1) { e--; for(uint i=0;e>0;e--) { if(s[e]==separator) { i++; if(i>=uint(-end-1)) break; } } } }
     assert(e>=b);
     return ref<byte>(s.data+b,e-b);
 }
@@ -113,13 +90,13 @@ array< ref<byte> > split(const ref<byte>& str, byte sep) {
 
 string join(const ref<string>& list, const ref<byte>& separator) {
     string str;
-    for(uint i=0;i<list.size;i++) { str<< list[i]; if(i<list.size-1) str<<separator; }
+    for(uint i: range(list.size)) { str<< list[i]; if(i<list.size-1) str<<separator; }
     return str;
 }
 
 string replace(const ref<byte>& s, const ref<byte>& before, const ref<byte>& after) {
     string r(s.size);
-    for(uint i=0;i<s.size;) {
+    for(uint i: range(s.size)) {
         if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r<<after; i+=before.size; }
         else { r << s[i]; i++; }
     }
@@ -133,8 +110,8 @@ string toLower(const ref<byte>& s) {
 }
 
 string simplify(string&& s) {
-    for(uint i=0;i<s.size();) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
-    for(uint i=0;i<s.size();) {
+    for(uint i: range(s.size())) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
+    for(uint i: range(s.size())) {
         byte c=s[i];
         if(c=='\r') { s.removeAt(i); continue; } //Removes any \r
         i++;

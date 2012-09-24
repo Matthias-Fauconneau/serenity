@@ -36,7 +36,6 @@ int BitReader::sbinary(int size) {
 }
 
 static uint8 log2[256];
-static_this { int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); }
 uint BitReader::unary() {
     assert(index<bsize);
     // 64bit word optimization of "uint size=0; while(!bit()) size++; assert(size<(64-8)+64);"
@@ -67,6 +66,7 @@ uint BitReader::utf8() {
 }
 
 FLAC::FLAC(const ref<byte>& data) {
+    static bool unused once = ({ int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); true;});
     BitReader::setData(data);
     assert(startsWith(data,"fLaC"_)); skip(32);
     for(;;) { //METADATA_BLOCK*
@@ -115,7 +115,7 @@ inline double round(double x) { //setRoundMode(Down) to round towards negative i
 
 template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned, double*& misaligned, float*& signal) {
     double2 sum = {0,0};
-    for(uint i=0;i<unroll;i++) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers
+    for(uint i: range(unroll)) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers
     double sample = round(extract(sum,0)+extract(sum,1))+double(*signal); //add residue to prediction [SS2SD=2]
     aligned[2*unroll]= misaligned[2*unroll]= sample; aligned++; misaligned++; //write out contexts, misalign align, align misalign
     *signal = sample; signal++; //write out decoded sample SD2SS=8
@@ -123,7 +123,7 @@ template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned
 
 template<int unroll> inline void convolve(double* predictor, double* even, double* odd, float* signal, float* end) {
     double2 kernel[unroll];
-    for(uint i=0;i<unroll;i++) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
+    for(uint i: range(unroll)) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
     for(;signal<end;) {
         filter<unroll>(kernel, even, odd, signal);
         filter<unroll>(kernel, odd, even, signal);
@@ -135,7 +135,7 @@ template<int unroll,int channelMode> inline void interleave(const float* A, cons
         __builtin_prefetch(A+32,0,0);
         __builtin_prefetch(B+32,0,0);
         __builtin_prefetch(ptr+32,0,0);
-        for(uint i=0;i<unroll;i++) {
+        for(uint i: range(unroll)) {
             float a=A[i], b=B[i];
             if(channelMode==Independent) ptr[i]=(float2)__(a,b);
             else if(channelMode==LeftSide) ptr[i]=(float2)__(a,a-b);
@@ -182,14 +182,14 @@ void FLAC::decodeFrame() {
 
         if (type >= 32) { //LPC
             order = (type&~0x20)+1; assert(order>0 && order<=32,order);
-            for(uint i=0;i<order;i++) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
+            for(uint i: range(order)) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
             int precision = binary(4)+1; assert(precision<=15,precision);
             int shift = sbinary(5); assert(shift>=0);
-            if(order%2) { predictor[0]=0; for(uint i=0;i<order;i++) predictor[order-i]= double(sbinary(precision))/(1<<shift); } //right align odd order
-            else { for(uint i=0;i<order;i++) predictor[order-1-i]= double(sbinary(precision))/(1<<shift); }
+            if(order%2) { predictor[0]=0; for(uint i: range(order)) predictor[order-i]= double(sbinary(precision))/(1<<shift); } //right align odd order
+            else { for(uint i: range(order)) predictor[order-1-i]= double(sbinary(precision))/(1<<shift); }
         } else if(type>=8 && type <=12) { //Fixed
             order = type & ~0x8; assert(order<=4,order);
-            for(uint i=0;i<order;i++) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
+            for(uint i: range(order)) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
             if(order==1) predictor[0]=0, predictor[1]=1;
             else if(order==2) predictor[0]=-1, predictor[1]=2;
             else if(order==3) predictor[0]=0, predictor[1]=1, predictor[2]=-3, predictor[3]=3;
@@ -236,7 +236,7 @@ void FLAC::decodeFrame() {
         signal=block[channel]+order;
         if(order%2) { //for odd order: compute first sample with 'right' predictor without advancing context to begin unrolled loops with even context
             double sum=0;
-            for(uint i=0;i<order;i++) sum += predictor[i+1] * even[i];
+            for(uint i: range(order)) sum += predictor[i+1] * even[i];
             double sample = round(sum)+*signal;
             even[order]=odd[order]= sample; //write out context
             *signal = sample; signal++; //write out decoded sample //TODO: float
