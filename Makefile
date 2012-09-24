@@ -1,14 +1,17 @@
 PREFIX ?= /usr
 TARGET ?= taskbar
 BUILD ?= release
-#CC= g++ -fabi-version=0 -pipe -march=native
-CC= clang++ -pipe -march=native
-FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
-FLAGS_debug := -g -fno-omit-frame-pointer -DDEBUG
-FLAGS_profile := -g -O3 -finstrument-functions
-SRCS_profile := profile
-FLAGS_release := -O3
 
+ifeq ($(TARGET),music)
+ CC := g++ -fabi-version=0 -pipe -march=native
+else
+ CC := clang++ -pipe -march=native
+endif
+
+FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
+FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
+FLAGS_profile = -g -O3 -finstrument-functions
+FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
@@ -16,6 +19,9 @@ ICONS_taskbar := button
 ICONS_desktop := feeds network shutdown
 ICONS_player := play pause next
 ICONS_music := music
+
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%)
+SRCS_profile = profile
 
 LIBS_font = freetype
 LIBS_player = mpg123
@@ -62,7 +68,6 @@ $(BUILD)/%.o: %.png
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<
 
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%)
 $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))

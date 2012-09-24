@@ -108,15 +108,11 @@ Image decodePNG(const ref<byte>& file) {
     return Image(image,width,height,width,true,depth==2||depth==4);
 }
 
-template<uint C, int K = 0> struct crc32__ { static constexpr uint value =  crc32__<(C & 1) ? (0xedb88320L ^ (C >> 1)) : (C >> 1), K+1>::value; };
-template<uint C> struct crc32__<C, 8> { static constexpr uint value = C; };
-template<int N = 0, uint ...D> struct crc32_ : crc32_<N+1, D..., crc32__<N>::value>  { };
-template<uint ...D> struct crc32_<256, D...> { static constexpr uint table[sizeof...(D)] = {  D... }; };
-template<uint ...D> constexpr uint crc32_<256, D...>::table[sizeof...(D)];
-
 uint32 crc32(const ref<byte>& data) {
+    uint crc_table[256];
+    static bool unused once = ({for(uint n: range(256)){ uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } true;});
     uint crc = 0xFFFFFFFF;
-    for(byte b: data) crc = crc32_<>::table[(crc ^ b) & 0xff] ^ (crc >> 8);
+    for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
     return ~crc;
 }
 

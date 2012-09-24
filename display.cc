@@ -1,10 +1,7 @@
 #include "display.h"
 
-/// Clip
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
-
-/// Render
 Image framebuffer;
 
 void fill(Rect rect, byte4 color, bool blend) {

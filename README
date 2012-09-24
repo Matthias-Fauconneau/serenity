@@ -1,12 +1,43 @@
-Usage: install.sh APPLICATION
+/**
+\mainpage Serenity documentation index
+
+\section Introduction
+
+Serenity is an elegant C++11 framework including:
+
+– Runtime support
+    - array
+    - string, log
+    - stack trace, profile
+    - disassembly
+
+– Platform abstraction
+    - file, network (POSIX)
+    - threads (Linux)
+    - window (X11)
+    - sound/MIDI (alsa)
+
+– GUI system
+    - text (freetype)
+    - image (ico,png,jpeg)
+    - widgets (scroll, button, slider)
+    - layout (bar, list, grid)
+
+\section build Build system
+
+Source dependencies for an application (given by $TARGET) are resolved by dep.py, linking all sources (.cc) corresponding to included headers (.h).
+
+Make is used to track header dependencies and incrementally build (using flags depending on $BUILD={debug,profile,release})
+
+The Qt Creator IDE project file offers preset build configurations for the existing applications
+
+\section Installation
+
+ Usage: install.sh APPLICATION
 
 Available applications:
-taskbar: Shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
-desktop: Displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
-player: Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position.
-music: SFZ sampler and PDF renderer (tested with Salamander)
-
-These applications are developed using an elegant C++11 framework including:
-– Runtime support: array, string, log, stack trace, profile, disassembly.
-– Platform abstraction: file/network/thread (Linux), window (X11), sound/MIDI (alsa).
-– GUI system: text (freetype), image (ico,png,jpeg), button, slider, layout (bar,list,grid).
+- taskbar: Shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
+- desktop: Displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
+- player: Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position.
+- music: SFZ sampler and PDF renderer (tested with Salamander)
+**/

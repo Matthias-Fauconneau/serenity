@@ -20,7 +20,7 @@ template<class T> __attribute((always_inline)) constexpr remove_reference(T)&& m
 template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 #define move_operator(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
-#define default_move(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)=default; T(){}
+#define default_move(T) T(){} T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&&)____(=default)
 /// base template for explicit copy (overriden by explicitly copyable types)
 template<class T> T copy(const T& t) { return t; }
 
@@ -65,7 +65,7 @@ template<class T> struct ref; //templated typedef using
 #define ____( ignore... ) //=default, constructor{} initializer
 #else
 namespace std { template<class T> struct initializer_list; }
-/// \a ref is an unmanaged const memory reference
+/// \a Unmanaged const memory reference
 template<class T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);

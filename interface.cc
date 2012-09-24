@@ -2,15 +2,13 @@
 #include "display.h"
 #include "layout.h"
 
-/// ScrollArea
-
+// ScrollArea
 void ScrollArea::render(int2 position, int2 size) {
     this->size=size;
     int2 hint = abs(widget().sizeHint());
     delta = min(int2(0,0), max(size-hint, delta));
     widget().render(position+delta, max(hint,size));
 }
-
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
     int2 hint = abs(widget().sizeHint());
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
@@ -27,14 +25,11 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, MouseButton but
     }
     return false;
 }
-
 void ScrollArea::ensureVisible(Rect target) { delta = max(-target.min, min(size-target.max, delta)); }
 void ScrollArea::center(int2 target) { delta = size/2-target; }
 
-/// Progress
-
+// Progress
 int2 Progress::sizeHint() { return int2(-height,height); }
-
 void Progress::render(int2 position, int2 size) {
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = size.x*uint(value-minimum)/uint(maximum-minimum);
@@ -45,8 +40,7 @@ void Progress::render(int2 position, int2 size) {
     }
 }
 
-/// Slider
-
+// Slider
 bool Slider::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
     if((event == Motion || event==Press) && button==LeftButton) {
         value = minimum+cursor.x*uint(maximum-minimum)/size.x;
@@ -56,8 +50,7 @@ bool Slider::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button)
     return false;
 }
 
-/// Selection
-
+// Selection
 bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, MouseButton button) {
     array<Rect> widgets = layout(0, size);
     for(uint i: range(widgets.size())) {
@@ -75,21 +68,18 @@ bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, MouseButt
     if(button == WheelUp && index<count()-1) { setActive(index+1); return true; }
     return false;
 }
-
 bool Selection::keyPress(Key key) {
     if(index<=count()) if(at(index).keyPress(key)) return true;
     if(key==DownArrow && index<count()-1) { setActive(index+1); return true; }
     if(key==UpArrow && index>0 && index<count()) { setActive(index-1); return true; }
     return false;
 }
-
 void Selection::setActive(uint i) {
     assert(i==uint(-1) || i<count());
     index=i; if(index!=uint(-1)) activeChanged(index);
 }
 
-/// HighlightSelection
-
+// HighlightSelection
 void HighlightSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
     for(uint i: range(count())) {
@@ -98,8 +88,7 @@ void HighlightSelection::render(int2 position, int2 size) {
     }
 }
 
-/// TabSelection
-
+// TabSelection
 void TabSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
     if(index>=count()) fill(position+Rect(size), darken); //no active tab
@@ -112,7 +101,7 @@ void TabSelection::render(int2 position, int2 size) {
     for(uint i: range(count()))  at(i).render(widgets[i]);
 }
 
-/// ImageView
+// ImageView
 int2 ImageView::sizeHint() { return image.size(); }
 void ImageView::render(int2 position, int2 size) {
     if(!image) return;
@@ -120,14 +109,13 @@ void ImageView::render(int2 position, int2 size) {
     blit(pos, image);
 }
 
-/// TriggerButton
-
+// TriggerButton
 bool TriggerButton::mouseEvent(int2, int2, Event event, MouseButton) {
     if(event==Press) { triggered(); return true; }
     return false;
 }
 
-///  ToggleButton
+//  ToggleButton
 int2 ToggleButton::sizeHint() { return (enabled?disableIcon:enableIcon).size(); }
 void ToggleButton::render(int2 position, int2 size) {
     Image& image = enabled?disableIcon:enableIcon;
@@ -140,8 +128,7 @@ bool ToggleButton::mouseEvent(int2, int2, Event event, MouseButton button) {
     return false;
 }
 
-/// TriggerItem
-
+// TriggerItem
 bool TriggerItem::mouseEvent(int2, int2, Event event, MouseButton) {
     if(event==Press) { triggered(); return true; }
     return false;

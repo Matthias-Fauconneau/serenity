@@ -9,7 +9,7 @@ inline bool operator <(const Event& a, const Event& b) { return a.date<b.date; }
 /// Returns events occuring on \a query date
 array<Event> getEvents(Date query=Date(-1,-1,-1,-1));
 
-/// Month shows a week-aligned calendar month
+/// Shows a week-aligned calendar month
 struct Calendar : GridSelection<Text> {
     Date active;
     array<Date> dates;
@@ -20,7 +20,7 @@ struct Calendar : GridSelection<Text> {
     void nextMonth();
 };
 
-/// Calendar shows current date, month grid and events
+/// Shows current date, month grid and events
 struct Events : VBox {
     HList<Text> date;// __(array<Text>{string( "<"_), string(""_), string(">"_)});
     Calendar month;

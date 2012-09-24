@@ -4,13 +4,13 @@
 #include "file.h"
 #include "ico.h"
 
-/// Entry is an \a Item with a \a link to an article
+/// Item with a #link to an article
 struct Entry : Item {
     string guid, link;
     Entry(string&& guid, string&& link, Image&& icon, string&& text, int size=16):Linear(Left),Item(move(icon),move(text),size),guid(move(guid)),link(move(link)){}
 };
 
-/// FavIcon is an \a Image shared between several \a Entries
+/// Image shared between several \link Entry Entries\endlink
 struct FavIcon {
     const string host;
     Image image;
@@ -24,7 +24,7 @@ struct FavIcon {
     void update();
 };
 
-/// Feeds is a list of entries fetched from RSS/Atom feeds
+/// List of entries fetched from RSS/Atom feeds
 /// \note .config/feeds contains the list of feeds to fetch, .config/read contains the list of read articles
 struct Feeds : List<Entry> {
     File readConfig;
@@ -42,7 +42,7 @@ struct Feeds : List<Entry> {
     bool isRead(const Entry& entry);
     /// Loads an RSS/Atom feed
     void loadFeed(const URL&, Map&& document);
-    /// If unread, appends entry at \a index to config\read
+    /// If unread, appends entry at \a index to ~/.config/read
     void setRead(uint index);
     /// Sends pageChanged signal and preload next page
     void readEntry(uint index);

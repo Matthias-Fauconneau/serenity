@@ -6,8 +6,7 @@
 #include "layout.h"
 #include "text.h"
 
-/// Scroll is a proxy Widget containing a widget in a scrollable area.
-//TODO: flick, scroll indicator, scrollbar
+/// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() =0;
@@ -25,17 +24,16 @@ struct ScrollArea : Widget {
     int2 size; // keep last size for ensureVisible
 };
 
-/// Scroll<T> implements a scrollable \a T by proxying it through \a ScrollArea
-/// It allows an object to act both as the content (T) and the container (ScrollArea)
-/// \note \a ScrollArea and \a T will be instancied as separate Widget (non-virtual multiple inheritance)
+/// Makes a widget scrollable by proxying it through \a ScrollArea
 template<class T> struct Scroll : ScrollArea, T {
     template<class... Args> Scroll(Args&&... args):T(forward<Args>(args)___){}
+    /// Returns a reference to \a T::Widget (for ScrollArea implementation)
     Widget& widget() override { return (T&)*this; }
-    /// Returns a reference to \a ScrollArea::Widget. e.g used when adding this widget to a layout
+    /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
     Widget& area() { return (ScrollArea&)*this; }
 };
 
-/// ImageView is a widget displaying a static image
+/// Displays a static image
 struct ImageView : Widget {
     /// Displayed image
     Image image;
@@ -49,7 +47,7 @@ struct ImageView : Widget {
 };
 typedef ImageView Icon;
 
-/// TriggerButton is a clickable Icon
+/// Clickable Icon
 struct TriggerButton : Icon {
     TriggerButton(){}
     TriggerButton(Image&& image):Icon(move(image)){}
@@ -58,7 +56,7 @@ struct TriggerButton : Icon {
     bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 };
 
-/// ToggleButton is a togglable Icon
+/// Togglable Icon
 struct ToggleButton : Widget {
     /// Creates a toggle button showing \a enable icon when disabled or \a disable icon when enabled
     ToggleButton(Image&& enable, Image&& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
@@ -77,7 +75,7 @@ struct ToggleButton : Widget {
     Image disableIcon;
 };
 
-/// Progress is a Widget to show a bounded value
+/// Shows a bounded value
 struct Progress : Widget {
     int minimum, maximum;
     /// current \a value shown by the progress bar
@@ -91,7 +89,7 @@ struct Progress : Widget {
     static constexpr int height = 32;
 };
 
-/// Slider is a Widget to show and control a bounded value
+/// Shows and controls a bounded value
 struct Slider : Progress {
     /// User edited the \a value
     signal<int> valueChanged;
@@ -99,7 +97,7 @@ struct Slider : Progress {
     bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 };
 
-/// Item is an icon with text
+/// Icon with \link Text text\endlink
 struct Item : Horizontal {
     Icon icon; Text text;
     Item(){}
@@ -108,7 +106,7 @@ struct Item : Horizontal {
     uint count() const override { return 2; }
 };
 
-/// TriggerButton is a clickable Item
+/// Clickable Item
 struct TriggerItem : Item {
     TriggerItem(){}
     TriggerItem(Image&& icon, string&& text, int size=16):Item(move(icon),move(text),size){}
@@ -117,5 +115,5 @@ struct TriggerItem : Item {
     bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
 };
 
-/// TabBar is a \a Bar containing \a Item elements
+/// Bar of \link Item items\endlink
 typedef Bar<Item> TabBar;

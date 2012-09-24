@@ -5,7 +5,7 @@
 
 template<class K, class V> struct const_pair { const K& key; const V& value; };
 template<class K, class V> struct pair { K& key; V& value; };
-/// \a map associates keys with values
+/// Associates keys with values
 template<class K, class V> struct map {
     array<K> keys;
     array<V> values;

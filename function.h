@@ -1,17 +1,17 @@
 #pragma once
 #include "array.h"
 
-/// functor abstract interface
+// functor abstract interface
 template<class R, class... Args> struct functor;
 template<class R, class... Args> struct functor<R(Args...)> { virtual R operator()(Args... args) const=0; };
-/// functor template specialization for lambdas
+// functor template specialization for lambdas
 template<class F, class R, class... Args> struct lambda;
 template<class F, class R, class... Args> struct lambda<F, R(Args...)> : functor<R(Args...)> {
     F f;
     lambda(F&& f):f(move(f)){}
     R operator()(Args... args) const { return f(forward<Args>(args)___); }
 };
-/// functor template specialization for methods
+// functor template specialization for methods
 template<class O, class R, class... Args> struct method;
 template<class O, class R, class... Args> struct method<O, R(Args...)> : functor<R(Args...)> {
     O* object;
@@ -19,7 +19,7 @@ template<class O, class R, class... Args> struct method<O, R(Args...)> : functor
     method(O* object, R (O::*pmf)(Args...)): object(object), pmf(pmf){}
     R operator ()(Args... args) const { return (object->*pmf)(forward<Args>(args)___); }
 };
-/// functor template specialization for const methods
+// functor template specialization for const methods
 template<class O, class R, class... Args> struct const_method;
 template<class O, class R, class... Args> struct const_method<O, R(Args...)> : functor<R(Args...)> {
     const O* object;
@@ -47,15 +47,22 @@ template<class R, class... Args> struct function<R(Args...)> {
     R operator()(Args... args) const { return ((functor<R(Args...)>&)any)(forward<Args>(args)___); }
 };
 
+/// Helps modularization by binding unrelated objects through persistent connections
 template<class... Args> struct signal {
     array< function<void(Args...)> > delegates;
+    /// Emits the signal to all registered delegates
     void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args ___); }
+    /// Connects an anonymous function
     template<class F> void connect(F f) { delegates<< f; }
+    /// Connects a class method
     template<class C, class B, predicate(__is_base_of(B,C))>
     void connect(C* object, void (B::*pmf)(Args...)) { delegates<< function<void(Args...)>(static_cast<B*>(object),pmf); }
+    /// Connects a const class method
     template<class C, class B, predicate(__is_base_of(B,C))>
     void connect(const C* object, void (B::*pmf)(Args...) const) { delegates<< function<void(Args...)>(static_cast<const B*>(object),pmf); }
+    /// Returns whether this signal is connected to any delegate
     explicit operator bool() { return delegates.size(); }
+    /// Returns the emit operator as an anonymous function
     operator function<void(Args...)>(){ return __(this,&signal<Args...>::operator()); }
 };
 template<class... Args> signal<Args...> copy(const signal<Args...>& b) { signal<Args...> a; a.delegates=copy(b.delegates); return a; }

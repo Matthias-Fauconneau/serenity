@@ -50,7 +50,7 @@ map<string,string> readSettings(const ref<byte>& path) {
     return entries;
 }
 
-/// Desktop displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
+/// Displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
 struct Desktop {
     Feeds feeds;
     Scroll<HTML> page;

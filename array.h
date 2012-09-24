@@ -2,7 +2,7 @@
 #include "core.h"
 #include "memory.h"
 
-/// \a array is a polyvalent memory reference (const or mutable, owned or reference, inline or on heap).
+/// Polyvalent memory reference (const or mutable, owned or reference, inline or on heap).
 /// \note \a array uses move semantics to avoid reference counting when managing an heap buffer
 /// \note \a array stores small arrays inline (<=31bytes)
 template<class T> struct array {

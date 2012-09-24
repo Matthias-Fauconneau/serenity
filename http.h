@@ -4,12 +4,13 @@
 #include "function.h"
 #include "file.h"
 
-/// \a Socket is a network socket
+/// TCP network socket (POSIX)
 struct TCPSocket : Socket {
     /// Connects to \a port on \a host
     TCPSocket(uint host, uint16 port);
 };
 
+/// SSL network socket (openssl)
 struct SSLSocket : TCPSocket {
     SSLSocket(uint host, uint16 port, bool secure=false);
     move_operator(SSLSocket):TCPSocket(move(o)),ssl(o.ssl){o.ssl=0;}
@@ -19,6 +20,7 @@ struct SSLSocket : TCPSocket {
     void write(const ref<byte>& buffer);
 };
 
+/// Implements Data::available using Stream::readUpTo
 template<class T/*: Stream*/> struct DataStream : T, virtual Data {
     template<class... Args> DataStream(Args... args):T(args ___){} //workaround lack of constructor inheritance support
     /// Feeds Data buffer using T::readUpTo
@@ -28,9 +30,11 @@ template<class T/*: Stream*/> struct DataStream : T, virtual Data {
 struct URL {
     string scheme,authorization,host,path,fragment;
     URL(){}
+    /// Parses an absolute URL
     URL(const ref<byte>& url);
+    /// Parses \a url relative to this URL
     URL relative(URL&& url) const;
-    explicit operator bool() { return host.size(); }
+    explicit operator bool() { return (bool)host; }
 };
 string str(const URL& url);
 inline bool operator ==(const URL& a, const URL& b) {
@@ -38,6 +42,7 @@ inline bool operator ==(const URL& a, const URL& b) {
 }
 
 typedef function<void(const URL&, Map&&)> Handler;
+/// Asynchronously fetches a file over HTTP
 struct HTTP : DataStream<SSLSocket>, Poll, TextData {
     URL url;
     array<string> headers; ref<byte> method; //Request

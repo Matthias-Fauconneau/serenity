@@ -1,7 +1,7 @@
 #pragma once
 #include "array.h"
 
-/// Handle is a Unix file descriptor
+/// Unix file descriptor
 struct Handle {
     no_copy(Handle);
     int fd;
@@ -13,7 +13,7 @@ struct Handle {
 };
 
 struct Folder;
-///// Returns a file descriptor to the root folder
+/// Returns a file descriptor to the root folder
 const Folder& root();
 
 struct Folder : Handle {
@@ -23,11 +23,11 @@ struct Folder : Handle {
 /// Returns whether this \a folder exists (as a folder)
 bool existsFolder(const ref<byte>& folder, const Folder& at=root());
 
-/// poll
+// poll
 enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64};
 struct pollfd { int fd; short events, revents; };
 
-/// Stream is an handle to an Unix I/O stream
+/// Handle to an Unix I/O stream
 struct Stream : Handle {
     Stream(Handle&& fd):Handle(move(fd)){}
     /// Reads exactly \a size bytes into \a buffer
@@ -52,6 +52,7 @@ struct Stream : Handle {
     void write(const ref<byte>& buffer);
 };
 
+/// Handle to a socket
 struct Socket : Stream {
     Socket(Handle&& fd):Stream(move(fd)){}
     enum {PF_LOCAL=1, PF_INET};
@@ -60,6 +61,7 @@ struct Socket : Stream {
 };
 
 enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, Asynchronous=020000};
+/// Handle to a file
 struct File : Stream {
     File(int fd):Stream(fd){}
     /// Opens \a file
@@ -82,6 +84,7 @@ template<uint major, uint minor> struct IO { static constexpr uint io = major<<8
 template<uint major, uint minor, class T> struct IOW { typedef T Type; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
 template<uint major, uint minor, class T> struct IOR { typedef T Type; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
 template<uint major, uint minor, class T> struct IOWR { typedef T Type; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
+/// Handle to a device
 struct Device : File {
     Device(const ref<byte>& file, int flags=ReadWrite):File(file,root(),flags){}
     /// Sends ioctl \a request with untyped \a arguments
@@ -96,6 +99,7 @@ struct Device : File {
     template<class IOWR> int iowr(typename IOWR::Type& reference) { return ioctl(IOWR::iowr, &reference); }
 };
 
+/// Managed memory mapping
 struct Map : ref<byte> {
     no_copy(Map);
     Map(){}
@@ -117,4 +121,5 @@ long modifiedTime(const ref<byte>& path, const Folder& at=root());
 void touchFile(const ref<byte>& path, const Folder& at=root());
 
 enum { Recursive=1, Sort=2, Folders=4, Files=8 };
+/// Lists all files in \a folder
 array<string> listFiles(const ref<byte>& folder, uint flags, const Folder& at=root());

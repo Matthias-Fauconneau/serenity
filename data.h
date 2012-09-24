@@ -9,11 +9,9 @@ template<class T, class O> ref<T> cast(const ref<O>& o) {
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
 
-/// Data is an interface to read structured data. \sa BinaryData TextData
+/// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
-    array<byte> buffer;
-    uint index=0;
     Data(){}
     /// Creates a Data interface to an \a array
     Data(array<byte>&& array) : buffer(move(array)) {}
@@ -42,16 +40,18 @@ struct Data {
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
     ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
+
+    array<byte> buffer;
+    uint index=0;
 };
 
 #define big32 __builtin_bswap32
 inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
 #define big16 __builtin_bswap16
 
-/// \a BinaryData provides a convenient interface to parse binary inputs
+/// Provides a convenient interface to parse binary inputs
 struct BinaryData : virtual Data {
-    bool isBigEndian = false;
-    default_move(BinaryData)
+    default_move(BinaryData);
     /// Creates a BinaryData interface to an \a array
     BinaryData(array<byte>&& array, bool isBigEndian=false) : Data(move(array)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to a \a reference
@@ -99,11 +99,13 @@ struct BinaryData : virtual Data {
 
    /// Reads \a size \a T elements (swap as needed)
    template<class T>  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
+
+   bool isBigEndian = false;
 };
 
-/// \a TextData provides a convenient interface to parse text streams
+/// Provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-    default_move(TextData)
+    default_move(TextData);
     /// Creates a TextData interface to an \a array
     TextData(array<byte>&& array) : Data(move(array)){}
     /// Creates a TextData interface to a \a reference
