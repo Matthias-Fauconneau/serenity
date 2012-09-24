@@ -1,2 +1,2 @@
 #pragma once
-// This header exists to triggers compilation and linking of jpeg.cc, JPEG decoding is done using decodeImage in image.h
+/// \file jpeg.h Triggers dependency on jpeg.cc to add support for JPEG decoding in decodeImage (weak link)

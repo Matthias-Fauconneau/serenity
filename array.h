@@ -1,10 +1,11 @@
 #pragma once
+/// \file array.h Common array container
 #include "core.h"
 #include "memory.h"
 
 /// Polyvalent memory reference (const or mutable, owned or reference, inline or on heap).
-/// \note \a array uses move semantics to avoid reference counting when managing an heap buffer
-/// \note \a array stores small arrays inline (<=31bytes)
+/// \note Uses move semantics to avoid reference counting when managing an heap buffer
+/// \note Stores small arrays inline (<=31bytes)
 template<class T> struct array {
     int8 tag = 0; //0: empty, >0: inline, -1 = reference, -2 = heap buffer
     struct{const T* data; uint size; uint capacity;} buffer = {0,0,0};
@@ -144,7 +145,7 @@ template<class T> struct array {
     const T* end() const { return data()+size(); }
     T* begin() { return (T*)data(); }
     T* end() { return (T*)data()+size(); }
-    /// \}'
+    /// \}
 };
 
 /// Copies all elements in a new array

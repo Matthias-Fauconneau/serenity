@@ -1,23 +1,27 @@
 #pragma once
+/// \file feeds.h RSS/Atom feeds reader (Entry, Favicon, Feeds)
 #include "interface.h"
 #include "html.h"
 #include "file.h"
 #include "ico.h"
 
-/// Item with a #link to an article
+/// Item with #link to an article
 struct Entry : Item {
-    string guid, link;
+    /// Global unique identifier
+    string guid;
+    /// Link to the associated article
+    string link;
     Entry(string&& guid, string&& link, Image&& icon, string&& text, int size=16):Linear(Left),Item(move(icon),move(text),size),guid(move(guid)),link(move(link)){}
 };
 
 /// Image shared between several \link Entry Entries\endlink
-struct FavIcon {
+struct Favicon {
     const string host;
     Image image;
     array<Image*> users;
     signal<> imageChanged;
     /// Loads favicon for \a host
-    FavIcon(string&& host);
+    Favicon(string&& host);
     /// Parses HTML link elements to find out favicon location
     void get(const URL& url, Map&& document);
     /// Updates shared users when receiving the real favicon
@@ -31,7 +35,7 @@ struct Feeds : List<Entry> {
     Map readMap;
     signal<> listChanged;
     signal< const ref<byte>& /*link*/, const ref<byte>& /*title*/, const Image& /*favicon*/ > pageChanged;
-    array<FavIcon*> favicons; //store strong references to favicons weakly referenced by entries (on heap because of ImageLoader)
+    array<Favicon*> favicons; //store strong references to favicons weakly referenced by entries (on heap because of ImageLoader)
 
     Feeds();
     /// Polls all feeds

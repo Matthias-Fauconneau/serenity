@@ -1,4 +1,5 @@
 #pragma once
+/// \file flac.h High performance FLAC decoder
 #include "memory.h"
 
 /// Decodes packed bitstreams
@@ -18,7 +19,7 @@ struct BitReader {
     int sbinary(int size);
     /// Reads an unary encoded value
     uint unary();
-    /// Reads an UCS-2 encoded value
+    /// Reads a byte-aligned UTF-8 encoded value
     uint utf8();
 
     void setData(const ref<byte>& buffer);

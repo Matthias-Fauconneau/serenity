@@ -1,4 +1,5 @@
 #pragma once
+/// \file disasm.h x86 (including SSE2) disassembler
 #include "core.h"
 #include "time.h"
 

@@ -29,6 +29,7 @@ template<class T> void reallocate(T*& buffer, int unused size, int need) { buffe
 template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); free((void*)buffer); buffer=0; }
 
 /// Dynamic object allocation (using constructor and destructor)
+inline void* operator new(unsigned long, void* p) { return p; } //placement new
 template<class T, class... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }
 template<class T> void free(T* t) { t->~T(); unallocate(t,1); }
 

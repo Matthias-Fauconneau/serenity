@@ -1,4 +1,5 @@
 #pragma once
+/// \file vector.h Vector types and operations
 #include "string.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
@@ -15,19 +16,22 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     }
     /// Copies each component from another vector \a o casting from \a T2 to \a T
     template<class F> explicit vector(const vector<V,F,N>& o) { for(int i=0;i<N;i++) at(i)=(T)o[i]; }
-    /// Accessors (always unchecked)
+    /// Unchecked accessor (const)
     const T& at(int i) const { return ((T*)this)[i]; }
+    /// Unchecked accessor
     T& at(int i) { return ((T*)this)[i]; }
-    /// Accessors (checked in debug build)
+    /// Accessor (checked in debug build, const)
     const T& operator[](uint i) const { assert(i<N); return at(i); }
+    /// Accessor (checked in debug build)
     T& operator[](uint i) { assert(i<N); return at(i); }
-    /// Operators
+    /// \name Operators
     explicit operator bool() const { for(int i=0;i<N;i++) if(at(i)!=0) return true; return false; }
     vector& operator +=(const vector& v) { for(int i=0;i<N;i++) at(i)+=v[i]; return *this; }
     vector& operator -=(const vector& v) { for(int i=0;i<N;i++) at(i)-=v[i]; return *this; }
     vector& operator *=(const vector& v) { for(int i=0;i<N;i++) at(i)*=v[i]; return *this; }
     vector& operator *=(const T& s) { for(int i=0;i<N;i++) at(i)*=s; return *this; }
     vector& operator /=(const T& s) { for(int i=0;i<N;i++) at(i)/=s; return *this; }
+    /// \}
 };
 
 #define generic template <template <typename> class V, class T, int N>
@@ -57,10 +61,14 @@ generic string str(const vector& v) { string s = string("("_); for(int i=0;i<N;i
 #undef generic
 
 template<class T> struct xy { T x,y; };
+/// \typedef int2
+/// Integer x,y vector
 typedef vector<xy,int,2> int2;
+/// \typedef vec2
+/// Floating-point x,y vector
 typedef vector<xy,float,2> vec2;
 
-/// Rect
+/// Axis-aligned rectangle
 struct Rect {
     int2 min,max;
     explicit Rect(int2 max):min(0,0),max(max){}

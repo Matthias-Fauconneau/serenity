@@ -1,20 +1,19 @@
 #include "image.h"
 #include "data.h"
 
-struct Directory { uint16 reserved, type, count; };
-struct Entry { uint8 width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
-struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
-
 Image decodeICO(const ref<byte>& file) {
     BinaryData s(array<byte>(file.data,file.size));
 
+    struct Directory { uint16 reserved, type, count; };
     Directory unused directory = s.read<Directory>();
     assert(directory.reserved==0);
     assert(directory.type==1);
     assert(directory.count>=1);
+    struct Entry { uint8 width, height, colorCount, reserved; uint16 planeCount, depth; uint32 size, offset; };
     Entry entry = s.read<Entry>();
     s.index=entry.offset; //skip other entries
 
+    struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
     Header header = s.read<Header>();
     assert(header.width==entry.width && header.height==entry.height*2);
     assert(header.headerSize==sizeof(Header));

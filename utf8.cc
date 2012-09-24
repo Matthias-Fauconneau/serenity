@@ -18,22 +18,6 @@ const utf8_iterator& utf8_iterator::operator++() {
     else pointer+=1; //Windows-1252
     return *this;
 }
-const utf8_iterator& utf8_iterator::operator--() {
-    byte code = *--pointer;
-    if(code>=128) {
-        if((code&0b11000000)!=0b10000000) {} //Windows-1252
-        else { //UTF-8
-            int i=0; for(;(code&0b11000000)==0b10000000;i++) code = *(--pointer);
-            if(i==1) { if((code&0b11100000)!=0b11000000) pointer++; }
-            else if(i==2) { if((code&0b11110000)!=0b11100000) pointer+=2; }
-            else if(i==3) { if((code&0b11111000)!=0b11110000) pointer+=3; }
-            else if(i==4) { if((code&0b11111100)!=0b11111000) pointer+=4; }
-            else if(i==5) { if((code&0b11111110)!=0b11111100) pointer+=5; }
-            else assert(0);
-        }
-    }
-    return *this;
-}
 
 string utf8(uint c) {
     string utf8;

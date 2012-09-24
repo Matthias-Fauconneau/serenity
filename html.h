@@ -1,4 +1,5 @@
 #pragma once
+/// \file html.h Asynchronous \link ImageLoader image loader\endlink and HTML layout engine
 #include "http.h"
 #include "xml.h"
 #include "interface.h"

@@ -1,4 +1,5 @@
 #pragma once
+/// \file interface.h Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)
 #include "function.h"
 #include "image.h"
 #include "display.h"

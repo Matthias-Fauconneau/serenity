@@ -31,5 +31,6 @@ struct Profile {
     }
 } profiler;
 
+#define notrace __attribute((no_instrument_function))
 extern "C" notrace void __cyg_profile_func_enter(void* function, void*) { if(profile) { profile=0; profiler.trace(function); profile=1; }}
 extern "C" notrace void __cyg_profile_func_exit(void*, void*) { if(profile) { profile=0; profiler.trace(0); profile=1; } else untraced++;}

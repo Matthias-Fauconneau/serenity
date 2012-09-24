@@ -1,4 +1,5 @@
 #pragma once
+/// \file image.h Image container and operations
 #include "vector.h"
 
 template<class T> struct bgra { T b,g,r,a; };

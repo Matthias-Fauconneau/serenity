@@ -202,7 +202,7 @@ string trace(int skip, void* ip) {
     void* frame = __builtin_frame_address(0);
     int i=0;
     for(;i<16;i++) {
-        if(ptr(frame)<0x10000) break;
+        if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }

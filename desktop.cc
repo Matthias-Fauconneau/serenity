@@ -3,13 +3,6 @@
 #include "calendar.h"
 #include "feeds.h"
 
-constexpr ref<byte> iconPaths[4] = {
-    "/usr/share/pixmaps/"_,
-    "/usr/share/icons/oxygen/$size/apps/"_,
-    "/usr/share/icons/hicolor/$size/apps/"_,
-    "/usr/local/share/icons/hicolor/$size/apps/"_
-};
-
 struct Search : TextInput {
     string browser;
     signal<> triggered;
@@ -36,14 +29,13 @@ bool Command::mouseEvent(int2, int2, Event event, MouseButton button) {
     return false;
 }
 
-map<string,string> readSettings(const ref<byte>& path) {
-    map<string,string> entries;
-    if(!existsFile(path)) { warn("Missing settings","'"_+path+"'"_); return entries; }
-    for(TextData s=readFile(path);s;) {
+map<ref<byte>,ref<byte> > readSettings(const ref<byte>& file) {
+    map<ref<byte>,ref<byte> > entries;
+    for(TextData s(file);s;) {
         if(s.matchAny("[#"_)) s.until('\n');
         else {
             ref<byte> key = s.until('='), value=s.until('\n');
-            entries.insertMulti(string(key),string(value));
+            entries.insertMulti(key,value);
         }
         s.whileAny("\n"_);
     }
@@ -66,21 +58,31 @@ struct Desktop {
         if(!existsFile("launcher"_,config())) warn("No launcher settings [.config/launcher]");
         else {
             auto apps = readFile("launcher"_,config());
-            for(const ref<byte>& desktop: split(apps,'\n')) {
-                if(startsWith(desktop,"#"_)) continue;
-                map<string,string> entries = readSettings(desktop);
+            for(const ref<byte>& path: split(apps,'\n')) {
+                if(startsWith(path,"#"_)) continue;
+                if(!existsFile(path)) { warn("Missing settings","'"_+path+"'"_); continue; }
+                string file = readFile(path);
+                map<ref<byte>,ref<byte> > entries = readSettings(file);
+
+                static constexpr ref<byte> iconPaths[4] = {
+                    "/usr/share/pixmaps/"_,
+                    "/usr/share/icons/oxygen/$size/apps/"_,
+                    "/usr/share/icons/hicolor/$size/apps/"_,
+                    "/usr/local/share/icons/hicolor/$size/apps/"_
+                };
                 Image icon;
                 for(const ref<byte>& folder: iconPaths) {
-                    string path = replace(folder,"$size"_,"32x32"_)+entries[string("Icon"_)]+".png"_;
+                    string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
                     if(existsFile(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
                 }
-                string path = string(section(entries[string("Exec"_)],' '));
-                if(!existsFile(path)) path="/usr/bin/"_+path;
-                if(!existsFile(path)) { warn("Executable not found",path); continue; }
-                array<string> arguments;  arguments<<string(section(entries[string("Exec"_)],' ',1,-1));
-                for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries[string("Name"_)]);
+                assert(icon,replace(iconPaths[1],"$size"_,"32x32"_)+entries["Icon"_]+".png"_);
+                string exec = string(section(entries["Exec"_],' '));
+                if(!existsFile(exec)) exec="/usr/bin/"_+exec;
+                if(!existsFile(exec)) { warn("Executable not found",exec); continue; }
+                array<string> arguments;  arguments<<string(section(entries["Exec"_],' ',1,-1));
+                for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
                 for(uint i=0; i<arguments.size();) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
-                shortcuts << Command(move(icon),move(entries[string("Name"_)]),move(path),move(arguments));
+                shortcuts << Command(move(icon),string(entries["Name"_]),move(exec),move(arguments));
             }
         }
         shortcuts<<Command(share(shutdownIcon()),string("Shutdown"_),string("/sbin/poweroff"_),__());

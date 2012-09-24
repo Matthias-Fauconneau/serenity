@@ -1,4 +1,5 @@
 #pragma once
+/// file map.h Associative array (using linear search)
 #include "array.h"
 #include "meta.h" //perfect forwarding
 #include "string.h"

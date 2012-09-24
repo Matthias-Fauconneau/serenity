@@ -1,4 +1,5 @@
 #pragma once
+/// \file font.h Freetype font renderer wrapper (Font)
 #include "data.h"
 #include "vector.h"
 #include "image.h"

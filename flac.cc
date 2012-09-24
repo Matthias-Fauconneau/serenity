@@ -53,7 +53,6 @@ uint BitReader::unary() {
     return size;
 }
 
-/// Reads a byte-aligned UTF-8 encoded value
 uint BitReader::utf8() {
     assert(index%8==0);
     const byte* pointer = &data[index/8];

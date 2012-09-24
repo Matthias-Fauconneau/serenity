@@ -10,17 +10,17 @@
 
 struct sockaddr { uint16 family; uint16 port; uint host; int pad[2]; };
 
-/// UDPSocket
+// UDPSocket
 struct UDPSocket : Socket {
     UDPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_DGRAM) { sockaddr addr = {PF_INET, big16(port), host}; check_(::connect(fd, &addr, sizeof(addr))); }
 };
-/// TCPSocket
+// TCPSocket
 TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|O_NONBLOCK) {
     assert(host!=uint(-1));
     sockaddr addr = {PF_INET,big16(port),host}; connect(Socket::fd, &addr, sizeof(addr));
     enum {F_SETFL=4}; fcntl(Socket::fd,F_SETFL,0);
 }
-/// SSLSocket
+// SSLSocket
 extern "C" {
  struct SSL;
  int SSL_library_init();
@@ -55,8 +55,7 @@ void SSLSocket::write(const ref<byte>& buffer) {
     int unused size=SSL_write(ssl,buffer.data,buffer.size); assert(size==(int)buffer.size);
 }
 
-/// DNS
-
+// DNS
 uint ip(TextData& s) { int a=s.integer(), b=(s.match('.'),s.integer()), c=(s.match('.'),s.integer()), d=(s.match('.'),s.integer()); return (d<<24)|(c<<16)|(b<<8)|a; }
 uint nameserver() { TextData s=readFile("/etc/resolv.conf"_); s.until("nameserver "_); return ip(s); }
 uint resolve(const ref<byte>& host) {
@@ -101,8 +100,7 @@ uint resolve(const ref<byte>& host) {
     return ip;
 }
 
-/// URL
-
+// URL
 string base64(const ref<byte>& input) {
     string output(input.size*4/3+1);
     for(uint j=0;j<input.size;) {
@@ -146,15 +144,13 @@ template<class T> uint DataStream<T>::available(uint need) {
     return Data::available(need);
 }
 
-/// HTTP
-
+// HTTP
 string cacheFile(const URL& url) {
     string name = replace(url.path,"/"_,"."_);
     if(!name || name=="."_) name=string("index.htm"_);
     assert(!url.host.contains('/'));
     return url.host+"/"_+name;
 }
-
 HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(str(url),Socket::fd,POLLOUT),
       url(move(url)), headers(move(headers)), method(method), handler(handler) {}

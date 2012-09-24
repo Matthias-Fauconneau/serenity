@@ -57,7 +57,7 @@ struct TextLayout {
         uint glyphCount=0;
         Word word;
         pen.y = font->ascender;
-        for(utf8_iterator it=text.begin();it!=text.end();++it) {
+        for(utf8_iterator it=text.begin();it!=(utf8_iterator)text.end();++it) {
             uint c = *it;
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 previous = spaceIndex;
@@ -92,7 +92,7 @@ struct TextLayout {
                 if(format&Link) {
                     for(;;) {
                         ++it;
-                        assert(it!=text.end(),text);
+                        assert(it!=(utf8_iterator)text.end(),text);
                         uint c = *it;
                         if(c == ' ') break;
                         link.identifier << utf8(c);

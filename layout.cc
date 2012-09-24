@@ -1,8 +1,7 @@
 #include "layout.h"
 #include "display.h"
 
-/// Layout
-
+// Layout
 void Layout::render(int2 position, int2 size) {
     push(position+Rect(size));
     array<Rect> widgets = layout(position,size);
@@ -16,8 +15,7 @@ bool Layout::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button)
     return false;
 }
 
-/// Linear
-
+// Linear
 int2 Linear::sizeHint() {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
@@ -103,8 +101,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
     return widgets;
 }
 
-/// Grid
-
+// Grid
 int2 Grid::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 max(0,0);

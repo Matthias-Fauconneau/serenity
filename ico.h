@@ -1,2 +1,2 @@
 #pragma once
-// This header exists to triggers compilation and linking of ico.cc, ICO decoding is done using decodeImage in image.h
+/// \file ico.h Triggers dependency on ico.cc to add support for ICO decoding in decodeImage (weak link)

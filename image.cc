@@ -39,6 +39,7 @@ Image resize(const Image& image, uint width, uint height) {
     return target;
 }
 
+#define weak(function) function __attribute((weak)); function
 weak(Image decodePNG(const ref<byte>&)) { error("PNG support not linked"_); }
 weak(Image decodeJPEG(const ref<byte>&)) { error("JPEG support not linked"_); }
 weak(Image decodeICO(const ref<byte>&)) { error("ICO support not linked"_); }

@@ -1,8 +1,8 @@
 #pragma once
+/// file matrix.h 2D linear and affine transformation matrices
 #include "vector.h"
 
-/// Fixed-size transformation matrices (using GLSL conventions)
-
+/// 2D linear transformation
 struct mat2 {
     float m11, m12, m21, m22;
     mat2(float m11, float m12, float m21, float m22):m11(m11),m12(m12),m21(m21),m22(m22){}
@@ -12,6 +12,7 @@ struct mat2 {
                                                 m21*m.m11 + m22*m.m21, m21*m.m12 + m22*m.m22); }
 };
 
+/// 2D affine transformation
 struct mat32 {
     float m11, m12, m21, m22, dx, dy;
     mat32(float m11, float m12, float m21, float m22, float dx, float dy):m11(m11),m12(m12),m21(m21),m22(m22),dx(dx),dy(dy){}

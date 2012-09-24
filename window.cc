@@ -17,7 +17,7 @@ Widget* drag;
 Window* current;
 string getSelection() { assert(current); return current->getSelection(); }
 
-/// Creates window
+// Creates X window
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Socket(PF_LOCAL, SOCK_STREAM), Poll("Window"_,Socket::fd),
     widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
@@ -62,7 +62,6 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         read<uint>(r.numSubpixels);
     }
 
-    // Creates X window
     if(size.x<0||size.y<0) {
         int2 hint=widget->sizeHint();
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
@@ -85,7 +84,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     setType(type);
 }
 
-/// Render
+// Render
 void Window::event() {
     current=this;
     if(revents==IDLE) {
@@ -142,7 +141,7 @@ void Window::event() {
     current=0;
 }
 
-/// Events
+// Events
 void Window::processEvent(uint8 type, const XEvent& event) {
     if(type==0) { const XError& e=(const XError&)event; uint8 code=e.code;
         if(e.major==Render::EXT) {
@@ -248,8 +247,7 @@ template<class T> T Window::readReply() {
     }
 }
 
-/// Configuration
-
+// Configuration
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=display.x+position.x;
     if(position.y<0) position.y=display.y+position.y;
@@ -280,8 +278,7 @@ void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}{R
 void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
 void Window::render() { if(mapped) queue(); }
 
-/// Keyboard
-
+// Keyboard
 uint Window::KeySym(uint8 code) {
     {GetKeyboardMapping r; r.keycode=code; send(raw(r));}
     {GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>();
@@ -302,8 +299,7 @@ signal<>& Window::globalShortcut(Key key) {
     return shortcuts.insert((uint16)key);
 }
 
-/// Properties
-
+// Properties
 uint Window::Atom(const ref<byte>& name) {
     {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; send(string(raw(r)+name+pad(4,r.length)));}
     {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
@@ -342,17 +338,14 @@ string Window::getSelection() {
     }
 }
 
-/// Cursor
-
+// Cursor
 ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move)
-
 const Image& Window::cursorIcon(Window::Cursor cursor) {
     static constexpr const Image& (*icons[])() = { arrowIcon, horizontalIcon, verticalIcon, fdiagonalIcon, bdiagonalIcon, moveIcon }; return icons[cursor]();
 }
 int2 Window::cursorHotspot(Window::Cursor cursor) {
     static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15) }; return hotspots[cursor];
 }
-
 void Window::setCursor(Cursor cursor, uint window) {
     if(cursor==this->cursor) return; this->cursor=cursor;
     const Image& image = cursorIcon(cursor); int2 hotspot = cursorHotspot(cursor);
@@ -371,8 +364,7 @@ void Window::setCursor(Cursor cursor, uint window) {
     {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}
 }
 
-/// Snapshot
-
+// Snapshot
 Image Window::getSnapshot() {
     Image buffer;
     buffer.stride=buffer.width=display.x, buffer.height=display.y;

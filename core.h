@@ -1,15 +1,8 @@
 #pragma once
-
-// Keywords
+/// \file core.h move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range, std::initializer_list (aka ref), fat string and basic operations
+// Attributes
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define weak(function) function __attribute((weak)); function
-#define offsetof(object, member) __builtin_offsetof (object, member)
-#define notrace __attribute((no_instrument_function))
-inline void* operator new(unsigned long, void* p) { return p; } //placement new
-#define constructor(id, priority...) void __attribute((constructor(priority))) constructor_ ## id()
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
 
 // Move
 template<typename T> struct remove_reference { typedef T type; };
@@ -42,7 +35,7 @@ template<> struct predicate<true> { typedef void* type; };
 #define predicate(E) typename predicate<E>::type& condition = enabler
 #define predicate1(E) typename predicate<E>::type& condition1 = enabler
 
-// Primitive types
+// Integer types
 typedef char byte;
 typedef signed char int8;
 typedef unsigned char uint8;

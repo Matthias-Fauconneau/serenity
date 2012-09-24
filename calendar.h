@@ -1,4 +1,5 @@
 #pragma once
+/// \file calendar.h Calendar, Events, Clock
 #include "time.h"
 #include "interface.h"
 

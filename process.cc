@@ -118,7 +118,7 @@ void Thread::event() {
 /// Signal handler
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     extern string trace(int skip, void* ip);
-    string s = trace(sig==SIGABRT?2:1,sig==SIGABRT?0:(void*)ctx->ip);
+    string s = trace(sig==SIGABRT?3:2,sig==SIGABRT?0:(void*)ctx->ip);
     if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP){
         Locker lock(threadsLock());
@@ -133,7 +133,7 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
     if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads
 }
 extern void restore_rt (void) asm ("__restore_rt"); asm(".text\n.align 16\n__restore_rt:\nmovq $15, %rax\nsyscall\n");
-constructor() {
+void __attribute((constructor(101))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}

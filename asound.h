@@ -1,7 +1,9 @@
 #pragma once
+/// \file asound.h ALSA wrapper
 #include "process.h"
 #include "function.h"
 
+/// Audio output through ALSA PCM interface
 struct AudioOutput : Device, Poll {
     const uint channels=2, rate=48000; uint periodSize = 0, bufferSize = 0;
     Map maps[3];

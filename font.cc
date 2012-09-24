@@ -1,7 +1,6 @@
 #include <ft2build.h>
 #include <freetype2/freetype/freetype.h>
 #include <freetype2/freetype/ftlcdfil.h>
-#undef offsetof
 
 #include "font.h"
 #include "file.h"

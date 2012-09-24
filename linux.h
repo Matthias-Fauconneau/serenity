@@ -1,4 +1,5 @@
 #pragma once
+/// file linux.h Linux kernel syscalls and error codes
 
 #if __x86_64
 #define attribute __attribute((always_inline))

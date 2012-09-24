@@ -1,4 +1,5 @@
 #pragma once
+/// \file http.h DNS queries, asynchronous HTTP requests, persistent disk cache
 #include "data.h"
 #include "process.h"
 #include "function.h"

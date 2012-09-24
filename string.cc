@@ -96,7 +96,7 @@ string join(const ref<string>& list, const ref<byte>& separator) {
 
 string replace(const ref<byte>& s, const ref<byte>& before, const ref<byte>& after) {
     string r(s.size);
-    for(uint i: range(s.size)) {
+    for(uint i=0; i<s.size;) {
         if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r<<after; i+=before.size; }
         else { r << s[i]; i++; }
     }

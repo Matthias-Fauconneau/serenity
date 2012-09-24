@@ -1,4 +1,5 @@
 #pragma once
+/// \file file.h Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)
 #include "array.h"
 
 /// Unix file descriptor

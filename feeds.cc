@@ -29,21 +29,21 @@ bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
 }
 bool Feeds::isRead(const Entry& entry) { return isRead(entry.guid, entry.link); }
 
-FavIcon::FavIcon(string&& host):host(move(host)){
+Favicon::Favicon(string&& host):host(move(host)){
     URL url(string("http://"_+this->host));
     if(existsFile(cacheFile(url.relative("/favicon.ico"_)),cache())) image=resize(decodeImage(readFile(cacheFile(url.relative("/favicon.ico"_)),cache())),16,16);
-    else getURL(move(url), Handler(this, &FavIcon::get), 7*24*60);
+    else getURL(move(url), Handler(this, &Favicon::get), 7*24*60);
     if(!image) image = ::resize(networkIcon(),16,16);
 }
-void FavIcon::get(const URL& url, Map&& document) {
+void Favicon::get(const URL& url, Map&& document) {
     Element page = parseHTML(move(document));
     ref<byte> icon=""_;
     page.xpath("html/head/link"_, [&icon](const Element& e){ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
     if(!icon) icon="/favicon.ico"_;
     if(url.relative(icon).path!=URL(host).relative("/favicon.ico"_).path) symlink(string("../"_+cacheFile(url.relative(icon))), cacheFile(URL(host).relative("/favicon.ico"_)),cache());
-    heap<ImageLoader>(url.relative(icon), &image, function<void()>(this, &FavIcon::update), int2(16,16), 7*24*60);
+    heap<ImageLoader>(url.relative(icon), &image, function<void()>(this, &Favicon::update), int2(16,16), 7*24*60);
 }
-void FavIcon::update() {
+void Favicon::update() {
     for(Image* user: users) *user=share(image);
     imageChanged();
 }
@@ -52,11 +52,11 @@ void Feeds::loadFeed(const URL&, Map&& document) {
     Element feed = parseXML(document);
     URL channel = URL(feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_])); //RSS ?: Atom
     assert(channel.host);
-    FavIcon* favicon=0;
-    for(FavIcon* f: favicons) if(f->host==channel.host) { favicon=f; break; }
+    Favicon* favicon=0;
+    for(Favicon* f: favicons) if(f->host==channel.host) { favicon=f; break; }
     if(!favicon) {
         assert(channel.host);
-        favicon = &heap<FavIcon>(move(channel.host));
+        favicon = &heap<Favicon>(move(channel.host));
         favicon->imageChanged.connect(&listChanged,&signal<>::operator());
         favicons << favicon;
     }

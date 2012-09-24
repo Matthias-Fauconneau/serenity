@@ -1,8 +1,9 @@
 #pragma once
+/// \file display.h Graphics primitives (fill, blit, substract)
 #include "vector.h"
 #include "image.h"
 
-/// Clip
+// Clip
 extern array<Rect> clipStack;
 extern Rect currentClip;
 inline void push(Rect clip) { clipStack << currentClip; currentClip=currentClip & clip; }

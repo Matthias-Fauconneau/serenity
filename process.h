@@ -8,9 +8,9 @@ struct Semaphore {
     /// Creates a semaphore with \a count initial ressources
     Semaphore(int count=0):futex(count){}
     /// Acquires \a count ressources
-    inline bool acquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) { wait(val); return true; } else return false; }
+    inline bool acquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(val<0) { wait(val); return true; } else return false; }
     /// Atomically tries to acquires \a count ressources only if available
-    inline bool tryAcquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(unlikely(val<0)) { __sync_fetch_and_add(&futex,count); return false; } else return true; }
+    inline bool tryAcquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(val<0) { __sync_fetch_and_add(&futex,count); return false; } else return true; }
     /// Waits for the semaphore
     void wait(int val);
     /// Releases \a count ressources

@@ -1,4 +1,5 @@
 #pragma once
+/// \file data.h Structured data parsers (Data, BinaryData, TextData)
 #include "array.h"
 
 /// Casts raw memory to \a T
