@@ -18,7 +18,7 @@ Window* current;
 string getSelection() { assert(current); return current->getSelection(); }
 
 // Creates X window
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Socket(PF_LOCAL, SOCK_STREAM), Poll("Window"_,Socket::fd),
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd),
     widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
@@ -171,8 +171,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     else if(type==1) error("Unexpected reply");
     else { const XEvent& e=event; type&=0b01111111; //msb set if sent by SendEvent
         /**/ if(type==MotionNotify) {
-            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, LeftButton)) queue();
-            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?LeftButton:None)) queue();
+            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) queue();
+            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) queue();
             else if(anchor==Float) {
                 if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; } //to reuse border intersection checks
                 bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
@@ -201,7 +201,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonPress) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (MouseButton)e.key)) queue();
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key)) queue();
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
@@ -217,7 +217,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(type==LeaveNotify && hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
-            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?LeftButton:None)) queue();
+            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) queue();
         }
         else if(type==Expose) { if(!e.expose.count) queue(); }
         else if(type==UnmapNotify) mapped=false;

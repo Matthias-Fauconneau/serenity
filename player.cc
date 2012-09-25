@@ -1,3 +1,4 @@
+/// \file player.cc Music player
 #include "process.h"
 #include "file.h"
 #include "flac.h"

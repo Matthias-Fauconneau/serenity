@@ -37,14 +37,6 @@ struct Window : Socket, Poll {
     /// Returns property \a name on \a window
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
 
-    uint16 sequence=-1;
-    void send(const ref<byte>& request);
-
-    struct QEvent { uint8 type; XEvent event; } packed;
-    array<QEvent> eventQueue;
-    /// Reads an X reply (checks for errors and queue events)
-    template<class T> T readReply();
-
     /// Shows window.
     void show();
     /// Hides window.
@@ -77,7 +69,8 @@ struct Window : Socket, Poll {
     /// \note The selection owner might lock this process if it fails to notify
     string getSelection();
 
-    enum Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Cross } cursor=Cross;
+    /// Cursor icons
+    enum Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Cross };
     /// Returns cursor icon for \a cursor
     const Image& cursorIcon(Cursor cursor);
     /// Returns cursor hotspot for \a cursor
@@ -107,10 +100,15 @@ struct Window : Socket, Poll {
 
     /// Root window
     uint root = 0;
-    /// KeyCode range
-    uint minKeyCode=8, maxKeyCode=255;
     /// This window base resource id
     uint id = 0;
+
+    /// Shortcuts triggered when a key is pressed
+    map<uint16, signal<> > shortcuts;
+
+private:
+    /// KeyCode range
+    uint minKeyCode=8, maxKeyCode=255;
     /// Associated window resource (relative to \a id)
     enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment };
 
@@ -124,8 +122,16 @@ struct Window : Socket, Poll {
     /// bgra32 Render PictFormat
     uint format=0;
 
-    /// Shortcuts triggered when a key is pressed
-    map<uint16, signal<> > shortcuts;
+    uint16 sequence=-1;
+    void send(const ref<byte>& request);
 
+    struct QEvent { uint8 type; XEvent event; } packed;
+    array<QEvent> eventQueue;
+    /// Reads an X reply (checks for errors and queue events)
+    template<class T> T readReply();
+
+    /// Current cursor
+    Cursor cursor = Cross;
+    /// Drag state
     int2 dragStart, dragPosition, dragSize;
 };

@@ -159,7 +159,7 @@ void Text::render(int2 position, int2 size) {
     for(const Line& l: lines) fill(offset+Rect(l.min-int2(0,1),l.max), black);
 }
 
-bool Text::mouseEvent(int2 position, int2 size, Event event, MouseButton) {
+bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
     if(event!=Press) return false;
     position -= max(int2(0),(size-textSize)/2);
     if(!Rect(textSize).contains(position)) return false;
@@ -174,7 +174,7 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, MouseButton) {
 
 /// TextInput
 
-bool TextInput::mouseEvent(int2 position, int2 size, Event event, MouseButton button) {
+bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button) {
     if(event!=Press) return false;
     focus=this;
     position -= max(int2(0,0),(size-textSize)/2);

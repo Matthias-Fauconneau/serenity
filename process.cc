@@ -4,7 +4,7 @@
 #include "data.h"
 #include "trace.h"
 
-/// Linux
+// Linux
 enum{FUTEX_WAIT,FUTEX_WAKE};
 enum{CLONE_VM=0x00000100,CLONE_FS=0x00000200,CLONE_FILES=0x00000400,CLONE_SIGHAND=0x00000800,CLONE_THREAD=0x00010000,CLONE_IO=0x80000000};
 struct rlimit { long cur,max; };
@@ -29,32 +29,30 @@ struct ucontext {
 };
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 
-/// Log
+// Log
 void log_(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 static ref<byte> message;
 template<> void __attribute((noreturn)) error(const ref<byte>& buffer) { message=buffer; tgkill(getpid(),gettid(),SIGABRT); for(;;) pause(); }
 
-/// Semaphore
+// Semaphore
 void Semaphore::wait(int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e]); }
 void Semaphore::wake() { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
 
-/// Lock
+// Lock
 debug(
         void Lock::setOwner() { assert(!owner,owner); owner=gettid(); }
         void Lock::checkRecursion() { assert(owner!=gettid(),owner,gettid()); }
         void Lock::checkOwner() { assert(owner==gettid(),owner,gettid()); owner=0; } )
 
-/// Poll
+// Poll
 void Poll::registerPoll() { thread+=this; thread.post(); }
 void Poll::unregisterPoll() {Locker lock(thread.lock); thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue+= this; thread.post();}
 
-/// EventFD
+// EventFD
 enum{EFD_SEMAPHORE=1};
 EventFD::EventFD():Stream(eventfd2(0,EFD_SEMAPHORE)){}
-
-/// Thread
 
 // Process-wide structures initialized on first usage
 // Lock access to thread list
@@ -64,6 +62,7 @@ static array<Thread*>& threads() { static array<Thread*> threads; return threads
 // Handle for the main thread (group leader)
 Thread& mainThread() { static Thread mainThread; return mainThread; }
 
+// main
 int main() {
     mainThread().run();
     if(threads().size()>1) sched_yield(); // Yields to let auxiliary threads cleanly terminate themselves
@@ -71,7 +70,9 @@ int main() {
     for(Thread* thread: threads()) if(thread!=&mainThread()) tgkill(getpid(),thread->tid,SIGKILL); // Kills any remaining thread
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
-Thread::Thread():Poll("Queue"_,EventFD::fd,POLLIN,*this){tid=gettid(); Locker lock(threadsLock()); threads()<<this;}
+
+// Thread
+Thread::Thread():Poll(EventFD::fd,POLLIN,*this){tid=gettid(); Locker lock(threadsLock()); threads()<<this;}
 static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
 Thread::Thread(int priority):Thread(){
     this->priority=priority;
@@ -115,7 +116,7 @@ void Thread::event() {
     }
 }
 
-/// Signal handler
+// Signal handler
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     extern string trace(int skip, void* ip);
     string s = trace(sig==SIGABRT?3:2,sig==SIGABRT?0:(void*)ctx->ip);
@@ -155,8 +156,7 @@ void exit() {
     for(Thread* thread: threads()) thread->terminate=true; // Tries to terminate all threads cleanly (triggers return from mainThread::run)
 }
 
-/// Environment
-
+// Environment
 void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     if(!existsFile(path)) { warn("Executable not found",path); return; }
 

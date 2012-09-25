@@ -3,6 +3,7 @@
 #include "process.h"
 #include "function.h"
 
+/// MIDI input through ALSA rawmidi interface
 struct Sequencer : Device, Poll {
     uint8 type=0;
     array<uint8> pressed;

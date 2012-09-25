@@ -34,7 +34,7 @@ struct Text : Widget {
     int2 sizeHint();
     void layout();
     void render(int2 position, int2 size) override;
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     // Layout bounding box
     int2 textSize=0;
@@ -58,7 +58,7 @@ struct Text : Widget {
 struct TextInput : Text {
     uint cursor=0;
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key) override;
     void render(int2 position, int2 size) override;
 };

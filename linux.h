@@ -65,7 +65,7 @@
     inline attribute type name(type0 arg0,type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) \
 {r(r0,arg0) r(r1,arg1) r(r2,arg2) r(r3,arg3) r(r4,arg4) r(r5, arg5) syscall(type, name, "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5))}
 
-enum class sys : long {
+enum class sys {
 #if __x86_64
     read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, sigprocmask, ioctl=16, sched_yield=24, shmget=29, shmat, shmctl, pause=34,
     getpid=39, socket=41, connect, clone=56, fork, execve=59, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, mlockall=151, setrlimit=160,

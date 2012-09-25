@@ -1,3 +1,4 @@
+/// \file desktop.cc Background shell application
 #include "process.h"
 #include "window.h"
 #include "calendar.h"
@@ -17,14 +18,15 @@ bool Search::keyPress(Key key) {
     else return TextInput::keyPress(key);
 }
 
+/// Executes \a path with \a args when pressed
 struct Command : Item {
     string path; array<string> args;
     Command(Image&& icon, string&& text, string&& path, array<string>&& args) :
         Linear(Left),Item(move(icon),move(text)),path(move(path)),args(move(args)){}
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button) override;
 };
 
-bool Command::mouseEvent(int2, int2, Event event, MouseButton button) {
+bool Command::mouseEvent(int2, int2, Event event, Button button) {
     if(event == Press && button == LeftButton) { execute(path,args,false); }
     return false;
 }
@@ -97,7 +99,7 @@ struct Desktop {
         window.show();
     }
     void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
-        if(!link) { browser.hide(); return; }
+        if(!link) { browser.hide(); window.render(); return; }
         page.delta=0;
         page.contentChanged.connect(&browser, &Window::render);
         browser.setTitle(title);

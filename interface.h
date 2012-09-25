@@ -1,5 +1,5 @@
 #pragma once
-/// \file interface.h Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)
+/// \file interface.h %Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, ::TabBar)
 #include "function.h"
 #include "image.h"
 #include "display.h"
@@ -20,7 +20,7 @@ struct ScrollArea : Widget {
     int2 delta=0, dragStart, flickStart;
 
     int2 sizeHint() { return widget().sizeHint(); }
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     void render(int2 position, int2 size) override;
     int2 size; // keep last size for ensureVisible
 };
@@ -46,6 +46,8 @@ struct ImageView : Widget {
     int2 sizeHint();
     void render(int2 position, int2 size) override;
 };
+/// \typedef ImageView Icon
+/// Displays an icon
 typedef ImageView Icon;
 
 /// Clickable Icon
@@ -54,7 +56,7 @@ struct TriggerButton : Icon {
     TriggerButton(Image&& image):Icon(move(image)){}
     /// User clicked on the button
     signal<> triggered;
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 
 /// Togglable Icon
@@ -70,7 +72,7 @@ struct ToggleButton : Widget {
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     Image enableIcon;
     Image disableIcon;
@@ -95,10 +97,10 @@ struct Slider : Progress {
     /// User edited the \a value
     signal<int> valueChanged;
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 
-/// Icon with \link Text text\endlink
+/// ::Icon with \ref Text "text"
 struct Item : Horizontal {
     Icon icon; Text text;
     Item(){}
@@ -113,7 +115,7 @@ struct TriggerItem : Item {
     TriggerItem(Image&& icon, string&& text, int size=16):Item(move(icon),move(text),size){}
     /// User clicked on the button
     signal<> triggered;
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 
 /// Bar of \link Item items\endlink

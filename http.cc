@@ -152,7 +152,7 @@ string cacheFile(const URL& url) {
     return url.host+"/"_+name;
 }
 HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>& method)
-    : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(str(url),Socket::fd,POLLOUT),
+    : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
       url(move(url)), headers(move(headers)), method(method), handler(handler) {}
 void HTTP::request() {
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate

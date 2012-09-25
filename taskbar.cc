@@ -1,3 +1,4 @@
+/// \file taskbar.cc Persistent panel application and X11 window manager
 #include "process.h"
 #include "file.h"
 #include "time.h"
@@ -12,7 +13,7 @@
 template<class T>  bool operator ==(const ref<T>& r, const T& value) { return r.size==1 && r.data[0] == value; }
 template<class T> bool operator ==(const array<T>& a, const T& value) { return  (ref<T>)a==value; }
 
-/// Taskbar shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
+/// Shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
 struct Taskbar : Socket, Poll {
     bool hasFocus; // for Escape key
     struct Task : Item {
@@ -20,7 +21,7 @@ struct Taskbar : Socket, Poll {
         uint id;
         Task(uint id):id(id){} //for indexOf
         Task(Taskbar* parent, uint id, Image&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
-        bool mouseEvent(int2, int2, Event event, MouseButton button) override {
+        bool mouseEvent(int2, int2, Event event, Button button) override {
             if(event==Press && button==LeftButton) {
                 if(parent->tasks.index!=uint(-1) && &parent->tasks.active()==this) {SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; parent->send(raw(r));}
                 parent->hasFocus=true;
@@ -42,7 +43,7 @@ struct Taskbar : Socket, Poll {
     uint desktop=0;
     uint escapeCode = window.KeyCode(Escape);
 
-    Taskbar() : Socket(PF_LOCAL, SOCK_STREAM), Poll("Taskbar"_,Socket::fd) {
+    Taskbar() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd) {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
@@ -253,5 +254,6 @@ struct Taskbar : Socket, Poll {
             while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
         }
     }
-} application;
+};
+Taskbar application;
 bool operator==(const Taskbar::Task& a,const Taskbar::Task& b){return a.id==b.id;}

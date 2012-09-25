@@ -9,7 +9,7 @@ void ScrollArea::render(int2 position, int2 size) {
     delta = min(int2(0,0), max(size-hint, delta));
     widget().render(position+delta, max(hint,size));
 }
-bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
+bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 hint = abs(widget().sizeHint());
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
         delta.y += button==WheelUp?-64:64;
@@ -41,7 +41,7 @@ void Progress::render(int2 position, int2 size) {
 }
 
 // Slider
-bool Slider::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
+bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     if((event == Motion || event==Press) && button==LeftButton) {
         value = minimum+cursor.x*uint(maximum-minimum)/size.x;
         valueChanged(value);
@@ -51,7 +51,7 @@ bool Slider::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button)
 }
 
 // Selection
-bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, MouseButton button) {
+bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button button) {
     array<Rect> widgets = layout(0, size);
     for(uint i: range(widgets.size())) {
         if(widgets[i].contains(cursor)) {
@@ -110,7 +110,7 @@ void ImageView::render(int2 position, int2 size) {
 }
 
 // TriggerButton
-bool TriggerButton::mouseEvent(int2, int2, Event event, MouseButton) {
+bool TriggerButton::mouseEvent(int2, int2, Event event, Button) {
     if(event==Press) { triggered(); return true; }
     return false;
 }
@@ -123,13 +123,13 @@ void ToggleButton::render(int2 position, int2 size) {
     int2 pos = position+(size-image.size())/2;
     blit(pos, image);
 }
-bool ToggleButton::mouseEvent(int2, int2, Event event, MouseButton button) {
+bool ToggleButton::mouseEvent(int2, int2, Event event, Button button) {
     if(event==Press && button==LeftButton) { enabled = !enabled; toggled(enabled); return true; }
     return false;
 }
 
 // TriggerItem
-bool TriggerItem::mouseEvent(int2, int2, Event event, MouseButton) {
+bool TriggerItem::mouseEvent(int2, int2, Event event, Button) {
     if(event==Press) { triggered(); return true; }
     return false;
 }

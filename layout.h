@@ -15,7 +15,7 @@ struct Layout : Widget {
     /// Renders all visible child widgets
     void render(int2 position, int2 size) override;
     /// Forwards event to intersecting child widgets until accepted
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 
 /// Implements Layout storage using array<Widget*> (i.e by reference)
@@ -120,7 +120,7 @@ struct Selection : virtual Layout {
     /// User clicked on an item.
     signal<uint /*index*/> itemPressed;
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key) override;
 };
 

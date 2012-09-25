@@ -1,5 +1,5 @@
 #pragma once
-/// \file process.h \link Thread threaded event loops\endlink, \link synchronization Semaphore\endlink, execute, process environment and arguments
+/// \file process.h \link Thread threaded event loops\endlink, \link Semaphore synchronization\endlink, execute, process environment and arguments
 #include "array.h"
 #include "file.h"
 
@@ -48,13 +48,12 @@ struct Thread& mainThread();
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {
     no_copy(Poll);
-    string id; /// Identifier for debugging and profiling
     Thread& thread; /// Thread monitoring this pollfd
     /// Allows to queue using \a wait method and \a event callback
-    Poll(const ref<byte>& id=""_, Thread& thread=mainThread()):id(id),thread(thread){}
+    Poll(Thread& thread=mainThread()):thread(thread){}
     void registerPoll();
     /// Registers \a fd to be polled in the event loop
-    Poll(const ref<byte>& id, int fd, int events=POLLIN, Thread& thread=mainThread()):____(pollfd{fd,(short)events},)id(id),thread(thread){ if(fd) registerPoll(); }
+    Poll(int fd, int events=POLLIN, Thread& thread=mainThread()):____(pollfd{fd,(short)events},)thread(thread){ if(fd) registerPoll(); }
     /// Removes \a fd from the event loop
     void unregisterPoll();
     ~Poll(){unregisterPoll();}
@@ -70,6 +69,7 @@ struct EventFD : Stream {
     void read(){Stream::read<uint64>();}
 };
 
+/// Concurrently runs an event loop
 struct Thread : array<Poll*>, EventFD, Poll {
     int tid=0,priority=0;
     bool terminate=0; // Flag to cleanly terminate a thread

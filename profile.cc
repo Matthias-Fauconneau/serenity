@@ -1,9 +1,11 @@
+/// \file profile.cc Profiles executable when linked (need all sources to be compiled with -finstrument-functions)
 #include "map.h"
 #include "time.h"
 #include "trace.h"
 
 static bool profile = 0;
 static int untraced;
+/// Traces functions to time their execution times and displays statistics on exit
 struct Profile {
     array<void*> stack;
     array<int> enter;
@@ -29,7 +31,8 @@ struct Profile {
             profile[function] += time;
         }
     }
-} profiler;
+};
+Profile profiler;
 
 #define notrace __attribute((no_instrument_function))
 extern "C" notrace void __cyg_profile_func_enter(void* function, void*) { if(profile) { profile=0; profiler.trace(function); profile=1; }}

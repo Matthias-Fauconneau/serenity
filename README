@@ -6,38 +6,38 @@
 Serenity is an elegant C++11 framework including:
 
 – Runtime support
-    - array
-    - string, log
-    - stack trace, profile
-    - disassembly
+    - #array
+    - #string, #log
+    - \ref trace "stack trace", \ref profile.cc "profiler"
+    - \link disassemble disassembly\endlink
 
 – Platform abstraction
-    - file, network (POSIX)
-    - threads (Linux)
-    - window (X11)
-    - sound/MIDI (alsa)
+    - \ref File "file", \ref TCPSocket "network" (POSIX)
+    - \ref Thread "threads" (Linux)
+    - \ref Window "window" (X11)
+    - \ref AudioOutput "sound"/\ref Sequencer "MIDI" (alsa)
 
 – GUI system
-    - text (freetype)
-    - image (ico,png,jpeg)
-    - widgets (scroll, button, slider)
-    - layout (bar, list, grid)
+    - \ref Text "text" (freetype)
+    - \ref ImageView "image" (ico,png,jpeg)
+    - widgets (\ref Scroll "scroll", \ref TriggerButton "button", \ref Slider "slider")
+    - \ref Layout "layout" (\ref Horizontal "bar", \ref Vertical "list", \ref Grid "grid")
 
 \section build Build system
 
 Source dependencies for an application (given by $TARGET) are resolved by dep.py, linking all sources (.cc) corresponding to included headers (.h).
 
-Make is used to track header dependencies and incrementally build (using flags depending on $BUILD={debug,profile,release})
+Make is used to track header dependencies and incrementally build (using flags depending on $BUILD={debug,profile,release}).
 
-The Qt Creator IDE project file offers preset build configurations for the existing applications
+The Qt Creator IDE project file offers preset build configurations for the existing applications.
 
 \section Installation
 
  Usage: install.sh APPLICATION
 
 Available applications:
-- taskbar: Shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
-- desktop: Displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
-- player: Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position.
-- music: SFZ sampler and PDF renderer (tested with Salamander)
+- \ref taskbar.cc "taskbar": Shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager.
+- \ref desktop.cc "desktop": Displays a \ref Feeds "feed reader", an \ref Events "event calendar" and an application launcher.
+- \ref player.cc "player": Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position (supports FLAC and mp3).
+- \ref music.cc "music": \ref Sampler "SFZ sampler" and \ref PDF "PDF renderer" (tested with Salamander)
 **/

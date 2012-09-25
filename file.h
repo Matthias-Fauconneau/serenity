@@ -25,7 +25,7 @@ struct Folder : Handle {
 bool existsFolder(const ref<byte>& folder, const Folder& at=root());
 
 // poll
-enum {POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64};
+enum { POLLIN = 1, POLLOUT=4, POLLERR=8, POLLHUP = 16, POLLNVAL=32, IDLE=64 };
 struct pollfd { int fd; short events, revents; };
 
 /// Handle to an Unix I/O stream

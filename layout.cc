@@ -9,7 +9,7 @@ void Layout::render(int2 position, int2 size) {
     pop();
 }
 
-bool Layout::mouseEvent(int2 cursor, int2 size, Event event, MouseButton button) {
+bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     array<Rect> widgets = layout(0, size);
     for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
     return false;

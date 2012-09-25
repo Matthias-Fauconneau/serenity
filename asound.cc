@@ -47,7 +47,7 @@ typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
 AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)> read, Thread& thread, bool realtime)
-    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll("AudioOutput"_,0,POLLOUT,thread), read(read) {
+    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(0,POLLOUT,thread), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(S16_LE);

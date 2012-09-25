@@ -61,10 +61,10 @@ generic string str(const vector& v) { string s = string("("_); for(int i=0;i<N;i
 #undef generic
 
 template<class T> struct xy { T x,y; };
-/// \typedef int2
+/// \typedef vector<xy,int,2> int2
 /// Integer x,y vector
 typedef vector<xy,int,2> int2;
-/// \typedef vec2
+/// \typedef vector<xy,float,2> vec2
 /// Floating-point x,y vector
 typedef vector<xy,float,2> vec2;
 

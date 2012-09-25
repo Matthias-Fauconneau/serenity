@@ -57,10 +57,10 @@ struct ImageTest : ImageView {
 } test;
 #endif
 
-#if 0
+#if 1
 #include "window.h"
 #include "html.h"
-struct HTMLTest : Application {
+struct HTMLTest {
     Scroll<HTML> page;
     Window window __(&page.area(),0,"HTML"_);
 
@@ -77,7 +77,7 @@ struct HTMLTest : Application {
 #include "window.h"
 #include "calendar.h"
 #include "png.h"
-struct WeekViewTest : Application, Widget {
+struct WeekViewTest : Widget {
     struct WeekView : Widget {
         uint time(Date date) { assert(date.hours>=0 && date.minutes>=0, date); return date.hours*60+date.minutes; }
         inline uint floor(uint width, uint value) { return value/width*width; }

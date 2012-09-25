@@ -1,3 +1,4 @@
+/// \file music.cc Keyboard (piano) practice application
 #include "process.h"
 #include "file.h"
 

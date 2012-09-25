@@ -2,7 +2,7 @@
 /// \file widget.h Widget interface to compose user interfaces
 #include "vector.h"
 
-enum MouseButton { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
+/// Key symbols
 enum Key {
     Escape=0xff1b, BackSpace=0xff08, Return=0xff0d, Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57, PrintScreen=0xff61, Delete=0xffff,
     Play=0x1008ff14, Email=0x1008ff19, WWW=0x1008ff18
@@ -23,15 +23,18 @@ struct Widget {
 // Event
     /// Mouse event type
     enum Event { Press, Release, Motion, Enter, Leave };
+    /// Mouse buttons
+    enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root Window#widget
     /// \return Whether the mouse event was accepted
-    virtual bool mouseEvent(int2 unused cursor, int2 unused size, Event unused event, MouseButton unused button) { return false; }
-    bool mouseEvent(Rect rect, int2 cursor, Event event, MouseButton button) { return mouseEvent(cursor-rect.min,rect.size(),event,button); }
+    virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { (void)cursor, (void)size, (void)event, (void)button; return false; }
+    /// Convenience overload for layout implementation
+    bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.min,rect.size(),event,button); }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted
-    virtual bool keyPress(Key) { return false; }
+    virtual bool keyPress(Key key) { (void)key; return false; }
 };
 
 /// Current widget that has the keyboard input focus

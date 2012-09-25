@@ -1,5 +1,5 @@
 #pragma once
-/// \file String manipulations (using lightweight ref<byte> when possible)
+/// \file string.h String manipulations (using lightweight ref<byte> when possible)
 #include "array.h"
 
 // Enforces exact match for overload resolution
@@ -8,7 +8,7 @@ template<class T> ref<byte> str(const T&) { static_assert(0&&sizeof(T),"No overl
 /// Lexically compare strings
 bool operator <(const ref<byte>& a, const ref<byte>& b);
 
-/// Returns a reference to the string between the \a{begin}th and \a{end}th occurence of \a separator
+/// Returns a reference to the string between the {begin}th and {end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 ref<byte> section(const ref<byte>& str, byte separator, int begin=0, int end=1);
 /// Returns an array of references splitting \a str wherever \a separator occurs

@@ -33,10 +33,10 @@ struct Sample {
     int16 pitch_keycenter=60; uint16 releaseTime=0; int16 amp_veltrack=100; /*int16 rt_decay=0;*/ int16 volume=1; //Performance parameters
 };
 
+/// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {
     /// Opens a .sfz instrument and maps all its samples
-    void open(const ref<byte>& path);
-    array<Sample> samples;
+    void open(const ref<byte>& path); array<Sample> samples;
     uint full=0,available=0,lock=0,current=0; signal<int, int> progressChanged; //decode start buffer for all samples
 
     /// Receives MIDI note events

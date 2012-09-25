@@ -45,7 +45,7 @@ struct Clock : Text, Timer {
     signal<> pressed;
     Clock(int size=16):Text(::str(date(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
     void event() { setText(::str(date(),"hh:mm"_)); setAbsolute(currentTime()/60*60+60); timeout(); }
-    bool mouseEvent(int2, int2, Event event, MouseButton) override {
+    bool mouseEvent(int2, int2, Event event, Button) override {
         if(event==Press) { pressed(); return true; }
         return false;
     }
