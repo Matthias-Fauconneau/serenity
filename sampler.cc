@@ -188,7 +188,7 @@ void Note::decode(uint need) {
 }
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
-        for(uint i: range(3)) for(uint j: range(notes[i].size())) { Note& note=notes[i][j];
+        for(uint i: range(3)) for(uint j=0; j<notes[i].size(); j++) { Note& note=notes[i][j];
             if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<=1.f/(1<<16)) notes[i].removeAt(j); else j++;
         }
         noteReadLock.unlock();

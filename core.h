@@ -69,7 +69,7 @@ inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
 
 #ifdef DEBUG
 #define debug( statements... ) statements
-#define warn error
+#define warn log
 #else
 /// Compiles \a statements in executable only if \a DEBUG flag is set
 #define debug( statements... )

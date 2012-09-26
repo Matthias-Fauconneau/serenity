@@ -110,8 +110,8 @@ string toLower(const ref<byte>& s) {
 }
 
 string simplify(string&& s) {
-    for(uint i: range(s.size())) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
-    for(uint i: range(s.size())) {
+    for(uint i=0; i<s.size();) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
+    for(uint i=0; i<s.size();) {
         byte c=s[i];
         if(c=='\r') { s.removeAt(i); continue; } //Removes any \r
         i++;

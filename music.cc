@@ -25,9 +25,9 @@ struct Music : Widget {
     AudioOutput audio __({&sampler, &Sampler::read},thread,true);
     Sequencer input __(thread);
 
-    //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
+    ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
     Music() {
-        //writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
+        writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
 
         array<string> files = listFiles("Sheets"_,Sort|Files);
         for(string& file : files) if(endsWith(file,".pdf"_) && files.contains(section(file,'.')+".mid"_)) sheets << string(section(file,'.'));
@@ -41,7 +41,7 @@ struct Music : Widget {
         sheet.contentChanged.connect(&window,&Window::render);
         sheet.onGlyph.connect(&score,&Score::onGlyph);
         sheet.onPath.connect(&score,&Score::onPath);
-        openSheet("Game of Thrones"_);
+        //openSheet("Game of Thrones"_);
 
         score.activeNotesChanged.connect(&sheet,&PDF::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);

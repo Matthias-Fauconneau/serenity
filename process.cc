@@ -65,14 +65,14 @@ Thread& mainThread() { static Thread mainThread; return mainThread; }
 // main
 int main() {
     mainThread().run();
-    if(threads().size()>1) sched_yield(); // Yields to let auxiliary threads cleanly terminate themselves
+    while(threads().size()) sched_yield(); // Yields to let auxiliary threads cleanly terminate themselves
     Locker lock(threadsLock());
     for(Thread* thread: threads()) if(thread!=&mainThread()) tgkill(getpid(),thread->tid,SIGKILL); // Kills any remaining thread
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
 // Thread
-Thread::Thread():Poll(EventFD::fd,POLLIN,*this){tid=gettid(); Locker lock(threadsLock()); threads()<<this;}
+Thread::Thread():Poll(EventFD::fd,POLLIN,*this){Locker lock(threadsLock()); threads()<<this;}
 static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
 Thread::Thread(int priority):Thread(){
     this->priority=priority;
@@ -86,13 +86,13 @@ void Thread::run() {
     if(priority) check_(setpriority(0,0,priority));
     while(!terminate) {
         uint size=this->size();
-        if(size==1) return;
+        if(size==1) break;
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i);
         if(check__( ::poll(pollfds,size,-1) ) != INTR) {
             for(uint i: range(size)) {
-                if(terminate) return;
+                if(terminate) break;
                 Poll* poll=at(i); int revents=pollfds[i].revents;
                 if(revents && !unregistered.contains(poll)) {
                     poll->revents = revents;
@@ -102,6 +102,8 @@ void Thread::run() {
         }
         while(unregistered){Locker lock(thread.lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
     }
+    Locker lock(threadsLock());
+    threads().removeAll(this);
 }
 void Thread::event() {
     EventFD::read();
@@ -153,7 +155,7 @@ void __attribute((constructor(101))) setup_signals() {
 
 void exit() {
     Locker lock(threadsLock());
-    for(Thread* thread: threads()) thread->terminate=true; // Tries to terminate all threads cleanly (triggers return from mainThread::run)
+    for(Thread* thread: threads()) { thread->terminate=true; thread->post(); } // Tries to terminate all threads cleanly (triggers return from mainThread::run)
 }
 
 // Environment
