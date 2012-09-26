@@ -1,0 +1,13 @@
+<map id="Stream" name="Stream">
+<area shape="rect" id="node5" href="$struct_file.html" title="Handle to a file." alt="" coords="159,161,201,189"/>
+<area shape="rect" id="node13" href="$struct_socket.html" title="Handle to a socket." alt="" coords="243,161,305,189"/>
+<area shape="rect" id="node2" href="$struct_handle.html" title="Unix file descriptor." alt="" coords="197,6,261,34"/>
+<area shape="rect" id="node7" href="$struct_device.html" title="Handle to a device." alt="" coords="138,238,200,266"/>
+<area shape="rect" id="node9" href="$struct_audio_output.html" title="Audio output through ALSA PCM interface." alt="" coords="5,315,101,343"/>
+<area shape="rect" id="node11" href="$struct_sequencer.html" title="MIDI input through ALSA rawmidi interface." alt="" coords="126,315,212,343"/>
+<area shape="rect" id="node15" href="$struct_t_c_p_socket.html" title="TCP network socket (POSIX)" alt="" coords="230,238,319,266"/>
+<area shape="rect" id="node23" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server." alt="" coords="343,238,413,266"/>
+<area shape="rect" id="node17" href="$struct_s_s_l_socket.html" title="SSL network socket (openssl)" alt="" coords="237,315,325,343"/>
+<area shape="rect" id="node19" href="$struct_data_stream.html" title="DataStream\&lt; SSLSocket \&gt;" alt="" coords="190,393,372,421"/>
+<area shape="rect" id="node21" href="$struct_h_t_t_p.html" title="Asynchronously fetches a file over HTTP." alt="" coords="253,470,309,498"/>
+</map>

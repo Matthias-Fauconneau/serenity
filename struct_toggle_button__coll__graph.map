@@ -1,0 +1,5 @@
+<map id="ToggleButton" name="ToggleButton">
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="5,115,69,143"/>
+<area shape="rect" id="node4" href="$structsignal.html" title="signal\&lt; bool \&gt;" alt="" coords="94,115,199,143"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="73,6,220,50"/>
+</map>

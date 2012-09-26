@@ -1,0 +1,17 @@
+<map id="calendar.h" name="calendar.h">
+<area shape="rect" id="node3" href="$time_8h.html" title="Time and date operations." alt="" coords="68,238,125,266"/>
+<area shape="rect" id="node20" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="237,83,320,111"/>
+<area shape="rect" id="node5" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData)" alt="" coords="131,393,188,421"/>
+<area shape="rect" id="node14" href="$process_8h.html" title="threaded event loops, synchronization, execute, process environment and arguments" alt="" coords="43,315,121,343"/>
+<area shape="rect" id="node7" href="$array_8h.html" title="Common array container." alt="" coords="95,470,157,498"/>
+<area shape="rect" id="node9" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="97,625,155,653"/>
+<area shape="rect" id="node11" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="126,547,207,575"/>
+<area shape="rect" id="node17" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)" alt="" coords="5,393,56,421"/>
+<area shape="rect" id="node22" href="$image_8h.html" title="Image container and operations." alt="" coords="212,238,281,266"/>
+<area shape="rect" id="node29" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="135,161,208,189"/>
+<area shape="rect" id="node33" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="323,238,396,266"/>
+<area shape="rect" id="node36" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="415,161,483,189"/>
+<area shape="rect" id="node39" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="285,161,339,189"/>
+<area shape="rect" id="node24" href="$vector_8h.html" title="Vector types and operations." alt="" coords="212,315,281,343"/>
+<area shape="rect" id="node26" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="213,393,280,421"/>
+</map>

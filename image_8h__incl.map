@@ -1,0 +1,7 @@
+<map id="image.h" name="image.h">
+<area shape="rect" id="node3" href="$vector_8h.html" title="Vector types and operations." alt="" coords="5,83,75,111"/>
+<area shape="rect" id="node5" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="7,161,73,189"/>
+<area shape="rect" id="node7" href="$array_8h.html" title="Common array container." alt="" coords="9,238,71,266"/>
+<area shape="rect" id="node9" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="11,393,68,421"/>
+<area shape="rect" id="node11" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="39,315,120,343"/>
+</map>

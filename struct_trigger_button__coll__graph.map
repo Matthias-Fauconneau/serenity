@@ -1,0 +1,6 @@
+<map id="TriggerButton" name="TriggerButton">
+<area shape="rect" id="node2" href="$struct_image_view.html" title="Displays a static image." alt="" coords="21,115,69,143"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="5,14,69,42"/>
+<area shape="rect" id="node6" href="$structsignal.html" title="Helps modularization by binding unrelated objects through persistent connections." alt="" coords="108,115,215,143"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="95,6,241,50"/>
+</map>

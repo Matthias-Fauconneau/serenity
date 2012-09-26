@@ -1,0 +1,5 @@
+<map id="UDPSocket" name="UDPSocket">
+<area shape="rect" id="node2" href="$struct_socket.html" title="Socket" alt="" coords="19,161,81,189"/>
+<area shape="rect" id="node4" href="$struct_stream.html" title="Stream is an handle to an Unix I/O stream." alt="" coords="18,83,83,111"/>
+<area shape="rect" id="node6" href="$struct_handle.html" title="Handle is a Unix file descriptor." alt="" coords="19,6,83,34"/>
+</map>

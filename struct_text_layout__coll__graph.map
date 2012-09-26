@@ -1,0 +1,7 @@
+<map id="TextLayout" name="TextLayout">
+<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; Word \&gt;" alt="" coords="19,5,125,33"/>
+<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; Character \&gt;" alt="" coords="5,57,139,85"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; Text::Link \&gt;" alt="" coords="7,109,137,137"/>
+<area shape="rect" id="node8" href="$structvector.html" title="vector\&lt; xy, int, 2 \&gt;" alt="" coords="6,161,138,189"/>
+<area shape="rect" id="node10" href="$structarray.html" title="array\&lt; Line \&gt;" alt="" coords="22,213,122,241"/>
+</map>

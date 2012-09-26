@@ -1,0 +1,9 @@
+<map id="Socket" name="Socket">
+<area shape="rect" id="node7" href="$struct_t_c_p_socket.html" title="TCP network socket (POSIX)" alt="" coords="51,238,140,266"/>
+<area shape="rect" id="node15" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server." alt="" coords="165,238,235,266"/>
+<area shape="rect" id="node2" href="$struct_stream.html" title="Handle to an Unix I/O stream." alt="" coords="115,83,180,111"/>
+<area shape="rect" id="node4" href="$struct_handle.html" title="Unix file descriptor." alt="" coords="116,6,180,34"/>
+<area shape="rect" id="node9" href="$struct_s_s_l_socket.html" title="SSL network socket (openssl)" alt="" coords="52,315,140,343"/>
+<area shape="rect" id="node11" href="$struct_data_stream.html" title="DataStream\&lt; SSLSocket \&gt;" alt="" coords="5,393,187,421"/>
+<area shape="rect" id="node13" href="$struct_h_t_t_p.html" title="Asynchronously fetches a file over HTTP." alt="" coords="67,470,124,498"/>
+</map>

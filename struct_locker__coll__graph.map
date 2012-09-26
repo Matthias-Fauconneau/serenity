@@ -1,0 +1,4 @@
+<map id="Locker" name="Locker">
+<area shape="rect" id="node2" href="$struct_lock.html" title="Lock is an initially released binary semaphore." alt="" coords="25,86,76,114"/>
+<area shape="rect" id="node4" href="$struct_semaphore.html" title="A simple semaphore using futex." alt="" coords="5,6,96,34"/>
+</map>

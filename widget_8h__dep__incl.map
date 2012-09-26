@@ -1,0 +1,14 @@
+<map id="widget.h" name="widget.h">
+<area shape="rect" id="node3" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="286,161,369,189"/>
+<area shape="rect" id="node22" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="249,83,316,111"/>
+<area shape="rect" id="node26" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="170,83,224,111"/>
+<area shape="rect" id="node30" href="$window_8h.html" title="X11 window display and input." alt="" coords="5,161,83,189"/>
+<area shape="rect" id="node36" href="$pdf_8h.html" title="Portable Document Format renderer." alt="" coords="107,161,159,189"/>
+<area shape="rect" id="node5" href="$calendar_8h.html" title="Calendar, Events, Clock." alt="" coords="329,238,411,266"/>
+<area shape="rect" id="node9" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="251,315,332,343"/>
+<area shape="rect" id="node11" href="$feeds_8h.html" title="RSS/Atom feeds reader (Entry, Favicon, Feeds)" alt="" coords="417,315,481,343"/>
+<area shape="rect" id="node14" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="487,238,544,266"/>
+<area shape="rect" id="node17" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="81,238,155,266"/>
+<area shape="rect" id="node19" href="$player_8cc.html" title="Music player." alt="" coords="180,238,253,266"/>
+<area shape="rect" id="node7" href="$desktop_8cc.html" title="Background shell application." alt="" coords="327,393,413,421"/>
+</map>

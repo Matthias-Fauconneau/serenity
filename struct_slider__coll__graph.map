@@ -1,0 +1,6 @@
+<map id="Slider" name="Slider">
+<area shape="rect" id="node2" href="$struct_progress.html" title="Shows a bounded value." alt="" coords="5,115,80,143"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="5,14,69,42"/>
+<area shape="rect" id="node6" href="$structsignal.html" title="signal\&lt; int \&gt;" alt="" coords="116,115,209,143"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="95,6,241,50"/>
+</map>

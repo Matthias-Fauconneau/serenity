@@ -1,0 +1,7 @@
+<map id="TriggerItem" name="TriggerItem">
+<area shape="rect" id="node2" href="$struct_item.html" title="Icon with text" alt="" coords="25,315,73,343"/>
+<area shape="rect" id="node4" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis." alt="" coords="8,238,89,266"/>
+<area shape="rect" id="node6" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="20,161,77,189"/>
+<area shape="rect" id="node8" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="19,83,80,111"/>
+<area shape="rect" id="node10" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="17,6,81,34"/>
+</map>

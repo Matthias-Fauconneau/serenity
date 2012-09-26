@@ -1,0 +1,8 @@
+<map id="Poll" name="Poll">
+<area shape="rect" id="node3" href="$struct_audio_output.html" title="Audio output through ALSA PCM interface." alt="" coords="5,83,101,111"/>
+<area shape="rect" id="node5" href="$struct_h_t_t_p.html" title="Asynchronously fetches a file over HTTP." alt="" coords="126,83,183,111"/>
+<area shape="rect" id="node7" href="$struct_sampler.html" title="High performance, low latency SFZ sound font sampler." alt="" coords="208,83,280,111"/>
+<area shape="rect" id="node9" href="$struct_sequencer.html" title="MIDI input through ALSA rawmidi interface." alt="" coords="305,83,391,111"/>
+<area shape="rect" id="node11" href="$struct_thread.html" title="Concurrently runs an event loop." alt="" coords="416,83,480,111"/>
+<area shape="rect" id="node13" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server." alt="" coords="505,83,575,111"/>
+</map>

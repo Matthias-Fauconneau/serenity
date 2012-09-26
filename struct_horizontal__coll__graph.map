@@ -1,0 +1,5 @@
+<map id="Horizontal" name="Horizontal">
+<area shape="rect" id="node2" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="16,161,73,189"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="15,83,76,111"/>
+<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="13,6,77,34"/>
+</map>

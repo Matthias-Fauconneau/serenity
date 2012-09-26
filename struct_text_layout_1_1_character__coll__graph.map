@@ -1,0 +1,17 @@
+<map id="TextLayout::Character" name="TextLayout::Character">
+<area shape="rect" id="node2" href="$structvector.html" title="vector\&lt; xy, int, 2 \&gt;" alt="" coords="351,179,483,207"/>
+<area shape="rect" id="node22" href="$struct_glyph.html" title="Glyph" alt="" coords="290,273,347,301"/>
+<area shape="rect" id="node4" href="$structxy.html" title="xy\&lt; int \&gt;" alt="" coords="380,86,453,114"/>
+<area shape="rect" id="node6" href="$struct_font.html" title="Freetype wrapper." alt="" coords="177,771,225,799"/>
+<area shape="rect" id="node8" href="$struct_map.html" title="Map" alt="" coords="24,670,72,698"/>
+<area shape="rect" id="node10" href="$structref.html" title="ref\&lt; byte \&gt;" alt="" coords="5,561,91,589"/>
+<area shape="rect" id="node12" href="$structmap.html" title="map\&lt; uint, map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="220,662,384,706"/>
+<area shape="rect" id="node14" href="$structarray.html" title="array\&lt; uint \&gt;" alt="" coords="117,561,213,589"/>
+<area shape="rect" id="node16" href="$structarray.html" title="array\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="238,553,377,597"/>
+<area shape="rect" id="node18" href="$structmap.html" title="map\&lt; uint16, Glyph \&gt;" alt="" coords="234,459,381,487"/>
+<area shape="rect" id="node20" href="$structarray.html" title="array\&lt; Glyph \&gt;" alt="" coords="264,366,373,394"/>
+<area shape="rect" id="node24" href="$struct_image.html" title="Image" alt="" coords="261,179,319,207"/>
+<area shape="rect" id="node26" href="$structvector.html" title="vector\&lt; V, T, N \&gt;" alt="" coords="229,86,352,114"/>
+<area shape="rect" id="node31" href="$structarray.html" title="array\&lt; uint16 \&gt;" alt="" coords="129,366,239,394"/>
+<area shape="rect" id="node33" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="97,670,196,698"/>
+</map>

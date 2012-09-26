@@ -1,0 +1,8 @@
+<map id="MidiFile" name="MidiFile">
+<area shape="rect" id="node2" href="$structmap.html" title="map\&lt; int, Chord \&gt;" alt="" coords="47,115,176,143"/>
+<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; int \&gt;" alt="" coords="5,14,93,42"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; Chord \&gt;" alt="" coords="119,14,229,42"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; Track \&gt;" alt="" coords="201,115,308,143"/>
+<area shape="rect" id="node10" href="$structsignal.html" title="signal\&lt; int, int \&gt;" alt="" coords="333,115,448,143"/>
+<area shape="rect" id="node12" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="317,6,464,50"/>
+</map>

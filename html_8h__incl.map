@@ -1,0 +1,18 @@
+<map id="html.h" name="html.h">
+<area shape="rect" id="node3" href="$http_8h.html" title="DNS queries, asynchronous HTTP requests, persistent disk cache." alt="" coords="55,238,109,266"/>
+<area shape="rect" id="node21" href="$xml_8h.html" title="XML parser." alt="" coords="148,238,203,266"/>
+<area shape="rect" id="node25" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="257,83,340,111"/>
+<area shape="rect" id="node5" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData)" alt="" coords="147,315,204,343"/>
+<area shape="rect" id="node14" href="$process_8h.html" title="threaded event loops, synchronization, execute, process environment and arguments" alt="" coords="43,315,121,343"/>
+<area shape="rect" id="node17" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)" alt="" coords="5,393,56,421"/>
+<area shape="rect" id="node7" href="$array_8h.html" title="Common array container." alt="" coords="113,470,175,498"/>
+<area shape="rect" id="node9" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="153,625,211,653"/>
+<area shape="rect" id="node11" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="182,547,263,575"/>
+<area shape="rect" id="node27" href="$image_8h.html" title="Image container and operations." alt="" coords="356,238,425,266"/>
+<area shape="rect" id="node34" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="445,161,517,189"/>
+<area shape="rect" id="node38" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="235,238,308,266"/>
+<area shape="rect" id="node41" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="222,161,289,189"/>
+<area shape="rect" id="node44" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="314,161,368,189"/>
+<area shape="rect" id="node29" href="$vector_8h.html" title="Vector types and operations." alt="" coords="344,315,413,343"/>
+<area shape="rect" id="node31" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="181,393,248,421"/>
+</map>

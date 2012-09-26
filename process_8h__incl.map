@@ -1,0 +1,6 @@
+<map id="process.h" name="process.h">
+<area shape="rect" id="node3" href="$array_8h.html" title="Common array container." alt="" coords="13,161,75,189"/>
+<area shape="rect" id="node10" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)" alt="" coords="51,83,101,111"/>
+<area shape="rect" id="node5" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="15,315,72,343"/>
+<area shape="rect" id="node7" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="43,238,124,266"/>
+</map>

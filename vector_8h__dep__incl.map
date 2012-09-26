@@ -1,0 +1,20 @@
+<map id="vector.h" name="vector.h">
+<area shape="rect" id="node3" href="$image_8h.html" title="Image container and operations." alt="" coords="380,83,449,111"/>
+<area shape="rect" id="node24" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="503,161,576,189"/>
+<area shape="rect" id="node27" href="$score_8h.html" title="Sheet music notation recognition from PDF files (with MIDI synchronization)" alt="" coords="585,238,652,266"/>
+<area shape="rect" id="node40" href="$font_8h.html" title="Freetype font renderer wrapper (Font)" alt="" coords="601,161,656,189"/>
+<area shape="rect" id="node42" href="$pdf_8h.html" title="Portable Document Format renderer." alt="" coords="509,238,560,266"/>
+<area shape="rect" id="node49" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="194,83,267,111"/>
+<area shape="rect" id="node5" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="158,238,241,266"/>
+<area shape="rect" id="node30" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="170,161,224,189"/>
+<area shape="rect" id="node34" href="$window_8h.html" title="X11 window display and input." alt="" coords="325,238,403,266"/>
+<area shape="rect" id="node45" href="$png_8h.html" title="PNG decoder and uncompressed encoder." alt="" coords="428,238,483,266"/>
+<area shape="rect" id="node7" href="$calendar_8h.html" title="Calendar, Events, Clock." alt="" coords="237,315,319,343"/>
+<area shape="rect" id="node11" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="327,393,408,421"/>
+<area shape="rect" id="node13" href="$feeds_8h.html" title="RSS/Atom feeds reader (Entry, Favicon, Feeds)" alt="" coords="167,393,232,421"/>
+<area shape="rect" id="node16" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="104,315,161,343"/>
+<area shape="rect" id="node19" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="496,315,569,343"/>
+<area shape="rect" id="node21" href="$player_8cc.html" title="Music player." alt="" coords="5,315,79,343"/>
+<area shape="rect" id="node9" href="$desktop_8cc.html" title="Background shell application." alt="" coords="235,470,321,498"/>
+<area shape="rect" id="node52" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="26,161,93,189"/>
+</map>

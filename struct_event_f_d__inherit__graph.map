@@ -1,0 +1,5 @@
+<map id="EventFD" name="EventFD">
+<area shape="rect" id="node7" href="$struct_thread.html" title="Thread" alt="" coords="9,238,73,266"/>
+<area shape="rect" id="node2" href="$struct_stream.html" title="Stream is an handle to an Unix I/O stream." alt="" coords="9,83,73,111"/>
+<area shape="rect" id="node4" href="$struct_handle.html" title="Handle is a Unix file descriptor." alt="" coords="9,6,73,34"/>
+</map>

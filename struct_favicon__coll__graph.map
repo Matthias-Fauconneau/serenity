@@ -1,0 +1,6 @@
+<map id="Favicon" name="Favicon">
+<area shape="rect" id="node2" href="$structarray.html" title="Polyvalent memory reference (const or mutable, owned or reference, inline or on heap)." alt="" coords="5,115,87,143"/>
+<area shape="rect" id="node4" href="$structsignal.html" title="Helps modularization by binding unrelated objects through persistent connections." alt="" coords="112,115,219,143"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="92,6,239,50"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; Image * \&gt;" alt="" coords="243,115,364,143"/>
+</map>

@@ -1,0 +1,13 @@
+<map id="Horizontal" name="Horizontal">
+<area shape="rect" id="node9" href="$struct_bar.html" title="Horizontal layout of selectable items." alt="" coords="5,315,79,343"/>
+<area shape="rect" id="node11" href="$struct_bar.html" title="Bar\&lt; Task \&gt;" alt="" coords="104,315,197,343"/>
+<area shape="rect" id="node13" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets." alt="" coords="222,315,276,343"/>
+<area shape="rect" id="node15" href="$struct_h_list.html" title="Horizontal layout of homogenous items." alt="" coords="301,315,384,343"/>
+<area shape="rect" id="node17" href="$struct_h_list.html" title="HList\&lt; Text \&gt;" alt="" coords="409,315,508,343"/>
+<area shape="rect" id="node19" href="$struct_item.html" title="Icon with text" alt="" coords="533,315,581,343"/>
+<area shape="rect" id="node2" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="267,161,324,189"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="265,83,327,111"/>
+<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="263,6,328,34"/>
+<area shape="rect" id="node21" href="$struct_entry.html" title="Item with link to an article." alt="" coords="483,393,536,421"/>
+<area shape="rect" id="node23" href="$struct_trigger_item.html" title="Clickable Item." alt="" coords="561,393,649,421"/>
+</map>

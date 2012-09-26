@@ -1,0 +1,7 @@
+<map id="Data" name="Data">
+<area shape="rect" id="node3" href="$struct_binary_data.html" title="Provides a convenient interface to parse binary inputs." alt="" coords="5,83,93,111"/>
+<area shape="rect" id="node5" href="$struct_data_stream.html" title="Implements Data::available using Stream::readUpTo." alt="" coords="118,83,241,111"/>
+<area shape="rect" id="node7" href="$struct_data_stream.html" title="DataStream\&lt; SSLSocket \&gt;" alt="" coords="266,83,448,111"/>
+<area shape="rect" id="node11" href="$struct_text_data.html" title="Provides a convenient interface to parse text streams." alt="" coords="473,83,547,111"/>
+<area shape="rect" id="node9" href="$struct_h_t_t_p.html" title="Asynchronously fetches a file over HTTP." alt="" coords="405,161,461,189"/>
+</map>

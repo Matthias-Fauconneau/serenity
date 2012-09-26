@@ -1,0 +1,9 @@
+<map id="score.h" name="score.h">
+<area shape="rect" id="node3" href="$array_8h.html" title="Common array container." alt="" coords="13,393,75,421"/>
+<area shape="rect" id="node10" href="$vector_8h.html" title="Vector types and operations." alt="" coords="57,238,127,266"/>
+<area shape="rect" id="node15" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="94,83,167,111"/>
+<area shape="rect" id="node5" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="15,547,72,575"/>
+<area shape="rect" id="node7" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="43,470,124,498"/>
+<area shape="rect" id="node12" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="51,315,117,343"/>
+<area shape="rect" id="node18" href="$image_8h.html" title="Image container and operations." alt="" coords="144,161,213,189"/>
+</map>

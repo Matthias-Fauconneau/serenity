@@ -1,0 +1,20 @@
+<map id="feeds.h" name="feeds.h">
+<area shape="rect" id="node3" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="258,161,341,189"/>
+<area shape="rect" id="node32" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="148,83,205,111"/>
+<area shape="rect" id="node42" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)" alt="" coords="45,470,96,498"/>
+<area shape="rect" id="node52" href="$ico_8h.html" title="Triggers dependency on ico.cc to add support for ICO decoding in decodeImage (weak link)..." alt="" coords="281,83,332,111"/>
+<area shape="rect" id="node5" href="$image_8h.html" title="Image container and operations." alt="" coords="405,315,475,343"/>
+<area shape="rect" id="node18" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="489,238,561,266"/>
+<area shape="rect" id="node22" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="285,315,357,343"/>
+<area shape="rect" id="node25" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="266,238,333,266"/>
+<area shape="rect" id="node28" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="358,238,412,266"/>
+<area shape="rect" id="node7" href="$vector_8h.html" title="Vector types and operations." alt="" coords="368,393,437,421"/>
+<area shape="rect" id="node9" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="349,470,416,498"/>
+<area shape="rect" id="node11" href="$array_8h.html" title="Common array container." alt="" coords="186,547,248,575"/>
+<area shape="rect" id="node13" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="224,702,281,730"/>
+<area shape="rect" id="node15" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="253,625,333,653"/>
+<area shape="rect" id="node34" href="$http_8h.html" title="DNS queries, asynchronous HTTP requests, persistent disk cache." alt="" coords="101,315,156,343"/>
+<area shape="rect" id="node46" href="$xml_8h.html" title="XML parser." alt="" coords="199,315,253,343"/>
+<area shape="rect" id="node36" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData)" alt="" coords="197,393,255,421"/>
+<area shape="rect" id="node39" href="$process_8h.html" title="threaded event loops, synchronization, execute, process environment and arguments" alt="" coords="93,393,172,421"/>
+</map>

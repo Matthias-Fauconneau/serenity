@@ -1,0 +1,8 @@
+<map id="Item" name="Item">
+<area shape="rect" id="node11" href="$struct_entry.html" title="Item with link to an article." alt="" coords="5,393,59,421"/>
+<area shape="rect" id="node13" href="$struct_trigger_item.html" title="Clickable Item." alt="" coords="83,393,172,421"/>
+<area shape="rect" id="node2" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis." alt="" coords="39,238,120,266"/>
+<area shape="rect" id="node4" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="51,161,108,189"/>
+<area shape="rect" id="node6" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="49,83,111,111"/>
+<area shape="rect" id="node8" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="47,6,112,34"/>
+</map>

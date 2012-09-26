@@ -1,0 +1,7 @@
+<map id="Clock" name="Clock">
+<area shape="rect" id="node2" href="$struct_text.html" title="Text is a Widget displaying text (can be multiple lines)" alt="" coords="15,161,61,189"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Widget is an abstract component to compose user interfaces." alt="" coords="5,83,69,111"/>
+<area shape="rect" id="node6" href="$struct_timer.html" title="Timer" alt="" coords="87,161,141,189"/>
+<area shape="rect" id="node8" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops." alt="" coords="94,83,137,111"/>
+<area shape="rect" id="node10" href="$structpollfd.html" title="pollfd" alt="" coords="89,6,143,34"/>
+</map>

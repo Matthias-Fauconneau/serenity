@@ -1,0 +1,20 @@
+<map id="file.h" name="file.h">
+<area shape="rect" id="node3" href="$process_8h.html" title="threaded event loops, synchronization, execute, process environment and arguments" alt="" coords="499,83,577,111"/>
+<area shape="rect" id="node7" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="213,238,287,266"/>
+<area shape="rect" id="node9" href="$player_8cc.html" title="Music player." alt="" coords="331,238,404,266"/>
+<area shape="rect" id="node17" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="811,315,892,343"/>
+<area shape="rect" id="node31" href="$http_8h.html" title="DNS queries, asynchronous HTTP requests, persistent disk cache." alt="" coords="1041,161,1096,189"/>
+<area shape="rect" id="node35" href="$feeds_8h.html" title="RSS/Atom feeds reader (Entry, Favicon, Feeds)" alt="" coords="1038,315,1103,343"/>
+<area shape="rect" id="node42" href="$sampler_8h.html" title="High performance, low latency SFZ sound font sampler." alt="" coords="99,161,177,189"/>
+<area shape="rect" id="node49" href="$font_8h.html" title="Freetype font renderer wrapper (Font)" alt="" coords="77,83,132,111"/>
+<area shape="rect" id="node5" href="$asound_8h.html" title="ALSA PCM output interface." alt="" coords="424,161,500,189"/>
+<area shape="rect" id="node11" href="$time_8h.html" title="Time and date operations." alt="" coords="680,161,737,189"/>
+<area shape="rect" id="node15" href="$desktop_8cc.html" title="Background shell application." alt="" coords="814,393,900,421"/>
+<area shape="rect" id="node25" href="$window_8h.html" title="X11 window display and input." alt="" coords="577,161,655,189"/>
+<area shape="rect" id="node39" href="$sequencer_8h.html" title="ALSA MIDI input interface." alt="" coords="203,161,297,189"/>
+<area shape="rect" id="node13" href="$calendar_8h.html" title="Calendar, Events, Clock." alt="" coords="531,238,612,266"/>
+<area shape="rect" id="node19" href="$disasm_8h.html" title="x86 (including SSE2) disassembler" alt="" coords="738,238,813,266"/>
+<area shape="rect" id="node21" href="$profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions)" alt="" coords="638,238,713,266"/>
+<area shape="rect" id="node33" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="1041,238,1099,266"/>
+<area shape="rect" id="node51" href="$pdf_8h.html" title="Portable Document Format renderer." alt="" coords="22,161,73,189"/>
+</map>

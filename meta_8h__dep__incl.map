@@ -1,0 +1,11 @@
+<map id="meta.h" name="meta.h">
+<area shape="rect" id="node7" href="$window_8h.html" title="X11 window display and input." alt="" coords="539,238,617,266"/>
+<area shape="rect" id="node23" href="$xml_8h.html" title="XML parser." alt="" coords="253,161,308,189"/>
+<area shape="rect" id="node39" href="$font_8h.html" title="Freetype font renderer wrapper (Font)" alt="" coords="797,161,852,189"/>
+<area shape="rect" id="node43" href="$pdf_8h.html" title="Portable Document Format renderer." alt="" coords="863,238,915,266"/>
+<area shape="rect" id="node53" href="$midi_8h.html" title="Standard MIDI file player." alt="" coords="937,161,993,189"/>
+<area shape="rect" id="node62" href="$score_8h.html" title="Sheet music notation recognition from PDF files (with MIDI synchronization)" alt="" coords="1019,161,1085,189"/>
+<area shape="rect" id="node67" href="$profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions)" alt="" coords="1195,161,1271,189"/>
+<area shape="rect" id="node25" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="252,238,309,266"/>
+<area shape="rect" id="node27" href="$feeds_8h.html" title="RSS/Atom feeds reader (Entry, Favicon, Feeds)" alt="" coords="283,315,348,343"/>
+</map>

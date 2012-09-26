@@ -1,0 +1,13 @@
+<map id="GridSelection&lt; T &gt;" name="GridSelection&lt; T &gt;">
+<area shape="rect" id="node2" href="$struct_grid.html" title="Layouts items on an uniform width x height grid." alt="" coords="146,225,192,253"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="320,115,381,143"/>
+<area shape="rect" id="node12" href="$struct_array.html" title="Implements Layout storage using array&lt;T&gt; (i.e by value)" alt="" coords="386,225,472,253"/>
+<area shape="rect" id="node17" href="$struct_selection.html" title="Implements selection of active widget/item for a Layout." alt="" coords="275,225,351,253"/>
+<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="318,14,383,42"/>
+<area shape="rect" id="node8" href="$structvector.html" title="vector\&lt; xy, int, 2 \&gt;" alt="" coords="5,115,136,143"/>
+<area shape="rect" id="node10" href="$struct_array_selection.html" title="Array with Selection." alt="" coords="359,305,499,333"/>
+<area shape="rect" id="node15" href="$structarray.html" title="Polyvalent memory reference (const or mutable, owned or reference, inline or on heap)." alt="" coords="405,115,487,143"/>
+<area shape="rect" id="node24" href="$struct_highlight_selection.html" title="Displays a selection using a blue highlight." alt="" coords="207,305,335,333"/>
+<area shape="rect" id="node20" href="$structsignal.html" title="signal\&lt; uint \&gt;" alt="" coords="161,115,263,143"/>
+<area shape="rect" id="node22" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="139,6,285,50"/>
+</map>

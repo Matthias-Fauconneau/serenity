@@ -1,0 +1,4 @@
+<map id="Text" name="Text">
+<area shape="rect" id="node5" href="$struct_text_input.html" title="TextInput is an editable Text." alt="" coords="5,161,80,189"/>
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="10,6,75,34"/>
+</map>

@@ -1,0 +1,12 @@
+<map id="interface.h" name="interface.h">
+<area shape="rect" id="node3" href="$image_8h.html" title="Image container and operations." alt="" coords="81,161,151,189"/>
+<area shape="rect" id="node16" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="5,83,77,111"/>
+<area shape="rect" id="node20" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="193,161,265,189"/>
+<area shape="rect" id="node23" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="285,83,352,111"/>
+<area shape="rect" id="node26" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="154,83,208,111"/>
+<area shape="rect" id="node5" href="$vector_8h.html" title="Vector types and operations." alt="" coords="81,238,151,266"/>
+<area shape="rect" id="node7" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="83,315,149,343"/>
+<area shape="rect" id="node9" href="$array_8h.html" title="Common array container." alt="" coords="85,393,147,421"/>
+<area shape="rect" id="node11" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="87,547,144,575"/>
+<area shape="rect" id="node13" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="115,470,196,498"/>
+</map>

@@ -1,0 +1,16 @@
+<map id="Vertical" name="Vertical">
+<area shape="rect" id="node9" href="$struct_list.html" title="Vertical layout of selectable items." alt="" coords="5,315,79,343"/>
+<area shape="rect" id="node11" href="$struct_list.html" title="List\&lt; Command \&gt;" alt="" coords="104,315,232,343"/>
+<area shape="rect" id="node13" href="$struct_list.html" title="List\&lt; Entry \&gt;" alt="" coords="257,315,353,343"/>
+<area shape="rect" id="node17" href="$struct_list.html" title="List\&lt; Text \&gt;" alt="" coords="379,315,469,343"/>
+<area shape="rect" id="node21" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets." alt="" coords="509,315,563,343"/>
+<area shape="rect" id="node29" href="$struct_v_list.html" title="Vertical layout of homogenous items." alt="" coords="587,315,668,343"/>
+<area shape="rect" id="node2" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="335,161,392,189"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="333,83,395,111"/>
+<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="331,6,396,34"/>
+<area shape="rect" id="node15" href="$struct_feeds.html" title="List of entries fetched from RSS/Atom feeds." alt="" coords="260,393,317,421"/>
+<area shape="rect" id="node19" href="$struct_scroll.html" title="Scroll\&lt; List\&lt; Text \&gt; \&gt;" alt="" coords="343,393,489,421"/>
+<area shape="rect" id="node23" href="$struct_events.html" title="Shows current date, month grid and events." alt="" coords="514,393,576,421"/>
+<area shape="rect" id="node25" href="$struct_h_t_m_l.html" title="Simple HTML layout engine." alt="" coords="601,393,659,421"/>
+<area shape="rect" id="node27" href="$struct_scroll.html" title="Scroll\&lt; HTML \&gt;" alt="" coords="573,470,688,498"/>
+</map>

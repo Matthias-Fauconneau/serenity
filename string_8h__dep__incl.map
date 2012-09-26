@@ -1,0 +1,23 @@
+<map id="string.h" name="string.h">
+<area shape="rect" id="node3" href="$vector_8h.html" title="Vector types and operations." alt="" coords="572,83,641,111"/>
+<area shape="rect" id="node44" href="$pdf_8h.html" title="Portable Document Format renderer." alt="" coords="646,315,697,343"/>
+<area shape="rect" id="node65" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations" alt="" coords="829,83,891,111"/>
+<area shape="rect" id="node5" href="$image_8h.html" title="Image container and operations." alt="" coords="372,161,441,189"/>
+<area shape="rect" id="node26" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="495,238,568,266"/>
+<area shape="rect" id="node29" href="$score_8h.html" title="Sheet music notation recognition from PDF files (with MIDI synchronization)" alt="" coords="551,315,617,343"/>
+<area shape="rect" id="node42" href="$font_8h.html" title="Freetype font renderer wrapper (Font)" alt="" coords="644,238,699,266"/>
+<area shape="rect" id="node51" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="218,161,291,189"/>
+<area shape="rect" id="node7" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="162,315,245,343"/>
+<area shape="rect" id="node32" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="111,238,165,266"/>
+<area shape="rect" id="node36" href="$window_8h.html" title="X11 window display and input." alt="" coords="413,315,491,343"/>
+<area shape="rect" id="node47" href="$png_8h.html" title="PNG decoder and uncompressed encoder." alt="" coords="329,315,384,343"/>
+<area shape="rect" id="node9" href="$calendar_8h.html" title="Calendar, Events, Clock." alt="" coords="237,393,319,421"/>
+<area shape="rect" id="node13" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="341,470,423,498"/>
+<area shape="rect" id="node15" href="$feeds_8h.html" title="RSS/Atom feeds reader (Entry, Favicon, Feeds)" alt="" coords="167,470,232,498"/>
+<area shape="rect" id="node18" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="104,393,161,421"/>
+<area shape="rect" id="node21" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="547,393,620,421"/>
+<area shape="rect" id="node23" href="$player_8cc.html" title="Music player." alt="" coords="5,393,79,421"/>
+<area shape="rect" id="node11" href="$desktop_8cc.html" title="Background shell application." alt="" coords="235,547,321,575"/>
+<area shape="rect" id="node54" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="19,238,87,266"/>
+<area shape="rect" id="node67" href="$profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions)" alt="" coords="826,161,901,189"/>
+</map>

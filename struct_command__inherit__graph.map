@@ -1,0 +1,7 @@
+<map id="Command" name="Command">
+<area shape="rect" id="node2" href="$struct_item.html" title="Item is an icon with text." alt="" coords="23,315,71,343"/>
+<area shape="rect" id="node4" href="$struct_horizontal.html" title="Horizontal layouts widgets on the horizontal axis." alt="" coords="5,238,87,266"/>
+<area shape="rect" id="node6" href="$struct_linear.html" title="Linear" alt="" coords="17,161,75,189"/>
+<area shape="rect" id="node8" href="$struct_layout.html" title="Layout is a proxy Widget containing multiple widgets." alt="" coords="16,83,77,111"/>
+<area shape="rect" id="node10" href="$struct_widget.html" title="Widget is an abstract component to compose user interfaces." alt="" coords="14,6,79,34"/>
+</map>

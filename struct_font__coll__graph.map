@@ -1,0 +1,7 @@
+<map id="Font" name="Font">
+<area shape="rect" id="node2" href="$struct_map.html" title="Managed memory mapping." alt="" coords="5,123,53,151"/>
+<area shape="rect" id="node4" href="$structmap.html" title="map\&lt; uint, map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="77,115,241,159"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; uint \&gt;" alt="" coords="39,14,136,42"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="161,6,300,50"/>
+<area shape="rect" id="node10" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="266,123,365,151"/>
+</map>

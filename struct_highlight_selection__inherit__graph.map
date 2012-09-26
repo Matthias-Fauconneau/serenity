@@ -1,0 +1,14 @@
+<map id="HighlightSelection" name="HighlightSelection">
+<area shape="rect" id="node9" href="$struct_grid_selection.html" title="GridSelection is a Grid layout of selectable items." alt="" coords="539,5,672,33"/>
+<area shape="rect" id="node11" href="$struct_grid_selection.html" title="GridSelection\&lt; Text \&gt;" alt="" coords="531,57,680,85"/>
+<area shape="rect" id="node15" href="$struct_list.html" title="Vertical layout of selectable items." alt="" coords="568,109,643,137"/>
+<area shape="rect" id="node17" href="$struct_list.html" title="List\&lt; Command \&gt;" alt="" coords="541,161,669,189"/>
+<area shape="rect" id="node19" href="$struct_list.html" title="List\&lt; Entry \&gt;" alt="" coords="557,213,654,241"/>
+<area shape="rect" id="node23" href="$struct_list.html" title="List\&lt; Text \&gt;" alt="" coords="560,265,651,293"/>
+<area shape="rect" id="node2" href="$struct_selection.html" title="Implements selection of active widget/item for a Layout." alt="" coords="229,135,307,163"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="120,135,181,163"/>
+<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="6,135,71,163"/>
+<area shape="rect" id="node13" href="$struct_calendar.html" title="Shows a week&#45;aligned calendar month." alt="" coords="763,57,839,85"/>
+<area shape="rect" id="node21" href="$struct_feeds.html" title="List of entries fetched from RSS/Atom feeds." alt="" coords="772,213,831,241"/>
+<area shape="rect" id="node25" href="$struct_scroll.html" title="Scroll\&lt; List\&lt; Text \&gt; \&gt;" alt="" coords="728,265,875,293"/>
+</map>

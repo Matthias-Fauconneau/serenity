@@ -1,0 +1,7 @@
+<map id="TabSelection" name="TabSelection">
+<area shape="rect" id="node9" href="$struct_bar.html" title="Horizontal layout of selectable items." alt="" coords="5,315,79,343"/>
+<area shape="rect" id="node11" href="$struct_bar.html" title="Bar\&lt; Task \&gt;" alt="" coords="104,315,197,343"/>
+<area shape="rect" id="node2" href="$struct_selection.html" title="Implements selection of active widget/item for a Layout." alt="" coords="57,161,133,189"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="65,83,127,111"/>
+<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="63,6,128,34"/>
+</map>

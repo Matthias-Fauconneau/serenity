@@ -1,0 +1,26 @@
+<map id="Score" name="Score">
+<area shape="rect" id="node2" href="$structmap.html" title="map\&lt; int, Chord \&gt;" alt="" coords="757,137,886,165"/>
+<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; int \&gt;" alt="" coords="206,155,295,183"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; Chord \&gt;" alt="" coords="455,166,567,194"/>
+<area shape="rect" id="node12" href="$structmap.html" title="map\&lt; int, int \&gt;" alt="" coords="621,213,728,241"/>
+<area shape="rect" id="node36" href="$structmap.html" title="map\&lt; int, array\&lt; vec2 \&gt; \&gt;" alt="" coords="424,271,597,299"/>
+<area shape="rect" id="node10" href="$structarray.html" title="array\&lt; float \&gt;" alt="" coords="771,334,871,362"/>
+<area shape="rect" id="node15" href="$structmap.html" title="map\&lt; vec2, string \&gt;" alt="" coords="752,467,891,495"/>
+<area shape="rect" id="node17" href="$structarray.html" title="array\&lt; vec2 \&gt;" alt="" coords="459,421,562,449"/>
+<area shape="rect" id="node19" href="$structvector.html" title="vector\&lt; V, T, N \&gt;" alt="" coords="189,421,312,449"/>
+<area shape="rect" id="node23" href="$structarray.html" title="array\&lt; string \&gt;" alt="" coords="457,487,565,515"/>
+<area shape="rect" id="node25" href="$structarray.html" title="array\&lt; T \&gt;" alt="" coords="209,487,292,515"/>
+<area shape="rect" id="node30" href="$structsignal.html" title="signal\&lt; const map\&lt;\l int, byte4 \&gt; &amp; \&gt;" alt="" coords="753,519,890,563"/>
+<area shape="rect" id="node32" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="437,555,584,599"/>
+<area shape="rect" id="node50" href="$structsignal.html" title="signal\&lt; float, float \&gt;" alt="" coords="752,587,891,615"/>
+<area shape="rect" id="node34" href="$structfunction.html" title="function\&lt; void(Args...)\&gt;" alt="" coords="171,563,331,591"/>
+<area shape="rect" id="node39" href="$structarray.html" title="array\&lt; array\&lt; vec2 \&gt; \&gt;" alt="" coords="173,311,329,339"/>
+<area shape="rect" id="node41" href="$structarray.html" title="array\&lt; Line \&gt;" alt="" coords="771,698,871,726"/>
+<area shape="rect" id="node43" href="$struct_p_d_f_1_1_line.html" title="PDF::Line" alt="" coords="470,691,551,719"/>
+<area shape="rect" id="node45" href="$structvector.html" title="vector\&lt; xy, float, 2 \&gt;" alt="" coords="179,663,322,691"/>
+<area shape="rect" id="node47" href="$structxy.html" title="xy\&lt; float \&gt;" alt="" coords="5,663,91,691"/>
+<area shape="rect" id="node53" href="$structarray.html" title="array\&lt; Staff \&gt;" alt="" coords="769,763,873,791"/>
+<area shape="rect" id="node55" href="$structmap.html" title="map associates keys with values" alt="" coords="462,763,559,791"/>
+<area shape="rect" id="node57" href="$structarray.html" title="array\&lt; V \&gt;" alt="" coords="209,741,293,769"/>
+<area shape="rect" id="node59" href="$structarray.html" title="array\&lt; K \&gt;" alt="" coords="209,793,293,821"/>
+</map>

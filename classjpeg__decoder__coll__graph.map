@@ -1,0 +1,6 @@
+<map id="jpeg_decoder" name="jpeg_decoder">
+<area shape="rect" id="node2" href="$structjpeg__decoder_1_1coeff__buf.html" title="jpeg_decoder::coeff_buf" alt="" coords="13,5,179,33"/>
+<area shape="rect" id="node4" href="$structjpeg__decoder_1_1mem__block.html" title="jpeg_decoder::mem_block" alt="" coords="6,97,186,125"/>
+<area shape="rect" id="node7" href="$structjpeg__decoder_1_1huff__tables.html" title="jpeg_decoder::huff\l_tables" alt="" coords="29,149,163,193"/>
+<area shape="rect" id="node9" href="$classjpeg__decoder__stream.html" title="jpeg_decoder_stream" alt="" coords="20,217,172,245"/>
+</map>

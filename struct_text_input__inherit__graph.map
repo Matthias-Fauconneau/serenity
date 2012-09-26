@@ -1,0 +1,4 @@
+<map id="TextInput" name="TextInput">
+<area shape="rect" id="node2" href="$struct_text.html" title="Text is a Widget displaying text (can be multiple lines)" alt="" coords="19,83,65,111"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="10,6,75,34"/>
+</map>

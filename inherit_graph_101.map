@@ -1,0 +1,60 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$structarray.html" title="Polyvalent memory reference (const or mutable, owned or reference, inline or on heap)." alt="" coords="148,326,231,354"/>
+<area shape="rect" id="node3" href="$struct_array.html" title="Array implements Layout storage using array&lt;T&gt; (i.e by value)" alt="" coords="334,326,421,354"/>
+<area shape="rect" id="node5" href="$struct_array_selection.html" title="ArraySelection is an Array with Selection." alt="" coords="523,370,664,398"/>
+<area shape="rect" id="node13" href="$struct_h_list.html" title="HList is a Horizontal layout of items." alt="" coords="771,110,855,138"/>
+<area shape="rect" id="node15" href="$struct_v_list.html" title="VList is a Vertical layout of items." alt="" coords="772,526,855,554"/>
+<area shape="rect" id="node7" href="$struct_bar.html" title="Bar is a Horizontal layout of selectable items." alt="" coords="776,318,851,346"/>
+<area shape="rect" id="node9" href="$struct_grid_selection.html" title="GridSelection is a Grid layout of selectable items." alt="" coords="747,370,880,398"/>
+<area shape="rect" id="node11" href="$struct_list.html" title="List is a Vertical layout of selectable items." alt="" coords="776,474,851,502"/>
+<area shape="rect" id="node16" href="$structarray.html" title="array\&lt; Command \&gt;" alt="" coords="121,598,258,626"/>
+<area shape="rect" id="node18" href="$struct_array.html" title="Array\&lt; Command \&gt;" alt="" coords="307,598,447,626"/>
+<area shape="rect" id="node20" href="$struct_array_selection.html" title="ArraySelection\&lt; Command \&gt;" alt="" coords="496,682,691,710"/>
+<area shape="rect" id="node22" href="$struct_list.html" title="List\&lt; Command \&gt;" alt="" coords="749,682,877,710"/>
+<area shape="rect" id="node23" href="$structarray.html" title="array\&lt; Entry \&gt;" alt="" coords="136,786,243,814"/>
+<area shape="rect" id="node25" href="$struct_array.html" title="Array\&lt; Entry \&gt;" alt="" coords="323,786,432,814"/>
+<area shape="rect" id="node27" href="$struct_array_selection.html" title="ArraySelection\&lt; Entry \&gt;" alt="" coords="511,786,675,814"/>
+<area shape="rect" id="node29" href="$struct_list.html" title="List\&lt; Entry \&gt;" alt="" coords="765,786,862,814"/>
+<area shape="rect" id="node31" href="$struct_feeds.html" title="List of entries fetched from RSS/Atom feeds." alt="" coords="980,786,1039,814"/>
+<area shape="rect" id="node32" href="$structarray.html" title="array\&lt; Task \&gt;" alt="" coords="138,274,241,302"/>
+<area shape="rect" id="node34" href="$struct_array.html" title="Array\&lt; Task \&gt;" alt="" coords="325,274,430,302"/>
+<area shape="rect" id="node36" href="$struct_array_selection.html" title="ArraySelection\&lt; Task \&gt;" alt="" coords="513,266,673,294"/>
+<area shape="rect" id="node38" href="$struct_bar.html" title="Bar\&lt; Task \&gt;" alt="" coords="767,266,860,294"/>
+<area shape="rect" id="node39" href="$structarray.html" title="array\&lt; Text \&gt;" alt="" coords="139,378,239,406"/>
+<area shape="rect" id="node41" href="$struct_array.html" title="Array\&lt; Text \&gt;" alt="" coords="326,378,429,406"/>
+<area shape="rect" id="node43" href="$struct_array_selection.html" title="ArraySelection\&lt; Text \&gt;" alt="" coords="515,526,672,554"/>
+<area shape="rect" id="node53" href="$struct_h_list.html" title="HList\&lt; Text \&gt;" alt="" coords="763,162,863,190"/>
+<area shape="rect" id="node45" href="$struct_grid_selection.html" title="GridSelection\&lt; Text \&gt;" alt="" coords="739,422,888,450"/>
+<area shape="rect" id="node49" href="$struct_list.html" title="List\&lt; Text \&gt;" alt="" coords="768,630,859,658"/>
+<area shape="rect" id="node47" href="$struct_calendar.html" title="Shows a week&#45;aligned calendar month." alt="" coords="971,422,1047,450"/>
+<area shape="rect" id="node51" href="$struct_scroll.html" title="Scroll\&lt; List\&lt; Text \&gt; \&gt;" alt="" coords="936,162,1083,190"/>
+<area shape="rect" id="node54" href="$structarray.html" title="array\&lt; Widget * \&gt;" alt="" coords="315,734,440,762"/>
+<area shape="rect" id="node56" href="$struct_widgets.html" title="Widgets implements Layout storage using array&lt;Widget*&gt; (i.e by reference)" alt="" coords="557,734,629,762"/>
+<area shape="rect" id="node58" href="$struct_h_box.html" title="HBox is a Horizontal layout of heterogenous widgets." alt="" coords="786,578,841,606"/>
+<area shape="rect" id="node60" href="$struct_v_box.html" title="VBox is a Vertical layout of heterogenous widgets." alt="" coords="787,734,840,762"/>
+<area shape="rect" id="node62" href="$struct_events.html" title="Shows current date, month grid and events." alt="" coords="978,682,1041,710"/>
+<area shape="rect" id="node64" href="$struct_h_t_m_l.html" title="Simple HTML layout engine." alt="" coords="980,734,1039,762"/>
+<area shape="rect" id="node66" href="$struct_scroll.html" title="Scroll\&lt; HTML \&gt;" alt="" coords="1131,397,1245,425"/>
+<area shape="rect" id="node67" href="$struct_widget.html" title="Widget is an abstract component to compose user interfaces." alt="" coords="6,197,71,225"/>
+<area shape="rect" id="node69" href="$struct_image_view.html" title="Displays a static image." alt="" coords="145,118,233,146"/>
+<area shape="rect" id="node73" href="$struct_layout.html" title="Layout is a proxy Widget containing multiple widgets." alt="" coords="159,430,220,458"/>
+<area shape="rect" id="node127" href="$struct_progress.html" title="Shows a bounded value." alt="" coords="151,170,227,198"/>
+<area shape="rect" id="node131" href="$struct_scroll_area.html" title="Implements a scrollable area for widget." alt="" coords="771,58,855,86"/>
+<area shape="rect" id="node139" href="$struct_text.html" title="Text is a Widget displaying text (can be multiple lines)" alt="" coords="166,222,213,250"/>
+<area shape="rect" id="node143" href="$struct_toggle_button.html" title="Togglable Icon." alt="" coords="139,482,239,510"/>
+<area shape="rect" id="node71" href="$struct_trigger_button.html" title="Clickable Icon." alt="" coords="327,118,428,146"/>
+<area shape="rect" id="node80" href="$struct_grid.html" title="UniformGrid layouts items on an uniform width x height grid." alt="" coords="570,422,617,450"/>
+<area shape="rect" id="node84" href="$struct_linear.html" title="Linear layouts widgets on an axis." alt="" coords="348,430,407,458"/>
+<area shape="rect" id="node107" href="$struct_selection.html" title="Selection implements selection of active widget/item for a Layout." alt="" coords="339,534,416,562"/>
+<area shape="rect" id="node86" href="$struct_horizontal.html" title="Horizontal layouts widgets on the horizontal axis." alt="" coords="552,214,635,242"/>
+<area shape="rect" id="node99" href="$struct_vertical.html" title="Vertical layouts widgets on the vertical axis." alt="" coords="560,630,627,658"/>
+<area shape="rect" id="node93" href="$struct_item.html" title="Icon with text." alt="" coords="789,214,837,242"/>
+<area shape="rect" id="node95" href="$struct_entry.html" title="Item with a #link to an article." alt="" coords="983,214,1036,242"/>
+<area shape="rect" id="node97" href="$struct_trigger_item.html" title="Clickable Item." alt="" coords="965,266,1054,294"/>
+<area shape="rect" id="node114" href="$struct_highlight_selection.html" title="Displays a selection using a blue highlight." alt="" coords="529,578,657,606"/>
+<area shape="rect" id="node122" href="$struct_tab_selection.html" title="Displays a selection using horizontal tabs." alt="" coords="544,318,643,346"/>
+<area shape="rect" id="node129" href="$struct_slider.html" title="Shows and controls a bounded value." alt="" coords="349,170,405,198"/>
+<area shape="rect" id="node133" href="$struct_scroll.html" title="Makes a widget scrollable by proxying it through ScrollArea." alt="" coords="966,110,1053,138"/>
+<area shape="rect" id="node137" href="$struct_scroll.html" title="Scroll\&lt; PDF \&gt;" alt="" coords="957,6,1062,34"/>
+<area shape="rect" id="node141" href="$struct_text_input.html" title="TextInput is an editable Text." alt="" coords="339,222,415,250"/>
+</map>

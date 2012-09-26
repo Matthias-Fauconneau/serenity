@@ -1,0 +1,10 @@
+<map id="font.h" name="font.h">
+<area shape="rect" id="node3" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData)" alt="" coords="5,161,63,189"/>
+<area shape="rect" id="node12" href="$vector_8h.html" title="Vector types and operations." alt="" coords="100,161,169,189"/>
+<area shape="rect" id="node17" href="$image_8h.html" title="Image container and operations." alt="" coords="117,83,187,111"/>
+<area shape="rect" id="node20" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)" alt="" coords="195,238,245,266"/>
+<area shape="rect" id="node5" href="$array_8h.html" title="Common array container." alt="" coords="103,315,165,343"/>
+<area shape="rect" id="node7" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="105,470,163,498"/>
+<area shape="rect" id="node9" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="134,393,215,421"/>
+<area shape="rect" id="node14" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="101,238,168,266"/>
+</map>

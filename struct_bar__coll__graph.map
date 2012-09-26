@@ -1,0 +1,13 @@
+<map id="Bar&lt; T &gt;" name="Bar&lt; T &gt;">
+<area shape="rect" id="node2" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis." alt="" coords="5,305,87,333"/>
+<area shape="rect" id="node4" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="21,225,79,253"/>
+<area shape="rect" id="node6" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="33,115,95,143"/>
+<area shape="rect" id="node12" href="$struct_array.html" title="Implements Layout storage using array&lt;T&gt; (i.e by value)" alt="" coords="259,225,345,253"/>
+<area shape="rect" id="node17" href="$struct_selection.html" title="Implements selection of active widget/item for a Layout." alt="" coords="124,225,200,253"/>
+<area shape="rect" id="node8" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="19,14,84,42"/>
+<area shape="rect" id="node10" href="$struct_array_selection.html" title="Array with Selection." alt="" coords="235,305,375,333"/>
+<area shape="rect" id="node15" href="$structarray.html" title="Polyvalent memory reference (const or mutable, owned or reference, inline or on heap)." alt="" coords="261,115,343,143"/>
+<area shape="rect" id="node24" href="$struct_tab_selection.html" title="Displays a selection using horizontal tabs." alt="" coords="112,305,211,333"/>
+<area shape="rect" id="node20" href="$structsignal.html" title="signal\&lt; uint \&gt;" alt="" coords="123,115,224,143"/>
+<area shape="rect" id="node22" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="109,6,256,50"/>
+</map>

@@ -1,0 +1,6 @@
+<map id="window.h" name="window.h">
+<area shape="rect" id="node3" href="$desktop_8cc.html" title="Background shell application." alt="" coords="5,83,91,111"/>
+<area shape="rect" id="node5" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="116,83,189,111"/>
+<area shape="rect" id="node7" href="$player_8cc.html" title="Music player." alt="" coords="215,83,288,111"/>
+<area shape="rect" id="node9" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="313,83,395,111"/>
+</map>

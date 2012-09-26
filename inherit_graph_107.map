@@ -1,0 +1,61 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$structarray.html" title="array is a polyvalent memory reference (const or mutable, owned or reference, inline or on heap)..." alt="" coords="148,629,231,657"/>
+<area shape="rect" id="node3" href="$struct_array.html" title="Array implements Layout storage using array&lt;T&gt; (i.e by value)" alt="" coords="334,629,421,657"/>
+<area shape="rect" id="node5" href="$struct_array_selection.html" title="ArraySelection is an Array with Selection." alt="" coords="523,317,664,345"/>
+<area shape="rect" id="node13" href="$struct_h_list.html" title="HList is a Horizontal layout of items." alt="" coords="771,733,855,761"/>
+<area shape="rect" id="node15" href="$struct_v_list.html" title="VList is a Vertical layout of items." alt="" coords="772,577,855,605"/>
+<area shape="rect" id="node7" href="$struct_bar.html" title="Bar is a Horizontal layout of selectable items." alt="" coords="776,369,851,397"/>
+<area shape="rect" id="node9" href="$struct_grid_selection.html" title="GridSelection is a Grid layout of selectable items." alt="" coords="747,109,880,137"/>
+<area shape="rect" id="node11" href="$struct_list.html" title="List is a Vertical layout of selectable items." alt="" coords="776,317,851,345"/>
+<area shape="rect" id="node16" href="$structarray.html" title="array\&lt; Command \&gt;" alt="" coords="121,265,258,293"/>
+<area shape="rect" id="node18" href="$struct_array.html" title="Array\&lt; Command \&gt;" alt="" coords="307,265,447,293"/>
+<area shape="rect" id="node20" href="$struct_array_selection.html" title="ArraySelection\&lt; Command \&gt;" alt="" coords="496,161,691,189"/>
+<area shape="rect" id="node22" href="$struct_list.html" title="List\&lt; Command \&gt;" alt="" coords="749,213,877,241"/>
+<area shape="rect" id="node23" href="$structarray.html" title="array\&lt; Entry \&gt;" alt="" coords="136,213,243,241"/>
+<area shape="rect" id="node25" href="$struct_array.html" title="Array\&lt; Entry \&gt;" alt="" coords="323,213,432,241"/>
+<area shape="rect" id="node27" href="$struct_array_selection.html" title="ArraySelection\&lt; Entry \&gt;" alt="" coords="511,109,675,137"/>
+<area shape="rect" id="node29" href="$struct_list.html" title="List\&lt; Entry \&gt;" alt="" coords="765,161,862,189"/>
+<area shape="rect" id="node31" href="$struct_feeds.html" title="Feeds is a list of entries fetched from RSS/Atom feeds." alt="" coords="980,161,1039,189"/>
+<area shape="rect" id="node32" href="$structarray.html" title="array\&lt; Task \&gt;" alt="" coords="138,421,241,449"/>
+<area shape="rect" id="node34" href="$struct_array.html" title="Array\&lt; Task \&gt;" alt="" coords="325,421,430,449"/>
+<area shape="rect" id="node36" href="$struct_array_selection.html" title="ArraySelection\&lt; Task \&gt;" alt="" coords="513,473,673,501"/>
+<area shape="rect" id="node38" href="$struct_bar.html" title="Bar\&lt; Task \&gt;" alt="" coords="767,421,860,449"/>
+<area shape="rect" id="node39" href="$structarray.html" title="array\&lt; Text \&gt;" alt="" coords="139,577,239,605"/>
+<area shape="rect" id="node41" href="$struct_array.html" title="Array\&lt; Text \&gt;" alt="" coords="326,577,429,605"/>
+<area shape="rect" id="node43" href="$struct_array_selection.html" title="ArraySelection\&lt; Text \&gt;" alt="" coords="515,213,672,241"/>
+<area shape="rect" id="node53" href="$struct_h_list.html" title="HList\&lt; Text \&gt;" alt="" coords="763,681,863,709"/>
+<area shape="rect" id="node45" href="$struct_grid_selection.html" title="GridSelection\&lt; Text \&gt;" alt="" coords="739,57,888,85"/>
+<area shape="rect" id="node49" href="$struct_list.html" title="List\&lt; Text \&gt;" alt="" coords="768,265,859,293"/>
+<area shape="rect" id="node47" href="$struct_calendar.html" title="Month shows a week&#45;aligned calendar month." alt="" coords="971,57,1047,85"/>
+<area shape="rect" id="node51" href="$struct_scroll.html" title="Scroll\&lt; List\&lt; Text \&gt; \&gt;" alt="" coords="936,317,1083,345"/>
+<area shape="rect" id="node54" href="$structarray.html" title="array\&lt; Widget * \&gt;" alt="" coords="315,525,440,553"/>
+<area shape="rect" id="node56" href="$struct_widgets.html" title="Widgets implements Layout storage using array&lt;Widget*&gt; (i.e by reference)" alt="" coords="557,577,629,605"/>
+<area shape="rect" id="node58" href="$struct_h_box.html" title="HBox is a Horizontal layout of heterogenous widgets." alt="" coords="786,629,841,657"/>
+<area shape="rect" id="node60" href="$struct_v_box.html" title="VBox is a Vertical layout of heterogenous widgets." alt="" coords="787,525,840,553"/>
+<area shape="rect" id="node62" href="$struct_events.html" title="Calendar shows current date, month grid and events." alt="" coords="978,525,1041,553"/>
+<area shape="rect" id="node64" href="$struct_h_t_m_l.html" title="Simple HTML layout engine." alt="" coords="980,615,1039,643"/>
+<area shape="rect" id="node66" href="$struct_scroll.html" title="Scroll\&lt; HTML \&gt;" alt="" coords="1131,687,1245,715"/>
+<area shape="rect" id="node67" href="$struct_widget.html" title="Widget is an abstract component to compose user interfaces." alt="" coords="6,161,71,189"/>
+<area shape="rect" id="node69" href="$struct_image_view.html" title="ImageView is a widget displaying a static image." alt="" coords="145,109,233,137"/>
+<area shape="rect" id="node73" href="$struct_layout.html" title="Layout is a proxy Widget containing multiple widgets." alt="" coords="159,343,220,371"/>
+<area shape="rect" id="node127" href="$struct_music.html" title="SFZ sampler and PDF renderer (tested with Salamander)" alt="" coords="161,5,218,33"/>
+<area shape="rect" id="node129" href="$struct_progress.html" title="Progress is a Widget to show a bounded value." alt="" coords="151,681,227,709"/>
+<area shape="rect" id="node133" href="$struct_scroll_area.html" title="Scroll is a proxy Widget containing a widget in a scrollable area." alt="" coords="771,785,855,813"/>
+<area shape="rect" id="node141" href="$struct_text.html" title="Text is a Widget displaying text (can be multiple lines)" alt="" coords="166,57,213,85"/>
+<area shape="rect" id="node145" href="$struct_toggle_button.html" title="ToggleButton is a togglable Icon." alt="" coords="139,161,239,189"/>
+<area shape="rect" id="node71" href="$struct_trigger_button.html" title="TriggerButton is a clickable Icon." alt="" coords="327,109,428,137"/>
+<area shape="rect" id="node80" href="$struct_grid.html" title="UniformGrid layouts items on an uniform width x height grid." alt="" coords="570,57,617,85"/>
+<area shape="rect" id="node84" href="$struct_linear.html" title="Linear layouts widgets on an axis." alt="" coords="348,369,407,397"/>
+<area shape="rect" id="node107" href="$struct_selection.html" title="Selection implements selection of active widget/item for a Layout." alt="" coords="339,317,416,345"/>
+<area shape="rect" id="node86" href="$struct_horizontal.html" title="Horizontal layouts widgets on the horizontal axis." alt="" coords="552,525,635,553"/>
+<area shape="rect" id="node99" href="$struct_vertical.html" title="Vertical layouts widgets on the vertical axis." alt="" coords="560,369,627,397"/>
+<area shape="rect" id="node93" href="$struct_item.html" title="Item is an icon with text." alt="" coords="789,473,837,501"/>
+<area shape="rect" id="node95" href="$struct_entry.html" title="Entry is an Item with a link to an article." alt="" coords="983,421,1036,449"/>
+<area shape="rect" id="node97" href="$struct_trigger_item.html" title="TriggerButton is a clickable Item." alt="" coords="965,473,1054,501"/>
+<area shape="rect" id="node114" href="$struct_highlight_selection.html" title="Displays a selection using a blue highlight." alt="" coords="529,265,657,293"/>
+<area shape="rect" id="node122" href="$struct_tab_selection.html" title="Displays a selection using horizontal tabs." alt="" coords="544,421,643,449"/>
+<area shape="rect" id="node131" href="$struct_slider.html" title="Slider is a Widget to show and control a bounded value." alt="" coords="349,681,405,709"/>
+<area shape="rect" id="node135" href="$struct_scroll.html" title="Scroll&lt;T&gt; implements a scrollable T by proxying it through ScrollArea It allows an object to act both..." alt="" coords="966,810,1053,838"/>
+<area shape="rect" id="node139" href="$struct_scroll.html" title="Scroll\&lt; PDF \&gt;" alt="" coords="957,706,1062,734"/>
+<area shape="rect" id="node143" href="$struct_text_input.html" title="TextInput is an editable Text." alt="" coords="339,57,415,85"/>
+</map>

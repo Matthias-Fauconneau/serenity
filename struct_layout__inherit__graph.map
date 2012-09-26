@@ -1,0 +1,43 @@
+<map id="Layout" name="Layout">
+<area shape="rect" id="node5" href="$struct_array.html" title="Implements Layout storage using array&lt;T&gt; (i.e by value)" alt="" coords="257,85,343,113"/>
+<area shape="rect" id="node19" href="$struct_array.html" title="Array\&lt; Command \&gt;" alt="" coords="230,474,370,502"/>
+<area shape="rect" id="node25" href="$struct_array.html" title="Array\&lt; Entry \&gt;" alt="" coords="245,578,355,606"/>
+<area shape="rect" id="node33" href="$struct_array.html" title="Array\&lt; Task \&gt;" alt="" coords="247,266,353,294"/>
+<area shape="rect" id="node39" href="$struct_array.html" title="Array\&lt; Text \&gt;" alt="" coords="249,526,351,554"/>
+<area shape="rect" id="node53" href="$struct_grid.html" title="Layouts items on an uniform width x height grid." alt="" coords="493,682,539,710"/>
+<area shape="rect" id="node57" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="271,370,329,398"/>
+<area shape="rect" id="node88" href="$struct_selection.html" title="Implements selection of active widget/item for a Layout." alt="" coords="261,422,339,450"/>
+<area shape="rect" id="node107" href="$struct_widgets.html" title="Implements Layout storage using array&lt;Widget*&gt; (i.e by reference)" alt="" coords="480,110,552,138"/>
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="6,422,71,450"/>
+<area shape="rect" id="node7" href="$struct_array_selection.html" title="Array with Selection." alt="" coords="445,422,587,450"/>
+<area shape="rect" id="node15" href="$struct_h_list.html" title="Horizontal layout of homogenous items." alt="" coords="694,6,778,34"/>
+<area shape="rect" id="node17" href="$struct_v_list.html" title="Vertical layout of homogenous items." alt="" coords="695,110,777,138"/>
+<area shape="rect" id="node9" href="$struct_bar.html" title="Horizontal layout of selectable items." alt="" coords="699,370,773,398"/>
+<area shape="rect" id="node11" href="$struct_grid_selection.html" title="GridSelection is a Grid layout of selectable items." alt="" coords="669,630,803,658"/>
+<area shape="rect" id="node13" href="$struct_list.html" title="Vertical layout of selectable items." alt="" coords="699,422,773,450"/>
+<area shape="rect" id="node21" href="$struct_array_selection.html" title="ArraySelection\&lt; Command \&gt;" alt="" coords="419,474,613,502"/>
+<area shape="rect" id="node23" href="$struct_list.html" title="List\&lt; Command \&gt;" alt="" coords="672,474,800,502"/>
+<area shape="rect" id="node27" href="$struct_array_selection.html" title="ArraySelection\&lt; Entry \&gt;" alt="" coords="434,526,598,554"/>
+<area shape="rect" id="node29" href="$struct_list.html" title="List\&lt; Entry \&gt;" alt="" coords="687,526,785,554"/>
+<area shape="rect" id="node31" href="$struct_feeds.html" title="List of entries fetched from RSS/Atom feeds." alt="" coords="903,526,961,554"/>
+<area shape="rect" id="node35" href="$struct_array_selection.html" title="ArraySelection\&lt; Task \&gt;" alt="" coords="436,214,596,242"/>
+<area shape="rect" id="node37" href="$struct_bar.html" title="Bar\&lt; Task \&gt;" alt="" coords="689,266,783,294"/>
+<area shape="rect" id="node41" href="$struct_array_selection.html" title="ArraySelection\&lt; Text \&gt;" alt="" coords="437,630,595,658"/>
+<area shape="rect" id="node51" href="$struct_h_list.html" title="HList\&lt; Text \&gt;" alt="" coords="686,318,786,346"/>
+<area shape="rect" id="node43" href="$struct_grid_selection.html" title="GridSelection\&lt; Text \&gt;" alt="" coords="661,682,811,710"/>
+<area shape="rect" id="node47" href="$struct_list.html" title="List\&lt; Text \&gt;" alt="" coords="691,578,781,606"/>
+<area shape="rect" id="node45" href="$struct_calendar.html" title="Shows a week&#45;aligned calendar month." alt="" coords="894,682,970,710"/>
+<area shape="rect" id="node49" href="$struct_scroll.html" title="Scroll\&lt; List\&lt; Text \&gt; \&gt;" alt="" coords="859,578,1005,606"/>
+<area shape="rect" id="node59" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis." alt="" coords="475,162,557,190"/>
+<area shape="rect" id="node73" href="$struct_vertical.html" title="Layouts widgets on the vertical axis." alt="" coords="483,370,549,398"/>
+<area shape="rect" id="node63" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets." alt="" coords="709,58,763,86"/>
+<area shape="rect" id="node67" href="$struct_item.html" title="Icon with text" alt="" coords="712,214,760,242"/>
+<area shape="rect" id="node69" href="$struct_entry.html" title="Item with link to an article." alt="" coords="905,266,959,294"/>
+<area shape="rect" id="node71" href="$struct_trigger_item.html" title="Clickable Item." alt="" coords="887,214,977,242"/>
+<area shape="rect" id="node79" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets." alt="" coords="709,162,763,190"/>
+<area shape="rect" id="node81" href="$struct_events.html" title="Shows current date, month grid and events." alt="" coords="901,162,963,190"/>
+<area shape="rect" id="node83" href="$struct_h_t_m_l.html" title="Simple HTML layout engine." alt="" coords="903,110,961,138"/>
+<area shape="rect" id="node85" href="$struct_scroll.html" title="Scroll\&lt; HTML \&gt;" alt="" coords="1053,110,1168,138"/>
+<area shape="rect" id="node95" href="$struct_highlight_selection.html" title="Displays a selection using a blue highlight." alt="" coords="452,578,580,606"/>
+<area shape="rect" id="node103" href="$struct_tab_selection.html" title="Displays a selection using horizontal tabs." alt="" coords="467,266,565,294"/>
+</map>

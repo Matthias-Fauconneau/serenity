@@ -1,0 +1,17 @@
+<map id="image.h" name="image.h">
+<area shape="rect" id="node3" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="395,161,479,189"/>
+<area shape="rect" id="node22" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="318,83,391,111"/>
+<area shape="rect" id="node28" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="158,83,212,111"/>
+<area shape="rect" id="node32" href="$window_8h.html" title="X11 window display and input." alt="" coords="73,161,151,189"/>
+<area shape="rect" id="node38" href="$font_8h.html" title="Freetype font renderer wrapper (Font)" alt="" coords="237,83,292,111"/>
+<area shape="rect" id="node43" href="$png_8h.html" title="PNG decoder and uncompressed encoder." alt="" coords="5,83,60,111"/>
+<area shape="rect" id="node5" href="$calendar_8h.html" title="Calendar, Events, Clock." alt="" coords="399,238,480,266"/>
+<area shape="rect" id="node9" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="211,315,292,343"/>
+<area shape="rect" id="node11" href="$feeds_8h.html" title="RSS/Atom feeds reader (Entry, Favicon, Feeds)" alt="" coords="502,315,567,343"/>
+<area shape="rect" id="node14" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="505,238,563,266"/>
+<area shape="rect" id="node17" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="249,238,323,266"/>
+<area shape="rect" id="node19" href="$player_8cc.html" title="Music player." alt="" coords="151,238,224,266"/>
+<area shape="rect" id="node7" href="$desktop_8cc.html" title="Background shell application." alt="" coords="397,393,483,421"/>
+<area shape="rect" id="node25" href="$score_8h.html" title="Sheet music notation recognition from PDF files (with MIDI synchronization)" alt="" coords="304,161,371,189"/>
+<area shape="rect" id="node40" href="$pdf_8h.html" title="Portable Document Format renderer." alt="" coords="227,161,279,189"/>
+</map>

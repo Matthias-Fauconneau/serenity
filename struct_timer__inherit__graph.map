@@ -1,0 +1,6 @@
+<map id="Timer" name="Timer">
+<area shape="rect" id="node7" href="$struct_clock.html" title="Clock" alt="" coords="5,238,60,266"/>
+<area shape="rect" id="node9" href="$struct_monitor.html" title="Monitor" alt="" coords="85,238,152,266"/>
+<area shape="rect" id="node2" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops." alt="" coords="54,83,97,111"/>
+<area shape="rect" id="node4" href="$structpollfd.html" title="pollfd" alt="" coords="49,6,103,34"/>
+</map>
