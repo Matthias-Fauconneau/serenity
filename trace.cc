@@ -198,10 +198,10 @@ void* return_address(void* fp) { return *((void**)fp-1); }
 #endif
 
 string trace(int skip, void* ip) {
-    void* stack[16]; clear((byte*)stack,sizeof(stack));
+    void* stack[32]; clear((byte*)stack,sizeof(stack));
     void* frame = __builtin_frame_address(0);
     int i=0;
-    for(;i<16;i++) {
+    for(;i<32;i++) {
         if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
         stack[i]=return_address(frame);
         frame=caller_frame(frame);

@@ -75,7 +75,7 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
 File::File(const ref<byte>& file, const Folder& at, uint flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
-int File::size() const { stat sb; check_(fstat(fd, &sb)); return sb.size; }
+int File::size() const { stat sb={}; check_(fstat(fd, &sb)); return sb.size; }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }

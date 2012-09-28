@@ -191,9 +191,15 @@ bool TextInput::keyPress(Key key) {
     else if(key==End) cursor=text.size();
     else if(key==Delete && cursor<text.size()) text.removeAt(cursor);
     else if(key==BackSpace && cursor>0) text.removeAt(--cursor);
-    else if(key>=' ' && key<=0xFF) { text.insertAt(cursor++, byte(key)); } //TODO: UTF8
-    else if(key>=KP_0 && key<=KP_9) { text.insertAt(cursor++, byte(key-KP_0+'0')); }
-    else return false;
+    else if(key==Return) textEntered(text);
+    else {
+        char c=0;
+        if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
+        else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';
+        else if(key==KP_Multiply) c='*'; else if(key==KP_Add) c='+'; else if(key==KP_Subtract) c='-'; else if(key==KP_Divide) c='/';
+        else return false;
+        text.insertAt(cursor++, c);
+    }
     textSize=0; textChanged(text); return true;
 }
 

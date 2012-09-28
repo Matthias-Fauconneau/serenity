@@ -59,6 +59,8 @@ struct TextInput : Text {
     uint cursor=0;
     /// User edited this text
     signal<const ref<byte>&> textChanged;
+    /// User pressed enter
+    signal<const ref<byte>&> textEntered;
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key) override;

@@ -1,7 +1,8 @@
+parser: immediate attributes, synthesized attributes
 HTTYD score, nki, FIR reverb
 TB: rsync, arm, taskbar, desktop, book
 fibermesh
-apps: shell, file manager, search, imap, torrent, irc, video
+apps: fix desktop leak, shell, file manager, search, imap, torrent, irc, video
 own: inflate, jpeg, mp3, font, ssl
-IDE: text editor, parser(attributes (L+S), scoped symbols, GLR), syntax highlighting, navigation, completion, git, static analyzer, interpreter, profiler, compiler
+IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git, static analyzer, interpreter, profiler, compiler
 touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

@@ -1,4 +1,3 @@
-(10+(21-32)*43)/54
-Expr: Factor | Expr ('+'|'-') Factor
-Factor: Term | Factor ('*'|'/') Term
-Term: [0-9]+ | '(' Expr ')'
+Expr: Term | Expr '+' Term { value: add Expr.value Term.value } | Expr '-' Term { value: sub Expr.value Term.value }
+Term: Factor | Term '*' Factor { value: mul Term.value Factor.value } | Term '/' Factor { value: div Term.value Factor.value }
+Factor: [0-9]+ { value: integer } | '(' Expr ')'

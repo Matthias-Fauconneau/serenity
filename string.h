@@ -3,7 +3,7 @@
 #include "array.h"
 
 // Enforces exact match for overload resolution
-template<class T> ref<byte> str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return ""_; }
+template<class T> string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return string(); }
 
 /// Lexically compare strings
 bool operator <(const ref<byte>& a, const ref<byte>& b);
@@ -74,6 +74,9 @@ template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p
 string ftoa(double number, int precision=2);
 inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
+
+/// Converts references
+template<class T> string str(const unique<T>& t) { return str(*t.pointer); }
 
 /// Converts arrays
 template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }

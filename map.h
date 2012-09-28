@@ -43,6 +43,7 @@ template<class K, class V> struct map {
         keys << forward<Kf>(key); values << V(); return values.last();
     }
     V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
+    V take(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); return values.take(i); }
     void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {

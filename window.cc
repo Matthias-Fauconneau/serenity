@@ -207,7 +207,6 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
-            log(e.state);
             uint key = KeySym(e.key,e.state);
             if(focus && focus->keyPress((Key)key) ) queue(); //normal keyPress event
             else {
