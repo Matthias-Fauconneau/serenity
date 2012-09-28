@@ -5,7 +5,7 @@
 #include "midi.h"
 #include "time.h"
 
-Sequencer::Sequencer(Thread& thread) : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll(Device::fd,POLLIN,thread) {}
+Sequencer::Sequencer(Thread& thread) : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll(Device::fd,POLLIN,thread) { registerPoll(); }
 
 void Sequencer::event() {
     uint8 key=read<uint8>();

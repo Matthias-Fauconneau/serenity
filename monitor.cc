@@ -69,7 +69,6 @@ struct Monitor : Timer {
                 }
             }
             window.setSize(int2(-1,-1));
-            window.show();
             window.render();
         }
         this->system=move(n); this->process=move(process);

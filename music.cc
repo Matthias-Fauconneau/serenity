@@ -51,7 +51,6 @@ struct Music : Widget {
         window.localShortcut(Escape).connect(&exit);
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
         window.localShortcut(Key('O')).connect(this,&Music::showSheetList);
-        window.show();
     }
 
     /// Shows samples loading progress. When loaded, displays any loaded sheet and starts audio output.

@@ -53,7 +53,7 @@ struct Poll : pollfd {
     Poll(Thread& thread=mainThread()):thread(thread){}
     void registerPoll();
     /// Registers \a fd to be polled in the event loop
-    Poll(int fd, int events=POLLIN, Thread& thread=mainThread()):____(pollfd{fd,(short)events},)thread(thread){ if(fd) registerPoll(); }
+    Poll(int fd, int events=POLLIN, Thread& thread=mainThread()):____(pollfd{fd,(short)events},)thread(thread){}
     /// Removes \a fd from the event loop
     void unregisterPoll();
     ~Poll(){unregisterPoll();}
@@ -65,7 +65,7 @@ struct Poll : pollfd {
 
 struct EventFD : Stream {
     EventFD();
-    void post(){write(raw<uint64>(1));}
+    void post(){Stream::write(raw<uint64>(1));}
     void read(){Stream::read<uint64>();}
 };
 
@@ -77,12 +77,12 @@ struct Thread : array<Poll*>, EventFD, Poll {
     array<Poll*> unregistered; // Poll objects removed while in event loop
     Lock lock;
     Map stack;
-    /// Default constructor for main thread
-    Thread();
-    /// Spawns a thread executing \a run
-    Thread(int priority);
-    /// Processes all events on \a polls and tasks on \a queue
+    /// Spawns a thread running an event loop with the given \a priority
+    Thread(int priority=0);
+    /// Processes all events on \a polls and tasks on \a queue until #terminate is set
     void run();
+    /// Processes all events on \a polls and tasks on \a queue
+    bool processEvents();
     /// Processes one queued task
     void event();
 };

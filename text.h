@@ -57,6 +57,8 @@ struct Text : Widget {
 //TODO: multiline
 struct TextInput : Text {
     uint cursor=0;
+    /// User edited this text
+    signal<const ref<byte>&> textChanged;
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key) override;

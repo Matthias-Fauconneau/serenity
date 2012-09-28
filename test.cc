@@ -25,7 +25,7 @@ struct SnapshotTest : TriggerButton {
 #include "text.h"
 struct KeyTest : Text {
     Window window __(this,int2(640,480),"KeyTest"_);
-    KeyTest(){ focus=this; window.localShortcut(Escape).connect(&exit); window.show(); }
+    KeyTest(){ focus=this; window.localShortcut(Escape).connect(&exit); }
     bool keyPress(Key key) { setText(str("'"_+str((char)key)+"'"_,dec(int(key)),"0x"_+hex(int(key)))); return true; }
 } test;
 #endif
@@ -37,7 +37,7 @@ struct KeyTest : Text {
 #include "window.h"
 struct VSyncTest : Widget {
     Window window __(this,0,"VSync"_);
-    VSyncTest(){ window.localShortcut(Escape).connect(&exit); window.show(); }
+    VSyncTest(){ window.localShortcut(Escape).connect(&exit); }
     bool odd; void render(int2 position, int2 size) {fill(position+Rect(size),(odd=!odd)?black:white); window.render();}
 } test;
 #endif
@@ -52,7 +52,6 @@ struct ImageTest : ImageView {
     ImageTest():ImageView(resize(decodeImage(readFile("feedproxy.google.com/favicon.ico"_,cache())),16,16)) {
         assert(image.own);
         window.localShortcut(Escape).connect(&exit);
-        window.show();
     }
 } test;
 #endif
@@ -68,7 +67,6 @@ struct HTMLTest {
         window.localShortcut(Escape).connect(&exit);
         page.contentChanged.connect(&window, &Window::render);
         page.go("http://www.girlgeniusonline.com/comic.php?date=20120917"_);
-        window.show();
     }
 } test;
 #endif
@@ -90,7 +88,7 @@ struct WeekViewTest : Widget {
                 y=max(y,day.sizeHint().y);
                 day.render(position+int2(i*w,0),int2(w,0));
             }
-            array< ::Event> events = getEvents();
+            array< ::Event> events = getEvents(Date());
             uint min=-1,max=0;
             for(::Event& e: events) if(e.date.day==-1) min=::min(min,floor(60,time(e.date))), max=::max(max,ceil(60,time(e.end)));
             for(::Event& e: events) if(e.date.day==-1) { // Displays only events recurring weekly
@@ -114,7 +112,7 @@ struct WeekViewTest : Widget {
     WeekViewTest(){
         renderPage();
         writeFile("week.png"_,encodePNG(page),home());
-        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF; window.show();
+        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
     }
     void renderPage() {
         framebuffer=share(page); currentClip = Rect(page.size());

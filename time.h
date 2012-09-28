@@ -20,15 +20,25 @@ long cpuTime();
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
-    debug(void invariant();)
+    debug(void invariant() const;)
+    /// Default constructs an undetermined date
     Date(){}
-    Date(int weekDay, int monthDay, int month, int year):year(year),month(month),day(monthDay),weekDay(weekDay) {debug(invariant();)}
-    Date(int seconds, int minutes, int hours, int day, int month, int year, int weekDay) :
-        year(year),month(month),day(day),hours(hours),minutes(minutes),seconds(seconds),weekDay(weekDay) {debug(invariant();)}
-    /// Sets month day and matching week day
-    void setDay(int monthDay);
+    /// Constructs a calendar date (unspecified hour)
+    Date(int monthDay, int month, int year, int weekDay=-1);
+    /// Converts UNIX \a timestamp (in secondes) to a local time calendar date
+    Date(long timestamp);
+    /// Returns days from Thursday, 1st January 1970
+    int days() const;
+    /// Returns whether this date is in daylight saving time
+    bool summerTime() const;
+    /// Returns the local time offset from UTC in minutes (time zone + DST)
+    int localTimeOffset() const;
+    /// Converts the date to Unix time (in seconds)
+    operator long() const;
 };
+/// Orders two dates
 bool operator <(const Date& a, const Date& b);
+/// Tests two dates
 bool operator ==(const Date& a, const Date& b);
 
 enum WeekDay { Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday };
@@ -38,15 +48,13 @@ constexpr ref<byte> months[12] = {"January"_,"February"_,"March"_,"April"_,"May"
 constexpr bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year);
 
-/// Convert unix timestamp to a calendar date
-Date date(long time=currentTime());
-
 /// Returns current date formatted using \a format string
 string str(Date date, const ref<byte>& format="dddd, dd MMMM yyyy hh:mm"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy
 Date parse(TextData& s);
+inline Date parse(const ref<byte>& s) { TextData t(s); return parse(t); }
 
 struct Timer : Poll {
     Timer();

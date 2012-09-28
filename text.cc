@@ -191,9 +191,10 @@ bool TextInput::keyPress(Key key) {
     else if(key==End) cursor=text.size();
     else if(key==Delete && cursor<text.size()) text.removeAt(cursor);
     else if(key==BackSpace && cursor>0) text.removeAt(--cursor);
-    else if(key>=' ' && key<=0xFF) { text.insertAt(cursor++, (byte)key); } //TODO: UTF8
+    else if(key>=' ' && key<=0xFF) { text.insertAt(cursor++, byte(key)); } //TODO: UTF8
+    else if(key>=KP_0 && key<=KP_9) { text.insertAt(cursor++, byte(key-KP_0+'0')); }
     else return false;
-    textSize=0; return true;
+    textSize=0; textChanged(text); return true;
 }
 
 void TextInput::render(int2 position, int2 size) {
@@ -201,7 +202,7 @@ void TextInput::render(int2 position, int2 size) {
     if(focus==this) {
         if(cursor>text.size()) cursor=text.size();
         int x = cursor < characters.size()? characters[cursor].pos.x : (cursor>0 && characters) ? characters.last().pos.x+characters.last().image.width : 0;
-        fill(position+max(int2(0,0), (size-textSize)/2)+Rect(int2(x,0), int2(x+1,size.y)), black);
+        fill(position+max(int2(0,0), (size-textSize)/2)+Rect(int2(x,0), int2(x+1,textSize.y)), black);
     }
 }
 

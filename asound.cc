@@ -47,7 +47,7 @@ typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
 AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)> read, Thread& thread, bool realtime)
-    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(0,POLLOUT,thread), read(read) {
+    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(S16_LE);
@@ -65,7 +65,7 @@ AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Read|Map::Write)).data);
 }
-void AudioOutput::start() { if(status->state != Prepared) io<PREPARE>(); Poll::fd=Device::fd; registerPoll(); }
+void AudioOutput::start() { if(status->state != Prepared) io<PREPARE>(); registerPoll(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
     if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }

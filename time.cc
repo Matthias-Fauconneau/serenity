@@ -16,7 +16,7 @@ int daysInMonth(int month, int year=0) {
 }
 
 template<class T> bool inRange(T min, T x, T max) { return x>=min && x<max; }
-debug(void Date::invariant() {
+debug(void Date::invariant() const {
     //Date
     if(year>=0) { assert(inRange(2012, year, 2013)); }
     if(month>=0) { assert(year>=0); assert(inRange(0, month, 12)); }
@@ -24,9 +24,7 @@ debug(void Date::invariant() {
     if(weekDay>=0) {
         assert(inRange(0, weekDay, 7));
         if(year>=0 && month>=0 && day>=0) {
-            int setWeekDay = weekDay;
-            setDay(day);
-            assert(weekDay==setWeekDay,weekDay,setWeekDay,str(*this));
+            assert(weekDay==(Thursday+days())%7,weekDay,(Thursday+days())%7,str(*this));
         }
     }
     //Hour
@@ -34,14 +32,61 @@ debug(void Date::invariant() {
     if(minutes>=0) { assert(inRange(0, minutes, 60)); assert(hours>=0); }
     if(seconds>=0) { assert(inRange(0, seconds, 60)); assert(minutes>=0); }
 })
-void Date::setDay(int monthDay) {
+int Date::days() const {
     assert(year>=0 && month>=0);
-    int days=3; //days from Thursday, 1st January 1970
+    int days=0; //days from Thursday, 1st January 1970
     for(int year=1970;year<this->year;year++) days+= leap(year)?366:365;
     for(int month=0;month<this->month;month++) days+=daysInMonth(month,year);
-    days+=monthDay;
-    weekDay = days%7;
+    return days+day;
 }
+Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day),weekDay(weekDay) {
+    if(weekDay<0 && day>=0) this->weekDay=(Thursday+days())%7;
+    debug(invariant();)
+}
+bool Date::summerTime() const { //FIXME: always European Summer Time
+    int lastMarchSunday = 30-Date(30,March,year).weekDay; assert(year==2012 && lastMarchSunday==25, lastMarchSunday); // after 01:00 UTC on the last Sunday in March
+    int lastOctoberSunday = 30-Date(30,October,year).weekDay; assert(year==2012 && lastOctoberSunday==28, lastOctoberSunday); // until 01:00 UTC on the last Sunday in October
+    return    (month>March    || (month==March    && (day>lastMarchSunday    || (day==lastMarchSunday    && hours>=1))))
+            && (month<October || (month==October && (day<lastOctoberSunday || (day==lastOctoberSunday && hours<  1))));
+}
+int Date::localTimeOffset() const {
+    int offset = 1; //FIXME: always Central European Time (UTC+1)
+    if(summerTime()) offset += 1;
+    else error("TESTME");
+    return offset*60;
+}
+Date::Date(long time) {
+    // UTC time and date
+    seconds = time;
+    minutes=seconds/60; seconds %= 60;
+    hours=minutes/60; minutes %= 60;
+    int days=hours/24; hours %= 24;
+    weekDay = (Thursday+days)%7, month=0, year=1970;
+    for(;;) { int nofDays = leap(year)?366:365; if(days>=nofDays) days-=nofDays, year++; else break; }
+    for(;days>=daysInMonth(month,year);month++) days-=daysInMonth(month,year);
+    day=days;
+
+    // Local time and date
+    minutes+=localTimeOffset();
+    if(minutes>=60) {
+        hours += minutes/60; minutes %= 60;
+        if(hours>=24) {
+            hours-=24; weekDay=(weekDay+1)%7; day++;
+            if(day>=daysInMonth(month,year)) {
+                day=0, month++;
+                if(month>=12) month=0, year++;
+            }
+        }
+    }
+
+    invariant();
+    assert(long(*this)==time, long(*this)/60.0, time/60.0, seconds, time%60);
+}
+Date::operator long() const {
+    invariant();
+    return ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0)-localTimeOffset())*60+(seconds>=0?seconds:0);
+}
+
 bool operator <(const Date& a, const Date& b) {
     if(a.year!=-1 && b.year!=-1) { if(a.year<b.year) return true; else if(a.year>b.year) return false; }
     if(a.month!=-1 && b.month!=-1) { if(a.month<b.month) return true; else if(a.month>b.month) return false; }
@@ -53,18 +98,6 @@ bool operator <(const Date& a, const Date& b) {
 }
 bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && a.minutes==b.minutes && a.hours==b.hours
             && a.day==b.day && a.month==b.month && a.year==b.year ; }
-
-Date date(long time) {
-    int seconds = time, minutes=seconds/60, hours=minutes/60+1/*UTC+1*/, day=hours/24, weekDay = (Thursday+day)%7, month=0, year=1970;
-    for(;;) { int nofDays = leap(year)?366:365; if(day>=nofDays) day-=nofDays, year++; else break; }
-    for(;day>daysInMonth(month,year);month++) day-=daysInMonth(month,year);
-    //European Summer Time (01:00 UTC on the last Sunday in March until 01:00 UTC on the last Sunday in October) [using 00:00 UTC+1 to simplify]
-    if(     (month==March && day+(6-weekDay)>=daysInMonth(March)) ||
-            (month>March && month<October) ||
-            (month==October && day+(6-weekDay)<daysInMonth(October) ) ) hours++;
-    else error("Not tested yet");
-    return Date( seconds%60, minutes%60, hours%24, day, month, year, weekDay );
-}
 
 string str(Date date, const ref<byte>& format) {
     string r;
@@ -88,13 +121,14 @@ string str(Date date, const ref<byte>& format) {
 
 Date parse(TextData& s) {
     Date date;
-    if(s.match("Today"_)) date=::date(), date.hours=date.minutes=date.seconds=-1;
+    if(s.match("Today"_)) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
     else for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }
     {
         s.whileAny(" ,\t"_);
         int number = s.integer();
         if(number>=0) {
-            if(s.match(":"_)) date.hours=number, date.minutes=s.integer();
+            if(s.match(":"_)) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : -1;
+            else if(s.match('h')) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0;
             else if(date.day==-1) date.day=number-1;
         }
     }
@@ -106,16 +140,25 @@ Date parse(TextData& s) {
         s.whileAny(" ,\t"_);
         int number = s.integer();
         if(number>=0) {
-            if(s.match(":"_)) date.hours=number, date.minutes=s.integer();
+            if(s.match(":"_)) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : -1;
+            else if(s.match('h')) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0;
             else if(date.day==-1) date.day=number-1;
         }
     }
-    if(date.year==-1 && date.month>=0) date.year=::date().year;
-    debug(date.invariant();) assert(date.hours>=0 || date.year>=0,date,s.buffer);
+    if(date.year<0) {
+        date.year=Date(currentTime()).year;
+        if(date.month<0) {
+            date.month=Date(currentTime()).month;
+            if(date.day<0) {
+                date.day=Date(currentTime()).day;
+            }
+        }
+    }
+    debug(date.invariant();) //assert(date.hours>=0 || date.year>=0,date,s.buffer);
     return date;
 }
 
 enum {TFD_CLOEXEC = 02000000};
-Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){}
+Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){registerPoll();}
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(uint date) { static timespec time[2]; time[1].sec=date; timerfd_settime(fd,1,time,0); }

@@ -3,8 +3,11 @@
 #include "vector.h"
 
 /// Key symbols
+//#include "X11/keysymdef.h"
 enum Key {
-    Escape=0xff1b, BackSpace=0xff08, Return=0xff0d, Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57, PrintScreen=0xff61, Delete=0xffff,
+    Escape=0xff1b, BackSpace=0xff08, Return=0xff0d, Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57, PrintScreen=0xff61,
+    KP_0=0xffb0,KP_1=0xffb1,KP_2=0xffb2,KP_3=0xffb3,KP_4=0xffb4,KP_5=0xffb5,KP_6=0xffb6,KP_7=0xffb7,KP_8=0xffb8,KP_9=0xffb9,
+    Delete=0xffff,
     Play=0x1008ff14, Email=0x1008ff19, WWW=0x1008ff18
 };
 

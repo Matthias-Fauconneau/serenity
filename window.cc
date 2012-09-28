@@ -18,8 +18,8 @@ Window* current;
 string getSelection() { assert(current); return current->getSelection(); }
 
 // Creates X window
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd),
-    widget(widget), overrideRedirect(title.size?false:true) {
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread)
+    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
     if(check(connect(Socket::fd,&addr,2+path.size()),path)) error("X connection failed");
@@ -62,7 +62,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         read<uint>(r.numSubpixels);
     }
 
-    if(size.x<0||size.y<0) {
+    if((size.x<0||size.y<0) && widget) {
         int2 hint=widget->sizeHint();
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
@@ -82,6 +82,8 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     setTitle(title);
     setIcon(icon);
     setType(type);
+    if(widget) show(); //asynchronous window are shown by default to avoid race conditions
+    registerPoll();
 }
 
 // Render
@@ -205,7 +207,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
-            uint key = KeySym(e.key);
+            log(e.state);
+            uint key = KeySym(e.key,e.state);
             if(focus && focus->keyPress((Key)key) ) queue(); //normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
@@ -279,16 +282,18 @@ void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));
 void Window::render() { if(mapped) queue(); }
 
 // Keyboard
-uint Window::KeySym(uint8 code) {
+uint Window::KeySym(uint8 code, uint8 state) {
     {GetKeyboardMapping r; r.keycode=code; send(raw(r));}
     {GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>();
         array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
-        return keysyms?keysyms.first():0;
+        if(!keysyms) return 0;
+        if(keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
+        return keysyms[state&1];
     }
 }
 uint Window::KeyCode(Key sym) {
     uint keycode=0;
-    for(uint i: range(minKeyCode,maxKeyCode)) if(KeySym(i)==sym) { keycode=i; break;  }
+    for(uint i: range(minKeyCode,maxKeyCode)) if(KeySym(i,0)==sym) { keycode=i; break;  }
     if(!keycode) warn("Unknown KeySym",int(sym));
     return keycode;
 }

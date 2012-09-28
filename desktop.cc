@@ -54,7 +54,7 @@ struct Desktop {
     List<Command> shortcuts;
     HBox applets;// __(&feeds, &timeBox, &shortcuts);
     Window window __(&applets,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
-    Window browser __(&page.area(),0,"Browser"_);
+    Window browser __(0,0,"Browser"_);
     ICON(shutdown)
     Desktop() {
         if(!existsFile("launcher"_,config())) warn("No launcher settings [.config/launcher]");
@@ -96,7 +96,6 @@ struct Desktop {
         feeds.pageChanged.connect(this,&Desktop::showPage);
         browser.localShortcut(Escape).connect(&browser, &Window::hide);
         browser.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);
-        window.show();
     }
     void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
         if(!link) { browser.hide(); window.render(); return; }
@@ -105,6 +104,6 @@ struct Desktop {
         browser.setTitle(title);
         browser.setIcon(favicon);
         page.go(link);
-        browser.show();
+        browser.widget=&page.area(); browser.show();
     }
 } application;

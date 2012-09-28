@@ -152,10 +152,10 @@ template<int base> string itoa(int64 number, int pad) {
 }
 template string itoa<10>(int64,int);
 
-string ftoa(float n, int precision, int base) {
+string ftoa(double n, int precision) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
-    uint m=1; for(int i=0;i<precision;i++) m*=base;
-    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint(m*abs(n))%m,precision);
+    uint64 m=1; for(int i=0;i<precision;i++) m*=10;
+    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint64(m*abs(n))%m,precision);
 }

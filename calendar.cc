@@ -53,24 +53,24 @@ void Calendar::setActive(Date active) {
     constexpr ref<byte> days[7] = {"Mon"_,"Tue"_,"Wed"_,"Thu"_,"Fri"_,"Sat"_,"Sun"_};
     for(int i=0;i<7;i++) {
         *this<< string(days[i]);
-        dates << Date(i,-1,active.month,active.year);
+        dates << Date(-1,active.month,active.year, i);
     }
-    Date date=active; date.setDay(1); int first=date.weekDay;
+    int first=Date(0, active.month, active.year).weekDay;
     for(int i=0;i<first-1;i++) { //previous month
         int previousMonth = (active.month+11)%12;
         int day = daysInMonth(previousMonth,active.year-(active.month==0))-first+i+1;
-        dates << Date(count()%7, day, previousMonth, active.year-(active.month==0));
+        dates << Date(day, previousMonth, active.year-(active.month==0), count()%7);
         *this<< Text(format(Italic)+dec(day+1,2),16,128);
     }
-    Date today=::date();
+    Date today = currentTime();
     for(int i=0;i<daysInMonth(active.month,active.year);i++) { //current month
         bool isToday = today.month==active.month && i==today.day;
         if(isToday) todayIndex=count();
-        dates << Date(count()%7, i, active.month, active.year);
+        dates << Date(i, active.month, active.year, count()%7);
         *this<< string((isToday?format(Bold):string())+dec(i+1,2)); //current day
     }
     for(int i=0;count()<7*8;i++) { //next month
-        dates << Date(count()%7, i, (active.month+1)%12, active.year+(active.month==11));
+        dates << Date(i, (active.month+1)%12, active.year+(active.month==11), count()%7);
         *this<< Text(format(Italic)+dec(i+1,2),16,128);
     }
     Selection::setActive(todayIndex);
@@ -88,7 +88,7 @@ Events::Events()/*:VBox(__(&date, &month, &events))*/ {
     events.minSize=int2(256,256);
     reset();
 }
-void Events::reset() { month.setActive(::date());  date[1].setText(::str(month.active,"MMMM yyyy"_) ); }
+void Events::reset() { month.setActive(currentTime());  date[1].setText(::str(month.active,"MMMM yyyy"_) ); }
 void Events::previousMonth() { month.previousMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
 void Events::nextMonth() { month.nextMonth(); date[1].setText(::str(month.active,"MMMM yyyy"_) ); events.setText(string()); }
 
@@ -111,4 +111,4 @@ void Events::showEvents(uint index) {
     this->events.setText(move(text));
 }
 
-void Events::checkAlarm() { if(getEvents(::date(currentTime()+5*60))) eventAlarm(); }
+void Events::checkAlarm() { if(getEvents(Date(currentTime()+5*60))) eventAlarm(); }

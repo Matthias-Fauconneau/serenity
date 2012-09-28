@@ -44,6 +44,7 @@ struct Taskbar : Socket, Poll {
     uint escapeCode = window.KeyCode(Escape);
 
     Taskbar() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd) {
+        registerPoll();
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
@@ -88,7 +89,6 @@ struct Taskbar : Socket, Poll {
         popup.autoResize=true;
         popup.anchor = TopRight;
         window.globalShortcut(PrintScreen).connect(this,&Taskbar::saveSnapshot);
-        window.show();
     }
 
     void processEvent(uint8 type, const XEvent& e) {
@@ -254,6 +254,5 @@ struct Taskbar : Socket, Poll {
             while(queue) { QEvent e=queue.take(0); processEvent(e.type, e.event); }
         }
     }
-};
-Taskbar application;
+} application;
 bool operator==(const Taskbar::Task& a,const Taskbar::Task& b){return a.id==b.id;}

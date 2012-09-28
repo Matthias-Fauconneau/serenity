@@ -153,7 +153,7 @@ string cacheFile(const URL& url) {
 }
 HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
-      url(move(url)), headers(move(headers)), method(method), handler(handler) {}
+      url(move(url)), headers(move(headers)), method(method), handler(handler) { registerPoll(); }
 void HTTP::request() {
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;
@@ -211,7 +211,7 @@ void HTTP::event() {
         }
         else if(chunked) {
             do {
-                if(!chunkSize) { chunkSize = integer(16); match("\r\n"_); } //else already parsed
+                if(!chunkSize) { chunkSize = hexadecimal(); match("\r\n"_); } //else already parsed
                 if(chunkSize==0) { state=Cache; break; }
                 assert(chunkSize>0,chunkSize,buffer);
                 if(available(chunkSize+2)<uint(chunkSize+2)) return;

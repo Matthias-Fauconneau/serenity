@@ -163,7 +163,6 @@ struct Player {
         window.setSize(int2(-512,-512));
         if(files) next();
         if(time) seek(time);
-        window.show();
         mainThread().priority=-19;
     }
     void queueFile(string&& path) {

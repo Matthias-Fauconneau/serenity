@@ -64,5 +64,7 @@ template<class... Args> struct signal {
     explicit operator bool() { return delegates.size(); }
     /// Returns the emit operator as an anonymous function
     operator function<void(Args...)>(){ return __(this,&signal<Args...>::operator()); }
+    /// Clears all connections
+    void clear() { delegates.clear(); }
 };
 template<class... Args> signal<Args...> copy(const signal<Args...>& b) { signal<Args...> a; a.delegates=copy(b.delegates); return a; }

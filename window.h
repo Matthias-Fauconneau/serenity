@@ -20,7 +20,7 @@ struct Window : Socket, Poll {
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
-           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_);
+           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread());
 
     /// Event handler
     void event();
@@ -30,8 +30,8 @@ struct Window : Socket, Poll {
     uint Atom(const ref<byte>& name);
     /// Returns name for \a atom
     string AtomName(uint atom);
-    /// Returns KeySym for \a code
-    uint KeySym(uint8 code);
+    /// Returns KeySym for key \a code and modifier \a state
+    uint KeySym(uint8 code, uint8 state);
     /// Returns KeyCode for \a sym
     uint KeyCode(Key sym);
     /// Returns property \a name on \a window

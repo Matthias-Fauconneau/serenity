@@ -60,8 +60,7 @@ static Lock& threadsLock() { static Lock threadsLock; return threadsLock; }
 // Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
 static array<Thread*>& threads() { static array<Thread*> threads; return threads; }
 // Handle for the main thread (group leader)
-Thread& mainThread() { static Thread mainThread; return mainThread; }
-
+Thread& mainThread() { static Thread mainThread(20); return mainThread; }
 // main
 int main() {
     mainThread().run();
@@ -72,10 +71,12 @@ int main() {
 }
 
 // Thread
-Thread::Thread():Poll(EventFD::fd,POLLIN,*this){Locker lock(threadsLock()); threads()<<this;}
 static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
-Thread::Thread(int priority):Thread(){
+Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
+    *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
+    Locker lock(threadsLock()); threads()<<this; // Adds this thread to global thread list
     this->priority=priority;
+    if(priority == 20) return; //escape code for main thread (already spawned)
     const int stackSize = 1<<20;
     stack = Map(0,0,stackSize,Map::Read|Map::Write,Map::Private|Map::Anonymous);
     mprotect((void*)stack.data,0x1000,0);
@@ -83,27 +84,29 @@ Thread::Thread(int priority):Thread(){
 }
 void Thread::run() {
     tid=gettid();
-    if(priority) check_(setpriority(0,0,priority));
-    while(!terminate) {
-        uint size=this->size();
-        if(size==1) break;
-
-        pollfd pollfds[size];
-        for(uint i: range(size)) pollfds[i]=*at(i);
-        if(check__( ::poll(pollfds,size,-1) ) != INTR) {
-            for(uint i: range(size)) {
-                if(terminate) break;
-                Poll* poll=at(i); int revents=pollfds[i].revents;
-                if(revents && !unregistered.contains(poll)) {
-                    poll->revents = revents;
-                    poll->event();
-                }
-            }
-        }
-        while(unregistered){Locker lock(thread.lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
-    }
+    if(priority!=20) check_(setpriority(0,0,priority));
+    while(!terminate) processEvents();
     Locker lock(threadsLock());
     threads().removeAll(this);
+}
+bool Thread::processEvents() {
+    uint size=this->size();
+    if(size==1) { return terminate=true; }
+
+    pollfd pollfds[size];
+    for(uint i: range(size)) pollfds[i]=*at(i);
+    if(check__( ::poll(pollfds,size,-1) ) != INTR) {
+        for(uint i: range(size)) {
+            if(terminate) return true;
+            Poll* poll=at(i); int revents=pollfds[i].revents;
+            if(revents && !unregistered.contains(poll)) {
+                poll->revents = revents;
+                poll->event();
+            }
+        }
+    }
+    while(unregistered){Locker lock(thread.lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
+    return terminate;
 }
 void Thread::event() {
     EventFD::read();
@@ -121,7 +124,7 @@ void Thread::event() {
 // Signal handler
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     extern string trace(int skip, void* ip);
-    string s = trace(sig==SIGABRT?3:2,sig==SIGABRT?0:(void*)ctx->ip);
+    string s = trace(sig==SIGABRT?2:1,sig==SIGABRT?0:(void*)ctx->ip);
     if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP){
         Locker lock(threadsLock());

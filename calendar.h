@@ -8,7 +8,7 @@ inline string str(const Event& e) { return str(e.date,"hh:mm"_)+(e.date!=e.end?s
 inline bool operator <(const Event& a, const Event& b) { return a.date<b.date; }
 
 /// Returns events occuring on \a query date
-array<Event> getEvents(Date query=Date(-1,-1,-1,-1));
+array<Event> getEvents(Date query);
 
 /// Shows a week-aligned calendar month
 struct Calendar : GridSelection<Text> {

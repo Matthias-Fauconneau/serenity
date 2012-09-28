@@ -121,11 +121,11 @@ struct TextData : virtual Data {
     /// If input match none of \a key, advances \a pos
     bool matchNo(const ref<byte>& any);
 
-    /// advances \a pos while input doesn't match \a key. \sa until
+    /// Advances while input doesn't match \a key. \sa until
     ref<byte> whileNot(char key);
-    /// advances \a pos while input match any of \a key
+    /// Advances while input match any of \a key
     ref<byte> whileAny(const ref<byte>& key);
-    /// advances \a pos while input match none of \a key
+    /// Advances while input match none of \a key
     ref<byte> whileNo(const ref<byte>& key);
 
     /// Reads until input match \a key. \sa whileNot
@@ -138,14 +138,20 @@ struct TextData : virtual Data {
     ref<byte> untilEnd();
     /// Skips whitespaces
     void skip();
-    /// Reads a single word [a-zA-Z"special"]*
-    ref<byte> word(const ref<byte>& special=""_);
-    /// Reads a single identifier [a-zA-Z0-9"special"]*
-    ref<byte> identifier(const ref<byte>& special=""_);
-    /// Reads a single integer
-    int integer(uint base=10);
-    /// Reads a single number
-    double number();
     /// Reads one possibly escaped character
     char character();
+    /// Reads a word [a-zA-Z"special"]*
+    ref<byte> word(const ref<byte>& special=""_);
+    /// Reads a identifier [a-zA-Z0-9"special"]*
+    ref<byte> identifier(const ref<byte>& special=""_);
+    /// Advances while input match [0-9]
+    ref<byte> whileDecimal();
+    /// Reads an integer
+    int integer();
+    /// Advances while input match [0-9a-fA-F]
+    ref<byte> whileHexadecimal();
+    /// Reads a hexadecimal integer
+    int hexadecimal();
+    /// Reads a decimal number
+    double number();
 };

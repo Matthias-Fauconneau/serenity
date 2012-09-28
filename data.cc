@@ -20,6 +20,7 @@ bool TextData::match(const ref<byte>& key) {
 }
 
 bool TextData::matchAny(const ref<byte>& any) {
+    if(!available(1)) return false;
     byte c=peek();
     for(const byte& e: any) if(c == e) { advance(1); return true; }
     return false;
@@ -102,14 +103,32 @@ char TextData::character() {
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 
-int TextData::integer(uint base) {
+ref<byte> TextData::whileDecimal() {
     uint start=index;
     for(;available(1);) {
         byte c=peek();
-        if((c>='0'&&c<='9')||(base==16&&((c>='a'&&c<='f')||(c>='A'&&c<='F')))) advance(1); else break;
+        if((c>='0'&&c<='9')) advance(1); else break;
     }
-    if(start==index) return -1;
-    return toInteger(slice(start,index-start), base);
+    return slice(start,index-start);
+}
+
+int TextData::integer() {
+    ref<byte> s = whileDecimal();
+    return s?toInteger(s, 10):-1;
+}
+
+ref<byte> TextData::whileHexadecimal() {
+    uint start=index;
+    for(;available(1);) {
+        byte c=peek();
+        if((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')) advance(1); else break;
+    }
+    return slice(start,index-start);
+}
+
+int TextData::hexadecimal() {
+    ref<byte> s = whileHexadecimal();
+    return s?toInteger(s, 16):-1;
 }
 
 double TextData::number() {
