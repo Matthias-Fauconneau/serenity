@@ -90,6 +90,9 @@ struct Thread : array<Poll*>, EventFD, Poll {
 /// Terminates all auxiliary threads, destroys all file-scope objects and exits process.
 void exit();
 
+/// Yields to scheduler
+void yield();
+
 /// Execute binary at \a path with command line arguments \a args
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);
 

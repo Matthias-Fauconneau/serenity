@@ -141,7 +141,7 @@ template string utoa<16>(uint64,int);
 template<int base> string itoa(int64 number, int pad) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
-    uint n=abs(number);
+    uint64 n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
@@ -152,11 +152,11 @@ template<int base> string itoa(int64 number, int pad) {
 }
 template string itoa<10>(int64,int);
 
-string ftoa(double n, int precision) {
+string ftoa(double n, int precision, int exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
-    uint32 e=0; while(int64(n)==0) n*=2, e++;
+    uint32 e=0; if(exponent) while(int64(n)==0) n*=exponent, e++;
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
-    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint64(m*abs(n))%m,precision)+(e?"·2^-"_+str(e):string());
+    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+(precision?"."_+utoa<10>(uint64(m*abs(n))%m,precision):string())+(e?"·"_+dec(exponent)+"^-"_+str(e):string());
 }

@@ -3,6 +3,7 @@
 #include "file.h"
 
 array<string> pool;
+static const word e = "ε"_;
 
 array<word> Parser::parseRuleExpression(TextData& s) {
     array<word> tokens;

@@ -120,9 +120,9 @@ template<class T> struct initializer_list {
     /// Slices a reference to elements from to the end of the reference
     initializer_list<T> slice(uint pos) const { assert(pos<=size); return initializer_list<T>(data+pos,size-pos); }
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    int indexOf(const T& value) const { for(uint i: range(size)) { if(data[i]==value) return i; } return -1; }
+    int indexOf(const T& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
-    bool contains(const T& value) const { return indexOf(value)>=0; }
+    bool contains(const T& key) const { return indexOf(key)>=0; }
 };
 }
 

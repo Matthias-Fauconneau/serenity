@@ -11,12 +11,12 @@ inline int floor(float f) { return __builtin_floorf(f); }
 inline int round(float f) { return __builtin_roundf(f); }
 inline int ceil(float f) { return __builtin_ceilf(f); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
-float exp2(float x) { return __builtin_exp2f(x); }
-float log2(float x) { return __builtin_log2f(x); }
-float exp10(float x) { return exp2(x*log2(10)); }
-float log10(float x) { return log2(x)/log2(10); }
-float dB(float x) { return 10*log10(x); }
-#define pow __builtin_pow
+inline float exp2(float x) { return __builtin_exp2f(x); }
+inline float log2(float x) { return __builtin_log2f(x); }
+inline float exp10(float x) { return exp2(x*log2(10)); }
+inline float log10(float x) { return log2(x)/log2(10); }
+inline float dB(float x) { return 10*log10(x); }
+inline float pow(float x, float y) { return __builtin_pow(x,y); }
 
 /// Raw memory copy
 typedef int m128 __attribute((vector_size(16)));

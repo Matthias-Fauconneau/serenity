@@ -7,7 +7,7 @@ struct timespec { long sec,nsec; };
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
 long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec*1000+ts.nsec/1000000; }
-long cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000+ts.nsec/1000; }
+uint64 cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000UL+ts.nsec/1000; }
 
 int daysInMonth(int month, int year=0) {
     if(month==1 && leap(year)) { assert(year!=0); return 29; }
@@ -79,11 +79,11 @@ Date::Date(long time) {
         }
     }
 
-    invariant();
+    debug(invariant();)
     assert(long(*this)==time, long(*this)/60.0, time/60.0, seconds, time%60);
 }
 Date::operator long() const {
-    invariant();
+    debug(invariant();)
     return ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0)-localTimeOffset())*60+(seconds>=0?seconds:0);
 }
 

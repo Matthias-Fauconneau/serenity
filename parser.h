@@ -113,7 +113,6 @@ inline string str(const Node& node) {
 }
 
 struct Parser {
-    const word e = "epsilon"_;
     array<Rule> rules;
     array<Rule> extended;
     array<State> states;

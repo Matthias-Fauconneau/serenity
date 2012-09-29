@@ -55,8 +55,8 @@ inline const string& str(const string& s) { return s; }
 /// Converts integers
 template<int base=10> string utoa(uint64 number, int pad=0);
 template<int base=10> string itoa(int64 number, int pad=0);
-inline string bin(uint n, int pad=0) { return utoa<2>(n,pad); }
-inline string dec(long n, int pad=0) { return itoa<10>(n,pad); }
+inline string bin(uint64 n, int pad=0) { return utoa<2>(n,pad); }
+inline string dec(int64 n, int pad=0) { return itoa<10>(n,pad); }
 inline string str(const uint8& n) { return dec(n); }
 inline string str(const int8& n) { return dec(n); }
 inline string str(const uint16& n) { return dec(n); }
@@ -71,7 +71,7 @@ inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 
 /// Converts floating-point numbers
-string ftoa(double number, int precision=2);
+string ftoa(double number, int precision=2, int exponent=0);
 inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 

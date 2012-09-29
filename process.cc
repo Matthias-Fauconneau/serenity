@@ -62,9 +62,10 @@ static array<Thread*>& threads() { static array<Thread*> threads; return threads
 // Handle for the main thread (group leader)
 Thread& mainThread() { static Thread mainThread(20); return mainThread; }
 // main
+void yield() { sched_yield(); }
 int main() {
     mainThread().run();
-    while(threads().size()) sched_yield(); // Yields to let auxiliary threads cleanly terminate themselves
+    while(threads().size()) yield(); // Yields to let auxiliary threads cleanly terminate themselves
     Locker lock(threadsLock());
     for(Thread* thread: threads()) if(thread!=&mainThread()) tgkill(getpid(),thread->tid,SIGKILL); // Kills any remaining thread
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group

@@ -25,7 +25,7 @@ string xmm(int r, int) { return "xmm"_+str(r); }
 string reg(int r, int size, int sse) { return sse ? xmm(r,size) : gpr(r,size); }
 
 constexpr ref<byte> ops[] = {"add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_};
-constexpr ref<byte> ccs[] = { "o"_,"no"_,"c"_,"nc"_,"e"_,"ne"_,"na"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_};
+constexpr ref<byte> ccs[] = { "o"_,"no"_,"b"_,"ae"_,"e"_,"ne"_,"be"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_};
 constexpr ref<byte> shs[] = {"rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_};
 
 int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
@@ -64,7 +64,7 @@ int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
 
 void disassemble(const ref<byte>& code) {
     for(const byte* c=code.begin(), *end=code.end();c<end;) {
-        log_(hex(int(c-code.begin()),2)+":\t"_  /*+hex(ref<byte>(c,5))+"\t"_*/);
+        string s=hex(int(c-code.begin()),2)+":\t"_  /*+hex(ref<byte>(c,5))+"\t"_*/;
         uint8 op = *c++;
         int size=2/*operand size*//*, asize=3*//*address size*/, scalar=0;
         if(op==0x66) size=1, op = *c++; //for SSE size=2 -> float (ps), size=1 -> double (pd)
@@ -76,34 +76,37 @@ void disassemble(const ref<byte>& code) {
             uint8 op = *c++;
             if(op==0x10 || op==0x28) { //mov[ua]p xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
-                log( (op==0x10?"movup"_:"movap"_)+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+                s<< (op==0x10?"movup"_:"movap"_)+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src;
             } else if(op==0x11 || op==0x29) { //mov[ua]p xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
-                log( (op==0x11?"movup"_:"movup"_)+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
+                s<< (op==0x11?"movup"_:"movup"_)+str("?sd?"[size])+" "_+src+", "_+xmm(r,size);
             } else if(op==0x12) { //movhlps xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
-                log("movhlp"_+str("?sd?"[size])+" "_+src+", "_+xmm(r,size) );
+                s<< "movhlp"_+str("?sd?"[size])+" "_+src+", "_+xmm(r,size);
             } else if(op==0x13) { //movhlps xmm/m, xmm
                 string src; int r=modrm(rex,2,c,src,1);
-                log("movlp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+                s<< "movlp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src;
             } else if(op==0x14) { //unpcklp xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
-                log( "unpcklp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+                s<< "unpcklp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src;
             } else if(op==0x15) { //unpckhp xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
-                log( "unpckhp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src );
+                s<< "unpckhp"_+str("?sd?"[size])+" "_+xmm(r,size)+", "_+src;
             } else if(op==0x18) { //prefetch
                 string src; int r=modrm(rex,2,c,src,1);
-                log("prefetch"_+(r==0?string("nta"_):dec(r-1))+" "_+src);
+                s<< "prefetch"_+(r==0?string("nta"_):dec(r-1))+" "_+src;
             } else if(op==0x1F) { //nop
                 string src; modrm(rex,2,c,src,1);
-                log( "nop"_ );
+                s<< "nop"_;
             } else if(op==0x2A || op==0x2C || op==0x2D) { //cvt r, xmm/m
                 string src; int r=modrm(rex,2,c,src,!scalar);
                 static constexpr ref<byte> lookup[] = {"cvti2f"_,"?"_,"cvttf2i"_,"cvtf2i"_};
-                log( replace(replace(lookup[op-0x2A],"i"_,scalar?"si"_:"pi"_),"f"_,string((scalar?"s"_:"p"_)+(size==1?"d"_:"s"_)))+" "_+src+", "_+xmm(r,size) );
+                s<< replace(replace(lookup[op-0x2A],"i"_,scalar?"si"_:"pi"_),"f"_,string((scalar?"s"_:"p"_)+(size==1?"d"_:"s"_)))+" "_+src+", "_+xmm(r,size);
             } else if(op==0x31) {
-                log( "rdtsc" );
+                s<< "rdtsc"_;
+            } else if((op&0xF0)==0x40) { //cmovcc r, r/m
+                string dst; int r = modrm(rex,size,c,dst);
+                s<< "cmov"_+ccs[op&0xF]+" "_+gpr(r,size)+", "_+dst;
             } else if(op>=0x51&&op<=0x6F) { //op xmm, xmm/m
                 string src; int r=modrm(rex,2,c,src,1);
                 const ref<byte> lookup[] = {"sqrt"_,"rsqrt"_,"rcp"_,"and"_,"andn"_,"or"_,"xor"_,"add"_,"mul"_,
@@ -111,116 +114,121 @@ void disassemble(const ref<byte>& code) {
                                             "sub"_,"min"_,"div"_,"max"_,"punpcklbw"_,"punpcklwd"_,"punpckldq"_,"packsswb"_,
                                             "pcmpgtb"_,"pcmpgtw"_,"pcmpgtd"_,"packuswb"_,"punpckhbw"_,"punpckhwd"_,"punpckhdq"_,
                                             "packssdw"_,"punpcklqdq"_,"punpckhqdq"_,"movq"_,"movq"_};
-                log_(lookup[op-0x51]);
-                if(op<=0x59||(op>=0x5C&&op<=0x5F)) log_(str("ps"[scalar])+str("?sd?"[size]));
-                log(" "_+xmm(r,size)+", "_+src);
+                s<< lookup[op-0x51];
+                if(op<=0x59||(op>=0x5C&&op<=0x5F)) s<< str("ps"[scalar])+str("?sd?"[size]);
+                s<< " "_+xmm(r,size)+", "_+src;
             } else if((op&0xF0)==0x80) { //jcc imm16/32
                 int disp = imm(c,size);
-                log("j"_+ccs[op&0xF]+" "_+ hex(int(c-code.begin())+disp,2<<size));
+                s<< "j"_+ccs[op&0xF]+" "_+ hex(int(c-code.begin())+disp,2<<size);
             } else if((op&0xF0)==0x90) { //setcc r/m8
                 size=0;
                 string dst; int r = modrm(rex,size,c,dst); if(r&7) error(r);
-                log("set"_+ccs[op&0xF]+" "_+ dst);
+                s<< "set"_+ccs[op&0xF]+" "_+ dst;
+            }  else if(op==0xAE) { //imul r, r/m
+                string src; int r = modrm(rex,size,c,src);
+                constexpr ref<byte> lookup[] = {"fxsave"_,"fxrstor"_,"ldmxcsr"_,"stmxcsr"_,"xsave"_,"lfence"_,"mfence"_,"sfence"_};
+                s<< lookup[r];
             } else if(op==0xAF) { //imul r, r/m
                 string src; int r = modrm(rex,size,c,src);
-                log("imul "_+gpr(r,size)+", "_+src );
+                s<< "imul "_+gpr(r,size)+", "_+src;
             } else if(op==0xB6||op==0xB7) {
                 if(!(op&1)) size=0;
                 string src; int r=modrm(rex,size,c,src);
-                log("movzx"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+                s<< "movzx"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src;
             } else error("0F"_+hex(op));
         } else if(op<0x40 && (op&0x7)<=5) { //binary operator
             if(!(op&1)) size=0;
             if(op&4) { //op ax, imm
                 int i=imm(c,size);
-                log(ops[op>>3]+str("bwlq"[size])+" "_+gpr(0,size)+", "_+hex(i,2<<size) );
+                s<< ops[op>>3]+str("bwlq"[size])+" "_+gpr(0,size)+", "_+hex(i,2<<size);
             } else {
                 if(op&2) { //op r, r/m
                     string src; int r = modrm(rex,size,c,src);
-                    log(ops[op>>3]+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+                    s<< ops[op>>3]+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src;
                 } else { //op r/m, r
                     string dst; int r = modrm(rex,size,c,dst);
-                    log(ops[op>>3]+str("bwlq"[size])+" "_+dst+", "_+gpr(r,size) );
+                    s<< ops[op>>3]+str("bwlq"[size])+" "_+dst+", "_+gpr(r,size);
                 }
             }
         } else if(op>=0x50&&op<0x60) {
             int r = op&7;
-            log( "push"_+str("bwlq"[size])+" "_+gpr(r,size));
+            s<< "push"_+str("bwlq"[size])+" "_+gpr(r,size);
         } else if(op==0x63) { //movsxd r, r/m
             string src; int r=modrm(rex,size,c,src);
-            log( "movsxd"_+" "_+gpr(r,size)+", "_+src );
+            s<< "movsxd"_+" "_+gpr(r,size)+", "_+src;
         } else if((op&0xF0)==0x70) { //jcc imm8
             int disp = imm(c,0);
-            log( "j"_+ccs[op&0xF]+" "_ + hex(int(c-code.begin())+disp,2) );
+            s<< "j"_+ccs[op&0xF]+" "_ + hex(int(c-code.begin())+disp,2);
         } else if(op==0x80 || op==0x81) { //op imm8, r/m
             if(!(op&1)) size=0;
             string src; int r=modrm(rex,size,c,src); r&=7;
-            log( ops[r]+str("bwlq"[size])+" "_+hex(imm(c,size==3?2:size),1<<size)+", "_+src );
+            s<< ops[r]+str("bwlq"[size])+" "_+hex(imm(c,size==3?2:size),1<<size)+", "_+src;
         } else if(op==0x83) { //op r/m, imm8
             string src; int r=modrm(rex,size,c,src); r&=7;
-            log( ops[r]+str("bwlq"[size])+" "_+src+", "_+hex(imm(c,0),2) );
+            s<< ops[r]+str("bwlq"[size])+" "_+src+", "_+hex(imm(c,0),2);
         } else if(op==0x84 || op==0x85) { //test r, r/m
             if(!(op&1)) size=0;
             string src; int r=modrm(rex,size,c,src);
-            log( "test"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+            s<< "test"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src;
         } else if(op==0x88 || op==0x89) { //mov r/m, r
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst);
-            log( "mov"_+str("bwlq"[size])+" "_+dst+", "_+gpr(r,size) );
+            s<< "mov"_+str("bwlq"[size])+" "_+dst+", "_+gpr(r,size);
         } else if(op==0x8A || op==0x8B) { //mov r, r/m
             if(!(op&1)) size=0;
             string src; int r=modrm(rex,size,c,src);
-            log( "mov"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src );
+            s<< "mov"_+str("bwlq"[size])+" "_+gpr(r,size)+", "_+src;
         } else if(op==0x8D) { //lea r, m
             string m; int r = modrm(rex,size,c,m);
-            log( "lea   "_+gpr(r,size)+", "_+m );
+            s<< "lea   "_+gpr(r,size)+", "_+m;
         } else if((op&0xF0)==0x90) { //xchg r, m
-            log( "xchg   "_+gpr((op&0xF)+(rex&4?8:0), size)+", "_+gpr(0, size) );
+            s<< "xchg   "_+gpr((op&0xF)+(rex&4?8:0), size)+", "_+gpr(0, size);
         } else if(op==0x98) { //sign extend
-            if(rex&0xC) log("cdqe rax, eax"_);
-            else log("cwde eax, ax"_);
+            if(rex&0xC) s<< "cdqe rax, eax"_;
+            else s<< "cwde eax, ax"_;
         } else if(op==0xC0 || op==0xC1) { //shx r/m, 1
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst); r&=7;
-            log(shs[r]+" "_+dst+", "_+hex(imm(c,0),2));
+            s<< shs[r]+" "_+dst+", "_+hex(imm(c,0),2);
         } else if(op==0xC6 || op==0xC7) { //mov r/m, imm
             if(!(op&1)) size=0;
             string dst; int r = modrm(rex,size,c,dst); if(r&7) error(r);
-            log( "mov"_+str("bwlq"[size])+" "_+ dst + " , "_ + hex(imm(c,size),2<<size) );
+            s<< "mov"_+str("bwlq"[size])+" "_+ dst + " , "_ + hex(imm(c,size),2<<size);
         } else if(op==0xD0 || op==0xD1) { //shx r/m, 1
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst); r&=7;
-            log(shs[r]+" "_+dst+", 1"_);
+            s<< shs[r]+" "_+dst+", 1"_;
         } else if(op==0xD2 || op==0xD3) { //shx r/m, cl
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst); r&=7;
-            log( shs[r]+" "_+dst+", cl"_ );
+            s<< shs[r]+" "_+dst+", cl"_;
         } else if(op==0xE8) { //call imm32
             int disp = imm(c,size);
-            log( "call  "_ + hex(int(c-code.begin())+disp,2));
+            s<< "call  "_ + hex(int(c-code.begin())+disp,2);
         } else if(op==0xE9) { //jmp imm32
             int disp = imm(c,size);
-            log( "jmp  "_ + hex(int(c-code.begin())+disp,2));
+            s<< "jmp  "_ + hex(int(c-code.begin())+disp,2);
         } else if(op==0xEB) { //jmp imm8
             int disp = imm(c,0);
-            log( "jmp  "_ + hex(int(c-code.begin())+disp,2) );
+            s<< "jmp  "_ + hex(int(c-code.begin())+disp,2);
         } else if(op==0xF6 || op==0xF7) {
             if(!(op&1)) size=0;
             string s; int r = modrm(rex,size,c,s); r&=7;
-            if(r==0||r==1) log("test "_+s+", "_+hex(imm(c,size),2<<size));
-            else if(r==2) log("not "_+s);
-            else if(r==3) log("neg "_+s);
+            if(r==0||r==1) s<< "test "_+s+", "_+hex(imm(c,size),2<<size);
+            else if(r==2) s<< "not "_+s;
+            else if(r==3) s<< "neg "_+s;
             else error("F7"_,r);
         } else if(op==0xF8) {
-            log("clc");
+            s<< "clc"_;
         } else if(op==0xFC) {
-            log("cld");
+            s<< "cld"_;
         } else if(op==0xFF) {
             string s; int r = modrm(rex,size,c,s); r&=7;
-            /**/  if(r==0) log("inc "_+s);
-            else if(r==1) log("dec "_+s);
+            /**/  if(r==0) s<< "inc "_+s;
+            else if(r==1) s<< "dec "_+s;
             else error("FF"_,r);
         } else error("Unkown opcode"_,hex(op));
+        log(s);
         assert(end<=code.end());
     }
 }

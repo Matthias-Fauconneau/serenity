@@ -96,11 +96,6 @@ template<class T> struct array {
     T& last() { return at(size()-1); }
     /// \}
 
-    /// Returns index of the first element matching \a value
-    int indexOf(const T& value) const { return ref<T>(*this).indexOf(value); }
-    /// Returns whether this array contains any elements matching \a value
-    bool contains(const T& value) const { return ref<T>(*this).contains(value); }
-
     /// \name Append operators
     array& operator <<(T&& e) { int s=size()+1; reserve(s); new (end()) T(move(e)); setSize(s); return *this; }
     array& operator <<(array<T>&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); return *this; }
@@ -146,6 +141,26 @@ template<class T> struct array {
     T* begin() { return (T*)data(); }
     T* end() { return (T*)data()+size(); }
     /// \}
+
+    /// Returns index of the first element matching \a value
+    int indexOf(const T& key) const {
+        debug(if(size()>32) log("binarySearch might be faster",size());)
+        return ref<T>(*this).indexOf(key);
+    }
+    /// Returns whether this array contains any elements matching \a value
+    bool contains(const T& key) const { return ref<T>(*this).contains(key); }
+    /// Returns index of the first element matching \a value using binary search (assuming a sorted array)
+    int binarySearch(const T& key) {
+        uint min=0, max=size();
+        while(min<max) {
+            uint mid = (min+max)/2;
+            assert(mid<max);
+            if(at(mid) < key) min = mid+1;
+            else max = mid;
+        }
+        if(min == max && at(min) == key) return min;
+        return -1;
+    }
 };
 
 /// Copies all elements in a new array

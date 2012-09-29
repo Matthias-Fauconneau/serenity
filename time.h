@@ -3,19 +3,22 @@
 #include "data.h"
 #include "process.h"
 
-#if __x86_64__
-inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc" : "=a" (lo), "=d" (hi)); return (uint64)hi << 32 | lo; }
-/// Returns the number of cycles used to execute \a statements
-#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
-struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
-#endif
-
 /// Returns Unix real-time in seconds
 long currentTime();
 /// Returns Unix real-time in milliseconds
 long realTime();
 /// Returns current thread CPU time in microseconds
-long cpuTime();
+uint64 cpuTime();
+
+/// Returns the number of cycles used to execute \a statements (robust against preemption)
+#define time( statements ) ({ uint64 start=cpuTime(); statements; cpuTime()-start; })
+
+#if __x86_64__
+inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
+/// Returns the number of cycles used to execute \a statements (low overhead)
+#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
+struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
+#endif
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

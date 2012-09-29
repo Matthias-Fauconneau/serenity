@@ -181,7 +181,7 @@ struct Player {
         next();
     }
     void playAlbum(uint index) {
-        stop(); files.clear(); titles.clear();
+        files.clear(); titles.clear();
         window.setTitle(albums[index].text);
         play(folders[index]);
     }
@@ -200,10 +200,7 @@ struct Player {
     void next() {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
-        else {
-            if(albums.index<albums.count()) window.setTitle(albums.active().text);
-            stop(); return;
-        }
+        else { window.setTitle("Player"_); stop(); return; }
         if(!playButton.enabled) setPlaying(true);
         //titles.ensureVisible(titles.active());
     }
