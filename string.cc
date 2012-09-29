@@ -156,6 +156,7 @@ string ftoa(double n, int precision) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
+    uint32 e=0; while(int64(n)==0) n*=2, e++;
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
-    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint64(m*abs(n))%m,precision);
+    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+"."_+utoa<10>(uint64(m*abs(n))%m,precision)+(e?"·2^-"_+str(e):string());
 }

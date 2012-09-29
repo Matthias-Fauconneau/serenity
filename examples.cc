@@ -47,7 +47,6 @@ struct Examples {
         array<int> a;
         for(int i: range(10)) a<< 9-i;
         log(a);
-#endif
 
         /// 6) Computes an integer arithmetic expression (e.g "(10+(21-32)*43)/54" )
         Parser parser;
@@ -69,6 +68,54 @@ struct Examples {
         Node result = parser.parse(expr);
         log(result.values.at("value"_));
 
-        //2.1 à 2.7, 2.13, 2.15, 4.1, 4.3 à 4.5, 5.1 à 5.3, 5.5, 6.1, 6.2, 6.4, 7.1, 7.2, 7.3, 7.5, 7.6
+        input.text.clear(); input.textEntered.clear();
+#endif
+
+        /// 7) Machine epsilon
+        // single precision
+        float e = 1.f;
+        log(bin((int&)e,32)); // exponent=0 [encoded as 127], significand = <implicit 1>
+        (int&)e += 1; // Increments the least significant digit (adds one unit in the last place)
+        log(bin((int&)e,32)); // significand = <implicit 1>·2^0 + 1·2^-23
+        e -= 1.f; // Substracts the initial one (scales the exponent to shift the epsilon into the implicit bit)
+        log(bin((int&)e,32)); // exponent= -23 [104], significand = <implicit 1>
+        log(e); //2^-23
+        // double precision
+        double e64 = 1.0;
+        (int&)e64 += 1;
+        log(e64-1.0); //2^-52
+        // legacy x87 extended precision
+        long double e80 = 1;
+        (int&)e80 += 1;
+        log<double>(e80-1); //2^-63
+
+        /// 8) Random number binary search game
+
+        /// Generates a sequence of pseudo-random 64bit integers
+        struct Random {
+            uint64 sz,sw;
+            uint64 z,w;
+            Random() { seed(); reset(); }
+            void seed() { sz=rdtsc(); sw=rdtsc(); }
+            void reset() { z=sz; w=sw; }
+            uint64 operator()() {
+                z = 36969 * (z & 0xFFFF) + (z >> 16);
+                w = 18000 * (w & 0xFFFF) + (w >> 16);
+                return (z << 16) + w;
+            }
+        } rand;
+
+        int number = rand()%11;
+        window.setTitle("Guess a number between 0 and 10"_);
+        int guess=-1;
+        input.textChanged.connect([&guess](const ref<byte>& text) { if(text) guess=toInteger(text); });
+        while(guess != number) {
+            if(mainThread().processEvents()) return;
+            if(guess<0) continue;
+            /**/  if(guess>number) window.setTitle("Less"_);
+            else if(guess<number) window.setTitle("More"_);
+        }
+
+        //4.1, 4.3 à 4.5, 5.1 à 5.3, 5.5, 6.1, 6.2, 6.4, 7.1, 7.2, 7.3, 7.5, 7.6
     }
 } application; //global variables are registered for construction by the compiler before entering main()
