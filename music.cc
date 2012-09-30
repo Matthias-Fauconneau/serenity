@@ -106,6 +106,7 @@ struct Music : Widget {
         window.widget=&sheet.area();
         window.setSize(int2(-1,-1));
         window.render();
-        togglePlay();
+        //togglePlay();
+        sheet.center(int2(0,999999));
     }
 } application;

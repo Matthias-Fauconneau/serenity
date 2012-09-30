@@ -59,8 +59,6 @@ static Lock& threadsLock() { static Lock threadsLock; return threadsLock; }
 static array<Thread*>& threads() { static array<Thread*> threads; return threads; }
 // Handle for the main thread (group leader)
 Thread& mainThread() { static Thread mainThread(20); return mainThread; }
-// Waits for threads to output traces
-static Semaphore& traceSemaphore() { static Semaphore traceSemaphore; return traceSemaphore; }
 // main
 void yield() { sched_yield(); }
 int main() {
@@ -129,13 +127,12 @@ void traceAllThreads() {
         thread->terminate=true; // Tries to terminate all other threads cleanly
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
-    traceSemaphore().acquire(threads().size()-1);
+    yield();
 }
 string trace(int skip, void* ip);
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     string s = trace(1,(void*)ctx->ip);
     if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
-    traceSemaphore().release(1);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); }
     if(sig==SIGSEGV) { log("Segmentation fault at "_+str(info->fault.addr)); exit_thread(0); } //Segfault kills the threads to prevent further corruption

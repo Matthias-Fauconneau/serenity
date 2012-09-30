@@ -50,13 +50,13 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             map<float, vec2> matches;
             for(vec2 dot : dots[i]) if(abs(dot.x-pos.x)<1) matches[dot.y]=dot;
             const array<float>& y = matches.keys; const array<vec2>& m = matches.values;
-            log("dot",pos,"on vertical line",m);
+            /*log("dot",pos,"on vertical line",m);
             if(m.size()>=2) log("01", abs(y[0]-y[1]));
             if(m.size()>=3) log("12",abs(y[1]-y[2]));
-            if(m.size()>=4) log("23",abs(y[2]-y[3]));
+            if(m.size()>=4) log("23",abs(y[2]-y[3]));*/
             if(m.size()==4) {
                 if(abs(y[0]-y[1])<13 && abs(y[1]-y[2])>=122 && abs(y[2]-y[3])<13 ) repeats<<(m[0]+m[1]+m[2]+m[3])/4.f;
-                else log("!REPEAT?");
+                //else log("!REPEAT?");
             }
         }
         /*static QPoint lastMeter; static int beatsPerMeasure,beatUnit;
@@ -81,7 +81,8 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
     if(duration>=0) notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration)); //negate y to sort by increasing pitch
 }
 
-struct Tie { uint li; int lx,ly; int ri,rx,ry; Tie():li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
+struct Tie { uint li; int lx,ly; uint ri; int rx,ry; Tie():li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
+string str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)+")"_; }
 void Score::synchronize(map<int,Chord>&& chords) {
     staffs << (lastClef.y+96); //add a last split at the bottom of the last page
 
@@ -99,15 +100,18 @@ void Score::synchronize(map<int,Chord>&& chords) {
             int ry = abs(y-t.ly);
 
             /// Detect first note of a tie
-            if(!t.ly) if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx > -32 && ly < 9) {
-                //debug[vec2(x,-y)]=string("L"_);
-                for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied;
-                t.li=i; t.lx=x; t.ly=y;
+            if(!t.ly) {
+                if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-34 && ly < 9 && rx<-34) {
+                    debug[vec2(x,-y)]=string("L"_);
+                    for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
+                    t.li=i; t.lx=x; t.ly=y;
+                }
+                //else if(lx<100 && lx>-100) if(!debug.contains(vec2(x,-y))) debug.insertMulti(vec2(x,-y),string("!L"_+str(lx,ly)));
             }
 
             /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
             if(!noteBetween && lx > 0 && rx < -16 && ry < 7) {
-                //debug[vec2(x,-y)]=string("B"_);
+                debug[vec2(x,-y)]=string("B"_);
                 noteBetween++;
                 if(abs(x-t.lx)<32) noteBetween++;
                 break;
@@ -115,7 +119,7 @@ void Score::synchronize(map<int,Chord>&& chords) {
 
             /// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
             if(noteBetween%2 && lx > 0 && rx < -16 && ry < 2 && l < 200) {
-                //debug[vec2(x,-y)]=string("O"_);
+                debug[vec2(x,-y)]=string("O"_);
                 notes[i][x].remove(y); noteBetween++;
             }
 
@@ -123,25 +127,31 @@ void Score::synchronize(map<int,Chord>&& chords) {
             if( (!noteBetween || (noteBetween<2 && l<210)) && ry < 6 && rx < 20 && rx > -12) {
                 t.ri=i;t.rx=x; t.ry=y;
                 tied << t; //defer remove for double ties
-                //debug[vec2(x,-y)]=string("R"_);
+                debug[vec2(x,-y)]=string("R"_);
                 goto staffDone;
-            }
+            } //else if(rx<2000 && rx>-2000 && ry<7000 && ry>-7000) /*if(!debug.contains(vec2(x,-y)))*/ debug[vec2(x,-y)]="!R"_+str(rx,ry);
 alreadyTied: ;
         }
 staffDone: ;
         /// Detect notes tied over a line wrap
         if(t.ly && (!noteBetween || (noteBetween<2 && l>150)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
-            for(int x=0;x<2;x++) {
+            for(int x=0;x<1;x++) {
                 int rx = notes[i+1].keys[x];
                 int ry = notes[i+1].values[x].keys[0];
                 for(Line trill : trills) if(abs(rx-trill.a.x)<8 && -ry-trill.a.y>0 && -ry-trill.a.y<200) goto trillCancelTie;
-                for(int y2 : notes[i+1].values[x].keys) {
-                    if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<12) {
+                float min=12;
+                for(float y2 : notes[i+1].values[x].keys) {float dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]); if(dy>=0) min=::min(min, abs(dy));}
+                for(float y2 : notes[i+1].values[x].keys) {
+                    int dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]);
+                    if(dy>=-7 && abs(dy)<=min) {
                         t.ri=i+1;t.rx=rx; t.ry=y2;
-                        //debug[tie.a]=string("W"_);
+                        debug[tie.a]=string("W"_);
+                        debug[vec2(x,-y2)]=string("W"_);
+                        for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1])); //goto alreadyTied2;
                         tied << t;
                         break;
-                    }
+                    } else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<=18) debug[vec2(rx,-y2)]="Y"_+str(dy,min);
+                    //alreadyTied2: ;
                 }
             }
 trillCancelTie: ;
@@ -149,21 +159,21 @@ trillCancelTie: ;
     }
     for(Tie t : tied) notes[t.ri][t.rx].remove(t.ry);
 
-    /*/// Remove muted double notes (necessary to sync with HTTYD sheets)
+    /// Remove muted double notes (necessary to sync with HTTYD sheets)
     for(map<int, map< int, Note> >& staff : notes) {
         int lastX=0;
         for(int x : staff.keys) {
             if(lastX>0) for(int y : staff[x].keys) for(int y2 : staff[lastX].keys)
-                if(staff[lastX].at(y2).duration && (abs(x-lastX)<=4 || (abs(x-lastX)<18 && y!=y2 && (x-lastX)+(y-y2)<32))){
+                if(staff[lastX].at(y2).duration && (abs(x-lastX)<=4 || (abs(x-lastX)<18 && y!=y2 && (x-lastX)+(y-y2)<20))){
                     if(staff[lastX].size()>=staff[x].size()) {
-                        staff[lastX].at(y2)=staff[x].at(y); staff[x].remove(y); debug[vec2(x,-y)]="x*"_+dec((x-lastX)+(y-y2)); break;
+                        staff[lastX].at(y2)=staff[x].at(y); staff[x].remove(y); debug[vec2(x,-y)]="x*"_+dec((x-lastX)+(y-y2)); log("x*",dec((x-lastX)+(y-y2))); break;
                     } else if(staff[lastX].size()<staff[x].size()) {
-                        staff[x].at(y2)=staff[lastX].at(y2); staff[lastX].remove(y2);  debug[vec2(lastX,-y2)]="x*"_+dec((x-lastX)+(y-y2));  break;
+                        staff[x].at(y2)=staff[lastX].at(y2); staff[lastX].remove(y2);  debug[vec2(lastX,-y2)]="x*"_+dec((x-lastX)+(y-y2)); log("x*",dec((x-lastX)+(y-y2)));  break;
                     }
                 }
             lastX=x;
         }
-    }*/
+    }
 
     /// Detect and explicit tremolos
     /*for(int i=0;i<tremolos.size-2;i++) {
@@ -224,7 +234,7 @@ spurious: ;
         uint n=0; for(Staff& staff: notes) for(int x : staff.keys) {
             int note=0; /*bool sync=true;*/ int lastY=0; array<vec2> chord; //uint noteIndex=n;
             for(int y : staff.at(x).keys) {
-                //if(!repeats) { //FIXME
+                if(!repeats) { //FIXME
                     if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) {
                         chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
                     }
@@ -236,7 +246,7 @@ spurious: ;
                             goto skip;
                         }
                     }*/
-                //}
+                }
                 chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; lastY=y;
                 //skip: ;
             }
@@ -262,15 +272,20 @@ spurious: ;
     }
 
     assert(indices.size()==positions.size());
-    assert(MIDI.size()>=positions.size(),MIDI.size(),positions.size());
+    //assert(MIDI.size()>=positions.size(),MIDI.size(),positions.size()); //FIXME
     //assert(MIDI.size()==positions.size(),MIDI.size(),positions.size()); //FIXME
 
     /// Debug
-    for(uint i: range(positions.size())) {
-        if(debug.contains(positions[i])) debug[positions[i]]=dec(MIDI[i])+"²"_;
-        else debug[positions[i]]=dec(MIDI[i]);
+#if 1
+    for(uint i: range(min(MIDI.size(),positions.size()))) {
+        /*if(debug.contains(positions[i])) {
+            assert(debug[positions[i]]==dec(MIDI[i]),debug[positions[i]],dec(MIDI[i]));
+            debug[positions[i]]=dec(MIDI[i])+"²"_;
+        } else debug[positions[i]]=dec(MIDI[i]);*/
+        debug.insertMulti(positions[i],dec(MIDI[i]));
     }
-    //for(Line l: ties) debug[(l.a+l.b)/2.f]=string("-"_);
+#endif
+    for(Line l: ties) debug[(l.a+l.b)/2.f]=string("^"_);
     for(float y: staffs) debug[vec2(0,y-16)]=string("___________"_);
 
     //log(chords);
