@@ -5,7 +5,12 @@
 #include "map.h"
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
-struct Track { uint time=0; int type=0; BinaryData data; Track(uint time, BinaryData&& data):time(time),data(move(data)){} };
+struct Track {
+    uint time=0; uint8 type=0; BinaryData data;
+    Track(uint time, BinaryData&& data):time(time),data(move(data)){}
+    uint startTime=0, startIndex=0;
+    void reset() { type=0; time=startTime; data.index=startIndex; }
+};
 
 /// Standard MIDI file player
 struct MidiFile {

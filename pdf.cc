@@ -313,10 +313,10 @@ void line(float x1, float y1, float x2, float y2) {
     }
 }
 
-int2 PDF::sizeHint() { return int2(2*(x2-x1),2*(y2-y1)); }
+int2 PDF::sizeHint() { return int2(scale*(x2-x1),scale*(y2-y1)); }
 
 void PDF::render(int2 position, int2 size) {
-    float scale = size.x/(x2-x1); // Fit width
+    scale = size.x/(x2-x1); // Fit width
 
     for(const Line& l: lines) {
         vec2 a = scale*l.a, b = scale*l.b;
@@ -331,8 +331,7 @@ void PDF::render(int2 position, int2 size) {
         if(pos.y>0 && pos.y<size.y) { //clip without glyph cache lookup
             c.font->font.setSize(round(scale*c.size*64));
             const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
-            if(!glyph.image) continue;
-            substract(pos+glyph.offset,glyph.image,colors.value(i,black));
+            if(glyph.image) substract(pos+glyph.offset,glyph.image,colors.value(i,black));
         }
         i++;
     }

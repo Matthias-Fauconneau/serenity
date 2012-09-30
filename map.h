@@ -24,25 +24,33 @@ template<class K, class V> struct map {
         return i>=0 ? values[i] : V(forward<Args>(args)___);
     }
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
+
+    template<perfect(K)> V& insert(Kf&& key) {
+        assert(!contains(key),key);
+        keys << forward<Kf>(key); values << V(); return values.last();
+    }
     template<perfect2(K,V)>
     V& insert(Kf&& key, Vf&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {'"_,keys,"}"_);
         keys << forward<Kf>(key); values << forward<Vf>(value); return values.last();
     }
     template<perfect2(K,V)>
+    V& insertSorted(Kf&& key, Vf&& value) {
+        if(contains(key)) error("'"_+str(key)+"' already in {'"_,keys,"}"_);
+        return  values.insertAt(keys.insertSorted(forward<Kf>(key)),forward<Vf>(value));
+    }
+    template<perfect2(K,V)>
     V& insertMulti(Kf&& key, Vf&& value) {
         keys << forward<Kf>(key); values << forward<Vf>(value); return values.last();
     }
+
+    V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
     template<perfect(K)> V& sorted(Kf&& key) {
         int i = keys.indexOf(key); if(i>=0) return values[i];
         return values.insertAt(keys.insertSorted(key),V());
     }
-    template<perfect(K)> V& insert(Kf&& key) {
-        assert(!contains(key),key);
-        keys << forward<Kf>(key); values << V(); return values.last();
-    }
-    V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
+
     V take(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); return values.take(i); }
     void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 

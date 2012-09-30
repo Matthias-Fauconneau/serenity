@@ -17,7 +17,7 @@ void MidiFile::open(const ref<byte>& data) { /// parse MIDI header
         s.advance(length);
     }
     uint minTime=-1; for(Track& track: tracks) minTime=min(minTime,track.time);
-    for(Track& track: tracks) { int time=track.time-minTime,index=track.data.index; read(track,-1,Sort); track.time=time; track.data.index=index; }
+    for(Track& track: tracks) { track.startTime=track.time-minTime, track.startIndex=track.data.index; read(track,-1,Sort); track.reset(); }
 }
 
 void MidiFile::read(Track& track, uint time, State state) {
@@ -30,7 +30,7 @@ void MidiFile::read(Track& track, uint time, State state) {
         else if( type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend ) s.advance(1);
         else if( type == ProgramChange || type == ChannelAftertouch ) {}
         else if( type == Meta ) {
-            uint8 c=s.read(); int len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
+            uint8 c=s.read(); uint len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
             s.advance(len);
         }
         track.type = type;
@@ -51,7 +51,7 @@ void MidiFile::read(Track& track, uint time, State state) {
 
 void MidiFile::seek(uint time) {
     for(Track& track: tracks) {
-        if(time < track.time) { track.time=0; track.data.index=0; }
+        if(time < track.time) track.reset();
         read(track,time,Seek);
     }
     this->time=time;

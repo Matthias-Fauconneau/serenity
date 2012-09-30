@@ -87,7 +87,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void event();
 };
 
-/// Terminates all auxiliary threads, destroys all file-scope objects and exits process.
+/// Flags all threads to terminate as soon as they return to event loop, destroys all file-scope objects and exits process.
 void exit();
 
 /// Yields to scheduler

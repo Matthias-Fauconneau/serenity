@@ -45,7 +45,7 @@ struct Monitor : Timer {
         map<ref<byte>, string>& o = this->system;
         map<ref<byte>, string> n = stat();
         map<ref<byte>, map<ref<byte>, string> > process;
-        for(const string& pid: listFiles(""_,Folders,procfs)) if(isInteger(pid)) process[pid]=stat(pid);
+        for(const string& pid: procfs.list(Folders)) if(isInteger(pid)) process[pid]=stat(pid);
         if(o) {
             /*log("User: "_+dec(toInteger(n["user"_])-toInteger(o["user"_]))+"%"
                 "\tNice: "_+dec(toInteger(n["nice"_])-toInteger(o["nice"_]))+"%"
@@ -55,7 +55,7 @@ struct Monitor : Timer {
             layout.clear();
             layout << string("Name"_) << string("RSS (MB)"_) << string("CPU (%)"_);
 
-            for(string& pid: listFiles(""_,Folders,procfs)) if(isInteger(pid)) {
+            for(string& pid: procfs.list(Folders)) if(isInteger(pid)) {
                 map<ref<byte>,string>& o = this->process[pid];
                 map<ref<byte>,string>& p = process[pid];
                 ref<byte> name = p["name"_].slice(1,p["name"_].size()-2);

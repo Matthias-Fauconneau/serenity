@@ -32,8 +32,6 @@ static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer over
 // Log
 void log_(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
-static ref<byte> message;
-template<> void __attribute((noreturn)) error(const ref<byte>& buffer) { message=buffer; tgkill(getpid(),gettid(),SIGABRT); for(;;) pause(); }
 
 // Semaphore
 void Semaphore::wait(int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e]); }
@@ -61,11 +59,13 @@ static Lock& threadsLock() { static Lock threadsLock; return threadsLock; }
 static array<Thread*>& threads() { static array<Thread*> threads; return threads; }
 // Handle for the main thread (group leader)
 Thread& mainThread() { static Thread mainThread(20); return mainThread; }
+// Waits for threads to output traces
+static Semaphore& traceSemaphore() { static Semaphore traceSemaphore; return traceSemaphore; }
 // main
 void yield() { sched_yield(); }
 int main() {
     mainThread().run();
-    while(threads().size()) yield(); // Yields to let auxiliary threads cleanly terminate themselves
+    while(threads().size()) yield(); // Lets all threads return to event loop
     Locker lock(threadsLock());
     for(Thread* thread: threads()) if(thread!=&mainThread()) tgkill(getpid(),thread->tid,SIGKILL); // Kills any remaining thread
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
@@ -123,18 +123,20 @@ void Thread::event() {
 }
 
 // Signal handler
-static void handler(int sig, siginfo* info, ucontext* ctx) {
-    extern string trace(int skip, void* ip);
-    string s = trace(sig==SIGABRT?2:1,sig==SIGABRT?0:(void*)ctx->ip);
-    if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
-    if(sig!=SIGTRAP){
-        Locker lock(threadsLock());
-        for(Thread* thread: threads()) {
-            thread->terminate=true; // Tries to terminate all other threads cleanly
-            if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
-        }
+void traceAllThreads() {
+    Locker lock(threadsLock());
+    for(Thread* thread: threads()) {
+        thread->terminate=true; // Tries to terminate all other threads cleanly
+        if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
-    if(sig==SIGABRT) { log(message); exit_thread(0); } //Abort doesn't let thread terminate cleanly
+    traceSemaphore().acquire(threads().size()-1);
+}
+string trace(int skip, void* ip);
+static void handler(int sig, siginfo* info, ucontext* ctx) {
+    string s = trace(1,(void*)ctx->ip);
+    if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    traceSemaphore().release(1);
+    if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); }
     if(sig==SIGSEGV) { log("Segmentation fault at "_+str(info->fault.addr)); exit_thread(0); } //Segfault kills the threads to prevent further corruption
     if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads
@@ -150,16 +152,24 @@ void __attribute((constructor(101))) setup_signals() {
         void (*restorer)() = &restore_rt;
         uint mask[2] = {0,0};
     } sa;
-    check_(sigaction(SIGABRT, &sa, 0, 8));
     check_(sigaction(SIGFPE, &sa, 0, 8));
     check_(sigaction(SIGSEGV, &sa, 0, 8));
     check_(sigaction(SIGTERM, &sa, 0, 8));
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 }
 
+template<> void __attribute((noreturn)) error(const ref<byte>& message) {
+    traceAllThreads();
+    string s = trace(1,0);
+    if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    log(message);
+    {Locker lock(threadsLock()); for(Thread* thread: threads()) if(thread->tid==gettid()) { threads().removeAll(thread); break; } }
+    exit_thread(0);
+}
+
 void exit() {
     Locker lock(threadsLock());
-    for(Thread* thread: threads()) { thread->terminate=true; thread->post(); } // Tries to terminate all threads cleanly (triggers return from mainThread::run)
+    for(Thread* thread: threads()) { thread->terminate=true; thread->post(); }
 }
 
 // Environment

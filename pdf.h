@@ -62,4 +62,5 @@ struct PDF : Widget {
 
     signal<> contentChanged;
     signal<int> hiddenHighlight;
+    float scale=2;
 };

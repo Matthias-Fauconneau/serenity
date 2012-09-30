@@ -143,7 +143,7 @@ struct Player {
         albums.activeChanged.connect(this, &Player::playAlbum);
         titles.activeChanged.connect(this, &Player::playTitle);
 
-        folders = listFiles("Music"_,Sort|Folders);
+        folders = Folder("Music"_).list(Folders);
         assert(folders);
         for(string& folder : folders) albums << string(section(folder,'/',-2,-1));
 
@@ -155,7 +155,7 @@ struct Player {
             string folder = string(section(last,'/',0,2));
             if(existsFolder(folder)) {
                 albums.index = folders.indexOf(folder);
-                array<string> files = listFiles(folder,Recursive|Sort|Files);
+                array<string> files = Folder(folder).list(Recursive|Files);
                 uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
                 for(;i<files.size();i++) queueFile(move(files[i]));
             }

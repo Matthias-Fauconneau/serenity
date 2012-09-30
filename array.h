@@ -144,7 +144,7 @@ template<class T> struct array {
 
     /// Returns index of the first element matching \a value
     int indexOf(const T& key) const {
-        debug(if(size()>32) log("binarySearch might be faster",size());)
+        //debug(if(size()>32) log("binarySearch might be faster",size());)
         return ref<T>(*this).indexOf(key);
     }
     /// Returns whether this array contains any elements matching \a value

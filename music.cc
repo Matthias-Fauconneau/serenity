@@ -14,7 +14,7 @@
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music : Widget {
-    ICON(music) Window window __(this,int2(256,256),"Piano"_,musicIcon());
+    ICON(music) Window window __(this,int2(0,0),"Piano"_,musicIcon());
     Sampler sampler;
     MidiFile midi;
     Scroll<PDF> sheet;
@@ -29,7 +29,7 @@ struct Music : Widget {
     Music() {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
 
-        array<string> files = listFiles("Sheets"_,Sort|Files);
+        array<string> files = Folder("Sheets"_).list(Files);
         for(string& file : files) if(endsWith(file,".pdf"_) && files.contains(section(file,'.')+".mid"_)) sheets << string(section(file,'.'));
         sheets.itemPressed.connect(this,&Music::openSheet);
 
@@ -41,7 +41,6 @@ struct Music : Widget {
         sheet.contentChanged.connect(&window,&Window::render);
         sheet.onGlyph.connect(&score,&Score::onGlyph);
         sheet.onPath.connect(&score,&Score::onPath);
-        //openSheet("Game of Thrones"_);
 
         score.activeNotesChanged.connect(&sheet,&PDF::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);
@@ -50,18 +49,19 @@ struct Music : Widget {
 
         window.localShortcut(Escape).connect(&exit);
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
-        window.localShortcut(Key('O')).connect(this,&Music::showSheetList);
+        window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
     }
 
     /// Shows samples loading progress. When loaded, displays any loaded sheet and starts audio output.
     int current=0,count=0;
     void showProgress(int current, int count) {
         if(current==count) {
-            if(sheet) {
-                window.backgroundCenter=window.backgroundColor=0xFF;
-                window.widget=&sheet.area();
-                window.setSize(int2(-1,-1));
-            }
+            showSheetList();
+            //openSheet("Game of Thrones"_);
+            //openSheet("Where's Hiccup"_);
+            //openSheet("Romantic Flight (Easy)"_);
+            //openSheet("Test Drive (Easy)"_);
+            openSheet("Forbidden Friendship (Easy)"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
@@ -84,14 +84,13 @@ struct Music : Widget {
     bool play=false;
     void togglePlay() {
         play=!play;
-        if(play) { midi.seek(0); sampler.timeChanged.connect(&midi,&MidiFile::update); }
+        if(play) { midi.seek(0); score.seek(0); sampler.timeChanged.connect(&midi,&MidiFile::update); }
         else sampler.timeChanged.delegates.clear();
     }
 
     /// Shows PDF+MIDI sheets selection to open
     void showSheetList() {
         window.widget=&sheets;
-        window.setSize(int2(-1,-1));
         window.render();
     }
 
@@ -103,6 +102,10 @@ struct Music : Widget {
         sheet.open(string(name+".pdf"_),"Sheets"_);
         score.synchronize(move(midi.notes));
         debug(sheet.setAnnotations(score.debug);)
-        score.seek(0);
+        window.backgroundCenter=window.backgroundColor=0xFF;
+        window.widget=&sheet.area();
+        window.setSize(int2(-1,-1));
+        window.render();
+        togglePlay();
     }
 } application;

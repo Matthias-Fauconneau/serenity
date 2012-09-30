@@ -31,7 +31,7 @@ uint16 Font::index(uint16 code) {
         uint index = FT_Get_Char_Index(face, code);
         if(index) return index;
     }
-    error(code);
+    return code; //error("Unknown code",code);
 }
 
 int Font::kerning(uint16 leftIndex, uint16 rightIndex) { FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*16/64; }

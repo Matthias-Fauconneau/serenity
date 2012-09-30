@@ -10,9 +10,6 @@ long realTime();
 /// Returns current thread CPU time in microseconds
 uint64 cpuTime();
 
-/// Returns the number of cycles used to execute \a statements (robust against preemption)
-#define time( statements ) ({ uint64 start=cpuTime(); statements; cpuTime()-start; })
-
 #if __x86_64__
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)

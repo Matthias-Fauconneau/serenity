@@ -69,7 +69,7 @@ inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
 
 #ifdef DEBUG
 #define debug( statements... ) statements
-#define warn log
+#define warn error
 #else
 /// Compiles \a statements in executable only if \a DEBUG flag is set
 #define debug( statements... )
@@ -79,7 +79,7 @@ inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
 /// Logs to standard output
 template<class ___ Args> void log(const Args& ___ args);
 template<> void log(const ref<byte>& message);
-/// Aborts unconditionally and display \a message
+/// Logs to standard output and aborts immediatly this thread
 template<class ___ Args> void error(const Args& ___ args)  __attribute((noreturn));
 template<> void error(const ref<byte>& message) __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message

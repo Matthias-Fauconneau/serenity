@@ -30,8 +30,8 @@ Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0)
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0666), folder);
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), folder);
 }
-array<string> listFiles(const ref<byte>& folder, uint flags, const Folder& at) {
-    Folder fd(folder,at);
+array<string> Folder::list(uint flags) {
+    Folder fd(""_,*this);
     array<string> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
@@ -39,13 +39,10 @@ array<string> listFiles(const ref<byte>& folder, uint flags, const Folder& at) {
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
             if(type==DT_DIR && flags&Recursive) {
-                array<string> files = listFiles(folder?string(folder+"/"_+name):string(name),flags,at);
-                if(flags&Sort) for(string& e: files) list.insertSorted(move(e));
-                else list << move(files);
+                array<string> files = Folder(name,*this).list(flags);
+                for(const string& file: files) list.insertSorted(name+"/"_+file);
             } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
-                string path = folder?string(folder+"/"_+name):string(name);
-                if(flags&Sort) list.insertSorted(move(path));
-                else list << move(path);
+                list.insertSorted(string(name));
             }
         }
     }

@@ -248,7 +248,7 @@ void getURL(URL&& url, Handler handler, int maximumAge) {
             handler(url,Map(file,cache()));
             return;
         }
-        headers<< "If-Modified-Since: "_+str(date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
+        headers<< "If-Modified-Since: "_+str(Date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
     heap<HTTP>(move(url),handler,move(headers));
 }

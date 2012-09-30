@@ -17,9 +17,12 @@ struct Folder;
 /// Returns a file descriptor to the root folder
 const Folder& root();
 
+enum { Files=1<<0, Folders=1<<1, Recursive=1<<2 };
 struct Folder : Handle {
     /// Opens \a folder
     Folder(const ref<byte>& folder, const Folder& at=root(), bool create=false);
+    /// Lists all files in \a folder
+    array<string> list(uint flags);
 };
 /// Returns whether this \a folder exists (as a folder)
 bool existsFolder(const ref<byte>& folder, const Folder& at=root());
@@ -120,7 +123,3 @@ void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=roo
 long modifiedTime(const ref<byte>& path, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
 void touchFile(const ref<byte>& path, const Folder& at=root());
-
-enum { Recursive=1, Sort=2, Folders=4, Files=8 };
-/// Lists all files in \a folder
-array<string> listFiles(const ref<byte>& folder, uint flags, const Folder& at=root());
