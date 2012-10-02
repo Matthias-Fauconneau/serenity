@@ -35,12 +35,12 @@ template<class K, class V> struct map {
     }
     template<perfect2(K,V)>
     V& insert(Kf&& key, Vf&& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {'"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << forward<Kf>(key); values << forward<Vf>(value); return values.last();
     }
     template<perfect2(K,V)>
     V& insertSorted(Kf&& key, Vf&& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {'"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         return  values.insertAt(keys.insertSorted(forward<Kf>(key)),forward<Vf>(value));
     }
     template<perfect2(K,V)>

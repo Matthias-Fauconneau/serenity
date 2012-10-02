@@ -315,8 +315,9 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
         polyline << copy(path.last());
         if((flags&Stroke) || (flags&Fill) || polyline.size()>16) {
             for(uint i: range(polyline.size()-1)) {
-                assert(polyline[i] != polyline[i+1],polyline,flags);
-                lines << Line __( polyline[i], polyline[i+1] );
+                //assert(polyline[i] != polyline[i+1],polyline,flags);
+                if(polyline[i] != polyline[i+1])
+                    lines << Line __( polyline[i], polyline[i+1] );
             }
             if(flags&Close) lines << Line __( polyline.last(), polyline.first() );
         }

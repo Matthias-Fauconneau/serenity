@@ -24,7 +24,6 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
     // Opus is Sibelius default font, Emmentaler is Lilypond default font
     if(find(font,"Opus"_)||find(font,"Emmentaler"_)) {
         if(font=="OpusStd"_) {
-            debug[pos]=str(code);
             if(code==8) {
                 if(size<30) duration= 0; //grace
                 else duration = 4; //quarter
@@ -32,7 +31,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==9) duration = 8; //half
             else if(code==16) duration = 16; //whole
             else if(code==3/*treble*/||code==5/*bass*/) {
-                if(pos.y-lastClef.y>154) {
+                if(pos.y-lastClef.y>202) {
                     staffs << (lastClef.y+90);
                     { static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
@@ -139,10 +138,10 @@ void Score::synchronize(map<int,Chord>&& chords) {
             }
 
             /// Detect right note of a tie
-            if( (!noteBetween || (noteBetween<2 && l<210)) && ry < 6 && rx < 20 && rx > -12) {
+            if( (!noteBetween || (noteBetween<2 && l<210)) && ry < 6 && rx < 20 && rx > -9/*-12*/) {
                 t.ri=i;t.rx=x; t.ry=y;
                 tied << t; //defer remove for double ties
-                debug[vec2(x,-y)]=string("R"_);
+                debug[vec2(x,-y)]=string("R"_+str(rx,ry));
                 goto staffDone;
             } //else if(rx<2000 && rx>-2000 && ry<7000 && ry>-7000) /*if(!debug.contains(vec2(x,-y)))*/ debug[vec2(x,-y)]="!R"_+str(rx,ry);
 alreadyTied: ;
@@ -162,11 +161,13 @@ staffDone: ;
                         t.ri=i+1;t.rx=rx; t.ry=y2;
                         debug[tie.a]=string("W"_);
                         debug[vec2(x,-y2)]=string("W"_);
-                        for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1])); //goto alreadyTied2;
+                        for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
+                            //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
+                            goto alreadyTied2;
                         tied << t;
                         break;
                     } else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<=18) debug[vec2(rx,-y2)]="Y"_+str(dy,min);
-                    //alreadyTied2: ;
+                    alreadyTied2: ;
                 }
             }
 trillCancelTie: ;
@@ -249,30 +250,22 @@ spurious: ;
         array<vec2> lastChord;
         //bool lastSync=true;
         uint n=0; for(Staff& staff: notes) for(int x : staff.keys) {
-            int note=0; int lastY=0; array<vec2> chord;
-            //bool sync=true; uint noteIndex=n;
+            int note=0; array<vec2> chord; int lastY=0;
             for(int y : staff.at(x).keys) {
-                if(lastY && y>lastY && n>0 && n<MIDI.size() && MIDI[n]<MIDI[n-1]) {
-                    debug[vec2(x,-y)]=string("!MIDI"_);
+                if(lastY && n>0 && n<MIDI.size() && y>lastY && MIDI[n]<MIDI[n-1]) {
+                    debug[vec2(x,-y)]=string("\\\\"_);
                     continue;
                 }
                 if(!repeats) { //FIXME
                     if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) {
+                        debug[vec2(x,-y)]=string("////"_);
                         chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
                     }
-                    //if(n<MIDI.size() && MIDI[n]<=note) { sync=false; }
                     note = n>=MIDI.size() ? 0 : MIDI[n];
-                    /*if(lastSync && sync && staff[x].size()<3) for(uint i: range(min(MIDI.size(),noteIndex+lastChord.size()))) {
-                        if(abs(lastChord[i-noteIndex].y+y)<=1 && abs(MIDI[i]-note)>2 && note!=MIDI[i]+12) {
-                            debug[vec2(x,-y)]=string("!MIDI"_);
-                            break;
-                        }
-                    }*/
                 }
                 chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; lastY=y;
-                //skip: ;
             }
-            lastChord=move(chord); //lastSync=sync;
+            lastChord=move(chord);
         }
     }
 
@@ -304,7 +297,7 @@ spurious: ;
             assert(debug[positions[i]]==dec(MIDI[i]),debug[positions[i]],dec(MIDI[i]));
             debug[positions[i]]=dec(MIDI[i])+"²"_;
         } else debug[positions[i]]=dec(MIDI[i]);*/
-        debug.insertMulti(positions[i],dec(MIDI[i]));
+        debug.insertMulti(positions[i]+vec2(12,0),dec(MIDI[i]));
     }
 #endif
     for(Line l: ties) debug[(l.a+l.b)/2.f]=string("^"_);

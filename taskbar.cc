@@ -36,9 +36,9 @@ struct Taskbar : Socket, Poll {
     Bar<Task> tasks;
     Clock clock __(16);
     Events calendar;
-    Window popup __(&calendar,int2(256,-1));
+    Window popup __(0,int2(256,-1));
     HBox panel;//__(&button, &tasks, &clock);
-    Window window __(&panel,int2(0,16));
+    Window window __(0,int2(0,16));
     uint root=window.root;
     uint desktop=0;
     uint escapeCode = window.KeyCode(Escape);
@@ -85,10 +85,13 @@ struct Taskbar : Socket, Poll {
         clock.pressed.connect(&calendar,&Events::reset);
         clock.pressed.connect(&popup,&Window::toggle);
         calendar.eventAlarm.connect(&popup,&Window::show);
+        popup.widget= &calendar;
         popup.hideOnLeave = true;
         popup.autoResize=true;
         popup.anchor = TopRight;
         window.globalShortcut(PrintScreen).connect(this,&Taskbar::saveSnapshot);
+        window.widget = &panel;
+        window.show();
     }
 
     void processEvent(uint8 type, const XEvent& e) {

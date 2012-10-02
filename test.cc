@@ -7,7 +7,7 @@ struct PDFTest {
     Window window __(&pdf.area(),int2(-1,-1),"PDF Test"_);
     PDFTest(){
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
-        pdf.open("/Sheets/Turret Opera (Cara Mia).pdf"_,home());
+        pdf.open("/Sheets/Brave Adventurers.pdf"_,home());
         window.setSize(int2(-1,-1));
     }
 } test;

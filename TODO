@@ -1,9 +1,9 @@
 Music:
- test/fix Sibelius PDF+MIDI: Turret Opera (Cara Mia), Brave Adventurers, Father and Son, Adagio for TRON
  test/fix MuseScore PDF+MIDI: Avatar (or render MusicXML?)
- seek, NKI, FIR reverb
-Touchbook: rsync, ARM, taskbar, desktop, book, hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition, CAS
+ convex polygon fill, seek, NKI, FIR reverb
+Touchbook: rsync, ARM, taskbar, desktop, book
 Fibermesh
-Apps: fix desktop leak, shell, file manager, search, imap, torrent, irc, video
-Own: inflate, jpeg, mp3, font, ssl
+Apps: fix desktop leak, runner, shell, file manager, search, imap, torrent, video, irc
+Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
+Standards: deflate, jpeg, mp3, truetype, ssl
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git, static analyzer, interpreter, profiler, compiler
