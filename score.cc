@@ -246,20 +246,26 @@ spurious: ;
     array<int> MIDI; //flatten chords for robust MIDI synchronization
     for(const Chord& chord: chords.values) MIDI<<chord;
     if(MIDI.size()) {
-        array<vec2> lastChord; //bool lastSync=true;
+        array<vec2> lastChord;
+        //bool lastSync=true;
         uint n=0; for(Staff& staff: notes) for(int x : staff.keys) {
-            int note=0; /*bool sync=true;*/ int lastY=0; array<vec2> chord; //uint noteIndex=n;
+            int note=0; int lastY=0; array<vec2> chord;
+            //bool sync=true; uint noteIndex=n;
             for(int y : staff.at(x).keys) {
+                if(lastY && y>lastY && n>0 && n<MIDI.size() && MIDI[n]<MIDI[n-1]) {
+                    debug[vec2(x,-y)]=string("!MIDI"_);
+                    continue;
+                }
                 if(!repeats) { //FIXME
                     if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) {
                         chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
                     }
                     //if(n<MIDI.size() && MIDI[n]<=note) { sync=false; }
                     note = n>=MIDI.size() ? 0 : MIDI[n];
-                    /*if(lastSync && sync && staff[x].size()<3) for(uint i: range(min(MIDI.size(),noteIndex+lastChord.size())) {
-                        if(abs(lastChord[j-noteIndex].y+y)<=1 && abs(MIDI[j]-note)>2 && note!=MIDI[j]+12) {
+                    /*if(lastSync && sync && staff[x].size()<3) for(uint i: range(min(MIDI.size(),noteIndex+lastChord.size()))) {
+                        if(abs(lastChord[i-noteIndex].y+y)<=1 && abs(MIDI[i]-note)>2 && note!=MIDI[i]+12) {
                             debug[vec2(x,-y)]=string("!MIDI"_);
-                            goto skip;
+                            break;
                         }
                     }*/
                 }
