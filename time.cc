@@ -145,7 +145,7 @@ Date parse(TextData& s) {
             else if(date.day==-1) date.day=number-1;
         }
     }
-    if(date.year<0) {
+    if(date.year<0 && (date.month>=0 || date.day>=0)) {
         date.year=Date(currentTime()).year;
         if(date.month<0) {
             date.month=Date(currentTime()).month;

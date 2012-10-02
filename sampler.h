@@ -54,7 +54,7 @@ struct Sampler : Poll {
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
-    uint64 time = 0;
+    uint64 lastTime=0, time = 0;
 
     /// Records performance to WAV file
     void recordWAV(const ref<byte>& path); File record=0; int16* pcm = 0; ~Sampler();

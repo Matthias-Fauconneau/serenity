@@ -19,9 +19,13 @@ template<class K, class V> struct map {
 
     const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
     V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
-    template<class... Args> V value(const K& key, Args&&... args) {
+    /*template<class... Args> V value(const K& key, Args&&... args) {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : V(forward<Args>(args)___);
+    }*/
+    const V& value(const K& key, const V& value=V()) {
+        int i = keys.indexOf(key);
+        return i>=0 ? values[i] : value;
     }
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
 

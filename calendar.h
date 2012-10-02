@@ -43,8 +43,8 @@ struct Events : VBox {
 struct Clock : Text, Timer {
     signal<> timeout;
     signal<> pressed;
-    Clock(int size=16):Text(::str(currentTime(),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
-    void event() { setText(::str(currentTime(),"hh:mm"_)); setAbsolute(currentTime()/60*60+60); timeout(); }
+    Clock(int size=16):Text(::str(Date(currentTime()),"hh:mm"_),size){ setAbsolute(currentTime()/60*60+60); }
+    void event() { setText(::str(Date(currentTime()),"hh:mm"_)); setAbsolute(currentTime()/60*60+60); timeout(); }
     bool mouseEvent(int2, int2, Event event, Button) override {
         if(event==Press) { pressed(); return true; }
         return false;

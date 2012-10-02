@@ -56,7 +56,7 @@ void Calendar::setActive(Date active) {
         dates << Date(-1,active.month,active.year, i);
     }
     int first=Date(0, active.month, active.year).weekDay;
-    for(int i=0;i<first-1;i++) { //previous month
+    for(int i=0;i<first;i++) { //previous month
         int previousMonth = (active.month+11)%12;
         int day = daysInMonth(previousMonth,active.year-(active.month==0))-first+i+1;
         dates << Date(day, previousMonth, active.year-(active.month==0), count()%7);

@@ -23,8 +23,22 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
     int duration=-1;
     // Opus is Sibelius default font, Emmentaler is Lilypond default font
     if(find(font,"Opus"_)||find(font,"Emmentaler"_)) {
-        if(endsWith(font,"Opus"_)||find(font,"Emmentaler"_)) {
-            //TODO: quaver detection
+        if(font=="OpusStd"_) {
+            debug[pos]=str(code);
+            if(code==8) {
+                if(size<30) duration= 0; //grace
+                else duration = 4; //quarter
+            }
+            else if(code==9) duration = 8; //half
+            else if(code==16) duration = 16; //whole
+            else if(code==3/*treble*/||code==5/*bass*/) {
+                if(pos.y-lastClef.y>154) {
+                    staffs << (lastClef.y+90);
+                    { static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
+                }
+                lastClef=pos;
+            }
+        } else if(endsWith(font,"Opus"_)||find(font,"Emmentaler"_)) {
             if(code==53/*Opus*/ || code==1/*Emmentaler*/) {
                 if(size<30) duration= 0; //grace
                 else duration = 4; //quarter
@@ -33,7 +47,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==39) duration = 16; //whole
             else if(code==71/*Opus treble*/||code==11/*Opus bass*/||code==214/*Emmentaler C key*/) {
                 //log(pos.y-lastClef.y);
-                if(pos.y-lastClef.y>141) staffs << (lastClef.y+90);
+                if(pos.y-lastClef.y>154) staffs << (lastClef.y+90);
                 lastClef=pos;
             }
         }
@@ -78,12 +92,13 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             lastClef=pos;
         }
     }
-    if(duration>=0) notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration)); //negate y to sort by increasing pitch
+    if(duration>=0 && !notes[i].sorted(pos.x).contains(-pos.y)) notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration)); //negate y to sort by increasing pitch
 }
 
 struct Tie { uint li; int lx,ly; uint ri; int rx,ry; Tie():li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
 string str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)+")"_; }
 void Score::synchronize(map<int,Chord>&& chords) {
+    if(!staffs) return; assert(staffs);
     staffs << (lastClef.y+96); //add a last split at the bottom of the last page
 
     /// Detect and remove tied notes
@@ -159,21 +174,22 @@ trillCancelTie: ;
     }
     for(Tie t : tied) notes[t.ri][t.rx].remove(t.ry);
 
-    /// Remove muted double notes (necessary to sync with HTTYD sheets)
+#if 0 /// Remove muted double notes (necessary to sync with HTTYD sheets)
     for(map<int, map< int, Note> >& staff : notes) {
         int lastX=0;
         for(int x : staff.keys) {
             if(lastX>0) for(int y : staff[x].keys) for(int y2 : staff[lastX].keys)
                 if(staff[lastX].at(y2).duration && (abs(x-lastX)<=4 || (abs(x-lastX)<18 && y!=y2 && (x-lastX)+(y-y2)<20))){
                     if(staff[lastX].size()>=staff[x].size()) {
-                        staff[lastX].at(y2)=staff[x].at(y); staff[x].remove(y); debug[vec2(x,-y)]="x*"_+dec((x-lastX)+(y-y2)); log("x*",dec((x-lastX)+(y-y2))); break;
+                        staff[lastX].at(y2)=staff[x].at(y); staff[x].remove(y); debug[vec2(x,-y)]="x*"_+dec((x-lastX)+(y-y2)); /*log("x*",dec((x-lastX)+(y-y2)));*/ break;
                     } else if(staff[lastX].size()<staff[x].size()) {
-                        staff[x].at(y2)=staff[lastX].at(y2); staff[lastX].remove(y2);  debug[vec2(lastX,-y2)]="x*"_+dec((x-lastX)+(y-y2)); log("x*",dec((x-lastX)+(y-y2)));  break;
+                        staff[x].at(y)=staff[lastX].at(y2); staff[lastX].remove(y2);  debug[vec2(lastX,-y2)]="x*"_+dec((x-lastX)+(y-y2)); /*log("x*",dec((x-lastX)+(y-y2)));*/  break;
                     }
                 }
             lastX=x;
         }
     }
+#endif
 
     /// Detect and explicit tremolos
     /*for(int i=0;i<tremolos.size-2;i++) {
@@ -294,11 +310,16 @@ spurious: ;
 }
 
 void Score::seek(uint unused time) {
+    if(!staffs) return;
     assert(time==0,"TODO");
-    chordIndex=0, noteIndex=0; expected.clear(); active.clear();
+    chordIndex=0, noteIndex=0; currentStaff=0; expected.clear(); active.clear();
     int i=noteIndex; for(int key: chords.values[chordIndex]) {
         expected.insertMulti(key, i);
-        while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) { nextStaff(staffs[currentStaff],staffs[currentStaff+1]); currentStaff++; }
+        while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
+            assert(currentStaff<staffs.size());
+            if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff]);
+            currentStaff++;
+        }
         i++;
     }
     map<int,byte4> activeNotes;
@@ -308,24 +329,28 @@ void Score::seek(uint unused time) {
 
 void Score::noteEvent(int key, int vel) {
     if(vel) {
-        if(!expected.contains(key)){log(key,"expected",expected); return;}
+        if(!expected.contains(key)){/*log(key,"expected",expected);*/ return;}
         active.insertMulti(key,expected[key]);
         expected.remove(key);
     } else if(key) {
         if(active.contains(key)) active.remove(key);
         return;
     }
-    if(!expected && chordIndex<chords.size()) {
+    if(!expected && chordIndex<chords.size()-1) {
         noteIndex+=chords.values[chordIndex].size();
         chordIndex++;
         int i=noteIndex; for(int key: chords.values[chordIndex]) {
             expected.insertMulti(key, i);
-            while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) { nextStaff(staffs[currentStaff],staffs[currentStaff+1]); currentStaff++; }
+            while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
+                assert(currentStaff<staffs.size());
+                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff]);
+                currentStaff++;
+            }
             i++;
         }
     }
     map<int,byte4> activeNotes;
     for(int i: expected.values) activeNotes.insert(indices[i],blue);
-    for(int i: active.values) if(!activeNotes.contains(indices[i])) activeNotes.insert(indices[i],red);
+    //for(int i: active.values) if(!activeNotes.contains(indices[i])) activeNotes.insert(indices[i],red);
     activeNotesChanged(activeNotes);
 }

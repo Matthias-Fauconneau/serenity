@@ -48,4 +48,6 @@ struct Score {
     signal<const map<int,byte4>&> activeNotesChanged;
     signal<float,float> nextStaff;
     map<vec2, string> debug;
+
+    void clear() { staffs.clear(); lastClef=vec2(0,0); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; currentChord.clear(); active.clear(); expected.clear(); debug.clear(); }
 };

@@ -27,5 +27,5 @@ struct MidiFile {
     uint time=0;
     void seek(uint time);
     void update(uint delta);
-
+    void clear() { tracks.clear(); trackCount=0; midiClock=0; notes.clear(); }
 };

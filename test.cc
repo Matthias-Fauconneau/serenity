@@ -1,11 +1,16 @@
-#if 0
-template<class... Args> void function(Args... args){ function(args...); }
-int main() {
-    int a=0,b=0;
-    function();
-    function(a);
-    function(a, b);
-}
+#if 1
+#include "window.h"
+#include "pdf.h"
+#include "interface.h"
+struct PDFTest {
+    Scroll<PDF> pdf;
+    Window window __(&pdf.area(),int2(-1,-1),"PDF Test"_);
+    PDFTest(){
+        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
+        pdf.open("/Sheets/Turret Opera (Cara Mia).pdf"_,home());
+        window.setSize(int2(-1,-1));
+    }
+} test;
 #endif
 
 #if 0
@@ -56,7 +61,7 @@ struct ImageTest : ImageView {
 } test;
 #endif
 
-#if 1
+#if 0
 #include "window.h"
 #include "html.h"
 struct HTMLTest {

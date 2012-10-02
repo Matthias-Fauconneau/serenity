@@ -2,6 +2,7 @@
 #include "file.h"
 
 void MidiFile::open(const ref<byte>& data) { /// parse MIDI header
+    clear();
     BinaryData s(data,true);
     s.advance(10);
     uint16 nofChunks = s.read(), clockUnit = s.read();
@@ -39,7 +40,9 @@ void MidiFile::read(Track& track, uint time, State state) {
             if(type==NoteOn) noteEvent(key,vel);
             else if(type==NoteOff) noteEvent(key,0);
         } else if(state==Sort) {
-            if(type==NoteOn && vel) notes.sorted(track.time).insertSorted(key);
+            if(type==NoteOn && vel) {
+                if(!notes.sorted(track.time).contains(key)) notes.sorted(track.time).insertSorted(key);
+            }
         }
 
         if(!s) return;

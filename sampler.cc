@@ -199,6 +199,8 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     size = max(size,1u<<10); //minimum in case all notes are nearly on underrun
     for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(size); //predecode all notes with buffer under size
 
+    if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
+
     if(current<samples.size()) {
         const Sample& s=samples[current++];
         uint size = s.map.size;
@@ -250,9 +252,9 @@ bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
 
         swPointer += size;
     }
+    time+=size;
     queue(); //queue background decoder in main thread
     //if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16))); time+=period;
-    time+=size; timeChanged(size); //read MIDI file / update UI
     return true;
 }
 

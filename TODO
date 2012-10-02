@@ -1,7 +1,9 @@
-HTTYD score, nki, FIR reverb
-TB: rsync, arm, taskbar, desktop, book
-fibermesh
-apps: fix desktop leak, shell, file manager, search, imap, torrent, irc, video
-own: inflate, jpeg, mp3, font, ssl
+Music:
+ test/fix Sibelius PDF+MIDI: Turret Opera (Cara Mia), Brave Adventurers, Father and Son, Adagio for TRON
+ test/fix MuseScore PDF+MIDI: Avatar (or render MusicXML?)
+ seek, NKI, FIR reverb
+Touchbook: rsync, ARM, taskbar, desktop, book, hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition, CAS
+Fibermesh
+Apps: fix desktop leak, shell, file manager, search, imap, torrent, irc, video
+Own: inflate, jpeg, mp3, font, ssl
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git, static analyzer, interpreter, profiler, compiler
-touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

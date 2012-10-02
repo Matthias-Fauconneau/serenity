@@ -61,7 +61,9 @@ struct Music : Widget {
             //openSheet("Where's Hiccup"_);
             //openSheet("Romantic Flight (Easy)"_);
             //openSheet("Test Drive (Easy)"_);
-            openSheet("Forbidden Friendship (Easy)"_);
+            //openSheet("Forbidden Friendship (Easy)"_);
+            //openSheet("Kingdom Dance"_);
+            openSheet("Turret Opera (Cara Mia)"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
@@ -75,9 +77,9 @@ struct Music : Widget {
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float top,float bottom) {
+    void nextStaff(float previous,float) {
         float scale = sheet.size.x/(sheet.x2-sheet.x1)/sheet.normalizedScale;
-        sheet.center(int2(sheet.size.x/2,scale*(top+bottom)/2));
+        sheet.delta.y = -scale*previous;
     }
 
     /// Toggles MIDI playing
@@ -97,6 +99,8 @@ struct Music : Widget {
     /// Opens the given PDF+MIDI sheet
     void openSheet(uint index) { openSheet(sheets[index].text); }
     void openSheet(const ref<byte>& name) {
+        if(play) togglePlay();
+        score.clear();
         window.setTitle(name);
         midi.open(readFile(string(name+".mid"_),"Sheets"_));
         sheet.open(string(name+".pdf"_),"Sheets"_);
@@ -106,7 +110,6 @@ struct Music : Widget {
         window.widget=&sheet.area();
         window.setSize(int2(-1,-1));
         window.render();
-        //togglePlay();
-        sheet.center(int2(0,999999));
+        midi.seek(0); score.seek(0);
     }
 } application;
