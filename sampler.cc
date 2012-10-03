@@ -78,7 +78,7 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->cache.decode(1<<16); //first frames
+                sample->cache.decode(1<<13); //first frames
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -140,7 +140,6 @@ float Note::actualLevel(uint size) const {
 }
 
 void Sampler::noteEvent(int key, int velocity) {
-    Locker lock(noteReadLock);
     Note* current=0;
     if(velocity==0) {
         for(int i=0;i<3;i++) for(Note& note: notes[i]) if(note.key==key) {
@@ -168,9 +167,11 @@ void Sampler::noteEvent(int key, int velocity) {
                 if(level>8) level=8;
             }
             note.level=(float4)__(level,level,level,level);
-            array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
-            if(notes.size()==notes.capacity()) {Locker lock(noteWriteLock); notes.reserve(notes.capacity()+1); log("size",notes.capacity());}
-            notes << move(note);
+            {Locker lock(noteReadLock);
+                array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
+                if(notes.size()==notes.capacity()) {Locker lock(noteWriteLock); notes.reserve(notes.capacity()+1); log("size",notes.capacity());}
+                notes << move(note);
+            }
             return;
         }
     }
@@ -182,7 +183,7 @@ void Sampler::noteEvent(int key, int velocity) {
 
 void Note::decode(uint need) {
     assert(need<=buffer.capacity);
-    if(readCount<=int(need) && blockSize && (int)writeCount>=blockSize) {
+    while(readCount<=int(need) && blockSize && (int)writeCount>=blockSize) {
         int size=blockSize; writeCount.acquire(size); FLAC::decodeFrame(); readCount.release(size);
     }
 }
@@ -196,7 +197,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     Locker lock(noteWriteLock);
     uint size=1<<16; // up to full buffer
     for(int i=0;i<3;i++) for(Note& note: notes[i]) size=min(size,note.buffer.size); //only predecode the least buffered notes
-    size = max(size,1u<<10); //minimum in case all notes are nearly on underrun
+    size = max(size,1u<<14); //minimum in case all notes are nearly on underrun
     for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(size); //predecode all notes with buffer under size
 
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
@@ -215,7 +216,10 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 inline void mix(float4& level, float4 step, float4* out, float4* in, uint size) { for(uint i: range(size)) { out[i] += level * in[i]; level*=step; } }
 void Note::read(float4* out, uint size) {
     if(blockSize==0 && readCount<int(size*2)) return; // end of stream
-    readCount.acquire(size*2); //ensure decoder follows
+    if(!readCount.tryAcquire(size*2)) {
+        log("decoder underrun");
+        readCount.acquire(size*2); //ensure decoder follows
+    }
     uint beforeWrap = (buffer.capacity-readIndex)/2;
     if(size>beforeWrap) {
         mix(level,step,out,(float4*)(buffer+readIndex),beforeWrap);

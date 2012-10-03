@@ -67,8 +67,8 @@ struct Music : Widget {
             //openSheet("Brave Adventurers"_);
             //openSheet("Father and Son"_);
             //openSheet("Adagio for TRON"_);
-            //openSheet("Inception - Time"_);
-            openSheet("Avatar"_);
+            openSheet("Inception - Time"_);
+            //openSheet("Avatar"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
@@ -82,9 +82,9 @@ struct Music : Widget {
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float previous,float) {
+    void nextStaff(float previous, float next) {
         float scale = sheet.size.x/(sheet.x2-sheet.x1)/sheet.normalizedScale;
-        sheet.delta.y = -scale*previous;
+        sheet.delta.y = -max(scale*previous, scale*next-sheet.size.y);
     }
 
     /// Toggles MIDI playing
@@ -108,6 +108,7 @@ struct Music : Widget {
         score.clear();
         window.setTitle(name);
         midi.open(readFile(string(name+".mid"_),"Sheets"_));
+        sheet.delta=0;
         sheet.open(string(name+".pdf"_),"Sheets"_);
         score.synchronize(move(midi.notes));
         debug(sheet.setAnnotations(score.debug);)

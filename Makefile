@@ -34,6 +34,7 @@ INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_feeds = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_music = icons/$(TARGET).png $(TARGET).desktop
+INSTALL_monitor = $(TARGET).desktop
 
 all: prepare $(BUILD)/$(TARGET)
 

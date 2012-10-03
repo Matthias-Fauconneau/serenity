@@ -74,4 +74,4 @@ struct Monitor : Timer {
         this->system=move(n); this->process=move(process);
         setAbsolute(currentTime()+1);
     }
-} monitor;
+} application;

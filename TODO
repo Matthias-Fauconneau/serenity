@@ -1,6 +1,6 @@
 Music:
- test/fix MuseScore PDF+MIDI: Avatar (or render MusicXML?)
- convex polygon fill, seek, NKI, FIR reverb
+ test/fix MuseScore PDF+MIDI: Avatar
+ polygon fill, seek, NKI, FIR reverb
 Touchbook: rsync, ARM, taskbar, desktop, book
 Fibermesh
 Apps: fix desktop leak, runner, shell, file manager, search, imap, torrent, video, irc

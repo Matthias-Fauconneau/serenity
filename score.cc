@@ -33,7 +33,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==3/*treble*/||code==5/*bass*/) {
                 if(pos.y-lastClef.y>202) {
                     staffs << (lastClef.y+90);
-                    { static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
+                    //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
                 lastClef=pos;
             }
@@ -45,7 +45,6 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==66) duration = 8; //half
             else if(code==39) duration = 16; //whole
             else if(code==71/*Opus treble*/||code==11/*Opus bass*/||code==214/*Emmentaler C key*/) {
-                //log(pos.y-lastClef.y);
                 if(pos.y-lastClef.y>154) staffs << (lastClef.y+90);
                 lastClef=pos;
             }
@@ -175,6 +174,9 @@ trillCancelTie: ;
     }
     for(Tie t : tied) notes[t.ri][t.rx].remove(t.ry);
 
+    /// Flatten sorted notes
+    uint n=0; for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) { positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; }
+
 #if 0 /// Remove muted double notes (necessary to sync with HTTYD sheets)
     for(map<int, map< int, Note> >& staff : notes) {
         int lastX=0;
@@ -243,32 +245,6 @@ spurious: ;
         }
     }*/
 
-    /// Synchronize notes to MIDI track
-    array<int> MIDI; //flatten chords for robust MIDI synchronization
-    for(const Chord& chord: chords.values) MIDI<<chord;
-    if(MIDI.size()) {
-        array<vec2> lastChord;
-        //bool lastSync=true;
-        uint n=0; for(Staff& staff: notes) for(int x : staff.keys) {
-            int note=0; array<vec2> chord; int lastY=0;
-            for(int y : staff.at(x).keys) {
-                if(lastY && n>0 && n<MIDI.size() && y>lastY && MIDI[n]<MIDI[n-1]) {
-                    debug[vec2(x,-y)]=string("\\\\"_);
-                    continue;
-                }
-                if(!repeats) { //FIXME
-                    if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) {
-                        debug[vec2(x,-y)]=string("////"_);
-                        chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
-                    }
-                    note = n>=MIDI.size() ? 0 : MIDI[n];
-                }
-                chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; lastY=y;
-            }
-            lastChord=move(chord);
-        }
-    }
-
     /// Detect and explicit repeats
     int startIndex=-1;
     for(vec2 pos : repeats) {
@@ -286,20 +262,26 @@ spurious: ;
         }
     }
 
-    assert(indices.size()==positions.size());
-    //assert(MIDI.size()>=positions.size(),MIDI.size(),positions.size()); //FIXME
-    //assert(MIDI.size()==positions.size(),MIDI.size(),positions.size()); //FIXME
-
-    /// Debug
-#if 1
-    for(uint i: range(min(MIDI.size(),positions.size()))) {
-        /*if(debug.contains(positions[i])) {
-            assert(debug[positions[i]]==dec(MIDI[i]),debug[positions[i]],dec(MIDI[i]));
-            debug[positions[i]]=dec(MIDI[i])+"²"_;
-        } else debug[positions[i]]=dec(MIDI[i]);*/
-        debug.insertMulti(positions[i]+vec2(12,0),dec(MIDI[i]));
+    /// Synchronize notes to MIDI track
+    array<int> MIDI; //flatten chords for robust MIDI synchronization
+    for(const Chord& chord: chords.values) MIDI<<chord;
+    vec2 lastPos=vec2(0,0); int lastNote=0;
+    for(uint i=0; i<MIDI.size() && i<positions.size();) {
+        vec2 pos=positions[i]; int note = MIDI[i];
+        /*if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) { //double notes in MIDI
+                    debug[vec2(x,-y)]=string("+++"_);
+                    chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
+                }*/
+        if(lastPos && lastNote && pos.x==lastPos.x && pos.y<lastPos.y && note<lastNote) { // missing note in MIDI
+            debug[pos+vec2(12,0)]=string("---"_);
+            positions.removeAt(i); indices.removeAt(i);
+        } else {
+            debug.insertMulti(positions[i]+vec2(12,0),dec(MIDI[i]));
+            i++;
+        }
+        lastPos=pos; lastNote=note;
     }
-#endif
+
     for(Line l: ties) debug[(l.a+l.b)/2.f]=string("^"_);
     for(float y: staffs) debug[vec2(0,y-16)]=string("___________"_);
 
@@ -329,7 +311,7 @@ void Score::seek(uint unused time) {
 void Score::noteEvent(int key, int vel) {
     if(vel) {
         if(!expected.contains(key)){/*log(key,"expected",expected);*/ return;}
-        active.insertMulti(key,expected[key]);
+        active.insertMulti(key,expected.at(key));
         expected.remove(key);
     } else if(key) {
         if(active.contains(key)) active.remove(key);
@@ -342,14 +324,14 @@ void Score::noteEvent(int key, int vel) {
             expected.insertMulti(key, i);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                 assert(currentStaff<staffs.size());
-                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff]);
+                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[min(staffs.size()-1,currentStaff+2)]);
                 currentStaff++;
             }
             i++;
         }
     }
     map<int,byte4> activeNotes;
-    for(int i: expected.values) activeNotes.insert(indices[i],blue);
+    for(int i: expected.values) activeNotes.insertMulti(indices[i],blue);
     //for(int i: active.values) if(!activeNotes.contains(indices[i])) activeNotes.insert(indices[i],red);
     activeNotesChanged(activeNotes);
 }
