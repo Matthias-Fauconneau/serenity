@@ -141,3 +141,14 @@ template<class A, class B> bool operator >(const A& a, const B& b) { return b<a;
 
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
+// Floating-point operations
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
+inline float sqrt(float f) { return __builtin_sqrtf(f); }
+
+// Trigonometric operations
+const double PI = 3.14159265358979323846;
+inline double cos(double t) { return __builtin_cos(t); }
+inline double sin(double t) { return __builtin_sin(t); }

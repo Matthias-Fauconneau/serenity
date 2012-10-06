@@ -1,6 +1,5 @@
-TP: integral, polar, print, simulation
 Music:
- test/fix MuseScore->Lilypond-> PDF+MIDI: Avatar
+ test/fix MuseScore->Lilypond->PDF+MIDI: Avatar
  polygon fill, seek, NKI, FIR reverb
 Touchbook: update ARM syscalls, book
 Fibermesh

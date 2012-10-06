@@ -168,7 +168,8 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     }
     x1 = +__FLT_MAX__, x2 = -__FLT_MAX__; vec2 pageOffset=0;
     array<Variant> pages = move(parse(xref[catalog.at("Pages"_).number]).dict.at("Kids"_).list);
-    for(const Variant& page : pages) {
+    for(uint i=0; i<pages.size(); i++) {
+        const Variant& page = pages[i];
         uint pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
         auto dict = parse(xref[page.number]).dict;
         if(dict.contains("Resources"_)) {
@@ -220,13 +221,13 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
 #define OP3(c1,c2,c3) break;case c1|c2<<8|c3<<16:
 #define f(i) args[i].number
 #define p(x,y) (Cm*vec2(f(x),f(y)))
-                    OP('b') drawPath(path,Close|Stroke|Fill|Winding);
-                    OP2('b','*') drawPath(path,Close|Stroke|Fill|OddEven);
-                    OP('B') drawPath(path,Stroke|Fill|Winding);
-                    OP2('B','*') drawPath(path,Stroke|Fill|OddEven);
+                    OP('b') drawPath(path,Close|Stroke|Fill|Winding|Trace);
+                    OP2('b','*') drawPath(path,Close|Stroke|Fill|OddEven|Trace);
+                    OP('B') drawPath(path,Stroke|Fill|Winding|Trace);
+                    OP2('B','*') drawPath(path,Stroke|Fill|OddEven|Trace);
                     OP('c') path.last() << p(0,1) << p(2,3) << p(4,5);
                     OP('d') {} //setDashOffset();
-                    OP('f') drawPath(path,Fill|Winding);
+                    OP('f') drawPath(path,Fill|Winding|Trace);
                     OP2('f','*') drawPath(path,Fill|OddEven|Trace);
                     OP('g') ;//brushColor = f(0);
                     OP('h') ;//close path
@@ -288,6 +289,8 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
         for(uint i: range(pageFirstLine,lines.size())) lines[i].a += offset, lines[i].b += offset;
         for(uint i: range(pageFirstCharacter,characters.size())) characters[i].pos += offset;
         for(uint i: range(pageFirstPath,paths.size())) for(vec2& pos: paths[i]) pos += offset;
+        // add any children
+        pages << move(dict["Kids"_].list);
     }
     y2=pageOffset.y;
     for(Line& l: lines) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; assert(l.a!=l.b,l.a,l.b); }

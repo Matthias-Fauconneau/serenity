@@ -114,8 +114,8 @@ struct Music : Widget {
         if(existsFile(string(name+".pdf"_),folder)) {
             sheet.open(string(name+".pdf"_),folder);
             score.synchronize(move(midi.notes));
-            debug(sheet.setAnnotations(score.debug);)
-                    window.backgroundCenter=window.backgroundColor=0xFF;
+            sheet.setAnnotations(score.debug);
+            window.backgroundCenter=window.backgroundColor=0xFF;
             window.widget=&sheet.area();
             window.setSize(int2(-1,-1));
             window.render();

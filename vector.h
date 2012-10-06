@@ -2,17 +2,6 @@
 /// \file vector.h Vector types and operations
 #include "string.h"
 
-// Floating-point operations
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
-inline float sqrt(float f) { return __builtin_sqrtf(f); }
-
-// Trigonometric operations
-const double PI = 3.14159265358979323846;
-inline double cos(double t) { return __builtin_cos(t); }
-inline double sin(double t) { return __builtin_sin(t); }
-
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, class T, int N> struct vector : V<T> {
@@ -61,13 +50,15 @@ generic bool operator <=(const vector& u, const vector& v) { for(int i=0;i<N;i++
 generic bool operator ==(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]!=v[i]) return false; return true; }
 generic bool operator >=(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<v[i]) return false; return true; }
 generic bool operator >(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
-inline bool isNaN(float x) { return __builtin_isnan(x); }
-generic bool isNaN(const vector& v){ for(int i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
 
 generic vector abs(const vector& v){ vector r; for(int i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
 generic vector min(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=min(a[i],b[i]); return r; }
 generic vector max(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=max(a[i],b[i]); return r; }
 generic vector clip(const vector& min, const vector& x, const vector& max){ vector r; for(int i=0;i<N;i++) r[i]=clip(min[i],x[i],max[i]); return r;  }
+
+generic float dot(const vector& a, const vector& b) { float l=0; for(int i=0;i<N;i++) l+=a[i]*b[i]; return l; }
+generic float length(const vector& a) { return sqrt(dot(a,a)); }
+generic vector normalize(const vector& a){ return a/length(a); }
 
 generic string str(const vector& v) { string s = string("("_); for(int i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
 
@@ -81,6 +72,9 @@ typedef vector<xy,int,2> int2;
 /// \typedef vector<xy,float,2> vec2
 /// Floating-point x,y vector
 typedef vector<xy,float,2> vec2;
+inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
+//inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
+//inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
 
 /// Axis-aligned rectangle
 struct Rect {

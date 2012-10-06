@@ -74,7 +74,6 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->cache.decode(1<<13); //first frames
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -199,10 +198,12 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
 
     if(current<samples.size()) {
-        const Sample& s=samples[current++];
+        Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-        debug(current=samples.size(); if(0)) s.map.lock(size); //not locking in debug mode
+        current=samples.size(); //DEBUG
+        //s.cache.decode(1<<12);
+        //s.map.lock(size);
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }

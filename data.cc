@@ -99,9 +99,10 @@ ref<byte> TextData::identifier(const ref<byte>& special) {
 char TextData::character() {
     byte c = next();
     if(c!='\\') return c;
-    c = next();
+    c = peek();
     int i="\'\"nrtbf()\\"_.indexOf(c);
-    if(i<0) { error("Invalid escape sequence"_,str(c),peek(16)); return '?'; }
+    if(i<0) { /*error("Invalid escape sequence '\\"_+str(c)+"'"_);*/ return '/'; }
+    advance(1);
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 

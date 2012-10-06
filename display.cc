@@ -80,3 +80,18 @@ void line(float x1, float y1, float x2, float y2, byte4 color) {
         intery += gradient;
     }
 }
+
+// Thick line hack
+void line(float x1, float y1, float x2, float y2, float w, byte4 color) {
+    line(x1,y1,x2,y2,color);
+    if(w>1) {
+        float dx = x2 - x1, dy = y2 - y1;
+        if(abs(dx)<abs(dy)) {
+            line(x1-1,y1,x2-1,y2,color);
+            line(x1+1,y1,x2+1,y2,color);
+        } else {
+            line(x1,y1-1,x2,y2-1,color);
+            line(x1,y1+1,x2,y2+1,color);
+        }
+    }
+}
