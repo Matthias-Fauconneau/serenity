@@ -132,7 +132,7 @@ array<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
     array<byte> data(w*h*4+h); data.setSize(data.capacity());
     byte* dst = data.data(); const byte* src = (byte*)image.data;
-    for(uint unused y: range(h)) { *dst++ = 0; copy(dst,src,w*4); dst+=w*4, src+=w*4; }
+    for(uint unused y: range(h)) { *dst++ = 0; for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]); dst+=w*4, src+=w*4; }
     return data;
 }
 
@@ -144,7 +144,7 @@ array<byte> encodePNG(const Image& image) {
 
     array<byte> IDAT = "IDAT"_+"\x78\x01"_; //zlib header: method=8, window=7, check=0, level=1
     array<byte> data = filter(image);
-    for(uint i: range(data.size())) {
+    for(uint i=0; i<data.size();) {
         uint16 len = min(data.size()-i,65535u), nlen = ~len;
         IDAT << (i+len==data.size()) << raw(len) << raw(nlen) << data.slice(i,len);
         i+=len;

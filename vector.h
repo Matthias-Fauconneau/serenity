@@ -2,6 +2,17 @@
 /// \file vector.h Vector types and operations
 #include "string.h"
 
+// Floating-point operations
+inline int floor(float f) { return __builtin_floorf(f); }
+inline int round(float f) { return __builtin_roundf(f); }
+inline int ceil(float f) { return __builtin_ceilf(f); }
+inline float sqrt(float f) { return __builtin_sqrtf(f); }
+
+// Trigonometric operations
+const double PI = 3.14159265358979323846;
+inline double cos(double t) { return __builtin_cos(t); }
+inline double sin(double t) { return __builtin_sin(t); }
+
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, class T, int N> struct vector : V<T> {

@@ -30,11 +30,6 @@
 #include "memory.h"
 #include "simd.h"
 
-/// Trigonometric primitives
-const double PI = 3.14159265358979323846;
-inline double sin(double t) { return __builtin_sin(t); }
-inline double atan(double f) { return __builtin_atan(f); }
-
 /// SIMD
 #if __clang__
 inline float4 loadu(const float *p) { struct float4u { float4 v; } __attribute((__packed__, __may_alias__)); return ((float4u*)p)->v; }

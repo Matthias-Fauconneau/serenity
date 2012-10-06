@@ -97,13 +97,13 @@ array< ref<byte> > split(const ref<byte>& str, byte sep) {
     auto b=str.begin();
     auto end=str.end();
     for(;;) {
-        if(b!=end && *b==sep) ++b;
         auto e = b;
         while(e!=end && *e!=sep) ++e;
         if(b==end) break;
         list << ref<byte>(b,e);
         if(e==end) break;
         b = e;
+        if(b!=end && *b==sep) ++b;
     }
     return list;
 }

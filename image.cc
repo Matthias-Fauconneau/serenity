@@ -11,9 +11,9 @@ Image resize(const Image& image, uint width, uint height) {
     if(!image) return Image();
     if(width==image.width && height==image.height) return copy(image);
     Image target(width, height, image.alpha);
-    const byte4* src = image.data;
     byte4* dst = (byte4*)target.data;
     if(image.width/width==image.height/height && !(image.width%width) && !(image.height%height)) { //integer box
+        const byte4* src = image.data;
         int scale = image.width/width;
         for(uint unused y: range(height)) {
             for(uint unused x: range(width)) {
@@ -28,10 +28,29 @@ Image resize(const Image& image, uint width, uint height) {
             }
             src += (scale-1)*image.stride;
         }
-    } else { //nearest
-        for(uint y: range(height)) {
-            for(uint x: range(width)) {
-                *dst = src[(y*image.height/height)*image.stride+x*image.width/width];
+    } else {
+        Image mipmap;
+        bool needMipmap = image.width>2*width || image.height>2*height;
+        log(image.width,width,image.height,height,needMipmap);
+        if(needMipmap) mipmap = resize(image, image.width/max(1u,(image.width/width)), image.height/max(1u,image.height/height));
+        const Image& source = needMipmap?mipmap:image;
+        //bilinear
+        const byte4* src = source.data;
+        int stride = source.stride*4;
+        float scaleX = source.width/float(width), scaleY = source.height/float(height);
+        for(uint dy: range(height)) {
+            for(uint dx: range(width)) {
+                float x = dx*scaleX, y=dy*scaleY;
+                const int fx = round(x*256), fy = round(y*256);
+                int ix = fx/256, iy = fy/256;
+                int u = fx%256, v = fy%256;
+                byte* s = (byte*)src+iy*stride+ix*4;
+                byte4 d;
+                for(int i=0; i<4; i++) {
+                    d[i] = ((s[       i] * (256-u) + s[       4+i] * u) * (256-v)
+                            + (s[stride+i] * (256-u) + s[stride+4+i] * u) * (    v) ) / (256*256);
+                }
+                *dst = d;
                 dst++;
             }
         }

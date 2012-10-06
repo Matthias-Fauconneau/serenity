@@ -44,10 +44,9 @@ inline void plot(uint x, uint y, float c, bool transpose, int4 invert) {
     if(transpose) swap(x,y);
     if(x<framebuffer.width && y<framebuffer.height) {
         byte4& d = framebuffer(x,y);
-        d=byte4(max(int4(0),int4(d)-int4(int(c*0xFF)*invert/0xFF)));
+        d=byte4(max<int>(0,d.b-c*invert.b),max<int>(0,d.g-c*invert.g),max<int>(0,d.r-c*invert.r),min<int>(255,d.a+c*invert.a));
     }
 }
-inline int round(float x) { return int(x + 0.5); }
 inline float fpart(float x) { return x-int(x); }
 inline float rfpart(float x) { return 1 - fpart(x); }
 void line(float x1, float y1, float x2, float y2, byte4 color) {

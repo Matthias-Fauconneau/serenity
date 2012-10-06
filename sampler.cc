@@ -7,10 +7,6 @@
 #include "string.h"
 
 /// Floating point operations
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
-inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline float exp2(float x) { return __builtin_exp2f(x); }
 inline float log2(float x) { return __builtin_log2f(x); }
 inline float exp10(float x) { return exp2(x*log2(10)); }

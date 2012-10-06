@@ -7,18 +7,29 @@
 #include "widget.h"
 #include "window.h"
 #include "pdf.h" //mat32
+#include "png.h"
 
 struct Wing : Widget {
-    Window window __(this,int2(5*256,2*256),"Graph"_);
-    struct Point : vec2 { Point(vec2 p, string&& label, int sign):vec2(p),label(move(label)),sign(sign){} string label; int sign; };
-    struct Curve : array<Point> { vec2 min,max; string name; double integral; };
+    //int width=3508, height=2480; //landscape A4 @300dpi
+    int width = 3508/1280*1280, height = 2480*width/3508/2*2; //landscape A4 with width rounded to nearest width multiple of 1280 (screen width)
+    Window window __(this,int2(1280,height*1280/width),"Graph"_);
+    struct Point : vec2 { Point(vec2 p, string&& label):vec2(p),label(move(label)){} string label; };
+    struct Curve : array<Point> { vec2 min,mean,max; string name; float integral=0; };
     array< Curve > curves;
+    Image page;
     Wing() {
         window.localShortcut(Escape).connect(&exit);
         window.backgroundColor=window.backgroundCenter=0xFF;
 
         parse("M1PAM/lift"_);
         parse("M1PAM/drag"_);
+
+        Image page __(width,height);
+        framebuffer=share(page); currentClip = Rect(page.size());
+        fill(Rect(framebuffer.size()),white);
+        render(int2(0,page.height/9),page.size());
+        writeFile("plot.png"_,encodePNG(page),home());
+        this->page=move(page);
     }
     void parse(const ref<byte>& path) {
         TextData text = readFile(path,home());
@@ -32,56 +43,97 @@ struct Wing : Widget {
             uint i=0; for(Field field: fields) data[i++] << field;
         }
         array<string> labels; for(Field label: data[0]) labels<< string(label);
-        array<int> signs; for(Field sign: data[1]) signs<< (sign=="+"_? 1 : -1);
-        array<double> X; for(Field x: data[2]) X<< toDecimal(x);
+        array<float> X; for(Field x: data[1]) X<< toDecimal(x);
         array<Curve> curves;
-        for(const array<Field>& Y: data.slice(3)) {
+        for(uint a: range(2,data.size())) {
             Curve curve;
+            curve.name = string(headers[a]);
+            const array<Field>& Y = data[a];
             for(uint i: range(Y.size())) {
-                double y = toDecimal(Y[i]);
-                curve<< Point(vec2(X[i],y), copy(labels[i]), signs[i]);
+                float y = toDecimal(Y[i]);
+                curve<< Point(vec2(X[i],y), copy(labels[i]));
             }
             curves << move(curve);
         }
         vec2 min=0,max=0;
-        for(const Curve& points: curves) {
-            for(vec2 p: points) {
+        for(Curve& curve: curves) {
+            vec2 sum=0;
+            for(vec2 p: curve) {
                 if(isNaN(p)) continue;
                 if(p.x<min.x) min.x=p.x; else if(p.x>max.x) max.x=p.x;
                 if(p.y<min.y) min.y=p.y; else if(p.y>max.y) max.y=p.y;
+                sum += p;
             }
+            curve.mean = sum/float(curve.size());
         }
         for(Curve& curve: curves) {
             curve.min=min, curve.max=max;
             /// Compute numeric integral (linear order)
-            double integral=0;
-            uint last=0;
-            for(uint i: range(1,curve.size())) {
+            float integral=0;
+            uint last=curve.size()-1;
+            for(uint i: range(curve.size())) {
                 const Point &a = curve[last], &b=curve[i];
                 if(isNaN(b)) continue;
-                /*float width = b.x-a.x;
-                integral += a
-                last=i;*/
+                float width = b.x-a.x; //signed
+                float height = a.y; //rectangle (0th order)
+                float delta = b.y-a.y; //triangle (1st order)
+                integral += width*(height+delta/2);
+                last=i;
             }
+            curve.integral = integral;
             this->curves << move(curve);
         }
     }
     void render(int2 position, int2 size) {
-        for(uint a: range(curves.size())) plot(curves[a],position+int2((a%5)*size.x/5,a/5*(size.y/2)),int2(size.x/5,size.y/2));
+        if(page) { blit(position,resize(page,size.x,page.height*size.x/page.width)); return; }
+        int width = size.x/6, margin=width/6;
+        int height = size.y/3;
+        for(uint a: range(curves.size()/2)) {
+            int x = margin/2+a*(width+margin);
+            Text(string("Inclinaison = "_+curves[a].name+"°"_),32).render(int2(x+width/2,height/8)+int2(-width/2,0),int2(width,0)); //column title
+            // Lift plot
+            plot(curves[a],         position +int2(x,0*height), int2(width,height), "x"_,"p"_,"n"_);
+            // Drag plot
+            plot(curves[5+a],    position +int2(x,1*height), int2(width,height), "z"_,"p"_,"a"_);
+
+            // Vector plot
+            vec2 center = vec2(position + int2(x,2*height) + int2(width,height)/2 - int2(0,height/8));
+            mat32 M(size.y/6,0,0,-size.y/6,center.x,center.y);
+
+            float angle = toDecimal(curves[a].name)*PI/180;
+            float normal = curves[a].integral;
+            vec2 L = normal*vec2(sin(angle),cos(angle));
+            float axial = curves[5+a].integral;
+            vec2 D = axial*vec2(cos(angle),sin(angle));
+
+            line(center,M*L,cyan); //normal
+            line(center,M*D,magenta); //axial
+            line(center,M*(L+D),blue); //sum
+            float drag = (L+D).x;
+            line(center,M*vec2(drag,0),red); //drag
+            float lift = (L+D).y;
+            line(center,M*vec2(0,lift),green); //lift
+            Text(str("Lift =",lift),32).render(int2(center)+int2(-width/2,24),int2(width,0));
+            Text(str("Drag =",drag),32).render(int2(center)+int2(-width/2,2*24),int2(width,0));
+            Text(str("Lift/Drag =",lift/drag),32).render(int2(center)+int2(-width/2,3*24),int2(width,0)); //lift/drag ratio
+        }
     }
-    void plot(const Curve& curve, int2 position, int2 size) {
+    void plot(const Curve& curve, int2 position, int2 size, const ref<byte>& xLabel, const ref<byte>& yLabel, const ref<byte>& aLabel) {
         vec2 scale = vec2(size)/(curve.max-curve.min), offset = -curve.min*scale;
         mat32 M(scale.x,0,0,-scale.y,position.x+offset.x,position.y+size.y-offset.y); //[min..max] -> [position..position+size]
-        line(M*vec2(curve.min.x,0),M*vec2(curve.max.x,0));
-        line(M*vec2(0,curve.min.y),M*vec2(0,curve.max.y));
-        uint last=0;
-        for(uint i: range(1,curve.size())) {
+        line(M*vec2(curve.min.x,0),M*vec2(curve.max.x,0)); // X axis
+        Text(string(xLabel),32).render(int2(M*vec2(curve.max.x,0))+int2(16,-16)); // X axis label
+        line(M*vec2(0,curve.min.y),M*vec2(0,curve.max.y)); // Y axis
+        Text(string(yLabel),32).render(int2(M*vec2(0,curve.max.y))+int2(-width/2,-32),int2(width,0)); // Y axis label
+        uint last=curve.size()-1;
+        for(uint i: range(curve.size())) {
             const Point &a = curve[last], &b=curve[i];
             if(isNaN(b)) continue;
             if(a.x!=b.x) line(M*a,M*b, b.x>a.x?red:blue);
-            Text(copy(b.label),10).render(int2(M*b)+int2(-8,b.sign==1?-16:0),int2(16,16));
+            Text(copy(b.label),24).render(int2(M*b)+int2(-size.x/2,b.x>a.x?-24:0),int2(size.x,0));
             last=i;
         }
+        Text(aLabel+"="_+ftoa(curve.integral),32).render(int2(M*curve.mean),int2(0,0));
     }
 } application;
 #endif

@@ -344,7 +344,6 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
 }
 
 int2 PDF::sizeHint() { return int2(scale*(x2-x1),scale*(y2-y1)); }
-inline int round(float x) { return int(x + 0.5); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
 

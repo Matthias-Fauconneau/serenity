@@ -18,8 +18,11 @@ constexpr byte4 lighten __(0xFF, 0xFF, 0xFF, 0x40);
 constexpr byte4 highlight __(0xE0, 0xC0, 0x80, 0xFF);
 constexpr byte4 white __(0xFF, 0xFF, 0xFF, 0xFF);
 constexpr byte4 blue __(0xFF, 0, 0, 0xFF);
+constexpr byte4 cyan __(0xFF, 0xFF, 0, 0xFF);
 constexpr byte4 green __(0, 0xFF, 0, 0xFF);
+constexpr byte4 yellow __(0, 0xFF, 0xFF, 0xFF);
 constexpr byte4 red __(0, 0, 0xFF, 0xFF);
+constexpr byte4 magenta __(0xFF, 0, 0xFF, 0xFF);
 
 /// Fills pixels inside \a rect with \a color
 void fill(Rect rect, byte4 color=black, bool blend=true);
