@@ -39,7 +39,7 @@ struct Monitor : Timer {
         map<ref<byte>, uint> memory;
         for(TextData s = File("/proc/meminfo"_).readUpTo(4096);s;) {
             ref<byte> key=s.until(':'); s.skip();
-            uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
+            uint value=toInteger(s.untilAny(" \n"_)); s.line();
             memory[key]=value;
         }
         map<ref<byte>, string>& o = this->system;

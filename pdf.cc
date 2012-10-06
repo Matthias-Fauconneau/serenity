@@ -25,7 +25,7 @@ string str(const Variant& o) {
 static Variant parse(TextData& s) {
     s.skip();
     if("0123456789.-"_.contains(s.peek())) {
-        double number = s.number();
+        double number = s.decimal();
         if(s[0]==' '&&(s[1]>='0'&&s[1]<='9')&&s[2]==' '&&s[3]=='R') s.advance(4); //FIXME: regexp
         assert(!__builtin_isnan(number));
         return number;
@@ -343,50 +343,8 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
     }
 }
 
-/// Xiaolin Wu's line algorithm
-inline void plot(uint x, uint y, float c, bool transpose) { //TODO: gamma correct
-    if(transpose) swap(x,y);
-    if(x<framebuffer.width && y<framebuffer.height) {
-        byte4& d = framebuffer(x,y);
-        d=max(0,d.g-int(255*c));
-    }
-}
-inline int round(float x) { return int(x + 0.5); }
-inline float fpart(float x) { return x-int(x); }
-inline float rfpart(float x) { return 1 - fpart(x); }
-void line(float x1, float y1, float x2, float y2) {
-    float dx = x2 - x1, dy = y2 - y1;
-    bool transpose=false;
-    if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
-    if(x2 < x1) swap(x1, x2), swap(y1, y2);
-    float gradient = dy / dx;
-    int i1,i2; float intery;
-    {
-        float xend = round(x1), yend = y1 + gradient * (xend - x1);
-        float xgap = rfpart(x1 + 0.5);
-        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose);
-        plot(int(xend), int(yend)+1, fpart(yend) * xgap, transpose);
-        i1 = int(xend);
-        intery = yend + gradient; // first y-intersection for the main loop
-    }
-    {
-        float xend = round(x2), yend = y2 + gradient * (xend - x2);
-        float xgap = fpart(x2 + 0.5);
-        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose);
-        plot(int(xend), int(yend) + 1, fpart(yend) * xgap, transpose);
-        i2 = int(xend);
-    }
-
-    // main loop
-    for(int x=i1+1;x<i2;x++) {
-        plot(x, int(intery), rfpart(intery), transpose);
-        plot(x, int(intery)+1, fpart(intery), transpose);
-        intery += gradient;
-    }
-}
-
 int2 PDF::sizeHint() { return int2(scale*(x2-x1),scale*(y2-y1)); }
-
+inline int round(float x) { return int(x + 0.5); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
 

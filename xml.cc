@@ -11,7 +11,7 @@ static Element parse(const ref<byte>& document, bool html) {
         s.skip();
         if(s.match("</"_)) log("Unexpected","</"_+s.until('>')+">"_);
         else if(s.match('<')) root.children << unique<Element>(s,html);
-        else log("Unexpected '",s.until('\n'),"'");
+        else log("Unexpected '",s.line(),"'");
         s.skip();
     }
     return root;
@@ -27,7 +27,7 @@ Element::Element(TextData& s, bool html) {
     else if(s.match("!--"_)) { s.until("-->"_); return; }
     else if(s.match('?')){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
     else name = string(s.identifier("_-:"_));
-    if(!name) { log(s.slice(0,s.index)); log("expected tag name got",s.until('\n')); }
+    if(!name) { log(s.slice(0,s.index)); log("expected tag name got",s.line()); }
     if(html) name=toLower(name);
     s.skip();
     while(!s.match('>')) {

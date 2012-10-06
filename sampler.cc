@@ -36,7 +36,7 @@ uint availableMemory() {
     map<string, uint> info;
     for(TextData s = File("/proc/meminfo"_).readUpTo(4096);s;) {
         ref<byte> key=s.until(':'); s.skip();
-        uint value=toInteger(s.untilAny(" \n"_)); s.until('\n');
+        uint value=toInteger(s.untilAny(" \n"_)); s.line();
         info.insert(string(key), value);
     }
     return info.at(string("MemFree"_))+info.at(string("Inactive"_))+info.at(string("Active(file)"_));

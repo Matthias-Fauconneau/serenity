@@ -17,7 +17,6 @@ struct MidiFile {
     array<Track> tracks;
     int trackCount=0;
     uint midiClock=0;
-    uint minDelta=-1;
     typedef array<int> Chord;
     map<int,Chord> notes;
     signal<int, int> noteEvent;

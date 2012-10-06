@@ -10,20 +10,20 @@ array<Event> getEvents(Date query) {
     map<string, array<Date>> exceptions; //Exceptions for recurring events
     for(TextData s(file);s;) { //first parse all exceptions (may occur after recurrence definitions)
         if(s.match("except "_)) {
-            Date except=parse(s); s.skip(); string title=string(s.until('\n'));
+            Date except=parse(s); s.skip(); string title=string(s.line());
             exceptions[move(title)] << except;
-        } else s.until('\n');
+        } else s.line();
     }
 
     Date until; //End date for recurring events
     for(TextData s(file);s.skip(), s;) {
-        if(s.match("#"_)) s.until('\n'); //comment
+        if(s.match("#"_)) s.line(); //comment
         else if(s.match("until "_)) { until=parse(s); } //apply to all following recurrence definitions
-        else if(s.match("except "_)) s.until('\n'); //already parsed
+        else if(s.match("except "_)) s.line(); //already parsed
         else {
             Date date = parse(s); s.skip();
             Date end=date; if(s.match("-"_)) { end=parse(s); s.skip(); }
-            string title = string(s.until('\n'));
+            string title = string(s.line());
             if(query.day>=0) {
                 if(date.day>=0) { if(date.day!=query.day) continue; }
                 else if(query>until) continue;

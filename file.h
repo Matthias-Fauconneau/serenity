@@ -75,7 +75,7 @@ struct File : Stream {
     /// Returns file size
     int size() const;
     /// Seeks to \a index
-    void seek(int index);
+    //void seek(int index);
 };
 /// Returns whether \a file exists (as a file)
 bool existsFile(const ref<byte>& file, const Folder& at=root());

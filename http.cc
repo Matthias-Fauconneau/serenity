@@ -62,7 +62,7 @@ uint resolve(const ref<byte>& host) {
     static File dnsCache = File("dns"_,cache(),ReadWrite|Create|Append);
     static Map dnsMap = dnsCache;
     uint ip=-1;
-    for(TextData s(dnsMap);s;s.until('\n')) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
+    for(TextData s(dnsMap);s;s.line()) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
     bool negativeEntry=false; if(!ip) ip=-1, negativeEntry=true; //return false; //try to resolve negative entries again
     if(ip==uint(-1)) {
         static UDPSocket dns = UDPSocket(nameserver(), 53);

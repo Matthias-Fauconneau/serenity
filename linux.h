@@ -11,11 +11,17 @@
 #define r4 r8
 #define r5 r9
 #define kernel "syscall"
-#define clobber "rcx", "r11"
+#define clobber "rcx", "r11",
 #define rR "rax"
 #elif __arm
-#define attribute
+#define attribute __attribute((always_inline))
 #define rN r7
+#define r0 r0
+#define r1 r1
+#define r2 r2
+#define r3 r3
+#define r4 r4
+#define r5 r5
 #define kernel "swi 0"
 #define clobber
 #define rR "r0"
@@ -40,7 +46,7 @@
 #define syscall(type, name, args ...) \
     r(rN,sys::name); \
     register long r asm(rR); \
-    asm volatile(kernel: "=r" (r): "r"(rN), ## args : clobber, "memory"); \
+    asm volatile(kernel: "=r" (r): "r"(rN), ## args : clobber "memory"); \
     return (type)r;
 
 #define syscall0(type,name) \
@@ -93,7 +99,7 @@ syscall3(int, open, const char*,name, int,oflag, int,perms)
 syscall1(int, close, int,fd)
 syscall2(int, fstat, int,fd, struct stat*,buf)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
-syscall3(int, lseek, int,fd, long,offset, int,whence)
+//syscall3(int, lseek, int,fd, long,offset, int,whence)
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, munmap, void*,addr, long,len)
 syscall3(int, mprotect, void*,addr, long,len, int,prot)

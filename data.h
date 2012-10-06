@@ -138,20 +138,24 @@ struct TextData : virtual Data {
     ref<byte> untilEnd();
     /// Skips whitespaces
     void skip();
+    /// Reads until end of line
+    ref<byte> line();
     /// Reads one possibly escaped character
     char character();
     /// Reads a word [a-zA-Z"special"]*
     ref<byte> word(const ref<byte>& special=""_);
     /// Reads a identifier [a-zA-Z0-9"special"]*
     ref<byte> identifier(const ref<byte>& special=""_);
-    /// Advances while input match [0-9]
-    ref<byte> whileDecimal();
+    /// Advances while input match [0-9-+]
+    ref<byte> whileInteger();
     /// Reads an integer
     int integer();
-    /// Advances while input match [0-9a-fA-F]
+    /// Advances while input match [0-9a-fA-F-+]
     ref<byte> whileHexadecimal();
-    /// Reads a hexadecimal integer
+    /// Reads an hexadecimal integer
     int hexadecimal();
+    /// Advances while input match [0-9.-+]
+    ref<byte> whileDecimal();
     /// Reads a decimal number
-    double number();
+    double decimal();
 };

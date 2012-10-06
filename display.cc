@@ -38,3 +38,46 @@ void substract(int2 target, const Image& source, byte4 color) {
         d=byte4(max(int4(0),int4(d)-s));
     }
 }
+
+/// Xiaolin Wu's line algorithm
+inline void plot(uint x, uint y, float c, bool transpose, int4 invert) {
+    if(transpose) swap(x,y);
+    if(x<framebuffer.width && y<framebuffer.height) {
+        byte4& d = framebuffer(x,y);
+        d=byte4(max(int4(0),int4(d)-int4(int(c*0xFF)*invert/0xFF)));
+    }
+}
+inline int round(float x) { return int(x + 0.5); }
+inline float fpart(float x) { return x-int(x); }
+inline float rfpart(float x) { return 1 - fpart(x); }
+void line(float x1, float y1, float x2, float y2, byte4 color) {
+    int4 invert = int4(0xFF-color.b,0xFF-color.g,0xFF-color.r,color.a);
+    float dx = x2 - x1, dy = y2 - y1;
+    bool transpose=false;
+    if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
+    if(x2 < x1) swap(x1, x2), swap(y1, y2);
+    float gradient = dy / dx;
+    int i1,i2; float intery;
+    {
+        float xend = round(x1), yend = y1 + gradient * (xend - x1);
+        float xgap = rfpart(x1 + 0.5);
+        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, invert);
+        plot(int(xend), int(yend)+1, fpart(yend) * xgap, transpose, invert);
+        i1 = int(xend);
+        intery = yend + gradient; // first y-intersection for the main loop
+    }
+    {
+        float xend = round(x2), yend = y2 + gradient * (xend - x2);
+        float xgap = fpart(x2 + 0.5);
+        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, invert);
+        plot(int(xend), int(yend) + 1, fpart(yend) * xgap, transpose, invert);
+        i2 = int(xend);
+    }
+
+    // main loop
+    for(int x=i1+1;x<i2;x++) {
+        plot(x, int(intery), rfpart(intery), transpose, invert);
+        plot(x, int(intery)+1, fpart(intery), transpose, invert);
+        intery += gradient;
+    }
+}

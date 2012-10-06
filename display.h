@@ -28,3 +28,7 @@ void fill(Rect rect, byte4 color=black, bool blend=true);
 void blit(int2 target, const Image& source, uint8 opacity=255);
 /// Substracts \a source from \a target
 void substract(int2 target, const Image& source, byte4 color=black);
+/// Draws an antialiased line from (x1, y1) to (x2,y2)
+void line(float x1, float y1, float x2, float y2, byte4 color=black);
+/// Draws an antialiased line from \a a to \a b
+inline void line(vec2 a, vec2 b, byte4 color=black) { line(a.x,a.y, b.x,b.y, color); }

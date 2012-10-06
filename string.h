@@ -27,6 +27,8 @@ bool find(const ref<byte>& str, const ref<byte>& substring);
 bool isInteger(const ref<byte>& s);
 /// Parses an integer value
 long toInteger(const ref<byte>& str, int base=10);
+/// Parses a decimal value
+double toDecimal(const ref<byte>& str);
 
 /// Forwards ref<byte>
 inline const ref<byte>& str(const ref<byte>& s) { return s; }

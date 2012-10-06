@@ -19,6 +19,7 @@ void MidiFile::open(const ref<byte>& data) { /// parse MIDI header
     }
     uint minTime=-1; for(Track& track: tracks) minTime=min(minTime,track.time);
     for(Track& track: tracks) { track.startTime=track.time-minTime, track.startIndex=track.data.index; read(track,-1,Sort); track.reset(); }
+    seek(0);
 }
 
 void MidiFile::read(Track& track, uint time, State state) {

@@ -34,9 +34,9 @@ bool Command::mouseEvent(int2, int2, Event event, Button button) {
 map<ref<byte>,ref<byte> > readSettings(const ref<byte>& file) {
     map<ref<byte>,ref<byte> > entries;
     for(TextData s(file);s;) {
-        if(s.matchAny("[#"_)) s.until('\n');
+        if(s.matchAny("[#"_)) s.line();
         else {
-            ref<byte> key = s.until('='), value=s.until('\n');
+            ref<byte> key = s.until('='), value=s.line();
             entries.insertMulti(key,value);
         }
         s.whileAny("\n"_);

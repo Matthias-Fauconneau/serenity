@@ -17,12 +17,12 @@ Feeds::Feeds() : readConfig("read"_,config(),ReadWrite|Create|Append), readMap(r
 void Feeds::load() {
     clear(); favicons.clear();
     *this<<Entry(string(),string(":refresh"_),::resize(feedsIcon(),16,16),string("Feeds"_));
-    for(TextData s=readFile("feeds"_,config());s;) { ref<byte> url=s.until('\n'); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
+    for(TextData s=readFile("feeds"_,config());s;) { ref<byte> url=s.line(); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
 }
 
 bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
     assert(!guid.contains('\n') && !link.contains('\n'));
-    for(TextData s(readMap);s;s.until('\n')) {
+    for(TextData s(readMap);s;s.line()) {
         if(s.match(guid) && s.match(' ') && s.match(link)) return true;
     }
     return false;

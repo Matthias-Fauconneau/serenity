@@ -78,6 +78,8 @@ ref<byte> TextData::untilEnd() { uint size=available(-1); return read(size); }
 
 void TextData::skip() { whileAny(" \t\n\r"_); }
 
+ref<byte> TextData::line() { return until('\n'); }
+
 ref<byte> TextData::word(const ref<byte>& special) {
     uint start=index;
     for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
@@ -103,17 +105,17 @@ char TextData::character() {
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 
-ref<byte> TextData::whileDecimal() {
+ref<byte> TextData::whileInteger() {
     uint start=index;
     for(;available(1);) {
         byte c=peek();
-        if((c>='0'&&c<='9')) advance(1); else break;
+        if((c>='0'&&c<='9')||c=='-'||c=='+') advance(1); else break;
     }
     return slice(start,index-start);
 }
 
 int TextData::integer() {
-    ref<byte> s = whileDecimal();
+    ref<byte> s = whileInteger();
     return s?toInteger(s, 10):-1;
 }
 
@@ -121,7 +123,7 @@ ref<byte> TextData::whileHexadecimal() {
     uint start=index;
     for(;available(1);) {
         byte c=peek();
-        if((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')) advance(1); else break;
+        if((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')||c=='-'||c=='+') advance(1); else break;
     }
     return slice(start,index-start);
 }
@@ -131,19 +133,16 @@ int TextData::hexadecimal() {
     return s?toInteger(s, 16):-1;
 }
 
-double TextData::number() {
-    assert(".0123456789-+"_.contains(peek()),peek(16));
-    int neg=0;
-    if(match('-')) neg=1; else match('+');
-    int exponent = 1;
-    int significand = 0;
-    for(bool gotDot=false;available(1);) {
-        if(match('.')) { gotDot=true; continue; }
-        int n = "0123456789"_.indexOf(peek());
-        if(n < 0) break; else advance(1);
-        significand *= 10;
-        significand += n;
-        if(gotDot) exponent *= 10;
+ref<byte> TextData::whileDecimal() {
+    uint start=index;
+    for(;available(1);) {
+        byte c=peek();
+        if((c>='0'&&c<='9')||c=='.'||c=='-'||c=='+') advance(1); else break;
     }
-    return neg ? -double(significand)/double(exponent) : double(significand)/double(exponent);
+    return slice(start,index-start);
+}
+
+double TextData::decimal() {
+    ref<byte> s = whileDecimal();
+    return s?toDecimal(s):-1;
 }

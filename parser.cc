@@ -156,10 +156,10 @@ void Parser::generate(const ref<byte>& grammar) {
     word firstRule=""_;
     while(s) {
         s.skip();
-        if(s.match('#')) { s.until('\n'); continue; }
+        if(s.match('#')) { s.line(); continue; }
         word name = s.until(':'); assert(name); if(!firstRule) firstRule=name;
         if(rules.contains(name))
-            error("duplicate",rules[rules.indexOf(name)],"and", str(name)+":"_+s.until('\n'),
+            error("duplicate",rules[rules.indexOf(name)],"and", str(name)+":"_+s.line(),
                     " \t(use choice operator '|' instead of multiple rules)");
         for(;;) {
             Rule rule(name, parseRuleExpression(s));

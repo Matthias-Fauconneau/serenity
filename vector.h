@@ -44,11 +44,14 @@ generic vector operator *(const vector& u, const vector& v) { vector r; for(int 
 generic vector operator *(const vector& u, T s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]*s; return r; }
 generic vector operator *(T s, const vector& u) { vector r; for(int i=0;i<N;i++) r[i]=s*u[i]; return r; }
 generic vector operator /(const vector& u, T s) { vector r; for(int i=0;i<N;i++) r[i]=u[i]/s; return r; }
+generic vector operator /(const vector& u, const vector& v) { vector r; for(int i=0;i<N;i++) r[i]=u[i]/v[i]; return r; }
 generic bool operator <(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]>=v[i]) return false; return true; }
 generic bool operator <=(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]>v[i]) return false; return true; }
 generic bool operator ==(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]!=v[i]) return false; return true; }
 generic bool operator >=(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<v[i]) return false; return true; }
 generic bool operator >(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
+inline bool isNaN(float x) { return __builtin_isnan(x); }
+generic bool isNaN(const vector& v){ for(int i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
 
 generic vector abs(const vector& v){ vector r; for(int i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
 generic vector min(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=min(a[i],b[i]); return r; }

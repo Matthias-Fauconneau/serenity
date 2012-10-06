@@ -1,4 +1,88 @@
 #if 1
+#include "process.h"
+#include "data.h"
+#include "string.h"
+#include "display.h"
+#include "text.h"
+#include "widget.h"
+#include "window.h"
+#include "pdf.h" //mat32
+
+struct Wing : Widget {
+    Window window __(this,int2(5*256,2*256),"Graph"_);
+    struct Point : vec2 { Point(vec2 p, string&& label):vec2(p),label(move(label)){} string label; };
+    struct Curve : array<Point> { vec2 min,max; string name; };
+    array< Curve > curves;
+    Wing() {
+        window.localShortcut(Escape).connect(&exit);
+        window.backgroundColor=window.backgroundCenter=0xFF;
+
+        parse("M1PAM/lift"_);
+        parse("M1PAM/drag"_);
+    }
+    void parse(const ref<byte>& path) {
+        TextData text = readFile(path,home());
+        typedef ref<byte> Field;
+        array<Field> headers = split(text.line(),'\t');
+        int columns = headers.size();
+        array< array<Field> > data; data.grow(columns);
+        while(text) {
+            array<Field> fields = split(text.line(),'\t');
+            assert(fields.size()==headers.size(),fields);
+            uint i=0; for(Field field: fields) data[i++] << field;
+        }
+        array<string> labels; for(Field label: data[0]) labels<< string(label);
+        array<bool> sign; for(Field label: data[0]) labels<< string(label);
+        array<double> X; for(Field x: data[2]) X<< toDecimal(x);
+        array<Curve> curves;
+        for(const array<Field>& Y: data.slice(3)) {
+            Curve curve;
+            for(uint i: range(Y.size())) {
+                double y = toDecimal(Y[i]);
+                curve<< Point(vec2(X[i],y), copy(labels[i]));
+            }
+            curves << move(curve);
+        }
+        vec2 min=0,max=0;
+        for(const Curve& points: curves) {
+            for(vec2 p: points) {
+                if(isNaN(p)) continue;
+                if(p.x<min.x) min.x=p.x; else if(p.x>max.x) max.x=p.x;
+                if(p.y<min.y) min.y=p.y; else if(p.y>max.y) max.y=p.y;
+            }
+        }
+        for(Curve& curve: curves) {
+            curve.min=min, curve.max=max;
+            this->curves << move(curve);
+        }
+        //this->curves << move(curves);
+    }
+    void render(int2 position, int2 size) {
+        for(uint a: range(curves.size())) plot(curves[a],position+int2((a%5)*size.x/5,a/5*(size.y/2)),int2(size.x/5,size.y/2));
+    }
+    void plot(const Curve& curve, int2 position, int2 size) {
+        vec2 scale = vec2(size)/(curve.max-curve.min), offset = -curve.min*scale;
+        mat32 M(scale.x,0,0,-scale.y,position.x+offset.x,position.y+size.y-offset.y); //[min..max] -> [position..position+size]
+        line(M*vec2(curve.min.x,0),M*vec2(curve.max.x,0));
+        line(M*vec2(0,curve.min.y),M*vec2(0,curve.max.y));
+        uint last=curve.size()-1;
+        for(uint i: range(curve.size())) {
+            const Point &a = curve[last], &b=curve[i];
+            if(isNaN(b)) continue;
+            line(M*a,M*b,blue);
+            Text(copy(b.label),10).render(int2(M*b)+int2(-8,b.y>0?-16:0),int2(16,16));
+            last=i;
+        }
+    }
+} application;
+#endif
+
+#if 0
+#include "linux.h"
+int main() { write(1,"Hello World!\n",sizeof("Hello World!\n")-1); return 0; }
+#endif
+
+#if 0
 #include "window.h"
 #include "pdf.h"
 #include "interface.h"
@@ -7,7 +91,7 @@ struct PDFTest {
     Window window __(&pdf.area(),int2(-1,-1),"PDF Test"_);
     PDFTest(){
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
-        pdf.open("/Sheets/Brave Adventurers.pdf"_,home());
+        pdf.open("/Sheets/Moonlight Sonata.pdf"_,home());
         window.setSize(int2(-1,-1));
     }
 } test;

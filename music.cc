@@ -20,6 +20,7 @@ struct Music : Widget {
     Scroll<PDF> sheet;
     Score score;
     List<Text> sheets;
+    Folder folder __("Sheets"_);
 
     Thread thread __(-20);
     AudioOutput audio __({&sampler, &Sampler::read},thread,true);
@@ -29,8 +30,8 @@ struct Music : Widget {
     Music() {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
 
-        array<string> files = Folder("Sheets"_).list(Files);
-        for(string& file : files) if(endsWith(file,".pdf"_) && files.contains(section(file,'.')+".mid"_)) sheets << string(section(file,'.'));
+        array<string> files = folder.list(Files);
+        for(string& file : files) if(endsWith(file,".mid"_) /*&& files.contains(section(file,'.')+".pdf"_)*/) sheets << string(section(file,'.'));
         sheets.itemPressed.connect(this,&Music::openSheet);
 
         sampler.open("/Samples/Salamander.sfz"_);
@@ -67,8 +68,9 @@ struct Music : Widget {
             //openSheet("Brave Adventurers"_);
             //openSheet("Father and Son"_);
             //openSheet("Adagio for TRON"_);
-            openSheet("Inception - Time"_);
+            //openSheet("Inception - Time"_);
             //openSheet("Avatar"_);
+            openSheet("Moonlight Sonata"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
@@ -107,15 +109,17 @@ struct Music : Widget {
         if(play) togglePlay();
         score.clear();
         window.setTitle(name);
-        midi.open(readFile(string(name+".mid"_),"Sheets"_));
+        midi.open(readFile(string(name+".mid"_),folder));
         sheet.delta=0;
-        sheet.open(string(name+".pdf"_),"Sheets"_);
-        score.synchronize(move(midi.notes));
-        debug(sheet.setAnnotations(score.debug);)
-        window.backgroundCenter=window.backgroundColor=0xFF;
-        window.widget=&sheet.area();
-        window.setSize(int2(-1,-1));
-        window.render();
-        midi.seek(0); score.seek(0);
+        if(existsFile(string(name+".pdf"_),folder)) {
+            sheet.open(string(name+".pdf"_),folder);
+            score.synchronize(move(midi.notes));
+            debug(sheet.setAnnotations(score.debug);)
+                    window.backgroundCenter=window.backgroundColor=0xFF;
+            window.widget=&sheet.area();
+            window.setSize(int2(-1,-1));
+            window.render();
+            score.seek(0);
+        }
     }
 } application;

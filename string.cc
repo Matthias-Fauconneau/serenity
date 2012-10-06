@@ -63,12 +63,32 @@ long toInteger(const ref<byte>& number, int base) {
         if(*i>='0' && *i<='9') n = *i-'0';
         else if(*i>='a' && *i<='f') n = *i+10-'a';
         else if(*i>='A' && *i<='F') n = *i+10-'A';
+        else if(*i == '.') error("Unexpected decimal");
         else break;
         value *= base;
         value += n;
     }
     return sign*value;
 }
+
+double toDecimal(const ref<byte>& number) {
+    if(!number) return __builtin_nan("");
+    double sign=1;
+    const byte* i = number.begin();
+    if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
+    double exponent = 1;
+    double significand = 0;
+    for(bool gotDot=false;i!=number.end();++i) {
+        if(*i == '.') { gotDot=true; continue; }
+        if(*i<'0' || *i>'9') error("Unexpected",*i);
+        int n = *i-'0';
+        significand *= 10;
+        significand += n;
+        if(gotDot) exponent *= 10;
+    }
+    return sign*significand/exponent;
+}
+
 
 /// string
 
@@ -77,13 +97,13 @@ array< ref<byte> > split(const ref<byte>& str, byte sep) {
     auto b=str.begin();
     auto end=str.end();
     for(;;) {
-        while(b!=end && *b==sep) ++b;
+        if(b!=end && *b==sep) ++b;
         auto e = b;
         while(e!=end && *e!=sep) ++e;
         if(b==end) break;
         list << ref<byte>(b,e);
         if(e==end) break;
-        b = ++e;
+        b = e;
     }
     return list;
 }
