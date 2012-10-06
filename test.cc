@@ -10,8 +10,8 @@
 
 struct Wing : Widget {
     Window window __(this,int2(5*256,2*256),"Graph"_);
-    struct Point : vec2 { Point(vec2 p, string&& label):vec2(p),label(move(label)){} string label; };
-    struct Curve : array<Point> { vec2 min,max; string name; };
+    struct Point : vec2 { Point(vec2 p, string&& label, int sign):vec2(p),label(move(label)),sign(sign){} string label; int sign; };
+    struct Curve : array<Point> { vec2 min,max; string name; double integral; };
     array< Curve > curves;
     Wing() {
         window.localShortcut(Escape).connect(&exit);
@@ -32,14 +32,14 @@ struct Wing : Widget {
             uint i=0; for(Field field: fields) data[i++] << field;
         }
         array<string> labels; for(Field label: data[0]) labels<< string(label);
-        array<bool> sign; for(Field label: data[0]) labels<< string(label);
+        array<int> signs; for(Field sign: data[1]) signs<< (sign=="+"_? 1 : -1);
         array<double> X; for(Field x: data[2]) X<< toDecimal(x);
         array<Curve> curves;
         for(const array<Field>& Y: data.slice(3)) {
             Curve curve;
             for(uint i: range(Y.size())) {
                 double y = toDecimal(Y[i]);
-                curve<< Point(vec2(X[i],y), copy(labels[i]));
+                curve<< Point(vec2(X[i],y), copy(labels[i]), signs[i]);
             }
             curves << move(curve);
         }
@@ -53,9 +53,18 @@ struct Wing : Widget {
         }
         for(Curve& curve: curves) {
             curve.min=min, curve.max=max;
+            /// Compute numeric integral (linear order)
+            double integral=0;
+            uint last=0;
+            for(uint i: range(1,curve.size())) {
+                const Point &a = curve[last], &b=curve[i];
+                if(isNaN(b)) continue;
+                /*float width = b.x-a.x;
+                integral += a
+                last=i;*/
+            }
             this->curves << move(curve);
         }
-        //this->curves << move(curves);
     }
     void render(int2 position, int2 size) {
         for(uint a: range(curves.size())) plot(curves[a],position+int2((a%5)*size.x/5,a/5*(size.y/2)),int2(size.x/5,size.y/2));
@@ -65,12 +74,12 @@ struct Wing : Widget {
         mat32 M(scale.x,0,0,-scale.y,position.x+offset.x,position.y+size.y-offset.y); //[min..max] -> [position..position+size]
         line(M*vec2(curve.min.x,0),M*vec2(curve.max.x,0));
         line(M*vec2(0,curve.min.y),M*vec2(0,curve.max.y));
-        uint last=curve.size()-1;
-        for(uint i: range(curve.size())) {
+        uint last=0;
+        for(uint i: range(1,curve.size())) {
             const Point &a = curve[last], &b=curve[i];
             if(isNaN(b)) continue;
-            line(M*a,M*b,blue);
-            Text(copy(b.label),10).render(int2(M*b)+int2(-8,b.y>0?-16:0),int2(16,16));
+            if(a.x!=b.x) line(M*a,M*b, b.x>a.x?red:blue);
+            Text(copy(b.label),10).render(int2(M*b)+int2(-8,b.sign==1?-16:0),int2(16,16));
             last=i;
         }
     }

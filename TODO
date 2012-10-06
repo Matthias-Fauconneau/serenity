@@ -1,4 +1,4 @@
-TP: integral, polar, print
+TP: integral, polar, print, simulation
 Music:
  test/fix MuseScore->Lilypond-> PDF+MIDI: Avatar
  polygon fill, seek, NKI, FIR reverb
