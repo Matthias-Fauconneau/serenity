@@ -13,7 +13,8 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[2]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(span.y>10 && abs(p[0].y-p[3].y)<1) {
+        if(span.y>10 && span.y<22 && abs(p[0].y-p[3].y)<1) {
+            debug[center]=str(span);
             ties+= Line(p[0],p[3]);
         }
     } else if(p.size==10) {
@@ -332,7 +333,7 @@ spurious: ;
         lastPos=pos; lastNote=note;
     }
 
-    for(Line l: ties) debug[(l.a+l.b)/2.f]=string("^"_);
+    for(Line l: ties) debug.insertMulti((l.a+l.b)/2.f,string("^"_));
     for(float y: staffs) debug[vec2(0,y-16)]=string("___________"_);
 
     //log(chords);
