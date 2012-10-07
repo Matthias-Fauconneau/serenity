@@ -59,18 +59,18 @@ struct Music : Widget {
         if(current==count) {
             showSheetList();
             //openSheet("Adagio for TRON"_);
-            openSheet("Brave Adventurers"_);
-            //openSheet("Game of Thrones"_);
-            //openSheet("Where's Hiccup"_);
-            //openSheet("Romantic Flight (Easy)"_);
-            //openSheet("Test Drive (Easy)"_);
-            //openSheet("Forbidden Friendship (Easy)"_);
-            //openSheet("Kingdom Dance"_);
-            //openSheet("Turret Opera (Cara Mia)"_);
-            //openSheet("Father and Son"_);
-            //openSheet("Inception - Time"_);
-            //openSheet("Moonlight Sonata"_);
             //openSheet("Avatar"_);
+            //openSheet("Brave Adventurers"_);
+            //openSheet("Father and Son"_);
+            //openSheet("Forbidden Friendship (Easy)"_);
+            //openSheet("Game of Thrones"_);
+            //openSheet("Inception - Time"_);
+            //openSheet("Kingdom Dance"_);
+            //openSheet("Moonlight Sonata"_);
+            //openSheet("Romantic Flight (Easy)"_);
+            openSheet("Test Drive (Easy)"_);
+            //openSheet("Turret Opera (Cara Mia)"_);
+            //openSheet("Where's Hiccup"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
@@ -86,8 +86,7 @@ struct Music : Widget {
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float unused previous, float current, float unused next) {
         float scale = sheet.size.x/(sheet.x2-sheet.x1)/sheet.normalizedScale;
-        //sheet.delta.y = -min(scale*current, max(scale*previous, scale*next-sheet.size.y));
-        sheet.delta.y = -scale*current;
+        sheet.delta.y = -min(scale*current, max(scale*previous, scale*next-sheet.size.y));
     }
 
     /// Toggles MIDI playing
@@ -115,7 +114,7 @@ struct Music : Widget {
         if(existsFile(string(name+".pdf"_),folder)) {
             sheet.open(string(name+".pdf"_),folder);
             score.synchronize(move(midi.notes));
-            sheet.setAnnotations(score.debug);
+            //sheet.setAnnotations(score.debug);
             window.backgroundCenter=window.backgroundColor=0xFF;
             window.widget=&sheet.area();
             window.setSize(int2(-1,-1));

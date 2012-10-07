@@ -13,13 +13,13 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[2]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(span.y>10 && span.y<22 && abs(p[0].y-p[3].y)<1) {
-            debug[center]=str(span);
+        debug[center]="V"_+str(span);
+        if(/*span.x>24 &&*/ span.y>7 && (span.y<14 || (span.x>100 && span.y<20) || (span.x>200 && span.y<27/*29*/))) {
             ties+= Line(p[0],p[3]);
         }
     } else if(p.size==10) {
-        if(span.x>36 && span.x<1000 && span.y>10 && span.y<40) {
-            debug[center]=str(span);
+        if(span.x>36 && span.x<1000 && span.y>10 && (span.y<14 || (span.x>100 && span.y<29))) {
+            debug[center]="X"_+str(span);
             ties+= Line(vec2(min.x,center.y),vec2(max.x,center.y));
         }
     }
@@ -104,7 +104,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         else if(code==8) duration = 8; //half
         //else if(code==9) duration = 16; //whole
         else if(code==1/*treble*/||code==5/*bass*/) {
-            if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+96);
+            if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+100);
             lastClef=pos;
         }
     }
@@ -148,16 +148,17 @@ void Score::synchronize(map<int,Chord>&& chords) {
 
                 /// Detect first note of a tie
                 if(!t.ly || abs(ly)<abs(t.dy)) {
-                    if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-34 && ly<15 && rx<-34) {
+                    if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-34 && ly>-34 && ly<15 && rx<-34) {
                         debug[vec2(x,-y)]=string("L"_);
                         for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
                         t.li=i; t.lx=x; t.ly=y; t.dy=ly;
                     } else if(lx>-50 && lx<10 && ly<20 && rx<-30) debug.insertMulti(vec2(x+16,-y-16),string("!L"_+str(lx,ly)));
                 }
+alreadyTied: ;
             }
             for(int y : notes[i][x].keys) {
                 int ry = y-t.ly;
-#if 0
+#if 1
                 /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
                 if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
                     debug[vec2(x,-y)]=string("B"_);
@@ -165,6 +166,8 @@ void Score::synchronize(map<int,Chord>&& chords) {
                     if(abs(x-t.lx)<32) noteBetween++;
                     break;
                 }
+#endif
+#if 0
                 /// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
                 if(noteBetween%2 && lx > 0 && rx < -16 && abs(ry) < 2 && l < 200) {
                     debug[vec2(x,-y)]=string("O"_);
@@ -173,14 +176,13 @@ void Score::synchronize(map<int,Chord>&& chords) {
                 }
 #endif
                 /// Detect right note of a tie
-                if( (!noteBetween || (noteBetween<2 && l<210)) && ry>-7 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
                     t.ri=i;t.rx=x; t.ry=y;
                     tied << t; //defer remove for double ties
                     debug[vec2(x,-y)]=string("R"_+str(rx,ry));
                     goto staffDone;
                 } else if(rx>-10 && rx<30 && ry>-10 && ry<10) debug[vec2(x,-y-16)]="!R"_+str(rx,ry);
             }
-alreadyTied: ;
         }
 staffDone: ;
         /// Detect notes tied over a line wrap
@@ -196,7 +198,7 @@ staffDone: ;
                     if(dy>=-7 && abs(dy)<=min) {
                         t.ri=i+1;t.rx=rx; t.ry=y2;
                         debug[tie.a]=string("W"_);
-                        debug[vec2(x,-y2)]=string("W"_);
+                        debug[vec2(rx,-y2)]=string("W"_);
                         for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
                             //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
                             goto alreadyTied2;
@@ -231,7 +233,7 @@ trillCancelTie: ;
                                 if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
                                 staff[lastX].remove(y2); debug[vec2(lastX,-y2)]=str("->"_,x-lastX,y-y2); goto again;
                             }
-                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<40 && abs(x-lastX)+abs(y-y2)<40)) debug[vec2(x,-y)]="?"_+str(x-lastX,y-y2);
+                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<40 && abs(x-lastX)+abs(y-y2)<40)) debug[vec2(x,-y)]="?"_+str(x-lastX,y-y2);
                     }
                 }
             }
@@ -294,7 +296,7 @@ spurious: ;
     uint n=0; for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) { positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; }
 
     /// Detect and explicit repeats
-    /*int startIndex=-1;
+    int startIndex=-1;
     for(vec2 pos : repeats) {
         uint i=0; for(;i<staffs.size()-1 && pos.y>staffs[i];i++) {}
         int index=notes[i].values[0].values[0].scoreIndex-1;
@@ -308,7 +310,7 @@ spurious: ;
             startIndex=-1;
             debug[pos]="}"_+dec(index);
         }
-    }*/
+    }
 
     /// Synchronize notes to MIDI track
     array<int> MIDI; //flatten chords for robust MIDI synchronization
@@ -349,7 +351,7 @@ void Score::seek(uint unused time) {
         expected.insertMulti(key, i);
         while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
             assert(currentStaff<staffs.size());
-            if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
+            if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
             currentStaff++;
         }
         i++;
@@ -375,7 +377,7 @@ void Score::noteEvent(int key, int vel) {
             expected.insertMulti(key, i);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                 assert(currentStaff<staffs.size());
-                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
+                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
                 currentStaff++;
             }
             i++;
