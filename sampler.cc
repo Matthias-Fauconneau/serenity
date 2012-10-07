@@ -148,8 +148,8 @@ void Sampler::noteEvent(int key, int velocity) {
     }
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
-            float currentActualLevel=0;
-            if(current && (currentActualLevel=current->actualLevel(1<<14))<1.f/(1<<15)) return;
+            float currentActualLevel= current ? current->actualLevel(1<<14) : 0;
+            if(current && currentActualLevel<0x1p-16) return;
             Note note = s.cache;
             note.step=(float4)__(1,1,1,1);
             note.releaseTime=s.releaseTime;
@@ -185,14 +185,14 @@ void Note::decode(uint need) {
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
         for(uint i: range(3)) for(uint j=0; j<notes[i].size(); j++) { Note& note=notes[i][j];
-            if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<=1.f/(1<<16)) notes[i].removeAt(j); else j++;
+            if((note.blockSize==0 && note.readCount==0) || extract(note.level,0)<=0x1p-16) notes[i].removeAt(j); else j++;
         }
         noteReadLock.unlock();
     }
     Locker lock(noteWriteLock);
     uint size=1<<16; // up to full buffer
     for(int i=0;i<3;i++) for(Note& note: notes[i]) size=min(size,note.buffer.size); //only predecode the least buffered notes
-    size = max(size,1u<<15); //minimum in case all notes are nearly on underrun
+    size = max(size,1u<<13); //minimum in case all notes are nearly on underrun
     for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(size); //predecode all notes with buffer under size
 
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
@@ -201,11 +201,11 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-#if 1
+#if 0
         current=samples.size(); //DEBUG
 #else
-        s.cache.decode(1<<14);
-        s.map.lock(size);
+        s.cache.decode(1<<12);
+        //s.map.lock(size);
 #endif
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
@@ -215,7 +215,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 /// Audio mixer (realtime thread)
 inline void mix(float4& level, float4 step, float4* out, float4* in, uint size) { for(uint i: range(size)) { out[i] += level * in[i]; level*=step; } }
 void Note::read(float4* out, uint size) {
-    if(blockSize==0 && readCount<int(size*2)) return; // end of stream
+    if(blockSize==0 && readCount<int(size*2)) { readCount=0; return; } // end of stream
     if(!readCount.tryAcquire(size*2)) {
         log("decoder underrun");
         readCount.acquire(size*2); //ensure decoder follows

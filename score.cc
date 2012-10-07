@@ -122,8 +122,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             notes[i].sorted(pos.x-x).remove(-pos.y); //double note
             debug[vec2(pos.x-x,-pos.y)]=string("**"_);
         }*/
-        if(!notes[i].sorted(pos.x).contains(-pos.y))
-            notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
+        notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
     }
 }
 
@@ -144,15 +143,15 @@ void Score::synchronize(map<int,Chord>&& chords) {
             int lx = x-tie.a.x;
             int ly = -y-tie.a.y;
             int rx = x-tie.b.x;
-            int ry = -y-tie.b.y;
+            int ry = y-t.ly; //-y-tie.b.y;
 
             /// Detect first note of a tie
             if(!t.ly) {
-                if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-34 && ly<14 && rx<-34) {
-                    //debug[vec2(x,-y)]=string("L"_);
+                if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-34 && ly<15 && rx<-34) {
+                    debug[vec2(x,-y)]=string("L"_);
                     for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
                     t.li=i; t.lx=x; t.ly=y;
-                } //else if(lx>-50 && lx<10 && ly<20 && rx<-30) debug.insertMulti(vec2(x+16,-y),string("!L"_+str(lx,ly)));
+                } else if(lx>-50 && lx<10 && ly<20 && rx<-30) debug.insertMulti(vec2(x+16,-y),string("!L"_+str(lx,ly)));
             }
 
             /*/// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
@@ -176,7 +175,7 @@ void Score::synchronize(map<int,Chord>&& chords) {
                 tied << t; //defer remove for double ties
                 debug[vec2(x,-y)]=string("R"_+str(rx,ry));
                 goto staffDone;
-            } //else if(rx>-50 && rx<50 && ry>-50 && ry<50) debug[vec2(x,-y-32)]="!R"_+str(rx,ry);
+            } else if(rx>-100 && rx<100 && ry>-100 && ry<100) debug[vec2(x,-y)]="!R"_+str(rx,ry);
 alreadyTied: ;
         }
 staffDone: ;
@@ -192,8 +191,8 @@ staffDone: ;
                     int dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]);
                     if(dy>=-7 && abs(dy)<=min) {
                         t.ri=i+1;t.rx=rx; t.ry=y2;
-                        //debug[tie.a]=string("W"_);
-                        //debug[vec2(x,-y2)]=string("W"_);
+                        debug[tie.a]=string("W"_);
+                        debug[vec2(x,-y2)]=string("W"_);
                         for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
                             //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
                             goto alreadyTied2;
@@ -217,7 +216,10 @@ trillCancelTie: ;
                 again: ;
                 for(int y: staff[x].keys) {
                     for(int y2 : staff[lastX].keys) {
-                        if(staff[lastX].at(y2).duration && (abs(x-lastX)<2 || (abs(x-lastX)<18 && abs(x-lastX)+abs(y-y2)<38)) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)) {
+                        if(staff[lastX].at(y2).duration && (
+                                    abs(x-lastX)<=4 ||
+                                    (abs(x-lastX)<=9 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
+                                    ((abs(x-lastX)<18 && abs(x-lastX)+abs(y-y2)<38) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)))) {
                             if(staff[lastX].size()>=staff[x].size()) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
                                 staff[x].remove(y); debug[vec2(x,-y)]=str("<-"_,x-lastX,y-y2); goto again;
@@ -225,7 +227,7 @@ trillCancelTie: ;
                                 if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
                                 staff[lastX].remove(y2); debug[vec2(lastX,-y2)]=str("->"_,x-lastX,y-y2); goto again;
                             }
-                        } else if(abs(x-lastX)<20 && abs(x-lastX)+abs(y-y2)<40) debug[vec2(x+8,-y-16)]="?"_+str(x-lastX,y-y2);
+                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<40 && abs(x-lastX)+abs(y-y2)<40)) debug[vec2(x,-y)]="?"_+str(x-lastX,y-y2);
                     }
                 }
             }
