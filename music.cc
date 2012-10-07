@@ -58,6 +58,7 @@ struct Music : Widget {
     void showProgress(int current, int count) {
         if(current==count) {
             showSheetList();
+            openSheet("Adagio for TRON"_);
             //openSheet("Game of Thrones"_);
             //openSheet("Where's Hiccup"_);
             //openSheet("Romantic Flight (Easy)"_);
@@ -67,10 +68,9 @@ struct Music : Widget {
             //openSheet("Turret Opera (Cara Mia)"_);
             //openSheet("Brave Adventurers"_);
             //openSheet("Father and Son"_);
-            //openSheet("Adagio for TRON"_);
             //openSheet("Inception - Time"_);
+            //openSheet("Moonlight Sonata"_);
             //openSheet("Avatar"_);
-            openSheet("Moonlight Sonata"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
@@ -115,7 +115,7 @@ struct Music : Widget {
         if(existsFile(string(name+".pdf"_),folder)) {
             sheet.open(string(name+".pdf"_),folder);
             score.synchronize(move(midi.notes));
-            //sheet.setAnnotations(score.debug);
+            sheet.setAnnotations(score.debug);
             window.backgroundCenter=window.backgroundColor=0xFF;
             window.widget=&sheet.area();
             window.setSize(int2(-1,-1));

@@ -42,7 +42,7 @@ void MidiFile::read(Track& track, uint time, State state) {
             else if(type==NoteOff) noteEvent(key,0);
         } else if(state==Sort) {
             if(type==NoteOn && vel) {
-                if(!notes.sorted(track.time/6000).contains(key)) notes.sorted(track.time/6000).insertSorted(key); //quantize to 1/8 seconds to synchronize arpeggios
+                if(!notes.sorted(track.time/5000).contains(key)) notes.sorted(track.time/5000).insertSorted(key); //quantize to synchronize arpeggios
             }
         }
 

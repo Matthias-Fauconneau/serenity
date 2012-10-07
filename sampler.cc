@@ -201,7 +201,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-#if 0
+#if 1
         current=samples.size(); //DEBUG
 #else
         s.cache.decode(1<<14);

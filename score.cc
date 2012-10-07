@@ -108,16 +108,20 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         }
     }
     if(duration>=0 && !notes[i].sorted(pos.x).contains(-pos.y)) {
-        for(int x: range(1,17)) if(notes[i].contains(pos.x-x)) {
+        /*for(int x: range(1,22)) if(notes[i].contains(pos.x-x)) {
             for(pair<int,Note> note: notes[i][pos.x-x]) { //move previous notes to this one
                 if(!notes[i].sorted(pos.x).contains(note.key)) { //double note error
                     notes[i].sorted(pos.x).insertSorted(note.key, note.value);
-                    debug[vec2(pos.x-x,-note.key)]=string("MERGE"_);
+                    debug[vec2(pos.x-x,-note.key)]=str("M"_,x);
                 }
             }
             notes[i].remove(pos.x-x);
             break;
         }
+        for(int x: range(1,32)) if(notes[i].contains(pos.x-x) && notes[i].sorted(pos.x-x).contains(-pos.y)) {
+            notes[i].sorted(pos.x-x).remove(-pos.y); //double note
+            debug[vec2(pos.x-x,-pos.y)]=string("**"_);
+        }*/
         if(!notes[i].sorted(pos.x).contains(-pos.y))
             notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
     }
@@ -140,7 +144,7 @@ void Score::synchronize(map<int,Chord>&& chords) {
             int lx = x-tie.a.x;
             int ly = -y-tie.a.y;
             int rx = x-tie.b.x;
-            int ry = abs(y-t.ly);
+            int ry = -y-tie.b.y;
 
             /// Detect first note of a tie
             if(!t.ly) {
@@ -152,7 +156,7 @@ void Score::synchronize(map<int,Chord>&& chords) {
             }
 
             /*/// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
-            if(!noteBetween && lx > 0 && rx < -16 && ry < 7) {
+            if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
                 debug[vec2(x,-y)]=string("B"_);
                 noteBetween++;
                 if(abs(x-t.lx)<32) noteBetween++;
@@ -160,19 +164,19 @@ void Score::synchronize(map<int,Chord>&& chords) {
             }*/
 
             /*/// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
-            if(noteBetween%2 && lx > 0 && rx < -16 && ry < 2 && l < 200) {
+            if(noteBetween%2 && lx > 0 && rx < -16 && abs(ry) < 2 && l < 200) {
                 debug[vec2(x,-y)]=string("O"_);
                 t.ri=i;t.rx=x; t.ry=y; tied<<t; //notes[i][x].remove(y);
                 noteBetween++;
             }*/
 
             /// Detect right note of a tie
-            if( (!noteBetween || (noteBetween<2 && l<210)) && ry < 7 && rx < 20 && rx > -10/*-9*//*-12*/) {
+            if( (!noteBetween || (noteBetween<2 && l<210)) && ry>-7 && ry < 7 && rx < 20 && rx > -10/*-9*//*-12*/) {
                 t.ri=i;t.rx=x; t.ry=y;
                 tied << t; //defer remove for double ties
                 debug[vec2(x,-y)]=string("R"_+str(rx,ry));
                 goto staffDone;
-            } else if(rx>-100 && rx<100 && ry>-100 && ry<100) debug[vec2(x,-y-32)]="!R"_+str(rx,ry);
+            } //else if(rx>-50 && rx<50 && ry>-50 && ry<50) debug[vec2(x,-y-32)]="!R"_+str(rx,ry);
 alreadyTied: ;
         }
 staffDone: ;
@@ -205,22 +209,29 @@ trillCancelTie: ;
     }
     for(Tie t : tied) if(notes[t.ri][t.rx].contains(t.ry)) notes[t.ri][t.rx].remove(t.ry);
 
-#if 1 /// Remove muted double notes
+    /// Fix chords with diadics (shifted x positions) or double notes
     for(map<int, map< int, Note> >& staff : notes) {
         int lastX=0;
         for(int x : staff.keys) {
-            if(lastX>0) for(int y : staff[x].keys) for(int y2 : staff[lastX].keys)
-                if(staff[lastX].at(y2).duration && (abs(x-lastX)<=4 || (abs(x-lastX)<18 && y!=y2 && abs(x-lastX)+abs(y-y2)<20))){
-                    if(staff[lastX].size()>=staff[x].size()) {
-                        staff[lastX].at(y2)=staff[x].at(y); staff[x].remove(y); debug[vec2(x,-y)]="x*"_+dec(abs(x-lastX)+abs(y-y2)); /*log("x*",dec((x-lastX)+(y-y2)));*/ break;
-                    } else if(staff[lastX].size()<staff[x].size()) {
-                        staff[x].at(y)=staff[lastX].at(y2); staff[lastX].remove(y2);  debug[vec2(lastX,-y2)]="x*"_+dec((x-lastX)+(y-y2)); /*log("x*",dec((x-lastX)+(y-y2)));*/  break;
+            if(lastX>0) {
+                again: ;
+                for(int y: staff[x].keys) {
+                    for(int y2 : staff[lastX].keys) {
+                        if(staff[lastX].at(y2).duration && (abs(x-lastX)<2 || (abs(x-lastX)<18 && abs(x-lastX)+abs(y-y2)<38)) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)) {
+                            if(staff[lastX].size()>=staff[x].size()) {
+                                if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
+                                staff[x].remove(y); debug[vec2(x,-y)]=str("<-"_,x-lastX,y-y2); goto again;
+                            } else if(staff[lastX].size()<staff[x].size()) {
+                                if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
+                                staff[lastX].remove(y2); debug[vec2(lastX,-y2)]=str("->"_,x-lastX,y-y2); goto again;
+                            }
+                        } else if(abs(x-lastX)<20 && abs(x-lastX)+abs(y-y2)<40) debug[vec2(x+8,-y-16)]="?"_+str(x-lastX,y-y2);
                     }
                 }
+            }
             lastX=x;
         }
     }
-#endif
 
     /// Detect and explicit tremolos
     /*for(int i=0;i<tremolos.size-2;i++) {
@@ -303,8 +314,11 @@ spurious: ;
                     debug[vec2(x,-y)]=string("+++"_);
                     chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
                 }*/
-        if(lastPos && lastNote && pos.x==lastPos.x && pos.y<lastPos.y && note<lastNote) { // missing note in MIDI
-            debug[pos+vec2(12,0)]=string("---"_);
+        /*if(pos.y==lastPos.y && note!=lastNote) { // double notes in score
+            debug[pos]=string("////"_);
+            positions.removeAt(i); indices.removeAt(i);
+        } else*/ if(lastPos && lastNote && pos.x==lastPos.x && pos.y<lastPos.y && note<lastNote) { // missing note in MIDI
+            debug[pos]=string("|||||"_);
             positions.removeAt(i); indices.removeAt(i);
         } else {
             debug.insertMulti(positions[i]+vec2(12,0),dec(MIDI[i]));
