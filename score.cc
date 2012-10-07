@@ -29,7 +29,20 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
     uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
     if(i>=notes.size()) notes.grow(i+1);
     int duration=-1;
-    if(find(font,"LilyPond"_)) {
+    if(font=="MScore-20"_) {
+        debug[pos]=dec(code);
+        if(code==14) {
+            if(size<30) duration= 0; //grace
+            else duration = 4; //quarter
+        }
+        else if(code==15) duration = 8; //half
+        else if(code==16) duration = 16; //whole
+        else if((code==12/*treble*/||code==13/*bass*/) && pos.x<200) {
+            log(pos,pos-lastClef);
+            if(pos.y-lastClef.y>202) staffs << (lastClef.y+100);
+            if(pos.y>lastClef.y) lastClef=pos;
+        }
+    } else if(find(font,"LilyPond"_)) {
         if(code==62) {
             if(size<30) duration= 0; //grace
             else duration = 4; //quarter

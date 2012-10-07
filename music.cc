@@ -59,7 +59,7 @@ struct Music : Widget {
         if(current==count) {
             showSheetList();
             //openSheet("Adagio for TRON"_);
-            //openSheet("Avatar"_);
+            openSheet("Avatar"_);
             //openSheet("Brave Adventurers"_);
             //openSheet("Father and Son"_);
             //openSheet("Forbidden Friendship (Easy)"_);
@@ -68,7 +68,7 @@ struct Music : Widget {
             //openSheet("Kingdom Dance"_);
             //openSheet("Moonlight Sonata"_);
             //openSheet("Romantic Flight (Easy)"_);
-            openSheet("Test Drive (Easy)"_);
+            //openSheet("Test Drive (Easy)"_);
             //openSheet("Turret Opera (Cara Mia)"_);
             //openSheet("Where's Hiccup"_);
             audio.start();
@@ -114,7 +114,7 @@ struct Music : Widget {
         if(existsFile(string(name+".pdf"_),folder)) {
             sheet.open(string(name+".pdf"_),folder);
             score.synchronize(move(midi.notes));
-            //sheet.setAnnotations(score.debug);
+            sheet.setAnnotations(score.debug);
             window.backgroundCenter=window.backgroundColor=0xFF;
             window.widget=&sheet.area();
             window.setSize(int2(-1,-1));

@@ -74,6 +74,7 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
+                sample->cache.decode(1<<13);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -96,10 +97,12 @@ void Sampler::open(const ref<byte>& path) {
 
     // Lock compressed samples in memory
     full=0; for(const Sample& s : samples) full += (s.map.size+4095)/4096*4;
-    available = availableMemory();
+    uint predecode = (samples.size()*(1<<14)*8)/1024;
+    available = availableMemory()/2;
+    if(available>predecode) available-=predecode; else available=0;
     if(full>available) {
         lock=0; for(const Sample& s : samples) lock += min(s.map.size/4096*4,available*1024/samples.size()/4096*4);
-        log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB");
+        log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB + predecode"_,predecode/1024,"MiB"_);
     }
     current=0; queue();
 }
@@ -148,19 +151,20 @@ void Sampler::noteEvent(int key, int velocity) {
     }
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
-            float currentActualLevel= current ? current->actualLevel(1<<14) : 0;
-            if(current && currentActualLevel<0x1p-16) return;
+            float level;
+            if(current) { //rt_decay is unreliable, matching levels works better
+                level = current->actualLevel(1<<14) / s.cache.actualLevel(1<<11);
+                level *= extract(current->level,0);
+                if(level>8) level=8;
+            } else {
+                level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
+            }
+            if(level<0x1p-15) return;
             Note note = s.cache;
+            if(!current) note.key=key;
             note.step=(float4)__(1,1,1,1);
             note.releaseTime=s.releaseTime;
             note.envelope=s.envelope;
-            float level;
-            if(!current) note.key=key, level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
-            else { //rt_decay is unreliable, matching levels works better
-                level = currentActualLevel / note.actualLevel(1<<11);
-                level *= extract(current->level,0);
-                if(level>8) level=8;
-            }
             note.level=(float4)__(level,level,level,level);
             {Locker lock(noteReadLock);
                 array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
@@ -185,14 +189,14 @@ void Note::decode(uint need) {
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
         for(uint i: range(3)) for(uint j=0; j<notes[i].size(); j++) { Note& note=notes[i][j];
-            if((note.blockSize==0 && note.readCount==0) || extract(note.level,0)<=0x1p-16) notes[i].removeAt(j); else j++;
+            if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<0x1p-15) notes[i].removeAt(j); else j++;
         }
         noteReadLock.unlock();
     }
     Locker lock(noteWriteLock);
     uint size=1<<16; // up to full buffer
     for(int i=0;i<3;i++) for(Note& note: notes[i]) size=min(size,note.buffer.size); //only predecode the least buffered notes
-    size = max(size,1u<<15); //minimum in case all notes are nearly on underrun
+    size = max(size,1u<<12); //minimum in case all notes are nearly on underrun
     for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(size); //predecode all notes with buffer under size
 
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
@@ -201,12 +205,8 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-#if 0
-        current=samples.size(); //DEBUG
-#else
-        s.cache.decode(1<<15);
-        //s.map.lock(size);
-#endif
+        current=samples.size(); if(0)
+        debug(current=samples.size(); if(0)) s.map.lock(size);
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }
