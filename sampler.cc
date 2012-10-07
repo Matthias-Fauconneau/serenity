@@ -204,7 +204,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 #if 0
         current=samples.size(); //DEBUG
 #else
-        s.cache.decode(1<<12);
+        s.cache.decode(1<<13);
         //s.map.lock(size);
 #endif
         progressChanged(current,samples.size());

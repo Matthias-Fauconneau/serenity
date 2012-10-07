@@ -58,7 +58,7 @@ struct Music : Widget {
     void showProgress(int current, int count) {
         if(current==count) {
             showSheetList();
-            //openSheet("Adagio for TRON"_);
+            openSheet("Adagio for TRON"_);
             //openSheet("Brave Adventurers"_);
             //openSheet("Game of Thrones"_);
             //openSheet("Where's Hiccup"_);
@@ -69,7 +69,7 @@ struct Music : Widget {
             //openSheet("Turret Opera (Cara Mia)"_);
             //openSheet("Father and Son"_);
             //openSheet("Inception - Time"_);
-            openSheet("Moonlight Sonata"_);
+            //openSheet("Moonlight Sonata"_);
             //openSheet("Avatar"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));

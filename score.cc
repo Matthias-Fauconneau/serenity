@@ -13,11 +13,11 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[2]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(abs(p[0].y-p[3].y)<1) {
+        if(span.y>10 && abs(p[0].y-p[3].y)<1) {
             ties+= Line(p[0],p[3]);
         }
     } else if(p.size==10) {
-        if(span.x>36 && span.x<1000 && span.y>1 && span.y<40) {
+        if(span.x>36 && span.x<1000 && span.y>10 && span.y<40) {
             debug[center]=str(span);
             ties+= Line(vec2(min.x,center.y),vec2(max.x,center.y));
         }
@@ -126,7 +126,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
     }
 }
 
-struct Tie { uint li; int lx,ly; uint ri; int rx,ry; Tie():li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
+struct Tie { uint li; int lx,ly; uint ri; int rx,ry; int dy; Tie():li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
 string str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)+")"_; }
 void Score::synchronize(map<int,Chord>&& chords) {
     if(!staffs) return; assert(staffs);
@@ -139,43 +139,46 @@ void Score::synchronize(map<int,Chord>&& chords) {
         int l = abs(tie.b.x-tie.a.x);
         uint i=0; for(;i<staffs.size()-1 && tie.a.y>staffs[i];i++) {}
         int noteBetween=0; Tie t;
-        for(int x : notes[i].keys) for(int y : notes[i][x].keys) {
+        for(int x : notes[i].keys) {
             int lx = x-tie.a.x;
-            int ly = -y-tie.a.y;
             int rx = x-tie.b.x;
-            int ry = y-t.ly; //-y-tie.b.y;
+            for(int y : notes[i][x].keys) {
+                int ly = -y-tie.a.y;
 
-            /// Detect first note of a tie
-            if(!t.ly) {
-                if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-34 && ly<15 && rx<-34) {
-                    debug[vec2(x,-y)]=string("L"_);
-                    for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
-                    t.li=i; t.lx=x; t.ly=y;
-                } else if(lx>-50 && lx<10 && ly<20 && rx<-30) debug.insertMulti(vec2(x+16,-y),string("!L"_+str(lx,ly)));
+                /// Detect first note of a tie
+                if(!t.ly || abs(ly)<abs(t.dy)) {
+                    if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-34 && ly<15 && rx<-34) {
+                        debug[vec2(x,-y)]=string("L"_);
+                        for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
+                        t.li=i; t.lx=x; t.ly=y; t.dy=ly;
+                    } else if(lx>-50 && lx<10 && ly<20 && rx<-30) debug.insertMulti(vec2(x+16,-y-16),string("!L"_+str(lx,ly)));
+                }
             }
-
-            /*/// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
-            if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
-                debug[vec2(x,-y)]=string("B"_);
-                noteBetween++;
-                if(abs(x-t.lx)<32) noteBetween++;
-                break;
-            }*/
-
-            /*/// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
-            if(noteBetween%2 && lx > 0 && rx < -16 && abs(ry) < 2 && l < 200) {
-                debug[vec2(x,-y)]=string("O"_);
-                t.ri=i;t.rx=x; t.ry=y; tied<<t; //notes[i][x].remove(y);
-                noteBetween++;
-            }*/
-
-            /// Detect right note of a tie
-            if( (!noteBetween || (noteBetween<2 && l<210)) && ry>-7 && ry < 7 && rx < 20 && rx > -10/*-9*//*-12*/) {
-                t.ri=i;t.rx=x; t.ry=y;
-                tied << t; //defer remove for double ties
-                debug[vec2(x,-y)]=string("R"_+str(rx,ry));
-                goto staffDone;
-            } else if(rx>-100 && rx<100 && ry>-100 && ry<100) debug[vec2(x,-y)]="!R"_+str(rx,ry);
+            for(int y : notes[i][x].keys) {
+                int ry = y-t.ly;
+#if 0
+                /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
+                if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
+                    debug[vec2(x,-y)]=string("B"_);
+                    noteBetween++;
+                    if(abs(x-t.lx)<32) noteBetween++;
+                    break;
+                }
+                /// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
+                if(noteBetween%2 && lx > 0 && rx < -16 && abs(ry) < 2 && l < 200) {
+                    debug[vec2(x,-y)]=string("O"_);
+                    t.ri=i;t.rx=x; t.ry=y; tied<<t; //notes[i][x].remove(y);
+                    noteBetween++;
+                }
+#endif
+                /// Detect right note of a tie
+                if( (!noteBetween || (noteBetween<2 && l<210)) && ry>-7 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                    t.ri=i;t.rx=x; t.ry=y;
+                    tied << t; //defer remove for double ties
+                    debug[vec2(x,-y)]=string("R"_+str(rx,ry));
+                    goto staffDone;
+                } else if(rx>-10 && rx<30 && ry>-10 && ry<10) debug[vec2(x,-y-16)]="!R"_+str(rx,ry);
+            }
 alreadyTied: ;
         }
 staffDone: ;
@@ -199,7 +202,7 @@ staffDone: ;
                         tied << t;
                         goto tieFound;
                     } //else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2)]="Y"_+str(dy,min);
-                    alreadyTied2: ;
+alreadyTied2: ;
                 }
             }
 tieFound: ;
@@ -217,7 +220,7 @@ trillCancelTie: ;
                 for(int y: staff[x].keys) {
                     for(int y2 : staff[lastX].keys) {
                         if(staff[lastX].at(y2).duration && (
-                                    abs(x-lastX)<=4 ||
+                                    abs(x-lastX)<2 ||
                                     (abs(x-lastX)<=9 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
                                     ((abs(x-lastX)<18 && abs(x-lastX)+abs(y-y2)<38) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)))) {
                             if(staff[lastX].size()>=staff[x].size()) {
