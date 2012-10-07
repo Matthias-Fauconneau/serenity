@@ -74,7 +74,8 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->cache.decode(1<<13);
+                sample->cache.decode(1<<14);
+                sample->cache.envelope = sample->envelope;
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -194,10 +195,17 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         noteReadLock.unlock();
     }
     Locker lock(noteWriteLock);
-    uint size=1<<16; // up to full buffer
-    for(int i=0;i<3;i++) for(Note& note: notes[i]) size=min(size,note.buffer.size); //only predecode the least buffered notes
-    size = max(size,1u<<12); //minimum in case all notes are nearly on underrun
-    for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(size); //predecode all notes with buffer under size
+    for(;;) {
+        Note* note=0; uint minBufferSize=-1;
+        for(int i=0;i<3;i++) for(Note& n: notes[i]) { // find least buffered note
+            if(n.blockSize && n.writeCount>=n.blockSize && n.buffer.size<minBufferSize) {
+                note=&n;
+                minBufferSize=n.buffer.size;
+            }
+        }
+        if(!note) break; //all notes are already fully buffered
+        int size=note->blockSize; note->writeCount.acquire(size); note->decodeFrame(); note->readCount.release(size);
+    }
 
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
 
