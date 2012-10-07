@@ -192,7 +192,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     Locker lock(noteWriteLock);
     uint size=1<<16; // up to full buffer
     for(int i=0;i<3;i++) for(Note& note: notes[i]) size=min(size,note.buffer.size); //only predecode the least buffered notes
-    size = max(size,1u<<14); //minimum in case all notes are nearly on underrun
+    size = max(size,1u<<15); //minimum in case all notes are nearly on underrun
     for(int i=0;i<3;i++) for(Note& note: notes[i]) note.decode(size); //predecode all notes with buffer under size
 
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
@@ -201,9 +201,12 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
+#if 0
         current=samples.size(); //DEBUG
-        //s.cache.decode(1<<12);
-        //s.map.lock(size);
+#else
+        s.cache.decode(1<<14);
+        s.map.lock(size);
+#endif
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }

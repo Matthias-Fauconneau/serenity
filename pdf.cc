@@ -297,7 +297,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     for(Character& c: characters) c.pos.x-=x1, c.pos.y=-c.pos.y;
     for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
 
-    float scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
+    scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
     for(uint i: range(characters.size())) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code); }
     for(const array<vec2>& path : paths) { array<vec2> scaled; for(vec2 pos : path) scaled<<scale*pos; onPath(scaled); }
     paths.clear();

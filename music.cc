@@ -84,9 +84,10 @@ struct Music : Widget {
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float previous, float next) {
+    void nextStaff(float unused previous, float current, float unused next) {
         float scale = sheet.size.x/(sheet.x2-sheet.x1)/sheet.normalizedScale;
-        sheet.delta.y = -max(scale*previous, scale*next-sheet.size.y);
+        //sheet.delta.y = -min(scale*current, max(scale*previous, scale*next-sheet.size.y));
+        sheet.delta.y = -scale*current;
     }
 
     /// Toggles MIDI playing
@@ -114,7 +115,7 @@ struct Music : Widget {
         if(existsFile(string(name+".pdf"_),folder)) {
             sheet.open(string(name+".pdf"_),folder);
             score.synchronize(move(midi.notes));
-            sheet.setAnnotations(score.debug);
+            //sheet.setAnnotations(score.debug);
             window.backgroundCenter=window.backgroundColor=0xFF;
             window.widget=&sheet.area();
             window.setSize(int2(-1,-1));

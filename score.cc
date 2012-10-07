@@ -36,7 +36,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         else if(code==61) duration = 8; //half
         else if(code==60) duration = 16; //whole
         else if((code==147/*treble*/||code==145/*bass*/) && pos.x<200) {
-            if(pos.y-lastClef.y>202) staffs << (lastClef.y+90);
+            if(pos.y-lastClef.y>202) staffs << (lastClef.y+100);
             if(pos.y>lastClef.y) lastClef=pos;
         }
     } else if(find(font,"Opus"_)||find(font,"Emmentaler"_)) {
@@ -111,13 +111,15 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         for(int x: range(1,17)) if(notes[i].contains(pos.x-x)) {
             for(pair<int,Note> note: notes[i][pos.x-x]) { //move previous notes to this one
                 if(!notes[i].sorted(pos.x).contains(note.key)) { //double note error
-                    notes[i].sorted(pos.x).insertSorted(note.key, move(note.value));
+                    notes[i].sorted(pos.x).insertSorted(note.key, note.value);
+                    debug[vec2(pos.x-x,-note.key)]=string("MERGE"_);
                 }
             }
-            debug[pos]=str("MERGE"_,x);
+            notes[i].remove(pos.x-x);
             break;
         }
-        notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
+        if(!notes[i].sorted(pos.x).contains(-pos.y))
+            notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
     }
 }
 
@@ -203,17 +205,14 @@ trillCancelTie: ;
     }
     for(Tie t : tied) if(notes[t.ri][t.rx].contains(t.ry)) notes[t.ri][t.rx].remove(t.ry);
 
-    /// Flatten sorted notes
-    uint n=0; for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) { positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; }
-
-#if 0 /// Remove muted double notes (necessary to sync with HTTYD sheets)
+#if 1 /// Remove muted double notes
     for(map<int, map< int, Note> >& staff : notes) {
         int lastX=0;
         for(int x : staff.keys) {
             if(lastX>0) for(int y : staff[x].keys) for(int y2 : staff[lastX].keys)
-                if(staff[lastX].at(y2).duration && (abs(x-lastX)<=4 || (abs(x-lastX)<18 && y!=y2 && (x-lastX)+(y-y2)<20))){
+                if(staff[lastX].at(y2).duration && (abs(x-lastX)<=4 || (abs(x-lastX)<18 && y!=y2 && abs(x-lastX)+abs(y-y2)<20))){
                     if(staff[lastX].size()>=staff[x].size()) {
-                        staff[lastX].at(y2)=staff[x].at(y); staff[x].remove(y); debug[vec2(x,-y)]="x*"_+dec((x-lastX)+(y-y2)); /*log("x*",dec((x-lastX)+(y-y2)));*/ break;
+                        staff[lastX].at(y2)=staff[x].at(y); staff[x].remove(y); debug[vec2(x,-y)]="x*"_+dec(abs(x-lastX)+abs(y-y2)); /*log("x*",dec((x-lastX)+(y-y2)));*/ break;
                     } else if(staff[lastX].size()<staff[x].size()) {
                         staff[x].at(y)=staff[lastX].at(y2); staff[lastX].remove(y2);  debug[vec2(lastX,-y2)]="x*"_+dec((x-lastX)+(y-y2)); /*log("x*",dec((x-lastX)+(y-y2)));*/  break;
                     }
@@ -274,6 +273,9 @@ spurious: ;
         }
     }*/
 
+    /// Flatten sorted notes
+    uint n=0; for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) { positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; }
+
     /// Detect and explicit repeats
     /*int startIndex=-1;
     for(vec2 pos : repeats) {
@@ -321,14 +323,13 @@ spurious: ;
 
 void Score::seek(uint unused time) {
     if(!staffs) return;
-    return;
     assert(time==0,"TODO");
     chordIndex=0, noteIndex=0; currentStaff=0; expected.clear(); active.clear();
     int i=noteIndex; for(int key: chords.values[chordIndex]) {
         expected.insertMulti(key, i);
         while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
             assert(currentStaff<staffs.size());
-            if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff]);
+            if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
             currentStaff++;
         }
         i++;
@@ -354,7 +355,7 @@ void Score::noteEvent(int key, int vel) {
             expected.insertMulti(key, i);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                 assert(currentStaff<staffs.size());
-                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[min(staffs.size()-1,currentStaff+2)]);
+                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
                 currentStaff++;
             }
             i++;

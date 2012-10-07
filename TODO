@@ -1,6 +1,6 @@
 Music:
  test/fix MuseScore->Lilypond->PDF+MIDI: Avatar
- polygon fill, seek, NKI, FIR reverb
+ polygon fill, seek, NKI, FIR reverb, score editor
 Touchbook: update ARM syscalls, book
 Fibermesh
 Apps: fix desktop leak, runner, shell, file manager, search, imap, torrent, video, irc
