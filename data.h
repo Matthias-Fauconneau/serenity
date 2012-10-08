@@ -146,15 +146,15 @@ struct TextData : virtual Data {
     ref<byte> word(const ref<byte>& special=""_);
     /// Reads a identifier [a-zA-Z0-9"special"]*
     ref<byte> identifier(const ref<byte>& special=""_);
-    /// Advances while input match [0-9-+]
-    ref<byte> whileInteger();
+    /// Matches [-+]?[0-9]*
+    ref<byte> whileInteger(bool sign);
     /// Reads an integer
-    int integer();
-    /// Advances while input match [0-9a-fA-F-+]
+    int integer(bool sign=false);
+    /// Matches [0-9a-fA-F]*
     ref<byte> whileHexadecimal();
     /// Reads an hexadecimal integer
     int hexadecimal();
-    /// Advances while input match [0-9.-+]
+    /// Matches [-+]?[0-9]*\.[0-9]*
     ref<byte> whileDecimal();
     /// Reads a decimal number
     double decimal();

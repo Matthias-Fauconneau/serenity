@@ -175,7 +175,7 @@ struct Taskbar : Socket, Poll {
         if(wa.mapState!=IsViewable) return -1;
         array<uint> type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
         if(type.size()>0 && type.first()==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
-        if(type.size()>0 && type.first()!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) return -1;
+        if(type.size()>0 && type.first()!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_) && type.first()!=Atom("_NET_WM_WINDOW_TYPE_DIALOG"_)) return -1;
         if(getProperty<uint>(id,"_NET_WM_STATE"_).contains(Atom("_NET_WM_SKIP_TASKBAR"_))) return -1;
         string title = getTitle(id); if(!title) return -1;
         Image icon = getIcon(id);

@@ -213,8 +213,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-        current=samples.size(); if(0)
-        debug(current=samples.size(); if(0)) s.map.lock(size);
+        ____(current=samples.size(); if(0)) s.map.lock(size);
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }

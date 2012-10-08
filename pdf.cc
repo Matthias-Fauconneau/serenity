@@ -6,7 +6,7 @@
 #include "text.h" //annotations
 
 struct Variant { //TODO: union
-    enum { Empty, Number, Data, List, Dict } type;
+    enum { Empty, Number, Data, List, Dict } type = Empty;
     double number=0; string data; array<Variant> list; map<ref<byte>,Variant> dict;
     Variant():type(Empty){}
     Variant(double number) : type(Number), number(number) {}

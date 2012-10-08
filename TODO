@@ -1,10 +1,12 @@
 Music:
- test/fix MuseScore->Lilypond->PDF+MIDI: Avatar
- fix Adagio, Father and Son, Forbidden Friendship, Kingdom Dance, Where's Hiccup
- polygon fill, seek, NKI, FIR reverb, score editor
-Touchbook: update ARM syscalls, book
+ When Cultures Meet: MIDI -> score render/follow (with heuristics/annotations for beat, hand, tonality)
+ fix Arrival at Aslans How, Best of Times, To Aslans Camp
+ MIDI record, MIDI/score editor
+ convex/concave polygon fill (extract from font renderer to display.cc), seek, NKI, FIR reverb
+Touchbook: update ARM syscalls, test PDF renderer on ARM, remember last position, previous/next page buttons
 Fibermesh
-Apps: fix desktop leak, runner, shell, file manager, search, imap, torrent, video, irc
+Desktop: restart on refresh (avoid leaks), runner
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
+IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Standards: deflate, jpeg, mp3, truetype, ssl
-IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git, static analyzer, interpreter, profiler, compiler
+Apps: shell, file manager, search, imap, torrent, video, irc

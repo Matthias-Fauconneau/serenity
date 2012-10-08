@@ -31,7 +31,6 @@ Image resize(const Image& image, uint width, uint height) {
     } else {
         Image mipmap;
         bool needMipmap = image.width>2*width || image.height>2*height;
-        log(image.width,width,image.height,height,needMipmap);
         if(needMipmap) mipmap = resize(image, image.width/max(1u,(image.width/width)), image.height/max(1u,image.height/height));
         const Image& source = needMipmap?mipmap:image;
         //bilinear

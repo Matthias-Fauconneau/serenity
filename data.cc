@@ -106,17 +106,18 @@ char TextData::character() {
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 
-ref<byte> TextData::whileInteger() {
+ref<byte> TextData::whileInteger(bool sign) {
     uint start=index;
+    if(sign) matchAny("-+"_);
     for(;available(1);) {
         byte c=peek();
-        if((c>='0'&&c<='9')||c=='-'||c=='+') advance(1); else break;
+        if(c>='0'&&c<='9') advance(1); else break;
     }
     return slice(start,index-start);
 }
 
-int TextData::integer() {
-    ref<byte> s = whileInteger();
+int TextData::integer(bool sign) {
+    ref<byte> s = whileInteger(sign);
     return s?toInteger(s, 10):-1;
 }
 
@@ -124,7 +125,7 @@ ref<byte> TextData::whileHexadecimal() {
     uint start=index;
     for(;available(1);) {
         byte c=peek();
-        if((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')||c=='-'||c=='+') advance(1); else break;
+        if((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')) advance(1); else break;
     }
     return slice(start,index-start);
 }
@@ -136,9 +137,11 @@ int TextData::hexadecimal() {
 
 ref<byte> TextData::whileDecimal() {
     uint start=index;
-    for(;available(1);) {
+    matchAny("-+"_);
+    for(bool gotDot=false;available(1);) {
         byte c=peek();
-        if((c>='0'&&c<='9')||c=='.'||c=='-'||c=='+') advance(1); else break;
+        if(c=='.') { if(gotDot) break; gotDot=true; advance(1); continue; }
+        if(c>='0'&&c<='9') advance(1); else break;
     }
     return slice(start,index-start);
 }

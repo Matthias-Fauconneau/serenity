@@ -13,9 +13,8 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[2]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        //debug[center]=str(span);
-        if(/*span.x>24 &&*/ span.y>2/*7*/ && (span.y<14 || (span.x>100 && span.y<20) || (span.x>200 && span.y<27/*29*/))) {
-            //debug[center]="V"_+str(span);
+        if(/*span.x>24 &&*/ span.y>2/*7*/ && (span.y<14 || (span.x>100 && span.y<20) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
+            debug[center]="V"_+str(span);
             ties+= Line(p[0],p[3]);
         }
     } else if(p.size==10) {
@@ -43,14 +42,14 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         } else if(font=="OpusStd"_) {
             if(code==3/*treble*/||code==5/*bass*/) {
                 if(pos.y-lastClef.y>202) {
-                    staffs << (lastClef.y+90);
+                    staffs << (lastClef.y+100);
                     //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
                 lastClef=pos;
             }
         } else if(endsWith(font,"Opus"_)) {
             if(code==71/*treble*/||code==11/*bass*/) {
-                if(pos.y-lastClef.y>154) staffs << (lastClef.y+90);
+                if(pos.y-lastClef.y>154) staffs << (lastClef.y+100);
                 lastClef=pos;
             }
          } else if(find(font,"DUCRGK"_)) { //TODO: glyph OCR
@@ -105,8 +104,9 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 map<float, vec2> matches;
                 for(vec2 dot : dots[i]) if(abs(dot.x-pos.x)<1) matches[dot.y]=dot;
                 const array<float>& y = matches.keys; const array<vec2>& m = matches.values;
-                if(m.size()==4) {
-                    if(abs(y[0]-y[1])<13 && abs(y[1]-y[2])>=122 && abs(y[2]-y[3])<13 ) repeats<<(m[0]+m[1]+m[2]+m[3])/4.f;
+                if(m.size()==4 && abs(y[0]-y[1])<13 && abs(y[1]-y[2])>=122 && abs(y[2]-y[3])<13 ) {
+                    vec2 pos = (m[0]+m[1]+m[2]+m[3])/4.f;
+                    uint i=0; for(;i<repeats.size() && repeats[i].y*1000+repeats[i].x < pos.y*1000+pos.x;i++) {} repeats.insertAt(i,pos);
                 }
             }
         } else if(find(font,"DUCRGK"_)) { //TODO: glyph OCR
@@ -329,7 +329,7 @@ spurious: ;
     }
 
     //for(Line l: ties) debug.insertMulti((l.a+l.b)/2.f,string("^"_));
-    //for(float y: staffs) debug[vec2(0,y-16)]=string("________"_);
+    for(float y: staffs) debug[vec2(0,y-16)]=string("________"_);
 
     //log(chords);
     this->chords=move(chords);
