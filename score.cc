@@ -13,7 +13,7 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[2]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(/*span.x>24 &&*/ span.y>2/*7*/ && (span.y<14 || (span.x>100 && span.y<20) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
+        if(span.y>2 && span.x<342 && (span.y<14 || (span.x>100 && span.y<20) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
             debug[center]="V"_+str(span);
             ties+= Line(p[0],p[3]);
         }
@@ -36,14 +36,15 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
         } else if(find(font,"LilyPond"_)) {
           if((code==147/*treble*/||code==145/*bass*/) && pos.x<200) {
-                if(pos.y-lastClef.y>202) staffs << (lastClef.y+100);
+                if(pos.y-lastClef.y>201) staffs << (lastClef.y+100);
+                //else { static uint max=0; int y=pos.y-lastClef.y; if(uint(y)>max) max=y, log(pos.y-lastClef.y); }
                 if(pos.y>lastClef.y) lastClef=pos;
             }
         } else if(font=="OpusStd"_) {
             if(code==3/*treble*/||code==5/*bass*/) {
                 if(pos.y-lastClef.y>202) {
                     staffs << (lastClef.y+100);
-                    { static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
+                    //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
                 lastClef=pos;
             }
@@ -51,13 +52,13 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             if(code==71/*treble*/||code==11/*bass*/) {
                 if(pos.y-lastClef.y>159) {
                     staffs << (lastClef.y+120);
-                    { static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
+                    //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
                 lastClef=pos;
             }
          } else if(find(font,"DUCRGK"_)) { //TODO: glyph OCR
             if(code==1/*treble*/||code==5/*bass*/) {
-                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+100);
+                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+110);
                 lastClef=pos;
             }
         }
@@ -358,10 +359,12 @@ void Score::seek(uint unused time) {
 }
 
 void Score::noteEvent(int key, int vel) {
+    if(miss.contains(key)) miss.remove(key);
     if(vel) {
-        if(!expected.contains(key)){/*log(key,"expected",expected);*/ return;}
+        if(!expected.contains(key)) return;
         active.insertMulti(key,expected.at(key));
         expected.remove(key);
+        if(expected.size()==1 && chordSize>=4) miss=move(expected);
     } else if(key) {
         if(active.contains(key)) active.remove(key);
         return;
@@ -378,9 +381,11 @@ void Score::noteEvent(int key, int vel) {
             }
             i++;
         }
+        chordSize = expected.size();
     }
     map<int,byte4> activeNotes;
     for(int i: expected.values) activeNotes.insertMulti(indices[i],blue);
+    for(int i: miss.values) activeNotes.insertMulti(indices[i],blue);
     //for(int i: active.values) if(!activeNotes.contains(indices[i])) activeNotes.insert(indices[i],red);
     activeNotesChanged(activeNotes);
 }

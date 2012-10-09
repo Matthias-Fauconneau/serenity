@@ -3,11 +3,11 @@ TARGET ?= test
 BUILD ?= debug
 CFLAGS ?= -march=native
 
-#ifeq ($(TARGET),music)
-# CC := g++ -fabi-version=0 -pipe $(CFLAGS)
-#else
+ifeq ($(TARGET),music)
+ CC := g++ -fabi-version=0 -pipe $(CFLAGS)
+else
  CC := clang++ -pipe $(CFLAGS)
-#endif
+endif
 
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG

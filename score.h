@@ -40,8 +40,9 @@ struct Score {
     array<int> indices; // MIDI-synchronized character indices in associated PDF
 
     uint chordIndex=-1, noteIndex=0, currentStaff=0;
-    array<int> currentChord;
+    int chordSize=0;
     map<int,int> active;
+    map<int,int> miss;
     map<int,int> expected;
     void seek(uint time);
     void noteEvent(int,int);
@@ -50,5 +51,5 @@ struct Score {
     map<vec2, string> debug;
     int pass=-1;
 
-    void clear() { staffs.clear(); lastClef=vec2(0,0); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; currentChord.clear(); active.clear(); expected.clear(); debug.clear(); pass=-1; }
+    void clear() { staffs.clear(); lastClef=vec2(0,0); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; active.clear(); miss.clear(); expected.clear(); debug.clear(); pass=-1; }
 };

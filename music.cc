@@ -59,7 +59,7 @@ struct Music : Widget {
         if(current==count) {
             showSheetList();
             //openSheet("Adagio for TRON"_);
-            //openSheet("Avatar"_);
+            openSheet("Avatar"_);
             //openSheet("Arrival at Aslans How"_);
             //openSheet("Brave Adventurers"_);
             //openSheet("Father and Son"_);
@@ -71,7 +71,6 @@ struct Music : Widget {
             //openSheet("Romantic Flight (Easy)"_);
             //openSheet("Test Drive (Easy)"_);
             //openSheet("Turret Opera (Cara Mia)"_);
-            //openSheet("Where's Hiccup"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
@@ -85,7 +84,7 @@ struct Music : Widget {
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float unused previous, float current, float unused next) {
+    void nextStaff(float previous, float current, float next) {
         float scale = sheet.size.x/(sheet.x2-sheet.x1)/sheet.normalizedScale;
         sheet.delta.y = -min(scale*current, max(scale*previous, scale*next-sheet.size.y));
     }

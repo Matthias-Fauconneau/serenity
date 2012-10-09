@@ -1,5 +1,6 @@
 #pragma once
-/// file linux.h Linux kernel syscalls and error codes
+/// \file linux.h Linux kernel syscalls and error codes
+#include "core.h"
 
 #if __x86_64
 #define attribute __attribute((always_inline))
@@ -146,6 +147,7 @@ syscall2(int, eventfd2, int,val, int,flags)
 
 inline __attribute((noreturn)) void exit_thread(int status) {r(r0,status) r(rN,sys::exit); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noreturn)) int exit_group(int status) {r(r0,status)  r(rN,sys::exit_group); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
+#if __x86_64
 inline __attribute((noinline)) long clone(int (*fn)(void*), void* stack, int flags, void* arg) {
     r(rN,sys::clone) r(r0,flags) r(r1,stack) r(r2,0) r(r3,0) r(r4,0) register long r asm(rR);
     asm volatile("mov %0, %%r14; mov %1, %%r15"::"r"(arg), "r"(fn): "r14", "r15");
@@ -154,6 +156,7 @@ inline __attribute((noinline)) long clone(int (*fn)(void*), void* stack, int fla
     asm("movq $0, %%rbp; movq %%r14, %%rdi; call *%%r15; movq %%rax, %%rdi; movq $60, %%rax; syscall":::/*"rbp",*/"rsp","rdi","rax");
     __builtin_unreachable();
 }
+#endif
 #if __i386
 syscall6(int, ipc, int,call, long,first, long,second, long,third, const void*,ptr, long,fifth)
 inline long shmat(int id, const void* ptr, int flag) { long addr; return ipc(21,id,flag,(long)&addr,ptr,0)<0 ?: addr; }

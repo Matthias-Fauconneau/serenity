@@ -74,7 +74,7 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->cache.decode(1<<15);
+                sample->cache.decode(1<<14);
                 sample->cache.envelope = sample->envelope;
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
@@ -98,12 +98,10 @@ void Sampler::open(const ref<byte>& path) {
 
     // Lock compressed samples in memory
     full=0; for(const Sample& s : samples) full += (s.map.size+4095)/4096*4;
-    uint predecode = (samples.size()*(1<<14)*8)/1024;
-    available = availableMemory()/2;
-    if(available>predecode) available-=predecode; else available=0;
+    available = availableMemory() - ((samples.size()*(1<<14)*2*sizeof(float))>>10) /*predecoded samples*/ - (10<<10) /*heap*/;
     if(full>available) {
         lock=0; for(const Sample& s : samples) lock += min(s.map.size/4096*4,available*1024/samples.size()/4096*4);
-        log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB + predecode"_,predecode/1024,"MiB"_);
+        log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB");
     }
     current=0; queue();
 }
