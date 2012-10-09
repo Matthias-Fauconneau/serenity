@@ -1,4 +1,9 @@
 #if 1
+#include "linux.h"
+int main() { write(1,"Hello World!\n",sizeof("Hello World!\n")-1); return 0; }
+#endif
+
+#if 0
 #include "process.h"
 #include "data.h"
 #include "string.h"
@@ -112,11 +117,6 @@ struct Wing : Widget {
         Text(str("Lift/Drag =",lift/drag),32).render(position+int2(0,size.y+2*32),int2(size.x,0));
     }
 } application;
-#endif
-
-#if 0
-#include "linux.h"
-int main() { write(1,"Hello World!\n",sizeof("Hello World!\n")-1); return 0; }
 #endif
 
 #if 0

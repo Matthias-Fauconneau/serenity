@@ -127,7 +127,6 @@ void traceAllThreads() {
         thread->terminate=true; // Tries to terminate all other threads cleanly
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
-    yield();
 }
 string trace(int skip, void* ip);
 static void handler(int sig, siginfo* info, ucontext* ctx) {

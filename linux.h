@@ -78,13 +78,15 @@ enum class sys {
     gettid=186, futex=202, clock_gettime=228, exit_group=231, tgkill=234, openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283,
     timerfd_settime=286, eventfd2=290
 #else
-    exit=1, fork, read, write, open, close, execve=11, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102,
-    ipc = 117, socket=281, connect=283, getdents=141, poll=168, sigaction=174, mmap=192, fstat=197,
+    exit=1, fork, read, write, open, close, execve=11, getpid=20, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102, wait4=114,
+    ipc = 117, clone=120, mprotect=125, getdents=141, mlock=150, sched_yield=158, poll=168, sigaction=174, mmap=192, fstat=197,
+    gettid=224, futex=240, exit_group = 248,
+    socket=281, connect=283,
 #if __arm__
-    clock_gettime=263,
+    clock_gettime=263, tgkill=268,
     shmat=305,shmdt,shmget,shmctl,
-    openat=322, mkdirat, fstatat, unlinkat, symlinkat=331,
-    timerfd_create=350, timerfd_settime=353
+    openat=322, mkdirat, fstatat, unlinkat, symlinkat=331, utimensat=348,
+    timerfd_create=350, timerfd_settime=353, eventfd2=356
 #elif __i386__
     clock_gettime=265,
     openat=295, mkdirat, fstatat=300, unlinkat, symlinkat=304,
@@ -113,7 +115,6 @@ syscall3(long, shmat, int,id, const void*,ptr, int,flag)
 syscall3(int, shmctl, int,id, int,cmd, struct shmid_ds*,buf)
 syscall1(int, shmdt, const void*,ptr)
 #endif
-syscall0(int, pause)
 syscall0(int, getpid)
 #if !__i386__
 syscall3(int, socket, int,domain, int,type, int,protocol)
@@ -124,12 +125,10 @@ syscall0(int, fork)
 syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
 //syscall1(int, exit, int, status)
 syscall4(int, wait4, int,pid, int*,status, int,options, struct rusage*, rusage)
-syscall2(int, kill, int,pid, int,sig)
 syscall3(int, fcntl, int,fd, int,cmd, int,param)
 syscall3(int, getdents, int,fd, void*,entry, long,size)
 syscall3(int, setpriority, int,which, int,who, int,prio)
 syscall2(int, mlock,const void*,addr, long,len)
-syscall1(int, mlockall, int,flags)
 syscall2(int, setrlimit, int,resource, struct rlimit*,limit)
 syscall0(int, gettid)
 syscall6(int, futex, int*,uaddr, int,op, int,val, const struct timespec*,timeout, int*,uaddr2, int,val3)

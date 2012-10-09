@@ -61,7 +61,6 @@ struct Music : Widget {
             //openSheet("Adagio for TRON"_);
             //openSheet("Avatar"_);
             //openSheet("Arrival at Aslans How"_);
-            openSheet("Best of Times"_);
             //openSheet("Brave Adventurers"_);
             //openSheet("Father and Son"_);
             //openSheet("Forbidden Friendship (Easy)"_);
@@ -116,7 +115,7 @@ struct Music : Widget {
         if(existsFile(string(name+".pdf"_),folder)) {
             sheet.open(string(name+".pdf"_),folder);
             score.synchronize(move(midi.notes));
-            sheet.setAnnotations(score.debug);
+            //sheet.setAnnotations(score.debug);
             window.backgroundCenter=window.backgroundColor=0xFF;
             window.widget=&sheet.area();
             window.setSize(int2(-1,-1));

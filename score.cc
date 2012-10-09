@@ -43,13 +43,16 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             if(code==3/*treble*/||code==5/*bass*/) {
                 if(pos.y-lastClef.y>202) {
                     staffs << (lastClef.y+100);
-                    //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
+                    { static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
                 lastClef=pos;
             }
         } else if(endsWith(font,"Opus"_)) {
             if(code==71/*treble*/||code==11/*bass*/) {
-                if(pos.y-lastClef.y>154) staffs << (lastClef.y+100);
+                if(pos.y-lastClef.y>159) {
+                    staffs << (lastClef.y+120);
+                    { static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
+                }
                 lastClef=pos;
             }
          } else if(find(font,"DUCRGK"_)) { //TODO: glyph OCR
@@ -145,7 +148,7 @@ void Score::synchronize(map<int,Chord>&& chords) {
                         //debug[vec2(x,-y)]=string("L"_);
                         for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
                         t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                    } //else if(lx>-20 && lx<20 && ly>-40 && ly<40 && rx<0) debug.insertMulti(vec2(x+16,-y-16),string("!L"_+str(lx,ly,rx)));
+                    } //else if(lx>-40 && lx<40 && ly>-80 && ly<80) debug.insertMulti(vec2(x+16,-y-16),string("!L"_+str(lx,ly,rx)));
                 }
 alreadyTied: ;
             }
