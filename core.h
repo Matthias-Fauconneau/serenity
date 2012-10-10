@@ -48,6 +48,11 @@ typedef unsigned int uint;
 typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
+#if __x86_64
+typedef unsigned long size_t;
+#else
+typedef unsigned int size_t;
+#endif
 
 // Works around missing support for some C++11 features in QtCreator code model
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
@@ -61,7 +66,7 @@ namespace std { template<class T> struct initializer_list; }
 /// \a Unmanaged const memory reference
 template<class T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
-inline constexpr ref<byte> operator "" _(const char* data, unsigned long size);
+inline constexpr ref<byte> operator "" _(const char* data, size_t size);
 #define __( args... ) { args }
 #define ___ ...
 #define ____( ignore... ) ignore
@@ -128,7 +133,7 @@ template<class T> struct initializer_list {
 
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
 /// Returns reference to string literals
-inline constexpr ref<byte> operator "" _(const char* data, unsigned long size) { return ref<byte>((byte*)data,size); }
+inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return ref<byte>((byte*)data,size); }
 #endif
 
 // Basic operations

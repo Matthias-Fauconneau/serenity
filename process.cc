@@ -22,7 +22,7 @@ struct ucontext {
 #if __x86_64__
     long r8,r9,r10,r11,r12,r13,r14,r15,rdi,rsi,rbp,rbx,rdx,rax,rcx,rsp,ip,efl,csgsfs,err,trap,oldmask,cr2;
 #elif __arm__
-    long trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,ip,cpsr,fault;
+    long trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,pc,cpsr,fault;
 #elif __i386__
     long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,ip,cs,efl,uesp,ss;
 #endif
@@ -76,10 +76,15 @@ Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     Locker lock(threadsLock()); threads()<<this; // Adds this thread to global thread list
     this->priority=priority;
     if(priority == 20) return; //escape code for main thread (already spawned)
+#if __x86_64
     const int stackSize = 1<<20;
     stack = Map(0,0,stackSize,Map::Read|Map::Write,Map::Private|Map::Anonymous);
     mprotect((void*)stack.data,0x1000,0);
     clone(::run,(void*)(stack.data+stackSize),CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
+#else
+    error("TODO: clone");
+    run();
+#endif
 }
 void Thread::run() {
     tid=gettid();
@@ -120,7 +125,6 @@ void Thread::event() {
     }
 }
 
-// Signal handler
 void traceAllThreads() {
     Locker lock(threadsLock());
     for(Thread* thread: threads()) {
@@ -128,6 +132,8 @@ void traceAllThreads() {
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
 }
+
+// Signal handler
 string trace(int skip, void* ip);
 static void handler(int sig, siginfo* info, ucontext* ctx) {
     string s = trace(1,(void*)ctx->ip);
@@ -137,7 +143,13 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
     if(sig==SIGSEGV) { log("Segmentation fault at "_+str(info->fault.addr)); exit_thread(0); } //Segfault kills the threads to prevent further corruption
     if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads
 }
-extern void restore_rt (void) asm ("__restore_rt"); asm(".text\n.align 16\n__restore_rt:\nmovq $15, %rax\nsyscall\n");
+
+#if __x86_64
+extern void restore_rt (void) asm ("__restore_rt"); asm(".text; .align 16; __restore_rt:; movq $15, %rax; syscall;");
+#elif __arm
+extern void restore_rt (void) asm ("__restore_rt"); asm(".text; .align 2; .fnstart; .save {r0-r15}; .pad #160; nop; __restore_rt:; mov r7, $119; swi 0; .fnend;");
+#endif
+
 void __attribute((constructor(101))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);

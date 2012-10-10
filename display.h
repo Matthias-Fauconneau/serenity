@@ -35,3 +35,5 @@ void substract(int2 target, const Image& source, byte4 color=black);
 void line(float x1, float y1, float x2, float y2, float w=1, byte4 color=black);
 /// Draws an antialiased line from \a a to \a b
 inline void line(vec2 a, vec2 b, float w=1, byte4 color=black) { line(a.x,a.y, b.x,b.y, w, color); }
+/// Draws an antialiased line from \a a to \a b
+inline void line(int2 a, int2 b, float w=1, byte4 color=black) { line(a.x,a.y, b.x,b.y, w, color); }

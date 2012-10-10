@@ -1,7 +1,6 @@
 Music:
  When Cultures Meet: MIDI -> score render/follow (with heuristics/annotations for beat, hand, tonality)
- audio record, video record
- MIDI record, MIDI/score editor
+ audio record, video record, MIDI record, MIDI/score editor
  convex/concave polygon fill (extract from font renderer to display.cc), seek, NKI, FIR reverb
  fix Arrival at Aslans How (tremolo), To Aslans Camp (pdf)
 Touchbook: test PDF renderer on ARM, remember last position, previous/next page buttons

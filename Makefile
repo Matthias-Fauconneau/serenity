@@ -1,15 +1,16 @@
 PREFIX ?= /usr
 TARGET ?= test
 BUILD ?= debug
-CFLAGS ?= -march=native
 
-ifeq ($(TARGET),music)
- CC := g++ -fabi-version=0 -pipe $(CFLAGS)
-else
- CC := clang++ -pipe $(CFLAGS)
+ifeq ($(CC),cc)
+ ifeq ($(TARGET),music)
+  CC := g++ -fabi-version=0 -march=native
+ else
+  CC := clang++ -march=native
+ endif
 endif
 
-FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var $(FLAGS_$(BUILD))
+FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var -pipe $(FLAGS_$(BUILD))
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast= -O3 -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions

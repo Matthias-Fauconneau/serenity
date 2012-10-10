@@ -6,8 +6,6 @@ struct timespec { long sec,nsec; };
 #if __x86_64
 struct stat { long dev; long ino; long nlink; int mode,uid,gid; long rdev,size,blksize,blocks; timespec atime,mtime,ctime; long pad[3]; };
 #else
-typedef unsigned short uint16;
-typedef unsigned long long uint64;
 struct stat { uint64 dev; int pad1; int ino; int mode; uint16 nlink; int uid,gid; uint64 rdev; int pad2;
               uint64 size; int blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
 #endif

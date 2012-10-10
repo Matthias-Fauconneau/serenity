@@ -74,7 +74,6 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->cache.decode(1<<14);
                 sample->cache.envelope = sample->envelope;
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
@@ -211,8 +210,8 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-        //current=samples.size();
-        debug(current=samples.size(); if(0)) s.map.lock(size);
+        current=samples.size();
+        debug(current=samples.size(); if(0)) s.cache.decode(1<<14), s.map.lock(size);
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }
