@@ -33,20 +33,22 @@ struct MidiScore : Widget {
     int2 position=0, size=0;
     // Returns staff X position from time
     int staffX(int t) {
-        const int timeInterval = 16, staffTime = size.x/timeInterval;
-        return t%staffTime*timeInterval;
+        const int systemHeader = 128;
+        const int timeInterval = 16, staffTime = (size.x-systemHeader)/timeInterval;
+        return systemHeader+t%staffTime*timeInterval;
     }
     // Returns system line index from time
     int systemLine(int t) {
-        const int timeInterval = 16, staffTime = size.x/timeInterval;
+        const int systemHeader = 128;
+        const int timeInterval = 16, staffTime = (size.x-systemHeader)/timeInterval;
         return t/staffTime;
     }
 
     // Returns page coordinates from staff coordinates
     int2 page(int staff, int t, int h) {
         const int staffCount = 2;
-        const int staffInterval = 16, staffMargin = 4*staffInterval, staffHeight = staffMargin+4*staffInterval+staffMargin;
-        return position+int2(staffX(t),systemLine(t)*staffCount*staffHeight+staff*staffHeight+staffMargin+h*staffInterval/2);
+        const int staffInterval = 16, staffMargin = 2*staffInterval, staffHeight = staffMargin+4*staffInterval+staffMargin, systemHeight=staffCount*staffHeight+2*staffMargin;
+        return position+int2(staffX(t),systemLine(t)*systemHeight+staff*staffHeight+2*staffMargin+h*staffInterval/2);
     }
 
     // Draws a staff
@@ -74,17 +76,9 @@ struct MidiScore : Widget {
         Clef clef = staffs[s];
         int h = staffY(clef, note);
         for(int i=-2;i>=h;i-=2) ledger(s, t, i);
-        for(int i=12;i<h;i+=2) ledger(s, t, i);
+        for(int i=10;i<h;i+=2) ledger(s, t, i);
         int2 position = page(s, t, h);
         fill(position+Rect(int2(0,-8),int2(16,8)));
-    }
-
-    void assign(const Chord& chord, int* indices, int i) {
-        if(indices[i]>=0) return;
-        int tone = chord[i];
-        int staff = tone>=60 ? 0 : 1;
-        for(int j: range(chord)) if(i!=j) if((staff==0 && chord[j]==tone-12) || (staff==1 && chord[j]==tone+12)) staff=!staff;
-        indices[i]=staff;
     }
 
     void render(int2 position, int2 size) {
@@ -94,10 +88,11 @@ struct MidiScore : Widget {
         for(pair<int,Chord> chords: notes) {
             int t = chords.key;
             const Chord& chord = chords.value;
-            int N = chord.size();
-            int indices[N]; clear(indices,N,-1);
-            for(int i: range(chord.size())) assign(chord, indices, i);
-            for(int i: range(chord.size())) note(t, indices[i], chord[i]);
+            for(int tone: chord) {
+                int staff = tone>=60 ? 0 : 1;
+                //if((staff==0 && chord.contains(tone-12)) || (staff==1 && chord.contains(tone+12))) staff=!staff;
+                note(t, staff, tone);
+            }
         }
     }
 };

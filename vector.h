@@ -73,7 +73,7 @@ typedef vector<xy,int,2> int2;
 /// Floating-point x,y vector
 typedef vector<xy,float,2> vec2;
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
-//inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
+inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 //inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
 
 /// Axis-aligned rectangle

@@ -105,15 +105,19 @@ struct Wing : Widget {
         vec2 scale = vec2(size)/(curve.max-curve.min), offset = -curve.min*scale;
         mat32 M(scale.x,0,0,-scale.y,position.x+offset.x,position.y+size.y-offset.y); //[min..max] -> [position..position+size]
         const int N = curve.size();
-        vec2 R=0;
+        vec2 R=0; float t=0;
         for(uint i: range(N)) {
             //const Point& prev = curve[(i-1+N)%N];
             const Point& curr = curve[i];
             const Point& next = curve[(i+1)%N];
-            vec2 P = -(curr.p+next.p)/2.f*normal(next-curr); //-curr.p/2*normal(next-prev); //positive pression is towards inside => minus sign; each segment is used twice => /2
-            R += P;
+            float p = (curr.p+next.p)/2.f;
+            vec2 F = -p*normal(next-curr); //-curr.p/2*normal(next-prev); //positive pression is towards inside => minus sign; each segment is used twice => /2
+            vec2 x = (curr+next)/2.f;
+            vec2 r = curr-curve.mean;
+            t += cross(r,F);
+            R += F;
             line(M*curr, M*next, 2);
-            line(M*((curr+next)/2.f), M*((curr+next)/2.f+P), 2, (curr.p+next.p)/2>0?red:blue);
+            line(M*x, M*(x+F), 2, p>0?red:blue);
         }
         line(M*curve.mean, M*(curve.mean+R), 2);
         float drag = R.x;
@@ -123,6 +127,7 @@ struct Wing : Widget {
         Text(str("Lift =",lift/100),                32).render(position+int2(0,size.y+0*32),int2(size.x,0));
         Text(str("Drag =",drag/100),          32).render(position+int2(0,size.y+1*32),int2(size.x,0));
         Text(str("Lift/Drag =",lift/drag),32).render(position+int2(0,size.y+2*32),int2(size.x,0));
+        Text(str("Torque =",t),32).render(position+int2(0,size.y+3*32),int2(size.x,0));
     }
 } application;
 #endif

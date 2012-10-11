@@ -147,65 +147,65 @@ struct Player {
         assert(folders);
         for(string& folder : folders) albums << string(section(folder,'/',-2,-1));
 
-        int time=0;
-        if(!files && existsFile("Music/.last"_)) {
+        if(existsFile("Music/.last"_)) {
             string mark = readFile("Music/.last"_);
             ref<byte> last = section(mark,0);
-            time = toInteger(section(mark,0,1,2));
-            string folder = string(section(last,'/',0,2));
-            if(existsFolder(folder)) {
-                albums.index = folders.indexOf(folder);
-                array<string> files = Folder(folder).list(Recursive|Files);
-                uint i=0; for(;i<files.size();i++) if(files[i]==last) break;
-                for(;i<files.size();i++) queueFile(move(files[i]));
+            ref<byte> album = section(last,'/',0,1);
+            ref<byte> title = section(last,'/',1,-1);
+            if(existsFolder(album,"Music"_)) {
+                albums.index = folders.indexOf(string(album));
+                array<string> files = Folder(album,"Music"_).list(Recursive|Files);
+                uint i=0; for(;i<files.size();i++) if(files[i]==title) break;
+                for(;i<files.size();i++) queueFile(files[i], album);
+                if(files) {
+                    next();
+                    seek(toInteger(section(mark,0,1,2)));
+                }
             }
         }
         window.setSize(int2(-512,-512));
-        if(files) next();
-        if(time) seek(time);
         mainThread().priority=-19;
     }
-    void queueFile(string&& path) {
-        string title = string(section(section(path,'/',-2,-1),'.',0,-2));
+    void queueFile(const ref<byte>& file, const ref<byte>& folder) {
+        string title = string(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size() && title[i]>='0'&&title[i]<='9') i++; //skip track number
         while(i<title.size() && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
         titles << Text(replace(title.slice(i),"_"_," "_), 16);
-        files << move(path);
+        files <<  folder+"/"_+file;
     }
-    void play(const string& path) {
-        assert(existsFolder(path));
-        array<string> files = listFiles(path,Recursive|Sort|Files);
-        for(string& file: files) queueFile(move(file));
+    void playAlbum(const ref<byte>& album) {
+        assert(existsFolder(album,"Music"_),album);
+        array<string> files = Folder(album,"Music"_).list(Recursive|Files);
+        for(const string& file: files) queueFile(file, album);
         window.setSize(int2(-512,-512));
-        next();
+        titles.index=-1; next();
     }
     void playAlbum(uint index) {
         files.clear(); titles.clear();
         window.setTitle(albums[index].text);
-        play(folders[index]);
+        playAlbum(folders[index]);
     }
     void playTitle(uint index) {
         window.setTitle(titles[index].text);
         ref<byte> path = files[index];
         if(media) media->~AudioMedia(), media=0;
-        if(endsWith(path,".mp3"_)||endsWith(path,".MP3"_)) media=new (&mp3) MP3Media(File(path));
-        else if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path));
+        if(endsWith(path,".mp3"_)||endsWith(path,".MP3"_)) media=new (&mp3) MP3Media(File(path,"Music"_));
+        else if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path,"Music"_));
         else warn("Unsupported format",path);
         assert(audio.channels==media->channels);
         if(audio.rate!=media->rate) new (&resampler) Resampler(audio.channels, media->rate, audio.rate, audio.periodSize);
         setPlaying(true);
-        writeFile("/Music/.last"_,string(files[index]+"\0"_+dec(0)));
     }
     void next() {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else { window.setTitle("Player"_); stop(); return; }
-        if(!playButton.enabled) setPlaying(true);
         //titles.ensureVisible(titles.active());
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
+        if(playButton.enabled==play) return;
         if(play) { audio.start(); window.setIcon(playIcon()); }
         else { audio.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play; window.render();
@@ -218,7 +218,7 @@ struct Player {
         remaining.setText(string("00:00"_));
         titles.index=-1;
     }
-    void seek(int position) { media->seek(position); }
+    void seek(int position) { if(media) media->seek(position); }
     void update(int position, int duration) {
         if(slider.value == position) return;
         writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));
