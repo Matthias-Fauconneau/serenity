@@ -110,10 +110,13 @@ int2 Grid::sizeHint() {
 }
 
 array<Rect> Grid::layout(int2 position, int2 size) {
-    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
-    int2 elementSize = int2(size.x/w,size.y/h);
-    int2 margin = (size - int2(w,h)*elementSize) / 2;
     array<Rect> widgets(count());
-    for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++)  widgets<< position + margin + int2(x,y)*elementSize + Rect(elementSize);
+    if(count()) {
+        uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
+        assert(w && h);
+        int2 elementSize = int2(size.x/w,size.y/h);
+        int2 margin = (size - int2(w,h)*elementSize) / 2;
+        for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++)  widgets<< position + margin + int2(x,y)*elementSize + Rect(elementSize);
+    }
     return widgets;
 }

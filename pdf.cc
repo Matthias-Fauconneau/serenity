@@ -6,16 +6,23 @@
 #include "text.h" //annotations
 
 struct Variant { //TODO: union
-    enum { Empty, Number, Data, List, Dict } type = Empty;
+    enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
     double number=0; string data; array<Variant> list; map<ref<byte>,Variant> dict;
     Variant():type(Empty){}
-    Variant(double number) : type(Number), number(number) {}
+    Variant(bool boolean) : type(Boolean), number(boolean) {}
+    Variant(int number) : type(Integer), number(number) {}
+    Variant(long number) : type(Integer), number(number) {}
+    Variant(double number) : type(Real), number(number) {}
     Variant(string&& data) : type(Data), data(move(data)) {}
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
     Variant(map<ref<byte>,Variant>&& dict) : type(Dict), dict(move(dict)) {}
+    int integer() const { assert(type==Integer, number); return number; }
+    double real() const { assert(type==Real||type==Integer); return number; }
 };
 string str(const Variant& o) {
-    if(o.type==Variant::Number) return str(o.number);
+    if(o.type==Variant::Boolean) return string(o.number?"true"_:"false"_);
+    if(o.type==Variant::Integer) return str(int(o.number));
+    if(o.type==Variant::Real) return str(o.number);
     if(o.type==Variant::Data) return copy(o.data);
     if(o.type==Variant::List) return str(o.list);
     if(o.type==Variant::Dict) return str(o.dict);
@@ -25,10 +32,9 @@ string str(const Variant& o) {
 static Variant parse(TextData& s) {
     s.skip();
     if("0123456789.-"_.contains(s.peek())) {
-        double number = s.decimal();
+        ref<byte> number = s.whileDecimal();
         if(s[0]==' '&&(s[1]>='0'&&s[1]<='9')&&s[2]==' '&&s[3]=='R') s.advance(4); //FIXME: regexp
-        assert(!__builtin_isnan(number));
-        return number;
+        return number.contains('.') ? Variant(toDecimal(number)) : Variant(toInteger(number));
     }
     if(s.match('/')) return string(s.identifier("-+"_));
     if(s.match('(')) {
@@ -55,10 +61,10 @@ static Variant parse(TextData& s) {
             array<byte> stream = inflate(s.until("endstream"_),true);
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
-                int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,Variant(1.0)).number;
+                int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,Variant(1)).integer();
                 if(predictor != 12) error("Unsupported predictor",predictor);
                 int size = stream.size();
-                int w = v.dict.at("DecodeParms"_).dict.value("Columns"_,Variant(1.0)).number;
+                int w = v.dict.at("DecodeParms"_).dict.value("Columns"_,Variant(1)).integer();
                 int h = size/(w+1);
                 assert(size == (w+1)*h);
                 const byte* src = stream.data();
@@ -82,11 +88,13 @@ static Variant parse(TextData& s) {
         while(!s.match('>')) data << toInteger(s.read(2),16);
         return move(data);
     }
-    error("Unknown type"_,s.peek(64));
-    return Variant(0);
+    if(s.match("true"_)) return true;
+    if(s.match("false"_)) return false;
+    error("Unknown type"_,s.index,s.slice(s.index>32?s.index-32:0,32),"|"_,s.slice(s.index,32));
+    return Variant();
 }
 static Variant parse(const ref<byte>& buffer) { TextData s(buffer); return parse(s); }
-static map<ref<byte>,Variant> toDict(const array< string >& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.number]).dict; }
+static map<ref<byte>,Variant> toDict(const array< string >& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.integer()]).dict; }
 
 void PDF::open(const ref<byte>& path, const Folder& folder) {
     lines.clear(); fonts.clear(); characters.clear(); paths.clear();
@@ -106,8 +114,10 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                 if(xref.size()<i+n) xref.grow(i+n);
                 for(;n>0;n--,i++) {
                     int offset=s.integer(); s.skip(); s.integer(); s.skip();
-                    if(s.match('n'))  xref[i] = string(s.slice(offset+(i<10?1:(i<100?2:3))+6));
-                    else if(s.match('f')) {}
+                    if(s.match('n')) {
+                        assert(offset);
+                        xref[i] = string(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
+                    } else if(s.match('f')) {}
                     else error(s.untilEnd());
                     s.skip();
                 }
@@ -118,87 +128,95 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                 uint unused n=s.integer(); s.skip();
                 if(!s.match("obj"_)) error("");
                 if(xref.size()<=i) xref.grow(i+1);
+                assert(s.index);
                 xref[i]=string(s.slice(s.index));
             }
             Variant object = parse(s);
             map<ref<byte>,Variant>& dict = object.dict;
             if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) {  // Cross reference stream
                 const array<Variant>& W = dict.at("W"_).list;
-                assert(W[0].number==1);
-                assert(W[1].number==2);
-                assert(W[2].number==0 || W[2].number==1);
-                uint n=dict.at("Size"_).number;
+                assert(W[0].integer()==1);
+                assert(W[1].integer()==2);
+                assert(W[2].integer()==0 || W[2].integer()==1);
+                uint n=dict.at("Size"_).integer();
                 if(xref.size()<n) xref.grow(n);
                 BinaryData b(object.data,true);
                 array<Variant> list;
                 if(dict.contains("Index"_)) list = move(dict.at("Index"_).list);
-                else list << Variant(0) << Variant(dict.at("Size"_).number);
+                else list << Variant(0) << Variant(dict.at("Size"_).integer());
                 for(uint l: range(list.size()/2)) {
-                    for(uint i=list[l*2].number,n=list[l*2+1].number;n>0;n--,i++) {
+                    for(uint i=list[l*2].integer(),n=list[l*2+1].integer();n>0;n--,i++) {
                         uint8 type=b.read();
                         if(type==0) { // free objects
                             uint16 unused n = b.read();
-                            assert(W[2].number==1);
+                            assert(W[2].integer()==1);
                             uint8 unused g = b.read();
                             //log("f",hex(n),g);
                         } else if(type==1) { // uncompressed objects
                             uint16 offset=b.read();
-                            xref[i]=string(s.slice(offset+(i<10?1:(i<100?2:3))+6));
-                            b.advance(W[2].number);
+                            assert(offset,offset);
+                            xref[i]=string(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
+                            b.advance(W[2].integer());
                             //log("u",hex(offset));
                         } else if(type==2) { // compressed objects
                             uint16 unused stream=b.read();
-                            uint8 unused index=0; if(W[2].number) index=b.read();
+                            uint8 unused index=0; if(W[2].integer()) index=b.read();
                             compressedXRefs << CompressedXRef __(stream,index);
                         } else error("type",type);
                     }
                 }
             }
-            if(!root && dict.contains("Root"_)) root=dict.at("Root"_).number;
+            if(!root && dict.contains("Root"_)) root=dict.at("Root"_).integer();
             if(!dict.contains("Prev"_)) break;
-            s.index=dict.at("Prev"_).number;
+            s.index=dict.at("Prev"_).integer();
         }
         catalog = parse(xref[root]).dict;
         for(CompressedXRef ref: compressedXRefs) {
             Variant stream = parse(xref[ref.object]);
             TextData s(stream.data);
-            uint objectNumber=-1,offset=-1; for(uint i=0;i<=ref.index;i++) { objectNumber=s.integer(); s.match(' '); offset=s.integer(); s.match(' ');}
-            xref[objectNumber] = string(s.slice(stream.dict.at("First"_).number+offset));
+            uint objectNumber=-1,offset=-1;
+            assert(ref.index>=0);
+            for(uint i=0;i<=ref.index;i++) {
+                objectNumber=s.integer(); s.match(' ');
+                offset=s.integer(); s.match(' ');
+                assert(offset,offset);
+            }
+            xref[objectNumber] = string(s.slice(stream.dict.at("First"_).integer()+offset));
         }
     }
     x1 = +__FLT_MAX__, x2 = -__FLT_MAX__; vec2 pageOffset=0;
-    array<Variant> pages = move(parse(xref[catalog.at("Pages"_).number]).dict.at("Kids"_).list);
+    array<Variant> pages = move(parse(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_).list);
     for(uint i=0; i<pages.size(); i++) {
         const Variant& page = pages[i];
         uint pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
-        auto dict = parse(xref[page.number]).dict;
+        auto dict = parse(xref[page.integer()]).dict;
         if(dict.contains("Resources"_)) {
             auto resources = toDict(xref,move(dict.at("Resources"_)));
             if(resources.contains("Font"_)) for(auto e : toDict(xref,move(resources.at("Font"_)))) {
                 if(fonts.contains(e.key)) continue;
                 fonts[e.key]=&heap<Font>();
-                auto fontDict = parse(xref[e.value.number]).dict;
-                auto descendant = fontDict.find("DescendantFonts"_);
-                if(descendant) fontDict = parse(xref[descendant->list[0].number]).dict;
+                map<ref<byte>,Variant> fontDict = parse(xref[e.value.integer()]).dict;
+                Variant* descendant = fontDict.find("DescendantFonts"_);
+                if(descendant) fontDict = parse(xref[descendant->type==Variant::Integer?descendant->integer():descendant->list[0].integer()]).dict;
                 if(!fontDict.contains("FontDescriptor"_)) continue;
                 fonts[e.key]->name = move(fontDict.at("BaseFont"_).data);
-                auto descriptor = parse(xref[fontDict.at("FontDescriptor"_).number]).dict;
-                auto fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
-                if(fontFile) fonts[e.key]->font = ::Font(parse(xref[fontFile->number]).data);
+                auto descriptor = parse(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
+                Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
+                if(fontFile) fonts[e.key]->font = ::Font(parse(xref[fontFile->integer()]).data);
                 Variant* firstChar = fontDict.find("FirstChar"_);
-                if(firstChar) fonts[e.key]->widths.grow(firstChar->number);
+                if(firstChar) fonts[e.key]->widths.grow(firstChar->integer());
                 Variant* widths = fontDict.find("Widths"_);
-                if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.number;
+                if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.real();
             }
         }
-        auto contents = dict.find("Contents"_);
+        Variant* contents = dict.find("Contents"_);
         if(contents) {
-            if(contents->number) contents->list << contents->number;
+            if(contents->type==Variant::Integer) contents->list << contents->integer();
             TextData s;
             for(const auto& contentRef : contents->list) {
-                Variant content = parse(xref[contentRef.number]);
+                Variant content = parse(xref[contentRef.integer()]);
                 assert(content.data, content);
-                //for(const Variant& dataRef : content.list) data << parse(xref[dataRef.number]).data;
+                //for(const Variant& dataRef : content.list) data << parse(xref[dataRef.integer()]).data;
                 s.buffer << content.data;
             }
             y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
@@ -213,18 +231,20 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     args << parse(s);
                     continue;
                 }
-                uint op = id[0]|(id.size>1?id[1]:0)<<8|(id.size>2?id[2]:0)<<16;
+                uint op = id[0]; if(id.size>1) { op|=id[1]<<8; if(id.size>2) op|=id[2]<<16; }
                 switch( op ) {
                 default: error("Unknown operator",str((const char*)&op),s.peek(16));
 #define OP(c) break;case c:
 #define OP2(c1,c2) break;case c1|c2<<8:
 #define OP3(c1,c2,c3) break;case c1|c2<<8|c3<<16:
-#define f(i) args[i].number
+#define f(i) args[i].real()
 #define p(x,y) (Cm*vec2(f(x),f(y)))
                     OP('b') drawPath(path,Close|Stroke|Fill|Winding|Trace);
                     OP2('b','*') drawPath(path,Close|Stroke|Fill|OddEven|Trace);
                     OP('B') drawPath(path,Stroke|Fill|Winding|Trace);
                     OP2('B','*') drawPath(path,Stroke|Fill|OddEven|Trace);
+                    OP3('B','D','C') ;
+                    OP3('E','M','C') ;
                     OP('c') path.last() << p(0,1) << p(2,3) << p(4,5);
                     OP('d') {} //setDashOffset();
                     OP('f') drawPath(path,Fill|Winding|Trace);
@@ -272,12 +292,13 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     OP('\'') { Tm=Tlm=mat32(0,-leading)*Tlm; drawText(font,fontSize,spacing,wordSpacing,args[0].data); }
                     OP2('T','j') drawText(font,fontSize,spacing,wordSpacing,args[0].data);
                     OP2('T','J') for(const auto& e : args[0].list) {
-                        if(e.number) Tm=mat32(-e.number*fontSize/1000,0)*Tm;
-                        else drawText(font,fontSize,spacing,wordSpacing,e.data);
+                        if(e.type==Variant::Integer) Tm=mat32(-e.integer()*fontSize/1000,0)*Tm;
+                        else if(e.type==Variant::Data) drawText(font,fontSize,spacing,wordSpacing,e.data);
+                        else error("Unexpected type");
                     }
                     OP2('T','f') font = fonts.at(args[0].data); fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat32(f(0),f(1),f(2),f(3),f(4),f(5));
-                    OP2('T','w') wordSpacing=f(0);
+                    OP2('T','w') { log("Tw",f(0));  wordSpacing=f(0); }
                 }
                 //log(str((const char*)&op),args);
                 args.clear();
@@ -297,8 +318,12 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     for(Character& c: characters) c.pos.x-=x1, c.pos.y=-c.pos.y;
     for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
 
-    //sort primitives for culling
-    array<Character> sortedCharacters; for(Character&c : characters) sortedCharacters.insertSorted(c); characters=move(sortedCharacters);
+    // insertion sorts primitives for culling
+    for(int i : range(1,characters.size())) {
+        Character e = characters[i];
+        while(i>0 && characters[i-1] > e) { characters[i]=characters[i-1];  i--; }
+        characters[i] = e;
+    }
 
     scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
     for(uint i: range(characters.size())) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code); }
@@ -335,7 +360,8 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
 
 void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data) {
     if(!font->font.face) return;
-    font->font.setSize(fontSize*64);
+    font->font.setSize(fontSize);
+    uint16 lastIndex=-1;
     for(uint8 code : data) {
         if(code==0) continue;
         mat32 Trm = Tm*Cm;
@@ -345,8 +371,9 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         characters << Character __(font, Trm.m11*fontSize, index, position, code);
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size()) advance += fontSize*font->widths[code]/1000;
-        else advance += font->font.advance(index)/16.f;
-        Tm = mat32(advance,0) * Tm;
+        else advance += font->font.linearAdvance(index); //+(lastIndex!=-1?font->font.kerning(lastIndex,index):0)
+        Tm = mat32(advance, 0) * Tm;
+        lastIndex=index;
     }
 }
 
@@ -365,7 +392,7 @@ void PDF::render(int2 position, int2 size) {
     int i=0; for(const Character& c: characters) {
         int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
         if(pos.y>0 && pos.y<size.y) { //clip without glyph cache lookup
-            c.font->font.setSize(round(scale*c.size*64));
+            c.font->font.setSize(scale*c.size);
             const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
             if(glyph.image) substract(pos+glyph.offset,glyph.image,colors.value(i,black));
         }

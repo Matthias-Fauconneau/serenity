@@ -153,7 +153,7 @@ struct TextData : virtual Data {
     /// Matches [0-9a-fA-F]*
     ref<byte> whileHexadecimal();
     /// Reads an hexadecimal integer
-    int hexadecimal();
+    uint hexadecimal();
     /// Matches [-+]?[0-9]*\.[0-9]*
     ref<byte> whileDecimal();
     /// Reads a decimal number

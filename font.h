@@ -10,7 +10,7 @@ const Folder& fonts();
 
 struct Glyph {
     bool valid=false;
-    int2 offset; // (left bearing, min.y-baseline) (in .4)
+    int2 offset; // (left bearing, min.y-baseline)
     Image image; //not owned
 };
 
@@ -18,7 +18,7 @@ struct Glyph {
 struct Font {
     Map keep; array<byte> data;
     struct FT_FaceRec_*  face=0;
-    int fontSize=0, ascender=0;
+    float fontSize=0, ascender=0;
     map<uint, map<uint16, Glyph> > cache;
 
     Font(){}
@@ -28,17 +28,19 @@ struct Font {
     Font(array<byte>&& data, int size=0);
     /// Loads font /a data scaled to /a size pixels high
     void load(const ref<byte>& data, int size);
-    /// Sets font size in .6 pixels
-    void setSize(int size);
+    /// Sets font size
+    void setSize(float size);
     /// Returns font glyph index for Unicode codepoint \a code
     uint16 index(uint16 code);
-    /// Returns advance for \a index
-    int advance(uint16 index);
+    /// Returns hinted advance for \a index
+    float advance(uint16 index);
+    /// Returns unhinted advance for \a index
+    float linearAdvance(uint16 index);
     /// Returns size for \a index
     vec2 size(uint16 index);
     /// Returns scaled kerning adjustment between \a leftIndex and \a rightIndex
-    int kerning(uint16 leftIndex, uint16 rightIndex); //space in .4
-    /// Caches and returns glyph for \a index at position \a x (in .4)
+    float kerning(uint16 leftIndex, uint16 rightIndex);
+    /// Caches and returns glyph for \a index at position \a x
     /// \a x fractional part is used to return subpixel positionned images
     const Glyph& glyph(uint16 index, int x=0);
     /// Renders glyph \a index with transformation matrix \a xx, xy, yx, yy, dx, dy into \a raster

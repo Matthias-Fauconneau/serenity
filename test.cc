@@ -8,7 +8,6 @@ struct PDFTest {
     PDFTest(){
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
         pdf.open("/Books/test.pdf"_,root());
-        log(pdf.PDF::sizeHint());
         window.setSize(int2(-1,-1));
     }
 } test;

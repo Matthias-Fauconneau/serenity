@@ -130,7 +130,7 @@ ref<byte> TextData::whileHexadecimal() {
     return slice(start,index-start);
 }
 
-int TextData::hexadecimal() {
+uint TextData::hexadecimal() {
     ref<byte> s = whileHexadecimal();
     return s?toInteger(s, 16):-1;
 }
@@ -146,7 +146,4 @@ ref<byte> TextData::whileDecimal() {
     return slice(start,index-start);
 }
 
-double TextData::decimal() {
-    ref<byte> s = whileDecimal();
-    return s?toDecimal(s):-1;
-}
+double TextData::decimal() { return toDecimal(whileDecimal()); }

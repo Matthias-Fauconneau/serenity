@@ -63,7 +63,7 @@ long toInteger(const ref<byte>& number, int base) {
         if(*i>='0' && *i<='9') n = *i-'0';
         else if(*i>='a' && *i<='f') n = *i+10-'a';
         else if(*i>='A' && *i<='F') n = *i+10-'A';
-        else if(*i == '.') error("Unexpected decimal");
+        else if(*i == '.') { error("Unexpected decimal"); break; }
         else break;
         value *= base;
         value += n;
@@ -80,7 +80,7 @@ double toDecimal(const ref<byte>& number) {
     double significand = 0;
     for(bool gotDot=false;i!=number.end();++i) {
         if(*i == '.') { gotDot=true; continue; }
-        if(*i<'0' || *i>'9') error("Unexpected",*i);
+        if(*i<'0' || *i>'9') { error("Unexpected",*i); break; }
         int n = *i-'0';
         significand *= 10;
         significand += n;

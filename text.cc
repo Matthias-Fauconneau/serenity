@@ -11,11 +11,11 @@ map<int,Font> defaultMono;
 /// Layouts formatted text with wrapping, justification and links
 /// \note Characters are positioned with .4 subpixel precision
 struct TextLayout {
-    int size; //.4
-    int wrap; //.4
-    int spaceAdvance; //.4
-    int2 pen=0; //.4
-    struct Character { Font* font; int2 pos;/*.4*/ uint index,advance,width; };
+    float size;
+    float wrap;
+    float spaceAdvance;
+    vec2 pen=0;
+    struct Character { Font* font; vec2 pos; uint index; uint width; float advance; };
     typedef array<Character> Word;
     array<Word> line;
     array<Character> text;
@@ -30,20 +30,20 @@ struct TextLayout {
         length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
         int space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0 || space>=16*spaceAdvance) space = spaceAdvance; //compact
+        if(space<=0 || space>=spaceAdvance) space = spaceAdvance; //compact
 
         //layout
         pen.x=0;
         for(Word& word: line) {
             assert(word);
-            for(Character& c: word) text << Character __(c.font, pen+c.pos, c.index, c.advance);
+            for(Character& c: word) text << Character __(c.font, pen+c.pos, c.index, 0, c.advance);
             pen.x += word.last().pos.x+word.last().advance+space;
         }
         line.clear();
         pen.x=0; pen.y+=size;
     }
 
-    TextLayout(const ref<byte>& text, int size, int wrap, Font* font=0):size(size<<4),wrap(wrap<<4) {
+    TextLayout(const ref<byte>& text, int size, int wrap, Font* font=0):size(size),wrap(wrap) {
         if(!font) {
             if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("dejavu/DejaVuSans.ttf"_,fonts()), size));
             font = &defaultSans.at(size);
@@ -64,7 +64,7 @@ struct TextLayout {
                 if(!word) { if(c=='\n') nextLine(false); continue; }
                 int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
                 length += word.last().pos.x+word.last().width; //last word
-                if(wrap && length>=(wrap<<4)) nextLine(true); //doesn't fit
+                if(wrap && length>=wrap) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
                 pen.x=0;
                 if(c=='\n') nextLine(false);
@@ -104,16 +104,16 @@ struct TextLayout {
             uint16 index = font->index(c);
             if(previous!=spaceIndex) pen.x += font->kerning(previous,index);
             previous = index;
-            uint advance = font->advance(index);
+            float advance = font->advance(index);
             const Image& image = font->glyph(index).image;
-            if(image) { word << Character __(font, int2(pen.x,0), index, advance, image.width<<4); glyphCount++; }
+            if(image) { word << Character __(font, vec2(pen.x,0), index, image.width, advance); glyphCount++; }
             pen.x += advance;
         }
         if(!text || text[text.size-1]!='\n') {
             if(word) {
                 int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
                 length += word.last().pos.x+word.last().width; //last word
-                if(wrap && length>=(wrap<<4)) nextLine(true); //doesn't fit
+                if(wrap && length>=wrap) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
                 pen.x=0;
             }
@@ -130,7 +130,7 @@ void Text::layout() {
     characters.clear();
     for(TextLayout::Character o: layout.text) {
         const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
-        Character c __(o.pos/16+glyph.offset, share(glyph.image));
+        Character c __(int2(o.pos)+glyph.offset, share(glyph.image));
         textSize=max(textSize,int2(c.pos)+c.image.size());
         characters << move(c);
     }
@@ -139,11 +139,11 @@ void Text::layout() {
     for(TextLayout::Line l: layout.lines) {
         Line line;
         TextLayout::Character c = layout.text[l.begin];
-        line.min = c.pos/16 + int2(0,2);
+        line.min = int2(c.pos) + int2(0,2);
         for(uint i: range(l.begin,l.end)) {
             TextLayout::Character c = layout.text[i];
-            int2 p = c.pos/16 + int2(0,2);
-            if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.font->advance(c.index)/16,0);
+            int2 p = int2(c.pos) + int2(0,2);
+            if(p.y!=line.min.y) lines<< move(line), line.min=p; else line.max=p+int2(c.font->advance(c.index),0);
         }
         if(line.max != line.min) lines<< move(line);
     }

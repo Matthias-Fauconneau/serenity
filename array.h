@@ -120,7 +120,7 @@ template<class T> struct array {
     /// Inserts a value at \a index
     T& insertAt(int index, const T& v) { return insertAt(index,copy(v)); }
     /// Inserts an element immediatly after the first lesser value in array
-    int insertSorted(T&& e) { uint i=0; for(;i<size() && at(i) < e;i++) {} insertAt(i,move(e)); return i; }
+    int insertSorted(T&& e) { uint i=0; while(i<size() && at(i) < e) i++; insertAt(i,move(e)); return i; }
     /// Inserts a value immediatly after the first lesser value in array
     int insertSorted(const T& v) { return insertSorted(copy(v)); }
 

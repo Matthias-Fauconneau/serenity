@@ -17,12 +17,12 @@ void Font::load(const ref<byte>& data, int size) {
     }
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) error("Couldn't load font",e,data.size);
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size*64,size*64,0,0}; FT_Request_Size(face,&req);
-    ascender=face->size->metrics.ascender*16/64;
+    ascender=face->size->metrics.ascender*0x1p-6;
 }
-void Font::setSize(int size) {
+void Font::setSize(float size) {
     if(fontSize==size) return; fontSize=size;
-    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,size,size,0,0}; FT_Request_Size(face,&req);
-    ascender=face->size->metrics.ascender*16/64;
+    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,long(size*0x1p6),long(size*0x1p6),0,0}; FT_Request_Size(face,&req);
+    ascender=face->size->metrics.ascender*0x1p-6;
 }
 
 uint16 Font::index(uint16 code) {
@@ -31,22 +31,20 @@ uint16 Font::index(uint16 code) {
         uint index = FT_Get_Char_Index(face, code);
         if(index) return index;
     }
-    return code; //error("Unknown code",code);
+    return code;
 }
 
-int Font::kerning(uint16 leftIndex, uint16 rightIndex) { FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*16/64; }
-
-int Font::advance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD); return face->glyph->advance.x*16/64; }
-vec2 Font::size(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD); return vec2(face->glyph->metrics.width / 64.f, face->glyph->metrics.height / 64.f); }
+float Font::kerning(uint16 leftIndex, uint16 rightIndex) { FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6; }
+float Font::advance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD); return face->glyph->advance.x*0x1p-6; }
+float Font::linearAdvance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD); return face->glyph->linearHoriAdvance*0x1p-16; }
+vec2 Font::size(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6); }
 
 const Glyph& Font::glyph(uint16 index, int) {
-    // Lookup glyph in cache
     Glyph& glyph = cache[fontSize][index];
     if(glyph.valid) return glyph;
     glyph.valid=true;
 
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
-    //FT_Set_Transform(face, 0, {fx,0});
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
     FT_Bitmap bitmap=face->glyph->bitmap;
