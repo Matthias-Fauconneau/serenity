@@ -1,16 +1,45 @@
+#if 0
+#include "process.h"
+#include "window.h"
+#include "text.h"
+struct KeyTest : Text {
+    Window window __(this,int2(640,480),"KeyTest"_);
+    KeyTest(){ focus=this; window.localShortcut(Escape).connect(&exit); }
+    bool keyPress(Key key) { setText(str("'"_+str((char)key)+"'"_,dec(int(key)),"0x"_+hex(int(key)))); return true; }
+} test;
+#endif
+
 #if 1
 #include "window.h"
 #include "pdf.h"
 #include "interface.h"
-struct PDFTest {
+struct Book {
+    string file;
     Scroll<PDF> pdf;
-    Window window __(&pdf.area(),int2(-1,-1),"PDF Test"_);
-    PDFTest(){
-        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
-        pdf.open("/Books/test.pdf"_,root());
-        window.setSize(int2(-1,-1));
+    Window window __(&pdf.area(),int2(0,0),"Book"_);
+    Book() {
+        if(arguments()) file=string(arguments().first());
+        else if(existsFile("Books/.last"_)) {
+            string mark = readFile("Books/.last"_);
+            ref<byte> last = section(mark,0);
+            if(existsFile(last)) {
+                file = string(last);
+                pdf.delta.y = toInteger(section(mark,0,1,2));
+            }
+        } //else TODO: file selection
+        pdf.open(file,root());
+        window.backgroundCenter=window.backgroundColor=0xFF;
+        window.localShortcut(Escape).connect(&exit);
+        window.localShortcut(UpArrow).connect(this,&Book::previous);
+        window.localShortcut(LeftArrow).connect(this,&Book::previous);
+        window.localShortcut(RightArrow).connect(this,&Book::next);
+        window.localShortcut(DownArrow).connect(this,&Book::next);
+        window.localShortcut(Power).connect(this,&Book::next);
     }
-} test;
+    void previous() { pdf.delta.y += window.size.y/2; window.render(); save(); }
+    void next() { pdf.delta.y -= window.size.y/2; window.render(); save(); }
+    void save() { writeFile("Books/.last"_,string(file+"\0"_+dec(pdf.delta.y))); }
+} application;
 #endif
 
 #if 0
@@ -281,17 +310,6 @@ struct Wing : Widget {
 struct SnapshotTest : TriggerButton {
     Window window __(this,0,"SnapshotTest"_);
     SnapshotTest(){ writeFile("snapshot.png"_,encodePNG(window.snapshot()),home()); exit();}
-} test;
-#endif
-
-#if 0
-#include "process.h"
-#include "window.h"
-#include "text.h"
-struct KeyTest : Text {
-    Window window __(this,int2(640,480),"KeyTest"_);
-    KeyTest(){ focus=this; window.localShortcut(Escape).connect(&exit); }
-    bool keyPress(Key key) { setText(str("'"_+str((char)key)+"'"_,dec(int(key)),"0x"_+hex(int(key)))); return true; }
 } test;
 #endif
 

@@ -1,9 +1,10 @@
 Music:
- When Cultures Meet: MIDI -> score render/follow (with heuristics/annotations for beat, hand, tonality)
+ MIDI -> score render/follow [When Cultures Meet]
+   - render glyphs
+   - heuristics/annotations for beat, hand, tonality
  audio record, MIDI record, MIDI/score editor
  convex/concave polygon fill (extract from font renderer to display.cc), video record, seek, NKI, FIR reverb
  fix Arrival at Aslans How (tremolo), To Aslans Camp (pdf)
-Touchbook: test PDF renderer on ARM, remember last position, previous/next page buttons
 Fibermesh
 Desktop: restart on refresh (avoid leaks), runner
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

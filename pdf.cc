@@ -115,7 +115,6 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                 for(;n>0;n--,i++) {
                     int offset=s.integer(); s.skip(); s.integer(); s.skip();
                     if(s.match('n')) {
-                        assert(offset);
                         xref[i] = string(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
                     } else if(s.match('f')) {}
                     else error(s.untilEnd());
@@ -128,7 +127,6 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                 uint unused n=s.integer(); s.skip();
                 if(!s.match("obj"_)) error("");
                 if(xref.size()<=i) xref.grow(i+1);
-                assert(s.index);
                 xref[i]=string(s.slice(s.index));
             }
             Variant object = parse(s);
@@ -154,7 +152,6 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                             //log("f",hex(n),g);
                         } else if(type==1) { // uncompressed objects
                             uint16 offset=b.read();
-                            assert(offset,offset);
                             xref[i]=string(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
                             b.advance(W[2].integer());
                             //log("u",hex(offset));
@@ -175,11 +172,9 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
             Variant stream = parse(xref[ref.object]);
             TextData s(stream.data);
             uint objectNumber=-1,offset=-1;
-            assert(ref.index>=0);
             for(uint i=0;i<=ref.index;i++) {
                 objectNumber=s.integer(); s.match(' ');
                 offset=s.integer(); s.match(' ');
-                assert(offset,offset);
             }
             xref[objectNumber] = string(s.slice(stream.dict.at("First"_).integer()+offset));
         }
@@ -347,7 +342,6 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
         polyline << copy(path.last());
         if((flags&Stroke) || (flags&Fill) || polyline.size()>16) {
             for(uint i: range(polyline.size()-1)) {
-                //assert(polyline[i] != polyline[i+1],polyline,flags);
                 if(polyline[i] != polyline[i+1])
                     lines << Line __( polyline[i], polyline[i+1] );
             }
@@ -361,7 +355,6 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
 void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data) {
     if(!font->font.face) return;
     font->font.setSize(fontSize);
-    uint16 lastIndex=-1;
     for(uint8 code : data) {
         if(code==0) continue;
         mat32 Trm = Tm*Cm;
@@ -371,13 +364,12 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         characters << Character __(font, Trm.m11*fontSize, index, position, code);
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size()) advance += fontSize*font->widths[code]/1000;
-        else advance += font->font.linearAdvance(index); //+(lastIndex!=-1?font->font.kerning(lastIndex,index):0)
+        else advance += font->font.linearAdvance(index);
         Tm = mat32(advance, 0) * Tm;
-        lastIndex=index;
     }
 }
 
-int2 PDF::sizeHint() { return int2(scale*(x2-x1),scale*(y2-y1)); }
+int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
 

@@ -146,9 +146,10 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
     string s = trace(1,(void*)ctx->ip);
     if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
-    if(sig==SIGFPE) { log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr); exit_thread(0); }
-    if(sig==SIGSEGV) { log("Segmentation fault at "_+str(info->fault.addr)); exit_thread(0); } //Segfault kills the threads to prevent further corruption
-    if(sig==SIGTERM) log("Terminated"); // Any signal (except trap) tries to cleanly terminate all threads
+    if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr);
+    if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->fault.addr));
+    if(sig==SIGTERM) log("Terminated");
+    exit_thread(0);
 }
 
 #if __x86_64

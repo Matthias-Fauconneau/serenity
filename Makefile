@@ -1,6 +1,6 @@
 PREFIX ?= /usr
 TARGET ?= test
-BUILD ?= debug
+BUILD ?= release
 
 ifeq ($(CC),cc)
  ifeq ($(TARGET),music)

@@ -7,7 +7,7 @@ void ScrollArea::render(int2 position, int2 size) {
     this->size=size;
     int2 hint = abs(widget().sizeHint());
     delta = min(int2(0,0), max(size-hint, delta));
-    widget().render(position+delta, max(hint,size));
+    widget().render(position+delta, int2(horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y));
 }
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 hint = abs(widget().sizeHint());
