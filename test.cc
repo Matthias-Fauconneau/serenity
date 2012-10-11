@@ -26,7 +26,7 @@ struct Book {
                 file = string(last);
                 pdf.delta.y = toInteger(section(mark,0,1,2));
             }
-        } //else TODO: file selection
+        }
         pdf.open(file,root());
         window.backgroundCenter=window.backgroundColor=0xFF;
         window.localShortcut(Escape).connect(&exit);

@@ -313,9 +313,16 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     for(Character& c: characters) c.pos.x-=x1, c.pos.y=-c.pos.y;
     for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
 
-    // insertion sorts primitives for culling
-    for(int i : range(1,characters.size())) {
-        Character e = characters[i];
+    // insertion sorts lines for culling
+    if(lines) for(int i : range(1,lines.size())) {
+        auto e = lines[i];
+        while(i>0 && lines[i-1] > e) { lines[i]=lines[i-1];  i--; }
+        lines[i] = e;
+    }
+
+    // insertion sorts characters for culling
+    if(characters) for(int i : range(1,characters.size())) {
+        auto e = characters[i];
         while(i>0 && characters[i-1] > e) { characters[i]=characters[i-1];  i--; }
         characters[i] = e;
     }
@@ -373,21 +380,23 @@ int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
 
-    for(const Line& l: lines) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position)/scale,vec2(-position)/scale)))) {
         vec2 a = scale*l.a, b = scale*l.b;
         a+=vec2(position), b+=vec2(position);
-        if((a.y < 0 && b.y < 0) || (a.y > size.y && b.y > size.y)) continue;
+        if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
+        if(a.y > currentClip.max.y && b.y > currentClip.max.y) break;
         if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
         line(a.x,a.y,b.x,b.y);
     }
 
-    int i=0; for(const Character& c: characters) {
+    int i=characters.binarySearch(Character __(0,0,0,vec2(-position)/scale));
+    for(const Character& c: characters.slice(i)) {
         int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
-        if(pos.y>0 && pos.y<size.y) { //clip without glyph cache lookup
-            c.font->font.setSize(scale*c.size);
-            const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
-            if(glyph.image) substract(pos+glyph.offset,glyph.image,colors.value(i,black));
-        }
+        if(pos.y<=currentClip.min.y) continue;
+        if(pos.y>=currentClip.max.y) break;
+        c.font->font.setSize(scale*c.size);
+        const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
+        if(glyph.image) substract(pos+glyph.offset,glyph.image,colors.value(i,black));
         i++;
     }
 

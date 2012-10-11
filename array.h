@@ -149,7 +149,7 @@ template<class T> struct array {
     }
     /// Returns whether this array contains any elements matching \a value
     bool contains(const T& key) const { return ref<T>(*this).contains(key); }
-    /// Returns index of the first element matching \a value using binary search (assuming a sorted array)
+    /// Returns index of the first element less than \a value using binary search (assuming a sorted array)
     int binarySearch(const T& key) {
         uint min=0, max=size();
         while(min<max) {
@@ -158,8 +158,8 @@ template<class T> struct array {
             if(at(mid) < key) min = mid+1;
             else max = mid;
         }
-        if(min == max && at(min) == key) return min;
-        return -1;
+        //if(min == max && at(min) == key) return min;
+        return min;
     }
 };
 

@@ -79,6 +79,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
+    {ChangeKeyboardControl r; r.key=124; send(raw(r));} // broken Touchbook Power button
     setTitle(title);
     setIcon(icon);
     setType(type);
@@ -207,7 +208,6 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
-            static int last; if(e.key==124 && e.key==last) return; last=e.key;
             uint key = KeySym(e.key,e.state);
             if(focus && focus->keyPress((Key)key) ) queue(); //normal keyPress event
             else {
