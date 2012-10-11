@@ -10,6 +10,9 @@
 #include "text.h"
 #include "simd.h"
 
+#include "linux.h"
+enum {MADV_RANDOM=1,MADV_SEQUENTIAL,MADV_WILLNEED,MADV_DONTNEED};
+
 extern "C" {
 enum mpg123_flags { MPG123_ADD_FLAGS=2, MPG123_FORCE_FLOAT  = 0x400 };
 struct mpg123;
@@ -72,13 +75,19 @@ struct FLACMedia : AudioMedia {
     Map map;
     FLAC flac;
     FLACMedia(){}
-    FLACMedia(File&& file):map(file),flac(map){ AudioMedia::rate=flac.rate; AudioMedia::channels=2; }
+    FLACMedia(File&& file):map(file),flac(map){ madvise(map.data,map.size,MADV_SEQUENTIAL); AudioMedia::rate=flac.rate; AudioMedia::channels=2; }
     uint position() { return flac.position/rate; }
     uint duration() { return flac.duration/rate; }
     void seek(uint position) {
         if(position>=duration()) return;
         if(position<this->position()) { flac.~FLAC(); flac=FLAC(map); }
-        while(this->position()<position) { flac.decodeFrame(); flac.position+=flac.buffer.size; flac.readIndex=(flac.readIndex+flac.buffer.size)%flac.buffer.capacity; flac.buffer.size=0; }
+        while(this->position()<position) {
+            flac.decodeFrame();
+            flac.position+=flac.buffer.size;
+            flac.readIndex+=flac.buffer.size;
+            if(flac.readIndex>flac.buffer.capacity) flac.readIndex-=flac.buffer.capacity;
+            flac.buffer.size=0;
+        }
     }
     int read(float2* out, uint size) { return flac.read(out,size); }
 };

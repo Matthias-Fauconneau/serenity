@@ -18,16 +18,24 @@ void copy16(void* dst,const void* src, int size);
 template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
 
 /// C runtime memory allocation
-extern "C" void* malloc(unsigned long size);
-extern "C" int posix_memalign(void** buffer, unsigned long alignment, unsigned long size);
-extern "C" void* realloc(void* buffer, unsigned long size);
+extern "C" void* malloc(size_t size);
+extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
+extern "C" void* realloc(void* buffer, size_t size);
 extern "C" void free(void* buffer);
 
 /// Typed memory allocation (without initialization)
-template<class T> T* allocate(int size) { assert(size); return (T*)malloc(size*sizeof(T)); }
-template<class T> T* allocate16(int size) { void* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
+#if HEAP_TRACE
+extern void heapTrace(int delta);
+template<class T> T* allocate(uint size) { assert(size); heapTrace(size*sizeof(T)); return (T*)malloc(size*sizeof(T)); }
+template<class T> T* allocate16(uint size) { void* buffer; heapTrace(size*sizeof(T)); posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
+template<class T> void reallocate(T*& buffer, int unused size, int need) { heapTrace((need-size)*sizeof(T)); buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
+template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); heapTrace(-size*sizeof(T)); free((void*)buffer); buffer=0; }
+#else
+template<class T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
+template<class T> T* allocate16(uint size) { void* buffer; posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
 template<class T> void reallocate(T*& buffer, int unused size, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
 template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); free((void*)buffer); buffer=0; }
+#endif
 
 /// Dynamic object allocation (using constructor and destructor)
 inline void* operator new(size_t, void* p) { return p; } //placement new

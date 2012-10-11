@@ -11,7 +11,7 @@ struct stat { uint64 dev; int pad1; int ino; int mode; uint16 nlink; int uid,gid
 #endif
 struct dirent { long ino, off; short len; char name[]; };
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000,
-#if __arm
+#if __arm__
       O_DIRECTORY=040000
 #else
       O_DIRECTORY=0200000

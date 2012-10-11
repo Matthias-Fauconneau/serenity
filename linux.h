@@ -14,7 +14,7 @@
 #define kernel "syscall"
 #define clobber "rcx", "r11",
 #define rR "rax"
-#elif __arm
+#elif __arm__
 #define attribute __attribute((always_inline))
 #define rN r7
 #define r0 r0
@@ -74,13 +74,13 @@
 
 enum class sys {
 #if __x86_64
-    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, sigprocmask, ioctl=16, sched_yield=24, shmget=29, shmat, shmctl, pause=34,
+    read, write, open, close, stat, fstat, lstat, poll, lseek, mmap, mprotect, munmap, brk, sigaction, sigprocmask, ioctl=16, sched_yield=24, madvise=28, shmget, shmat, shmctl,
     getpid=39, socket=41, connect, clone=56, fork, execve=59, exit, wait4, kill, shmdt=67, fcntl=72, getdents=78, setpriority=141, mlock=149, mlockall=151, setrlimit=160,
     gettid=186, futex=202, clock_gettime=228, exit_group=231, tgkill=234, openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283,
     timerfd_settime=286, eventfd2=290
 #else
     exit=1, fork, read, write, open, close, execve=11, getpid=20, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102, wait4=114,
-    ipc = 117, clone=120, mprotect=125, getdents=141, mlock=150, sched_yield=158, poll=168, sigaction=174, mmap=192, fstat=197,
+    ipc = 117, clone=120, mprotect=125, getdents=141, mlock=150, sched_yield=158, poll=168, sigaction=174, mmap=192, fstat=197, madvise=220,
     gettid=224, futex=240, exit_group = 248,
     socket=281, connect=283,
 #if __arm__
@@ -110,6 +110,7 @@ syscall1(void*, brk, void*,new_brk)
 syscall4(int, sigaction, int,sig, const void*,act, void*,old, int, sigsetsize)
 syscall3(int, ioctl, int,fd, long,request, void*,arguments)
 syscall0(int, sched_yield)
+syscall3(int, madvise, const void*,addr, long,length, int,advice)
 #if !__i386__
 syscall3(int, shmget, int,key, long,size, int,flag)
 syscall3(long, shmat, int,id, const void*,ptr, int,flag)

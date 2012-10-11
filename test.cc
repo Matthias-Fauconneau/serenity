@@ -1,17 +1,20 @@
-#if 0
+#if 1
 #include "window.h"
-//#include "interface.h"
-struct WindowTest : Widget {
-    Window window __(this,int2(0,0),"Window Test"_);
-    WindowTest(){
-        window.localShortcut(Escape).connect(&exit);
-        //pdf.open("/Books/"_+arguments().first(),home());
+#include "pdf.h"
+#include "interface.h"
+struct PDFTest {
+    Scroll<PDF> pdf;
+    Window window __(&pdf.area(),int2(-1,-1),"PDF Test"_);
+    PDFTest(){
+        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
+        pdf.open("/Books/test.pdf"_,root());
+        log(pdf.PDF::sizeHint());
+        window.setSize(int2(-1,-1));
     }
-    void render(int2, int2) {}
 } test;
 #endif
 
-#if 1
+#if 0
 #include "process.h"
 #include "data.h"
 #include "string.h"
@@ -269,22 +272,6 @@ struct Wing : Widget {
         Text(aLabel+"="_+ftoa(curve.integral),32).render(int2(M*curve.mean),int2(0,0));
     }
 } application;
-#endif
-
-#if 0
-#include "window.h"
-#include "pdf.h"
-#include "interface.h"
-struct PDFTest {
-    Scroll<PDF> pdf;
-    Window window __(&pdf.area(),int2(-1,-1),"PDF Test"_);
-    PDFTest(){
-        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
-        pdf.open("/Sheets/Moonlight Sonata.pdf"_,home());
-        log(pdf.PDF::sizeHint());
-        window.setSize(int2(-1,-1));
-    }
-} test;
 #endif
 
 #if 0

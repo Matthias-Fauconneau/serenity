@@ -33,6 +33,11 @@ static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer over
 void log_(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
+#if HEAP_TRACE
+static int heapSize=0;
+void heapTrace(int delta) { log(heapSize,"\t",delta); heapSize+=delta; }
+#endif
+
 // Semaphore
 void Semaphore::wait(int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e]); }
 void Semaphore::wake() { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
@@ -70,7 +75,9 @@ int main() {
 }
 
 // Thread
+#if __x86_64
 static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
+#endif
 Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
     Locker lock(threadsLock()); threads()<<this; // Adds this thread to global thread list
@@ -145,9 +152,11 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
 }
 
 #if __x86_64
-extern void restore_rt (void) asm ("__restore_rt"); asm(".text; .align 16; __restore_rt:; movq $15, %rax; syscall;");
-#elif __arm
-extern void restore_rt (void) asm ("__restore_rt"); asm(".text; .align 2; .fnstart; .save {r0-r15}; .pad #160; nop; __restore_rt:; mov r7, $119; swi 0; .fnend;");
+extern void restore_rt() asm ("__restore_rt"); asm(".text; .align 16; __restore_rt:; movq $15, %rax; syscall;");
+#elif __arm__
+extern void restore_rt() asm ("__restore_rt"); asm(".text; .align 2; .fnstart; .save {r0-r15}; .pad #160; nop; __restore_rt:; mov r7, $119; swi 0; .fnend;");
+#else
+#error Unsupported architecture
 #endif
 
 void __attribute((constructor(101))) setup_signals() {
@@ -166,10 +175,15 @@ void __attribute((constructor(101))) setup_signals() {
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 }
 
+static int recurse=0;
 template<> void __attribute((noreturn)) error(const ref<byte>& message) {
-    traceAllThreads();
-    string s = trace(1,0);
-    if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    if(recurse==0) {
+        recurse++;
+        traceAllThreads();
+        string s = trace(1,0);
+        if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+        recurse--;
+    }
     log(message);
     {Locker lock(threadsLock()); for(Thread* thread: threads()) if(thread->tid==gettid()) { threads().removeAll(thread); break; } }
     exit_thread(0);

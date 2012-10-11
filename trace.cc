@@ -189,12 +189,14 @@ Symbol findNearestLine(void* find) {
     return symbol;
 }
 
-#if __x86_64__ || __i386__
+#if __x86_64 || __i386
 void* caller_frame(void* fp) { return *(void**)fp; }
 void* return_address(void* fp) { return *((void**)fp+1); }
 #elif __arm__ // Assumes APCS stack layout (i.e works only when compiled with GCC's -mapcs flag)
 void* caller_frame(void* fp) { return *((void**)fp-3); }
 void* return_address(void* fp) { return *((void**)fp-1); }
+#else
+#error Unsupported architecture
 #endif
 
 string trace(int skip, void* ip) {
@@ -202,7 +204,11 @@ string trace(int skip, void* ip) {
     void* frame = __builtin_frame_address(0);
     int i=0;
     for(;i<32;i++) {
+#if __x86_64
         if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
+#else
+        if(ptr(frame)<0x1000) break;
+#endif
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }

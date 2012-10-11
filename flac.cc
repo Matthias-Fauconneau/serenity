@@ -250,7 +250,7 @@ void FLAC::decodeFrame() {
     setRoundMode(Even);
     index=align(8,index);
     skip(16);
-    assert(blockSize<=readIndex+buffer.capacity-writeIndex); buffer.size+=blockSize;
+    assert(blockSize<=readIndex+buffer.capacity-writeIndex,blockSize,readIndex,buffer.capacity,writeIndex); buffer.size+=blockSize;
     uint beforeWrap=buffer.capacity-writeIndex;
     if(blockSize>beforeWrap) {
         interleave<4>(channelMode,block[0],block[1],buffer+writeIndex,buffer+buffer.capacity);
