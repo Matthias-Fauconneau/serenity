@@ -348,7 +348,7 @@ void Score::seek(uint unused time) {
         expected.insertMulti(note.key, i);
         while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
             assert(currentStaff<staffs.size());
-            if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
+            if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
             currentStaff++;
         }
         i++;
@@ -377,7 +377,7 @@ void Score::noteEvent(int key, int vel) {
             expected.insertMulti(note.key, i);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                 assert(currentStaff<staffs.size());
-                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
+                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
                 currentStaff++;
             }
             i++;

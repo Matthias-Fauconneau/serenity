@@ -13,7 +13,7 @@
 #include "score.h"
 
 struct MidiScore : Widget {
-    enum Clef { Treble, Bass };
+    enum Clef { Bass, Treble };
     int keys[2][11] = {
         {1,0,1,0,1,1,0,1,0,1,0}, // F minor
         {0,1,0,1,1,0,1,0,1,0,1}  // C major
@@ -44,7 +44,7 @@ struct MidiScore : Widget {
         staffTime = 5*beatsPerMeasure;
     }
 
-    int2 sizeHint() { return int2(1280,systemHeight*(notes.keys.last()/staffTime)); }
+    int2 sizeHint() { return int2(1280,systemHeight*(notes.keys.last()/staffTime+1)); }
 
     // Returns staff coordinates from note  (for a given clef and key)
     int staffY(Clef clef, int note) {
@@ -61,7 +61,7 @@ struct MidiScore : Widget {
     int staffX(int t) { return systemHeader+t%staffTime*(size.x-systemHeader-16)/staffTime; }
 
     // Returns page coordinates from staff coordinates
-    int2 page(int staff, int t, int h) { return position+int2(staffX(t),t/staffTime*systemHeight+staff*staffHeight+2*staffMargin+h*staffInterval/2); }
+    int2 page(int staff, int t, int h) { return position+int2(staffX(t),t/staffTime*systemHeight+(!staff)*staffHeight+2*staffMargin+h*staffInterval/2); }
 
     void glyph(int2 position, const ref<byte> name, byte4 color=black) {
         const Glyph& glyph = font.glyph(font.index(name));
@@ -106,18 +106,18 @@ struct MidiScore : Widget {
 
             if(int(t/staffTime)>lastSystem) { // Draws system
                 lastSystem=t/staffTime;
-                drawStaff(t, 0, Treble);
-                drawStaff(t, 1, Bass);
-                line(int2(position.x+16,page(0,t,0).y),int2(position.x+16,page(1,t,8).y));
-                line(int2(position.x+size.x-16,page(0,t,0).y),int2(position.x+size.x-16,page(1,t,8).y));
-                staffs << (lastSystem+1)*staffHeight;
+                drawStaff(t, 0, Bass);
+                drawStaff(t, 1, Treble);
+                line(int2(position.x+16,page(1,t,0).y),int2(position.x+16,page(0,t,8).y));
+                line(int2(position.x+size.x-16,page(1,t,0).y),int2(position.x+size.x-16,page(0,t,8).y));
+                staffs << staffMargin+(lastSystem+1)*systemHeight;
             } else if(t/beatsPerMeasure>lastMeasure) { // Draws measure bars
-                line(page(0,t,0)-int2(8,0),page(1,t,8)-int2(8,0));
+                line(page(1,t,0)-int2(8,0),page(0,t,8)-int2(8,0));
             }
 
             if(t/beatsPerMeasure>lastMeasure) { // Links quaver tails
                 for(int s: range(2)) {
-                    Clef clef = s?Bass:Treble;
+                    Clef clef = (Clef)s;
                     bool tailUp=true; int dx = tailUp ? 12 : 0; uint slurY=tailUp?-1:0;
                     uint begin=0;
                     for(uint i: range(quavers[s].size())) {
@@ -126,7 +126,7 @@ struct MidiScore : Widget {
                         if(tailUp) slurY=min<uint>(slurY,position.y);
                         else slurY=max<uint>(slurY,position.y);
                         uint duration=note.duration;
-                        if(i+1>=quavers[s].size() || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
+                        if(i+1>=quavers[s].size() || quavers[s][i+1].duration<duration || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
                             ref<MidiNote> linked = quavers[s].slice(begin,i+1-begin);
                             if(linked.size==1) slurY+=tailUp?-32:32; else slurY+=tailUp?-24:24;
                             int2 lastPosition=0;
@@ -159,26 +159,31 @@ struct MidiScore : Widget {
 
             array<MidiNote> current[2]; // new notes to be pressed
             for(MidiNote note: chords.value) { //first rough split based on pitch
-                int s = note.key<60; //middle C
+                int s = note.key>=60; //middle C
                 current[s] << note;
                 active[s] << note;
             }
             for(int s: range(2)) { // then balances load on both hand
                 while(
                       current[s] && // any notes to move ?
-                      ((s==1 && current[s].last().key>52) || (s==0 && current[s].first().key<68)) && // prevent stealing from far notes (TODO: relative to last active)
-                      active[s].size()>=active[!s].size() && // keep active notes balanced
-                      current[s].size()>=current[!s].size() && // keep load balanced
-                      (!current[!s] || abs(current[1].last().key-current[0].first().key)<=12) && // keep short span
+                      ((s==0 && current[s].last().key>=52) || (s==1 && current[s].first().key<68)) && // prevent stealing from far notes (TODO: relative to last active)
+                      current[s].size()>=current[!s].size() && // keep new notes balanced
+                      active[s].size()>=active[!s].size() && // keep active (sustain+new) notes balanced
+                      (!current[!s] ||
+                       (s==1 && abs(current[!s].first().key-current[s].first().key)<=12) || // keep short span on new notes (left)
+                       (s==0 && abs(current[!s].last().key-current[s].last().key)<=12) ) && // keep short span on new notes (right)
+                      (!sustain[!s] ||
+                       (s==1 && abs(active[!s][0].key-current[s].first().key)<=18) || // keep short span with active notes (left)
+                       (s==0 && abs(active[!s][sustain[!s]-1].key-current[s].last().key)<=18) ) && // keep short span with active notes (right)
                       (
                           active[s].size()>active[!s].size()+1 || // balance active notes
                           current[s].size()>current[!s].size()+1 || // balance load
                           // both new notes and active notes load are balanced
-                          (current[0] && current[1] && s == 0 && abs(current[1].first().key-current[1].last().key)<abs(current[0].first().key-current[0].last().key)) || // minimize right span
-                          (current[0] && current[1] && s == 1 && abs(current[0].first().key-current[0].last().key)<abs(current[1].first().key-current[1].last().key)) || // minimize left span
+                          (current[0] && current[1] && s == 0 && abs(current[1].first().key-current[1].last().key)<abs(current[0].first().key-current[0].last().key)) || // minimize left span
+                          (current[0] && current[1] && s == 1 && abs(current[0].first().key-current[0].last().key)<abs(current[1].first().key-current[1].last().key)) || // minimize right span
                           (sustain[s] && sustain[!s] && active[s][sustain[s]-1].start>active[!s][sustain[!s]-1].start) // load least recently used hand
                           )) {
-                    if(s) {
+                    if(!s) {
                         current[!s].insertAt(0, current[s].pop());
                         active[!s].insertAt(0, active[s].pop());
                     } else {
@@ -186,24 +191,10 @@ struct MidiScore : Widget {
                         active[!s] << active[s].take(sustain[s]);
                     }
                 }
-                if(current[s].size()>=4 && current[!s].size()==1 && current[s].size()>current[!s].size()+1) {
-                    log(s,current[0],"-",current[1]);
-                    assert(current[s]);
-                    assert((s==1 && current[s].last().key>52) || (s==0 && current[s].first().key<68));
-                    assert(active[s].size()>=active[!s].size());
-                    assert(current[s].size()>=current[!s].size());
-                    assert(!current[!s] || abs(current[1].last().key-current[0].first().key)<=12);
-                    assert(
-                        active[s].size()>active[!s].size()+1 || // balance active notes
-                        current[s].size()>current[!s].size()+1 || // balance load
-                        // both new notes and active notes load are balanced
-                        (sustain[s] && sustain[!s] && active[s][sustain[s]-1].start>active[!s][sustain[!s]-1].start) // load least recently used hand
-                            );
-                }
             }
 
             for(int s: range(2)) { // finally displays notes on the right staff
-                Clef clef = s?Bass:Treble;
+                Clef clef = (Clef)s;
                 int tailMin=100, tailMax=-100; uint minDuration=-1,maxDuration=0;
                 for(MidiNote note: current[s]) { // draws notes
                     int h = staffY(clef, note.key);
@@ -225,7 +216,7 @@ struct MidiScore : Widget {
                     if(duration==3 || duration==6 || duration==12 || duration == 24) glyph(position+int2(16,4),"dots.dot"_);
                 }
                 if(tailMin<=tailMax) {
-                    bool tailUp = s;
+                    bool tailUp = !s;
                     int x = page(s,t,0).x + (tailUp ? 12 : 0);
                     line(vec2(x+0.5, page(s,t,tailMax).y+(tailUp?0:32)),vec2(x+0.5, page(s,t,tailMin).y+(tailUp?-32:0)),2);
                     //assert(minDuration==maxDuration,minDuration,maxDuration);
@@ -318,8 +309,11 @@ struct Music : Widget {
 
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float previous, float current, float next) {
-        float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
-        pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.size.y));
+        if(pdfScore) {
+            float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
+            pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.ScrollArea::size.y));
+        }
+        midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
     }
 
     /// Toggles MIDI playing
