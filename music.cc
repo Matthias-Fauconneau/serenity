@@ -14,6 +14,14 @@
 
 struct MidiScore : Widget {
     enum Clef { Treble, Bass };
+    int keys[2][11] = {
+        {1,0,1,0,1,1,0,1,0,1,0}, // F minor
+        {0,1,0,1,1,0,1,0,1,0,1}  // C major
+    };
+    int accidentals[2][12] = { //1=b, 2=#
+        {0,1,0,1,0,0,1,0,1,0,0,0}, // F minor
+        {0,2,0,2,0,0,2,0,2,0,2,0}  // C major
+    };
     Font font __("/usr/share/lilypond/2.16.0/fonts/otf/emmentaler-20.otf"_,128);
     map<int,Chord> notes;
     int key; uint tempo; uint timeSignature[2];
@@ -23,6 +31,9 @@ struct MidiScore : Widget {
     const int systemHeader = 128;
     int beatsPerMeasure;
     int staffTime;
+
+    array<float> staffs;
+    array<vec2> positions;
 
     void parse(map<int,Chord>&& notes, int key, uint tempo, uint timeSignature[2]) {
         this->notes=move(notes);
@@ -37,10 +48,8 @@ struct MidiScore : Widget {
 
     // Returns staff coordinates from note  (for a given clef and key)
     int staffY(Clef clef, int note) {
-        int key[11] = {0,1,0,1,1,0,1,0,1,0,1}; // C major
-        if(this->key==-1) key[9]=1, key[10]=0;
-        else error("TODO: generic");
-        int h=note/12*7; for(int i=0;i<note%12;i++) h+=key[i];
+        assert(key>=-1 && key<=0);
+        int h=note/12*7; for(int i=0;i<note%12;i++) h+=keys[key+1][i];
         const int trebleOffset = 6*7+3; // C0 position in intervals from top line
         const int bassOffset = 4*7+5; // C0 position in intervals from top line
         int clefOffset = clef==Treble ? trebleOffset : clef==Bass ? bassOffset : 0;
@@ -54,9 +63,9 @@ struct MidiScore : Widget {
     // Returns page coordinates from staff coordinates
     int2 page(int staff, int t, int h) { return position+int2(staffX(t),t/staffTime*systemHeight+staff*staffHeight+2*staffMargin+h*staffInterval/2); }
 
-    void glyph(int2 position, const ref<byte> name) {
+    void glyph(int2 position, const ref<byte> name, byte4 color=black) {
         const Glyph& glyph = font.glyph(font.index(name));
-        substract(position+glyph.offset,glyph.image);
+        substract(position+glyph.offset,glyph.image,color);
     }
 
     // Draws a staff
@@ -82,7 +91,8 @@ struct MidiScore : Widget {
     }
 
     void render(int2 position, int2 size) {
-        int lastSystem=-1; uint lastMeasure=0;
+        staffs.clear(); positions.clear();
+        int lastSystem=-1; uint lastMeasure=0, noteIndex=0;
         this->position=position, this->size=size;
         //Text(str(notes)).render(position,size);
         array<MidiNote> active[2]; //0 = treble (right hand), 1 = bass (left hand)
@@ -100,6 +110,7 @@ struct MidiScore : Widget {
                 drawStaff(t, 1, Bass);
                 line(int2(position.x+16,page(0,t,0).y),int2(position.x+16,page(1,t,8).y));
                 line(int2(position.x+size.x-16,page(0,t,0).y),int2(position.x+size.x-16,page(1,t,8).y));
+                staffs << (lastSystem+1)*staffHeight;
             } else if(t/beatsPerMeasure>lastMeasure) { // Draws measure bars
                 line(page(0,t,0)-int2(8,0),page(1,t,8)-int2(8,0));
             }
@@ -107,7 +118,7 @@ struct MidiScore : Widget {
             if(t/beatsPerMeasure>lastMeasure) { // Links quaver tails
                 for(int s: range(2)) {
                     Clef clef = s?Bass:Treble;
-                    bool tailUp=s; int dx = tailUp ? 13 : 1; uint slurY=tailUp?-1:0;
+                    bool tailUp=true; int dx = tailUp ? 12 : 0; uint slurY=tailUp?-1:0;
                     uint begin=0;
                     for(uint i: range(quavers[s].size())) {
                         MidiNote note = quavers[s][i];
@@ -122,18 +133,18 @@ struct MidiScore : Widget {
                             for(MidiNote note : linked) {
                                 int2 position = page(s,note.start,staffY(clef, note.key));
                                 int x = position.x + dx;
-                                line(int2(x,position.y),int2(x,slurY),1.5);
+                                line(vec2(x+0.5,position.y),vec2(x+0.5,slurY),2);
                                 if(linked.size==1) { // draws single tail
                                     int x = position.x + dx;
                                     if(note.duration==1) glyph(int2(x+1,slurY),tailUp?"flags.u4"_:"flags.d4"_);
                                     else if(note.duration==2) glyph(int2(x+1,slurY),tailUp?"flags.u3"_:"flags.d3"_);
                                 } else if(lastPosition){ // draws horizontal tail links
                                     if(note.duration==1) {
-                                        line(int2(lastPosition.x+dx,slurY+(tailUp?7:-7)),int2(position.x+dx,slurY+(tailUp?7:-7)),2);
-                                        line(int2(lastPosition.x+dx,slurY+(tailUp?9:-9)),int2(position.x+dx,slurY+(tailUp?9:-9)),2);
+                                        line(vec2(lastPosition.x+dx,slurY+(tailUp?7:-7)+0.5),vec2(position.x+dx,slurY+(tailUp?7:-7)+0.5),2);
+                                        line(vec2(lastPosition.x+dx,slurY+(tailUp?9:-9)+0.5),vec2(position.x+dx,slurY+(tailUp?9:-9)+0.5),2);
                                     }
-                                    line(int2(lastPosition.x+dx,slurY),int2(position.x+dx,slurY),2);
-                                    line(int2(lastPosition.x+dx,slurY+(tailUp?2:-2)),int2(position.x+dx,slurY+(tailUp?2:-2)),2);
+                                    line(vec2(lastPosition.x+dx,slurY+0.5),vec2(position.x+dx,slurY+0.5),2);
+                                    line(vec2(lastPosition.x+dx,slurY+(tailUp?2:-2)+0.5),vec2(position.x+dx,slurY+(tailUp?2:-2)+0.5),2);
                                 }
                                 lastPosition=position;
                             }
@@ -201,25 +212,31 @@ struct MidiScore : Widget {
                     int2 position = page(s, t, h);
                     uint duration=note.duration;
                     if(duration <= 12) {
-                        glyph(position, duration<=6?"noteheads.s2"_:"noteheads.s1"_);
+                        glyph(position, duration<=6?"noteheads.s2"_:"noteheads.s1"_, colors.value(noteIndex,black));
+                        int accidental = accidentals[key+1][note.key%12];
+                        if(accidental) glyph(position+int2(-12,0),accidental==1?"accidentals.flat"_:"accidentals.sharp"_);
                         if(duration<=3) quavers[s] << note;
                         else {
                             tailMin=min(tailMin,h), tailMax=max(tailMax,h);
                             minDuration = min(minDuration,duration), maxDuration=max(maxDuration,duration);
                         }
-                    } else glyph(position,"noteheads.s0"_);
+                    } else glyph(position,"noteheads.s0"_, colors.value(noteIndex,black));
+                    positions << vec2(position); noteIndex++;
                     if(duration==3 || duration==6 || duration==12 || duration == 24) glyph(position+int2(16,4),"dots.dot"_);
                 }
                 if(tailMin<=tailMax) {
                     bool tailUp = s;
-                    int x = page(s,t,0).x + (tailUp ? 13 : 1);
-                    line(int2(x, page(s,t,tailMax).y+(tailUp?0:32)),int2(x, page(s,t,tailMin).y+(tailUp?-32:-1)),1.5);
+                    int x = page(s,t,0).x + (tailUp ? 12 : 0);
+                    line(vec2(x+0.5, page(s,t,tailMax).y+(tailUp?0:32)),vec2(x+0.5, page(s,t,tailMin).y+(tailUp?-32:0)),2);
                     //assert(minDuration==maxDuration,minDuration,maxDuration);
                     //if(minDuration!=maxDuration) Text(string("!"_)).render(int2(x,page(s,t,tailMin).y));
                 }
             }
         }
     }
+    map<int,byte4> colors;
+    signal<> contentChanged;
+    void setColors(const map<int,byte4>& colors) { this->colors=copy(colors); contentChanged(); }
 };
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
@@ -233,10 +250,10 @@ struct Music : Widget {
     Scroll<MidiScore> midiScore;
     Score score;
 
-    /*Sampler sampler;
+    Sampler sampler;
     Thread thread __(-20);
     AudioOutput audio __({&sampler, &Sampler::read},thread,true);
-    Sequencer input __(thread);*/
+    Sequencer input __(thread);
 
     ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
     Music() {
@@ -246,18 +263,20 @@ struct Music : Widget {
         for(string& file : files) if(endsWith(file,".mid"_)) sheets << string(section(file,'.'));
         sheets.itemPressed.connect(this,&Music::openSheet);
 
-        /*sampler.open("/Samples/Salamander.sfz"_);
+        sampler.open("/Samples/Salamander.sfz"_);
         sampler.progressChanged.connect(this,&Music::showProgress);
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
-        input.noteEvent.connect(&score,&Score::noteEvent);*/
-        openSheet("When Cultures Meet"_);
+        input.noteEvent.connect(&score,&Score::noteEvent);
 
         pdfScore.contentChanged.connect(&window,&Window::render);
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);
 
+        midiScore.contentChanged.connect(&window,&Window::render);
+
         score.activeNotesChanged.connect(&pdfScore,&PDF::setColors);
+        score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);
         midi.noteEvent.connect(&score,&Score::noteEvent);
 
@@ -285,7 +304,7 @@ struct Music : Widget {
             //openSheet("Test Drive (Easy)"_);
             //openSheet("Turret Opera (Cara Mia)"_);
             openSheet("When Cultures Meet"_);
-            //audio.start();
+            audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;
         window.render();
@@ -293,7 +312,7 @@ struct Music : Widget {
     void render(int2 position, int2 size) {
         if(current!=count) {
             Progress(0,count,current).render(position,size);
-            //if(sampler.lock && sampler.lock<sampler.full) Text(string(dec(100*sampler.lock/sampler.full)+"%"_)).render(position,size);
+            if(sampler.lock && sampler.lock<sampler.full) Text(string(dec(100*sampler.lock/sampler.full)+"%"_)).render(position,size);
         }
     }
 
@@ -307,7 +326,7 @@ struct Music : Widget {
     bool play=false;
     void togglePlay() {
         play=!play;
-        //if(play) { midi.seek(0); score.seek(0); sampler.timeChanged.connect(&midi,&MidiFile::update); } else sampler.timeChanged.delegates.clear();
+        if(play) { midi.seek(0); score.seek(0); sampler.timeChanged.connect(&midi,&MidiFile::update); } else sampler.timeChanged.delegates.clear();
     }
 
     /// Shows PDF+MIDI sheets selection to open
@@ -329,12 +348,16 @@ struct Music : Widget {
             pdfScore.open(string(name+".pdf"_),folder);
             score.synchronize(move(midi.notes));
             //pdfScore.setAnnotations(score.debug);
-            score.seek(0);
             window.widget = &pdfScore.area();
         } else {
             midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature);
             window.widget = &midiScore.area();
+            midiScore.widget().render(int2(0,0),int2(1280,0));
+            score.chords = copy(midiScore.notes);
+            score.staffs = move(midiScore.staffs);
+            score.positions = move(midiScore.positions);
         }
+        score.seek(0);
         window.setSize(int2(0,0));
         window.render();
     }

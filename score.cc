@@ -354,17 +354,18 @@ void Score::seek(uint unused time) {
         i++;
     }
     map<int,byte4> activeNotes;
-    for(int i: expected.values) activeNotes.insert(indices[i],blue);
+    for(int i: expected.values) activeNotes.insert(indices?indices[i]:i,blue);
     activeNotesChanged(activeNotes);
 }
 
 void Score::noteEvent(int key, int vel) {
-    if(miss.contains(key)) miss.remove(key);
     if(vel) {
-        if(!expected.contains(key)) return;
-        active.insertMulti(key,expected.at(key));
-        expected.remove(key);
-        if(expected.size()==1 && chordSize>=4) miss=move(expected);
+        if(expected.contains(key)) {
+            active.insertMulti(key,expected.at(key));
+            expected.remove(key);
+            if(expected.size()==1 && chordSize>=4) miss=move(expected);
+        } else if(miss.contains(key)) miss.remove(key);
+        else return;
     } else if(key) {
         if(active.contains(key)) active.remove(key);
         return;
@@ -384,8 +385,8 @@ void Score::noteEvent(int key, int vel) {
         chordSize = expected.size();
     }
     map<int,byte4> activeNotes;
-    for(int i: expected.values) activeNotes.insertMulti(indices[i],blue);
-    for(int i: miss.values) activeNotes.insertMulti(indices[i],blue);
-    //for(int i: active.values) if(!activeNotes.contains(indices[i])) activeNotes.insert(indices[i],red);
+    for(int i: expected.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
+    for(int i: miss.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
+    //for(int i: active.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,red);
     activeNotesChanged(activeNotes);
 }
