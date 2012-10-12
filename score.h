@@ -5,8 +5,8 @@
 #include "map.h"
 #include "function.h"
 #include "display.h"
+#include "midi.h"
 
-typedef array<int> Chord;
 struct Score {
     void onPath(const ref<vec2>&);
     void onGlyph(int, vec2, float,const ref<byte>&, int);

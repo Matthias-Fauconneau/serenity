@@ -1,13 +1,12 @@
 Music:
- MIDI -> score render/follow [When Cultures Meet]
-   - render glyphs
-   - heuristics/annotations for beat, hand, tonality
- audio record, MIDI record, MIDI/score editor
- convex/concave polygon fill (extract from font renderer to display.cc), video record, seek, NKI, FIR reverb
- fix Arrival at Aslans How (tremolo), To Aslans Camp (pdf)
+ [When Cultures Meet]: link tails, link quavers, accidentals, follow
+ [Arrival at Aslans How]: sync tremolos
+ [To Aslans Camp]: fix pdf parser
+ [Enterprising Young Men, Once Upon a Time in Africa] MIDI record/edit -> help synching PDF-only sheets
+ convex/concave polygon fill (extract from font renderer to display.cc), seek, record
 Fibermesh
 Desktop: restart on refresh (avoid leaks), runner
-Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
+Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, truetype, ssl
 Apps: shell, file manager, search, imap, torrent, video, irc

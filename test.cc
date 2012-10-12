@@ -1,4 +1,4 @@
-#if 0
+#if 1
 #include "process.h"
 #include "window.h"
 #include "text.h"
@@ -9,7 +9,7 @@ struct KeyTest : Text {
 } test;
 #endif
 
-#if 1
+#if 0
 #include "window.h"
 #include "pdf.h"
 #include "interface.h"

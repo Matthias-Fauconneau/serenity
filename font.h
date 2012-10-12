@@ -30,6 +30,8 @@ struct Font {
     void load(const ref<byte>& data, int size);
     /// Sets font size
     void setSize(float size);
+    /// Returns font glyph index for glyph \a name
+    uint16 index(const ref<byte>& name);
     /// Returns font glyph index for Unicode codepoint \a code
     uint16 index(uint16 code);
     /// Returns hinted advance for \a index

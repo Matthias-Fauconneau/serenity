@@ -310,11 +310,11 @@ spurious: ;
     }
 
     /// Synchronize notes to MIDI track
-    array<int> MIDI; //flatten chords for robust MIDI synchronization
+    array<MidiNote> MIDI; //flatten chords for robust MIDI synchronization
     for(const Chord& chord: chords.values) MIDI<<chord;
-    vec2 lastPos=vec2(0,0); int lastNote=0;
+    vec2 lastPos=vec2(0,0); int lastKey=0;
     for(uint i=0; i<MIDI.size() && i<positions.size();) {
-        vec2 pos=positions[i]; int note = MIDI[i];
+        vec2 pos=positions[i]; MidiNote note = MIDI[i];
         /*if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) { //double notes in MIDI
                     debug[vec2(x,-y)]=string("+++"_);
                     chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
@@ -322,14 +322,14 @@ spurious: ;
         /*if(pos.y==lastPos.y && note!=lastNote) { // double notes in score
             debug[pos]=string("////"_);
             positions.removeAt(i); indices.removeAt(i);
-        } else*/ if(lastPos && lastNote && pos.x==lastPos.x && pos.y<lastPos.y && note<lastNote) { // missing note in MIDI
+        } else*/ if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
             debug[pos]=string("||||"_);
             positions.removeAt(i); indices.removeAt(i);
         } else {
-            debug.insertMulti(positions[i]+vec2(12,0),dec(MIDI[i]));
+            debug.insertMulti(positions[i]+vec2(12,0),dec(MIDI[i].key));
             i++;
         }
-        lastPos=pos; lastNote=note;
+        lastPos=pos; lastKey=note.key;
     }
 
     //for(Line l: ties) debug.insertMulti((l.a+l.b)/2.f,string("^"_));
@@ -344,8 +344,8 @@ void Score::seek(uint unused time) {
     if(!staffs) return;
     assert(time==0,"TODO");
     chordIndex=0, noteIndex=0; currentStaff=0; expected.clear(); active.clear();
-    int i=noteIndex; for(int key: chords.values[chordIndex]) {
-        expected.insertMulti(key, i);
+    int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
+        expected.insertMulti(note.key, i);
         while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
             assert(currentStaff<staffs.size());
             if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
@@ -372,8 +372,8 @@ void Score::noteEvent(int key, int vel) {
     if(!expected && chordIndex<chords.size()-1) {
         noteIndex+=chords.values[chordIndex].size();
         chordIndex++;
-        int i=noteIndex; for(int key: chords.values[chordIndex]) {
-            expected.insertMulti(key, i);
+        int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
+            expected.insertMulti(note.key, i);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                 assert(currentStaff<staffs.size());
                 if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);

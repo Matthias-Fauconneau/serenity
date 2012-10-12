@@ -115,7 +115,7 @@ Resampler::~Resampler() {
 }
 
 template<bool mix> void Resampler::filter(const float* source, uint sourceSize, float* target, uint targetSize) {
-    assert(sourceSize>=need(targetSize));
+    assert(int(sourceSize)>=need(targetSize));
     write(source,sourceSize); read<mix>(target,targetSize);
 }
 template void Resampler::filter<false>(const float* source, uint sourceSize, float* target, uint targetSize);

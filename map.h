@@ -55,7 +55,7 @@ template<class K, class V> struct map {
         return values.insertAt(keys.insertSorted(key),V());
     }
 
-    V take(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); return values.take(i); }
+    V take(const K& key) { int i=keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); keys.removeAt(i); return values.take(i); }
     void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
