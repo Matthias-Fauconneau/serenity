@@ -48,9 +48,9 @@ void MidiFile::read(Track& track, uint time, State state) {
             else if(type==NoteOff) noteEvent(key,0);
         } else if(state==Sort) {
             if((type==NoteOff || type==NoteOn) && active.contains(key)) {
-                int start = active.take(key);
-                int duration = track.time-start;
-                notes.sorted(start*4/ticksPerBeat).insertSorted(MidiNote __(key, start*4/ticksPerBeat, round(duration*4.f/ticksPerBeat*10/9)));
+                uint start = active.take(key);
+                uint duration = track.time-start;
+                notes.sorted(start*4/ticksPerBeat).insertSorted(MidiNote __(key, start*4/ticksPerBeat, (uint)round(duration*4.f/ticksPerBeat*10/9)));
             }
             if(type==NoteOn && vel) active.insert(key,track.time);
         }

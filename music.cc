@@ -82,27 +82,68 @@ struct MidiScore : Widget {
     }
 
     void render(int2 position, int2 size) {
-        int lastSystem=-1, lastMeasure=0;
+        int lastSystem=-1; uint lastMeasure=0;
         this->position=position, this->size=size;
         //Text(str(notes)).render(position,size);
         array<MidiNote> active[2]; //0 = treble (right hand), 1 = bass (left hand)
+        array<MidiNote> quavers[2]; // for quaver linking
         for(pair<int,Chord> chords: notes) {
-            int t = chords.key;
+            uint t = chords.key;
 
             // Removes released notes from active sets
             for(uint s: range(2)) for(uint i=0;i<active[s].size();) if(active[s][i].start+active[s][i].duration<=t) active[s].removeAt(i); else i++;
             uint sustain[2] = { active[0].size(), active[1].size() }; // Remaining notes kept sustained
 
-            if(t/staffTime>lastSystem) { // Draws system
+            if(int(t/staffTime)>lastSystem) { // Draws system
                 lastSystem=t/staffTime;
                 drawStaff(t, 0, Treble);
                 drawStaff(t, 1, Bass);
-                lastMeasure=t/beatsPerMeasure;
                 line(int2(position.x+16,page(0,t,0).y),int2(position.x+16,page(1,t,8).y));
                 line(int2(position.x+size.x-16,page(0,t,0).y),int2(position.x+size.x-16,page(1,t,8).y));
             } else if(t/beatsPerMeasure>lastMeasure) { // Draws measure bars
-                lastMeasure=t/beatsPerMeasure;
                 line(page(0,t,0)-int2(8,0),page(1,t,8)-int2(8,0));
+            }
+
+            if(t/beatsPerMeasure>lastMeasure) { // Links quaver tails
+                for(int s: range(2)) {
+                    Clef clef = s?Bass:Treble;
+                    bool tailUp=s; int dx = tailUp ? 13 : 1; uint slurY=tailUp?-1:0;
+                    uint begin=0;
+                    for(uint i: range(quavers[s].size())) {
+                        MidiNote note = quavers[s][i];
+                        int2 position = page(s, note.start, staffY(clef, note.key));
+                        if(tailUp) slurY=min<uint>(slurY,position.y);
+                        else slurY=max<uint>(slurY,position.y);
+                        uint duration=note.duration;
+                        if(i+1>=quavers[s].size() || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
+                            ref<MidiNote> linked = quavers[s].slice(begin,i+1-begin);
+                            if(linked.size==1) slurY+=tailUp?-32:32; else slurY+=tailUp?-24:24;
+                            int2 lastPosition=0;
+                            for(MidiNote note : linked) {
+                                int2 position = page(s,note.start,staffY(clef, note.key));
+                                int x = position.x + dx;
+                                line(int2(x,position.y),int2(x,slurY),1.5);
+                                if(linked.size==1) { // draws single tail
+                                    int x = position.x + dx;
+                                    if(note.duration==1) glyph(int2(x+1,slurY),tailUp?"flags.u4"_:"flags.d4"_);
+                                    else if(note.duration==2) glyph(int2(x+1,slurY),tailUp?"flags.u3"_:"flags.d3"_);
+                                } else if(lastPosition){ // draws horizontal tail links
+                                    if(note.duration==1) {
+                                        line(int2(lastPosition.x+dx,slurY+(tailUp?7:-7)),int2(position.x+dx,slurY+(tailUp?7:-7)),2);
+                                        line(int2(lastPosition.x+dx,slurY+(tailUp?9:-9)),int2(position.x+dx,slurY+(tailUp?9:-9)),2);
+                                    }
+                                    line(int2(lastPosition.x+dx,slurY),int2(position.x+dx,slurY),2);
+                                    line(int2(lastPosition.x+dx,slurY+(tailUp?2:-2)),int2(position.x+dx,slurY+(tailUp?2:-2)),2);
+                                }
+                                lastPosition=position;
+                            }
+                            begin=i+1;
+                            slurY=tailUp?-1:0;
+                        }
+                    }
+                    quavers[s].clear();
+                }
+                lastMeasure=t/beatsPerMeasure;
             }
 
             array<MidiNote> current[2]; // new notes to be pressed
@@ -152,29 +193,29 @@ struct MidiScore : Widget {
 
             for(int s: range(2)) { // finally displays notes on the right staff
                 Clef clef = s?Bass:Treble;
-                bool tailUp=true; uint tailMin=-1, tailMax=0; uint minDuration=-1,maxDuration=0;
+                int tailMin=100, tailMax=-100; uint minDuration=-1,maxDuration=0;
                 for(MidiNote note: current[s]) { // draws notes
-                    uint key=note.key, duration=note.duration;
-                    int h = staffY(clef, key);
-                    int2 position = page(s, t, h);
-
+                    int h = staffY(clef, note.key);
                     for(int i=-2;i>=h;i-=2) drawLedger(s, t, i);
                     for(int i=10;i<=h;i+=2) drawLedger(s, t, i);
+                    int2 position = page(s, t, h);
+                    uint duration=note.duration;
                     if(duration <= 12) {
                         glyph(position, duration<=6?"noteheads.s2"_:"noteheads.s1"_);
-                        if(tailUp) tailMin=min<uint>(tailMin,position.y-32), tailMax=max<uint>(tailMax,position.y);
-                        else tailMin=min<uint>(tailMin,position.y), tailMax=max<uint>(tailMax,position.y+32);
-                        minDuration = min(minDuration,duration), maxDuration=max(maxDuration,duration);
+                        if(duration<=3) quavers[s] << note;
+                        else {
+                            tailMin=min(tailMin,h), tailMax=max(tailMax,h);
+                            minDuration = min(minDuration,duration), maxDuration=max(maxDuration,duration);
+                        }
                     } else glyph(position,"noteheads.s0"_);
                     if(duration==3 || duration==6 || duration==12 || duration == 24) glyph(position+int2(16,4),"dots.dot"_);
                 }
-                if(tailMin<tailMax) {
-                    int x = page(s,t,0).x+13;
-                    line(int2(x,tailMin),int2(x,tailMax),1.5);
+                if(tailMin<=tailMax) {
+                    bool tailUp = s;
+                    int x = page(s,t,0).x + (tailUp ? 13 : 1);
+                    line(int2(x, page(s,t,tailMax).y+(tailUp?0:32)),int2(x, page(s,t,tailMin).y+(tailUp?-32:-1)),1.5);
                     //assert(minDuration==maxDuration,minDuration,maxDuration);
-                    if(minDuration!=maxDuration) Text(string("!"_)).render(int2(x,tailMin));
-                    if(minDuration==1) glyph(int2(x+1,tailUp?tailMin:tailMax),tailUp?"flags.u4"_:"flags.d4"_);
-                    else if(minDuration==2) glyph(int2(x+1,tailUp?tailMin:tailMax),tailUp?"flags.u3"_:"flags.d3"_);
+                    //if(minDuration!=maxDuration) Text(string("!"_)).render(int2(x,page(s,t,tailMin).y));
                 }
             }
         }
