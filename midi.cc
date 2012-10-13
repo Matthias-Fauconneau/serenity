@@ -43,7 +43,7 @@ void MidiFile::read(Track& track, uint time, State state) {
             //else if(key==TrackName||key==InstrumentName) log(data); else if(key==EndOfTrack) {} else log(hex(key),":", hex(data),data);
         }
 
-        if((type==NoteOff || type==NoteOn) && active.contains(key) && (!last.contains(key) || track.time-last[key]>64 || (track.time-active[key])*4/ticksPerBeat>=16)) {
+        if((type==NoteOff || type==NoteOn) && active.contains(key) && (!last.contains(key) || track.time-last[key]>8/*64*/ || (track.time-active[key])*4/ticksPerBeat>=16)) {
             if(state==Play) noteEvent(key,0);
             uint start = active.take(key);
             if(state==Sort) {

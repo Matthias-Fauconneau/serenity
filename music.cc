@@ -24,7 +24,7 @@ struct MidiScore : Widget {
     };
     Font font __("/usr/share/lilypond/2.16.0/fonts/otf/emmentaler-20.otf"_,128);
     map<int,Chord> notes;
-    int key; uint tempo; uint timeSignature[2];
+    int key=-1; uint tempo=120; uint timeSignature[2] = {4,4};
 
     const int staffCount = 2;
     const int staffInterval = 12, staffMargin = 4*staffInterval, staffHeight = staffMargin+4*staffInterval+staffMargin, systemHeight=staffCount*staffHeight+staffMargin;
@@ -35,12 +35,15 @@ struct MidiScore : Widget {
     array<float> staffs;
     array<vec2> positions;
 
-    void parse(map<int,Chord>&& notes, int key, uint tempo, uint timeSignature[2]) {
+    void parse(map<int,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2]) {
         this->notes=move(notes);
         this->key=key;
         this->tempo=tempo;
-        for(uint i: range(2)) this->timeSignature[i]=timeSignature[i];
-        beatsPerMeasure = timeSignature[0]*timeSignature[1];
+        if(this->timeSignature[0]==3 && this->timeSignature[0]==4) {
+            this->timeSignature[0]=timeSignature[0];
+            this->timeSignature[1]=timeSignature[1];
+        }
+        beatsPerMeasure = this->timeSignature[0]*this->timeSignature[1];
         staffTime = 5*beatsPerMeasure;
     }
 
@@ -293,7 +296,7 @@ struct Music : Widget {
             //openSheet("Moonlight Sonata"_);
             //openSheet("Romantic Flight (Easy)"_);
             //openSheet("Test Drive (Easy)"_);
-            //openSheet("To Aslans Camp"_);
+            openSheet("To Aslans Camp"_);
             //openSheet("Turret Opera (Cara Mia)"_);
             //openSheet("When Cultures Meet"_);
             audio.start();

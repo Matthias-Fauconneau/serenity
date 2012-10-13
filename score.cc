@@ -12,10 +12,10 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[3]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(span.y>2 && span.x<342 && (span.y<14 || (span.x>100 && span.y<20) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
+        if(span.y>2 && span.x<342 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<20) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
             debug[center]="V"_+str(span);
             ties+= Line(p[0],p[3]);
-        }
+        } else debug[center]="!"_+str(span);
     } else if(p.size==10) {
         if(span.x>36 && span.x<1000 && span.y>10 && (span.y<14 || (span.x>100 && span.y<29))) {
             debug[center]="X"_+str(span);
@@ -50,7 +50,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         } else if(endsWith(font,"Opus"_)) {
             if(code==71/*treble*/||code==11/*bass*/) {
                 if(pos.y-lastClef.y>159) {
-                    staffs << (lastClef.y+100); //90-120
+                    staffs << (lastClef.y+pos.y)/2; //(lastClef.y+90/*100*/); //90-100-120
                     //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
                 lastClef=pos;
@@ -225,9 +225,9 @@ trillCancelTie: ;
                     for(int y2 : staff[lastX].keys) {
                         if(staff[lastX].at(y2).duration && (
                                     abs(x-lastX)<2 ||
-                                    (abs(x-lastX)<25 && abs(y-y2)<6) ||
                                     (abs(x-lastX)<=9 && abs(y-y2)<180 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
-                                    ((abs(x-lastX)<18 && abs(x-lastX)+abs(y-y2)<38) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)))) {
+                                    ((abs(x-lastX)<18 && abs(y-y2)<20) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)) ||
+                                    (abs(x-lastX)<26 && abs(y-y2)<19))) {
                             if(staff[lastX].size()>=staff[x].size()) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
                                 staff[x].remove(y); debug[vec2(x,-y)]=str("<-"_,x-lastX,y-y2); goto again;
@@ -235,7 +235,7 @@ trillCancelTie: ;
                                 if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
                                 staff[lastX].remove(y2); debug[vec2(lastX,-y2)]=str("->"_,x-lastX,y-y2); goto again;
                             }
-                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<40 && abs(x-lastX)+abs(y-y2)<40)) debug[vec2(x,-y)]="?"_+str(x-lastX,y-y2);
+                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<40 && abs(y-y2)<20)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
                     }
                 }
             }
@@ -354,9 +354,13 @@ spurious: ;
         /*if(pos.y==lastPos.y && note!=lastNote) { // double notes in score
             debug[pos]=string("////"_);
             positions.removeAt(i); indices.removeAt(i);
-        } else*/ if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
-            debug[pos]=string("||||"_);
+        } else*/
+        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
+            debug[pos]=string("++++"_);
             positions.removeAt(i); indices.removeAt(i);
+        } else if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
+            debug.insertMulti(pos,str("----"_,lastPos.x-pos.x,lastPos.y-pos.y));
+            MIDI.removeAt(i);
         } else {
             debug.insertMulti(positions[i]+vec2(12,0),str(MIDI[i].key));
             i++;
