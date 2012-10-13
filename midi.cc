@@ -43,16 +43,21 @@ void MidiFile::read(Track& track, uint time, State state) {
             //else if(key==TrackName||key==InstrumentName) log(data); else if(key==EndOfTrack) {} else log(hex(key),":", hex(data),data);
         }
 
-        if(state==Play) {
-            if(type==NoteOn) noteEvent(key,vel);
-            else if(type==NoteOff) noteEvent(key,0);
-        } else if(state==Sort) {
-            if((type==NoteOff || type==NoteOn) && active.contains(key)) {
-                uint start = active.take(key);
+        if((type==NoteOff || type==NoteOn) && active.contains(key) && (!last.contains(key) || track.time-last[key]>64 || (track.time-active[key])*4/ticksPerBeat>=16)) {
+            if(state==Play) noteEvent(key,0);
+            uint start = active.take(key);
+            if(state==Sort) {
                 uint duration = track.time-start;
+                //static uint min=-1; if(duration<min) min=duration, log(min);
                 notes.sorted(start*4/ticksPerBeat).insertSorted(MidiNote __(key, start*4/ticksPerBeat, (uint)round(duration*4.f/ticksPerBeat*10/9)));
             }
-            if(type==NoteOn && vel) active.insert(key,track.time);
+        }
+        if(type==NoteOn && vel) {
+            if(!active.contains(key)) {
+                if(state==Play) noteEvent(key,vel);
+                active.insert(key,track.time);
+            }
+            last[key]=track.time;
         }
 
         if(!s) return;
@@ -63,6 +68,7 @@ void MidiFile::read(Track& track, uint time, State state) {
 }
 
 void MidiFile::seek(uint time) {
+    active.clear(); last.clear();
     for(Track& track: tracks) {
         if(time < track.time*(48*60000/120)/ticksPerBeat) track.reset();
         read(track,time,Seek);

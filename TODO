@@ -1,8 +1,7 @@
 Music:
+ [To Aslans Camp, Arrival at Aslans How]: tremolos
  [When Cultures Meet]: anticipate hard sustains
- [Arrival at Aslans How]: sync tremolos
- [To Aslans Camp]: fix pdf parser
- [Enterprising Young Men, Once Upon a Time in Africa] MIDI record/edit -> help synching PDF-only sheets
+ [Enterprising Young Men, Once Upon a Time in Africa, ...] MIDI record/edit -> help synchronizing PDF-only sheets
  convex/concave polygon fill (extract from font renderer to display.cc), seek, record
 Fibermesh
 Desktop: restart on refresh (avoid leaks), runner

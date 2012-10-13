@@ -293,8 +293,9 @@ struct Music : Widget {
             //openSheet("Moonlight Sonata"_);
             //openSheet("Romantic Flight (Easy)"_);
             //openSheet("Test Drive (Easy)"_);
+            //openSheet("To Aslans Camp"_);
             //openSheet("Turret Opera (Cara Mia)"_);
-            openSheet("When Cultures Meet"_);
+            //openSheet("When Cultures Meet"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,256));
         this->current=current, this->count=count;

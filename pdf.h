@@ -31,7 +31,7 @@ struct PDF : Widget {
     float x1,y1,x2,y2;
     void extend(vec2 p) { if(p.x<x1) x1=p.x; if(p.x>x2) x2=p.x; if(p.y<y1) y1=p.y; if(p.y>y2) y2=p.y; }
 
-    struct Line { vec2 a,b; bool operator <(const Line& o) const{return a.y<o.a.y && b.y<o.b.y;}};
+    struct Line { vec2 a,b; bool operator <(const Line& o) const{return a.y<o.a.y || b.y<o.b.y;}};
     array<Line> lines;
     enum Flags { Close=1,Stroke=2,Fill=4,OddEven=8,Winding=16,Trace=32 };
     void drawPath(array<array<vec2> >& paths, int flags);

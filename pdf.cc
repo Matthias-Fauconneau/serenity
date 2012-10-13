@@ -134,7 +134,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
             if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) {  // Cross reference stream
                 const array<Variant>& W = dict.at("W"_).list;
                 assert(W[0].integer()==1);
-                assert(W[1].integer()==2);
+                int w1 = W[1].integer(); assert(w1==2||w1==3,w1);
                 assert(W[2].integer()==0 || W[2].integer()==1);
                 uint n=dict.at("Size"_).integer();
                 if(xref.size()<n) xref.grow(n);
@@ -146,18 +146,20 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     for(uint i=list[l*2].integer(),n=list[l*2+1].integer();n>0;n--,i++) {
                         uint8 type=b.read();
                         if(type==0) { // free objects
-                            uint16 unused n = b.read();
-                            assert(W[2].integer()==1);
+                            uint16 unused offset = b.read();
+                            if(w1==3) offset = offset<<16|(uint8)b.read();
                             uint8 unused g = b.read();
                             //log("f",hex(n),g);
                         } else if(type==1) { // uncompressed objects
-                            uint16 offset=b.read();
+                            uint16 offset = b.read();
+                            if(w1==3) offset = offset<<16|(uint8)b.read();
                             xref[i]=string(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
                             b.advance(W[2].integer());
                             //log("u",hex(offset));
                         } else if(type==2) { // compressed objects
-                            uint16 unused stream=b.read();
-                            uint8 unused index=0; if(W[2].integer()) index=b.read();
+                            uint16 stream=b.read();
+                            if(w1==3) stream = stream<<16|(uint8)b.read();
+                            uint8 index=0; if(W[2].integer()) index=b.read();
                             compressedXRefs << CompressedXRef __(stream,index);
                         } else error("type",type);
                     }
@@ -287,13 +289,13 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     OP('\'') { Tm=Tlm=mat32(0,-leading)*Tlm; drawText(font,fontSize,spacing,wordSpacing,args[0].data); }
                     OP2('T','j') drawText(font,fontSize,spacing,wordSpacing,args[0].data);
                     OP2('T','J') for(const auto& e : args[0].list) {
-                        if(e.type==Variant::Integer) Tm=mat32(-e.integer()*fontSize/1000,0)*Tm;
+                        if(e.type==Variant::Integer||e.type==Variant::Real) Tm=mat32(-e.real()*fontSize/1000,0)*Tm;
                         else if(e.type==Variant::Data) drawText(font,fontSize,spacing,wordSpacing,e.data);
-                        else error("Unexpected type");
+                        else error("Unexpected type",(int)e.type);
                     }
                     OP2('T','f') font = fonts.at(args[0].data); fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat32(f(0),f(1),f(2),f(3),f(4),f(5));
-                    OP2('T','w') { log("Tw",f(0));  wordSpacing=f(0); }
+                    OP2('T','w') wordSpacing=f(0);
                 }
                 //log(str((const char*)&op),args);
                 args.clear();
@@ -316,7 +318,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
     // insertion sorts lines for culling
     if(lines) for(int i : range(1,lines.size())) {
         auto e = lines[i];
-        while(i>0 && lines[i-1] > e) { lines[i]=lines[i-1];  i--; }
+        while(i>0 && e < lines[i-1]) { lines[i]=lines[i-1];  i--; }
         lines[i] = e;
     }
 
@@ -380,7 +382,7 @@ int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
 
-    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position)/scale,vec2(-position)/scale)))) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position-int2(0,100))/scale,vec2(-position-int2(0,100))/scale)))) {
         vec2 a = scale*l.a, b = scale*l.b;
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;

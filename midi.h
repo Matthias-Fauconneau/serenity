@@ -23,6 +23,7 @@ struct MidiFile {
     uint16 ticksPerBeat=0;
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
     map<int,int> active;
+    map<int,int> last;
     map<int,Chord> notes;
     signal<int, int> noteEvent;
     void open(const ref<byte>& path);
@@ -32,5 +33,5 @@ struct MidiFile {
     uint time=0;
     void seek(uint time);
     void update(uint delta);
-    void clear() { tracks.clear(); trackCount=0; ticksPerBeat=0; notes.clear(); }
+    void clear() { tracks.clear(); trackCount=0; ticksPerBeat=0; notes.clear(); active.clear(); last.clear(); }
 };

@@ -7,10 +7,9 @@ void Score::onPath(const ref<vec2>& p) {
         if(p[0].x==p[1].x && abs(p[0].y-p[1].y)>20 && abs(p[0].y-p[1].y)<70) {
             tails << Line(p[0], p[1]);
         }
-    } else if(p.size==5) {
-        if( (abs(p[0].y-p[2].y)<20 || abs(p[1].y-p[3].y)<20) &&
-                abs(p[0].x-p[2].x)>10 && abs(p[0].x-p[2].x)<500) {
-            tremolos << Line(p[0], p[2]);
+    } else if(p.size==5||p.size==13) {
+        if(span.x > 75 && span.x < 76 && span.y > 8 && span.y < 18) {
+            tremolos << Line(p[0], p[3]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
         if(span.y>2 && span.x<342 && (span.y<14 || (span.x>100 && span.y<20) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
@@ -51,7 +50,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         } else if(endsWith(font,"Opus"_)) {
             if(code==71/*treble*/||code==11/*bass*/) {
                 if(pos.y-lastClef.y>159) {
-                    staffs << (lastClef.y+120);
+                    staffs << (lastClef.y+100); //90-120
                     //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
                 lastClef=pos;
@@ -67,7 +66,6 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         if(i>=notes.size()) notes.grow(i+1);
         int duration=-1;
         if(font=="MScore-20"_) {
-            //debug[pos]=dec(code);
             if(code==14) {
                 if(size<30) duration= 0; //grace
                 else duration = 4; //quarter
@@ -97,13 +95,9 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 else if(code==66) duration = 8; //half
                 else if(code==39) duration = 16; //whole
             }
-            if(code==56) trills << Line(pos,pos); //trill head
-            else if(code==41 && trills && abs(trills.last().b.y-pos.y)<16) trills.last().b=pos; //trill tail
+            if(code==41 && trills && abs(trills.last().b.y-pos.y)<16) { trills.last().b=pos; debug[pos]=string("Trill"_); } //trill tail
+            else if(code==56) { trills << Line(pos,pos); debug[pos]=string("Trill"_); } //trill head
             else if(code==58) { //dot
-                for(int x : notes[i].keys) {
-                    if(x>pos.x-16) break;
-                    if(x>pos.x-48) for(int y : notes[i][x].keys) if(-y>pos.y-16&&-y<pos.y+32) notes[i][x].at(y).duration *= 3/2;
-                }
                 dots[i] << pos;
                 map<float, vec2> matches;
                 for(vec2 dot : dots[i]) if(abs(dot.x-pos.x)<1) matches[dot.y]=dot;
@@ -112,7 +106,9 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                     vec2 pos = (m[0]+m[1]+m[2]+m[3])/4.f;
                     uint i=0; for(;i<repeats.size() && repeats[i].y*1000+repeats[i].x < pos.y*1000+pos.x;i++) {} repeats.insertAt(i,pos);
                 }
-            }
+            } /*else if(code==77) { //tremolo
+                tremolos << Line(pos,pos);
+            }*/
         } else if(find(font,"DUCRGK"_)) { //TODO: glyph OCR
             if(code==7) {
                 if(size<2) duration = 0; //grace
@@ -130,6 +126,14 @@ void Score::synchronize(map<int,Chord>&& chords) {
     if(!staffs) return; assert(staffs);
     staffs << (lastClef.y+96); //add a last split at the bottom of the last page
     //uint i=0; for(Staff& staff: notes) { for(int x : staff.keys) for(int y : staff.at(x).keys) debug[vec2(x+16,-y)]=str(i); i++; } //assert proper staff sorting
+
+    /// Lengthens dotted notes
+    for(pair< int,array<vec2> > dots: this->dots) {
+        for(vec2 pos: dots.value) for(int x : notes[dots.key].keys) {
+            if(x>pos.x-16) break;
+            if(x>pos.x-48) for(int y : notes[dots.key][x].keys) if(-y>pos.y-16&&-y<pos.y+32) notes[dots.key][x].at(y).duration = notes[dots.key][x].at(y).duration*3/2;
+        }
+    }
 
     /// Detect and remove tied notes
     array<Tie> tied;
@@ -221,7 +225,8 @@ trillCancelTie: ;
                     for(int y2 : staff[lastX].keys) {
                         if(staff[lastX].at(y2).duration && (
                                     abs(x-lastX)<2 ||
-                                    (abs(x-lastX)<=9 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
+                                    (abs(x-lastX)<25 && abs(y-y2)<6) ||
+                                    (abs(x-lastX)<=9 && abs(y-y2)<180 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
                                     ((abs(x-lastX)<18 && abs(x-lastX)+abs(y-y2)<38) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)))) {
                             if(staff[lastX].size()>=staff[x].size()) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
@@ -239,35 +244,62 @@ trillCancelTie: ;
     }
 
     /// Detect and explicit tremolos
-    /*for(int i=0;i<tremolos.size-2;i++) {
-        if(tremolos[i].x1()==tremolos[i+1].x1()) {
-            foreach(QLineF tail,tails) if(abs(tail.x1()-tremolos[i].x1())<6 && abs(tail.y2()-tremolos[i].y1())<60) goto spurious;
+#if 0
+    uint begin=0;
+    for(uint i: range(tremolos.size())) {
+        if(i+1>=tremolos.size() || tremolos[i].a.x!=tremolos[i+1].a.x) {
+            int N = i+1-begin;
+            for(Line tail : tails) if(abs(tail.a.x-tremolos[i].a.x)<6 && abs(tail.b.y-tremolos[i].a.y)<60) { log("Spurious"); goto spurious; }
             {
-                //debug << Debug(QPoint(tremolos[i].x1(),tremolos[i].y1()), "tremolos");
-                int staff=0; for(;staff<staffs.size-1 && tremolos[i].y1()>staffs[staff];staff++) {}
-                int prevX=0,X1=0,X2=0,Y1=0,Y2=0;
-                foreach(int x, notes[staff].keys()) {
-                    foreach(int y, notes[staff][x].keys()) if(abs(-y-tremolos[i].y1())<60) goto inRange;
+                uint staff=0; for(;staff<staffs.size()-1 && tremolos[i].a.y>staffs[staff];staff++) {}
+#if 0 //filtered out by MIDI reader
+                // single chord tremolo
+                int X=0; for(int x : notes[staff].keys) if(x>tremolos[i].a.x-10) { X=x; break; }
+                debug[vec2(X,notes[staff][X].keys.first())]=string("T"_);
+                if(X) {
+                    map<int,Note> chord;
+                    for(pair<int,Note> note: notes[staff].at(X)) {
+                        if(abs(-note.key-tremolos[i].a.y)<75) chord.insert(note.key, note.value);
+                        else if(abs(-note.key-tremolos[i].a.y)<90) debug[vec2(X,-note.key)]="T"_+dec(-note.key-tremolos[i].a.y);
+                    }
+                    int duration = chord.values.first().duration;
+                    int times = duration*(1<<N);
+                    for(int t=1;t<=times;t++) notes[staff].insertMulti(X+t*3, copy(chord));
+                }
+#endif
+#if 0 //alternating tremolo
+                int X1=0,X2=0,Y1=0,Y2=0;
+                for(int x : notes[staff].keys) {
+                    for(int y : notes[staff][x].keys) {
+                        if(abs(-y-tremolos[i].a.y)<70) goto inRange;
+                        else if(abs(-y-tremolos[i].a.y)<120) log(abs(-y-tremolos[i].a.y));
+                    }
                     continue;
 inRange: ;
-                    if(!X1 && x>tremolos[i].x1()) { X1=prevX; Y1=notes[staff][X1].keys()[0]; }
-                    if( x+10>tremolos[i].x2() ) {X2=x;Y2=notes[staff][x].keys()[0];break;}
-                    prevX=x;
+                    if(x<tremolos[i].a.x) { X1=x, Y1=notes[staff].at(X1).keys[0]; }
+                    if(x+10>tremolos[i].b.x) { X2=x; Y2=notes[staff].at(x).keys[0]; break;}
                 }
+                debug[tremolos[i].a]=string("A"_);
+                debug[tremolos[i].b]=string("B"_);
+                debug[vec2(X1,-Y1)]=string("T1"_);
+                debug[vec2(X2,-Y2)]=string("T2"_);
+                log("Tremolo",begin,i,X1,X2,Y1,Y2);
                 if(X1&&X2) {
-                    int duration = notes[staff][X1][Y1]+notes[staff][X2][Y2];
-                    notes[staff][X2].remove(Y2);
-                    int times = duration*((tremolos[i].x1()==tremolos[i+2].x1())?4:2)/8;
+                    Note a = notes[staff][X1].take(Y1), b = notes[staff][X2].take(Y2);
+                    int duration = a.duration+b.duration;
+                    int times = duration*(N?4:2)/8;
                     for(int t=0;t<times;t++) {
-                        notes[staff][X1+(X2-X1)*(2*t+0)/times][Y1]=duration/times;
-                        notes[staff][X1+(X2-X1)*(2*t+1)/times][Y2]=duration/times;
+                        notes[staff][X1+(X2-X1)*(2*t+0)/times].insert(Y1, Note(a.index, duration/times));
+                        notes[staff][X1+(X2-X1)*(2*t+1)/times].insert(Y2, Note(a.index, duration/times));
                     }
                 }
-                if(tremolos[i].x1()==tremolos[i+2].x1()) i+=2; else i++;
+#endif
             }
 spurious: ;
+            begin=i;
         }
-    }*/
+    }
+#endif
 
     /// Detect and explicit trills
     /*foreach(QLineF trill, trills) {
@@ -326,7 +358,7 @@ spurious: ;
             debug[pos]=string("||||"_);
             positions.removeAt(i); indices.removeAt(i);
         } else {
-            debug.insertMulti(positions[i]+vec2(12,0),dec(MIDI[i].key));
+            debug.insertMulti(positions[i]+vec2(12,0),str(MIDI[i].key));
             i++;
         }
         lastPos=pos; lastKey=note.key;
