@@ -312,8 +312,8 @@ struct Music : Widget {
         if(current==count) {
             showSheetList();
             //openSheet("Adagio for TRON"_);
-            //openSheet("Avatar"_);
             //openSheet("Arrival at Aslans How"_);
+            //openSheet("Avatar"_);
             //openSheet("Ballad of Serenity"_);
             //openSheet("Brave Adventurers"_);
             //openSheet("Enterprising Young Men"_);
@@ -330,7 +330,7 @@ struct Music : Widget {
             //openSheet("Turret Opera (Cara Mia)"_);
             //openSheet("When Cultures Meet"_);
             audio.start();
-        } else if(count!=this->count) window.setSize(int2(count,256));
+        } else if(count!=this->count) window.setSize(int2(count,512));
         this->current=current, this->count=count;
         window.render();
     }

@@ -1,6 +1,7 @@
 Music:
  display images, record positions (for image only PDFs)
  convex/concave polygon fill (extract from font renderer to display.cc), seek, record
+ refix: Avatar
 Fibermesh
 Desktop: restart on refresh (avoid leaks), runner
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git

@@ -51,7 +51,7 @@ void MidiFile::read(Track& track, uint time, State state) {
                 //static uint min=-1; if(duration<min) min=duration, log(min);
                 notes.sorted(start*4/ticksPerBeat).insertSorted(MidiNote __(key, start*4/ticksPerBeat, (uint)round(duration*4.f/ticksPerBeat*10/9)));
             }
-        }
+        } else if((type==NoteOff || type==NoteOn) && active.contains(key) && last.contains(key)) log(track.time-last[key]);
         if(type==NoteOn && vel) {
             if(!active.contains(key)) {
                 if(state==Play) noteEvent(key,vel);

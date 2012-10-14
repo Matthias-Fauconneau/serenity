@@ -97,7 +97,7 @@ void Sampler::open(const ref<byte>& path) {
 
     // Lock compressed samples in memory
     full=0; for(const Sample& s : samples) full += (s.map.size+4095)/4096*4;
-    available = availableMemory() - ((samples.size()*(1<<14)*2*sizeof(float))>>10) /*predecoded samples*/ - (10<<10) /*heap*/;
+    available = availableMemory() - ((samples.size()*(1<<14)*2*sizeof(float))>>10) /*predecoded samples*/ - (16<<10) /*heap*/;
     if(full>available) {
         lock=0; for(const Sample& s : samples) lock += min(s.map.size/4096*4,available*1024/samples.size()/4096*4);
         log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB");
@@ -210,7 +210,8 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         Sample& s=samples[current++];
         uint size = s.map.size;
         if(full>available) size=min(size, available*1024/samples.size());
-        debug(current=samples.size(); if(0)) s.cache.decode(1<<14), s.map.lock(size);
+        //current=samples.size();
+        debug(current=samples.size(); if(0)) s.cache.decode(1<<14);//, s.map.lock(size);
         progressChanged(current,samples.size());
         if(current<samples.size()) queue();
     }

@@ -59,6 +59,7 @@ struct Score {
     signal<float,float,float> nextStaff;
     map<vec2, string> debug;
     int pass=-1;
+    int msScore=0;
 
     void clear() { staffs.clear(); lastClef=vec2(0,0); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; active.clear(); miss.clear(); expected.clear(); debug.clear(); pass=-1; }
 };
