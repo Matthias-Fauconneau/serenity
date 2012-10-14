@@ -26,7 +26,7 @@ struct MidiFile {
     map<int,int> last;
     map<int,Chord> notes;
     signal<int, int> noteEvent;
-    void open(const ref<byte>& path);
+    void open(const ref<byte>& data);
 
     enum State { Seek=0, Play=1, Sort=2 };
     void read(Track& track, uint time, State state);

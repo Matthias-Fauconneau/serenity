@@ -96,12 +96,11 @@ static Variant parse(TextData& s) {
 static Variant parse(const ref<byte>& buffer) { TextData s(buffer); return parse(s); }
 static map<ref<byte>,Variant> toDict(const array< string >& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.integer()]).dict; }
 
-void PDF::open(const ref<byte>& path, const Folder& folder) {
+void PDF::open(const ref<byte>& data) {
     lines.clear(); fonts.clear(); characters.clear(); paths.clear();
-    file = Map(path,folder);
     array<string> xref; map<ref<byte>,Variant> catalog;
     {
-        TextData s(file);
+        TextData s(data);
         for(s.index=s.buffer.size()-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
         s.index=s.integer(); assert(s.index!=uint(-1));
         int root=0;
@@ -230,7 +229,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                 }
                 uint op = id[0]; if(id.size>1) { op|=id[1]<<8; if(id.size>2) op|=id[2]<<16; }
                 switch( op ) {
-                default: error("Unknown operator",str((const char*)&op),s.peek(16));
+                default: error("Unknown operator '"_+str((const char*)&op)+"'"_);
 #define OP(c) break;case c:
 #define OP2(c1,c2) break;case c1|c2<<8:
 #define OP3(c1,c2,c3) break;case c1|c2<<8|c3<<16:
@@ -256,19 +255,23 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     OP('l') path.last() << p(0,1) << p(0,1) << p(0,1);
                     OP('m') path << move(array<vec2>()<<p(0,1));
                     OP('M') ;//setMiterLimit(f(0));
+                    OP('n') path.clear();
                     OP('q') stack<<Cm;
                     OP('Q') Cm=stack.pop();
                     OP('s') drawPath(path,Close|Stroke|OddEven);
                     OP('S') drawPath(path,Stroke|OddEven|Trace);
+                    OP('v') ;//curveTo (replicate first)
                     OP('w') ;//setWidth(Cm.m11()*f(0));
                     OP('W') path.clear(); //intersect winding clip
-                    OP2('W','*') path.clear(); //intersect odd even clip
-                    OP('n') path.clear();
+                    OP('y') ;//curveTo (replicate last)
+
+                    OP2('B','T') Tm=Tlm=mat32();
                     OP2('c','s') ;//set fill colorspace
                     OP2('C','S') ;//set stroke colorspace
-                    OP3('S','C','N') ;
-                    OP3('s','c','n') ;
                     OP2('c','m') Cm=mat32(f(0),f(1),f(2),f(3),f(4),f(5))*Cm;
+                    OP2('D','o') ;//p->drawPixmap(Cm.mapRect(QRect(0,0,1,1)),images[args[0].data]);
+                    OP2('E','T') ;
+                    OP2('g','s') ;
                     OP2('r','e') {
                         vec2 p1 = p(0,1), p2 = p1 + vec2(f(2)*Cm.m11,f(3)*Cm.m22);
                         path << move(array<vec2>() << p1
@@ -276,10 +279,8 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                                      << p2 << p2 << p2
                                      << vec2(p2.x,p1.y) << vec2(p2.x,p1.y) << vec2(p2.x,p1.y));
                     }
-                    OP2('D','o') ;//p->drawPixmap(Cm.mapRect(QRect(0,0,1,1)),images[args[0].data]);
-                    OP2('g','s') ;
-                    OP2('B','T') Tm=Tlm=mat32();
-                    OP2('E','T') ;
+                    OP3('S','C','N') ;
+                    OP3('s','c','n') ;
                     OP2('T','*') Tm=Tlm=mat32(0,-leading)*Tlm;
                     OP2('T','d') Tm=Tlm=mat32(f(0),f(1))*Tlm;
                     OP2('T','D') Tm=Tlm=mat32(f(0),f(1))*Tlm; leading=-f(1);
@@ -296,6 +297,7 @@ void PDF::open(const ref<byte>& path, const Folder& folder) {
                     OP2('T','f') font = fonts.at(args[0].data); fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat32(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
+                    OP2('W','*') path.clear(); //intersect odd even clip
                 }
                 //log(str((const char*)&op),args);
                 args.clear();
@@ -382,11 +384,11 @@ int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
 
-    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position-int2(0,100))/scale,vec2(-position-int2(0,100))/scale)))) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position)/scale,vec2(-position)/scale)))) {
         vec2 a = scale*l.a, b = scale*l.b;
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
-        if(a.y > currentClip.max.y && b.y > currentClip.max.y) break;
+        if(a.y > currentClip.max.y+100 && b.y > currentClip.max.y+100) break;
         if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
         line(a.x,a.y,b.x,b.y);
     }

@@ -233,6 +233,21 @@ struct MidiScore : Widget {
     void setColors(const map<int,byte4>& colors) { this->colors=copy(colors); contentChanged(); }
 };
 
+// Simple human readable/editable format for score synchronization annotations
+map<int, Chord> parseAnnotations(string&& annotations) {
+    map<int, Chord> chords;
+    uint t=0,i=0;
+    for(TextData s(annotations);s;) {
+        while(!s.match('\n')) {
+            int key = s.integer(); s.match(' ');
+            chords[t] << MidiNote __(key,t,1);
+            i++;
+        }
+        t++;
+    }
+    return chords;
+}
+
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music : Widget {
     Folder folder __("Sheets"_);
@@ -254,7 +269,13 @@ struct Music : Widget {
         writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
 
         array<string> files = folder.list(Files);
-        for(string& file : files) if(endsWith(file,".mid"_)) sheets << string(section(file,'.'));
+        for(string& file : files) {
+            if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
+                for(const Text& text: sheets) if(text.text==section(file,'.')) goto break_;
+                /*else*/ sheets << string(section(file,'.'));
+                break_:;
+            }
+        }
         sheets.itemPressed.connect(this,&Music::openSheet);
 
         sampler.open("/Samples/Salamander.sfz"_);
@@ -272,11 +293,17 @@ struct Music : Widget {
         score.activeNotesChanged.connect(&pdfScore,&PDF::setColors);
         score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);
+        score.annotationsChanged.connect(this,&Music::annotationsChanged);
         midi.noteEvent.connect(&score,&Score::noteEvent);
 
         window.localShortcut(Escape).connect(&exit);
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
+        window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
+        window.localShortcut(LeftArrow).connect(&score,&Score::previous);
+        window.localShortcut(RightArrow).connect(&score,&Score::next);
+        window.localShortcut(Insert).connect(&score,&Score::insert);
+        window.localShortcut(Delete).connect(&score,&Score::remove);
     }
 
     /// Shows samples loading progress. When loaded, displays any loaded sheet and starts audio output.
@@ -287,16 +314,19 @@ struct Music : Widget {
             //openSheet("Adagio for TRON"_);
             //openSheet("Avatar"_);
             //openSheet("Arrival at Aslans How"_);
+            //openSheet("Ballad of Serenity"_);
             //openSheet("Brave Adventurers"_);
+            //openSheet("Enterprising Young Men"_);
             //openSheet("Father and Son"_);
             //openSheet("Forbidden Friendship (Easy)"_);
             //openSheet("Game of Thrones"_);
             //openSheet("Inception - Time"_);
             //openSheet("Kingdom Dance"_);
             //openSheet("Moonlight Sonata"_);
+            //openSheet("Once Upon a Time in Africa"_);
             //openSheet("Romantic Flight (Easy)"_);
             //openSheet("Test Drive (Easy)"_);
-            openSheet("To Aslans Camp"_);
+            //openSheet("To Aslans Camp"_);
             //openSheet("Turret Opera (Cara Mia)"_);
             //openSheet("When Cultures Meet"_);
             audio.start();
@@ -313,7 +343,7 @@ struct Music : Widget {
 
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float previous, float current, float next) {
-        if(pdfScore) {
+        if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
             pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.ScrollArea::size.y));
         }
@@ -335,22 +365,27 @@ struct Music : Widget {
 
     /// Opens the given PDF+MIDI sheet
     void openSheet(uint index) { openSheet(sheets[index].text); }
+    string name;
     void openSheet(const ref<byte>& name) {
         if(play) togglePlay();
-        score.clear();
+        score.clear(); midi.clear();
+        this->name=string(name);
         window.setTitle(name);
-        midi.open(readFile(string(name+".mid"_),folder));
-        pdfScore.delta = 0;
+        if(existsFile(string(name+".mid"_),folder)) midi.open(readFile(string(name+".mid"_),folder));
         window.backgroundCenter=window.backgroundColor=0xFF;
         if(existsFile(string(name+".pdf"_),folder)) {
-            pdfScore.open(string(name+".pdf"_),folder);
-            score.synchronize(move(midi.notes));
+            pdfScore.open(readFile(string(name+".pdf"_),folder));
+            score.parse();
+            if(midi.notes) score.synchronize(move(midi.notes));
+            else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
             //pdfScore.setAnnotations(score.debug);
             window.widget = &pdfScore.area();
+            pdfScore.delta = 0;
         } else {
             midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature);
             window.widget = &midiScore.area();
-            midiScore.widget().render(int2(0,0),int2(1280,0));
+            midiScore.delta=0;
+            midiScore.widget().render(int2(0,0),int2(1280,0)); //compute note positions for score scrolling
             score.chords = copy(midiScore.notes);
             score.staffs = move(midiScore.staffs);
             score.positions = move(midiScore.positions);
@@ -358,5 +393,15 @@ struct Music : Widget {
         score.seek(0);
         window.setSize(int2(0,0));
         window.render();
+    }
+
+    void annotationsChanged(const map<int, Chord>& chords) {
+        pdfScore.setAnnotations(score.debug);
+        string annotations;
+        for(const_pair<int, Chord> chord: chords) {
+            for(MidiNote note: chord.value) annotations <<dec(note.key)<<' ';
+            annotations <<'\n';
+        }
+        writeFile(string(name+".not"_),annotations,folder);
     }
 } application;
