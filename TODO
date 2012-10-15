@@ -1,10 +1,8 @@
 Music:
- display images, record positions (for image only PDFs)
+ display images, record positions (for image-only PDFs)
  convex/concave polygon fill (extract from font renderer to display.cc), seek, record
- refix: Avatar
 Fibermesh
-Desktop: restart on refresh (avoid leaks), runner
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, truetype, ssl
-Apps: shell, file manager, search, imap, torrent, video, irc
+Apps: runner, shell, file manager, search, imap, torrent, video, irc

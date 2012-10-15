@@ -185,79 +185,81 @@ void Score::parse() {
     array<Tie> tied;
     for(Line tie : ties) {
         int l = abs(tie.b.x-tie.a.x);
-        uint i=0; for(;i<staffs.size()-1 && tie.a.y>staffs[i];i++) {}
+        uint staff=0; for(;staff<staffs.size()-1 && tie.a.y>staffs[staff];staff++) {}
         int noteBetween=0; Tie t;
-        for(int x : notes[i].keys) {
-            int lx = x-tie.a.x;
-            int rx = x-tie.b.x;
-            for(int y : notes[i][x].keys) {
-                int ly = -y-tie.a.y;
+        for(uint i=staff-1;i<staff+1;i++) {
+            for(int x : notes[i].keys) {
+                int lx = x-tie.a.x;
+                int rx = x-tie.b.x;
+                for(int y : notes[i][x].keys) {
+                    int ly = -y-tie.a.y;
 
-                /// Detect first note of a tie
-                if(!t.ly || abs(ly)<abs(t.dy)) {
-                    if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-49 && ly>-34 && ly<15 && rx<1) {
-                        debug[vec2(x,-y)]=string("L"_);
-                        for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
-                        t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                    } //else if(lx>-49 && lx<4 && ly>-40 && ly<20 && rx<1) debug.insertMulti(vec2(x,-y),string("!L"_+str(lx,ly,rx)));
-                }
+                    /// Detect first note of a tie
+                    if(!t.ly || abs(ly)<abs(t.dy)) {
+                        if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-49 && ly>-34 && ly<15 && rx<1) {
+                            //debug[vec2(x,-y)]=string("L"_);
+                            for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
+                            t.li=i; t.lx=x; t.ly=y; t.dy=ly;
+                        } else if(lx>-49 && lx<4 && ly>-40 && ly<20 && rx<1) debug.insertMulti(vec2(x,-y),string("!L"_+str(lx,ly,rx)));
+                    }
 alreadyTied: ;
-            }
-            for(int y : notes[i][x].keys) {
-                int ry = y-t.ly;
-#if 1
-                /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
-                if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
-                    debug[vec2(x,-y)]=string("B"_);
-                    noteBetween++;
-                    if(abs(x-t.lx)<32) noteBetween++;
-                    break;
                 }
+                for(int y : notes[i][x].keys) {
+                    int ry = y-t.ly;
+#if 1
+                    /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
+                    if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
+                        debug[vec2(x,-y)]=string("B"_);
+                        noteBetween++;
+                        if(abs(x-t.lx)<32) noteBetween++;
+                        break;
+                    }
 #endif
 #if 0
-                /// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
-                if(noteBetween%2 && lx > 0 && rx < -16 && abs(ry) < 2 && l < 200) {
-                    debug[vec2(x,-y)]=string("O"_);
-                    t.ri=i;t.rx=x; t.ry=y; tied<<t; //notes[i][x].remove(y);
-                    noteBetween++;
-                }
+                    /// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
+                    if(noteBetween%2 && lx > 0 && rx < -16 && abs(ry) < 2 && l < 200) {
+                        debug[vec2(x,-y)]=string("O"_);
+                        t.ri=i;t.rx=x; t.ry=y; tied<<t; //notes[i][x].remove(y);
+                        noteBetween++;
+                    }
 #endif
-                /// Detect right note of a tie
-                if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
-                    t.ri=i;t.rx=x; t.ry=y;
-                    tied << t; //defer remove for double ties
-                    //debug[vec2(x,-y-24)]=string("R"_+str(rx,ry));
-                    goto staffDone;
-                } //else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug.insertMulti(vec2(x,-y),str("!R"_,rx,ry));
-            }
-        }
-staffDone: ;
-        /// Detect notes tied over a line wrap
-        if(t.ly && (!noteBetween || (noteBetween<2 && l>150)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
-            for(int x=0;x<2;x++) {
-                int rx = notes[i+1].keys[x];
-                int ry = notes[i+1].values[x].keys[0];
-                for(Line trill : trills) if(abs(rx-trill.a.x)<8 && -ry-trill.a.y>0 && -ry-trill.a.y<200) goto trillCancelTie;
-                float min=12;
-                for(float y2 : notes[i+1].values[x].keys) {float dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]); if(dy>=0) min=::min(min, abs(dy));}
-                for(float y2 : notes[i+1].values[x].keys) {
-                    int dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]);
-                    if(dy>=-7 && abs(dy)<=min) {
-                        t.ri=i+1;t.rx=rx; t.ry=y2;
-                        debug[tie.a]=string("W"_);
-                        debug[vec2(rx,-y2)]=string("W"_);
-                        for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
-                            //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
-                            goto alreadyTied2;
-                        tied << t;
-                        goto tieFound;
-                    } else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2)]="Y"_+str(dy,min);
-alreadyTied2: ;
+                    /// Detect right note of a tie
+                    if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                        t.ri=i;t.rx=x; t.ry=y;
+                        tied << t; //defer remove for double ties
+                        //debug[vec2(x,-y-24)]=string("R"_+str(rx,ry));
+                        goto staffDone;
+                    } //else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug.insertMulti(vec2(x,-y+16),str("!R"_,rx,ry));
                 }
             }
+staffDone: ;
+            /// Detect notes tied over a line wrap
+            if(t.ly && (!noteBetween || (noteBetween<2 && l>150)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
+                for(int x=0;x<2;x++) {
+                    int rx = notes[i+1].keys[x];
+                    int ry = notes[i+1].values[x].keys[0];
+                    for(Line trill : trills) if(abs(rx-trill.a.x)<8 && -ry-trill.a.y>0 && -ry-trill.a.y<200) goto trillCancelTie;
+                    float min=12;
+                    for(float y2 : notes[i+1].values[x].keys) {float dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]); if(dy>=0) min=::min(min, abs(dy));}
+                    for(float y2 : notes[i+1].values[x].keys) {
+                        int dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]);
+                        if(dy>=-7 && abs(dy)<=min) {
+                            t.ri=i+1;t.rx=rx; t.ry=y2;
+                            debug[tie.a]=string("W"_);
+                            debug[vec2(rx,-y2)]=string("W"_);
+                            for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
+                                //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
+                                goto alreadyTied2;
+                            tied << t;
+                            goto tieFound;
+                        } else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2)]="Y"_+str(dy,min);
+alreadyTied2: ;
+                    }
+                }
 tieFound: ;
 trillCancelTie: ;
-        } //else debug[tie.a]=str("!W"_,noteBetween,tie.b.x,notes[i].keys.last()+10);
+            } //else debug[tie.a]=str("!W"_,noteBetween,tie.b.x,notes[i].keys.last()+10);
+        }
     }
     for(Tie t : tied) if(notes[t.ri][t.rx].contains(t.ry)) notes[t.ri][t.rx].remove(t.ry);
 
@@ -271,9 +273,10 @@ trillCancelTie: ;
                     for(int y2 : staff[lastX].keys) {
                         if(staff[lastX].at(y2).duration && (
                                     abs(x-lastX)<2 ||
-                                    (abs(x-lastX)<=9 && abs(y-y2)<180 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
+                                    (abs(x-lastX)<10 && abs(y-y2)<180 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
                                     ((abs(x-lastX)<18 && abs(y-y2)<20) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1))
-                                    || (abs(x-lastX)<19/*25*/ && abs(y-y2)<6))) {
+                                    //|| (abs(x-lastX)<19/*25*/ && abs(y-y2)<6) //TODO: relative to average note distance
+                                    )) {
                             if(staff[lastX].size()>=staff[x].size()) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
                                 staff[x].remove(y); debug[vec2(x,-y)]=str("<-"_,x-lastX,y-y2); goto again;
@@ -281,7 +284,7 @@ trillCancelTie: ;
                                 if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
                                 staff[lastX].remove(y2); debug[vec2(lastX,-y2)]=str("->"_,x-lastX,y-y2); goto again;
                             }
-                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<40 && abs(y-y2)<40)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
+                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
                     }
                 }
             }
