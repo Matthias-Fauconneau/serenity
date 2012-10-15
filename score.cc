@@ -396,14 +396,14 @@ spurious: ;
     //dots.clear(); notes.clear(); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear();
 }
 
-void Score::synchronize(map<int,Chord>&& chords) {
+void Score::synchronize(const map<int,Chord>& MIDI) {
     /// Synchronize notes to MIDI track
-    array<MidiNote> MIDI; //flatten chords for robust MIDI synchronization
-    for(const Chord& chord: chords.values) MIDI<<chord;
+    array<MidiNote> notes; //flatten chords for robust MIDI synchronization
+    for(const Chord& chord: MIDI.values) notes<<chord;
     vec2 lastPos=vec2(0,0); int lastKey=0;
-    for(uint i=0; i<MIDI.size() && i<positions.size();) {
-        vec2 pos=positions[i]; MidiNote note = MIDI[i];
-        /*if(n<MIDI.size() && MIDI[n]==note && lastY && y!=lastY && abs(y-lastY)<16) { //double notes in MIDI
+    for(uint i=0; i<notes.size() && i<positions.size();) {
+        vec2 pos=positions[i]; MidiNote note = notes[i];
+        /*if(n<notes.size() && notes[n]==note && lastY && y!=lastY && abs(y-lastY)<16) { //double notes in MIDI
                     debug[vec2(x,-y)]=string("+++"_);
                     chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
                 }*/
@@ -416,15 +416,20 @@ void Score::synchronize(map<int,Chord>&& chords) {
             positions.removeAt(i); indices.removeAt(i);
         } else if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
             debug.insertMulti(pos,str("----"_,lastPos.x-pos.x,lastPos.y-pos.y));
-            MIDI.removeAt(i);
+            notes.removeAt(i);
         } else {
-            debug.insertMulti(positions[i]+vec2(12,0),str(MIDI[i].key));
+            debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
             i++;
         }
         lastPos=pos; lastKey=note.key;
     }
 
-    this->chords=move(chords);
+    chords.clear();
+    uint t=-1; for(uint i: range(notes.size())) { //reconstruct chords after edition
+        if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
+        chords.at(t) << notes[i];
+        debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
+    }
 }
 
 void Score::annotate(map<int,Chord>&& chords) {

@@ -66,8 +66,8 @@ void MidiScore::render(int2 position, int2 size) {
     //Text(str(notes)).render(position,size);
     array<MidiNote> active[2]; //0 = treble (right hand), 1 = bass (left hand)
     array<MidiNote> quavers[2]; // for quaver linking
-    for(pair<int,Chord> chords: notes) {
-        uint t = chords.key;
+    for(uint i: range(notes.size())) {
+        uint t = notes.keys[i];
 
         // Removes released notes from active sets
         for(uint s: range(2)) for(uint i=0;i<active[s].size();) if(active[s][i].start+active[s][i].duration<=t) active[s].removeAt(i); else i++;
@@ -80,54 +80,14 @@ void MidiScore::render(int2 position, int2 size) {
             line(int2(position.x+16,page(1,t,0).y),int2(position.x+16,page(0,t,8).y));
             line(int2(position.x+size.x-16,page(1,t,0).y),int2(position.x+size.x-16,page(0,t,8).y));
             staffs << staffMargin+(lastSystem+1)*systemHeight;
+            lastMeasure=t/beatsPerMeasure;
         } else if(t/beatsPerMeasure>lastMeasure) { // Draws measure bars
             line(page(1,t,0)-int2(8,0),page(0,t,8)-int2(8,0));
-        }
-
-        if(t/beatsPerMeasure>lastMeasure) { // Links quaver tails
-            for(int s: range(2)) {
-                Clef clef = (Clef)s;
-                bool tailUp=true; int dx = tailUp ? 12 : 0; uint slurY=tailUp?-1:0;
-                uint begin=0;
-                for(uint i: range(quavers[s].size())) {
-                    MidiNote note = quavers[s][i];
-                    int2 position = page(s, note.start, staffY(clef, note.key));
-                    if(tailUp) slurY=min<uint>(slurY,position.y);
-                    else slurY=max<uint>(slurY,position.y);
-                    uint duration=note.duration;
-                    if(i+1>=quavers[s].size() || quavers[s][i+1].duration<duration || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
-                        ref<MidiNote> linked = quavers[s].slice(begin,i+1-begin);
-                        if(linked.size==1) slurY+=tailUp?-32:32; else slurY+=tailUp?-24:24;
-                        int2 lastPosition=0;
-                        for(MidiNote note : linked) {
-                            int2 position = page(s,note.start,staffY(clef, note.key));
-                            int x = position.x + dx;
-                            line(vec2(x+0.5,position.y),vec2(x+0.5,slurY),2);
-                            if(linked.size==1) { // draws single tail
-                                int x = position.x + dx;
-                                if(note.duration==1) glyph(int2(x+1,slurY),tailUp?"flags.u4"_:"flags.d4"_);
-                                else if(note.duration==2) glyph(int2(x+1,slurY),tailUp?"flags.u3"_:"flags.d3"_);
-                            } else if(lastPosition){ // draws horizontal tail links
-                                if(note.duration==1) {
-                                    line(vec2(lastPosition.x+dx,slurY+(tailUp?7:-7)+0.5),vec2(position.x+dx,slurY+(tailUp?7:-7)+0.5),2);
-                                    line(vec2(lastPosition.x+dx,slurY+(tailUp?9:-9)+0.5),vec2(position.x+dx,slurY+(tailUp?9:-9)+0.5),2);
-                                }
-                                line(vec2(lastPosition.x+dx,slurY+0.5),vec2(position.x+dx,slurY+0.5),2);
-                                line(vec2(lastPosition.x+dx,slurY+(tailUp?2:-2)+0.5),vec2(position.x+dx,slurY+(tailUp?2:-2)+0.5),2);
-                            }
-                            lastPosition=position;
-                        }
-                        begin=i+1;
-                        slurY=tailUp?-1:0;
-                    }
-                }
-                quavers[s].clear();
-            }
             lastMeasure=t/beatsPerMeasure;
         }
 
         array<MidiNote> current[2]; // new notes to be pressed
-        for(MidiNote note: chords.value) { //first rough split based on pitch
+        for(MidiNote note: notes.values[i]) { //first rough split based on pitch
             int s = note.key>=60; //middle C
             current[s] << note;
             active[s] << note;
@@ -190,6 +150,48 @@ void MidiScore::render(int2 position, int2 size) {
                 line(vec2(x+0.5, page(s,t,tailMax).y+(tailUp?0:32)),vec2(x+0.5, page(s,t,tailMin).y+(tailUp?-32:0)),2);
                 //assert(minDuration==maxDuration,minDuration,maxDuration);
                 //if(minDuration!=maxDuration) Text(string("!"_)).render(int2(x,page(s,t,tailMin).y));
+            }
+        }
+
+        t = i+1<notes.size() ? notes.keys[i+1] : t+beatsPerMeasure;
+        if(t/beatsPerMeasure>lastMeasure) { // Links quaver tails
+            for(int s: range(2)) {
+                Clef clef = (Clef)s;
+                bool tailUp=true; int dx = tailUp ? 12 : 0; uint slurY=tailUp?-1:0;
+                uint begin=0;
+                for(uint i: range(quavers[s].size())) {
+                    MidiNote note = quavers[s][i];
+                    int2 position = page(s, note.start, staffY(clef, note.key));
+                    if(tailUp) slurY=min<uint>(slurY,position.y);
+                    else slurY=max<uint>(slurY,position.y);
+                    uint duration=note.duration;
+                    if(i+1>=quavers[s].size() || quavers[s][i+1].duration<duration || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
+                        ref<MidiNote> linked = quavers[s].slice(begin,i+1-begin);
+                        if(linked.size==1) slurY+=tailUp?-32:32; else slurY+=tailUp?-24:24;
+                        int2 lastPosition=0;
+                        for(MidiNote note : linked) {
+                            int2 position = page(s,note.start,staffY(clef, note.key));
+                            int x = position.x + dx;
+                            line(vec2(x+0.5,position.y),vec2(x+0.5,slurY),2);
+                            if(linked.size==1) { // draws single tail
+                                int x = position.x + dx;
+                                if(note.duration==1) glyph(int2(x+1,slurY),tailUp?"flags.u4"_:"flags.d4"_);
+                                else if(note.duration==2) glyph(int2(x+1,slurY),tailUp?"flags.u3"_:"flags.d3"_);
+                            } else if(lastPosition){ // draws horizontal tail links
+                                if(note.duration==1) {
+                                    line(vec2(lastPosition.x+dx,slurY+(tailUp?7:-7)+0.5),vec2(position.x+dx,slurY+(tailUp?7:-7)+0.5),2);
+                                    line(vec2(lastPosition.x+dx,slurY+(tailUp?9:-9)+0.5),vec2(position.x+dx,slurY+(tailUp?9:-9)+0.5),2);
+                                }
+                                line(vec2(lastPosition.x+dx,slurY+0.5),vec2(position.x+dx,slurY+0.5),2);
+                                line(vec2(lastPosition.x+dx,slurY+(tailUp?2:-2)+0.5),vec2(position.x+dx,slurY+(tailUp?2:-2)+0.5),2);
+                            }
+                            lastPosition=position;
+                        }
+                        begin=i+1;
+                        slurY=tailUp?-1:0;
+                    }
+                }
+                quavers[s].clear();
             }
         }
     }

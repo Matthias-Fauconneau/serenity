@@ -84,6 +84,7 @@ struct Music : Widget {
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);
         window.localShortcut(Delete).connect(&score,&Score::remove);
+        window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
     }
 
     /// Shows samples loading progress. When loaded, displays any loaded sheet and starts audio output.
@@ -93,7 +94,7 @@ struct Music : Widget {
             showSheetList();
             //openSheet("Adagio for TRON"_);
             //openSheet("Arrival at Aslans How"_);
-            openSheet("Avatar"_);
+            //openSheet("Avatar"_);
             //openSheet("Ballad of Serenity"_);
             //openSheet("Brave Adventurers"_);
             //openSheet("Enterprising Young Men"_);
@@ -143,6 +144,10 @@ struct Music : Widget {
         window.render();
     }
 
+    void toggleAnnotations() {
+        if(pdfScore.annotations) pdfScore.annotations.clear(), window.render(); else pdfScore.setAnnotations(score.debug);
+    }
+
     /// Opens the given PDF+MIDI sheet
     void openSheet(uint index) { openSheet(sheets[index].text); }
     string name;
@@ -158,7 +163,7 @@ struct Music : Widget {
             score.parse();
             if(midi.notes) score.synchronize(move(midi.notes));
             else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
-            pdfScore.setAnnotations(score.debug);
+            //pdfScore.setAnnotations(score.debug);
             window.widget = &pdfScore.area();
             pdfScore.delta = 0;
         } else {

@@ -35,7 +35,7 @@ struct Score {
     map<int, array<vec2> > dots;
 
     void parse();
-    void synchronize(map<int,Chord>&& chords);
+    void synchronize(const map<int,Chord>& MIDI);
     void annotate(map<int,Chord>&& chords);
     signal<const map<int,Chord>&> annotationsChanged;
     map<int,Chord> chords; // chronological MIDI notes key values

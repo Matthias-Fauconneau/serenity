@@ -1,6 +1,5 @@
 Music:
  display images, record positions (for image-only PDFs)
- convex/concave polygon fill (extract from font renderer to display.cc), seek, record
 Fibermesh
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
