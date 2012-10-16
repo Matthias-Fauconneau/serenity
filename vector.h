@@ -52,6 +52,7 @@ generic bool operator >=(const vector& u, const vector& v) { for(int i=0;i<N;i++
 generic bool operator >(const vector& u, const vector& v) { for(int i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
 
 generic vector abs(const vector& v){ vector r; for(int i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
+generic vector sign(const vector& v){ vector r; for(int i=0;i<N;i++) r[i]=sign(v[i]); return r;  }
 generic vector min(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=min(a[i],b[i]); return r; }
 generic vector max(const vector& a, const vector& b){ vector r; for(int i=0;i<N;i++) r[i]=max(a[i],b[i]); return r; }
 generic vector clip(const vector& min, const vector& x, const vector& max){ vector r; for(int i=0;i<N;i++) r[i]=clip(min[i],x[i],max[i]); return r;  }
@@ -66,15 +67,23 @@ generic string str(const vector& v) { string s = string("("_); for(int i=0;i<N;i
 #undef generic
 
 template<class T> struct xy { T x,y; };
-/// \typedef vector<xy,int,2> int2
 /// Integer x,y vector
 typedef vector<xy,int,2> int2;
-/// \typedef vector<xy,float,2> vec2
 /// Floating-point x,y vector
 typedef vector<xy,float,2> vec2;
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
-//inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+
+template<class T> struct xyz { T x,y,z; vector<xy,T,2> xy()const{return vector<::xy,T,2>(x,y);}};
+/// Integer x,y,z vector
+typedef vector<xyz,int,3> int3;
+/// Floating-point x,y,z vector
+typedef vector<xyz,float,3> vec3;
+inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+
+template<class T> struct xyzw { T x,y,z,w; vector<xyz,T,3> xyz()const{return vector<::xyz,T,3>(x,y,z);}};
+/// Floating-point x,y,z,w vector
+typedef vector<xyzw,float,4> vec4;
 
 /// Axis-aligned rectangle
 struct Rect {

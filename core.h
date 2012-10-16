@@ -143,6 +143,7 @@ template<class T> constexpr T min(T a, T b) { return a<b ? a : b; }
 template<class T> constexpr T max(T a, T b) { return a>b ? a : b; }
 template<class T> constexpr T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 template<class T> constexpr T abs(T x) { return x>=0 ? x : -x; }
+template<class T> constexpr T sign(T x) { return x>=0 ? 1 : -1; }
 template<class A, class B> bool operator !=(const A& a, const B& b) { return !(a==b); }
 template<class A, class B> bool operator >(const A& a, const B& b) { return b<a; }
 

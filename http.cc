@@ -138,7 +138,7 @@ string str(const URL& url) {
 template<class T> uint DataStream<T>::available(uint need) {
     while(need>Data::available(need) && T::poll()) {
         array<byte> chunk = T::readUpTo(max(4096u,need-Data::available(need)));
-        if(!chunk) { log("Empty chunk",Data::available(need),need); break; }
+        if(!chunk) { error("Empty chunk",Data::available(need),need); break; }
         buffer << chunk;
     }
     return Data::available(need);

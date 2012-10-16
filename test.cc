@@ -1,4 +1,4 @@
-#if 1
+#if 0
 #include "process.h"
 #include "window.h"
 #include "text.h"
@@ -9,7 +9,7 @@ struct KeyTest : Text {
 } test;
 #endif
 
-#if 0
+#if 1
 #include "window.h"
 #include "pdf.h"
 #include "interface.h"
@@ -27,7 +27,7 @@ struct Book {
                 pdf.delta.y = toInteger(section(mark,0,1,2));
             }
         }
-        pdf.open(file,root());
+        pdf.open(readFile(file,root()));
         window.backgroundCenter=window.backgroundColor=0xFF;
         window.localShortcut(Escape).connect(&exit);
         window.localShortcut(UpArrow).connect(this,&Book::previous);

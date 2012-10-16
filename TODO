@@ -1,5 +1,4 @@
-Music:
- display images, record positions (for image-only PDFs)
+Music: record positions (for image-only PDFs)
 Fibermesh
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

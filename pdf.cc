@@ -16,6 +16,7 @@ struct Variant { //TODO: union
     Variant(string&& data) : type(Data), data(move(data)) {}
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
     Variant(map<ref<byte>,Variant>&& dict) : type(Dict), dict(move(dict)) {}
+    operator bool() const { return type!=Empty; }
     int integer() const { assert(type==Integer, number); return number; }
     double real() const { assert(type==Real||type==Integer); return number; }
 };
@@ -58,7 +59,14 @@ static Variant parse(TextData& s) {
         dictionaryEnd: s.skip();
         Variant v = move(dict);
         if(s.match("stream"_)) { s.skip();
-            array<byte> stream = inflate(s.until("endstream"_),true);
+            /*array<byte> stream (s.read(v.dict.at("Length"_).integer()));
+            s.skip(); if(!s.match("endstream"_)) error(v.dict,s.peek(16));*/
+            array<byte> stream ( s.until("endstream"_) );
+            if(v.dict.contains("Filter"_)) {
+                ref<byte> filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
+                if(filter=="FlateDecode"_) stream=inflate(stream, true);
+                else error("Unsupported filter",v.dict);
+            }
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
                 int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,Variant(1)).integer();
@@ -97,7 +105,7 @@ static Variant parse(const ref<byte>& buffer) { TextData s(buffer); return parse
 static map<ref<byte>,Variant> toDict(const array< string >& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.integer()]).dict; }
 
 void PDF::open(const ref<byte>& data) {
-    lines.clear(); fonts.clear(); characters.clear(); paths.clear();
+    blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear();
     array<string> xref; map<ref<byte>,Variant> catalog;
     {
         TextData s(data);
@@ -181,10 +189,12 @@ void PDF::open(const ref<byte>& data) {
         }
     }
     x1 = +__FLT_MAX__, x2 = -__FLT_MAX__; vec2 pageOffset=0;
-    array<Variant> pages = move(parse(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_).list);
+    Variant kids = move(parse(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
+    array<Variant> pages = kids.list ? move(kids.list) : parse(xref[kids.integer()]).list;
+    y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
     for(uint i=0; i<pages.size(); i++) {
         const Variant& page = pages[i];
-        uint pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
+        uint pageFirstBlit = blits.size(), pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
         auto dict = parse(xref[page.integer()]).dict;
         if(dict.contains("Resources"_)) {
             auto resources = toDict(xref,move(dict.at("Resources"_)));
@@ -204,6 +214,34 @@ void PDF::open(const ref<byte>& data) {
                 Variant* widths = fontDict.find("Widths"_);
                 if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.real();
             }
+            if(resources.contains("XObject"_)) for(auto e: move(resources.at("XObject"_).dict) ? : parse(xref[resources.at("XObject"_).integer()]).dict) {
+                if(images.contains(string(e.key))) continue;
+                Variant object = parse(xref[e.value.integer()]);
+                Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
+                int depth=object.dict.at("BitsPerComponent"_).number/8;
+                byte4 palette[256]; bool indexed=false;
+                if(depth==1 && object.dict.contains("ColorSpace"_)) {
+                    Variant cs = parse(xref[object.dict.at("ColorSpace"_).integer()]);
+                    if(cs.data=="DeviceGray"_) {}
+                    else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
+                        TextData s (cs.list[3].data);
+                        for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
+                        indexed=true;
+                    } else error("Unsupported colorspace",cs);
+                }
+                const uint8* src = (uint8*)object.data.data(); assert(object.data.size()==image.height*image.width*depth);
+                byte4* dst = (byte4*)image.data;
+                /**/  if(depth==1) {
+                    if(indexed) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=palette[src[0]];
+                    else for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=byte4(src[0],src[0],src[0],0xFF);
+                } else if(depth==3) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=3) dst[0]=byte4(src[0],src[1],src[2],0xFF);
+                else if(depth==4) {
+                    for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=4) dst[0]=byte4(src[0],src[1],src[2],src[3]);
+                    image.alpha=true;
+                }
+                else error("Unsupported depth",depth);
+                images.insert(string(e.key), move(image));
+            }
         }
         Variant* contents = dict.find("Contents"_);
         if(contents) {
@@ -215,7 +253,7 @@ void PDF::open(const ref<byte>& data) {
                 //for(const Variant& dataRef : content.list) data << parse(xref[dataRef.integer()]).data;
                 s.buffer << content.data;
             }
-            y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
+            //y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
             Cm=Tm=mat32(); array<mat32> stack;
             Font* font=0; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat32 Tlm;
             array< array<vec2> > path;
@@ -269,7 +307,7 @@ void PDF::open(const ref<byte>& data) {
                     OP2('c','s') ;//set fill colorspace
                     OP2('C','S') ;//set stroke colorspace
                     OP2('c','m') Cm=mat32(f(0),f(1),f(2),f(3),f(4),f(5))*Cm;
-                    OP2('D','o') ;//p->drawPixmap(Cm.mapRect(QRect(0,0,1,1)),images[args[0].data]);
+                    OP2('D','o') extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1)); blits<<Blit __(Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)));
                     OP2('E','T') ;
                     OP2('g','s') ;
                     OP2('r','e') {
@@ -303,9 +341,10 @@ void PDF::open(const ref<byte>& data) {
                 args.clear();
             }
         }
-        // tighten page bounds
-        pageOffset += vec2(0,y1-y2-16);
-        vec2 offset = pageOffset+vec2(0,-y1);
+        // translate from page to document
+        //const array<Variant>& cropBox = (dict.value("CropBox"_)?:dict.at("MediaBox"_)).list; pageOffset += vec2(0,-cropBox[3].real()); vec2 offset = pageOffset;
+        pageOffset += vec2(0,y1-y2-16); vec2 offset = pageOffset+vec2(0,-y1);
+        for(uint i: range(pageFirstBlit,blits.size())) blits[i].pos += offset;
         for(uint i: range(pageFirstLine,lines.size())) lines[i].a += offset, lines[i].b += offset;
         for(uint i: range(pageFirstCharacter,characters.size())) characters[i].pos += offset;
         for(uint i: range(pageFirstPath,paths.size())) for(vec2& pos: paths[i]) pos += offset;
@@ -313,9 +352,18 @@ void PDF::open(const ref<byte>& data) {
         pages << move(dict["Kids"_].list);
     }
     y2=pageOffset.y;
+
+    for(Blit& b: blits) b.pos.x-=x1, b.pos.y=-b.pos.y;
     for(Line& l: lines) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; assert(l.a!=l.b,l.a,l.b); }
     for(Character& c: characters) c.pos.x-=x1, c.pos.y=-c.pos.y;
     for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
+
+    // insertion sorts blits for culling
+    if(blits) for(int i : range(1,blits.size())) {
+        auto e = move(blits[i]);
+        while(i>0 && blits[i-1] > e) { blits[i]=move(blits[i-1]);  i--; }
+        blits[i] = move(e);
+    }
 
     // insertion sorts lines for culling
     if(lines) for(int i : range(1,lines.size())) {
@@ -383,6 +431,12 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
 int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
+
+    for(const Blit& blit: blits) {
+        if(position.y+scale*(blit.pos.y+blit.size.y) < currentClip.min.y) continue;
+        if(position.y+scale*blit.pos.y > currentClip.max.y) break;
+        ::blit(position+int2(scale*blit.pos),resize(blit.image,scale*blit.size.x,scale*blit.size.y));
+    }
 
     for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position)/scale,vec2(-position)/scale)))) {
         vec2 a = scale*l.a, b = scale*l.b;

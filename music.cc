@@ -92,6 +92,7 @@ struct Music : Widget {
     void showProgress(int current, int count) {
         if(current==count) {
             showSheetList();
+            openSheet("Across The Stars"_);
             //openSheet("Adagio for TRON"_);
             //openSheet("Arrival at Aslans How"_);
             //openSheet("Avatar"_);
