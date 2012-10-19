@@ -235,6 +235,7 @@ alreadyTied: ;
 staffDone: ;
             /// Detect notes tied over a line wrap
             if(t.ly && (!noteBetween || (noteBetween<2 && l>150)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
+                debug[tie.a]=string("W"_);
                 for(int x=0;x<2;x++) {
                     int rx = notes[i+1].keys[x];
                     int ry = notes[i+1].values[x].keys[0];
@@ -243,16 +244,15 @@ staffDone: ;
                     for(float y2 : notes[i+1].values[x].keys) {float dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]); if(dy>=0) min=::min(min, abs(dy));}
                     for(float y2 : notes[i+1].values[x].keys) {
                         int dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]);
-                        if(dy>=-7 && abs(dy)<=min) {
+                        if(dy>=-12 && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
-                            debug[tie.a]=string("W"_);
                             debug[vec2(rx,-y2)]=string("W"_);
                             for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
                                 //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
                                 goto alreadyTied2;
                             tied << t;
                             goto tieFound;
-                        } else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2)]="Y"_+str(dy,min);
+                        } else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2+16)]<<"Y"_+str(dy,min);
 alreadyTied2: ;
                     }
                 }
