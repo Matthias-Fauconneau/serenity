@@ -24,7 +24,7 @@ struct MidiFile {
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
     map<int,int> active;
     map<int,int> last;
-    map<int,Chord> notes;
+    map<uint,Chord> notes;
     signal<int, int> noteEvent;
     void open(const ref<byte>& data);
 

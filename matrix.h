@@ -5,12 +5,14 @@
 /// 2D linear transformation
 struct mat2 {
     float m11, m12, m21, m22;
-    mat2(float m11, float m12, float m21, float m22):m11(m11),m12(m12),m21(m21),m22(m22){}
-    mat2() : mat2(1,0,0,1) {}
-    vec2 operator*(vec2 v) { return vec2( m11*v.x + m21*v.y, m12*v.x + m22*v.y ); }
+    constexpr mat2(float m11, float m12, float m21, float m22):m11(m11),m12(m12),m21(m21),m22(m22){}
+    constexpr mat2() : mat2(1,0,0,1) {}
+    vec2 operator*(vec2 v) const { return vec2( m11*v.x + m21*v.y, m12*v.x + m22*v.y ); }
     mat2 operator*(mat2 m) const { return mat2( m11*m.m11 + m12*m.m21, m11*m.m12 + m12*m.m22,
                                                 m21*m.m11 + m22*m.m21, m21*m.m12 + m22*m.m22); }
 };
+inline bool operator==(const mat2& a,const mat2& b) { return a.m11==b.m11 && a.m12==b.m12 && a.m21==b.m21 && a.m22==b.m22; }
+inline string str(const mat2& a) { return str("\n["_,a.m11,a.m12,"\n ",a.m21,a.m22,']'); }
 
 /// 2D affine transformation
 struct mat32 {
@@ -38,7 +40,7 @@ struct mat4 {
     float& m(int i, int j) { return data[j*4+i]; }
     float operator()(int i, int j) const { return m(i,j); }
     float& operator()(int i, int j) { return m(i,j); }
-    vec4 operator*(vec4 v) const { vec4 r(0,0,0,0); for(int i=0;i<4;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+v.w*m(i,3); return r; }
+    vec4 operator*(vec3 v) const { vec4 r(0,0,0,0); for(int i=0;i<4;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+1*m(i,3); return r; }
     mat4 operator*(mat4 b) const {
         mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.m(i,j) += m(i,k)*b.m(k,j); return r;
     }

@@ -8,9 +8,10 @@ struct Matrix {
     Matrix(Matrix&& o) : data(o.data), m(o.m), n(o.n) { o.data=0; }
     Matrix& operator=(Matrix&& o) {assert(&o!=this); this->~Matrix(); data=o.data; m=o.m; n=o.n; o.data=0; return *this; }
     /// Allocate a m-row, n-column matrix
-    Matrix(int m, int n):data(allocate<float>(m*n)),m(m),n(n){debug(clear(data,m*n,__builtin_nanf(""));)}
+    Matrix(int m, int n):data(allocate<float>(m*n)),m(m),n(n){debug(::clear(data,m*n,__builtin_nanf(""));)}
     ~Matrix() { if(data) delete data; }
 
+    void clear(float v) { ::clear(data, m*n, v); }
     float operator()(int i, int j) const { assert(data && i>=0 && i<m && j>=0 && j<n); return data[j*m+i]; }
     float& operator()(int i, int j) { assert(data && i>=0 && i<m && j>=0 && j<n); return data[j*m+i]; }
 

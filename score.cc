@@ -59,7 +59,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
          } else if(find(font,"DUCRGK"_)) { //TODO: glyph OCR
             if(code==1/*treble*/||code==5/*bass*/) {
-                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+pos.y)/2;//(lastClef.y+110);
+                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+110);
                 lastClef=pos;
             }
         } else if(find(font,"ZVBUUH"_)) { //TODO: glyph OCR
@@ -396,7 +396,7 @@ spurious: ;
     //dots.clear(); notes.clear(); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear();
 }
 
-void Score::synchronize(const map<int,Chord>& MIDI) {
+void Score::synchronize(const map<uint,Chord>& MIDI) {
     /// Synchronize notes to MIDI track
     array<MidiNote> notes; //flatten chords for robust MIDI synchronization
     for(const Chord& chord: MIDI.values) notes<<chord;
@@ -425,14 +425,14 @@ void Score::synchronize(const map<int,Chord>& MIDI) {
     }
 
     chords.clear();
-    uint t=-1; for(uint i: range(notes.size())) { //reconstruct chords after edition
+    uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
         debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
     }
 }
 
-void Score::annotate(map<int,Chord>&& chords) {
+void Score::annotate(map<uint,Chord>&& chords) {
     /// Synchronize notes to MIDI track
     array<MidiNote> notes; //flatten chords for robust annotations
     for(const Chord& chord: chords.values) notes<<chord;

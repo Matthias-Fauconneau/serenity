@@ -14,8 +14,8 @@
 #include "midiscore.h"
 
 // Simple human readable/editable format for score synchronization annotations
-map<int, Chord> parseAnnotations(string&& annotations) {
-    map<int, Chord> chords;
+map<uint, Chord> parseAnnotations(string&& annotations) {
+    map<uint, Chord> chords;
     uint t=0,i=0;
     for(TextData s(annotations);s;) {
         while(!s.match('\n')) {
@@ -92,7 +92,7 @@ struct Music : Widget {
     void showProgress(int current, int count) {
         if(current==count) {
             showSheetList();
-            openSheet("Across The Stars"_);
+            //openSheet("Across The Stars"_);
             //openSheet("Adagio for TRON"_);
             //openSheet("Arrival at Aslans How"_);
             //openSheet("Avatar"_);
@@ -181,10 +181,10 @@ struct Music : Widget {
         window.render();
     }
 
-    void annotationsChanged(const map<int, Chord>& chords) {
+    void annotationsChanged(const map<uint, Chord>& chords) {
         pdfScore.setAnnotations(score.debug);
         string annotations;
-        for(const_pair<int, Chord> chord: chords) {
+        for(const_pair<uint, Chord> chord: chords) {
             for(MidiNote note: chord.value) annotations <<dec(note.key)<<' ';
             annotations <<'\n';
         }

@@ -1,7 +1,7 @@
 #include "midiscore.h"
 #include "display.h"
 
-void MidiScore::parse(map<int,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2]) {
+void MidiScore::parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2]) {
         this->notes=move(notes);
         this->key=key;
         this->tempo=tempo;

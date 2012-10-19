@@ -13,7 +13,7 @@ struct MidiScore : Widget {
         {0,1,0,1,0,0,1,0,1,0,0,0}, // F minor
         {0,2,0,2,0,0,2,0,2,0,2,0}  // C major
     };
-    map<int,Chord> notes;
+    map<uint,Chord> notes;
     int key=-1; uint tempo=120; uint timeSignature[2] = {4,4};
 
     const int staffCount = 2;
@@ -25,7 +25,7 @@ struct MidiScore : Widget {
     array<float> staffs;
     array<vec2> positions;
 
-    void parse(map<int,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2]);
+    void parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2]);
     int2 sizeHint();
 
     // Returns staff coordinates from note  (for a given clef and key)

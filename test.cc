@@ -9,7 +9,7 @@ struct KeyTest : Text {
 } test;
 #endif
 
-#if 1
+#if 0
 #include "window.h"
 #include "pdf.h"
 #include "interface.h"
@@ -349,7 +349,7 @@ struct HTMLTest {
     HTMLTest() {
         window.localShortcut(Escape).connect(&exit);
         page.contentChanged.connect(&window, &Window::render);
-        page.go("http://www.girlgeniusonline.com/comic.php?date=20120917"_);
+        page.go("http://feedproxy.google.com/~r/Phoronix/~3/LdcmrpZu6FA/vr.php"_);
     }
 } test;
 #endif

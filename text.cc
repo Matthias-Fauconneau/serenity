@@ -26,11 +26,11 @@ struct TextLayout {
     void nextLine(bool justify) {
         if(!line) { pen.y+=size; return; }
         //justify
-        int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance; //sum word length
+        float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance; //sum word length
         length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
-        int space=0;
+        float space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0 || space>=spaceAdvance) space = spaceAdvance; //compact
+        if(space<=0 || space>=2*spaceAdvance) space = spaceAdvance; //compact
 
         //layout
         pen.x=0;
@@ -62,7 +62,7 @@ struct TextLayout {
             if(c==' '||c=='\t'||c=='\n') {//next word/line
                 previous = spaceIndex;
                 if(!word) { if(c=='\n') nextLine(false); continue; }
-                int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
+                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
                 length += word.last().pos.x+word.last().width; //last word
                 if(wrap && length>=wrap) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
@@ -111,7 +111,7 @@ struct TextLayout {
         }
         if(!text || text[text.size-1]!='\n') {
             if(word) {
-                int length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
+                float length=0; for(const Word& word: line) length+=word.last().pos.x+word.last().advance+spaceAdvance;
                 length += word.last().pos.x+word.last().width; //last word
                 if(wrap && length>=wrap) nextLine(true); //doesn't fit
                 line << move(word); //add to current line (or first of new line)

@@ -214,33 +214,37 @@ void PDF::open(const ref<byte>& data) {
                 Variant* widths = fontDict.find("Widths"_);
                 if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.real();
             }
-            if(resources.contains("XObject"_)) for(auto e: move(resources.at("XObject"_).dict) ? : parse(xref[resources.at("XObject"_).integer()]).dict) {
-                if(images.contains(string(e.key))) continue;
-                Variant object = parse(xref[e.value.integer()]);
-                Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
-                int depth=object.dict.at("BitsPerComponent"_).number/8;
-                byte4 palette[256]; bool indexed=false;
-                if(depth==1 && object.dict.contains("ColorSpace"_)) {
-                    Variant cs = parse(xref[object.dict.at("ColorSpace"_).integer()]);
-                    if(cs.data=="DeviceGray"_) {}
-                    else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
-                        TextData s (cs.list[3].data);
-                        for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
-                        indexed=true;
-                    } else error("Unsupported colorspace",cs);
+            if(resources.contains("XObject"_)) {
+                Variant& object = resources.at("XObject"_);
+                map<ref<byte>,Variant> dict = object.type==Variant::Integer ? parse(xref[object.integer()]).dict : move(object.dict);
+                for(auto e: dict) {
+                    if(images.contains(string(e.key))) continue;
+                    Variant object = parse(xref[e.value.integer()]);
+                    Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
+                    int depth=object.dict.at("BitsPerComponent"_).number/8;
+                    byte4 palette[256]; bool indexed=false;
+                    if(depth==1 && object.dict.contains("ColorSpace"_)) {
+                        Variant cs = parse(xref[object.dict.at("ColorSpace"_).integer()]);
+                        if(cs.data=="DeviceGray"_) {}
+                        else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
+                            TextData s (cs.list[3].data);
+                            for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
+                            indexed=true;
+                        } else { log("Unsupported colorspace",cs); continue; }
+                    }
+                    const uint8* src = (uint8*)object.data.data(); assert(object.data.size()==image.height*image.width*depth);
+                    byte4* dst = (byte4*)image.data;
+                    /**/  if(depth==1) {
+                        if(indexed) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=palette[src[0]];
+                        else for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=byte4(src[0],src[0],src[0],0xFF);
+                    } else if(depth==3) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=3) dst[0]=byte4(src[0],src[1],src[2],0xFF);
+                    else if(depth==4) {
+                        for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=4) dst[0]=byte4(src[0],src[1],src[2],src[3]);
+                        image.alpha=true;
+                    }
+                    else error("Unsupported depth",depth);
+                    images.insert(string(e.key), move(image));
                 }
-                const uint8* src = (uint8*)object.data.data(); assert(object.data.size()==image.height*image.width*depth);
-                byte4* dst = (byte4*)image.data;
-                /**/  if(depth==1) {
-                    if(indexed) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=palette[src[0]];
-                    else for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=byte4(src[0],src[0],src[0],0xFF);
-                } else if(depth==3) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=3) dst[0]=byte4(src[0],src[1],src[2],0xFF);
-                else if(depth==4) {
-                    for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=4) dst[0]=byte4(src[0],src[1],src[2],src[3]);
-                    image.alpha=true;
-                }
-                else error("Unsupported depth",depth);
-                images.insert(string(e.key), move(image));
             }
         }
         Variant* contents = dict.find("Contents"_);
@@ -307,7 +311,10 @@ void PDF::open(const ref<byte>& data) {
                     OP2('c','s') ;//set fill colorspace
                     OP2('C','S') ;//set stroke colorspace
                     OP2('c','m') Cm=mat32(f(0),f(1),f(2),f(3),f(4),f(5))*Cm;
-                    OP2('D','o') extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1)); blits<<Blit __(Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)));
+                    OP2('D','o') if(images.contains(args[0].data)) {
+                        extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
+                        blits<<Blit __(Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)));
+                    }
                     OP2('E','T') ;
                     OP2('g','s') ;
                     OP2('r','e') {

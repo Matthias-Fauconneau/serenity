@@ -73,15 +73,16 @@ typedef vector<xy,int,2> int2;
 typedef vector<xy,float,2> vec2;
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
+inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
 
-template<class T> struct xyz { T x,y,z; vector<xy,T,2> xy()const{return vector<::xy,T,2>(x,y);}};
+template<class T> struct xyz { T x,y,z; vector<xy,T,2> xy()const{return vector< ::xy,T,2>(x,y);}};
 /// Integer x,y,z vector
 typedef vector<xyz,int,3> int3;
 /// Floating-point x,y,z vector
 typedef vector<xyz,float,3> vec3;
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
 
-template<class T> struct xyzw { T x,y,z,w; vector<xyz,T,3> xyz()const{return vector<::xyz,T,3>(x,y,z);}};
+template<class T> struct xyzw { T x,y,z,w; vector<xyz,T,3> xyz()const{return vector< ::xyz,T,3>(x,y,z);}};
 /// Floating-point x,y,z,w vector
 typedef vector<xyzw,float,4> vec4;
 

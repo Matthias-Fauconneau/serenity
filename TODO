@@ -1,6 +1,6 @@
-Music: record positions (for image-only PDFs)
-Fibermesh
+Music: fix heuristics, record staff+notes positions (for image-only PDFs)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
+Fibermesh
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, truetype, ssl
 Apps: runner, shell, file manager, search, imap, torrent, video, irc
