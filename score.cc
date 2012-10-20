@@ -77,6 +77,15 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+pos.y)/2;
                 lastClef=pos;
             }
+        } else if(font=="Manual"_) { // Manual annotations
+            if(!staffs || (pos.x < 200 && lastPos.x > 900 && pos.y > lastPos.y)) { staffs << lastClef.y+70; lastClef=pos; }
+            lastPos=pos;
+            uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
+            debug[pos]=str(i);
+            if(i>=notes.size()) notes.grow(i+1);
+            for(int x : notes[i].keys) if(abs(x-pos.x)<16) { notes[i].sorted(x).insertSorted(-pos.y, Note(index,4)); goto break_; }
+            /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
+            break_:;
         }
     } else if(pass==1) {
         uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
@@ -170,7 +179,7 @@ struct Tie { uint li; int lx,ly; uint ri; int rx,ry; int dy; Tie():li(0),lx(0),l
 string str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)+")"_; }
 void Score::parse() {
     if(!staffs) return; assert(staffs);
-    staffs << (lastClef.y+96); //add a last split at the bottom of the last page
+    staffs << (lastClef.y+110); //add a last split at the bottom of the last page
     //uint i=0; for(Staff& staff: notes) { for(int x : staff.keys) for(int y : staff.at(x).keys) debug[vec2(x+16,-y)]=str(i); i++; } //assert proper staff sorting
 
     /// Lengthens dotted notes
@@ -284,7 +293,7 @@ trillCancelTie: ;
                                 if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
                                 staff[lastX].remove(y2); debug[vec2(lastX,-y2)]=str("->"_,x-lastX,y-y2); goto again;
                             }
-                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
+                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
                     }
                 }
             }
@@ -460,7 +469,7 @@ void Score::toggleEdit() {
 }
 
 void Score::previous() {
-    if(editMode) {
+    if(editMode && noteIndex>0) {
         expected.clear();
         expected.insert(0, --noteIndex);
         map<int,byte4> activeNotes;
@@ -535,7 +544,7 @@ void Score::seek(uint unused time) {
     if(editMode) {
         expected.clear();
         expected.insert(0,noteIndex=0);
-    } else {
+    } else if(chords) {
         chordIndex=0, noteIndex=0; currentStaff=0; expected.clear(); active.clear();
         int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
             expected.insertMulti(note.key, i);

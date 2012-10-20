@@ -34,7 +34,7 @@ struct PDF : Widget {
     void drawText(Font* font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data);
 
     map<string, Image> images;
-    struct Blit { vec2 pos,size; Image image; bool operator <(const Blit& o) const{return pos.y<o.pos.y;}};
+    struct Blit { vec2 pos,size; Image image; Image resized; bool operator <(const Blit& o) const{return pos.y<o.pos.y;}};
     array<Blit> blits;
 
     /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document

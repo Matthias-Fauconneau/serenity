@@ -1,4 +1,3 @@
-Music: fix heuristics, record staff+notes positions (for image-only PDFs)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Fibermesh
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

@@ -12,7 +12,7 @@ struct Score {
     void onGlyph(int, vec2, float,const ref<byte>&, int);
 
     array<float> staffs;
-    vec2 lastClef=vec2(0,0);
+    vec2 lastClef=0, lastPos=0;
     array<vec2> repeats;
 
     struct Line {
@@ -61,5 +61,5 @@ struct Score {
     int pass=-1;
     int msScore=0;
 
-    void clear() { staffs.clear(); lastClef=vec2(0,0); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; active.clear(); miss.clear(); expected.clear(); debug.clear(); pass=-1; }
+    void clear() { staffs.clear(); lastClef=lastPos=0; repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; active.clear(); miss.clear(); expected.clear(); debug.clear(); pass=-1; }
 };

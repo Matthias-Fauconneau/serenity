@@ -439,10 +439,11 @@ int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
     scale = size.x/(x2-x1); // Fit width
 
-    for(const Blit& blit: blits) {
+    for(Blit& blit: blits) {
         if(position.y+scale*(blit.pos.y+blit.size.y) < currentClip.min.y) continue;
         if(position.y+scale*blit.pos.y > currentClip.max.y) break;
-        ::blit(position+int2(scale*blit.pos),resize(blit.image,scale*blit.size.x,scale*blit.size.y));
+        if(!blit.resized) blit.resized=resize(blit.image,scale*blit.size.x,scale*blit.size.y);
+        ::blit(position+int2(scale*blit.pos),blit.resized);
     }
 
     for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position)/scale,vec2(-position)/scale)))) {
@@ -466,5 +467,10 @@ void PDF::render(int2 position, int2 size) {
     }
 
     static Font font __(string(),array<float>(),::Font(File("dejavu/DejaVuSans.ttf"_,::fonts()),10));
-    for(const pair<vec2,string>& text: annotations) Text(copy(text.value)).render(position+int2(text.key*scale/normalizedScale),int2(0,0));
+    for(const pair<vec2,string>& text: annotations) {
+        int2 pos = position+int2(text.key*scale/normalizedScale);
+        if(pos.y<=currentClip.min.y) continue;
+        if(pos.y>=currentClip.max.y) continue; //break;
+        Text(copy(text.value)).render(pos,int2(0,0));
+    }
 }

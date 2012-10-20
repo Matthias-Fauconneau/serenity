@@ -1,7 +1,7 @@
 #include "midiscore.h"
 #include "display.h"
 
-void MidiScore::parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2]) {
+void MidiScore::parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2], uint ticksPerBeat) {
         this->notes=move(notes);
         this->key=key;
         this->tempo=tempo;
@@ -9,6 +9,7 @@ void MidiScore::parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint 
             this->timeSignature[0]=timeSignature[0];
             this->timeSignature[1]=timeSignature[1];
         }
+        this->ticksPerBeat=ticksPerBeat;
         beatsPerMeasure = this->timeSignature[0]*this->timeSignature[1];
         staffTime = 5*beatsPerMeasure;
     }
@@ -67,7 +68,7 @@ void MidiScore::render(int2 position, int2 size) {
     array<MidiNote> active[2]; //0 = treble (right hand), 1 = bass (left hand)
     array<MidiNote> quavers[2]; // for quaver linking
     for(uint i: range(notes.size())) {
-        uint t = notes.keys[i];
+        uint t = notes.keys[i]*4/ticksPerBeat;
 
         // Removes released notes from active sets
         for(uint s: range(2)) for(uint i=0;i<active[s].size();) if(active[s][i].start+active[s][i].duration<=t) active[s].removeAt(i); else i++;
@@ -153,7 +154,7 @@ void MidiScore::render(int2 position, int2 size) {
             }
         }
 
-        t = i+1<notes.size() ? notes.keys[i+1] : t+beatsPerMeasure;
+        t = i+1<notes.size() ? notes.keys[i+1]*4/ticksPerBeat : t+beatsPerMeasure;
         if(t/beatsPerMeasure>lastMeasure) { // Links quaver tails
             for(int s: range(2)) {
                 Clef clef = (Clef)s;

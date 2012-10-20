@@ -28,6 +28,46 @@ map<uint, Chord> parseAnnotations(string&& annotations) {
     return chords;
 }
 
+struct PDFScore : PDF {
+    array<vec2> positions;
+    signal<const ref<vec2>&> positionsChanged;
+    void loadPositions(const ref<byte>& data) {
+        positions.clear();
+        for(vec2 pos: cast<vec2>(data)) {
+            if(pos.x>0 && pos.y<-y2 && pos.x*scale<1280) {
+                positions << pos;
+            }
+        }
+        int i=0; for(vec2 position: positions) {
+            onGlyph(i++,position*scale,32,"Manual"_,0);
+        }
+    }
+    bool mouseEvent(int2 cursor, int2, Event event, Button button) override {
+        if(event!=Press) return false;
+        vec2 position = vec2(cursor)/scale;
+        int best=-1; float D=60;
+        for(int i: range(positions.size())) {
+            vec2 delta = positions[i]-position;
+            float d = length(delta);
+            if(d<D) { D=d; if(abs(delta.x)<16) best=i; else best=-1; }
+        }
+        if(button == LeftButton) {
+            if(best>=0) positions.insertAt(positions[best].y<position.y?best:best+1,position); else positions << position;
+        } else if(button == RightButton) {
+            if(best>=0) positions.removeAt(best);
+        } else return false; //TODO: move, insert
+        positionsChanged(positions);
+        return true;
+    }
+    void render(int2 position, int2 size) override {
+        PDF::render(position,size);
+        if(annotations) for(vec2 pos: positions) fill(position+int2(scale*pos)-int2(2)+Rect(4),red);
+        for(pair<int,byte4> highlight: colors) {
+            fill(position+int2(scale*positions[highlight.key])-int2(3)+Rect(6),green);
+        }
+    }
+};
+
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music : Widget {
     Folder folder __("Sheets"_);
@@ -35,7 +75,7 @@ struct Music : Widget {
     List<Text> sheets;
 
     MidiFile midi;
-    Scroll<PDF> pdfScore;
+    Scroll<PDFScore> pdfScore;
     Scroll<MidiScore> midiScore;
     Score score;
 
@@ -67,6 +107,7 @@ struct Music : Widget {
         pdfScore.contentChanged.connect(&window,&Window::render);
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);
+        pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
 
         midiScore.contentChanged.connect(&window,&Window::render);
 
@@ -92,25 +133,6 @@ struct Music : Widget {
     void showProgress(int current, int count) {
         if(current==count) {
             showSheetList();
-            //openSheet("Across The Stars"_);
-            //openSheet("Adagio for TRON"_);
-            //openSheet("Arrival at Aslans How"_);
-            //openSheet("Avatar"_);
-            //openSheet("Ballad of Serenity"_);
-            //openSheet("Brave Adventurers"_);
-            //openSheet("Enterprising Young Men"_);
-            //openSheet("Father and Son"_);
-            //openSheet("Forbidden Friendship (Easy)"_);
-            //openSheet("Game of Thrones"_);
-            //openSheet("Inception - Time"_);
-            //openSheet("Kingdom Dance"_);
-            //openSheet("Moonlight Sonata"_);
-            //openSheet("Once Upon a Time in Africa"_);
-            //openSheet("Romantic Flight (Easy)"_);
-            //openSheet("Test Drive (Easy)"_);
-            //openSheet("To Aslans Camp"_);
-            //openSheet("Turret Opera (Cara Mia)"_);
-            //openSheet("When Cultures Meet"_);
             audio.start();
         } else if(count!=this->count) window.setSize(int2(count,512));
         this->current=current, this->count=count;
@@ -161,14 +183,18 @@ struct Music : Widget {
         window.backgroundCenter=window.backgroundColor=0xFF;
         if(existsFile(string(name+".pdf"_),folder)) {
             pdfScore.open(readFile(string(name+".pdf"_),folder));
+            if(existsFile(string(name+".pos"_),folder)) {
+                score.clear();
+                pdfScore.loadPositions(readFile(string(name+".pos"_),folder));
+            }
             score.parse();
-            if(midi.notes) score.synchronize(move(midi.notes));
+            if(midi.notes) score.synchronize(copy(midi.notes));
             else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
             //pdfScore.setAnnotations(score.debug);
             window.widget = &pdfScore.area();
             pdfScore.delta = 0;
         } else {
-            midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature);
+            midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature,midi.ticksPerBeat);
             window.widget = &midiScore.area();
             midiScore.delta=0;
             midiScore.widget().render(int2(0,0),int2(1280,0)); //compute note positions for score scrolling
@@ -189,5 +215,15 @@ struct Music : Widget {
             annotations <<'\n';
         }
         writeFile(string(name+".not"_),annotations,folder);
+    }
+
+    void positionsChanged(const ref<vec2>& positions) {
+        writeFile(string(name+".pos"_),cast<byte>(positions),folder);
+        score.clear();
+        pdfScore.loadPositions(readFile(string(name+".pos"_),folder));
+        score.parse();
+        if(midi.notes) score.synchronize(copy(midi.notes));
+        else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
+        pdfScore.setAnnotations(score.debug);
     }
 } application;

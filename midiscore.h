@@ -19,13 +19,14 @@ struct MidiScore : Widget {
     const int staffCount = 2;
     const int staffInterval = 12, staffMargin = 4*staffInterval, staffHeight = staffMargin+4*staffInterval+staffMargin, systemHeight=staffCount*staffHeight+staffMargin;
     const int systemHeader = 128;
+    int ticksPerBeat;
     int beatsPerMeasure;
     int staffTime;
 
     array<float> staffs;
     array<vec2> positions;
 
-    void parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2]);
+    void parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2], uint ticksPerBeat);
     int2 sizeHint();
 
     // Returns staff coordinates from note  (for a given clef and key)
