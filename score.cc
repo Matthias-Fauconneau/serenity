@@ -78,7 +78,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 lastClef=pos;
             }
         } else if(font=="Manual"_) { // Manual annotations
-            if(!staffs || (pos.x < 200 && lastPos.x > 900 && pos.y > lastPos.y)) { staffs << lastClef.y+70; lastClef=pos; }
+            if(!staffs || (pos.x < 300 && lastPos.x > 900 && pos.y > lastPos.y)) { staffs << lastClef.y+70; lastClef=pos; }
             lastPos=pos;
             uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
             debug[pos]=str(i);

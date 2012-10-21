@@ -31,8 +31,8 @@ map<uint, Chord> parseAnnotations(string&& annotations) {
 struct PDFScore : PDF {
     array<vec2> positions;
     signal<const ref<vec2>&> positionsChanged;
+    void clear() { PDF::clear(); positions.clear(); }
     void loadPositions(const ref<byte>& data) {
-        positions.clear();
         for(vec2 pos: cast<vec2>(data)) {
             if(pos.x>0 && pos.y<-y2 && pos.x*scale<1280) {
                 positions << pos;
@@ -42,8 +42,10 @@ struct PDFScore : PDF {
             onGlyph(i++,position*scale,32,"Manual"_,0);
         }
     }
+    bool editMode=false;
+    void toggleEdit() { editMode=!editMode; }
     bool mouseEvent(int2 cursor, int2, Event event, Button button) override {
-        if(event!=Press) return false;
+        if(!editMode || event!=Press) return false;
         vec2 position = vec2(cursor)/scale;
         int best=-1; float D=60;
         for(int i: range(positions.size())) {
@@ -62,7 +64,7 @@ struct PDFScore : PDF {
     void render(int2 position, int2 size) override {
         PDF::render(position,size);
         if(annotations) for(vec2 pos: positions) fill(position+int2(scale*pos)-int2(2)+Rect(4),red);
-        for(pair<int,byte4> highlight: colors) {
+        if(positions) for(pair<int,byte4> highlight: colors) {
             fill(position+int2(scale*positions[highlight.key])-int2(3)+Rect(6),green);
         }
     }
@@ -121,6 +123,7 @@ struct Music : Widget {
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
+        window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);
@@ -176,7 +179,7 @@ struct Music : Widget {
     string name;
     void openSheet(const ref<byte>& name) {
         if(play) togglePlay();
-        score.clear(); midi.clear();
+        score.clear(); midi.clear(); pdfScore.clear();
         this->name=string(name);
         window.setTitle(name);
         if(existsFile(string(name+".mid"_),folder)) midi.open(readFile(string(name+".mid"_),folder));

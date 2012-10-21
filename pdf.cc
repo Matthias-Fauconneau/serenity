@@ -105,7 +105,7 @@ static Variant parse(const ref<byte>& buffer) { TextData s(buffer); return parse
 static map<ref<byte>,Variant> toDict(const array< string >& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.integer()]).dict; }
 
 void PDF::open(const ref<byte>& data) {
-    blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear();
+    clear();
     array<string> xref; map<ref<byte>,Variant> catalog;
     {
         TextData s(data);
