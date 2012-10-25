@@ -5,8 +5,6 @@
 #include "trace.h"
 
 // Linux
-enum{FUTEX_WAIT,FUTEX_WAKE};
-enum{CLONE_VM=0x00000100,CLONE_FS=0x00000200,CLONE_FILES=0x00000400,CLONE_SIGHAND=0x00000800,CLONE_THREAD=0x00010000,CLONE_IO=0x80000000};
 struct rlimit { long cur,max; };
 enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
 enum {SIGHUP=1, SIGINT, SIGQUIT, SIGILL, SIGTRAP, SIGABRT, SIGBUS, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM, SIGIO=29};
@@ -38,6 +36,10 @@ static int heapSize=0;
 void heapTrace(int delta) { log(heapSize,"\t",delta); heapSize+=delta; }
 #endif
 
+#ifndef PTHREAD
+enum{FUTEX_WAIT,FUTEX_WAKE};
+enum{CLONE_VM=0x00000100,CLONE_FS=0x00000200,CLONE_FILES=0x00000400,CLONE_SIGHAND=0x00000800,CLONE_THREAD=0x00010000,CLONE_IO=0x80000000};
+
 // Semaphore
 void Semaphore::wait(int val) { int e; while((val=futex)<0 && (e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e],val,futex); }
 void Semaphore::wake() { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
@@ -47,6 +49,7 @@ debug(
         void Lock::setOwner() { assert(!owner,owner); owner=gettid(); }
         void Lock::checkRecursion() { assert(owner!=gettid(),owner,gettid()); }
         void Lock::checkOwner() { assert(owner==gettid(),owner,gettid()); owner=0; } )
+#endif
 
 // Poll
 void Poll::registerPoll() { thread+=this; thread.post(); }
@@ -75,25 +78,30 @@ int main() {
 }
 
 // Thread
-#if __x86_64
-static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
-#endif
 Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
     Locker lock(threadsLock()); threads()<<this; // Adds this thread to global thread list
     this->priority=priority;
 }
+
+#if PTHREAD
+static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
+void Thread::spawn() { pthread_create(&thread,0,&::run,this); }
+#elif __x86_64
+static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() {
-#if __x86_64
     const int stackSize = 1<<20;
     stack = Map(0,0,stackSize,Map::Read|Map::Write,Map::Private|Map::Anonymous);
     mprotect((void*)stack.data,0x1000,0);
     clone(::run,(void*)(stack.data+stackSize),CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
+}
 #else
+void Thread::spawn() {
     error("TODO: clone");
     run();
-#endif
 }
+#endif
+
 void Thread::run() {
     tid=gettid();
     if(priority!=20) check_(setpriority(0,0,priority));
@@ -117,14 +125,14 @@ bool Thread::processEvents() {
             }
         }
     }
-    while(unregistered){Locker lock(thread.lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
+    while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
     return terminate;
 }
 void Thread::event() {
     EventFD::read();
     if(queue){
         Poll* poll;
-        {Locker lock(thread.lock);
+        {Locker lock(this->lock);
             poll=queue.take(0);
             if(unregistered.contains(poll)) return;
         }
