@@ -3,8 +3,6 @@
 #include "array.h"
 #include "file.h"
 
-#define PTHREAD 1
-#if PTHREAD
 #define timespec timespec_
 #include <pthread.h>
 #undef timespec
@@ -38,59 +36,6 @@ struct Lock {
     /// Unlocks the mutex.
     inline void unlock() {pthread_mutex_unlock(&mutex);}
 };
-#elif 1
-#include <mutex>
-#include <condition_variable>
-
-/// A semaphore using std::mutex, std::condition_variable, and a counter
-struct Semaphore {
-    std::mutex mutex;
-    std::condition_variable condition;
-    long counter;
-    /// Creates a semaphore with \a count initial ressources
-    Semaphore(int count=0):counter(count){}
-    /// Acquires \a count ressources
-    inline bool acquire(int count) {mutex::scoped_lock lock(mutex); while(counter<count) condition.wait(lock); counter-=count;}
-    /// Atomically tries to acquires \a count ressources only if available
-    inline bool tryAcquire(int count) {mutex::scoped_lock lock(mutex); if(counter<count) return false; counter-=count; return true; }
-    /// Releases \a count ressources
-    inline void release(int count) {mutex::scoped_lock lock(mutex); counter+=count; condition.notify_one();}
-    /// Returns available ressources \a count
-    operator int() { return counter; }
-};
-#else
-/// A semaphore using futex
-struct Semaphore {
-    int futex;
-    /// Creates a semaphore with \a count initial ressources
-    Semaphore(int count=0):futex(count){}
-    /// Acquires \a count ressources
-    inline bool acquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(val<0) { wait(val); return true; } else return false; }
-    /// Atomically tries to acquires \a count ressources only if available
-    inline bool tryAcquire(int count) { int val=__sync_sub_and_fetch(&futex, count); if(val<0) { __sync_fetch_and_add(&futex,count); return false; } else return true; }
-    /// Waits for the semaphore
-    void wait(int val);
-    /// Releases \a count ressources
-    inline void release(int count) { int val=__sync_fetch_and_add(&futex, count); if(val<0) wake(); }
-    /// Wakes any thread waiting for the semaphore
-    void wake();
-    /// Returns available ressources \a count
-    operator int() { return futex; }
-};
-
-/// Lock is an initially released binary semaphore which can only be released by the acquiring thread
-struct Lock : Semaphore {
-    int owner=0;//keep same layout between debug/release
-    debug(void checkRecursion(); void setOwner(); void checkOwner();)
-    Lock():Semaphore(1){}
-    /// Locks the mutex.
-    inline void lock() { debug(checkRecursion();) acquire(1); debug(setOwner();) }
-    /// Atomically lock the mutex only if unlocked.
-    inline bool tryLock() { debug(checkRecursion();) if(tryAcquire(1)) { debug(setOwner();) return true; } else return false; }
-    /// Unlocks the mutex.
-    inline void unlock() { debug(checkOwner();) release(1); }
-};
-#endif
 
 /// Convenience class to automatically unlock a mutex
 struct Locker {
@@ -128,9 +73,7 @@ struct EventFD : Stream {
 
 /// Concurrently runs an event loop
 struct Thread : array<Poll*>, EventFD, Poll {
-#if PTHREAD
     pthread_t thread;
-#endif
     int tid=0,priority=0;
     bool terminate=0; // Flag to cleanly terminate a thread
     array<Poll*> queue; // Poll objects queued on this thread

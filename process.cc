@@ -31,26 +31,6 @@ static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer over
 void log_(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
-#if HEAP_TRACE
-static int heapSize=0;
-void heapTrace(int delta) { log(heapSize,"\t",delta); heapSize+=delta; }
-#endif
-
-#ifndef PTHREAD
-enum{FUTEX_WAIT,FUTEX_WAKE};
-enum{CLONE_VM=0x00000100,CLONE_FS=0x00000200,CLONE_FILES=0x00000400,CLONE_SIGHAND=0x00000800,CLONE_THREAD=0x00010000,CLONE_IO=0x80000000};
-
-// Semaphore
-void Semaphore::wait(int val) { int e; while((val=futex)<0 && (e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e],val,futex); }
-void Semaphore::wake() { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
-
-// Lock
-debug(
-        void Lock::setOwner() { assert(!owner,owner); owner=gettid(); }
-        void Lock::checkRecursion() { assert(owner!=gettid(),owner,gettid()); }
-        void Lock::checkOwner() { assert(owner==gettid(),owner,gettid()); owner=0; } )
-#endif
-
 // Poll
 void Poll::registerPoll() { thread+=this; thread.post(); }
 void Poll::unregisterPoll() {Locker lock(thread.lock); thread.unregistered<<this;}
@@ -84,23 +64,8 @@ Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     this->priority=priority;
 }
 
-#if PTHREAD
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { pthread_create(&thread,0,&::run,this); }
-#elif __x86_64
-static int run(void* thread) { ((Thread*)thread)->run(); return 0; }
-void Thread::spawn() {
-    const int stackSize = 1<<20;
-    stack = Map(0,0,stackSize,Map::Read|Map::Write,Map::Private|Map::Anonymous);
-    mprotect((void*)stack.data,0x1000,0);
-    clone(::run,(void*)(stack.data+stackSize),CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_IO,this);
-}
-#else
-void Thread::spawn() {
-    error("TODO: clone");
-    run();
-}
-#endif
 
 void Thread::run() {
     tid=gettid();
