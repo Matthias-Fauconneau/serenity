@@ -2,7 +2,7 @@
 /// \file x.h X11 protocol
 #include "core.h"
 
-struct sockaddr_un { uint16 family=1; char path[108]; };
+struct sockaddr_un { uint16 family=1; char path[108]={}; };
 enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 
 #define fixed(T) packed ; static_assert(sizeof(T)==31,"")
@@ -44,31 +44,31 @@ struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; 
                       uint mask=BackgroundPixmap|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
                                         uint backgroundPixmap=0,borderPixel=0, bitGravity=10, winGravity=10, overrideRedirect, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
-struct SetWindowCursor { int8 req=2; uint16 size=4; uint window, mask=Cursor; uint cursor; };
+struct SetWindowCursor { int8 req=2, pad=0; uint16 size=4; uint window, mask=Cursor; uint cursor; };
 struct GetWindowAttributes { int8 req=3; uint16 size=2; uint window; };
 struct GetWindowAttributesReply { int8 backingStore; uint16 seq; uint length, visual; int16 class_; int8 bit,win; uint planes, pixel; int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; uint colormap, allEventMask, yourEventMask; int16 nopropagate, pad; } packed;
 struct DestroyWindow { int8 req=4; uint16 size=2; uint id; };
-struct MapWindow { int8 req=8; uint16 size=2; uint id;};
-struct UnmapWindow { int8 req=10; uint16 size=2; uint id;};
-struct ConfigureWindow { int8 req=12; uint16 size=8; uint id; int16 mask=X|Y|W|H|StackMode,pad; uint x,y,w,h,stackMode; };
-struct SetPosition { int8 req=12; uint16 size=5; uint id; int16 mask=X|Y,pad; uint x,y; };
-struct SetSize { int8 req=12; uint16 size=5; uint id; int16 mask=W|H,pad; uint w,h; };
-struct SetGeometry { int8 req=12; uint16 size=7; uint id; int16 mask=X|Y|W|H,pad; uint x,y,w,h; };
-struct RaiseWindow { int8 req=12; uint16 size=4; uint id; int16 mask=StackMode,pad; uint stackMode=Above; };
-struct GetGeometry{ int8 req=14; uint16 size=2; uint id; };
+struct MapWindow { int8 req=8, pad=0; uint16 size=2; uint id;};
+struct UnmapWindow { int8 req=10, pad=0; uint16 size=2; uint id;};
+struct ConfigureWindow { int8 req=12, pad=0; uint16 size=8; uint id; int16 mask=X|Y|W|H|StackMode,pad2=0; uint x,y,w,h,stackMode; };
+struct SetPosition { int8 req=12, pad=0; uint16 size=5; uint id; int16 mask=X|Y,pad2=0; uint x,y; };
+struct SetSize { int8 req=12, pad=0; uint16 size=5; uint id; int16 mask=W|H,pad2=0; uint w,h; };
+struct SetGeometry { int8 req=12, pad=0; uint16 size=7; uint id; int16 mask=X|Y|W|H,pad2=0; uint x,y,w,h; };
+struct RaiseWindow { int8 req=12, pad=0; uint16 size=4; uint id; int16 mask=StackMode, pad3=0; uint stackMode=Above; };
+struct GetGeometry{ int8 req=14, pad=0; uint16 size=2; uint id; };
 struct GetGeometryReply { byte depth; uint16 seq; uint length; uint root; int16 x,y,w,h,border; byte pad[10]; } fixed(GetGeometryReply);
-struct QueryTree { int8 req=15, pad; uint16 size=2; uint id; };
+struct QueryTree { int8 req=15, pad=0; uint16 size=2; uint id; };
 struct QueryTreeReply { byte pad; uint16 seq; uint length; uint root,parent; uint16 count; byte pad2[14]; } fixed(QueryTreeReply);
-struct InternAtom { int8 req=16,exists=0; uint16 size=2; int16 length, pad; };
+struct InternAtom { int8 req=16,exists=0; uint16 size=2; int16 length, pad=0; };
 struct InternAtomReply { byte pad; uint16 seq; uint length,atom; byte pad2[20]; } fixed(InternAtomReply);
-struct GetAtomName { int8 req=17,pad; uint16 size=2; uint atom; };
+struct GetAtomName { int8 req=17,pad=0; uint16 size=2; uint atom; };
 struct GetAtomNameReply { byte pad; uint16 seq; uint length; uint16 size; byte pad2[22]; } fixed(GetAtomNameReply);
-struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint window,property,type; uint8 format; uint length; };
+struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint window,property,type; uint8 format,pad[3]={}; uint length; };
 struct GetProperty { int8 req=20,remove=0; uint16 size=6; uint window,property,type=0; uint offset=0,length=-1; };
 struct GetPropertyReply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length,pad[3]; } fixed(GetPropertyReply);
-struct GetSelectionOwner { uint8 req=23,pad; uint16 size=2; uint selection=1; };
+struct GetSelectionOwner { uint8 req=23,pad=0; uint16 size=2; uint selection=1; };
 struct GetSelectionOwnerReply { uint8 pad; uint16 seq; uint size; uint owner, pad2[5]; } fixed(GetSelectionOwnerReply);
-struct ConvertSelection { uint8 req=24,pad; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
+struct ConvertSelection { uint8 req=24,pad=0; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
 struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; XEvent event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
 struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
@@ -78,15 +78,15 @@ struct ReplayKeyboard { int8 req=35, mode=5; uint16 size=2; uint time=0; };
 struct ReplayPointer { int8 req=35, mode=2; uint16 size=2; uint time=0; };
 struct SetInputFocus { int8 req=42,revertTo=1; uint16 size=3; uint window=1; uint time=0; };
 struct CreatePixmap { int8 req=53,depth=32; uint16 size=4; uint pixmap,window; int16 w,h; };
-struct FreePixmap { int8 req=54,pad; uint16 size=2; uint pixmap; };
-struct CreateGC { int8 req=55,pad; uint16 size=4; uint context,window,mask=0; };
-struct CopyArea { int8 req=62,pad; uint16 size=7; uint src,dst,gc; int16 srcX,srcY,dstX,dstY,w,h; };
-struct PutImage { int8 req=72,format=2; uint16 size=6; uint drawable,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad; };
+struct FreePixmap { int8 req=54,pad=0; uint16 size=2; uint pixmap; };
+struct CreateGC { int8 req=55,pad=0; uint16 size=4; uint context,window,mask=0; };
+struct CopyArea { int8 req=62,pad=0; uint16 size=7; uint src,dst,gc; int16 srcX,srcY,dstX,dstY,w,h; };
+struct PutImage { int8 req=72,format=2; uint16 size=6; uint drawable,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad=0; };
 struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint colormap,window,visual; };
-struct FreeCursor { int8 req=95,pad; uint16 size=2; uint cursor; };
-struct QueryExtension { int8 req=98,pad; uint16 size=2, length, pad2; };
+struct FreeCursor { int8 req=95,pad=0; uint16 size=2; uint cursor; };
+struct QueryExtension { int8 req=98,pad=0; uint16 size=2, length, pad2=0; };
 struct QueryExtensionReply { byte pad; uint16 seq; uint length; uint8 present,major,firstEvent,firstError; byte pad2[20]; } fixed(QueryExtensionReply);
-struct GetKeyboardMapping { int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad; };
+struct GetKeyboardMapping { int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad=0; };
 struct GetKeyboardMappingReply { uint8 numKeySymsPerKeyCode; uint16 seq; uint length; byte pad[24]; } fixed(GetKeyboardMappingReply);
 
 constexpr ref<byte> requests[] = {"0"_,"CreateWindow"_,"ChangeWindowAttributes"_,"GetWindowAttributes"_,"DestroyWindow"_,"DestroySubwindows"_,"ChangeSaveSet"_,"ReparentWindow"_,"MapWindow"_,"MapSubwindows"_,"UnmapWindow"_,"UnmapSubwindows"_,"ConfigureWindow"_,"CirculateWindow"_,"GetGeometry"_,"QueryTree"_,"InternAtom"_,"GetAtomName"_,"ChangeProperty"_,"DeleteProperty"_,"GetProperty"_,"ListProperties"_,"SetSelectionOwner"_,"GetSelectionOwner"_,"ConvertSelection"_,"SendEvents"_,"GrabPointer"_,"UngrabPointer"_,"GrabButton"_,"UngrabButton"_,"ChangeActivePointerGrab"_,"GrabKeyboard"_,"UngrabKeyboard"_,"GrabKey"_,"UngrabKey"_,"AllowEvents"_,"GrabServer"_,"UngrabServer"_,"QueryPointer"_,"GetMotionEvents"_,"TranslateCoordinates"_,"WarpPointer"_,"SetInputFocus"_,"GetInputFocus"_,"QueryKeymap"_,"OpenFont"_,"CloseFont"_,"QueryFont"_,"QueryTextElements"_,"ListFonts"_,"ListFontsWithInfo"_,"SetFontPath"_,"GetFontPath"_,"CreatePixmap"_,"FreePixmap"_,"CreateGC"_,"ChangeGC"_,"CopyGC"_,"SetDashes"_,"SetClipRectangles"_,"FreeGC"_,"ClearArea"_,"CopyArea"_,"CopyPlane"_,"PolyPoint"_,"PolyLine"_,"PolySegment"_,"PolyRectange"_,"PolyArc"_,"FillPoly"_,"PolyFillRectangle"_,"PolyFillArc"_,"PutImage"_};
@@ -102,7 +102,7 @@ namespace Shm {
 extern int EXT, event, errorBase;
 struct QueryVersion { int8 ext=EXT, req=0; uint16 size=1; };
 struct QueryVersionReply { int8 sharedPixmaps; uint16 seq; uint length; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
-struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]; };
+struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]={}; };
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
 struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 W, H, srcX=0, srcY=0, w, h,
                   dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };

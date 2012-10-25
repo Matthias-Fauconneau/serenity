@@ -20,7 +20,7 @@ string getSelection() { assert(current); return current->getSelection(); }
 // Creates X window
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread)
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true) {
-    string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
+    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
     if(check(connect(Socket::fd,&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;
@@ -135,7 +135,7 @@ void Window::event() {
 
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;
-    } else while(poll()) {
+    } else {
         uint8 type = read<uint8>();
         processEvent(type, read<XEvent>());
         while(eventQueue) { QEvent e=eventQueue.take(0); processEvent(e.type, e.event); }
@@ -276,7 +276,10 @@ void Window::setGeometry(int2 position, int2 size) {
     else if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
     else if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
 }
-void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));}{RaiseWindow r; r.id=id; send(raw(r));}}
+void Window::show() {
+    {MapWindow r; r.id=id; send(raw(r));}
+    {RaiseWindow r; r.id=id; send(raw(r));}
+}
 void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
 void Window::render() { if(mapped) queue(); }
 
@@ -345,7 +348,7 @@ string Window::getSelection() {
 // Cursor
 ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move)
 const Image& Window::cursorIcon(Window::Cursor cursor) {
-    static constexpr const Image& (*icons[])() = { arrowIcon, horizontalIcon, verticalIcon, fdiagonalIcon, bdiagonalIcon, moveIcon }; return icons[cursor]();
+    static const Image icons[] = { arrowIcon(), horizontalIcon(), verticalIcon(), fdiagonalIcon(), bdiagonalIcon(), moveIcon() }; return icons[cursor];
 }
 int2 Window::cursorHotspot(Window::Cursor cursor) {
     static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15) }; return hotspots[cursor];

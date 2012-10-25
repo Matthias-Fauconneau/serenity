@@ -71,9 +71,9 @@ struct PDFScore : PDF {
 };
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
-struct Music : Widget {
+struct Music {
     Folder folder __("Sheets"_);
-    ICON(music) Window window __(this,int2(0,0),"Piano"_,musicIcon());
+    ICON(music) Window window __(&sheets,int2(0,0),"Piano"_,musicIcon());
     List<Text> sheets;
 
     MidiFile midi;
@@ -86,10 +86,7 @@ struct Music : Widget {
     AudioOutput audio __({&sampler, &Sampler::read},thread,true);
     Sequencer input __(thread);
 
-    ~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"conservative"_); }
     Music() {
-        writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
-
         array<string> files = folder.list(Files);
         for(string& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
@@ -101,7 +98,6 @@ struct Music : Widget {
         sheets.itemPressed.connect(this,&Music::openSheet);
 
         sampler.open("/Samples/Salamander.sfz"_);
-        sampler.progressChanged.connect(this,&Music::showProgress);
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&score,&Score::noteEvent);
@@ -129,23 +125,10 @@ struct Music : Widget {
         window.localShortcut(Insert).connect(&score,&Score::insert);
         window.localShortcut(Delete).connect(&score,&Score::remove);
         window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
-    }
 
-    /// Shows samples loading progress. When loaded, displays any loaded sheet and starts audio output.
-    int current=0,count=0;
-    void showProgress(int current, int count) {
-        if(current==count) {
-            showSheetList();
-            audio.start();
-        } else if(count!=this->count) window.setSize(int2(count,512));
-        this->current=current, this->count=count;
-        window.render();
-    }
-    void render(int2 position, int2 size) {
-        if(current!=count) {
-            Progress(0,count,current).render(position,size);
-            if(sampler.lock && sampler.lock<sampler.full) Text(string(dec(100*sampler.lock/sampler.full)+"%"_)).render(position,size);
-        }
+        showSheetList();
+        audio.start();
+        thread.spawn();
     }
 
     /// Called by score to scroll PDF as needed when playing

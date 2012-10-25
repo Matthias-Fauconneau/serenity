@@ -127,7 +127,7 @@ void Text::layout() {
     textSize=int2(0,size);
     TextLayout layout(text, size, wrap);
 
-    characters.clear();
+    characters.clear(); characters.reserve(layout.text.size());
     for(TextLayout::Character o: layout.text) {
         const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
         Character c __(int2(o.pos)+glyph.offset, share(glyph.image));

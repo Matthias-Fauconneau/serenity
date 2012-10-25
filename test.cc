@@ -1,3 +1,11 @@
+#if 1
+#include "sequencer.h"
+struct MIDITest {
+    Thread thread __(-20);
+    Sequencer input __(thread);
+} test;
+#endif
+
 #if 0
 #include "process.h"
 #include "window.h"

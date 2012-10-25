@@ -95,14 +95,8 @@ void Sampler::open(const ref<byte>& path) {
     new (&resampler[1]) Resampler(2, 1024, round(1024*exp2((-1)/12.0)));
     for(int i=0;i<3;i++) notes[i].reserve(128);
 
-    // Lock compressed samples in memory
-    full=0; for(const Sample& s : samples) full += (s.map.size+4095)/4096*4;
-    available = availableMemory() - ((samples.size()*(1<<12)*2*sizeof(float))>>10) /*predecoded samples*/ - (256<<10) /*heap*/;
-    if(full>available) {
-        lock=0; for(const Sample& s : samples) lock += min(s.map.size/4096*4,available*1024/samples.size()/4096*4);
-        log("Locking",lock/1024,"MiB of",available/1024,"MiB available memory, full cache need",full/1024,"MiB");
-    } else log("Locking",full/1024,"MiB of",available/1024,"MiB available memory");
-    current=0; queue();
+    // Predecode 4K (10ms) and lock compressed samples in memory
+    for(Sample& s: samples) s.cache.decode(1<<12), s.map.lock();
 }
 
 /// Input events (realtime thread)
@@ -169,6 +163,7 @@ void Sampler::noteEvent(int key, int velocity) {
                 if(notes.size()==notes.capacity()) {Locker lock(noteWriteLock); notes.reserve(notes.capacity()+1); log("size",notes.capacity());}
                 notes << move(note);
             }
+            queue(); //queue background decoder in main thread
             return;
         }
     }
@@ -205,16 +200,6 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     }
 
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
-
-    if(current<samples.size()) {
-        Sample& s=samples[current++];
-        uint size = s.map.size;
-        if(full>available) size=min(size, available*1024/samples.size());
-        //current=samples.size();
-        debug(current=samples.size(); if(0)) s.cache.decode(1<<12);//, s.map.lock(size);
-        progressChanged(current,samples.size());
-        if(current<samples.size()) queue();
-    }
 }
 
 /// Audio mixer (realtime thread)

@@ -39,7 +39,7 @@ void heapTrace(int delta) { log(heapSize,"\t",delta); heapSize+=delta; }
 #endif
 
 // Semaphore
-void Semaphore::wait(int val) { int e; while((e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e]); }
+void Semaphore::wait(int val) { int e; while((val=futex)<0 && (e=check__(::futex(&futex,FUTEX_WAIT,val,0,0,0)))) log(errno[-e],val,futex); }
 void Semaphore::wake() { check_(::futex(&futex,FUTEX_WAKE,1,0,0,0),futex); }
 
 // Lock
@@ -82,7 +82,8 @@ Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
     Locker lock(threadsLock()); threads()<<this; // Adds this thread to global thread list
     this->priority=priority;
-    if(priority == 20) return; //escape code for main thread (already spawned)
+}
+void Thread::spawn() {
 #if __x86_64
     const int stackSize = 1<<20;
     stack = Map(0,0,stackSize,Map::Read|Map::Write,Map::Private|Map::Anonymous);
@@ -146,6 +147,7 @@ static void handler(int sig, siginfo* info, ucontext* ctx) {
     string s = trace(1,(void*)ctx->ip);
     if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
+    if(sig==SIGABRT) log("Aborted");
     if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr);
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->fault.addr));
     if(sig==SIGTERM) log("Terminated");
@@ -171,6 +173,7 @@ void __attribute((constructor(101))) setup_signals() {
         uint mask[2] = {0,0};
     } sa;
     check_(sigaction(SIGFPE, &sa, 0, 8));
+    check_(sigaction(SIGABRT, &sa, 0, 8));
     check_(sigaction(SIGSEGV, &sa, 0, 8));
     check_(sigaction(SIGTERM, &sa, 0, 8));
     check_(sigaction(SIGTRAP, &sa, 0, 8));
@@ -220,14 +223,13 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     else { enum{WNOHANG=1}; wait4(pid,0,WNOHANG,0); }
 }
 
-ref<byte> getenv(const ref<byte>& name) {
-    static string environ = File("proc/self/environ"_).readUpTo(4096);
-    for(TextData s(environ);s;) {
+string getenv(const ref<byte>& name) {
+    for(TextData s = File("proc/self/environ"_).readUpTo(4096);s;) {
         ref<byte> key=s.until('='); ref<byte> value=s.until('\0');
-        if(key==name) return value;
+        if(key==name) return string(value);
     }
     warn("Undefined environment variable"_, name);
-    return ""_;
+    return string();
 }
 
 array< ref<byte> > arguments() {
@@ -235,6 +237,6 @@ array< ref<byte> > arguments() {
     return split(section(arguments,0,1,-1),0);
 }
 
-const Folder& home() { static Folder home=getenv("HOME"_); return home; }
+const Folder& home() { static Folder home(getenv("HOME"_)); return home; }
 const Folder& config() { static Folder config=Folder(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache=Folder(".cache"_,home(),true); return cache; }

@@ -199,4 +199,4 @@ constexpr ref<byte> errno[] = {"OK"_, "PERM"_, "NOENT"_, "SRCH"_, "INTR"_, "IO"_
 /// Aborts if \a expr is negative and logs corresponding error code (unused result)
 #define check_(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) warn(#expr ""_, errno[-e], ##message); })
 /// Aborts if \a expr is negative and logs corresponding error code (unless EINTR or EAGAIN)
-#define check__(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST && -e!=INTR) warn(#expr ""_, errno[-e], ##message); e; })
+#define check__(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST && -e!=INTR && -e!=AGAIN) warn(#expr ""_, errno[-e], ##message); e; })

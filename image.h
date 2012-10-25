@@ -50,8 +50,7 @@ Image decodeImage(const ref<byte>& file);
 /// \note an icon with the same name must be linked by the build system
 ///       'ld -r -b binary -o name.o name.png' can be used to embed a file in the binary
 #define ICON(name) \
-static const Image& name ## Icon() { \
+static Image name ## Icon() { \
     extern byte _binary_icons_## name ##_png_start[]; extern byte _binary_icons_## name ##_png_end[]; \
-    static Image icon = decodeImage(array<byte>(_binary_icons_## name ##_png_start, _binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start)); \
-    return icon; \
+    return decodeImage(array<byte>(_binary_icons_## name ##_png_start, _binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start)); \
 }

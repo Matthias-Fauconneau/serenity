@@ -114,7 +114,7 @@ struct Map : ref<byte> {
     move_operator(Map):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
     ~Map();
     /// Locks memory map in RAM
-    void lock(uint size) const;
+    void lock(uint size=-1) const;
 };
 
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links

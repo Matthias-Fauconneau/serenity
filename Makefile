@@ -5,6 +5,7 @@ BUILD ?= release
 ifeq ($(CC),cc)
  ifeq ($(TARGET),music)
   CC := g++ -fabi-version=0 -march=native
+  #CC := clang++ -march=native -faddress-sanitizer
  else
   CC := clang++ -march=native
  endif

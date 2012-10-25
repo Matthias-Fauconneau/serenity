@@ -13,7 +13,6 @@ void Sequencer::event() {
     uint8 value=0;
     if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value=read<uint8>();
     else error("Unhandled MIDI event"_);
-
     if(type == NoteOn) {
         if(value == 0 ) {
             if(!pressed.contains(key)) return; //pressed even before the device was opened

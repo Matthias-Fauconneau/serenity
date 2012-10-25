@@ -50,10 +50,10 @@ struct Poll : pollfd {
     no_copy(Poll);
     Thread& thread; /// Thread monitoring this pollfd
     /// Allows to queue using \a wait method and \a event callback
-    Poll(Thread& thread=mainThread()):thread(thread){}
+    Poll(Thread& thread=mainThread()):____(pollfd{0,0,0},)thread(thread){}
     void registerPoll();
     /// Registers \a fd to be polled in the event loop
-    Poll(int fd, int events=POLLIN, Thread& thread=mainThread()):____(pollfd{fd,(short)events},)thread(thread){}
+    Poll(int fd, int events=POLLIN, Thread& thread=mainThread()):____(pollfd{fd,(short)events,0},)thread(thread){}
     /// Removes \a fd from the event loop
     void unregisterPoll();
     ~Poll(){unregisterPoll();}
@@ -77,8 +77,9 @@ struct Thread : array<Poll*>, EventFD, Poll {
     array<Poll*> unregistered; // Poll objects removed while in event loop
     Lock lock;
     Map stack;
-    /// Spawns a thread running an event loop with the given \a priority
     Thread(int priority=0);
+    /// Spawns a thread running an event loop with the given \a priority
+    void spawn();
     /// Processes all events on \a polls and tasks on \a queue until #terminate is set
     void run();
     /// Processes all events on \a polls and tasks on \a queue
@@ -97,7 +98,7 @@ void yield();
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);
 
 /// Returns value for environment variable \a name
-ref<byte> getenv(const ref<byte>& name);
+string getenv(const ref<byte>& name);
 
 /// Returns command line arguments
 array< ref<byte> > arguments();

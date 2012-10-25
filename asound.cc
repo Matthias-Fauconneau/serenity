@@ -10,9 +10,9 @@ enum Intervals { SampleBits, FrameBits, Channels, Rate, PeriodTime, PeriodSize, 
 enum Flags { NoResample=1, ExportBuffer=2, NoPeriodWakeUp=4 };
 
 struct Interval {
-    uint min, max; uint openmin:1, openmax:1, integer:1, empty:1;
-    Interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0){}
-    Interval(uint exact):min(exact),max(exact),openmin(0),openmax(0),integer(1),empty(0){}
+    uint min, max; uint openmin:1, openmax:1, integer:1, empty:1, pad:28;
+    Interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0),pad(0){}
+    Interval(uint exact):min(exact),max(exact),openmin(0),openmax(0),integer(1),empty(0),pad(0){}
     operator uint() { assert(integer); assert(min==max); return max; }
 };
 struct Mask {
@@ -25,9 +25,9 @@ struct HWParams {
     Mask mres[5];
     Interval intervals[12];
     Interval ires[9];
-    uint rmask, cmask, info, msbits, rate_num, rate_den;
-    long fifo_size;
-    byte reserved[64];
+    uint rmask=0, cmask=0, info=0, msbits=0, rate_num=0, rate_den=0;
+    long fifo_size=0;
+    byte reserved[64]={};
     Interval& interval(int i) { assert(i<12); return intervals[i]; }
     Mask& mask(int i) { assert(i<3); return masks[i]; }
 };

@@ -37,7 +37,6 @@ struct Sample {
 struct Sampler : Poll {
     /// Opens a .sfz instrument and maps all its samples
     void open(const ref<byte>& path); array<Sample> samples;
-    uint full=0,available=0,lock=0,current=0; signal<int, int> progressChanged; //decode start buffer for all samples
 
     /// Receives MIDI note events
     void noteEvent(int key, int velocity);
@@ -46,7 +45,7 @@ struct Sampler : Poll {
     array<Note> notes[3]; // Active notes (currently being sampled)
 
     /// Callback to decode samples
-    void event();
+    void event() override;
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer (TODO: reverb)
     bool read(ptr& swPointer, int16* output, uint size);

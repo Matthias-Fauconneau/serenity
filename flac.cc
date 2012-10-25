@@ -154,7 +154,7 @@ uint64 rice=0, predict=0, order=0;
 void FLAC::decodeFrame() {
     assert(blockSize && blockSize<buffer.capacity);
     int allocSize = align(4096,blockSize);
-    float* block[2] = {allocate16<float>(allocSize),allocate16<float>(allocSize)};
+    float block[2][allocSize];
     setRoundMode(Down);
     for(int channel=0;channel<2;channel++) {
         int rawSampleSize = sampleSize; //one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
@@ -175,8 +175,9 @@ void FLAC::decodeFrame() {
         }
 
         double predictor[32]; uint order;
-        double* even = allocate16<double>(allocSize);
-        double* odd = allocate16<double>(allocSize+1)+1;
+        double buffer1[blockSize]; double* even = buffer1;
+        double buffer2[blockSize+1]; double* odd = buffer2+1;
+        if(ptr(even)%16) odd=buffer1, even=buffer2+1;
         float* signal = block[channel];
 
         if (type >= 32) { //LPC
@@ -244,8 +245,6 @@ void FLAC::decodeFrame() {
         switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
         #undef o
         int t=rice*48000/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
-        unallocate(even,allocSize);
-        odd-=1; unallocate(odd,allocSize+1);
     }
     setRoundMode(Even);
     index=align(8,index);
@@ -260,7 +259,6 @@ void FLAC::decodeFrame() {
         interleave<4>(channelMode,block[0],block[1],buffer+writeIndex,buffer+writeIndex+blockSize);
         writeIndex += blockSize;
     }
-    unallocate(block[0],allocSize); unallocate(block[1],allocSize);
     if(index<bsize) parseFrame(); else blockSize=0;
     //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }

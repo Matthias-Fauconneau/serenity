@@ -15,7 +15,7 @@ struct Sequencer : Device, Poll {
     int lastTick=0;
     File record=0;
 
-    Sequencer(Thread& thread);
+    Sequencer(Thread& thread=mainThread());
     void setRecord(bool record);
     void event();
     void recordMID(const ref<byte>& path);

@@ -22,10 +22,12 @@ struct Font {
     map<uint, map<uint16, Glyph> > cache;
 
     Font(){}
+    move_operator(Font):keep(move(o.keep)),data(move(o.data)),face(o.face),fontSize(o.fontSize),ascender(o.ascender),cache(move(o.cache)){ o.face=0; }
     /// Loads font at /a path scaled to /a size pixels high
     Font(const File& file, int size);
     /// Loads font /a data scaled to /a size pixels high
     Font(array<byte>&& data, int size=0);
+    ~Font();
     /// Loads font /a data scaled to /a size pixels high
     void load(const ref<byte>& data, int size);
     /// Sets font size
