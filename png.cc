@@ -10,7 +10,7 @@ template<class T> struct luma { T i; operator byte4() const {return byte4 __(i,i
 
 typedef vector<rgb,uint8,3> rgb3;
 
-template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride) {
+template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
     typedef vector<T,uint8,N> S;
     typedef vector<T,int,N> V;
 #if __clang__
@@ -18,17 +18,17 @@ template<template<typename> class T, int N> void unfilter(byte4* dst, const byte
 #else
     S prior[width]; clear(prior,width,S(0));
 #endif
-    for(int y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
+    for(uint y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);
         S* src = (S*)raw;
         S a=0;
-        if(filter==0) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]=      src[i];
-        if(filter==1) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]= a= a+src[i];
-        if(filter==2) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]=      prior[i]+src[i];
-        if(filter==3) for(int i=0;i<width;i++) dst[xStride*i]= prior[i]= a= S((V(prior[i])+V(a))/2)+src[i];
+        if(filter==0) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]=      src[i];
+        if(filter==1) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]= a= a+src[i];
+        if(filter==2) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]=      prior[i]+src[i];
+        if(filter==3) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]= a= S((V(prior[i])+V(a))/2)+src[i];
         if(filter==4) {
             V b=0;
-            for(int i=0;i<width;i++) {
+            for(uint i=0;i<width;i++) {
                 V c = b;
                 b = V(prior[i]);
                 V d = V(a) + b - c;
@@ -39,25 +39,25 @@ template<template<typename> class T, int N> void unfilter(byte4* dst, const byte
         }
     }
 }
-template void unfilter<luma,1>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
-template void unfilter<ia,2>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
-template void unfilter<rgb,3>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
-template void unfilter<rgba,4>(byte4* dst, const byte* raw, int width, int height, int xStride, int yStride);
+template void unfilter<luma,1>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
+template void unfilter<ia,2>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
+template void unfilter<rgb,3>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
+template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
 
 Image decodePNG(const ref<byte>& file) {
     BinaryData s(array<byte>(file.data,file.size), true);
     if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { warn("Invalid PNG"); return Image(); }
     array<byte> buffer;
-    uint width=0,height=0,depth=0; uint8 type=0, interlace=0;
-    ref<byte> palette;
+    uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
+    array<byte4> palette; bool alpha=false;
     for(;;) {
         uint32 size = s.read();
         uint32 tag = s.read<uint32>();
         if(tag == raw<uint32>("IHDR"_)) {
             width = s.read(), height = s.read();
-            uint8 unused bitDepth = s.read();
-            if(bitDepth!=8){ warn("Unsupported PNG bit depth"_,bitDepth,width,height); return Image(); }
-            type = s.read(); depth = (int[])__(1,0,3,1,2,0,4)[type]; assert(depth>0&&depth<=4,type);
+            bitDepth = s.read(); if(bitDepth!=8 && bitDepth != 4){ warn("Unsupported PNG depth"_,bitDepth,width,height); return Image(); }
+            type = s.read(); ____(depth = (int[])__(1,0,3,1,2,0,4)[type];) assert(depth>0&&depth<=4,type);
+            alpha = depth==2||depth==4;
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
             interlace = s.read();
@@ -68,14 +68,35 @@ Image decodePNG(const ref<byte>& file) {
             s.advance(4); //CRC
             break;
         } else if(tag == raw<uint32>("PLTE"_)) {
-            palette = s.read<byte>(size);
+            ref<rgb3> plte = s.read<rgb3>(size/3);
+            palette.reserve(plte.size); palette.setSize(plte.size);
+            for(uint i: range(plte.size)) palette[i]=plte[i];
+        }  else if(tag == raw<uint32>("tRNS"_)) {
+            ref<byte> trns = s.read<byte>(size);
+            assert(trns.size<=palette.size());
+            for(uint i: range(trns.size)) palette[i].a=trns[i];
+            alpha=true;
         } else {
             s.advance(size);
         }
         s.advance(4); //CRC
         assert(s);
     }
-    const array<byte> data = inflate(buffer, true);
+    array<byte> data = inflate(buffer, true);
+    if(bitDepth==4) {
+        assert(depth==1,depth);
+        assert(width%2==0);
+        if(data.size() != height*(1+width*depth*bitDepth/8)) { warn("Invalid PNG",data.size(),height*(1+width*depth),width,height,depth); return Image(); }
+        const byte* src = data.data();
+        array<byte> bytes; bytes.grow(height*(1+width*depth));
+        byte* dst = bytes.data();
+        for(uint y=0;y<height;y++) {
+            dst[0] = src[0]; src++; dst++;
+            for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
+            src+=width/2; dst += width;
+        }
+        data = move(bytes);
+    }
     if(data.size() < height*(1+width*depth)) { warn("Invalid PNG",data.size(),height*(1+width*depth),width,height,depth); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
@@ -102,10 +123,9 @@ Image decodePNG(const ref<byte>& file) {
     }
     if(type==3) {
         assert(palette);
-        rgb3* lookup = (rgb3*)palette.data;
-        for(uint i: range(width*height)) image[i]=lookup[image[i][0]];
+        for(uint i: range(width*height)) image[i]=palette[image[i][0]];
     }
-    return Image(image,width,height,width,true,depth==2||depth==4);
+    return Image(image,width,height,width,true,alpha);
 }
 
 uint32 crc32(const ref<byte>& data) {

@@ -132,12 +132,14 @@ struct Music {
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float previous, float current, float next) {
+    void nextStaff(float unused previous, float current, float unused next) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
-            pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.ScrollArea::size.y));
+            //pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.ScrollArea::size.y));
+            pdfScore.center(int2(0,scale*current));
         }
-        midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
+        //midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
+        midiScore.center(int2(0,current));
     }
 
     /// Toggles MIDI playing

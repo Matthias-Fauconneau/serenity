@@ -55,39 +55,41 @@ struct Desktop {
     HBox applets;// __(&feeds, &timeBox, &shortcuts);
     Window window __(&applets,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
     Window browser __(0,0,"Browser"_);
-    ICON(shutdown)
     Desktop() {
         if(!existsFile("launcher"_,config())) warn("No launcher settings [.config/launcher]");
         else {
             auto apps = readFile("launcher"_,config());
-            for(const ref<byte>& path: split(apps,'\n')) {
-                if(startsWith(path,"#"_)) continue;
-                if(!existsFile(path)) { warn("Missing settings","'"_+path+"'"_); continue; }
-                string file = readFile(path);
+            for(const ref<byte>& desktop: split(apps,'\n')) {
+                if(startsWith(desktop,"#"_)) continue;
+                if(!existsFile(desktop)) { warn("Missing settings","'"_+desktop+"'"_); continue; }
+                string file = readFile(desktop);
                 map<ref<byte>,ref<byte> > entries = readSettings(file);
 
-                static constexpr ref<byte> iconPaths[4] = {
+                static constexpr ref<byte> iconPaths[] = {
                     "/usr/share/pixmaps/"_,
-                    "/usr/share/icons/oxygen/$size/apps/"_,
-                    "/usr/share/icons/hicolor/$size/apps/"_,
-                    "/usr/local/share/icons/hicolor/$size/apps/"_
+                    "/usr/share/icons/oxygen/32x32/apps/"_,
+                    "/usr/share/icons/hicolor/32x32/apps/"_,
+                    "/usr/share/icons/oxygen/32x32/actions/"_,
                 };
                 Image icon;
                 for(const ref<byte>& folder: iconPaths) {
-                    string path = replace(folder,"$size"_,"32x32"_)+entries["Icon"_]+".png"_;
+                    string path = folder+entries["Icon"_]+".png"_;
                     if(existsFile(path)) { icon=resize(decodeImage(readFile(path)), 32,32); break; }
                 }
-                assert(icon,replace(iconPaths[1],"$size"_,"32x32"_)+entries["Icon"_]+".png"_);
+                assert(icon,entries["Icon"_]);
                 string exec = string(section(entries["Exec"_],' '));
-                if(!existsFile(exec)) exec="/usr/bin/"_+exec;
-                if(!existsFile(exec)) { warn("Executable not found",exec); continue; }
+                string path = copy(exec);
+                if(!existsFile(path)) path="/usr/bin/"_+exec;
+                if(!existsFile(path)) path="/usr/local/bin/"_+exec;
+                if(!existsFile(path)) path="/bin/"_+exec;
+                if(!existsFile(path)) path="/sbin/"_+exec;
+                if(!existsFile(path)) { warn("Executable not found",exec); continue; }
                 array<string> arguments;  arguments<<string(section(entries["Exec"_],' ',1,-1));
                 for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
                 for(uint i=0; i<arguments.size();) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
-                shortcuts << Command(move(icon),string(entries["Name"_]),move(exec),move(arguments));
+                shortcuts << Command(move(icon),string(entries["Name"_]),move(path),move(arguments));
             }
         }
-        shortcuts<<Command(share(shutdownIcon()),string("Shutdown"_),string("/sbin/poweroff"_),__());
 
         timeBox<<&clock<<&calendar;
         applets<<&feeds<<&timeBox<<&shortcuts;

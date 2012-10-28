@@ -12,21 +12,22 @@ Image resize(const Image& image, uint width, uint height) {
     if(width==image.width && height==image.height) return copy(image);
     Image target(width, height, image.alpha);
     byte4* dst = (byte4*)target.data;
-    if(image.width/width==image.height/height && !(image.width%width) && !(image.height%height)) { //integer box
+    if(image.width/width==image.height/height && image.width%width<=1 && image.height%height<=1) { //integer box
         const byte4* src = image.data;
         int scale = image.width/width;
         for(uint unused y: range(height)) {
+            const byte4* line = src;
             for(uint unused x: range(width)) {
                 int4 s=0; //TODO: alpha blending
                 for(uint i: range(scale)) {
                     for(uint j: range(scale)) {
-                        s+= int4(src[i*image.stride+j]);
+                        s+= int4(line[i*image.stride+j]);
                     }
                 }
                 *dst = byte4(s/(scale*scale));
-                src+=scale, dst++;
+                line+=scale, dst++;
             }
-            src += (scale-1)*image.stride;
+            src += scale*image.stride;
         }
     } else {
         Image mipmap;

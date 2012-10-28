@@ -32,6 +32,7 @@ LIBS_player = mpg123
 LIBS_ffmpeg = avformat avcodec
 LIBS_http = ssl
 LIBS_sequencer = asound
+LIBS_process = pthread
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

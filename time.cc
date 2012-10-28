@@ -44,15 +44,14 @@ Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),d
     debug(invariant();)
 }
 bool Date::summerTime() const { //FIXME: always European Summer Time
-    int lastMarchSunday = 30-Date(30,March,year).weekDay; assert(year==2012 && lastMarchSunday==25, lastMarchSunday); // after 01:00 UTC on the last Sunday in March
-    int lastOctoberSunday = 30-Date(30,October,year).weekDay; assert(year==2012 && lastOctoberSunday==28, lastOctoberSunday); // until 01:00 UTC on the last Sunday in October
+    int lastMarchSunday = 31-1-(Date(31-1,March,year).weekDay+1)%7; assert(year==2012 && lastMarchSunday==25-1); // after 01:00 UTC on the last Sunday in March
+    int lastOctoberSunday = 31-1-(Date(31-1,October,year).weekDay+1)%7; // until 01:00 UTC on the last Sunday in October
     return    (month>March    || (month==March    && (day>lastMarchSunday    || (day==lastMarchSunday    && hours>=1))))
             && (month<October || (month==October && (day<lastOctoberSunday || (day==lastOctoberSunday && hours<  1))));
 }
 int Date::localTimeOffset() const {
     int offset = 1; //FIXME: always Central European Time (UTC+1)
     if(summerTime()) offset += 1;
-    else error("TESTME");
     return offset*60;
 }
 Date::Date(long time) {

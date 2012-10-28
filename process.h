@@ -3,15 +3,24 @@
 #include "array.h"
 #include "file.h"
 
-#define timespec timespec_
-#include <pthread.h>
-#undef timespec
-#undef CLOCK_REALTIME
-#undef CLOCK_THREAD_CPUTIME_ID
+typedef unsigned long int pthread;
+struct pthread_mutex { int lock; uint count; int owner; uint nusers; int kind, spins; void* prev,*next; };
+struct pthread_cond { int lock; uint futex; uint64 total_seq, wakeup_seq, woken_seq; void* mutex; uint nwaiters; uint broadcast_seq; };
+extern "C" {
+int pthread_create(pthread* thread, void* attr, void *(*start_routine)(void*), void* arg);
+int pthread_mutex_init(pthread_mutex* mutex, const void* attr);
+int pthread_mutex_trylock(pthread_mutex* mutex);
+int pthread_mutex_lock(pthread_mutex* mutex);
+int pthread_mutex_unlock(pthread_mutex* mutex);
+int pthread_cond_init(pthread_cond* cond, const void* attr);
+int pthread_cond_wait(pthread_cond* cond, pthread_mutex* mutex);
+int pthread_cond_signal(pthread_cond* cond);
+}
+
 /// A semaphore using POSIX mutex, POSIX condition variable, and a counter
 struct Semaphore {
-    pthread_mutex_t mutex;
-    pthread_cond_t condition;
+    pthread_mutex mutex;
+    pthread_cond condition;
     long counter;
     /// Creates a semaphore with \a count initial ressources
     Semaphore(int count=0):counter(count){pthread_mutex_init(&mutex,0); pthread_cond_init(&condition,0);}
@@ -27,7 +36,7 @@ struct Semaphore {
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock {
-    pthread_mutex_t mutex;
+    pthread_mutex mutex;
     Lock(){pthread_mutex_init(&mutex,0);}
     /// Locks the mutex.
     inline void lock() {pthread_mutex_lock(&mutex);}
@@ -73,7 +82,7 @@ struct EventFD : Stream {
 
 /// Concurrently runs an event loop
 struct Thread : array<Poll*>, EventFD, Poll {
-    pthread_t thread;
+    pthread thread;
     int tid=0,priority=0;
     bool terminate=0; // Flag to cleanly terminate a thread
     array<Poll*> queue; // Poll objects queued on this thread

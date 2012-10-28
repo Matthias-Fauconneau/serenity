@@ -63,7 +63,6 @@ Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     Locker lock(threadsLock()); threads()<<this; // Adds this thread to global thread list
     this->priority=priority;
 }
-
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { pthread_create(&thread,0,&::run,this); }
 
