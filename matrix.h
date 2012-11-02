@@ -2,6 +2,21 @@
 /// file matrix.h 2D linear and affine transformation matrices
 #include "vector.h"
 
+template<int M, int N> inline string str(const float a[M*N]) {
+    string s; s<<"\n["_;
+    for(int i=0;i<M;i++) {
+        if(N==1) s = s+"\t"_+str(a[i*M+0]);
+        else {
+            for(int j=0;j<N;j++) {
+                s = s+"\t"_+str(a[i*M+j]);
+            }
+            if(i<M-1) s=s+"\n"_;
+        }
+    }
+    s<<" ]"_;
+    return s;
+}
+
 /// 2D linear transformation
 struct mat2 {
     float m11, m12, m21, m22;
@@ -11,8 +26,6 @@ struct mat2 {
     mat2 operator*(mat2 m) const { return mat2( m11*m.m11 + m12*m.m21, m11*m.m12 + m12*m.m22,
                                                 m21*m.m11 + m22*m.m21, m21*m.m12 + m22*m.m22); }
 };
-inline bool operator==(const mat2& a,const mat2& b) { return a.m11==b.m11 && a.m12==b.m12 && a.m21==b.m21 && a.m22==b.m22; }
-inline string str(const mat2& a) { return str("\n["_,a.m11,a.m12,"\n ",a.m21,a.m22,']'); }
 
 /// 2D affine transformation
 struct mat32 {
@@ -26,16 +39,22 @@ struct mat32 {
     vec2 operator*(vec2 v) const { return vec2( m11*v.x + m21*v.y + dx, m12*v.x + m22*v.y + dy ); }
 };
 
+/// 2D projective transformation or 3D linear transformation
 struct mat3 {
     float data[3*3];
+    mat3() { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) m(i,i)=1; }
     float& m(int i, int j) { return data[j*3+i]; }
     float& operator()(int i, int j) { return m(i,j); }
+    vec2 operator*(vec2 v) { vec2 r(0,0); for(int i=0;i<2;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+1*m(i,2); return r; }
     vec3 operator*(vec3 v) { vec3 r(0,0,0); for(int i=0;i<3;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2); return r; }
+    void translate(vec2 v) { for(int i=0;i<2;i++) m(i,2) += m(i,0)*v.x + m(i,1)*v.y; }
+    void scale(vec2 v) { for(int j=0;j<2;j++) for(int i=0;i<3;i++) m(i,j)*=v[j]; }
 };
+inline string str(const mat3& m) { return str<3,3>(m.data); }
 
 struct mat4 {
     float data[4*4];
-    mat4(int d=1) { for(int i=0;i<16;i++) data[i]=0; if(d!=0) for(int i=0;i<4;i++) m(i,i)=d; }
+    mat4(int d=1) { for(int i=0;i<4*4;i++) data[i]=0; if(d != 0) for(int i=0;i<4;i++) m(i,i)=d; }
     float m(int i, int j) const { return data[j*4+i]; }
     float& m(int i, int j) { return data[j*4+i]; }
     float operator()(int i, int j) const { return m(i,j); }
