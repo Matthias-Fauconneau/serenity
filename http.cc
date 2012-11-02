@@ -35,10 +35,10 @@ extern "C" {
 }
 SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port) {
     assert(host!=uint(-1));
-    if(secure) {
+    if(secure && fd) {
         static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
         ssl = SSL_new(ctx);
-        SSL_set_fd(ssl,Socket::fd);
+        SSL_set_fd(ssl, fd);
         SSL_connect(ssl);
     }
 }

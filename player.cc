@@ -119,8 +119,8 @@ struct Player {
     }
 
 // Interface
-    ICON(play) ICON(pause) ToggleButton playButton __(share(playIcon()), share(pauseIcon()));
-    ICON(next) TriggerButton nextButton __(share(nextIcon()));
+    ICON(play) ICON(pause) ToggleButton playButton __(playIcon(), pauseIcon());
+    ICON(next) TriggerButton nextButton __(nextIcon());
     Text elapsed __(string("00:00"_));
     Slider slider;
     Text remaining __(string("00:00"_));
@@ -227,7 +227,7 @@ struct Player {
         remaining.setText(string("00:00"_));
         titles.index=-1;
     }
-    void seek(int position) { if(media) media->seek(position); }
+    void seek(int position) { if(media) { media->seek(position); update(media->position(),media->duration()); } }
     void update(int position, int duration) {
         if(slider.value == position) return;
         writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));

@@ -48,3 +48,4 @@ test.cc
 png.h
 jpeg.h
 ico.h
+desktop.cc

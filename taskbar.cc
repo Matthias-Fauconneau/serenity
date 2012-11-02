@@ -114,7 +114,7 @@ struct Taskbar : Socket, Poll {
             if(i>=0) tasks.index=i;
         } else if(type==FocusOut) {
             {GrabButton r; r.window=e.focus.window; send(raw(r));}
-        } else if(type == UnmapNotify||type==DestroyNotify) { uint id=e.unmap.window;
+        } else if(type==DestroyNotify) { uint id=e.unmap.window;
             windows.removeAll(id);
             uint i = tasks.removeOne(id);
             if(i!=uint(-1) && tasks.index == i) tasks.index=tasks.indexOf(windows.last());
@@ -158,7 +158,7 @@ struct Taskbar : Socket, Poll {
                 if(getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_)==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
                 if(i<0) return;
             } else return;
-        } else if(type==CreateNotify||type==ConfigureNotify||type==ClientMessage||type==ReparentNotify||type==MappingNotify||type==FocusIn) {
+        } else if(type==CreateNotify||type==ConfigureNotify||type==UnmapNotify||type==ClientMessage||type==ReparentNotify||type==MappingNotify||type==FocusIn) {
         } else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
         if(previousIndex!=tasks.index || previousSize!=tasks.size()) window.render();
     }
