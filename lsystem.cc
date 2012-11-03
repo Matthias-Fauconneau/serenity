@@ -26,7 +26,8 @@ struct LSystem : Widget {
     struct Rule {
         byte edge; ref<byte> production;
         ref<byte> left,right; //context
-        Rule(byte edge, ref<byte> production, ref<byte> left=""_, ref<byte> right=""_):edge(edge),production(production),left(left),right(right){}
+        Rule(byte edge, ref<byte> production):edge(edge),production(production){}
+        Rule(ref<byte> left, byte edge, ref<byte> right, ref<byte> production):edge(edge),production(production),left(left),right(right){}
     };
     struct System {
        float angle;
@@ -50,7 +51,7 @@ struct LSystem : Widget {
                                    for(int j=i-1; path.size()<r.left.size && j>=0; j--) {
                                        byte c = code[j];
                                        if(c==']') { while(code[j]!='[') j--; continue; } // skip brackets
-                                       if(c=='+' || c=='-' || c=='[') continue;
+                                       if(c=='+' || c=='-' || c=='F' || c=='[') continue;
                                        path << c;
                                    }
                                    if(path!=r.left) continue;
@@ -60,7 +61,7 @@ struct LSystem : Widget {
                                    for(uint j=i+1; path.size()<r.right.size && j<code.size(); j++) {
                                        byte c = code[j];
                                        if(c=='[') { while(code[j]!=']') j++; continue; } // skip brackets
-                                       if(c=='+' || c=='-') continue;
+                                       if(c=='+' || c=='-' || c=='F') continue;
                                        path << c;
                                    }
                                    if(path!=r.right) continue;
@@ -69,6 +70,7 @@ struct LSystem : Widget {
                            matches << r.production;
                        }
                    }
+                   assert(matches.size()<=1);
                    if(matches) next << matches[random()%matches.size()];
                    else next << c;
                }
@@ -80,7 +82,7 @@ struct LSystem : Widget {
     array<System> systems;
 
     Window window __(this,int2(0,0),"L-System"_);
-    uint current=0, level=0; bool label=true;
+    uint current=0, level=4; bool label=false;
 
     LSystem() {
         systems <<
@@ -104,9 +106,65 @@ struct LSystem : Widget {
                    // Stochastic
                    System(PI/7,"F"_, Rule('F',"F[+F]F[-F]F"_), Rule('F',"F[+F]F"_), Rule('F',"F[-F]F"_)) <<
                    // Context sensitive
-                   System(PI/2,"BAAAAAAAA"_, Rule('A',"B"_,"B"_), Rule('B',"A"_)) << //Wave propagation
-                   System(PI/3,"B[+A]A[-A]A[+A]A"_,Rule('A',"B"_,"B"_,""_)) << //Acropetal signal
-                   System(PI/3,"A[+A]A[-A]A[+A]B"_,Rule('A',"B"_,""_,"B"_)); //Basipetal signal
+                   System(PI/2,"BAAAAAAAA"_, Rule("B"_,'A',""_,"B"_), Rule('B',"A"_)) << //Wave propagation
+                   System(PI/3,"B[+A]A[-A]A[+A]A"_,Rule("B"_,'A',""_,"B"_)) << //Acropetal signal
+                   System(PI/3,"A[+A]A[-A]A[+A]B"_,Rule(""_,'A',"B"_,"B"_)) << //Basipetal signal
+                   //Hogeweg and Hesper plants
+                   System(PI/8,"F1F1F1"_,
+                          Rule("0"_,'0',"0"_,"0"_),
+                          Rule("0"_,'0',"1"_,"1[+F1F1]"_),
+                          Rule("0"_,'1',"0"_,"1"_),
+                          Rule("0"_,'1',"1"_,"1"_),
+                          Rule("1"_,'0',"0"_,"0"_),
+                          Rule("1"_,'0',"1"_,"1F1"_),
+                          Rule("1"_,'1',"0"_,"0"_),
+                          Rule("1"_,'1',"1"_,"0"_),
+                          Rule(""_,'+',""_,"-"_),
+                          Rule(""_,'-',""_,"+"_)) <<
+                   System(PI/8,"F1F1F1"_,
+                          Rule("0"_,'0',"0"_,"1"_),
+                          Rule("0"_,'0',"1"_,"1[-F1F1]"_),
+                          Rule("0"_,'1',"0"_,"1"_),
+                          Rule("0"_,'1',"1"_,"1"_),
+                          Rule("1"_,'0',"0"_,"0"_),
+                          Rule("1"_,'0',"1"_,"1F1"_),
+                          Rule("1"_,'1',"0"_,"1"_),
+                          Rule("1"_,'1',"1"_,"0"_),
+                          Rule(""_,'+',""_,"-"_),
+                          Rule(""_,'-',""_,"+"_)) <<
+                   System(PI/7,"F1F1F1"_,
+                          Rule("0"_,'0',"0"_,"0"_),
+                          Rule("0"_,'0',"1"_,"1"_),
+                          Rule("0"_,'1',"0"_,"0"_),
+                          Rule("0"_,'1',"1"_,"1[+F1F1]"_),
+                          Rule("1"_,'0',"0"_,"0"_),
+                          Rule("1"_,'0',"1"_,"1F1"_),
+                          Rule("1"_,'1',"0"_,"0"_),
+                          Rule("1"_,'1',"1"_,"0"_),
+                          Rule(""_,'+',""_,"-"_),
+                          Rule(""_,'-',""_,"+"_)) <<
+                   System(PI/7,"F0F1F1"_,
+                          Rule("0"_,'0',"0"_,"1"_),
+                          Rule("0"_,'0',"1"_,"0"_),
+                          Rule("0"_,'1',"0"_,"0"_),
+                          Rule("0"_,'1',"1"_,"1F1"_),
+                          Rule("1"_,'0',"0"_,"1"_),
+                          Rule("1"_,'0',"1"_,"1[+F1F1]"_),
+                          Rule("1"_,'1',"0"_,"1"_),
+                          Rule("1"_,'1',"1"_,"0"_),
+                          Rule(""_,'+',""_,"-"_),
+                          Rule(""_,'-',""_,"+"_)) <<
+                   System(PI/8,"F1F1F1"_,
+                          Rule("0"_,'0',"0"_,"0"_),
+                          Rule("0"_,'0',"1"_,"1[-F1F1]"_),
+                          Rule("0"_,'1',"0"_,"1"_),
+                          Rule("0"_,'1',"1"_,"1"_),
+                          Rule("1"_,'0',"0"_,"0"_),
+                          Rule("1"_,'0',"1"_,"1F1"_),
+                          Rule("1"_,'1',"0"_,"1"_),
+                          Rule("1"_,'1',"1"_,"0"_),
+                          Rule(""_,'+',""_,"-"_),
+                          Rule(""_,'-',""_,"+"_));
 
         /*debug(
         for(int unused level: range(9)) log(systems.last().generate(level));
@@ -115,9 +173,9 @@ struct LSystem : Widget {
 
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; window.render();});
-        window.localShortcut(Key(KP_Add)).connect([this]{if(level<16) level++; window.render();});
-        window.localShortcut(Key(LeftArrow)).connect([this]{if(current>0){ current--; level=0; } window.render();});
-        window.localShortcut(Key(RightArrow)).connect([this]{if(current<systems.size()-1){ current++; level=0; } window.render();});
+        window.localShortcut(Key(KP_Add)).connect([this]{if(level<32) level++; window.render();});
+        window.localShortcut(Key(LeftArrow)).connect([this]{if(current>0){ current--; if(level>4) level=4; } window.render();});
+        window.localShortcut(Key(RightArrow)).connect([this]{if(current<systems.size()-1){ current++; if(level>4) level=4; } window.render();});
         window.localShortcut(Key(' ')).connect([this]{label=!label; window.render();});
         debug(current=systems.size()-1);
     }
@@ -137,9 +195,9 @@ struct LSystem : Widget {
             else if(command=='+') { state.heading=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*state.heading; }
             else if(command=='[') { stack << state; }
             else if(command==']') { state = stack.pop(); }
-            else { // all other letters are "forward" (uppercase draws a line)
+            else if(command>='A' && command<='Z') { // uppercase letters move forwards drawing a line
                 vec2 next = state.position+state.heading;
-                if(command>='A' && command<='Z') lines << Line __(command,state.position,next);
+                lines << Line __(command,state.position,next);
                 state.position = next;
                 min=::min(min,state.position);
                 max=::max(max,state.position);
@@ -154,7 +212,6 @@ struct LSystem : Widget {
         for(Line line: lines) {
             vec2 a=m*line.a, b=m*line.b;
             ::line(a.x,window.y-a.y,b.x,window.y-b.y);
-            //::line(round(a.x),round(window.y-a.y),round(b.x),round(window.y-b.y));
             vec2 c = (a+b)/2.f;
             if(label) Text(string(str(line.label))).render(int2(round(c.x),round(window.y-c.y)));
         }

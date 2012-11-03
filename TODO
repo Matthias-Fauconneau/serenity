@@ -1,3 +1,5 @@
+L-System
+Apps: tiling WM, standalone feed reader
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, truetype, ssl
