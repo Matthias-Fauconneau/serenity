@@ -209,6 +209,7 @@ struct Player {
     void next() {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
+        else if(albums.count()) playAlbum(albums.index=0);
         else { window.setTitle("Player"_); stop(); return; }
         //titles.ensureVisible(titles.active());
     }
