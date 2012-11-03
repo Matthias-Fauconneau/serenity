@@ -1,4 +1,4 @@
-// TODO: 3D, wide lines, polygons
+// TODO: 3D, wide lines, polygons, instances, navigation
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -23,15 +23,15 @@ struct Random {
 
 /// Bracketed, deterministic, context-free L-system
 struct LSystem : Widget {
-    Window window __(this,int2(1050,1050),"Koch"_);
+    Window window __(this,int2(0,0),"Koch"_);
     static constexpr int nofCurve=16, maxLevel=20;
     int curve=0+debug(nofCurve-1), level=4;
     LSystem() {
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
         window.localShortcut(Key(KP_Sub)).connect([this]{level=(level+maxLevel-1)%maxLevel; window.render();});
         window.localShortcut(Key(KP_Add)).connect([this]{level=(level+1)%maxLevel; window.render();});
-        window.localShortcut(Key(LeftArrow)).connect([this]{curve=(curve+nofCurve-1)%nofCurve; window.render();});
-        window.localShortcut(Key(RightArrow)).connect([this]{curve=(curve+1)%nofCurve; window.render();});
+        window.localShortcut(Key(LeftArrow)).connect([this]{curve=(curve+nofCurve-1)%nofCurve; level=min(4,level); window.render();});
+        window.localShortcut(Key(RightArrow)).connect([this]{curve=(curve+1)%nofCurve; level=min(4,level); window.render();});
     }
     void render(int2, int2 window) override {
         this->window.setTitle(string("#"_+dec(curve)+"@"_+dec(level)));
@@ -93,7 +93,7 @@ struct LSystem : Widget {
         }
         mat3 m;
         vec2 size = max-min;
-        float scale = ::min(window.x,window.y)/::max(size.x,size.y);
+        float scale = ::min(window.x/size.x,window.y/size.y);
         m.scale(scale);
         vec2 margin = vec2(window)/scale-size;
         m.translate(-min+margin/2.f);
