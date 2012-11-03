@@ -1,11 +1,3 @@
-#if 1
-#include "sequencer.h"
-struct MIDITest {
-    Thread thread __(-20);
-    Sequencer input __(thread);
-} test;
-#endif
-
 #if 0
 #include "process.h"
 #include "window.h"
@@ -362,7 +354,7 @@ struct HTMLTest {
 } test;
 #endif
 
-#if 0
+#if 1
 #include "window.h"
 #include "calendar.h"
 #include "png.h"
@@ -381,8 +373,8 @@ struct WeekViewTest : Widget {
             }
             array< ::Event> events = getEvents(Date());
             uint min=-1,max=0;
-            for(::Event& e: events) if(e.date.day==-1) min=::min(min,floor(60,time(e.date))), max=::max(max,ceil(60,time(e.end)));
-            for(::Event& e: events) if(e.date.day==-1) { // Displays only events recurring weekly
+            for(const ::Event& e: events) if(e.date.day==-1 && e.date.weekDay!=-1 && e.end!=e.date) min=::min(min,floor(60,time(e.date))), max=::max(max,ceil(60,time(e.end)));
+            for(const ::Event& e: events) if(e.date.day==-1 && e.date.weekDay!=-1 && e.end!=e.date) { // Displays only events recurring weekly
                 int x = e.date.weekDay*w;
                 int begin = y+(size.y-y)*(time(e.date)-min)/(max-min);
                 fill(position+int2(x,begin-2)+Rect(int2(w,3)));
@@ -392,7 +384,7 @@ struct WeekViewTest : Widget {
                 fill(position+int2(x+w-2,begin)+Rect(int2(3,end-begin)));
                 Text time(str(e.date,"hh:mm"_)+(e.date!=e.end?string("-"_+str(e.end,"hh:mm"_)):string()),64);
                 time.render(position+int2(x, begin+3),int2(w,0));
-                Text title(move(e.title),64);
+                Text title(copy(e.title),64);
                 title.render(position+int2(x, begin),int2(w,end-begin));
             }
         }

@@ -15,7 +15,7 @@ template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define move_operator(T) T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
 #define default_move(T) T(){} T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&&)____(=default)
 /// base template for explicit copy (overriden by explicitly copyable types)
-template<class T> T copy(const T& t) { return t; }
+template<class T> T copy(const T& o) { return o; }
 
 // Forward
 namespace std {

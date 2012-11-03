@@ -196,7 +196,7 @@ void Score::parse() {
         int l = abs(tie.b.x-tie.a.x);
         uint staff=0; for(;staff<staffs.size()-1 && tie.a.y>staffs[staff];staff++) {}
         int noteBetween=0; Tie t;
-        for(uint i=staff-1;i<staff+1;i++) {
+        for(uint i=staff>0?staff-1:0;i<staff+1;i++) {
             for(int x : notes[i].keys) {
                 int lx = x-tie.a.x;
                 int rx = x-tie.b.x;
@@ -233,7 +233,7 @@ alreadyTied: ;
                     }
 #endif
                     /// Detect right note of a tie
-                    if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                    if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>=-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
                         //debug[vec2(x,-y-24)]=string("R"_+str(rx,ry));

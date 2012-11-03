@@ -26,7 +26,6 @@ struct Score {
     array<Line> trills;
 
     struct Note {
-        //Note() : index(1), duration(1) {}
         Note(int index, int duration) : index(index), duration(duration) {}
         int index,duration,scoreIndex=-1;
     };
