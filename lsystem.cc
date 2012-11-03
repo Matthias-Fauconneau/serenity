@@ -5,39 +5,42 @@
 #include "text.h"
 #include "matrix.h"
 
-/// Deterministic, context-free L-System (DOL)
+/// Bracketed, deterministic, context-free L-system
 struct LSystem : Widget {
-    Window window __(this,int2(1024,1024),"Koch"_);
+    Window window __(this,int2(1050,1050),"Koch"_);
+    static constexpr int nofCurve=15, maxLevel=20;
+    int curve=0+debug(nofCurve-1), level=4;
     LSystem() {
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
-        window.localShortcut(Key(KP_Sub)).connect([this]{level=(level+20-1)%20; window.render();});
-        window.localShortcut(Key(KP_Add)).connect([this]{level=(level+1)%20; window.render();});
-        window.localShortcut(Key(LeftArrow)).connect([this]{curve=(curve+8-1)%8; window.render();});
-        window.localShortcut(Key(RightArrow)).connect([this]{curve=(curve+1)%8; window.render();});
+        window.localShortcut(Key(KP_Sub)).connect([this]{level=(level+maxLevel-1)%maxLevel; window.render();});
+        window.localShortcut(Key(KP_Add)).connect([this]{level=(level+1)%maxLevel; window.render();});
+        window.localShortcut(Key(LeftArrow)).connect([this]{curve=(curve+nofCurve-1)%nofCurve; window.render();});
+        window.localShortcut(Key(RightArrow)).connect([this]{curve=(curve+1)%nofCurve; window.render();});
     }
-    int curve=0, level=4;
     void render(int2, int2 window) override {
         this->window.setTitle(string("#"_+dec(curve)+"@"_+dec(level)));
         map<byte,ref<byte>> rules;
         string code;
+        float angle;
         switch(curve) {
-#define koch(i,generator,axiom) case i: rules['F']=generator ""_; code = string(axiom ""_); break
-        koch(0,"F+F-F-F+F","-F");
-        koch(1,"F-F+F+FF-F-F+F","F-F-F-F");
-        koch(2,"FF-F-F-F-F-F+F","F-F-F-F");
-        koch(3,"FF-F-F-F-FF","F-F-F-F");
-        koch(4,"FF-F--F-F","F-F-F-F");
-        koch(5,"FrFllFrF","FllFllF");
-        case 6: { //Sierpinski gasket
-            rules['L']="RrLrR"_;
-            rules['R']="LlRlL"_;
-            code = string("R"_);
-        } break;
-        case 7: { //Dragon curve
-            rules['L']="L+R+"_;
-            rules['R']="-L-R"_;
-            code = string("L"_);
-        } break;
+#define simple(i,a,axiom,generator) case i: angle=PI/a; rules['F']=generator ""_; code = string(axiom ""_); break
+        simple(0,2,"-F", "F+F-F-F+F");
+        simple(1,2,"F-F-F-F", "F-F+F+FF-F-F+F");
+        simple(2,2,"F-F-F-F", "FF-F-F-F-F-F+F");
+        simple(3,2,"F-F-F-F", "FF-F-F-F-FF");
+        simple(4,2,"F-F-F-F", "FF-F--F-F");
+        simple(5,3,"F--F--F", "F+F--F+F");
+#define double(i,a,axiom,p1,r1,p2,r2) case i: angle=PI/a; rules[p1]=r1 ""_; rules[p2]=r2 ""_; code = string(axiom ""_); break
+        double(6,3,"R", 'L',"R+L+R", 'R',"L-R-L"); // Sierpinski gasket
+        double(7,2,"L", 'L',"L+R+", 'R',"-L-R"); // Dragon curve
+        double(8,3,"L", 'L',"L+R++R-L--LL-R+", 'R',"-L+RR++R+L--L-R"); // Hexagonal Gosper curve
+        // "Trees"
+        simple(9,7,"F", "F[+F]F[-F]F");
+        simple(10,9,"F", "F[+F]F[-F][F]");
+        simple(11,8,"F", "FF-[-F+F+F]+[+F-F-F]");
+        double(12,9,"X", 'X',"F[+X]F[-X]+X", 'F',"FF");
+        double(13,7,"X", 'X',"F[+X][-X]FX", 'F',"FF");
+        double(14,8,"X", 'X',"F-[[X]+X]+F[+FX]-X", 'F',"FF");
         }
         for(int unused i: range(level)) {
             string next;
@@ -47,22 +50,23 @@ struct LSystem : Widget {
             }
             code = move(next);
         }
-        vec2 position = vec2(0,0); vec2 heading = vec2(0,1);
-        float step=1, angle=PI/2;
+        struct State { vec2 position, heading; };
+        array<State> stack;
+        State state __(vec2(0,0), vec2(0,1));
         struct Line { vec2 a,b; };
         array<Line> lines;
         vec2 min=0,max=0;
         for(byte command : code) {
-            /**/  if(command=='-') { heading=mat2(cos(-angle),-sin(-angle),sin(-angle),cos(-angle))*heading; }
-            else if(command=='+') { heading=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*heading; }
-            else if(command=='l') { heading=mat2(cos(-PI/3),-sin(-PI/3),sin(-PI/3),cos(-PI/3))*heading; }
-            else if(command=='r') { heading=mat2(cos(PI/3),-sin(PI/3),sin(PI/3),cos(PI/3))*heading; }
+            /**/  if(command=='-') { state.heading=mat2(cos(-angle),-sin(-angle),sin(-angle),cos(-angle))*state.heading; }
+            else if(command=='+') { state.heading=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*state.heading; }
+            else if(command=='[') { stack << state; }
+            else if(command==']') { state = stack.pop(); }
             else { // all other letters are "forward" (uppercase draws a line)
-                vec2 next = position+step*heading;
-                if(command>='A' && command<='Z') lines << Line __(position,next);
-                position = next;
-                min=::min(min,position);
-                max=::max(max,position);
+                vec2 next = state.position+state.heading;
+                if(command>='A' && command<='Z') lines << Line __(state.position,next);
+                state.position = next;
+                min=::min(min,state.position);
+                max=::max(max,state.position);
             }
         }
         mat3 m;
