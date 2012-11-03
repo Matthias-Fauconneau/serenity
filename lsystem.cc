@@ -1,4 +1,4 @@
-// TODO: 3D, wide lines, polygons, instances, navigation
+// TODO: context sensitive, 3D, wide lines, polygons, instances, navigation
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -23,69 +23,123 @@ struct Random {
 
 /// Bracketed, deterministic, context-free L-system
 struct LSystem : Widget {
-    Window window __(this,int2(0,0),"Koch"_);
-    static constexpr int nofCurve=16, maxLevel=20;
-    int curve=0+debug(nofCurve-1), level=4;
+    struct Rule {
+        byte edge; ref<byte> production;
+        ref<byte> left,right; //context
+        Rule(byte edge, ref<byte> production, ref<byte> left=""_, ref<byte> right=""_):edge(edge),production(production),left(left),right(right){}
+    };
+    struct System {
+       float angle;
+       ref<byte> axiom;
+       array<Rule> rules;
+       System(float angle, ref<byte> axiom):angle(angle),axiom(axiom){}
+       template<class... Args> System(float angle, ref<byte> axiom, Rule rule, Args... args):System(angle,axiom,args ___){rules<<rule;}
+       array<byte> generate(int level) const {
+           array<byte> code = string(axiom);
+           for(int unused i: range(level)) {
+               array<byte> next;
+               for(uint i: range(code.size())) { byte c = code[i];
+                   array<ref<byte>> matches; bool sensitive=false;
+                   for(Rule r: rules) {
+                       //TODO: context sensitive matches
+                       if(r.edge==c) {
+                           if(r.left || r.right) {
+                               if(!sensitive) matches.clear(), sensitive=true;
+                               if(r.left) {
+                                   array<byte> path;
+                                   for(int j=i-1; path.size()<r.left.size && j>=0; j--) {
+                                       byte c = code[j];
+                                       if(c==']') { while(code[j]!='[') j--; continue; } // skip brackets
+                                       if(c=='+' || c=='-' || c=='[') continue;
+                                       path << c;
+                                   }
+                                   if(path!=r.left) continue;
+                               }
+                               if(r.right) {
+                                   array<byte> path;
+                                   for(uint j=i+1; path.size()<r.right.size && j<code.size(); j++) {
+                                       byte c = code[j];
+                                       if(c=='[') { while(code[j]!=']') j++; continue; } // skip brackets
+                                       if(c=='+' || c=='-') continue;
+                                       path << c;
+                                   }
+                                   if(path!=r.right) continue;
+                               }
+                           } else if(sensitive) continue;
+                           matches << r.production;
+                       }
+                   }
+                   if(matches) next << matches[random()%matches.size()];
+                   else next << c;
+               }
+               code = move(next);
+           }
+           return code;
+       }
+    };
+    array<System> systems;
+
+    Window window __(this,int2(0,0),"L-System"_);
+    uint current=0, level=0; bool label=true;
+
     LSystem() {
+        systems <<
+                // Abstract curves
+                   System(PI/2,"-F"_, Rule('F',"F+F-F-F+F"_)) <<
+                   System(PI/2,"F-F-F-F"_, Rule('F',"F-F+F+FF-F-F+F"_)) <<
+                   System(PI/2,"F-F-F-F"_, Rule('F',"FF-F-F-F-F-F+F"_)) <<
+                   System(PI/2,"F-F-F-F"_, Rule('F',"FF-F-F-F-FF"_)) <<
+                   System(PI/2,"F-F-F-F"_, Rule('F',"FF-F--F-F"_)) <<
+                   System(PI/3,"F--F--F"_, Rule('F',"F+F--F+F"_)) <<
+                   System(PI/3,"R"_, Rule('L',"R+L+R"_), Rule('R',"L-R-L"_)) << // Sierpinski gasket
+                   System(PI/2,"L"_, Rule('L',"L+R+"_), Rule('R',"-L-R"_)) << // Dragon curve
+                   System(PI/3,"L"_, Rule('L',"L+R++R-L--LL-R+"_), Rule('R',"-L+RR++R+L--L-R"_)) << // Hexagonal Gosper curve
+                   // Plants
+                   System(PI/7,"F"_, Rule('F',"F[+F]F[-F]F"_)) <<
+                   System(PI/9,"F"_, Rule('F',"F[+F]F[-F][F]"_)) <<
+                   System(PI/8,"F"_, Rule('F',"FF-[-F+F+F]+[+F-F-F]"_)) <<
+                   System(PI/9,"X"_, Rule('X',"F[+X]F[-X]+X"_), Rule('F',"FF"_)) <<
+                   System(PI/7,"X"_, Rule('X',"F[+X][-X]FX"_), Rule('F',"FF"_)) <<
+                   System(PI/8,"X"_, Rule('X',"F-[[X]+X]+F[+FX]-X"_), Rule('F',"FF"_)) <<
+                   // Stochastic
+                   System(PI/7,"F"_, Rule('F',"F[+F]F[-F]F"_), Rule('F',"F[+F]F"_), Rule('F',"F[-F]F"_)) <<
+                   // Context sensitive
+                   System(PI/2,"BAAAAAAAA"_, Rule('A',"B"_,"B"_), Rule('B',"A"_)) << //Wave propagation
+                   System(PI/3,"B[+A]A[-A]A[+A]A"_,Rule('A',"B"_,"B"_,""_)) << //Acropetal signal
+                   System(PI/3,"A[+A]A[-A]A[+A]B"_,Rule('A',"B"_,""_,"B"_)); //Basipetal signal
+
+        /*debug(
+        for(int unused level: range(9)) log(systems.last().generate(level));
+        exit();
+        )*/
+
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
-        window.localShortcut(Key(KP_Sub)).connect([this]{level=(level+maxLevel-1)%maxLevel; window.render();});
-        window.localShortcut(Key(KP_Add)).connect([this]{level=(level+1)%maxLevel; window.render();});
-        window.localShortcut(Key(LeftArrow)).connect([this]{curve=(curve+nofCurve-1)%nofCurve; level=min(4,level); window.render();});
-        window.localShortcut(Key(RightArrow)).connect([this]{curve=(curve+1)%nofCurve; level=min(4,level); window.render();});
+        window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; window.render();});
+        window.localShortcut(Key(KP_Add)).connect([this]{if(level<16) level++; window.render();});
+        window.localShortcut(Key(LeftArrow)).connect([this]{if(current>0){ current--; level=0; } window.render();});
+        window.localShortcut(Key(RightArrow)).connect([this]{if(current<systems.size()-1){ current++; level=0; } window.render();});
+        window.localShortcut(Key(' ')).connect([this]{label=!label; window.render();});
+        debug(current=systems.size()-1);
     }
+
     void render(int2, int2 window) override {
-        this->window.setTitle(string("#"_+dec(curve)+"@"_+dec(level)));
-        map<byte,array<ref<byte>>> rules;
-        string code;
-        float angle;
-        switch(curve) {
-#define simple(i,a,axiom,generator) case i: angle=PI/a; rules['F']<<generator ""_; code = string(axiom ""_); break
-        simple(0,2,"-F", "F+F-F-F+F");
-        simple(1,2,"F-F-F-F", "F-F+F+FF-F-F+F");
-        simple(2,2,"F-F-F-F", "FF-F-F-F-F-F+F");
-        simple(3,2,"F-F-F-F", "FF-F-F-F-FF");
-        simple(4,2,"F-F-F-F", "FF-F--F-F");
-        simple(5,3,"F--F--F", "F+F--F+F");
-#define double(i,a,axiom,p1,r1,p2,r2) case i: angle=PI/a; rules[p1]<<r1 ""_; rules[p2]<<r2 ""_; code = string(axiom ""_); break
-        double(6,3,"R", 'L',"R+L+R", 'R',"L-R-L"); // Sierpinski gasket
-        double(7,2,"L", 'L',"L+R+", 'R',"-L-R"); // Dragon curve
-        double(8,3,"L", 'L',"L+R++R-L--LL-R+", 'R',"-L+RR++R+L--L-R"); // Hexagonal Gosper curve
-        // Plants
-        simple(9,7,"F", "F[+F]F[-F]F");
-        simple(10,9,"F", "F[+F]F[-F][F]");
-        simple(11,8,"F", "FF-[-F+F+F]+[+F-F-F]");
-        double(12,9,"X", 'X',"F[+X]F[-X]+X", 'F',"FF");
-        double(13,7,"X", 'X',"F[+X][-X]FX", 'F',"FF");
-        double(14,8,"X", 'X',"F-[[X]+X]+F[+FX]-X", 'F',"FF");
-        // Stochastic
-        case 15: {
-            angle = PI/7;
-            code = string("F"_);
-            rules['F']<<"F[+F]F[-F]F"_<<"F[+F]F"_<<"F[-F]F"_;
-        } break;
-        }
-        for(int unused i: range(level)) {
-            string next;
-            for(char c: code) {
-                if(rules.contains(c)) next << rules[c][random()%rules[c].size()];
-                else next << c;
-            }
-            code = move(next);
-        }
+        this->window.setTitle(string("#"_+dec(current)+"@"_+dec(level)));
         struct State { vec2 position, heading; };
         array<State> stack;
         State state __(vec2(0,0), vec2(0,1));
-        struct Line { vec2 a,b; };
+        struct Line { byte label; vec2 a,b; };
         array<Line> lines;
         vec2 min=0,max=0;
-        for(byte command : code) {
+        const System& system = systems[current];
+        float angle = system.angle;
+        for(byte command : system.generate(level)) {
             /**/  if(command=='-') { state.heading=mat2(cos(-angle),-sin(-angle),sin(-angle),cos(-angle))*state.heading; }
             else if(command=='+') { state.heading=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*state.heading; }
             else if(command=='[') { stack << state; }
             else if(command==']') { state = stack.pop(); }
             else { // all other letters are "forward" (uppercase draws a line)
                 vec2 next = state.position+state.heading;
-                if(command>='A' && command<='Z') lines << Line __(state.position,next);
+                if(command>='A' && command<='Z') lines << Line __(command,state.position,next);
                 state.position = next;
                 min=::min(min,state.position);
                 max=::max(max,state.position);
@@ -101,6 +155,8 @@ struct LSystem : Widget {
             vec2 a=m*line.a, b=m*line.b;
             ::line(a.x,window.y-a.y,b.x,window.y-b.y);
             //::line(round(a.x),round(window.y-a.y),round(b.x),round(window.y-b.y));
+            vec2 c = (a+b)/2.f;
+            if(label) Text(string(str(line.label))).render(int2(round(c.x),round(window.y-c.y)));
         }
     }
 } application;
