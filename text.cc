@@ -196,7 +196,7 @@ bool TextInput::keyPress(Key key) {
         char c=0;
         if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
         else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';
-        else if(key==KP_Multiply) c='*'; else if(key==KP_Add) c='+'; else if(key==KP_Subtract) c='-'; else if(key==KP_Divide) c='/';
+        else if(key==KP_Multiply) c='*'; else if(key==KP_Add) c='+'; else if(key==KP_Sub) c='-'; else if(key==KP_Divide) c='/';
         else return false;
         text.insertAt(cursor++, c);
     }

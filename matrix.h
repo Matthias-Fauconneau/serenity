@@ -48,7 +48,7 @@ struct mat3 {
     vec2 operator*(vec2 v) { vec2 r(0,0); for(int i=0;i<2;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+1*m(i,2); return r; }
     vec3 operator*(vec3 v) { vec3 r(0,0,0); for(int i=0;i<3;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2); return r; }
     void translate(vec2 v) { for(int i=0;i<2;i++) m(i,2) += m(i,0)*v.x + m(i,1)*v.y; }
-    void scale(vec2 v) { for(int j=0;j<2;j++) for(int i=0;i<3;i++) m(i,j)*=v[j]; }
+    void scale(float f) { for(int j=0;j<2;j++)for(int i=0;i<3;i++) m(i,j)*=f; }
 };
 inline string str(const mat3& m) { return str<3,3>(m.data); }
 

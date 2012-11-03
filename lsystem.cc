@@ -5,66 +5,76 @@
 #include "text.h"
 #include "matrix.h"
 
-#if 0
-struct Koch : Widget {
+/// Deterministic, context-free L-System (DOL)
+struct LSystem : Widget {
     Window window __(this,int2(1024,1024),"Koch"_);
-    int max=0;
     LSystem() {
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
-        window.localShortcut(Key(' ')).connect([this]{max=(max+1)%8; window.render();});
+        window.localShortcut(Key(KP_Sub)).connect([this]{level=(level+20-1)%20; window.render();});
+        window.localShortcut(Key(KP_Add)).connect([this]{level=(level+1)%20; window.render();});
+        window.localShortcut(Key(LeftArrow)).connect([this]{curve=(curve+8-1)%8; window.render();});
+        window.localShortcut(Key(RightArrow)).connect([this]{curve=(curve+1)%8; window.render();});
     }
-    void render(int2 position, int2 size) override {
-        window.setTitle(dec(max));
-        array<vec2> state, generator;
-        if(0) { //Triangle Koch
-            state
-                    << vec2(cos(1*PI/6),sin(1*PI/6))
-                    << vec2(cos(5*PI/6),sin(5*PI/6))
-                    << vec2(cos(9*PI/6),sin(9*PI/6))
-                    << vec2(cos(1*PI/6),sin(1*PI/6));
-            generator << vec2(0,0) << vec2(1./3,0) << vec2(1./3+cos(PI/3)/3,-sin(PI/3)/3) << vec2(2./3,0) << vec2(1,0);
-        } else { //Quadratic Koch
-            state << vec2(-1,0) << vec2(1,0);
-            generator << vec2(0,0) << vec2(1./4,0) << vec2(1./4,1./4) << vec2(2./4,1./4) << vec2(2./4,0)
-                      << vec2(2./4,-1./4) << vec2(3./4,-1./4) << vec2(3./4,0) << vec2(1,0);
-        }
-        for(int unused i: range(max)) {
-            array<vec2> next;
-            vec2 A=state.first();
-            for(vec2 B : state.slice(1)) {
-                for(vec2 p : generator) {
-                    next << A+p.x*(B-A)+p.y*normal(B-A);
-                }
-                A=B;
-            }
-            state = move(next);
-        }
-        vec2 A=state.first();
-        mat3 m; m.translate(vec2(position+size/2)); m.scale(vec2(size/2));
-        for(vec2 B: state.slice(1)) {
-            line(m*A,m*B);
-            A=B;
-        }
-    }
-} application;
-#endif
-
-/// Deterministic, context-free L-System (DOL)
-struct LSystem {
-    LSystem() {
+    int curve=0, level=4;
+    void render(int2, int2 window) override {
+        this->window.setTitle(string("#"_+dec(curve)+"@"_+dec(level)));
         map<byte,ref<byte>> rules;
-        rules['l']="Lr"_;
-        rules['r']="lR"_;
-        rules['L']="l"_;
-        rules['R']="r"_;
-        string state ("r"_);
-        for(int unused i: range(8)) {
+        string code;
+        switch(curve) {
+#define koch(i,generator,axiom) case i: rules['F']=generator ""_; code = string(axiom ""_); break
+        koch(0,"F+F-F-F+F","-F");
+        koch(1,"F-F+F+FF-F-F+F","F-F-F-F");
+        koch(2,"FF-F-F-F-F-F+F","F-F-F-F");
+        koch(3,"FF-F-F-F-FF","F-F-F-F");
+        koch(4,"FF-F--F-F","F-F-F-F");
+        koch(5,"FrFllFrF","FllFllF");
+        case 6: { //Sierpinski gasket
+            rules['L']="RrLrR"_;
+            rules['R']="LlRlL"_;
+            code = string("R"_);
+        } break;
+        case 7: { //Dragon curve
+            rules['L']="L+R+"_;
+            rules['R']="-L-R"_;
+            code = string("L"_);
+        } break;
+        }
+        for(int unused i: range(level)) {
             string next;
-            for(char c: state) {
-                next << rules[c];
+            for(char c: code) {
+                if(rules.contains(c)) next << rules[c];
+                else next << c;
             }
-            state = move(next);
-            log(state);
+            code = move(next);
+        }
+        vec2 position = vec2(0,0); vec2 heading = vec2(0,1);
+        float step=1, angle=PI/2;
+        struct Line { vec2 a,b; };
+        array<Line> lines;
+        vec2 min=0,max=0;
+        for(byte command : code) {
+            /**/  if(command=='-') { heading=mat2(cos(-angle),-sin(-angle),sin(-angle),cos(-angle))*heading; }
+            else if(command=='+') { heading=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*heading; }
+            else if(command=='l') { heading=mat2(cos(-PI/3),-sin(-PI/3),sin(-PI/3),cos(-PI/3))*heading; }
+            else if(command=='r') { heading=mat2(cos(PI/3),-sin(PI/3),sin(PI/3),cos(PI/3))*heading; }
+            else { // all other letters are "forward" (uppercase draws a line)
+                vec2 next = position+step*heading;
+                if(command>='A' && command<='Z') lines << Line __(position,next);
+                position = next;
+                min=::min(min,position);
+                max=::max(max,position);
+            }
+        }
+        mat3 m;
+        vec2 size = max-min;
+        float scale = ::min(window.x,window.y)/::max(size.x,size.y);
+        m.scale(scale);
+        vec2 margin = vec2(window)/scale-size;
+        m.translate(-min+margin/2.f);
+        for(Line line: lines) {
+            vec2 a=m*line.a, b=m*line.b;
+            ::line(a.x,window.y-a.y,b.x,window.y-b.y);
+            //::line(round(a.x),round(window.y-a.y),round(b.x),round(window.y-b.y));
         }
     }
 } application;

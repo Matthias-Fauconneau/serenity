@@ -6,7 +6,7 @@
 //#include "X11/keysymdef.h"
 enum Key {
     Escape=0xff1b, BackSpace=0xff08, Return=0xff0d, Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57, PrintScreen=0xff61, Execute, Insert,
-    KP_Enter=0xff8d, KP_Multiply=0xffaa, KP_Add, KP_Separator, KP_Subtract, KP_Decimal, KP_Divide, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
+    KP_Enter=0xff8d, KP_Multiply=0xffaa, KP_Add, KP_Separator, KP_Sub, KP_Decimal, KP_Divide, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
     Delete=0xffff,
     Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19, Power=0x1008ff2a
 };
