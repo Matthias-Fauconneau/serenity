@@ -1,4 +1,4 @@
-// TODO: parser, 3D, wide lines, polygons, instances, navigation
+// TODO: polygons (wide lines), parser
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -129,9 +129,9 @@ struct LSystem : Widget {
                    System(PI/2,""_, "F-F-F-F"_, Rule('F',"FF-F-F-F-FF"_)) <<
                    System(PI/2,""_, "F-F-F-F"_, Rule('F',"FF-F--F-F"_)) <<
                    System(PI/3,""_, "F--F--F"_, Rule('F',"F+F--F+F"_)) <<
-                   System(PI/3,""_, "R"_, Rule('L',"R+L+R"_), Rule('R',"L-R-L"_)) << // Sierpinski gasket
+                   /*System(PI/3,""_, "R"_, Rule('L',"R+L+R"_), Rule('R',"L-R-L"_)) << // Sierpinski gasket
                    System(PI/2,""_, "L"_, Rule('L',"L+R+"_), Rule('R',"-L-R"_)) << // Dragon curve
-                   System(PI/3,""_, "L"_, Rule('L',"L+R++R-L--LL-R+"_), Rule('R',"-L+RR++R+L--L-R"_)) << // Hexagonal Gosper
+                   System(PI/3,""_, "L"_, Rule('L',"L+R++R-L--LL-R+"_), Rule('R',"-L+RR++R+L--L-R"_)) << // Hexagonal Gosper*/
                    // Plants
                    System(PI/7,""_, "F"_, Rule('F',"F[+F]F[-F]F"_)) <<
                    System(PI/9,""_, "F"_, Rule('F',"F[+F]F[-F][F]"_)) <<
@@ -139,6 +139,9 @@ struct LSystem : Widget {
                    System(PI/9,""_, "X"_, Rule('X',"F[+X]F[-X]+X"_), Rule('F',"FF"_)) <<
                    System(PI/7,""_, "X"_, Rule('X',"F[+X][-X]FX"_), Rule('F',"FF"_)) <<
                    System(PI/8,""_, "X"_, Rule('X',"F-[[X]+X]+F[+FX]-X"_), Rule('F',"FF"_)) <<
+                   // 3D Plant
+                   System(PI/8,""_, "A"_, Rule('A',"[&FL!A]/////'[&FL!A]///////'[&FL!A]"_), Rule('F',"S/////F"_), Rule('S',"FL"_),
+                          Rule('L',"['''^^{-f+f+f-|-f+f+f}]"_)) <<
                    // Stochastic
                    System(PI/7,""_, "F"_, Rule('F',"F[+F]F[-F]F"_), Rule('F',"F[+F]F"_), Rule('F',"F[-F]F"_)) <<
                    // Context sensitive
@@ -179,7 +182,7 @@ struct LSystem : Widget {
                    // Anabaena with heterocysts
                 << ({
                         const float CH = 900 /*high concentration*/, CT=0.4 /*concentration threshold */, ST=3.9 /*segment size threshold*/;
-                        array<Module> axiom; axiom << Module('-',90) << Module('F',0,0,CH) << Module('F',4,1,CH) << Module('F',0,0,CH);
+                        array<Module> axiom; axiom << Module('-',PI/2) << Module('F',0,0,CH) << Module('F',4,1,CH) << Module('F',0,0,CH);
                         System(0,"f~H"_,move(axiom),
                         //F(s,t,c) : t=1 & s>=6 → F(s/3*2,2,c)f(1)F(s/3,1,c)
                         Rule(""_,'F',""_, [](ref<float> a){return a[1]==1 && a[0]>=6;},
@@ -213,6 +216,7 @@ struct LSystem : Widget {
                                                         << Module('H',a[0]*1.1);
                                                         return p;})
                         ); })
+                   // Row of trees
                 << ({
                         const float c=1, p=0.3, q=c-p, h=sqrt(p*q);
                         array<Module> axiom; axiom << Module('F',1,0);
@@ -233,8 +237,56 @@ struct LSystem : Widget {
                         [](ref<float> a)->array<Module>{array<Module> r; r
                                                         << Module('F',a[0],a[1]-1);
                                                         return r;})
+                        ); })
+                   // Growing branching pattern
+                << ({
+                        const float R=1.456;
+                        array<Module> axiom; axiom << Module('A');
+                        System(85*PI/180,""_,move(axiom),
+                        //A → F(1)[+A][−A]
+                        Rule(""_,'A',""_,[](ref<float>){return true;},
+                        [](ref<float>)->array<Module>{array<Module> r; r
+                                                         << Module('F',1)
+                                                         << Module('[') << Module('+') << Module('A') << Module(']')
+                                                         << Module('[') << Module('-') << Module('A') << Module(']');
+                                                         return r;}),
+                        //F(s) → F(s∗R)
+                        Rule(""_,'F',""_,[](ref<float>){return true;},
+                        [R](ref<float> a)->array<Module>{array<Module> r; r
+                                                         << Module('F',a[0]*R);
+                                                         return r;})
+                        ); })
+                   // Honda monopodial tree-like structure
+                << ({
+                        const float r1=0.9/*trunk contraction ratio*/, r2=0.6/*branches contraction ratio*/, a0=PI/4/*trunk branching angle*/,
+                        a2=PI/4/*lateral axes branching angles*/,d=137.5*PI/180/*divergence angle*/,wr=0.707/*width decrease rate*/;
+                        array<Module> axiom; axiom << Module('A',1,10);
+                        System(0,""_,move(axiom),
+                        //A(l,w) → !(w)F(l)[&(a0)B(l*r2 ,w*wr )]/(d)A(l*r1,w*wr )
+                        Rule(""_,'A',""_,[](ref<float>){return true;},
+                        [a0,r1,r2,wr,d](ref<float> a)->array<Module>{array<Module> r; r
+                                                                   << Module('!',a[1])
+                                                                   << Module('F',a[0])
+                                                                   << Module('[') << Module('&',a0) << Module('B',a[0]*r2,a[1]*wr) << Module(']')
+                                                                   << Module('/',d) << Module('A',a[0]*r1,a[1]*wr);
+                                                                   return r;}),
+                        //B(l,w) → !(w)F(l)[-(a2)$C(l*r2 ,w*wr)]C(l*r1 ,w*wr)
+                        Rule(""_,'B',""_,[](ref<float>){return true;},
+                        [a2,r1,r2,wr](ref<float> a)->array<Module>{array<Module> r; r
+                                                                   << Module('!',a[1])
+                                                                   << Module('F',a[0])
+                                                                   << Module('[') << Module('-',a2) << Module('$') << Module('C',a[0]*r2,a[1]*wr) << Module(']')
+                                                                   << Module('C',a[0]*r1,a[1]*wr);
+                                                                   return r;}),
+                        //C(l,w) → !(w)F(l)[+(a2)$B(l*r2 ,w*wr)]B(l*r1 ,w*wr)
+                        Rule(""_,'C',""_,[](ref<float>){return true;},
+                        [a2,r1,r2,wr](ref<float> a)->array<Module>{array<Module> r; r
+                                                                   << Module('!',a[1])
+                                                                   << Module('F',a[0])
+                                                                   << Module('[') << Module('+',a2) << Module('$') << Module('B',a[0]*r2,a[1]*wr) << Module(']')
+                                                                   << Module('B',a[0]*r1,a[1]*wr);
+                                                                   return r;})
                         ); });
-
         /*debug(
         for(int unused level: range(4)) log(systems.last().generate(level));
         exit();
@@ -251,40 +303,46 @@ struct LSystem : Widget {
 
     void render(int2, int2 window) override {
         this->window.setTitle(string("#"_+dec(current)+"@"_+dec(level)));
-        struct State { vec2 position, heading; };
-        array<State> stack;
-        State state __(vec2(0,0), vec2(0,1));
-        struct Line { byte label; vec2 a,b; };
+        // Turtle interpretation of modules string generated by an L-system
+        array<mat4> stack;
+        mat4 state;
+        state.rotateZ(PI/2); //+X (heading) is up
+        struct Line { byte label; vec3 a,b; };
         array<Line> lines;
-        vec2 min=0,max=0;
+        vec3 min=0,max=0;
         const System& system = systems[current];
         float angle = system.angle;
         for(const Module& module : system.generate(level)) { char symbol=module.symbol;
-            /**/  if(symbol=='-') {
-                float a = -(module.arguments?module.arguments[0]*PI/180:angle);
-                state.heading=mat2(cos(a),-sin(a),sin(a),cos(a))*state.heading;
-            } else if(symbol=='+') {
-                float a = module.arguments?module.arguments[0]*PI/180:angle;
-                state.heading=mat2(cos(a),-sin(a),sin(a),cos(a))*state.heading;
-            } else if(symbol=='[') { stack << state; }
-            else if(symbol==']') { state = stack.pop(); }
-            else if((symbol>='a' && symbol<='z') || (symbol>='A' && symbol<='Z')) { // letters move forwards
+            float a = module.arguments?module.arguments[0]:angle;
+            if(symbol=='\\'||symbol=='/') state.rotateX(symbol=='\\'?a:-a);
+            else if(symbol=='&'||symbol=='^') state.rotateY(symbol=='&'?a:-a);
+            else if(symbol=='-' ||symbol=='+') state.rotateZ(symbol=='+'?a:-a);
+            //else if(symbol=='!') state.scale(vec3(a,0,0));
+            else if(symbol=='[') stack << state;
+            else if(symbol==']') state = stack.pop();
+            else if(symbol=='f' || symbol=='F') {
                 float step = module.arguments?module.arguments[0]:1;
-                vec2 next = state.position+step*state.heading;
-                if(symbol>='A' && symbol<='Z') lines << Line __(module.symbol,state.position,next); //uppercase draws a line
-                state.position = next;
-                min=::min(min,state.position);
-                max=::max(max,state.position);
+                vec3 a = (state*vec3(0,0,0)).xyz();
+                state.translate(vec3(step,0,0)); //forward axis is +X
+                vec3 b = (state*vec3(0,0,0)).xyz();
+                if(symbol=='F') lines << Line __(module.symbol,a,b);
+                min=::min(min,b);
+                max=::max(max,b);
             }
         }
+        // Render lines
         mat3 m;
-        vec2 size = max-min;
-        float scale = ::min(window.x/size.x,window.y/size.y);
-        m.scale(scale);
-        vec2 margin = vec2(window)/scale-size;
-        m.translate(-min+margin/2.f);
+        if(1) { //Fit window (for normalized fractal curves)
+            vec2 size = (max-min).xy();
+            float scale = ::min(window.x/size.x,window.y/size.y);
+            m.scale(scale);
+            vec2 margin = vec2(window)/scale-size;
+            m.translate(-min.xy()+margin/2.f);
+        } else { //Fixed size (for growing trees)
+            m.translate(vec2(window.x/2,0)); m.scale(16);
+        }
         for(Line line: lines) {
-            vec2 a=m*line.a, b=m*line.b;
+            vec2 a=m*line.a.xy(), b=m*line.b.xy();
             ::line(a.x,window.y-a.y,b.x,window.y-b.y);
             vec2 c = (a+b)/2.f;
             if(label) Text(string(str(line.label))).render(int2(round(c.x),round(window.y-c.y)));
