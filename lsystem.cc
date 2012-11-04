@@ -1,4 +1,4 @@
-// TODO: polygons (wide lines), parser
+// TODO: tropism, polygons (wide lines), parser
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -117,7 +117,7 @@ struct LSystem : Widget {
     array<System> systems;
 
     Window window __(this,int2(0,0),"L-System"_);
-    uint current=0, level=10; bool label=false;
+    uint current=0, level=6; bool label=false;
     float yaw=0,pitch=0;
 
     LSystem() {
@@ -286,14 +286,65 @@ struct LSystem : Widget {
                                                                    << Module('[') << Module('+',a2) << Module('$') << Module('B',a[0]*r2,a[1]*wr) << Module(']')
                                                                    << Module('B',a[0]*r1,a[1]*wr);
                                                                    return r;})
+                        ); })
+                   // Aono-Kunii sympodial tree-like structure
+                << ({
+                        const float r1=0.9, r2=0.7/*contraction ratios*/, a1=10*PI/180,a2=60*PI/180/*branching angles*/,wr=1/sqrt(2)/*width decrease rate*/;
+                        array<Module> axiom; axiom << Module('A',1,10);
+                        System(0,""_,move(axiom),
+                        //trunk: A(l,w) → !(w)F(l)[&(a1)B(l*r1,w*wr )]/(180)[&(a2)B(l*r2,w*wr)]
+                        Rule(""_,'A',""_,[](ref<float>){return true;},
+                        [a1,a2,r1,r2,wr](ref<float> a)->array<Module>{array<Module> r; r
+                                                                      << Module('!',a[1])
+                                                                      << Module('F',a[0])
+                                                                      << Module('[') << Module('&',a1) << Module('B',a[0]*r1,a[1]*wr) << Module(']')
+                                                                      << Module('/',PI)
+                                                                      << Module('[') << Module('&',a2) << Module('B',a[0]*r2,a[1]*wr) << Module(']');
+                                                                      return r;}),
+                        //branch: B(l,w) → !(w)F(l)[+(a1)$B(l*r1,w*wr )][-(a2)$B(l*r2,w*wr )]
+                        Rule(""_,'B',""_,[](ref<float>){return true;},
+                        [a1,a2,r1,r2,wr](ref<float> a)->array<Module>{array<Module> r; r
+                                                                   << Module('!',a[1])
+                                                                   << Module('F',a[0])
+                                                                   << Module('[') << Module('+',a1) << Module('$') << Module('B',a[0]*r1,a[1]*wr) << Module(']')
+                                                                   << Module('[') << Module('-',a2) << Module('$') << Module('B',a[0]*r2,a[1]*wr) << Module(']');
+                                                                   return r;})
+                        ); })
+                   // Ternary tree-like structure
+                << ({
+                        const float d1=94.74*PI/180, d2=132.63*PI/180/*divergence angles*/, a=18.95*PI/180/*branching angle*/,
+                        lr=1.109/*elongation rate*/, wr=1.732/*width increase rate*/;
+                        array<Module> axiom; axiom << Module('!',1) << Module('F',200) << Module('/',PI/4) << Module('A');
+                        System(0,""_,move(axiom),
+                        //ternary branch: A → !(vr)F(50)[&(a)F(50)A]/(d1)[&(a)F(50)A]/(d2 )[&(a)F(50)A]
+                        Rule(""_,'A',""_,[](ref<float>){return true;},
+                        [wr,a,d1,d2](ref<float>)->array<Module>{array<Module> r; r
+                                                          << Module('!',wr)
+                                                          << Module('F',50)
+                                                          << Module('[') << Module('&',a) << Module('F',50) << Module('A') << Module(']')
+                                                          << Module('/',d1)
+                                                          << Module('[') << Module('&',a) << Module('F',50) << Module('A') << Module(']')
+                                                          << Module('/',d2)
+                                                          << Module('[') << Module('&',a) << Module('F',50) << Module('A') << Module(']');
+                                                          return r;}),
+                        //growth: F(l) → F(l*lr)
+                        Rule(""_,'F',""_,[](ref<float>){return true;},
+                        [lr](ref<float> a)->array<Module>{array<Module> r; r
+                                                          << Module('F',a[0]*lr);
+                                                          return r;}),
+                        //growth: !(w) → !(w*wr)
+                        Rule(""_,'!',""_,[](ref<float>){return true;},
+                        [wr](ref<float> a)->array<Module>{array<Module> r; r
+                                                          << Module('!',a[0]*wr);
+                                                          return r;})
                         ); });
         //debug(for(int unused level: range(4)) log(systems.last().generate(level)); exit();)
 
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; window.render();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; window.render();});
-        window.localShortcut(Key(KP_Divide)).connect([this]{if(current>0){ current--; if(level>4) level=4; } window.render();});
-        window.localShortcut(Key(KP_Multiply)).connect([this]{if(current<systems.size()-1){ current++; if(level>4) level=4; } window.render();});
+        window.localShortcut(Key(KP_Divide)).connect([this]{if(current>0){current--; if(level>10) level=10;} window.render();});
+        window.localShortcut(Key(KP_Multiply)).connect([this]{if(current<systems.size()-1){current++; if(level>10) level=10;} window.render();});
         window.localShortcut(Key(' ')).connect([this]{label=!label; window.render();});
         //TODO: mouse navigation
         window.localShortcut(LeftArrow).connect([this]{yaw-=PI/12; window.render();});
@@ -339,27 +390,35 @@ struct LSystem : Widget {
                 max=::max(max,b);
             }
         }
-        mat4 view;
-        view.rotateY(yaw); // yaw
-        view.rotateX(pitch); // pitch
-        view.rotateZ(PI/2); //+X (heading) is up
-        // Render lines
-        mat3 fit;
-        if(1) { //Fit window (for normalized fractal curves)
-            vec2 m=::min(view*min,view*max).xy(), M=::max(view*min,view*max).xy();
-            vec2 size = M-m;
-            float scale = ::min(window.x/size.x,window.y/size.y);
-            fit.scale(scale);
-            vec2 margin = vec2(window)/scale-size;
-            fit.translate(-m+margin/2.f);
-        } else { //Fixed size (for growing trees)
-            fit.translate(vec2(window.x/2,0)); fit.scale(16);
+
+        // Fit window
+        mat3 fit; {
+            mat4 view;
+            view.rotateZ(PI/2); //+X (heading) is up
+            if(1) { //Fit window (for normalized fractal curves)
+                vec2 m=::min(view*min,view*max).xy(), M=::max(view*min,view*max).xy();
+                vec2 size = M-m;
+                float scale = ::min(window.x/size.x,window.y/size.y)*0.5;
+                fit.scale(scale);
+                vec2 margin = vec2(window)/scale-size;
+                fit.translate(vec2(vec2(vec2(window)/scale/2.f).x,vec2(-m+margin/2.f).y));
+            } else { //Fixed size (for growing trees)
+                fit.translate(vec2(window.x/2,0)); fit.scale(16);
+            }
         }
-        for(Line line: lines) {
-            vec2 a=fit*(view*line.a).xy(), b=fit*(view*line.b).xy();
-            ::line(a.x,window.y-a.y,b.x,window.y-b.y);
-            vec2 c = (a+b)/2.f;
-            if(label) Text(string(str(line.label))).render(int2(round(c.x),round(window.y-c.y)));
+
+        // Render lines (TODO: line width)
+        {
+            mat4 view;
+            view.rotateX(pitch); // pitch
+            view.rotateY(yaw); // yaw
+            view.rotateZ(PI/2); //+X (heading) is up
+            for(Line line: lines) {
+                vec2 a=fit*(view*line.a).xy(), b=fit*(view*line.b).xy();
+                ::line(a.x,window.y-a.y,b.x,window.y-b.y);
+                vec2 c = (a+b)/2.f;
+                if(label) Text(string(str(line.label))).render(int2(round(c.x),round(window.y-c.y)));
+            }
         }
     }
 } application;
