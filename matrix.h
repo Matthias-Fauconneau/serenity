@@ -52,6 +52,7 @@ struct mat3 {
 };
 inline string str(const mat3& m) { return str<3,3>(m.data); }
 
+/// 3D projective transformation
 struct mat4 {
     float data[4*4];
     mat4(int d=1) { for(int i=0;i<4*4;i++) data[i]=0; if(d != 0) for(int i=0;i<4;i++) m(i,i)=d; }
@@ -59,7 +60,8 @@ struct mat4 {
     float& m(int i, int j) { return data[j*4+i]; }
     float operator()(int i, int j) const { return m(i,j); }
     float& operator()(int i, int j) { return m(i,j); }
-    vec4 operator*(vec3 v) const { vec4 r(0,0,0,0); for(int i=0;i<4;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+1*m(i,3); return r; }
+    vec3 operator*(vec3 v) const { vec3 r(0,0,0); for(int i=0;i<3;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+1*m(i,3); return r; }
+    //vec4 operator*(vec4 v) const { vec4 r(0,0,0,0); for(int i=0;i<4;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+v.z*m(i,3); return r; }
     mat4 operator*(mat4 b) const {
         mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.m(i,j) += m(i,k)*b.m(k,j); return r;
     }

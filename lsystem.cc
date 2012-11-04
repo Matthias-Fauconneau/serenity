@@ -114,11 +114,11 @@ struct System {
 
 /// Bracketed, Stochastic, context-sensitive, parametric L-system
 struct LSystem : Widget {
-
     array<System> systems;
 
     Window window __(this,int2(0,0),"L-System"_);
-    uint current=0, level=4; bool label=false;
+    uint current=0, level=10; bool label=false;
+    float yaw=0,pitch=0;
 
     LSystem() {
         systems <<
@@ -259,10 +259,10 @@ struct LSystem : Widget {
                    // Honda monopodial tree-like structure
                 << ({
                         const float r1=0.9/*trunk contraction ratio*/, r2=0.6/*branches contraction ratio*/, a0=PI/4/*trunk branching angle*/,
-                        a2=PI/4/*lateral axes branching angles*/,d=137.5*PI/180/*divergence angle*/,wr=0.707/*width decrease rate*/;
+                        a2=PI/4/*lateral axes branching angles*/,d=137.5*PI/180/*divergence angle*/,wr=1/sqrt(2)/*width decrease rate*/;
                         array<Module> axiom; axiom << Module('A',1,10);
                         System(0,""_,move(axiom),
-                        //A(l,w) → !(w)F(l)[&(a0)B(l*r2 ,w*wr )]/(d)A(l*r1,w*wr )
+                        //main axis: A(l,w) → !(w)F(l)[&(a0)B(l*r2 ,w*wr )]/(d)A(l*r1,w*wr )
                         Rule(""_,'A',""_,[](ref<float>){return true;},
                         [a0,r1,r2,wr,d](ref<float> a)->array<Module>{array<Module> r; r
                                                                    << Module('!',a[1])
@@ -270,7 +270,7 @@ struct LSystem : Widget {
                                                                    << Module('[') << Module('&',a0) << Module('B',a[0]*r2,a[1]*wr) << Module(']')
                                                                    << Module('/',d) << Module('A',a[0]*r1,a[1]*wr);
                                                                    return r;}),
-                        //B(l,w) → !(w)F(l)[-(a2)$C(l*r2 ,w*wr)]C(l*r1 ,w*wr)
+                        //lateral branch: B(l,w) → !(w)F(l)[-(a2)$C(l*r2 ,w*wr)]C(l*r1 ,w*wr)
                         Rule(""_,'B',""_,[](ref<float>){return true;},
                         [a2,r1,r2,wr](ref<float> a)->array<Module>{array<Module> r; r
                                                                    << Module('!',a[1])
@@ -278,7 +278,7 @@ struct LSystem : Widget {
                                                                    << Module('[') << Module('-',a2) << Module('$') << Module('C',a[0]*r2,a[1]*wr) << Module(']')
                                                                    << Module('C',a[0]*r1,a[1]*wr);
                                                                    return r;}),
-                        //C(l,w) → !(w)F(l)[+(a2)$B(l*r2 ,w*wr)]B(l*r1 ,w*wr)
+                        //alternate lateral branch: C(l,w) → !(w)F(l)[+(a2)$B(l*r2 ,w*wr)]B(l*r1 ,w*wr)
                         Rule(""_,'C',""_,[](ref<float>){return true;},
                         [a2,r1,r2,wr](ref<float> a)->array<Module>{array<Module> r; r
                                                                    << Module('!',a[1])
@@ -287,27 +287,28 @@ struct LSystem : Widget {
                                                                    << Module('B',a[0]*r1,a[1]*wr);
                                                                    return r;})
                         ); });
-        /*debug(
-        for(int unused level: range(4)) log(systems.last().generate(level));
-        exit();
-        )*/
+        //debug(for(int unused level: range(4)) log(systems.last().generate(level)); exit();)
 
         window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; window.render();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; window.render();});
-        window.localShortcut(Key(LeftArrow)).connect([this]{if(current>0){ current--; if(level>4) level=4; } window.render();});
-        window.localShortcut(Key(RightArrow)).connect([this]{if(current<systems.size()-1){ current++; if(level>4) level=4; } window.render();});
+        window.localShortcut(Key(KP_Divide)).connect([this]{if(current>0){ current--; if(level>4) level=4; } window.render();});
+        window.localShortcut(Key(KP_Multiply)).connect([this]{if(current<systems.size()-1){ current++; if(level>4) level=4; } window.render();});
         window.localShortcut(Key(' ')).connect([this]{label=!label; window.render();});
+        //TODO: mouse navigation
+        window.localShortcut(LeftArrow).connect([this]{yaw-=PI/12; window.render();});
+        window.localShortcut(RightArrow).connect([this]{yaw+=PI/12; window.render();});
+        window.localShortcut(DownArrow).connect([this]{pitch-=PI/12; window.render();});
+        window.localShortcut(UpArrow).connect([this]{pitch+=PI/12; window.render();});
         debug(current=systems.size()-1);
     }
 
     void render(int2, int2 window) override {
         this->window.setTitle(string("#"_+dec(current)+"@"_+dec(level)));
         // Turtle interpretation of modules string generated by an L-system
-        array<mat4> stack;
-        mat4 state;
-        state.rotateZ(PI/2); //+X (heading) is up
-        struct Line { byte label; vec3 a,b; };
+        array<mat4> stack; array<float> lineWidthStack;
+        mat4 state; float lineWidth=1;
+        struct Line { byte label; vec3 a,b; float w; };
         array<Line> lines;
         vec3 min=0,max=0;
         const System& system = systems[current];
@@ -317,32 +318,45 @@ struct LSystem : Widget {
             if(symbol=='\\'||symbol=='/') state.rotateX(symbol=='\\'?a:-a);
             else if(symbol=='&'||symbol=='^') state.rotateY(symbol=='&'?a:-a);
             else if(symbol=='-' ||symbol=='+') state.rotateZ(symbol=='+'?a:-a);
-            //else if(symbol=='!') state.scale(vec3(a,0,0));
-            else if(symbol=='[') stack << state;
-            else if(symbol==']') state = stack.pop();
+            else if(symbol=='!') lineWidth=a;
+            else if(symbol=='$') { //set Y horizontal (keeping X), Z=X×Y
+                vec3 X; for(int i=0;i<3;i++) X[i]=state(i,0);
+                if(length(cross(vec3(1,0,0),X))<0.01) continue; //X is up (all possible Y are already horizontal)
+                vec3 Y = normalize(cross(vec3(1,0,0),X));
+                assert(Y.x==0);
+                vec3 Z = cross(X,Y);
+                for(int i=0;i<3;i++) state(i,1)=Y[i], state(i,2)=Z[i];
+            }
+            else if(symbol=='[') stack << state, lineWidthStack << lineWidth;
+            else if(symbol==']') state = stack.pop(), lineWidth = lineWidthStack.pop();
             else if(symbol=='f' || symbol=='F') {
                 float step = module.arguments?module.arguments[0]:1;
-                vec3 a = (state*vec3(0,0,0)).xyz();
+                vec3 a = (state*vec3(0,0,0));
                 state.translate(vec3(step,0,0)); //forward axis is +X
-                vec3 b = (state*vec3(0,0,0)).xyz();
-                if(symbol=='F') lines << Line __(module.symbol,a,b);
+                vec3 b = (state*vec3(0,0,0));
+                if(symbol=='F') lines << Line __(module.symbol,a,b,lineWidth);
                 min=::min(min,b);
                 max=::max(max,b);
             }
         }
+        mat4 view;
+        view.rotateY(yaw); // yaw
+        view.rotateX(pitch); // pitch
+        view.rotateZ(PI/2); //+X (heading) is up
         // Render lines
-        mat3 m;
+        mat3 fit;
         if(1) { //Fit window (for normalized fractal curves)
-            vec2 size = (max-min).xy();
+            vec2 m=::min(view*min,view*max).xy(), M=::max(view*min,view*max).xy();
+            vec2 size = M-m;
             float scale = ::min(window.x/size.x,window.y/size.y);
-            m.scale(scale);
+            fit.scale(scale);
             vec2 margin = vec2(window)/scale-size;
-            m.translate(-min.xy()+margin/2.f);
+            fit.translate(-m+margin/2.f);
         } else { //Fixed size (for growing trees)
-            m.translate(vec2(window.x/2,0)); m.scale(16);
+            fit.translate(vec2(window.x/2,0)); fit.scale(16);
         }
         for(Line line: lines) {
-            vec2 a=m*line.a.xy(), b=m*line.b.xy();
+            vec2 a=fit*(view*line.a).xy(), b=fit*(view*line.b).xy();
             ::line(a.x,window.y-a.y,b.x,window.y-b.y);
             vec2 c = (a+b)/2.f;
             if(label) Text(string(str(line.label))).render(int2(round(c.x),round(window.y-c.y)));
