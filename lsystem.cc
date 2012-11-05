@@ -1,4 +1,4 @@
-// TODO: tropism, polygons (wide lines), parser
+// TODO: polygons (wide lines), parser, herbaceous plants
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -313,7 +313,7 @@ struct LSystem : Widget {
                    // Ternary tree-like structure
                 << ({
                         const float d1=94.74*PI/180, d2=132.63*PI/180/*divergence angles*/, a=18.95*PI/180/*branching angle*/,
-                        lr=1.109/*elongation rate*/, wr=1.732/*width increase rate*/;
+                        lr=1.109/*elongation rate*/, wr=sqrt(3)/*width increase rate*/;
                         array<Module> axiom; axiom << Module('!',1) << Module('F',200) << Module('/',PI/4) << Module('A');
                         System(0,""_,move(axiom),
                         //ternary branch: A → !(vr)F(50)[&(a)F(50)A]/(d1)[&(a)F(50)A]/(d2 )[&(a)F(50)A]
@@ -372,8 +372,10 @@ struct LSystem : Widget {
             else if(symbol=='!') lineWidth=a;
             else if(symbol=='$') { //set Y horizontal (keeping X), Z=X×Y
                 vec3 X; for(int i=0;i<3;i++) X[i]=state(i,0);
-                if(length(cross(vec3(1,0,0),X))<0.01) continue; //X is up (all possible Y are already horizontal)
-                vec3 Y = normalize(cross(vec3(1,0,0),X));
+                vec3 Y = cross(vec3(1,0,0),X);
+                float y = length(Y);
+                if(y<0.01) continue; //X is colinear to vertical (all possible Y are already horizontal)
+                Y /= y;
                 assert(Y.x==0);
                 vec3 Z = cross(X,Y);
                 for(int i=0;i<3;i++) state(i,1)=Y[i], state(i,2)=Z[i];
@@ -388,6 +390,13 @@ struct LSystem : Widget {
                 if(symbol=='F') lines << Line __(module.symbol,a,b,lineWidth);
                 min=::min(min,b);
                 max=::max(max,b);
+                // Apply tropism
+                vec3 X; for(int i=0;i<3;i++) X[i]=state(i,0);
+                vec3 Y = cross(vec3(-1,0,0),X);
+                float y = length(Y);
+                if(y<0.01) continue; //X is colinear to tropism (all rotations are possible)
+                assert(Y.x==0);
+                state.rotate(0.22,state.inverse().normalMatrix()*Y);
             }
         }
 

@@ -68,6 +68,16 @@ struct mat4 {
     void translate(vec3 v) { for(int i=0;i<4;i++) m(i,3) += m(i,0)*v.x + m(i,1)*v.y + m(i,2)*v.z; }
     void scale(float f) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) m(i,j)*=f; }
     void scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) m(i,j)*=v[j]; }
+    void rotate(float angle, vec3 u) {
+        float x=u.x, y=u.y, z=u.z;
+        float c=cos(angle), s=sin(angle), ic=1-c;
+        mat4 r;
+        r(0,0) = x*x*ic + c; r(1,0) = x*y*ic - z*s; r(2,0) = x*z*ic + y*s; r(3,0) = 0;
+        r(0,1) = y*x*ic + z*s; r(1,1) = y*y*ic + c; r(2,1) = y*z*ic - x*s; r(3,1) = 0;
+        r(0,2) = x*z*ic - y*s; r(1,2) = y*z*ic + x*s; r(2,2) = z*z*ic + c; r(3,2) = 0;
+        r(0,3) = 0; r(1,3) = 0; r(2,3) = 0; r(3,3) = 1;
+        *this = *this * r;
+    }
     void rotateX(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.m(1,1) = c; r.m(2,2) = c; r.m(1,2) = -s; r.m(2,1) = s; *this = *this * r; }
     void rotateY(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.m(0,0) = c; r.m(2,2) = c; r.m(2,0) = -s; r.m(0,2) = s; *this = *this * r; }
     void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.m(0,0) = c; r.m(1,1) = c; r.m(0,1) = -s; r.m(1,0) = s; *this = *this * r; }
@@ -76,6 +86,7 @@ struct mat4 {
                 m(i0,j1) * (m(i1,j0) * m(i2,j2) - m(i2,j0) * m(i1,j2)) +
                 m(i0,j2) * (m(i1,j0) * m(i2,j1) - m(i2,j0) * m(i1,j1));
     }
+    //transpose of the inverse of the top-left 3x3 part
     mat3 normalMatrix() const {
         float det = 1 / det3(0, 1, 2, 0, 1, 2);
         mat3 n;
