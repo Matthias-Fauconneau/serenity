@@ -62,3 +62,18 @@ struct Timer : Poll {
     void setAbsolute(uint date);
     virtual void event() =0;
 };
+
+/// Generates a sequence of uniformly distributed pseudo-random 64bit integers
+struct Random {
+    uint64 sz,sw;
+    uint64 z,w;
+    Random() { seed(); reset(); }
+    void seed() { sz=rdtsc(); sw=rdtsc(); }
+    void reset() { z=sz; w=sw; }
+    uint64 next() {
+        z = 36969 * (z & 0xFFFF) + (z >> 16);
+        w = 18000 * (w & 0xFFFF) + (w >> 16);
+        return (z << 16) + w;
+    }
+    uint64 operator()() { return next(); }
+};

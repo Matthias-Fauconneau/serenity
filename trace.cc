@@ -213,7 +213,7 @@ string trace(int skip, void* ip) {
         frame=caller_frame(frame);
     }
     string r;
-    for(i=i-3; i>=skip; i--) { Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<hex(ptr(stack[i]))<<"\n"_; }
-    if(ip) { Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<hex(ptr(ip))<<"\n"_; }
+    for(i=i-3; i>=skip; i--) { Symbol s = findNearestLine(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<"0x"_+hex(ptr(stack[i]))<<"\n"_; }
+    if(ip) { Symbol s = findNearestLine(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<"0x"_+hex(ptr(ip))<<"\n"_; }
     return r;
 }

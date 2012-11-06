@@ -23,7 +23,8 @@ enum {DT_DIR=4, DT_REG=8};
 Handle::~Handle() { if(fd>0) close(fd); }
 
 // Folder
-const Folder& root() { const int AT_FDCWD=-100; static const Folder root = Folder("/"_,(const Folder&)AT_FDCWD); return root; }
+const Folder& cwd() { static const int AT_FDCWD=-100; return (const Folder&)AT_FDCWD; }
+const Folder& root() { static const Folder root = Folder("/"_,cwd()); return root; }
 Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0666), folder);
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), folder);
