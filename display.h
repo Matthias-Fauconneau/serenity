@@ -41,25 +41,7 @@ void line(vec2 a, vec2 b, float wa=1, float wb=1, byte4 color=black);
 inline void line(vec2 a, vec2 b, float w=1, byte4 color=black) { line(a,b,w,w,color); }
 
 /// Draws a convex polygon
-template<uint N> inline void polygon(vec2 polygon[N], byte4 color=black) {
-    vec2 min=polygon[0],max=polygon[0];
-    float lines[N][3]; // cross(P-A,B-A) > 0 <=> (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1) > 0 <=> δx*y + δy*x > d (with d=y1*δx-x1*δy)
-    for(int i: range(N-1)) {
-        min=::min(min,polygon[i+1]), max=::max(max,polygon[i+1]);
-        lines[i][0] = polygon[i+1].x-polygon[i].x;
-        lines[i][1] = polygon[i+1].y-polygon[i].y;
-        lines[i][2] = polygon[i].y*lines[i][0] - polygon[i].x*lines[i][1];
-    }
-    lines[N-1][0] = polygon[0].x-polygon[N-1].x;
-    lines[N-1][1] = polygon[0].y-polygon[N-1].y;
-    lines[N-1][2] = polygon[N-1].y*lines[N-1][0] - polygon[N-1].x*lines[N-1][1];
-    min = ::max(min,vec2(0,0)), max=::min(max,vec2(framebuffer.size()));
-    for(float y=min.y; y<max.y; y++) for(float x=min.x; x<max.x; x++) {
-        for(uint i=0; i<N; i++) if(lines[i][0]*y-lines[i][1]*x>lines[i][2]) goto outside;
-        framebuffer(x,y)=color;
-        outside:;
-    }
-}
+template<uint N> void polygon(vec2 polygon[N], byte4 color=black);
 
 /// Draws a triangle
 inline void triangle(vec2 A, vec2 B, vec2 C, byte4 color=black) { polygon<3>((vec2[]){A,B,C},color); }

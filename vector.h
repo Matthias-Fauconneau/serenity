@@ -15,7 +15,7 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Copies each component from another vector \a o casting from \a T2 to \a T
-    template<class F> explicit vector(const vector<V,F,N>& o) { for(int i=0;i<N;i++) at(i)=(T)o[i]; }
+    template<template<typename> class W, class F> explicit vector(const vector<W,F,N>& o) { for(int i=0;i<N;i++) at(i)=(T)o[i]; }
     /// Unchecked accessor (const)
     const T& at(int i) const { return ((T*)this)[i]; }
     /// Unchecked accessor

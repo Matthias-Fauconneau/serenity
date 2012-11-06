@@ -1,4 +1,4 @@
-// TODO: MSAA, top-left rasterization rule, mouse navigation, GUI, herbaceous plants, colors, lighting, texturing, perspective
+// TODO: better line junction, mouse navigation, GUI, herbaceous plants, colors, lighting, texturing, perspective
 #include "process.h"
 #include "window.h"
 #include "display.h"
