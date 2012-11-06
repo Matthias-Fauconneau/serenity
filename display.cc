@@ -81,17 +81,11 @@ void line(float x1, float y1, float x2, float y2, byte4 color) {
     }
 }
 
-// Thick line hack
-void line(float x1, float y1, float x2, float y2, float w, byte4 color) {
-    if(w<=1 || w>2) line(x1,y1,x2,y2,color);
-    else if(w<=3) {
-        float dx = x2 - x1, dy = y2 - y1;
-        if(abs(dx)<abs(dy)) {
-            line(x1-w/4,y1,x2-w/4,y2,color);
-            line(x1+w/4,y1,x2+w/4,y2,color);
-        } else {
-            line(x1,y1-w/4,x2,y2-w/4,color);
-            line(x1,y1+w/4,x2,y2+w/4,color);
-        }
-    }
+// Wide lines (oriented rectangle)
+void line(vec2 A, vec2 B, float wa, float wb, byte4 color) {
+    vec2 T = B-A;
+    float l = length(T);
+    if(l<0.01) return;
+    vec2 N = normal(T)/l;
+    quad(A+N*(wa/2),B+N*(wb/2),B-N*(wb/2),A-N*(wa/2),color);
 }

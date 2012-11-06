@@ -1,3 +1,21 @@
+#if 1
+#include "window.h"
+#include "display.h"
+
+
+struct PolygonTest : Widget {
+    Window window __(this,int2(256,256),"PolygonTest"_);
+    PolygonTest(){
+        window.localShortcut(Escape).connect(&exit);
+        window.backgroundColor=window.backgroundCenter=0xFF; window.featherBorder=0;
+    }
+    void render(int2, int2 size) {
+        vec2 A=vec2(size/4), B=vec2(3*size/4);
+        line(A,B,1);
+    }
+} test ;
+#endif
+
 #if 0
 #include "process.h"
 #include "window.h"
@@ -354,7 +372,7 @@ struct HTMLTest {
 } test;
 #endif
 
-#if 1
+#if 0
 #include "window.h"
 #include "calendar.h"
 #include "png.h"

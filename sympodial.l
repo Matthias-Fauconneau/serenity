@@ -7,4 +7,4 @@ width decrease rate 1/sqrt(2) : wr=0.707
 trunk : A(l,w) → !(w)F(l)[&(a1)B(l*r1,w*wr )]/(180)[&(a2)B(l*r2,w*wr)]
 branch : B(l,w) → !(w)F(l)[+(a1)$B(l*r1,w*wr )][-(a2)$B(l*r2,w*wr )]
 
-A(1,10)
+A(10,1)

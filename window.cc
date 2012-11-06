@@ -126,12 +126,13 @@ void Window::event() {
         widget->render(0,size);
         assert(!clipStack);
 
-        //feather edges //TODO: client side shadow
-        const bool corner = 1;
-        if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-        if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-        if(position.x+size.x<display.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-        if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+        if(featherBorder) { //feather borders
+            const bool corner = 1;
+            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+            if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+            if(position.x+size.x<display.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
+            if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+        }
 
         {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
         state=Server;

@@ -9,4 +9,4 @@ main axis : A(l,w) → !(w)F(l)[&(a0)B(l*r2,w*wr)]/(d)A(l*r1,w*wr )
 lateral branch : B(l,w) → !(w)F(l)[-(a2)$C(l*r2,w*wr)]C(l*r1,w*wr)
 lateral branch (alternate) : C(l,w) → !(w)F(l)[+(a2)$B(l*r2,w*wr)]B(l*r1,w*wr)
 
-A(1,10)
+A(10,1)
