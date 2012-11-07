@@ -35,15 +35,18 @@ void substract(int2 target, const Image& source, byte4 color=black);
 
 /// Draws a thin antialiased line from (x1, y1) to (x2,y2)
 void line(float x1, float y1, float x2, float y2, byte4 color=black);
-/// Draws a thick line (trapezoid) from \a a to \a b with width interpolated from \a wa to \a wb
-void line(vec2 a, vec2 b, float wa=1, float wb=1, byte4 color=black);
-/// Draws a thick line (rectangle) from \a a to \a b
-inline void line(vec2 a, vec2 b, float w=1, byte4 color=black) { line(a,b,w,w,color); }
 
 /// Draws a convex polygon
 template<uint N> void polygon(vec2 polygon[N], byte4 color=black);
-
 /// Draws a triangle
 inline void triangle(vec2 A, vec2 B, vec2 C, byte4 color=black) { polygon<3>((vec2[]){A,B,C},color); }
 /// Draws a convex quad
 inline void quad(vec2 A, vec2 B, vec2 C, vec2 D, byte4 color=black) { polygon<4>((vec2[]){A,B,C,D},color); }
+
+/// Draws a circle
+void circle(vec2 A, float r, byte4 color=black);
+
+/// Draws a thick line (trapezoid) from \a a to \a b with width interpolated from \a wa to \a wb
+void line(vec2 a, vec2 b, float wa=1, float wb=1, byte4 color=black);
+/// Draws a thick line (rectangle) from \a a to \a b
+inline void line(vec2 a, vec2 b, float w=1, byte4 color=black) { line(a,b,w,w,color); }

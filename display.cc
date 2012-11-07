@@ -97,15 +97,15 @@ template<uint N> inline void polygon(vec2 polygon[N], byte4 color) {
     lines[N-1][1] = polygon[0].y-polygon[N-1].y;
     lines[N-1][2] = polygon[N-1].y*lines[N-1][0] - polygon[N-1].x*lines[N-1][1];
     min = ::max(min,vec2(0,0)), max=::min(max,vec2(framebuffer.size()));
-    for(float y=min.y; y<max.y; y++) for(float x=min.x; x<max.x; x++) {
+    for(float y=floor(min.y); y<max.y; y++) for(float x=floor(min.x); x<max.x; x++) {
         for(uint i=0; i<N; i++) {
             float d = lines[i][0]*y-lines[i][1]*x-lines[i][2];
-            if(d>sqrt(2)/2) goto done; //outside
+            if(d>1./2) goto done; //outside
         }
         for(uint i=0; i<N; i++) { //smooth edges (TODO: MSAA, sRGB)
             float d = lines[i][0]*y-lines[i][1]*x-lines[i][2];
-            if(d>-sqrt(2)/2) {
-                d = d/sqrt(2)+0.5; assert(d>=0 && d<=1);
+            if(d>-1./2) {
+                d +=1./2; assert(d>=0 && d<=1);
                 framebuffer(x,y)=byte4((1-d)*vec4(color)+d*vec4(framebuffer(x,y)));
                 goto done;
             }
@@ -117,11 +117,24 @@ template<uint N> inline void polygon(vec2 polygon[N], byte4 color) {
 template void polygon<3>(vec2 polygon[3], byte4 color);
 template void polygon<4>(vec2 polygon[4], byte4 color);
 
-// Wide lines (oriented rectangle)
+void circle(vec2 A, float r, byte4 color) {
+    A+=vec2(1./2,1./2);
+    for(float y=A.y-r-1; y<A.y+r+1; y++) for(float x=A.x-r-1; x<A.x+r+1; x++) {
+        float d = length(vec2(x,y)-A)-r;
+        if(d<-1./2) framebuffer(x,y)=color;
+        else if(d<1./2) {
+            d +=1./2;
+            framebuffer(x,y)=byte4((1-d)*vec4(color)+d*vec4(framebuffer(x,y)));
+        }
+    }
+}
+
 void line(vec2 A, vec2 B, float wa, float wb, byte4 color) {
     vec2 T = B-A;
     float l = length(T);
     if(l<0.01) return;
     vec2 N = normal(T)/l;
+    circle(A,(wa-1)/2,color);
     quad(A+N*(wa/2),B+N*(wb/2),B-N*(wb/2),A-N*(wa/2),color);
+    circle(B,(wb-1)/2,color);
 }
