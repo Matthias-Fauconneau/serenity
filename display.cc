@@ -3,6 +3,7 @@
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 Image framebuffer;
+ref<float> zbuffer;
 
 void fill(Rect rect, byte4 color, bool blend) {
     rect = rect & currentClip;
@@ -79,60 +80,4 @@ void line(float x1, float y1, float x2, float y2, byte4 color) {
         plot(x, int(intery)+1, fpart(intery), transpose, invert);
         intery += gradient;
     }
-}
-
-template<uint N> inline void polygon(vec2 polygon[N], const Shader& shader) {
-    vec2 min=polygon[0],max=polygon[0];
-    float lines[N][3]; // cross(P-A,B-A) > 0 <=> (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1) > 0 <=> δx*y + δy*x > c (with c=y1*δx-x1*δy)
-    for(int i: range(N-1)) {
-        min=::min(min,polygon[i+1]), max=::max(max,polygon[i+1]);
-        lines[i][0] = polygon[i+1].x-polygon[i].x;
-        lines[i][1] = polygon[i+1].y-polygon[i].y;
-        lines[i][2] = polygon[i].y*lines[i][0] - polygon[i].x*lines[i][1];
-        if(lines[i][1]>0 || (lines[i][1]==0 && lines[i][0]<0)) lines[i][2]++; //top-left fill rule
-        float l = sqrt(lines[i][0]*lines[i][0]+lines[i][1]*lines[i][1]);
-        lines[i][0]/=l, lines[i][1]/=l, lines[i][2]/=l; // normalize distance equation (for line smoothing)
-    }
-    lines[N-1][0] = polygon[0].x-polygon[N-1].x;
-    lines[N-1][1] = polygon[0].y-polygon[N-1].y;
-    lines[N-1][2] = polygon[N-1].y*lines[N-1][0] - polygon[N-1].x*lines[N-1][1];
-    min = ::max(min,vec2(0,0)), max=::min(max,vec2(framebuffer.size()));
-    for(float y=floor(min.y); y<max.y; y++) for(float x=floor(min.x); x<max.x; x++) {
-        for(uint i=0; i<N; i++) {
-            float d = lines[i][0]*y-lines[i][1]*x-lines[i][2];
-            if(d>1./2) goto done; //outside
-        }
-        for(uint i=0; i<N; i++) { //smooth edges (TODO: MSAA, sRGB)
-            float d = lines[i][0]*y-lines[i][1]*x-lines[i][2];
-            if(d>-1./2) {
-                d +=1./2; assert(d>=0 && d<=1);
-                framebuffer(x,y)=byte4((1-d)*255.f*shader(vec2(x,y))+d*vec4(framebuffer(x,y)));
-                goto done;
-            }
-        }
-        framebuffer(x,y)=byte4(255.f*shader(vec2(x,y))); //completely inside
-        done:;
-    }
-}
-template void polygon<3>(vec2 polygon[3], const Shader& shader);
-template void polygon<4>(vec2 polygon[4], const Shader& shader);
-
-void circle(vec2 A, float r, const Shader& shader) {
-    A+=vec2(1./2,1./2);
-    for(float y=A.y-r-1; y<A.y+r+1; y++) for(float x=A.x-r-1; x<A.x+r+1; x++) {
-        float d = length(vec2(x,y)-A)-r;
-        if(d<-1./2) framebuffer(x,y)=byte4(255.f*shader(vec2(x,y)));
-        else if(d<1./2) {
-            d +=1./2;
-            framebuffer(x,y)=byte4((1-d)*255.f*shader(vec2(x,y))+d*vec4(framebuffer(x,y)));
-        }
-    }
-}
-
-void line(vec2 A, vec2 B, float wa, float wb, const Shader& shader) {
-    vec2 T = B-A;
-    float l = length(T);
-    if(l<0.01) return;
-    vec2 N = normal(T)/l;
-    quad(A+N*(wa/2),B+N*(wb/2),B-N*(wb/2),A-N*(wa/2),shader);
 }

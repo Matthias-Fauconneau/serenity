@@ -14,6 +14,10 @@ template<template<typename> class V, class T, int N> struct vector : V<T> {
     template<class... Args> explicit constexpr vector(T a, T b, Args... args):____(V<T>{a,b,T(args)...}){
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
+    /// Copies each component from another vector \a o of size N-1
+    template<template<typename> class W> explicit vector(const vector<W,T,N-1>& o, float w) {
+        for(int i=0;i<N-1;i++) at(i)=(T)o[i]; at(N-1)=w;
+    }
     /// Copies each component from another vector \a o casting from \a T2 to \a T
     template<template<typename> class W, class F> explicit vector(const vector<W,F,N>& o) { for(int i=0;i<N;i++) at(i)=(T)o[i]; }
     /// Unchecked accessor (const)

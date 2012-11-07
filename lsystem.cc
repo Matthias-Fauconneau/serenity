@@ -1,8 +1,8 @@
-// Z-Buffer HSR, TODO: lighting, herbaceous plants, colors, textures, perspective vertex transform, vertex attribute interpolation, perspective correct interpolation, tile-based deferred rendering
+//TODO: Z-Buffer HSR, lighting, herbaceous plants, colors, textures, scene (sky, terrain, grass, plants, forest...), better rasterizer
 #include "data.h"
 #include "matrix.h"
 #include "process.h"
-#include "display.h"
+#include "raster.h"
 #include "window.h"
 #include "interface.h"
 #include "text.h"
@@ -281,7 +281,7 @@ struct Editor : Widget {
     vec2 rotation=0;
     mat4 view() {
         mat4 view;
-        view.scale(scale);
+        view.scale(vec3(scale,scale,0x1.0p-16)); // -znear = zfar = 2^16
         view.translate(position);
         view.rotateX(rotation.y); // pitch
         view.rotateY(rotation.x); // yaw
@@ -308,24 +308,27 @@ struct Editor : Widget {
 
         { // Render
             mat4 view = this->view();
-            mat4 device; device.translate(vec3(targetPosition.x, targetSize.y-targetPosition.y,0)); device.scale(vec3(1,-1,1)); view = device*view;
+            Rasterizer raster __(framebuffer.width,framebuffer.height);
+            raster.clear();
             for(Line line: lines) {
                 // project end points
-                vec2 A=(view*line.a).xy(); float wa=line.wa*scale;
-                vec2 B=(view*line.b).xy(); float wb=line.wb*scale;
+                vec3 A=view*line.a; float wa=line.wa*scale;
+                vec3 B=view*line.b; float wb=line.wb*scale;
 
                 // compute line equation to interpolate [-1,1] across cylinder (TODO: replace with vertex attribute interpolation)
-                vec2 D = B-A; float c= A.y*D.x - A.x*D.y;
+                vec2 D = B.xy()-A.xy(); float c= A.y*D.x - A.x*D.y;
                 float l = length(D); D/=l, c/=l;
 
                 float w = (wa+wb)/2;
-                function<vec4(vec2)> shader = [D,c,w](vec2 p){
-                    float d = cross(p,D)-c;
-                    return vec4(clip(0.f,(d/w+1)/2,1.f));
+                function<vec4(vec3)> shader = [D,c,w](vec3 p){
+                    float d = cross(p.xy(),D)-c;
+                    float x = clip(0.f,(d/w+1)/2,1.f);
+                    return vec4(x,x,x,1);
                 };
-                circle(A,(wa-1)/2,shader);
-                ::line(A,B,wa,wb,shader);
+                raster.circle(A,(wa-1)/2,shader);
+                raster.line(A,B,wa,wb,shader);
             }
+            raster.resolve(targetPosition,targetSize);
         }
     }
 } application;

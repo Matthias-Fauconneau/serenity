@@ -1,8 +1,7 @@
 #pragma once
-/// \file display.h Graphics primitives (fill, blit, substract, line, polygon, circle)
+/// \file display.h Graphics primitives (fill, blit, substract, line)
 #include "vector.h"
 #include "image.h"
-#include "function.h"
 
 // Clip
 extern array<Rect> clipStack;
@@ -25,6 +24,8 @@ constexpr byte4 yellow __(0, 0xFF, 0xFF, 0xFF);
 constexpr byte4 red __(0, 0, 0xFF, 0xFF);
 constexpr byte4 magenta __(0xFF, 0, 0xFF, 0xFF);
 
+// Graphics primitives
+
 /// Fills pixels inside \a rect with \a color
 void fill(Rect rect, byte4 color=black, bool blend=true);
 
@@ -36,22 +37,3 @@ void substract(int2 target, const Image& source, byte4 color=black);
 
 /// Draws a thin antialiased line from (x1, y1) to (x2,y2)
 void line(float x1, float y1, float x2, float y2, byte4 color=black);
-
-// TODO: coverage masks
-typedef functor<vec4(vec2)> Shader;
-struct Flat : Shader { vec4 color; Flat(byte4 color):color(color){} vec4 operator()(vec2) const { return vec4(color)/255.f; } };
-
-/// Draws a convex polygon
-template<uint N> void polygon(vec2 polygon[N], const Shader& shader=Flat(black));
-/// Draws a triangle
-inline void triangle(vec2 A, vec2 B, vec2 C, const Shader& shader=Flat(black)) { polygon<3>((vec2[]){A,B,C},shader); }
-/// Draws a convex quad
-inline void quad(vec2 A, vec2 B, vec2 C, vec2 D, const Shader& shader=Flat(black)) { polygon<4>((vec2[]){A,B,C,D},shader); }
-
-/// Draws a circle
-void circle(vec2 A, float r, const Shader& shader=Flat(black));
-
-/// Draws a thick line (trapezoid) from \a a to \a b with width interpolated from \a wa to \a wb
-void line(vec2 a, vec2 b, float wa=1, float wb=1, const Shader& shader=Flat(black));
-/// Draws a thick line (rectangle) from \a a to \a b
-inline void line(vec2 a, vec2 b, float w=1, const Shader& shader=Flat(black)) { line(a,b,w,w,shader); }
