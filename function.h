@@ -9,7 +9,7 @@ template<class F, class R, class... Args> struct lambda;
 template<class F, class R, class... Args> struct lambda<F, R(Args...)> : functor<R(Args...)> {
     F f;
     lambda(F&& f):f(move(f)){}
-    R operator()(Args... args) const { return f(forward<Args>(args)___); }
+    virtual R operator()(Args... args) const override { return f(forward<Args>(args)___); }
 };
 // functor template specialization for methods
 template<class O, class R, class... Args> struct method;
@@ -17,7 +17,7 @@ template<class O, class R, class... Args> struct method<O, R(Args...)> : functor
     O* object;
     R (O::*pmf)(Args...);
     method(O* object, R (O::*pmf)(Args...)): object(object), pmf(pmf){}
-    R operator ()(Args... args) const { return (object->*pmf)(forward<Args>(args)___); }
+    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)___); }
 };
 // functor template specialization for const methods
 template<class O, class R, class... Args> struct const_method;
@@ -25,11 +25,11 @@ template<class O, class R, class... Args> struct const_method<O, R(Args...)> : f
     const O* object;
     R (O::*pmf)(Args...) const;
     const_method(const O* object, R (O::*pmf)(Args...) const): object(object), pmf(pmf){}
-    R operator ()(Args... args) const { return (object->*pmf)(forward<Args>(args)___); }
+    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)___); }
 };
 
 template<class R, class... Args> struct function;
-template<class R, class... Args> struct function<R(Args...)> {
+template<class R, class... Args> struct function<R(Args...)> : functor<R(Args...)> {
     long any[6]; //always store functor inline
     template<class F> function(F f) {
         static_assert(sizeof(lambda<F,R(Args...)>)<=sizeof(any),"");
@@ -44,7 +44,7 @@ template<class R, class... Args> struct function<R(Args...)> {
         new (any) const_method<O,R(Args...)>(object, pmf);
     }
 #pragma GCC system_header //-Wstrict-aliasing
-    R operator()(Args... args) const { return ((functor<R(Args...)>&)any)(forward<Args>(args)___); }
+    virtual R operator()(Args... args) const override { return ((functor<R(Args...)>&)any)(forward<Args>(args)___); }
 };
 
 /// Helps modularization by binding unrelated objects through persistent connections

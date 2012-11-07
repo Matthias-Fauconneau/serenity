@@ -1,4 +1,4 @@
-// TODO: GUI, lighting, herbaceous plants, colors, texturing, perspective
+// Z-Buffer HSR, TODO: lighting, herbaceous plants, colors, textures, perspective vertex transform, vertex attribute interpolation, perspective correct interpolation, tile-based deferred rendering
 #include "data.h"
 #include "matrix.h"
 #include "process.h"
@@ -192,7 +192,7 @@ struct Editor : Widget {
     LSystem system;
     uint current=0, level=6; bool label=false;
 
-    struct Line { byte label; vec3 a,b; float wa,wb; };
+    struct Line { vec3 a,b; float wa,wb; };
     array<Line> lines;
     vec3 min=0,max=0;
 
@@ -230,7 +230,7 @@ struct Editor : Widget {
                 vec3 A = (state*vec3(0,0,0));
                 state.translate(vec3(module.arguments[0]?:1,0,0)); //forward axis is +X
                 vec3 B = (state*vec3(0,0,0));
-                if(symbol=='F') lines << Line __(module,A,B,previousLineWidth,lineWidth);
+                if(symbol=='F') lines << Line __(A,B,previousLineWidth,lineWidth);
                 previousLineWidth=lineWidth;
                 min=::min(min,B);
                 max=::max(max,B);
@@ -255,10 +255,8 @@ struct Editor : Widget {
         systems.activeChanged.connect(this,&Editor::openSystem);
         systems.setActive(2);
 
-        //TODO : GUI
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; generate();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
-        //window.localShortcut(Key(' ')).connect([this]{label=!label; window.render();});
     }
 
     int2 lastPos;
@@ -291,29 +289,42 @@ struct Editor : Widget {
         return view;
     }
 
-    void render(int2 viewportPosition, int2 viewportSize) override {
-        systems.render(viewportPosition,int2(viewportSize.x,16));
+    void render(int2 targetPosition, int2 targetSize) override {
+        systems.render(targetPosition,int2(targetSize.x,16));
+        Text(string(dec(level)),32).render(int2(targetPosition+int2(16)));
 
         position=0; scale = 1;
         if(1) { //Fit window
             mat4 view; view.rotateZ(PI/2); //+X (heading) is up
             vec2 m=::min(view*min,view*max).xy(), M=::max(view*min,view*max).xy();
             vec2 size = M-m;
-            scale = ::min(viewportSize.x/size.x,viewportSize.y/size.y)*0.5;
-            vec2 margin = vec2(viewportSize)/scale-size;
-            position = vec3(vec2(vec2(viewportSize)/scale/2.f).x,vec2(-m+margin/2.f).y,0);
+            scale = ::min(targetSize.x/size.x,targetSize.y/size.y)*0.5;
+            vec2 margin = vec2(targetSize)/scale-size;
+            position = vec3(vec2(vec2(targetSize)/scale/2.f).x,vec2(-m+margin/2.f).y,0);
         } else { //Fixed size
             scale = 16;
-            position = vec3(viewportSize.x/2,0,0);
+            position = vec3(targetSize.x/2,0,0);
         }
 
         { // Render
             mat4 view = this->view();
-            mat4 viewport; viewport.translate(vec3(viewportPosition.x,viewportPosition.y,0)); view = viewport*view;
+            mat4 device; device.translate(vec3(targetPosition.x, targetSize.y-targetPosition.y,0)); device.scale(vec3(1,-1,1)); view = device*view;
             for(Line line: lines) {
-                vec2 a=(view*line.a).xy(), b=(view*line.b).xy();
-                ::line(vec2(a.x,viewportSize.y-a.y),vec2(b.x,viewportSize.y-b.y),line.wa*scale,line.wb*scale);
-                //if(label) { vec2 c = (a+b)/2.f; Text(string(str(line.label))).render(int2(round(c.x),round(window.y-c.y))); }
+                // project end points
+                vec2 A=(view*line.a).xy(); float wa=line.wa*scale;
+                vec2 B=(view*line.b).xy(); float wb=line.wb*scale;
+
+                // compute line equation to interpolate [-1,1] across cylinder (TODO: replace with vertex attribute interpolation)
+                vec2 D = B-A; float c= A.y*D.x - A.x*D.y;
+                float l = length(D); D/=l, c/=l;
+
+                float w = (wa+wb)/2;
+                function<vec4(vec2)> shader = [D,c,w](vec2 p){
+                    float d = cross(p,D)-c;
+                    return vec4(clip(0.f,(d/w+1)/2,1.f));
+                };
+                circle(A,(wa-1)/2,shader);
+                ::line(A,B,wa,wb,shader);
             }
         }
     }
