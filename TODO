@@ -1,5 +1,7 @@
-L-System
-Apps: tiling WM, standalone feed reader
+CG:
+ MSAA, top-left fill, vertex attribute interpolation, lighting
+ herbaceous plants, colors, textures, scene (sky, terrain, grass, plants, forest...)
+ 4x latin samples, sRGB, tile-based deferred rendering using coverage masks, color compression, Z compression
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, truetype, ssl

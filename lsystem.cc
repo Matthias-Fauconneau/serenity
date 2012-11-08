@@ -1,4 +1,3 @@
-//TODO: Z-Buffer HSR, lighting, herbaceous plants, colors, textures, scene (sky, terrain, grass, plants, forest...), better rasterizer
 #include "data.h"
 #include "matrix.h"
 #include "process.h"
@@ -227,9 +226,9 @@ struct Editor : Widget {
             else if(symbol=='[') stack << state, lineWidthStack << lineWidth;
             else if(symbol==']') state = stack.pop(), previousLineWidth = lineWidth = lineWidthStack.pop();
             else if(symbol=='f' || symbol=='F') {
-                vec3 A = (state*vec3(0,0,0));
+                vec3 A = (state*vec3(0,0,0)).xyz();
                 state.translate(vec3(module.arguments[0]?:1,0,0)); //forward axis is +X
-                vec3 B = (state*vec3(0,0,0));
+                vec3 B = (state*vec3(0,0,0)).xyz();
                 if(symbol=='F') lines << Line __(A,B,previousLineWidth,lineWidth);
                 previousLineWidth=lineWidth;
                 min=::min(min,B);
@@ -281,7 +280,7 @@ struct Editor : Widget {
     vec2 rotation=0;
     mat4 view() {
         mat4 view;
-        view.scale(vec3(scale,scale,0x1.0p-16)); // -znear = zfar = 2^16
+        view.scale(scale);
         view.translate(position);
         view.rotateX(rotation.y); // pitch
         view.rotateY(rotation.x); // yaw
@@ -312,8 +311,8 @@ struct Editor : Widget {
             raster.clear();
             for(Line line: lines) {
                 // project end points
-                vec3 A=view*line.a; float wa=line.wa*scale;
-                vec3 B=view*line.b; float wb=line.wb*scale;
+                vec4 A=view*line.a; float wa=line.wa*scale;
+                vec4 B=view*line.b; float wb=line.wb*scale;
 
                 // compute line equation to interpolate [-1,1] across cylinder (TODO: replace with vertex attribute interpolation)
                 vec2 D = B.xy()-A.xy(); float c= A.y*D.x - A.x*D.y;

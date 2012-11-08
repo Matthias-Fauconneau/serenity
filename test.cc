@@ -1,17 +1,30 @@
 #if 1
 #include "window.h"
 #include "display.h"
+#include "raster.h"
 
-
+// Test correct top-left rasterization rules using a simple triangle fan
 struct PolygonTest : Widget {
-    Window window __(this,int2(256,256),"PolygonTest"_);
+    Window window __(this,int2(4*2*16,6*2*16),"PolygonTest"_);
     PolygonTest(){
         window.localShortcut(Escape).connect(&exit);
-        window.backgroundColor=window.backgroundCenter=0xFF; window.featherBorder=0;
+        window.backgroundColor=window.backgroundCenter=0xFF;
     }
-    void render(int2, int2 size) {
-        vec2 A=vec2(size/4), B=vec2(3*size/4);
-        line(A,B,1);
+    void render(int2 position, int2 size) {
+        Rasterizer raster(4,6);
+        raster.clear();
+        if(1) { //aligned
+            //raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(1-1./2,1-1./2,0,1),vec4(3-1./2,1-1./2,0,1),Flat(vec4(0,0,0,1./2))); //bottom
+            //raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(3-1./2,1-1./2,0,1),vec4(3-1./2,5-1./2,0,1),Flat(vec4(0,0,1,1./2))); //right
+            raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(3-1./2,5-1./2,0,1),vec4(1-1./2,5-1./2,0,1),Flat(vec4(0,1,0,1./2))); //top
+            //raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(1-1./2,5-1./2,0,1),vec4(1-1./2,1-1./2,0,1),Flat(vec4(1,0,0,1./2))); //left
+        } else { //centered
+            raster.triangle(vec4(2,3,0,1),vec4(1,1,0,1),vec4(3,1,0,1),Flat(vec4(0,0,0,1./2))); //bottom
+            raster.triangle(vec4(2,3,0,1),vec4(3,1,0,1),vec4(3,5,0,1),Flat(vec4(0,0,1,1./2))); // right
+            raster.triangle(vec4(2,3,0,1),vec4(3,5,0,1),vec4(1,5,0,1),Flat(vec4(0,1,0,1./2))); //top
+            raster.triangle(vec4(2,3,0,1),vec4(1,5,0,1),vec4(1,1,0,1),Flat(vec4(1,0,0,1./2))); //left
+        }
+        raster.resolve(position,size);
     }
 } test ;
 #endif
