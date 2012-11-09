@@ -3,12 +3,12 @@
 #include "display.h"
 #include "function.h"
 
-typedef functor<vec4(vec3)> Shader;
+typedef functor<vec4(float,float)> Shader;
 struct Flat : Shader {
     vec4 color;
     Flat(vec4 color):color(color){}
     Flat(byte4 color):color(vec4(color)/255.f){}
-    virtual vec4 operator()(vec3) const override { return color; }
+    virtual vec4 operator()(float,float) const override { return color; }
 };
 
 /// 3D rasterizer

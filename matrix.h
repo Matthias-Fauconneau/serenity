@@ -29,12 +29,12 @@ struct mat3 {
                 m(0,1) * (m(1,0) * m(2,2) - m(2,0) * m(1,2)) +
                 m(0,2) * (m(1,0) * m(2,1) - m(2,0) * m(1,1));
     }
-    mat3 adjugate(const float idet=1) const {
+    mat3 adjugate(const float idet=1) const { //transpose of cofactors
         mat3 adj(0);
-        adj(0,0) =  (m(1,1) * m(2,2) - m(1,2) * m(2,1)) * idet;
+        adj(0,0) =  (m(1,1) * m(2,2) - m(2,1) * m(1,2)) * idet;
         adj(0,1) = -(m(0,1) * m(2,2) - m(2,1) * m(0,2)) * idet;
         adj(0,2) =  (m(0,1) * m(1,2) - m(1,1) * m(0,2)) * idet;
-        adj(1,0) = -(m(1,0) * m(2,2) - m(1,2) * m(2,0)) * idet;
+        adj(1,0) = -(m(1,0) * m(2,2) - m(2,0) * m(1,2)) * idet;
         adj(1,1) =  (m(0,0) * m(2,2) - m(2,0) * m(0,2)) * idet;
         adj(1,2) = -(m(0,0) * m(1,2) - m(1,0) * m(0,2)) * idet;
         adj(2,0) =  (m(1,0) * m(2,1) - m(2,0) * m(1,1)) * idet;

@@ -30,7 +30,7 @@ template<class O, class R, class... Args> struct const_method<O, R(Args...)> : f
 
 template<class R, class... Args> struct function;
 template<class R, class... Args> struct function<R(Args...)> : functor<R(Args...)> {
-    long any[6]; //always store functor inline
+    long any[11]; //always store functor inline
     template<class F> function(F f) {
         static_assert(sizeof(lambda<F,R(Args...)>)<=sizeof(any),"");
         new (any) lambda<F,R(Args...)>(move(f));

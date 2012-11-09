@@ -156,6 +156,8 @@ inline int round(float f) { return __builtin_roundf(f); }
 inline int ceil(float f) { return __builtin_ceilf(f); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 
+inline float pow(float x, float y) { return __builtin_pow(x,y); }
+
 // Trigonometric operations
 const double PI = 3.14159265358979323846;
 inline double cos(double t) { return __builtin_cos(t); }

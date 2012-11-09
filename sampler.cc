@@ -12,7 +12,6 @@ inline float log2(float x) { return __builtin_log2f(x); }
 inline float exp10(float x) { return exp2(x*log2(10)); }
 inline float log10(float x) { return log2(x)/log2(10); }
 inline float dB(float x) { return 10*log10(x); }
-inline float pow(float x, float y) { return __builtin_pow(x,y); }
 
 /// Raw memory copy
 typedef int m128 __attribute((vector_size(16)));

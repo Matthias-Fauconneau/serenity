@@ -16,7 +16,7 @@ void Rasterizer::clear() {
 
 inline void Rasterizer::shade(float X, float Y, uint mask, const Shader& shader) {
     if(mask) {
-        vec4 bgra = shader(vec3(X+0.5,Y+0.5,0)); //TODO: centroid
+        vec4 bgra = shader(X+0.5,Y+0.5); //TODO: centroid
         float a = bgra.w;
         bgra *= a;
         vec4* d = &framebuffer[int(Y*MSAA)*stride+int(X*MSAA)];
@@ -102,7 +102,8 @@ void Rasterizer::line(vec4 A, vec4 B, float wa, float wb, const Shader& shader) 
                 shader);
 }
 
-//TODO: MSAA, sRGB
+inline float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; }
+inline vec4 sRGB(vec4 c) { return vec4(sRGB(c.x),sRGB(c.y),sRGB(c.z),c.w); }
 void Rasterizer::resolve(int2 position, int2 unused size) {
     assert(size.x>=width && size.y>=height);
     int x0=position.x, y0=position.y;
@@ -117,7 +118,7 @@ void Rasterizer::resolve(int2 position, int2 unused size) {
 #else
         vec4 sum=0;
         for(int i=0;i<MSAA;i++) for(int j=0;j<MSAA;j++) sum+=s[i*stride+j];
-        ::framebuffer(x0+x,y0+(height-1-y))=byte4((255.f/(MSAA*MSAA))*sum);
+        ::framebuffer(x0+x,y0+(height-1-y))=byte4(255.f*sRGB(sum/float(MSAA*MSAA)));
 #endif
     }
 }
