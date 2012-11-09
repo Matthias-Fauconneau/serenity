@@ -1,7 +1,6 @@
 CG:
- fix branch junctions
- vertex attributes
  tile-based deferred rendering using coverage masks
+ shadow
  SSE quads, color compression, Z compression
  herbaceous plants, colors, leaves, textures
  scene (sky, grass, plants, forest, terrain...)

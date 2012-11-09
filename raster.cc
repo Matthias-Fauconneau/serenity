@@ -21,31 +21,7 @@ void Rasterizer::clear(vec4 color, float depth) {
     ::clear(framebuffer,width*height*MSAA*MSAA,color);
 }
 
-inline void Rasterizer::shade(float X, float Y, uint mask, const Shader& shader) {
-    if(mask) {
-        vec4 bgra = shader(X+0.5,Y+0.5); //TODO: centroid
-        float a = bgra.w;
-        bgra *= a;
-        vec4* d = &framebuffer[int(Y*MSAA)*stride+int(X*MSAA)];
-        if(mask==(1<<(MSAA*MSAA))-1) { //TODO: color compression
-            for(int i=0;i<MSAA;i++) for(int j=0;j<MSAA;j++) {
-                vec4& s = d[i*stride+j];
-                s=s*(1-a)+bgra;
-            }
-        } else {
-            uint bit=1;
-            for(int i=0;i<MSAA;i++) for(int j=0;j<MSAA;j++) {
-                if(mask&bit) {
-                    vec4& s = d[i*stride+j];
-                    s=s*(1-a)+bgra;
-                }
-                bit <<= 1;
-            }
-        }
-    }
-}
-
-void Rasterizer::triangle(vec4 A, vec4 B, vec4 C, const Shader& shader) {
+template<int N> void Rasterizer::triangle(const Shader<N>& shader, vec4 A, vec4 B, vec4 C, vec3 attributes[N]) {
     assert(A.w==1); assert(B.w==1); assert(C.w==1);
     mat3 M = mat3(A.xyw(), B.xyw(), C.xyw());
     float det = M.det();
@@ -58,12 +34,14 @@ void Rasterizer::triangle(vec4 A, vec4 B, vec4 C, const Shader& shader) {
     vec3 e2 = vec3(0,0,1)*M; if(e2.x>0/*dy<0*/ || (e2.x==0/*dy=0*/ && e2.y<0/*dx<0*/)) e2.z++;
     vec3 iw = vec3(1,1,1)*M;
     vec3 zw = vec3(A.z,B.z,C.z)*M;
+    vec3 varyings[N];
+    for(int i=0;i<N;i++) varyings[i] = attributes[i]*M;
 
     vec2 min = ::max(vec2(0,0),::min(::min(A.xy(),B.xy()),C.xy()));
     vec2 max = ::min(vec2(width-1,height-1),::max(::max(A.xy(),B.xy()),C.xy()));
     for(float Y=floor(min.y); Y<=max.y; Y++) for(float X=floor(min.x); X<=max.x; X++) {
         uint mask=0, bit=1;
-        vec2 centroid = 0; float N=0;
+        float centroid[N] = {}; float samples=0;
         for(float y=Y+1./(2*MSAA); y<Y+1; y+=1./MSAA) for(float x=X+1./(2*MSAA); x<X+1; x+=1./MSAA) {
             vec3 XY1(x,y,1);
             float d0 = dot(e0,XY1), d1 = dot(e1,XY1), d2 = dot(e2,XY1);
@@ -72,45 +50,40 @@ void Rasterizer::triangle(vec4 A, vec4 B, vec4 C, const Shader& shader) {
                 float z = w*dot(zw,XY1);
 
                 float& Z = zbuffer[int(y*MSAA)*stride+int(x*MSAA)];
-                if(z>=Z) { Z = z; mask|=bit; centroid+=vec2(x,y); N++; }
+                if(z>=Z) {
+                    Z = z;
+                    samples++;
+                    mask |= bit;
+                    for(int i=0;i<N;i++) centroid[i]+=w*dot(varyings[i],XY1);
+                }
             }
             bit <<= 1;
         }
-        centroid /= N;
-        centroid = vec2(X,Y);
-        shade(centroid.x, centroid.y, mask, shader);
-    }
-}
-
-void Rasterizer::circle(vec4 A, float r, const Shader& shader) {
-    A/=A.w; r/=A.w;
-    float z=A.z-r;
-    for(float Y=floor(A.y-r); Y<=A.y+r; Y++) for(float X=floor(A.x-r); X<=A.x+r; X++) {
-        uint mask=0, bit=1;
-        for(float y=Y+1./(2*MSAA); y<Y+1; y+=1./MSAA) for(float x=X+1./(2*MSAA); x<X+1; x+=1./MSAA) {
-            float d = length(vec2(x,y)-A.xy())-r;
-            if(d<0) {
-                float& Z = zbuffer[int(y*MSAA)*stride+int(x*MSAA)];
-                if(z>=Z) { Z = z; mask |= bit; }
+        if(mask) {
+            for(int i=0;i<N;i++) centroid[i] /= samples;
+            vec4 bgra = shader(centroid);
+            float a = bgra.w;
+            bgra *= a;
+            vec4* d = &framebuffer[int(Y*MSAA)*stride+int(X*MSAA)];
+            if(mask==(1<<(MSAA*MSAA))-1) { //TODO: color compression
+                for(int i=0;i<MSAA;i++) for(int j=0;j<MSAA;j++) {
+                    vec4& s = d[i*stride+j];
+                    s=s*(1-a)+bgra;
+                }
+            } else {
+                uint bit=1;
+                for(int i=0;i<MSAA;i++) for(int j=0;j<MSAA;j++) {
+                    if(mask&bit) {
+                        vec4& s = d[i*stride+j];
+                        s=s*(1-a)+bgra;
+                    }
+                    bit <<= 1;
+                }
             }
-            bit <<= 1;
         }
-        shade(X, Y, mask, shader);
     }
 }
-
-void Rasterizer::line(vec4 A, vec4 B, float wa, float wb, const Shader& shader) {
-    vec2 T = B.xy()-A.xy();
-    float l = length(T);
-    if(l<0.01) return;
-    vec2 N = normal(T)/l;
-    quad(
-                vec4(A.xy() - N*(wa/2), A.z, 1.f),
-                vec4(B.xy() - N*(wb/2), B.z, 1.f),
-                vec4(B.xy() + N*(wb/2), B.z, 1.f),
-                vec4(A.xy() + N*(wa/2), A.z, 1.f),
-                shader);
-}
+template void Rasterizer::triangle<1>(const Shader<1>& shader, vec4 A, vec4 B, vec4 C, vec3 d[1]);
 
 inline byte4 sRGB(vec4 c) { return byte4(sRGBLookup[c.x],sRGBLookup[c.y],sRGBLookup[c.z],c.w); }
 void Rasterizer::resolve(int2 position, int2 unused size) {
