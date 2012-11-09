@@ -4,8 +4,7 @@ branching angle : a=18.95
 elongation rate : lr=1.109
 width increase rate sqrt(3) : wr=1.732
 
-ternary branch : A → F(50)!(wr)[&(a)F(50)A]/(d1)[&(a)F(50)A]/(d2)[&(a)F(50)A]
-length growth : F(l) → F(l*lr)
-width growth : !(w) → !(w*wr)
+ternary branch : A → F(50,wr,wr)[&(a)F(50,wr,1)A]/(d1)[&(a)F(50,wr,1)A]/(d2)[&(a)F(50,wr,1)A]
+growth : F(l,w1,w2) → F(l*lr,w1*wr,w2*wr)
 
-!(1)F(0)F(200)/(45)A
+F(200,wr,1)/(45)A

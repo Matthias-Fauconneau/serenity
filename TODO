@@ -1,6 +1,9 @@
 CG:
+ fix branch junctions
+ vertex attributes
+ tile-based deferred rendering using coverage masks
+ SSE quads, color compression, Z compression
  herbaceous plants, colors, leaves, textures
- tile-based deferred rendering using coverage masks, SSE quads, color compression, Z compression
  scene (sky, grass, plants, forest, terrain...)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

@@ -1,6 +1,13 @@
 #include "raster.h"
 #include "matrix.h"
 
+struct sRGBLookup {
+    uint8 lookup[256];
+    inline float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; }
+    sRGBLookup() { for(int i=0;i<256;i++) { int l = round(255*sRGB(i/255.f)); assert(l>=0 && l<256); lookup[i]=l; } }
+    inline uint8 operator [](float c) { assert(round(c)>=0 && round(c)<256,c); return lookup[round(c)%256]; }
+} sRGBLookup;
+
 static constexpr int MSAA=2; // multisample antialiasing
 
 Rasterizer::Rasterizer(int width, int height) : width(width),height(height),stride(width*MSAA),
@@ -9,9 +16,9 @@ Rasterizer::Rasterizer(int width, int height) : width(width),height(height),stri
 
 Rasterizer::~Rasterizer() { unallocate(zbuffer,width*height*MSAA*MSAA); unallocate(framebuffer,width*height*MSAA*MSAA); }
 
-void Rasterizer::clear() {
-    ::clear(zbuffer,width*height*MSAA*MSAA,-0x1p16f);
-    ::clear(framebuffer,width*height*MSAA*MSAA,vec4(1,1,1,0));
+void Rasterizer::clear(vec4 color, float depth) {
+    ::clear(zbuffer,width*height*MSAA*MSAA,depth);
+    ::clear(framebuffer,width*height*MSAA*MSAA,color);
 }
 
 inline void Rasterizer::shade(float X, float Y, uint mask, const Shader& shader) {
@@ -56,6 +63,7 @@ void Rasterizer::triangle(vec4 A, vec4 B, vec4 C, const Shader& shader) {
     vec2 max = ::min(vec2(width-1,height-1),::max(::max(A.xy(),B.xy()),C.xy()));
     for(float Y=floor(min.y); Y<=max.y; Y++) for(float X=floor(min.x); X<=max.x; X++) {
         uint mask=0, bit=1;
+        vec2 centroid = 0; float N=0;
         for(float y=Y+1./(2*MSAA); y<Y+1; y+=1./MSAA) for(float x=X+1./(2*MSAA); x<X+1; x+=1./MSAA) {
             vec3 XY1(x,y,1);
             float d0 = dot(e0,XY1), d1 = dot(e1,XY1), d2 = dot(e2,XY1);
@@ -64,11 +72,13 @@ void Rasterizer::triangle(vec4 A, vec4 B, vec4 C, const Shader& shader) {
                 float z = w*dot(zw,XY1);
 
                 float& Z = zbuffer[int(y*MSAA)*stride+int(x*MSAA)];
-                if(z>=Z) { Z = z; mask|=bit; }
+                if(z>=Z) { Z = z; mask|=bit; centroid+=vec2(x,y); N++; }
             }
             bit <<= 1;
         }
-        shade(X, Y, mask, shader);
+        centroid /= N;
+        centroid = vec2(X,Y);
+        shade(centroid.x, centroid.y, mask, shader);
     }
 }
 
@@ -102,23 +112,15 @@ void Rasterizer::line(vec4 A, vec4 B, float wa, float wb, const Shader& shader) 
                 shader);
 }
 
-inline float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; }
-inline vec4 sRGB(vec4 c) { return vec4(sRGB(c.x),sRGB(c.y),sRGB(c.z),c.w); }
+inline byte4 sRGB(vec4 c) { return byte4(sRGBLookup[c.x],sRGBLookup[c.y],sRGBLookup[c.z],c.w); }
 void Rasterizer::resolve(int2 position, int2 unused size) {
     assert(size.x>=width && size.y>=height);
     int x0=position.x, y0=position.y;
     for(int y=0; y<height; y++) for(int x=0; x<width; x++) {
         vec4* s = &framebuffer[(y*MSAA)*stride+x*MSAA];
-#if 0
-        for(int i=0;i<MSAA;i++) for(int j=0;j<MSAA;j++) {
-            const int upsample=16;
-            for(int k=0;k<upsample-1;k++) for(int l=0;l<upsample-1;l++)
-                ::framebuffer(x0+(x*MSAA+j)*upsample+k,y0+(height*MSAA-1-(y*MSAA+i))*upsample+l)=byte4(255.f*s[i*stride+j]);
-        }
-#else
         vec4 sum=0;
         for(int i=0;i<MSAA;i++) for(int j=0;j<MSAA;j++) sum+=s[i*stride+j];
-        ::framebuffer(x0+x,y0+(height-1-y))=byte4(255.f*sRGB(sum/float(MSAA*MSAA)));
-#endif
+        sum *= 255.f/(MSAA*MSAA); //normalize to [0-255]
+        ::framebuffer(x0+x,y0+(height-1-y))=sRGB(sum);
     }
 }

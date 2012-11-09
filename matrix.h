@@ -55,6 +55,7 @@ struct mat4 {
     float& m(int i, int j) { return data[j*4+i]; }
     float operator()(int i, int j) const { return m(i,j); }
     float& operator()(int i, int j) { return m(i,j); }
+    vec4& operator[](int j) { return (vec4&)data[j*4]; }
 
     vec4 operator*(vec3 v) const { vec4 r(0,0,0,0); for(int i=0;i<4;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+1*m(i,3); return r; }
     mat4 operator*(mat4 b) const {
@@ -125,10 +126,10 @@ struct mat4 {
 template<int M, int N> inline string str(const float a[M*N]) {
     string s; s<<"\n["_;
     for(int i=0;i<M;i++) {
-        if(N==1) s = s+"\t"_+str(a[i*M+0]);
+        if(N==1) s = s+"\t"_+str(a[i]);
         else {
             for(int j=0;j<N;j++) {
-                s = s+"\t"_+str(a[i*M+j]);
+                s = s+"\t"_+str(a[j*M+i]);
             }
             if(i<M-1) s=s+"\n"_;
         }

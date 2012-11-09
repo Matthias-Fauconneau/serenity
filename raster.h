@@ -19,7 +19,7 @@ struct Rasterizer {
     Rasterizer(int width, int height);
     ~Rasterizer();
 
-    void clear();
+    void clear(vec4 color=vec4(1,1,1,1), float depth=-0x1p16f);
 
     inline void shade(float X, float Y, uint mask, const Shader& shader);
 

@@ -5,8 +5,8 @@ lateral branching angle : a2=45
 trunk divergence angle : d=137.5
 width decrease rate 1/sqrt(2) : wr=0.707
 
-main axis : A(l,w) → !(w)F(l)[&(a0)B(l*r2,w*wr)]/(d)A(l*r1,w*wr )
-lateral branch : B(l,w) → !(w)F(l)[-(a2)$C(l*r2,w*wr)]C(l*r1,w*wr)
-lateral branch (alternate) : C(l,w) → !(w)F(l)[+(a2)$B(l*r2,w*wr)]B(l*r1,w*wr)
+main axis : A(l,w) → F(w,l)[&(a0)B(l*r2,w*wr)]/(d)A(l*r1,w*wr )
+lateral branch : B(l,w) → F(w,l)[-(a2)$C(l*r2,w*wr)]C(l*r1,w*wr)
+lateral branch (alternate) : C(l,w) → F(w,l)[+(a2)$B(l*r2,w*wr)]B(l*r1,w*wr)
 
 A(10,1)
