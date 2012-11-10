@@ -1,12 +1,10 @@
 CG:
 TBDR:
- 16x16 block trivial reject
- 4x4 quad trivial reject
- 64x64 tile trivial reject
- 1x1 pixel trivial reject
- partial (edge) rejects
+ MSAA compression (flag full pixels)
  full accepts
- MSAA Z/color compression, latin square
+ partial (edge) accepts
+ latin square
+ check assembly and explicit optimizations as needed
  shadows
  herbaceous plants, colors, leaves, textures
  multithreading, scene (sky, grass, plants, forest, terrain...)

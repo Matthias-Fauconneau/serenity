@@ -5,35 +5,29 @@
 
 template<class FaceAttributes, int V> using Shader = functor<vec4(FaceAttributes,float[V])>;
 
-static constexpr int pixelSize=2; // multisample antialiasing (TODO: 4)
-
-static constexpr int quadSize=4*pixelSize; //TODO
-static constexpr int blockSize = 4*quadSize; //TODO
-
-// 64x64 pixels tile
-static constexpr int tileSize = 2*blockSize;
-struct Tile { // 8K triangles (virtual) + 64K framebuffer (actual)
+/// 64×64 pixels bin for L1 cache locality (64×64×RGBZ×float~64KB)
+struct Bin { // 8K triangles (virtual) + 64K framebuffer (actual)
     uint16 cleared=0;
     uint16 faceCount=0;
-    uint16 faces[tileSize*tileSize-2]; // maximum virtual capacity
-    vec3 color[tileSize*tileSize]; float depth[tileSize*tileSize]; //TODO: 4x4 blocks of 4x4 quads (=16x16 quads)
+    uint16 faces[64*64-2]; // maximum virtual capacity
+    float depth[64*64], blue[64*64], green[64*64], red[64*64];
 };
 
 /// Tiled render target
 struct RenderTarget {
-    int tileWidth,tileHeight; //in tiles
-    Tile* tiles;
-    vec3 color; float depth;
+    int width,height; //in bins
+    Bin* bins;
+    float depth, blue, green, red;
 
-    // Allocates all tiles and flags them to be cleared before first render
-    RenderTarget(uint width, uint height, vec3 color=vec3(1,1,1), float depth=-0x1p16f)
-        : tileWidth(align(tileSize,width*pixelSize)/tileSize),
-          tileHeight(align(tileSize,height*pixelSize)/tileSize),
-          tiles(allocate16<Tile>(tileWidth*tileHeight)),
-          color(color), depth(depth){
-        for(int i: range(tileWidth*tileHeight)) { Tile& tile = tiles[i]; tile.cleared=0; tile.faceCount=0; }
+    // Allocates all bins and flags them to be cleared before first render
+    RenderTarget(uint width, uint height, float depth=-0x1p16f, float blue=1, float green=1, float red=1)
+        : width(align(64,width)/64),
+          height(align(64,height)/64),
+          bins(allocate16<Bin>(this->width*this->height)),
+          depth(depth), blue(blue), green(green), red(red) {
+        for(int i: range(this->width*this->height)) { Bin& bin = bins[i]; bin.cleared=0; bin.faceCount=0; }
     }
-    ~RenderTarget() { unallocate(tiles,tileWidth*tileHeight); }
+    ~RenderTarget() { unallocate(bins,width*height); }
 
     // Resolves internal MSAA linear framebuffer for sRGB display on the active X window
     void resolve(int2 position, int2 size);
@@ -41,11 +35,12 @@ struct RenderTarget {
 
 template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vertex varying attributes*/> struct RenderPass {
     // triangle face with 3F constant face attributes and V varying (perspective-interpolated) vertex attributes
-    struct VertexAttributes { vec3 vertexAttributes[V]; };
+    struct VertexAttributes { vec3 data[V]; };
     struct Face {
-        mat3 M; vec3 Z;
-        VertexAttributes vertexAttributes;
-        FaceAttributes faceAttributes;
+        mat3 E; //edge equations
+        vec3 Z; //vertex depth attributes
+        VertexAttributes vertexAttributes; //custom vertex attributes (as a struct because fixed arrays miss value semantics)
+        FaceAttributes faceAttributes; //custom constant face attributes
     };
 
     RenderTarget& target;
@@ -55,93 +50,165 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
     // Implementation is inline to allow per-pass face attributes specialization
 
-    // Submits triangles for tile binning, actual rendering is deferred until render
+    /// Submits triangles for bin binning, actual rendering is deferred until render
+    /// \note Device coordinates are not normalized, positions should be in [0..Width],[0..Height]
     void submit(vec4 A, vec4 B, vec4 C, VertexAttributes vertexAttributes, FaceAttributes faceAttributes) {
         assert(A.w==1); assert(B.w==1); assert(C.w==1);
-        mat3 M = mat3(A.xyw(), B.xyw(), C.xyw());
-        float det = M.det();
+        mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
+        float det = E.det();
         if(det<=1) return; //small or back-facing triangle
-        M = M.adjugate(); //elegant definition of edge equations
-        faces[faceCount] = Face __(M, vec3(A.z,B.z,C.z), vertexAttributes, faceAttributes);
+        E = E.cofactor(); //edge equations are now columns of E
+        if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z++;
+        if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
+        if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z++;
 
-        int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy())))/tileSize);
-        int2 max = ::min(int2(target.tileWidth-1,target.tileHeight-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy())))/tileSize);
-        for(int tileY=min.y; tileY<=max.y; tileY++) for(int tileX=min.x; tileX<=max.x; tileX++) {
-            Tile& tile = target.tiles[tileY*target.tileWidth+tileX];
-            tile.faces[tile.faceCount++]=faceCount;
+        faces[faceCount] = Face __(E, vec3(A.z,B.z,C.z), vertexAttributes, faceAttributes);
+
+        int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy())))/64);
+        int2 max = ::min(int2(target.width-1,target.height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy())))/64);
+        for(int binY=min.y; binY<=max.y; binY++) for(int binX=min.x; binX<=max.x; binX++) {
+            Bin& bin = target.bins[binY*target.width+binX];
+            bin.faces[bin.faceCount++]=faceCount;
+            if(faceCount>sizeof(bin.faces)/sizeof(uint16)) error("Overflow");
         }
         faceCount++;
         if(faceCount>sizeof(faces)/sizeof(Face)) error("Overflow");
     }
 
-    // For each tile, rasterizes and shade all triangles using given shader
+    // For each bin, rasterizes and shade all triangles using given shader
     void render(const Shader<FaceAttributes,V>& shader) {
-        for(int tileI=0; tileI<target.tileHeight; tileI++) for(int tileJ=0; tileJ<target.tileWidth; tileJ++) {
-            Tile& tile = target.tiles[tileI*target.tileWidth+tileJ];
-            if(!tile.cleared) {
-                clear(tile.color,tileSize*tileSize,target.color);
-                clear(tile.depth,tileSize*tileSize,target.depth);
-                tile.cleared=1;
+        // Loop on all bins (64x64 samples (16x16 pixels))
+        for(int binI=0; binI<target.height; binI++) for(int binJ=0; binJ<target.width; binJ++) {
+            Bin& bin = target.bins[binI*target.width+binJ];
+            if(!bin.cleared) {
+                clear(bin.depth,64*64,target.depth);
+                clear(bin.blue,64*64,target.blue);
+                clear(bin.green,64*64,target.green);
+                clear(bin.red,64*64,target.red);
+                bin.cleared=1;
             }
-            int tileY=tileI*tileSize, tileX=tileJ*tileSize;
-            for(int i=0; i<tile.faceCount; i++) {
-                const Face& face = faces[tile.faces[i]];
-                mat3 M = face.M;
+            float* const buffer = bin.depth;
+            const vec2 binXY = vec2(binJ,binI);
+            // Loop on all faces in the bin
+            for(int faceI=0; faceI<bin.faceCount; faceI++) {
+                const Face& face = faces[bin.faces[faceI]];
+                const mat3& E = face.E;
+
                 // Interpolation functions (-dy, dx, d)
-                vec3 e0 = vec3(1,0,0)*M; if(e0.x>0/*dy<0*/ || (e0.x==0/*dy=0*/ && e0.y<0/*dx<0*/)) e0.z++;
-                vec3 e1 = vec3(0,1,0)*M; if(e1.x>0/*dy<0*/ || (e1.x==0/*dy=0*/ && e1.y<0/*dx<0*/)) e1.z++;
-                vec3 e2 = vec3(0,0,1)*M; if(e2.x>0/*dy<0*/ || (e2.x==0/*dy=0*/ && e2.y<0/*dx<0*/)) e2.z++;
-                vec3 iz = face.Z*M;
-                vec3 iw = vec3(1,1,1)*M;
-                vec3 varyings[V];
-                for(int i=0;i<V;i++) varyings[i] = face.vertexAttributes.vertexAttributes[i]*M;
+                const vec2 e[3] = {E[0].xy(), E[1].xy(), E[2].xy()};
 
-                const int pixelPerTile = tileSize/pixelSize;
-                for(int pixelI=0; pixelI<pixelPerTile; pixelI++) for(int pixelJ=0; pixelJ<pixelPerTile; pixelJ++) {
-                    int pixelIndex = (pixelI*pixelPerTile+pixelJ)*pixelSize*pixelSize;
-                    vec3* pixelColor = &tile.color[pixelIndex]; float* pixelDepth = &tile.depth[pixelIndex];
-                    int pixelY = tileY+pixelI*pixelSize, pixelX=tileX+pixelJ*pixelSize;
+                // Initial distance step
+                const float pixelToBin = 1.f/64;
+                float binD0 = pixelToBin*E[0].z + dot(e[0],binXY),
+                        binD1 = pixelToBin*E[1].z + dot(e[1],binXY),
+                        binD2 = pixelToBin*E[2].z + dot(e[2],binXY);
 
-                    //TODO: 4x4 16x16px blocks
-                    uint mask=0, bit=1;
-                    float centroid[V] = {}; float samples=0;
+                // trivial accept/reject corner for each edge
+                vec2 accept[3], reject[3];
+                for(int edgeI=0; edgeI<3; edgeI++) {
+                    vec2 edge = e[edgeI];
+                    reject[edgeI] = vec2(edge.x>0,edge.y>0);
+                    accept[edgeI] = vec2(!(edge.x>0),!(edge.y>0));
+                }
 
-                    for(int sampleI=0; sampleI<pixelSize; sampleI++) for(int sampleJ=0; sampleJ<pixelSize; sampleJ++) {
-                        int sampleY = pixelY+sampleI, sampleX = pixelX+sampleJ;
-                        vec3 XY1(sampleX+1.f/2, sampleY+1.f/2, 1);
+                // trivial reject
+                if(binD0 + dot(e[0],reject[0]) <= 0) continue;
+                if(binD1 + dot(e[1],reject[1]) <= 0) continue;
+                if(binD2 + dot(e[2],reject[2]) <= 0) continue;
 
-                        float d0 = dot(e0,XY1), d1 = dot(e1,XY1), d2 = dot(e2,XY1);
-                        if(d0>0 && d1>0 && d2>0) {
-                            float w = 1/dot(iw,XY1);
-                            float z = w*dot(iz,XY1);
+                const vec3 iw = E[0]+E[1]+E[2];
+                const vec3 iz = E*face.Z;
+                vec3 varyings[V]; for(int i=0;i<V;i++) varyings[i] = E*face.vertexAttributes.data[i];
 
-                            float& depth = pixelDepth[sampleI*pixelSize+sampleJ];
-                            if(z>=depth) {
-                                depth = z;
-                                samples++;
-                                mask |= bit;
-                                for(int i=0;i<V;i++) centroid[i]+=w*dot(varyings[i],XY1);
+                //4×4 xy steps constant mask
+                static constexpr vec2 XY[4*4] = {
+                                                  vec2(0,0),vec2(1,0),vec2(2,0),vec2(3,0),
+                                                  vec2(0,1),vec2(1,1),vec2(2,1),vec2(3,1),
+                                                  vec2(0,2),vec2(1,2),vec2(2,2),vec2(3,2),
+                                                  vec2(0,3),vec2(1,3),vec2(2,3),vec2(3,3),
+                                                };
+
+                // Scale from bin to blocks
+                binD0 *= 4, binD1 *= 4, binD2 *= 4;
+
+                // Loop on 4×4 blocks (TODO: vectorize, loop on coverage mask bitscan)
+                for(int blockI=0; blockI<4*4; blockI++) {
+                    float* const block = buffer + blockI*(4*4)*(4*4);
+                    const vec2 blockXY = XY[blockI];
+                    float blockD0 = binD0 + dot(e[0],blockXY),
+                            blockD1 = binD1 + dot(e[1],blockXY),
+                            blockD2 = binD2 + dot(e[2],blockXY);
+
+                    // trivial reject
+                    if(blockD0 + dot(e[0],reject[0]) <= 0) continue;
+                    if(blockD1 + dot(e[1],reject[1]) <= 0) continue;
+                    if(blockD2 + dot(e[2],reject[2]) <= 0) continue;
+
+                    // TODO: block Hi-Z
+
+                    // Scale from blocks to pixels
+                    blockD0 *= 4, blockD1 *= 4, blockD2 *= 4;
+
+                    // Loop on 4×4 pixels (TODO: vectorize, loop on coverage mask bitscan)
+                    for(int pixelI=0; pixelI<4*4; pixelI++) {
+                        float* const pixel = block+pixelI*16;
+                        const vec2 pixelXY = XY[pixelI];
+                        float pixelD0 = blockD0 + dot(e[0],pixelXY),
+                                pixelD1 = blockD1 + dot(e[1],pixelXY),
+                                pixelD2 = blockD2 + dot(e[2],pixelXY);
+
+                        // trivial reject
+                        if(pixelD0 + dot(e[0],reject[0]) <= 0) continue;
+                        if(pixelD1 + dot(e[1],reject[1]) <= 0) continue;
+                        if(pixelD2 + dot(e[2],reject[2]) <= 0) continue;
+                        // TODO: interleaved pixels (planar samples) + flag subsampled
+
+                        // Scale from pixels to samples
+                        pixelD0 *= 4, pixelD1 *= 4, pixelD2 *= 4;
+
+                        uint mask=0; float centroid[V] = {}; float samples=0;
+                        // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                        for(int sampleI=0; sampleI<16; sampleI++) {
+                            float* const sample = pixel+sampleI;
+                            const vec2 sampleXY = XY[sampleI]; //TODO: latin square pattern
+                            const float
+                                    sampleD0 = pixelD0 + dot(e[0],sampleXY),
+                                    sampleD1 = pixelD1 + dot(e[1],sampleXY),
+                                    sampleD2 = pixelD2 + dot(e[2],sampleXY);
+
+                            if(sampleD0>0 && sampleD1>0 && sampleD2>0) {
+                                vec3 XY1 = vec3( ((binXY*4.f+blockXY)*4.f+pixelXY)*4.f+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
+                                float w = 1/dot(iw,XY1);
+                                float z = w*dot(iz,XY1);
+
+                                float& depth = *sample;
+                                if(z>=depth) {
+                                    depth = z;
+                                    samples++;
+                                    mask |= 1<<sampleI;
+                                    for(int i=0;i<V;i++) centroid[i]+=w*dot(varyings[i],XY1);
+                                }
                             }
                         }
-                        bit <<= 1;
-                    }
-                    if(mask) {
+
                         for(int i=0;i<V;i++) centroid[i] /= samples;
-                        vec4 color_opacity = shader(face.faceAttributes,centroid);
-                        float a = color_opacity.w; vec3 color = color_opacity.xyz()*a;
-                        //TODO: z/color compression
-                        uint bit=1;
-                        for(int i=0;i<pixelSize;i++) for(int j=0;j<pixelSize;j++) {
-                            if(mask&bit) {
-                                vec3& s = pixelColor[i*pixelSize+j];
-                                s=s*(1-a)+color;
+                        vec4 bgra = shader(face.faceAttributes,centroid);
+                        float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                        for(int sampleI=0;sampleI<16;sampleI++) {
+                            float* const sample = pixel+sampleI;
+                            if(mask&(1<<sampleI)) {
+                                float& dstB = sample[1*64*64];
+                                float& dstG = sample[2*64*64];
+                                float& dstR = sample[3*64*64];
+                                dstB=(1-srcA)*dstB+srcA*srcB;
+                                dstG=(1-srcA)*dstG+srcA*srcG;
+                                dstR=(1-srcA)*dstR+srcA*srcR;
                             }
-                            bit <<= 1;
                         }
                     }
                 }
             }
-            tile.faceCount=0;
+            bin.faceCount=0;
         }
         faceCount=0;
     }

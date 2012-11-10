@@ -315,16 +315,16 @@ struct Editor : Widget {
 
     Text status __(dec(level),32);
     void render(int2 targetPosition, int2 targetSize) override {
-        RenderTarget target __(targetSize.x,targetSize.y);
+        RenderTarget target __(targetSize.x*4,targetSize.y*4);
 
         // Fit window
         {
             mat4 view; view.rotateZ(PI/2); //+X (heading) is up
             vec2 m=min(view*sceneMin,view*sceneMax).xy(), M=max(view*sceneMin,view*sceneMax).xy();
             vec2 size = M-m;
-            scale = min(target.tileWidth*tileSize/size.x,target.tileHeight*tileSize/size.y)*0.75;
-            vec2 margin = vec2(target.tileWidth*tileSize,target.tileHeight*tileSize)/scale-size;
-            position = vec3(vec2(vec2(target.tileWidth*tileSize,target.tileHeight*tileSize)/scale/2.f).x,vec2(-m+margin/2.f).y,0);
+            scale = min(target.width*64/size.x,target.height*64/size.y)*0.75;
+            vec2 margin = vec2(target.width*64,target.height*64)/scale-size;
+            position = vec3(vec2(vec2(target.width*64,target.height*64)/scale/2.f).x,vec2(-m+margin/2.f).y,0);
         }
 
         // Render

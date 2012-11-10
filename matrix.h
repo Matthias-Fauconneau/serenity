@@ -14,7 +14,8 @@ struct mat3 {
     float& m(int i, int j) { return data[j*3+i]; }
     float operator()(int i, int j) const { return m(i,j); }
     float& operator()(int i, int j) { return m(i,j); }
-    vec4& operator[](int j) { return (vec4&)data[j*3]; }
+    vec3& operator[](int j) { return (vec3&)data[j*3]; }
+    const vec3& operator[](int j) const { return (vec3&)data[j*3]; }
 
     vec2 operator*(vec2 v) const {vec2 r(0,0); for(int i=0;i<2;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+1*m(i,2); return r; }
     vec3 operator*(vec3 v) const {vec3 r(0,0,0); for(int i=0;i<3;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2); return r; }
@@ -46,7 +47,6 @@ struct mat3 {
     mat3 translate(vec2 v) const { mat3 r=*this; for(int i=0;i<2;i++) r(i,2) += m(i,0)*v.x + m(i,1)*v.y; return r; }
     mat3 scale(float f) const { mat3 r=*this; for(int j=0;j<2;j++)for(int i=0;i<3;i++) r(i,j)*=f; return r; }
 };
-inline vec3 operator*(vec3 v, mat3 m) { vec3 r(0,0,0); for(int j=0;j<3;j++) r[j] = v.x*m(0,j)+v.y*m(1,j)+v.z*m(2,j); return r; }
 inline mat3 operator*(float s, mat3 m) {mat3 r(0); for(int j=0;j<3;j++) for(int i=0;i<3;i++) r.m(i,j)=s*m(i,j); return r; }
 
 /// 3D projective transformation

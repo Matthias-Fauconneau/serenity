@@ -5,26 +5,22 @@
 
 // Test correct top-left rasterization rules using a simple triangle fan
 struct PolygonTest : Widget {
-    Window window __(this,int2(4*2*16,6*2*16),"PolygonTest"_);
+    Window window __(this,int2(4*16,6*16),"PolygonTest"_);
     PolygonTest(){
         window.localShortcut(Escape).connect(&exit);
         window.backgroundColor=window.backgroundCenter=0xFF;
     }
     void render(int2 position, int2 size) {
-        Rasterizer raster(4,6);
-        raster.clear();
-        if(1) { //aligned
-            //raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(1-1./2,1-1./2,0,1),vec4(3-1./2,1-1./2,0,1),Flat(vec4(0,0,0,1./2))); //bottom
-            //raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(3-1./2,1-1./2,0,1),vec4(3-1./2,5-1./2,0,1),Flat(vec4(0,0,1,1./2))); //right
-            raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(3-1./2,5-1./2,0,1),vec4(1-1./2,5-1./2,0,1),Flat(vec4(0,1,0,1./2))); //top
-            //raster.triangle(vec4(2-1./2,3-1./2,0,1),vec4(1-1./2,5-1./2,0,1),vec4(1-1./2,1-1./2,0,1),Flat(vec4(1,0,0,1./2))); //left
-        } else { //centered
-            raster.triangle(vec4(2,3,0,1),vec4(1,1,0,1),vec4(3,1,0,1),Flat(vec4(0,0,0,1./2))); //bottom
-            raster.triangle(vec4(2,3,0,1),vec4(3,1,0,1),vec4(3,5,0,1),Flat(vec4(0,0,1,1./2))); // right
-            raster.triangle(vec4(2,3,0,1),vec4(3,5,0,1),vec4(1,5,0,1),Flat(vec4(0,1,0,1./2))); //top
-            raster.triangle(vec4(2,3,0,1),vec4(1,5,0,1),vec4(1,1,0,1),Flat(vec4(1,0,0,1./2))); //left
-        }
-        raster.resolve(position,size);
+        RenderTarget target(4*16*4,6*16*4);
+        RenderPass<vec4,0> pass(target);
+        mat4 M; M.scale(64);
+        pass.submit(M*vec3(2,3,0),M*vec3(1,1,0),M*vec3(3,1,0),__(),vec4(0,0,0,1./2)); //bottom
+        pass.submit(M*vec3(2,3,0),M*vec3(3,1,0),M*vec3(3,5,0),__(),vec4(0,0,1,1./2)); // right
+        pass.submit(M*vec3(2,3,0),M*vec3(3,5,0),M*vec3(1,5,0),__(),vec4(0,1,0,1./2)); //top
+        pass.submit(M*vec3(2,3,0),M*vec3(1,5,0),M*vec3(1,1,0),__(),vec4(1,0,0,1./2)); //left
+        function<vec4(vec4,float[0])> flat = [](vec4 color,float[0]){return color;};
+        pass.render(flat);
+        target.resolve(position,size);
     }
 } test ;
 #endif
