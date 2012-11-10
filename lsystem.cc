@@ -310,7 +310,7 @@ struct Editor : Widget {
     }
 
     uint64 miscStart=cpuTime();
-    uint64 miscTime=0, setupTime=0, rasterTime=0, resolveTime=0;
+    uint64 miscTime=0, setupTime=0, rasterTime=500, resolveTime=100;
     const uint T=4; // exponential moving average
 
     Text status __(dec(level),32);

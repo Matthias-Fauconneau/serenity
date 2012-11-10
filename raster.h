@@ -6,16 +6,17 @@
 template<class FaceAttributes, int V> using Shader = functor<vec4(FaceAttributes,float[V])>;
 
 /// 64×64 pixels bin for L1 cache locality (64×64×RGBZ×float~64KB)
-struct Bin { // 8K triangles (virtual) + 64K framebuffer (actual)
+struct Bin { // 16KB triangles (stream) + 64KB framebuffer (L1)
     uint16 cleared=0;
     uint16 faceCount=0;
-    uint16 faces[64*64-2]; // maximum virtual capacity
+    uint16 subsample[16]; //Per-pixel flag to trigger subpixel operations
+    uint16 faces[2*64*64-2-16]; // maximum virtual capacity
     float depth[64*64], blue[64*64], green[64*64], red[64*64];
 };
 
 /// Tiled render target
 struct RenderTarget {
-    int width,height; //in bins
+    uint width,height; //in bins
     Bin* bins;
     float depth, blue, green, red;
 
@@ -33,7 +34,7 @@ struct RenderTarget {
     void resolve(int2 position, int2 size);
 };
 
-template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vertex varying attributes*/> struct RenderPass {
+template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vertex varying attributes*/, bool blend=false> struct RenderPass {
     // triangle face with 3F constant face attributes and V varying (perspective-interpolated) vertex attributes
     struct VertexAttributes { vec3 data[V]; };
     struct Face {
@@ -45,7 +46,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
     RenderTarget& target;
     uint16 faceCount=0;
-    Face faces[4096]; // maximum virtual capacity
+    Face faces[1<<12]; // maximum virtual capacity
     RenderPass(RenderTarget& target):target(target){}
 
     // Implementation is inline to allow per-pass face attributes specialization
@@ -66,59 +67,37 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
         int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy())))/64);
         int2 max = ::min(int2(target.width-1,target.height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy())))/64);
+        // TODO: profile average bin count, if count>=16: add a hierarchy level
         for(int binY=min.y; binY<=max.y; binY++) for(int binX=min.x; binX<=max.x; binX++) {
             Bin& bin = target.bins[binY*target.width+binX];
             bin.faces[bin.faceCount++]=faceCount;
-            if(faceCount>sizeof(bin.faces)/sizeof(uint16)) error("Overflow");
+            if(faceCount>sizeof(bin.faces)/sizeof(uint16)) error("Index overflow");
         }
         faceCount++;
-        if(faceCount>sizeof(faces)/sizeof(Face)) error("Overflow");
+        if(faceCount>sizeof(faces)/sizeof(Face)) error("Face overflow");
     }
 
     // For each bin, rasterizes and shade all triangles using given shader
-    void render(const Shader<FaceAttributes,V>& shader) {
+    void render(const Shader<FaceAttributes,V>& shader unused) {
+        // TODO: multithreaded tiles (4×4 bins (64×64 pixels))
         // Loop on all bins (64x64 samples (16x16 pixels))
-        for(int binI=0; binI<target.height; binI++) for(int binJ=0; binJ<target.width; binJ++) {
+        for(uint binI=0; binI<target.height; binI++) for(uint binJ=0; binJ<target.width; binJ++) {
             Bin& bin = target.bins[binI*target.width+binJ];
             if(!bin.cleared) {
+                clear(bin.subsample,16);
                 clear(bin.depth,64*64,target.depth);
                 clear(bin.blue,64*64,target.blue);
                 clear(bin.green,64*64,target.green);
                 clear(bin.red,64*64,target.red);
                 bin.cleared=1;
             }
+            uint16* const subsample = bin.subsample;
             float* const buffer = bin.depth;
             const vec2 binXY = vec2(binJ,binI);
             // Loop on all faces in the bin
-            for(int faceI=0; faceI<bin.faceCount; faceI++) {
+            for(uint faceI=0; faceI<bin.faceCount; faceI++) {
                 const Face& face = faces[bin.faces[faceI]];
                 const mat3& E = face.E;
-
-                // Interpolation functions (-dy, dx, d)
-                const vec2 e[3] = {E[0].xy(), E[1].xy(), E[2].xy()};
-
-                // Initial distance step
-                const float pixelToBin = 1.f/64;
-                float binD0 = pixelToBin*E[0].z + dot(e[0],binXY),
-                        binD1 = pixelToBin*E[1].z + dot(e[1],binXY),
-                        binD2 = pixelToBin*E[2].z + dot(e[2],binXY);
-
-                // trivial accept/reject corner for each edge
-                vec2 accept[3], reject[3];
-                for(int edgeI=0; edgeI<3; edgeI++) {
-                    vec2 edge = e[edgeI];
-                    reject[edgeI] = vec2(edge.x>0,edge.y>0);
-                    accept[edgeI] = vec2(!(edge.x>0),!(edge.y>0));
-                }
-
-                // trivial reject
-                if(binD0 + dot(e[0],reject[0]) <= 0) continue;
-                if(binD1 + dot(e[1],reject[1]) <= 0) continue;
-                if(binD2 + dot(e[2],reject[2]) <= 0) continue;
-
-                const vec3 iw = E[0]+E[1]+E[2];
-                const vec3 iz = E*face.Z;
-                vec3 varyings[V]; for(int i=0;i<V;i++) varyings[i] = E*face.vertexAttributes.data[i];
 
                 //4×4 xy steps constant mask
                 static constexpr vec2 XY[4*4] = {
@@ -128,81 +107,219 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                                   vec2(0,3),vec2(1,3),vec2(2,3),vec2(3,3),
                                                 };
 
+                // Computes bin initial distance, 4×4 edge steps and trivial reject/accept corner steps for each edge
+                float step[3][4*4], binD[3], reject[3], accept[3];
+                for(int e=0;e<3;e++) {
+                    // Interpolation functions (-dy, dx, d)
+                    const vec2 edge = E[e].xy();
+                    // Bin initial distance
+                    binD[e] = 1.f/64*E[e].z + dot(edge,binXY);
+                    // 4×4 edge steps
+                    for(int i=0;i<4*4;i++) step[e][i] = dot(edge,XY[i]);
+                    // trivial reject/accept corner steps for each edge
+                    int rejectIndex = (edge.y>0)*3*4 + (edge.x>0)*3;
+                    int acceptIndex = ~rejectIndex;
+                    reject[e] = step[e][rejectIndex];
+                    accept[e] = step[e][acceptIndex];
+                }
+
+                // trivial reject
+                if((binD[0] + reject[0] <= 0) || (binD[1] + reject[1] <= 0) || (binD[2] + reject[2] <= 0) ) continue;
+
+                // TODO: Hi-Z block reject
+
+                const vec3 iw = E[0]+E[1]+E[2];
+                const vec3 iz = E*face.Z;
+                vec3 varyings[V]; for(int i=0;i<V;i++) varyings[i] = E*face.vertexAttributes.data[i];
+
+                // TODO: trivial edge accept (for bin)
+
+                // Full tile accept
+
                 // Scale from bin to blocks
-                binD0 *= 4, binD1 *= 4, binD2 *= 4;
+                for(int e=0;e<3;e++) binD[e] *= 4;
 
                 // Loop on 4×4 blocks (TODO: vectorize, loop on coverage mask bitscan)
-                for(int blockI=0; blockI<4*4; blockI++) {
-                    float* const block = buffer + blockI*(4*4)*(4*4);
-                    const vec2 blockXY = XY[blockI];
-                    float blockD0 = binD0 + dot(e[0],blockXY),
-                            blockD1 = binD1 + dot(e[1],blockXY),
-                            blockD2 = binD2 + dot(e[2],blockXY);
+                for(uint blockI=0; blockI<4*4; blockI++) {
+                    float blockD[3]; for(int e=0;e<3;e++) blockD[e] = binD[e] + step[e][blockI];
 
                     // trivial reject
-                    if(blockD0 + dot(e[0],reject[0]) <= 0) continue;
-                    if(blockD1 + dot(e[1],reject[1]) <= 0) continue;
-                    if(blockD2 + dot(e[2],reject[2]) <= 0) continue;
+                    if((blockD[0] + reject[0] <= 0) || (blockD[1] + reject[1] <= 0) || (blockD[2] + reject[2] <= 0) ) continue;
 
-                    // TODO: block Hi-Z
+                    // TODO: Hi-Z block reject
+
+                    // TODO: trivial edge accept (for block)
+
+                    // Full block accept
 
                     // Scale from blocks to pixels
-                    blockD0 *= 4, blockD1 *= 4, blockD2 *= 4;
+                    for(int e=0;e<3;e++) blockD[e] *= 4;
+                    const uint blockPtr = blockI*(4*4); //not (4*4)² since samples are planar
+                    const vec2 blockXY = XY[blockI];
 
                     // Loop on 4×4 pixels (TODO: vectorize, loop on coverage mask bitscan)
-                    for(int pixelI=0; pixelI<4*4; pixelI++) {
-                        float* const pixel = block+pixelI*16;
-                        const vec2 pixelXY = XY[pixelI];
-                        float pixelD0 = blockD0 + dot(e[0],pixelXY),
-                                pixelD1 = blockD1 + dot(e[1],pixelXY),
-                                pixelD2 = blockD2 + dot(e[2],pixelXY);
+                    for(uint pixelI=0; pixelI<4*4; pixelI++) {
+                        float pixelD[3]; for(int e=0;e<3;e++) pixelD[e] = blockD[e] + step[e][pixelI];
 
                         // trivial reject
-                        if(pixelD0 + dot(e[0],reject[0]) <= 0) continue;
-                        if(pixelD1 + dot(e[1],reject[1]) <= 0) continue;
-                        if(pixelD2 + dot(e[2],reject[2]) <= 0) continue;
-                        // TODO: interleaved pixels (planar samples) + flag subsampled
+                        if((pixelD[0] + reject[0] <= 0) || (pixelD[1] + reject[1] <= 0) || (pixelD[2] + reject[2] <= 0) ) continue;
 
-                        // Scale from pixels to samples
-                        pixelD0 *= 4, pixelD1 *= 4, pixelD2 *= 4;
+                        // TODO: Hi-Z pixel reject
 
-                        uint mask=0; float centroid[V] = {}; float samples=0;
-                        // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
-                        for(int sampleI=0; sampleI<16; sampleI++) {
-                            float* const sample = pixel+sampleI;
-                            const vec2 sampleXY = XY[sampleI]; //TODO: latin square pattern
-                            const float
-                                    sampleD0 = pixelD0 + dot(e[0],sampleXY),
-                                    sampleD1 = pixelD1 + dot(e[1],sampleXY),
-                                    sampleD2 = pixelD2 + dot(e[2],sampleXY);
+                        const uint pixelPtr = blockPtr+pixelI; //not pixel*(4*4) since samples are planar
+                        const vec2 pixelXY = XY[pixelI];
+                        float* const pixel = buffer+pixelPtr;
 
-                            if(sampleD0>0 && sampleD1>0 && sampleD2>0) {
-                                vec3 XY1 = vec3( ((binXY*4.f+blockXY)*4.f+pixelXY)*4.f+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
+                        // TODO: trivial edge pixel accept
+
+                        // Full pixel accept
+                        if(
+                                pixelD[0] + accept[0] > 0 &&
+                                pixelD[1] + accept[1] > 0 &&
+                                pixelD[2] + accept[2] > 0 ) {
+                            if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                                vec3 XY1 = vec3(((binXY*4.f+blockXY)*4.f+pixelXY+vec2(1.f/2, 1.f/2))*4.f, 1.f);
                                 float w = 1/dot(iw,XY1);
                                 float z = w*dot(iz,XY1);
 
-                                float& depth = *sample;
+                                float& depth = *pixel;
                                 if(z>=depth) {
-                                    depth = z;
-                                    samples++;
-                                    mask |= 1<<sampleI;
-                                    for(int i=0;i<V;i++) centroid[i]+=w*dot(varyings[i],XY1);
+                                    float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(varyings[i],XY1);
+                                    vec4 bgra = vec4(0,0,0,1); //shader(face.faceAttributes,centroid);
+                                    float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
+                                    float& dstB = pixel[1*64*64];
+                                    float& dstG = pixel[2*64*64];
+                                    float& dstR = pixel[3*64*64];
+                                    if(blend) {
+                                        dstB=(1-srcA)*dstB+srcA*srcB;
+                                        dstG=(1-srcA)*dstG+srcA*srcG;
+                                        dstR=(1-srcA)*dstR+srcA*srcR;
+                                    } else {
+                                        dstB=srcB;
+                                        dstG=srcG;
+                                        dstR=srcR;
+                                    }
+                                    dstG=1; //DEBUG: non-multisampled pixel
                                 }
+                            } else { // Full coverage accept
+                                uint mask=0; float centroid[V] = {}; float samples=0;
+                                // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                for(uint sampleI=0; sampleI<16; sampleI++) {
+                                    float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
+                                    const vec2 sampleXY = XY[sampleI]; //TODO: latin square pattern
+
+                                    vec3 XY1 = vec3(((binXY*4.f+blockXY)*4.f+pixelXY)*4.f+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
+                                    float w = 1/dot(iw,XY1);
+                                    float z = w*dot(iz,XY1);
+
+                                    float& depth = *sample;
+                                    if(z>=depth) {
+                                        depth = z;
+                                        samples++;
+                                        mask |= 1<<sampleI;
+                                        for(int i=0;i<V;i++) centroid[i]+=w*dot(varyings[i],XY1);
+                                    }
+                                }
+
+                                for(uint i=0;i<V;i++) centroid[i] /= samples;
+                                vec4 bgra = vec4(0,0,0,1); //shader(face.faceAttributes,centroid);
+                                float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                                // Occluded subsampled pixel become whole again
+                                if(mask==(1<<16)-1) { //TODO: Hi-Z full pixel accept to avoid 16 Z-test + interpolation
+                                    subsample[pixelPtr/16]&=~(1<<(pixelPtr%16));
+                                    float& dstB = pixel[1*64*64];
+                                    float& dstG = pixel[2*64*64];
+                                    float& dstR = pixel[3*64*64];
+                                    if(blend) {
+                                        dstB=(1-srcA)*dstB+srcA*srcB;
+                                        dstG=(1-srcA)*dstG+srcA*srcG;
+                                        dstR=(1-srcA)*dstR+srcA*srcR;
+                                    } else {
+                                        dstB=srcB;
+                                        dstG=srcG;
+                                        dstR=srcR;
+                                    }
+                                    dstB=1; //DEBUG: coalesced pixel
+                                } else {
+                                    for(uint sampleI=0;sampleI<16;sampleI++) {
+                                        float* const sample = 16*16*sampleI+pixel;
+                                        if(mask&(1<<sampleI)) {
+                                            float& dstB = sample[1*64*64];
+                                            float& dstG = sample[2*64*64];
+                                            float& dstR = sample[3*64*64];
+                                            if(blend) {
+                                                dstB=(1-srcA)*dstB+srcA*srcB;
+                                                dstG=(1-srcA)*dstG+srcA*srcG;
+                                                dstR=(1-srcA)*dstR+srcA*srcR;
+                                            } else {
+                                                dstB=srcB;
+                                                dstG=srcG;
+                                                dstR=srcR;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+
+                        // Scale from pixels to samples
+                        for(int e=0;e<3;e++) pixelD[e] *= 4;
+
+                        if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                            // Set subsampled pixel flag
+                            subsample[pixelPtr/16]|=(1<<(pixelPtr%16));
+                            // Broadcast pixel (first) sample to all (other) subsamples
+                            for(uint sampleI=1;sampleI<16;sampleI++) {
+                                float* const sample = 16*16*sampleI+pixel;
+                                sample[0*64*64]=pixel[0*64*64];
+                                sample[1*64*64]=pixel[1*64*64];
+                                sample[2*64*64]=pixel[2*64*64];
+                                sample[3*64*64]=pixel[3*64*64];
                             }
                         }
 
-                        for(int i=0;i<V;i++) centroid[i] /= samples;
-                        vec4 bgra = shader(face.faceAttributes,centroid);
+                        uint mask=0; float centroid[V] = {}; float samples=0;
+                        // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                        for(uint sampleI=0; sampleI<16; sampleI++) {
+                            float sampleD[3]; for(int e=0;e<3;e++) sampleD[e] = pixelD[e] + step[e][sampleI];
+
+                            // reject
+                            if((sampleD[0] + reject[0] <= 0) || (sampleD[1] + reject[1] <= 0) || (sampleD[2] + reject[2] <= 0) ) continue;
+
+                            const vec2 sampleXY = XY[sampleI]; //TODO: latin square pattern
+                            vec3 XY1 = vec3(((binXY*4.f+blockXY)*4.f+pixelXY)*4.f+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
+                            float w = 1/dot(iw,XY1);
+                            float z = w*dot(iz,XY1);
+
+                            float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
+                            float& depth = *sample;
+                            if(z>=depth) {
+                                depth = z;
+                                samples++;
+                                mask |= 1<<sampleI;
+                                for(int i=0;i<V;i++) centroid[i]+=w*dot(varyings[i],XY1);
+                            }
+                        }
+
+                        for(uint i=0;i<V;i++) centroid[i] /= samples;
+                        vec4 bgra = vec4(0,0,0,1); //shader(face.faceAttributes,centroid);
                         float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                        for(int sampleI=0;sampleI<16;sampleI++) {
-                            float* const sample = pixel+sampleI;
+                        for(uint sampleI=0;sampleI<16;sampleI++) {
+                            float* const sample = 16*16*sampleI+pixel;
                             if(mask&(1<<sampleI)) {
                                 float& dstB = sample[1*64*64];
                                 float& dstG = sample[2*64*64];
                                 float& dstR = sample[3*64*64];
-                                dstB=(1-srcA)*dstB+srcA*srcB;
-                                dstG=(1-srcA)*dstG+srcA*srcG;
-                                dstR=(1-srcA)*dstR+srcA*srcR;
+                                if(blend) {
+                                    dstB=(1-srcA)*dstB+srcA*srcB;
+                                    dstG=(1-srcA)*dstG+srcA*srcG;
+                                    dstR=(1-srcA)*dstR+srcA*srcR;
+                                } else {
+                                    dstB=srcB;
+                                    dstG=srcG;
+                                    dstR=srcR;
+                                }
                             }
                         }
                     }
