@@ -205,6 +205,7 @@ struct Editor : Widget {
     Bar<Text> systems;
 
     Window window __(this,int2(0,0),"L-System Editor"_);
+    //Window window __(this,int2(256,256),"L-System Editor"_);
     LSystem system;
     uint current=0, level=6; bool label=false;
 
@@ -309,29 +310,33 @@ struct Editor : Widget {
     }
 
     uint64 miscStart=cpuTime();
+    uint64 miscTime=0, setupTime=0, rasterTime=0, resolveTime=0;
+    const uint T=4; // exponential moving average
+
     Text status __(dec(level),32);
     void render(int2 targetPosition, int2 targetSize) override {
-        systems.render(targetPosition,int2(targetSize.x,16));
+        RenderTarget target __(targetSize.x,targetSize.y);
 
         // Fit window
         {
             mat4 view; view.rotateZ(PI/2); //+X (heading) is up
             vec2 m=min(view*sceneMin,view*sceneMax).xy(), M=max(view*sceneMin,view*sceneMax).xy();
             vec2 size = M-m;
-            scale = min(targetSize.x/size.x,targetSize.y/size.y)*0.75;
-            vec2 margin = vec2(targetSize)/scale-size;
-            position = vec3(vec2(vec2(targetSize)/scale/2.f).x,vec2(-m+margin/2.f).y,0);
+            scale = min(target.tileWidth*tileSize/size.x,target.tileHeight*tileSize/size.y)*0.75;
+            vec2 margin = vec2(target.tileWidth*tileSize,target.tileHeight*tileSize)/scale-size;
+            position = vec3(vec2(vec2(target.tileWidth*tileSize,target.tileHeight*tileSize)/scale/2.f).x,vec2(-m+margin/2.f).y,0);
         }
 
         // Render
         mat4 view = this->view();
         mat3 normalMatrix = view.normalMatrix();
-        vec3 sky = normalize(normalMatrix*vec3(1,0,0));
-        vec3 sun = normalize(normalMatrix*vec3(1,1,0));
-        Rasterizer raster __(framebuffer.width,framebuffer.height-16-32);
-        raster.clear(vec4(1,1,1,0));
-        uint64 rasterStart=cpuTime();
-        uint64 miscTime = rasterStart-miscStart;
+
+        // Trees (cylinders)
+        struct FaceAttributes { vec3 Y,Z; };
+        RenderPass<FaceAttributes,1> pass(target);
+
+        uint64 setupStart=cpuTime();
+        miscTime = (setupStart-miscStart + (T-1)*miscTime)/T;
         for(Cone cone: cones) {
             // View transform
             vec3 A=(view*cone.A).xyz(); float wA = scale*cone.wA;
@@ -344,33 +349,40 @@ struct Editor : Widget {
             // Normal basis to be interpolated
             vec3 Y=cross(vec3(0,0,1),X), Z=cross(X,Y);
 
-            function<vec4(float[1])> shader = [/*uniform*/sky,sun,/*TODO: face attribute*/ Y,Z](float varying[1]){
-                float d = clip(-1.f,varying[0],1.f);
-                vec3 N = d*Y + sqrt(1-d*d)*Z;
-
-                vec3 diffuseLight =
-                        light(N,sky,vec3(1./2,1./4,1./8)) +
-                        light(N,sun,vec3(1./2,3./4,7./8), PI/2);
-
-                vec3 albedo = vec3(1,1,1);
-                vec3 diffuse = albedo*diffuseLight;
-                return vec4(diffuse,1.f);
-            };
-            {
-                vec4 a(A - Y*(wA/2), 1.f), b(B - Y*(wB/2), 1.f), c(B + Y*(wB/2), 1.f), d(A + Y*(wA/2), 1.f);
-                raster.triangle(shader,a,b,c,(vec3[]){vec3(-1,-1,1)});
-                raster.triangle(shader,c,d,a,(vec3[]){vec3(1,1,-1)});
-            }
+            vec4 a(A - Y*(wA/2), 1.f), b(B - Y*(wB/2), 1.f), c(B + Y*(wB/2), 1.f), d(A + Y*(wA/2), 1.f);
+            pass.submit(a,b,c,__({vec3(-1,-1,1)}),__(Y,Z));
+            pass.submit(c,d,a,__({vec3(1,1,-1)}),__(Y,Z));
         }
-        uint64 resolveStart = cpuTime();
-        uint64 rasterTime = resolveStart-rasterStart;
-        raster.resolve(targetPosition+int2(0,16+32),targetSize);
-        miscStart = cpuTime();
-        uint64 resolveTime = miscStart-resolveStart;
+        uint64 rasterStart=cpuTime();
+        setupTime = (rasterStart-setupStart + (T-1)*setupTime)/T;
 
-        uint64 totalTime = miscTime+rasterTime+resolveTime;
-        status.setText(str(1e6f/totalTime)+"fps "_+str(totalTime/1000)+"ms "
+        vec3 sky = normalize(normalMatrix*vec3(1,0,0));
+        vec3 sun = normalize(normalMatrix*vec3(1,1,0));
+        function<vec4(FaceAttributes,float[1])> shader = [sky,sun](FaceAttributes face, float varying[1]){
+            float d = clip(-1.f,varying[0],1.f);
+            vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
+
+            vec3 diffuseLight =
+                    light(N,sky,vec3(1./2,1./4,1./8)) +
+                    light(N,sun,vec3(1./2,3./4,7./8), PI/2);
+
+            vec3 albedo = vec3(1,1,1);
+            vec3 diffuse = albedo*diffuseLight;
+            return vec4(diffuse,1.f);
+        };
+        pass.render(shader);
+
+        uint64 resolveStart = cpuTime();
+        rasterTime = (resolveStart-rasterStart + (T-1)*rasterTime)/T;
+        target.resolve(targetPosition,targetSize);
+        miscStart = cpuTime();
+        resolveTime = (miscStart-resolveStart + (T-1)*resolveTime)/T;
+
+        systems.render(targetPosition,int2(targetSize.x,16));
+        uint64 totalTime = miscTime+setupTime+rasterTime+resolveTime;
+        status.setText(ftoa(1e6f/totalTime,1)+"fps "_+str(totalTime/1000)+"ms "
                        "misc="_+str(100*miscTime/totalTime)+"% "
+                       "setup="_+str(100*setupTime/totalTime)+"% "
                        "raster="_+str(100*rasterTime/totalTime)+"% "
                        "resolve="_+str(100*resolveTime/totalTime)+"% "_);
         status.render(int2(targetPosition+int2(16)));

@@ -1,9 +1,15 @@
 CG:
- tile-based deferred rendering using coverage masks
- shadow
- SSE quads, color compression, Z compression
+TBDR:
+ 16x16 block trivial reject
+ 4x4 quad trivial reject
+ 64x64 tile trivial reject
+ 1x1 pixel trivial reject
+ partial (edge) rejects
+ full accepts
+ MSAA Z/color compression, latin square
+ shadows
  herbaceous plants, colors, leaves, textures
- scene (sky, grass, plants, forest, terrain...)
+ multithreading, scene (sky, grass, plants, forest, terrain...)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, truetype, ssl

@@ -62,9 +62,11 @@ generic bool operator >(const vector& u, const vector& v) { for(uint i=0;i<N;i++
 
 generic vector abs(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
 generic vector sign(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=sign(v[i]); return r;  }
+generic vector floor(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=floor(v[i]); return r;  }
+generic vector ceil(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=ceil(v[i]); return r;  }
 generic vector min(const vector& a, const vector& b){ vector r; for(uint i=0;i<N;i++) r[i]=min(a[i],b[i]); return r; }
 generic vector max(const vector& a, const vector& b){ vector r; for(uint i=0;i<N;i++) r[i]=max(a[i],b[i]); return r; }
-generic vector clip(const vector& min, const vector& x, const vector& max){ vector r; for(uint i=0;i<N;i++) r[i]=clip(min[i],x[i],max[i]); return r;  }
+generic vector clip(const vector& min, const vector& x, const vector& max){vector r; for(uint i=0;i<N;i++) r[i]=clip(min[i],x[i],max[i]); return r;}
 
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
 generic float length(const vector& a) { return sqrt(dot(a,a)); }
