@@ -5,19 +5,19 @@
 
 // Test correct top-left rasterization rules using a simple triangle fan
 struct PolygonTest : Widget {
-    Window window __(this,int2(4*16,6*16),"PolygonTest"_);
+    Window window __(this,int2(4*64,6*64),"PolygonTest"_);
     PolygonTest(){
         window.localShortcut(Escape).connect(&exit);
         window.backgroundColor=window.backgroundCenter=0xFF;
     }
     void render(int2 position, int2 size) {
-        RenderTarget target(4*16*4,6*16*4);
-        RenderPass<vec4,0> pass(target);
-        mat4 M; M.scale(64);
-        pass.submit(M*vec3(2,3,0),M*vec3(1,1,0),M*vec3(3,1,0),__(),vec4(0,0,0,1./2)); //bottom
-        pass.submit(M*vec3(2,3,0),M*vec3(3,1,0),M*vec3(3,5,0),__(),vec4(0,0,1,1./2)); // right
-        pass.submit(M*vec3(2,3,0),M*vec3(3,5,0),M*vec3(1,5,0),__(),vec4(0,1,0,1./2)); //top
-        pass.submit(M*vec3(2,3,0),M*vec3(1,5,0),M*vec3(1,1,0),__(),vec4(1,0,0,1./2)); //left
+        RenderTarget target(4*64*4,6*64*4);
+        RenderPass<vec4,1> pass(target,4);
+        mat4 M; M.scale(64*4);
+        pass.submit(M*vec3(2,3,0),M*vec3(1,1,0),M*vec3(3,1,0),(vec3[]){vec3(0,0,0)},vec4(0,0,0,1./2)); //bottom
+        pass.submit(M*vec3(2,3,0),M*vec3(3,1,0),M*vec3(3,5,0),(vec3[]){vec3(0,0,0)},vec4(0,0,1,1./2)); // right
+        pass.submit(M*vec3(2,3,0),M*vec3(3,5,0),M*vec3(1,5,0),(vec3[]){vec3(0,0,0)},vec4(0,1,0,1./2)); //top
+        pass.submit(M*vec3(2,3,0),M*vec3(1,5,0),M*vec3(1,1,0),(vec3[]){vec3(0,0,0)},vec4(1,0,0,1./2)); //left
         function<vec4(vec4,float[0])> flat = [](vec4 color,float[0]){return color;};
         pass.render(flat);
         target.resolve(position,size);

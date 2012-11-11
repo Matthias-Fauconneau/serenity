@@ -1,11 +1,8 @@
 CG:
 TBDR:
- defer shading (output draw commands (uint8 x,y, uint16 mask) in bin/block/pixel queues) until whole triangle (in bin) is rasterized
  partial (edge) accepts
- quads
- full block/bin accepts
+ quad polygon ?
  latin square
- fixed point ?
  check assembly and explicit optimizations as needed
  shadows
  herbaceous plants, colors, leaves, textures

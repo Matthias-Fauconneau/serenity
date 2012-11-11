@@ -333,7 +333,7 @@ struct Editor : Widget {
 
         // Trees (cylinders)
         struct FaceAttributes { vec3 Y,Z; };
-        RenderPass<FaceAttributes,1> pass(target);
+        RenderPass<FaceAttributes,1> pass(target, cones.size()*2);
 
         uint64 setupStart=cpuTime();
         miscTime = (setupStart-miscStart + (T-1)*miscTime)/T;
@@ -350,8 +350,8 @@ struct Editor : Widget {
             vec3 Y=cross(vec3(0,0,1),X), Z=cross(X,Y);
 
             vec4 a(A - Y*(wA/2), 1.f), b(B - Y*(wB/2), 1.f), c(B + Y*(wB/2), 1.f), d(A + Y*(wA/2), 1.f);
-            pass.submit(a,b,c,__({vec3(-1,-1,1)}),__(Y,Z));
-            pass.submit(c,d,a,__({vec3(1,1,-1)}),__(Y,Z));
+            pass.submit(a,b,c,(vec3[]){vec3(-1,-1,1)},__(Y,Z));
+            pass.submit(c,d,a,(vec3[]){vec3(1,1,-1)},__(Y,Z));
         }
         uint64 rasterStart=cpuTime();
         setupTime = (rasterStart-setupStart + (T-1)*setupTime)/T;
