@@ -2,6 +2,7 @@
 /// \file raster.h 3D rasterizer (polygon, circle)
 #include "matrix.h"
 #include "function.h"
+#include "time.h"
 
 template<class FaceAttributes, int V> using Shader = functor<vec4(FaceAttributes,float[V])>;
 
@@ -78,6 +79,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
     RenderTarget& target;
     uint16 faceCount=0, faceCapacity;
     Face* faces;
+    int64 clearTime=0, rasterTime=0, pixelTime=0, sampleTime=0, userTime=0, totalTime=0;
     RenderPass(RenderTarget& target, uint faceCapacity):target(target),faceCapacity(faceCapacity){
         faces = allocate16<Face>(faceCapacity);
     }
@@ -154,18 +156,22 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
     }
 
     // For each bin, rasterizes and shade all triangles using given shader
-    void render(const Shader<FaceAttributes,V>& shader unused) {
+    void render(const Shader<FaceAttributes,V>& shader) {
+        int64 start = rdtsc();
         // TODO: multithreaded tiles (4×4 bins (64×64 pixels))
         // Loop on all bins (64x64 samples (16x16 pixels))
         for(uint binI=0; binI<target.height; binI++) for(uint binJ=0; binJ<target.width; binJ++) {
             Bin& bin = target.bins[binI*target.width+binJ];
+            if(!bin.faceCount) continue;
             if(!bin.cleared) {
+                int64 start=rdtsc();
                 clear(bin.subsample,16);
-                clear(bin.depth,64*64,target.depth);
-                clear(bin.blue,64*64,target.blue);
-                clear(bin.green,64*64,target.green);
-                clear(bin.red,64*64,target.red);
+                clear(bin.depth,16*16,target.depth);
+                clear(bin.blue,16*16,target.blue);
+                clear(bin.green,16*16,target.green);
+                clear(bin.red,16*16,target.red);
                 bin.cleared=1;
+                clearTime += rdtsc()-start;
             }
             uint16* const subsample = bin.subsample;
             float* const buffer = bin.depth;
@@ -174,107 +180,132 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
             for(uint faceI=0; faceI<bin.faceCount; faceI++) {
                 struct DrawCommand { vec2 pos; uint ptr; uint mask; } blocks[4*4], pixels[16*16]; uint blockCount=0, pixelCount=0;
                 const Face& face = faces[bin.faces[faceI]];
-                int binReject[3], binAccept[3];
-                for(int e=0;e<3;e++) {
-                    binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
-                    binAccept[e] = face.binAccept[e] + dot(face.edges[e], binXY);
-                }
+                {
+                    int64 start=rdtsc();
+                    int binReject[3], binAccept[3];
+                    for(int e=0;e<3;e++) {
+                        binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
+                        binAccept[e] = face.binAccept[e] + dot(face.edges[e], binXY);
+                    }
+                    // TODO: Hi-Z reject
+                    // TODO: trivial edge accept
+                    // Full bin accept
+                    if(
+                            binAccept[0] > 0 &&
+                            binAccept[1] > 0 &&
+                            binAccept[2] > 0 ) {
+                        for(;blockCount<16;blockCount++)
+                            blocks[blockCount] = DrawCommand __(binXY+16.f*XY[0][blockCount], blockCount*(4*4), 0xFFFF);
+                    } else {
+                        // Loop on 4×4 blocks (TODO: vectorize, loop on coverage mask bitscan)
+                        for(uint blockI=0; blockI<4*4; blockI++) {
+                            int blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
 
-                // TODO: Hi-Z reject
-                // TODO: trivial edge accept
-                // Full bin accept
-                if(
-                        binAccept[0] > 0 &&
-                        binAccept[1] > 0 &&
-                        binAccept[2] > 0 ) {
-                    for(;blockCount<16;blockCount++)
-                        blocks[blockCount] = DrawCommand __(binXY+16.f*XY[0][blockCount], blockCount*(4*4), 0xFFFF);
-                } else {
-                    // Loop on 4×4 blocks (TODO: vectorize, loop on coverage mask bitscan)
-                    for(uint blockI=0; blockI<4*4; blockI++) {
-                        int blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
-
-                        // trivial reject
-                        if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
-
-                        // TODO: Hi-Z reject
-                        // TODO: trivial edge accept
-
-                        const uint16 blockPtr = blockI*(4*4); //not (4*4)² since samples are planar
-                        const vec2 blockXY = binXY+16.f*XY[0][blockI];
-
-                        int blockAccept[3]; for(int e=0;e<3;e++) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
-                        // Full block accept
-                        if(
-                                blockAccept[0] > 0 &&
-                                blockAccept[1] > 0 &&
-                                blockAccept[2] > 0 ) {
-                            blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, 0xFFFF);
-                            continue;
-                        }
-
-                        // Loop on 4×4 pixels (TODO: vectorize, loop on coverage mask bitscan)
-                        uint16 partialBlockMask=0; // partial block of full pixels
-                        for(uint pixelI=0; pixelI<4*4; pixelI++) {
                             // trivial reject
-                            if(
-                                    blockReject[0] + face.pixelRejectStep[0][pixelI] <= 0 ||
-                                    blockReject[1] + face.pixelRejectStep[1][pixelI] <= 0 ||
-                                    blockReject[2] + face.pixelRejectStep[2][pixelI] <= 0 ) continue;
+                            if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
 
                             // TODO: Hi-Z reject
                             // TODO: trivial edge accept
 
-                            // Full pixel accept
+                            const uint16 blockPtr = blockI*(4*4); //not (4*4)² since samples are planar
+                            const vec2 blockXY = binXY+16.f*XY[0][blockI];
+
+                            int blockAccept[3]; for(int e=0;e<3;e++) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
+                            // Full block accept
                             if(
-                                    blockAccept[0] > face.pixelAcceptStep[0][pixelI] &&
-                                    blockAccept[1] > face.pixelAcceptStep[1][pixelI] &&
-                                    blockAccept[2] > face.pixelAcceptStep[2][pixelI] ) {
-                                partialBlockMask |= 1<<pixelI;
+                                    blockAccept[0] > 0 &&
+                                    blockAccept[1] > 0 &&
+                                    blockAccept[2] > 0 ) {
+                                blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, 0xFFFF);
                                 continue;
                             }
 
-                            int pixelReject[3]; for(int e=0;e<3;e++) pixelReject[e] = blockReject[e] + face.pixelRejectStep[e][pixelI];
+                            // Loop on 4×4 pixels (TODO: vectorize, loop on coverage mask bitscan)
+                            uint16 partialBlockMask=0; // partial block of full pixels
+                            for(uint pixelI=0; pixelI<4*4; pixelI++) {
+                                int pixelReject[3]; for(int e=0;e<3;e++) pixelReject[e] = blockReject[e] + face.pixelRejectStep[e][pixelI];
 
-                            uint16 mask=0;
-                            // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
-                            for(uint sampleI=0; sampleI<16; sampleI++) {
-                                if(
-                                        pixelReject[0] <= face.sampleStep[0][sampleI] ||
-                                        pixelReject[1] <= face.sampleStep[1][sampleI] ||
-                                        pixelReject[2] <= face.sampleStep[2][sampleI] ) continue;
-                                mask |= (1<<sampleI);
+                                // trivial reject
+                                if(pixelReject[0] <= 0 || pixelReject[1] <= 0 || pixelReject[2] <= 0) continue;
+
+                                // TODO: Hi-Z reject
+
+                                // Accept any trivial edge
+                                int const* sampleStep[3]; int edgeCount=0;
+                                if(blockAccept[0] <= face.pixelAcceptStep[0][pixelI])
+                                    pixelReject[edgeCount]=pixelReject[0], sampleStep[edgeCount]=face.sampleStep[0], edgeCount++;
+                                if(blockAccept[1] <= face.pixelAcceptStep[1][pixelI])
+                                    pixelReject[edgeCount]=pixelReject[1], sampleStep[edgeCount]=face.sampleStep[1], edgeCount++;
+                                if(blockAccept[2] <= face.pixelAcceptStep[2][pixelI])
+                                    pixelReject[edgeCount]=pixelReject[2], sampleStep[edgeCount]=face.sampleStep[2], edgeCount++;
+
+                                // Full pixel accept
+                                if(edgeCount==0) {
+                                    partialBlockMask |= 1<<pixelI;
+                                    continue;
+                                }
+
+                                uint16 mask=0;
+                                if(edgeCount==1) {
+                                    // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                    for(uint sampleI=0; sampleI<16; sampleI++) {
+                                        if( pixelReject[0] <= sampleStep[0][sampleI] ) continue;
+                                        mask |= (1<<sampleI);
+                                    }
+                                } else if(edgeCount==2) {
+                                    // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                    for(uint sampleI=0; sampleI<16; sampleI++) {
+                                        if(
+                                                pixelReject[0] <= sampleStep[0][sampleI] ||
+                                                pixelReject[1] <= sampleStep[1][sampleI] ) continue;
+                                        mask |= (1<<sampleI);
+                                    }
+                                } else {
+                                    // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                    for(uint sampleI=0; sampleI<16; sampleI++) {
+                                        if(
+                                                pixelReject[0] <= sampleStep[0][sampleI] ||
+                                                pixelReject[1] <= sampleStep[1][sampleI] ||
+                                                pixelReject[2] <= sampleStep[2][sampleI] ) continue;
+                                        mask |= (1<<sampleI);
+                                    }
+                                }
+                                const vec2 pixelXY = 4.f*XY[0][pixelI];
+                                const uint16 pixelPtr = blockPtr+pixelI; //not pixel*(4*4) since samples are planar
+                                pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, mask);
                             }
-                            const vec2 pixelXY = 4.f*XY[0][pixelI];
-                            const uint16 pixelPtr = blockPtr+pixelI; //not pixel*(4*4) since samples are planar
-                            pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, mask);
+                            blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, partialBlockMask);
                         }
-                        blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, partialBlockMask);
                     }
+                    rasterTime += rdtsc()-start;
                 }
 
-                assert(blockCount<=16);
-                for(uint i=0; i<blockCount; i++) { //Blocks of fully covered pixels
-                    const DrawCommand& draw = blocks[i];
-                    const uint blockPtr = draw.ptr;
-                    const vec2 blockXY = draw.pos;
-                    const uint16 mask = draw.mask;
-                    for(uint pixelI=0; pixelI<4*4; pixelI++) {
-                        if(!(mask&(1<<pixelI))) continue; //vectorized code might actually mask output instead
-                        const uint pixelPtr = blockPtr+pixelI; //not pixel*(4*4) since samples are planar
-                        const vec2 pixelXY = 4.f*XY[0][pixelI];
-                        float* const pixel = buffer+pixelPtr;
-                        // Pixel coverage on single sample pixel
-                        if(1/*!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))*/) {
-                            vec3 XY1 = vec3(blockXY+pixelXY+vec2(4.f/2, 4.f/2), 1.f);
-                            float w = 1/dot(face.iw,XY1);
-                            float z = w*dot(face.iz,XY1);
+                {
+                    int64 start = rdtsc();
+                    int64 userTime=0;
+                    for(uint i=0; i<blockCount; i++) { //Blocks of fully covered pixels
+                        const DrawCommand& draw = blocks[i];
+                        const uint blockPtr = draw.ptr;
+                        const vec2 blockXY = draw.pos;
+                        const uint16 mask = draw.mask;
+                        for(uint pixelI=0; pixelI<4*4; pixelI++) {
+                            if(!(mask&(1<<pixelI))) continue; //vectorized code might actually mask output instead
+                            const uint pixelPtr = blockPtr+pixelI; //not pixel*(4*4) since samples are planar
+                            const vec2 pixelXY = blockXY+4.f*XY[0][pixelI];
+                            float* const pixel = buffer+pixelPtr;
+                            // Pixel coverage on single sample pixel
+                            if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                                vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
+                                float w = 1/dot(face.iw,XY1);
+                                float z = w*dot(face.iz,XY1);
 
-                            float& depth = *pixel;
-                            if(z>=depth) {
+                                float& depth = *pixel;
+                                if(z < depth) continue;
+                                depth =z;
                                 float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
-                                //vec4 bgra = vec4(0,0,0,1); //DEBUG
+                                int64 start = rdtsc();
                                 vec4 bgra = shader(face.faceAttributes,centroid);
+                                userTime += rdtsc()-start;
                                 float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
                                 float& dstB = pixel[1*64*64];
                                 float& dstG = pixel[2*64*64];
@@ -288,40 +319,127 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstG=srcG;
                                     dstR=srcR;
                                 }
-                                dstG=1; //DEBUG: non-multisampled pixel
                             }
-                        }
-                        else // Pixel coverage on subsampled pixel
-                        {
-                            uint mask=0; float centroid[V] = {}; float samples=0;
-                            // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
-                            for(uint sampleI=0; sampleI<16; sampleI++) {
-                                float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
-                                const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
+                            else // Pixel coverage on subsampled pixel
+                            {
+                                uint mask=0; float centroid[V] = {}; float samples=0;
+                                // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                for(uint sampleI=0; sampleI<16; sampleI++) {
+                                    float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
+                                    const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
 
-                                vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
-                                float w = 1/dot(face.iw,XY1);
-                                float z = w*dot(face.iz,XY1);
+                                    vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
+                                    float w = 1/dot(face.iw,XY1);
+                                    float z = w*dot(face.iz,XY1);
 
-                                float& depth = *sample;
-                                if(z>=depth) {
-                                    depth = z;
-                                    samples++;
-                                    mask |= 1<<sampleI;
-                                    for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
+                                    float& depth = *sample;
+                                    if(z>=depth) {
+                                        depth = z;
+                                        samples++;
+                                        mask |= (1<<sampleI);
+                                        for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
+                                    }
+                                }
+
+                                for(uint i=0;i<V;i++) centroid[i] /= samples;
+                                int64 start = rdtsc();
+                                vec4 bgra = shader(face.faceAttributes,centroid);
+                                userTime += rdtsc()-start;
+                                float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                                // Occluded subsampled pixel become whole again
+                                if(mask==(1<<16)-1) { //TODO: Hi-Z full pixel accept to avoid 16 Z-test + interpolation
+                                    subsample[pixelPtr/16] &= ~(1<<(pixelPtr%16));
+                                    float& dstB = pixel[1*64*64];
+                                    float& dstG = pixel[2*64*64];
+                                    float& dstR = pixel[3*64*64];
+                                    if(blend) {
+                                        dstB=(1-srcA)*dstB+srcA*srcB;
+                                        dstG=(1-srcA)*dstG+srcA*srcG;
+                                        dstR=(1-srcA)*dstR+srcA*srcR;
+                                    } else {
+                                        dstB=srcB;
+                                        dstG=srcG;
+                                        dstR=srcR;
+                                    }
+                                    dstG=1; //DEBUG: coalesced pixel
+                                } else {
+                                    for(uint sampleI=0;sampleI<16;sampleI++) {
+                                        float* const sample = 16*16*sampleI+pixel;
+                                        if(mask&(1<<sampleI)) {
+                                            float& dstB = sample[1*64*64];
+                                            float& dstG = sample[2*64*64];
+                                            float& dstR = sample[3*64*64];
+                                            if(blend) {
+                                                dstB=(1-srcA)*dstB+srcA*srcB;
+                                                dstG=(1-srcA)*dstG+srcA*srcG;
+                                                dstR=(1-srcA)*dstR+srcA*srcR;
+                                            } else {
+                                                dstB=srcB;
+                                                dstG=srcG;
+                                                dstR=srcR;
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                        }
+                    }
+                    this->userTime+=userTime;
+                    pixelTime += rdtsc()-start - userTime;
+                }
+                {
+                    int64 start = rdtsc();
+                    int64 userTime=0;
+                    for(uint i=0; i<pixelCount; i++) { // Partially covered pixel of samples
+                        const DrawCommand& draw = pixels[i];
+                        const uint pixelPtr = draw.ptr;
+                        const vec2 pixelXY = draw.pos;
+                        float* const pixel = buffer+pixelPtr;
+                        uint16 mask = draw.mask;
 
-                            for(uint i=0;i<V;i++) centroid[i] /= samples;
-                            //vec4 bgra = vec4(0,0,0,1); //DEBUG
-                            vec4 bgra = shader(face.faceAttributes,centroid);
-                            float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                            // Occluded subsampled pixel become whole again
-                            if(mask==(1<<16)-1) { //TODO: Hi-Z full pixel accept to avoid 16 Z-test + interpolation
-                                subsample[pixelPtr/16] &= ~(1<<(pixelPtr%16));
-                                float& dstB = pixel[1*64*64];
-                                float& dstG = pixel[2*64*64];
-                                float& dstR = pixel[3*64*64];
+                        // Convert single sample pixel to subsampled pixel
+                        if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                            // Set subsampled pixel flag
+                            subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
+                            // Broadcast pixel (first) sample to all (other) subsamples
+                            for(uint sampleI=1;sampleI<16;sampleI++) {
+                                float* const sample = 16*16*sampleI+pixel;
+                                sample[0*64*64]=pixel[0*64*64];
+                                sample[1*64*64]=pixel[1*64*64];
+                                sample[2*64*64]=pixel[2*64*64];
+                                sample[3*64*64]=pixel[3*64*64];
+                            }
+                        }
+
+                        float centroid[V] = {}; float samples=0;
+                        // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                        for(uint sampleI=0; sampleI<16; sampleI++) {
+                            if(!(mask&(1<<sampleI))) continue; //vectorized code might actually mask output instead
+
+                            const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
+                            vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
+                            float w = 1/dot(face.iw,XY1);
+                            float z = w*dot(face.iz,XY1);
+
+                            float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
+                            float& depth = *sample;
+                            if(z<depth) { mask &= ~(1<<sampleI); continue; }
+                            depth = z;
+                            samples++;
+                            for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
+                        }
+
+                        for(uint i=0;i<V;i++) centroid[i] /= samples;
+                        int64 start = rdtsc();
+                        vec4 bgra = shader(face.faceAttributes,centroid);
+                        userTime += rdtsc()-start;
+                        float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                        for(uint sampleI=0;sampleI<16;sampleI++) {
+                            float* const sample = 16*16*sampleI+pixel;
+                            if(mask&(1<<sampleI)) {
+                                float& dstB = sample[1*64*64];
+                                float& dstG = sample[2*64*64];
+                                float& dstR = sample[3*64*64];
                                 if(blend) {
                                     dstB=(1-srcA)*dstB+srcA*srcB;
                                     dstG=(1-srcA)*dstG+srcA*srcG;
@@ -331,96 +449,18 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstG=srcG;
                                     dstR=srcR;
                                 }
-                                //dstB=1; //DEBUG: coalesced pixel
-                            } else {
-                                for(uint sampleI=0;sampleI<16;sampleI++) {
-                                    float* const sample = 16*16*sampleI+pixel;
-                                    if(mask&(1<<sampleI)) {
-                                        float& dstB = sample[1*64*64];
-                                        float& dstG = sample[2*64*64];
-                                        float& dstR = sample[3*64*64];
-                                        if(blend) {
-                                            dstB=(1-srcA)*dstB+srcA*srcB;
-                                            dstG=(1-srcA)*dstG+srcA*srcG;
-                                            dstR=(1-srcA)*dstR+srcA*srcR;
-                                        } else {
-                                            dstB=srcB;
-                                            dstG=srcG;
-                                            dstR=srcR;
-                                        }
-                                    }
-                                }
+                                dstR=1; //DEBUG
                             }
                         }
                     }
-                }
-
-                assert(pixelCount<=16*16);
-                for(uint i=0; i<pixelCount; i++) { //Partially covered Pixel of samples
-                    const DrawCommand& draw = pixels[i];
-                    const uint pixelPtr = draw.ptr; assert(pixelPtr/16<16);
-                    const vec2 pixelXY = draw.pos;
-                    float* const pixel = buffer+pixelPtr;
-                    uint16 mask = draw.mask;
-
-                    // Convert single sample pixel to subsampled pixel
-                    if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
-                        // Set subsampled pixel flag
-                        subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
-                        // Broadcast pixel (first) sample to all (other) subsamples
-                        for(uint sampleI=1;sampleI<16;sampleI++) {
-                            float* const sample = 16*16*sampleI+pixel;
-                            sample[0*64*64]=pixel[0*64*64];
-                            sample[1*64*64]=pixel[1*64*64];
-                            sample[2*64*64]=pixel[2*64*64];
-                            sample[3*64*64]=pixel[3*64*64];
-                        }
-                    }
-
-                    float centroid[V] = {}; float samples=0;
-                    // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
-                    for(uint sampleI=0; sampleI<16; sampleI++) {
-                        if(!(mask&(1<<sampleI))) continue; //vectorized code might actually mask output instead
-
-                        const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
-                        vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
-                        float w = 1/dot(face.iw,XY1);
-                        float z = w*dot(face.iz,XY1);
-
-                        float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
-                        float& depth = *sample;
-                        if(z<depth) { mask &= ~(1<<sampleI); continue; }
-                        depth = z;
-                        samples++;
-                        for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
-                    }
-
-                    for(uint i=0;i<V;i++) centroid[i] /= samples;
-                    //vec4 bgra = vec4(0,0,0,1); //DEBUG
-                    vec4 bgra = shader(face.faceAttributes,centroid);
-                    float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                    for(uint sampleI=0;sampleI<16;sampleI++) {
-                        float* const sample = 16*16*sampleI+pixel;
-                        if(mask&(1<<sampleI)) {
-                            float& dstB = sample[1*64*64];
-                            float& dstG = sample[2*64*64];
-                            float& dstR = sample[3*64*64];
-                            if(blend) {
-                                dstB=(1-srcA)*dstB+srcA*srcB;
-                                dstG=(1-srcA)*dstG+srcA*srcG;
-                                dstR=(1-srcA)*dstR+srcA*srcR;
-                            } else {
-                                dstB=srcB;
-                                dstG=srcG;
-                                dstR=srcR;
-                            }
-                        }
-                    }
+                    this->userTime += userTime;
+                    sampleTime += rdtsc()-start - userTime;
                 }
             }
             bin.faceCount=0;
         }
         faceCount=0;
+        totalTime = rdtsc()-start;
     }
 };
 

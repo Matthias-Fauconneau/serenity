@@ -1,6 +1,6 @@
 CG:
 TBDR:
- partial (edge) accepts
+ vectorize
  quad polygon ?
  latin square
  check assembly and explicit optimizations as needed

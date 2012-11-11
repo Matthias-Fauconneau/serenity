@@ -310,10 +310,10 @@ struct Editor : Widget {
     }
 
     uint64 miscStart=cpuTime();
-    uint64 miscTime=0, setupTime=0, rasterTime=500, resolveTime=100;
+    uint64 miscTime=0, setupTime=0, renderTime=500, resolveTime=100;
     const uint T=4; // exponential moving average
 
-    Text status __(dec(level),32);
+    Text status __(dec(level),16);
     void render(int2 targetPosition, int2 targetSize) override {
         RenderTarget target __(targetSize.x*4,targetSize.y*4);
 
@@ -336,7 +336,7 @@ struct Editor : Widget {
         RenderPass<FaceAttributes,1> pass(target, cones.size()*2);
 
         uint64 setupStart=cpuTime();
-        miscTime = (setupStart-miscStart + (T-1)*miscTime)/T;
+        miscTime = ( (setupStart-miscStart) + (T-1)*miscTime)/T;
         for(Cone cone: cones) {
             // View transform
             vec3 A=(view*cone.A).xyz(); float wA = scale*cone.wA;
@@ -353,12 +353,13 @@ struct Editor : Widget {
             pass.submit(a,b,c,(vec3[]){vec3(-1,-1,1)},__(Y,Z));
             pass.submit(c,d,a,(vec3[]){vec3(1,1,-1)},__(Y,Z));
         }
-        uint64 rasterStart=cpuTime();
-        setupTime = (rasterStart-setupStart + (T-1)*setupTime)/T;
+        uint64 renderStart=cpuTime();
+        setupTime = (renderStart-setupStart + (T-1)*setupTime)/T;
 
         vec3 sky = normalize(normalMatrix*vec3(1,0,0));
         vec3 sun = normalize(normalMatrix*vec3(1,1,0));
         function<vec4(FaceAttributes,float[1])> shader = [sky,sun](FaceAttributes face, float varying[1]){
+            return vec4(0,0,0,1);
             float d = clip(-1.f,varying[0],1.f);
             vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
 
@@ -373,18 +374,23 @@ struct Editor : Widget {
         pass.render(shader);
 
         uint64 resolveStart = cpuTime();
-        rasterTime = (resolveStart-rasterStart + (T-1)*rasterTime)/T;
+        renderTime = ( (resolveStart-renderStart) + (T-1)*renderTime)/T;
         target.resolve(targetPosition,targetSize);
         miscStart = cpuTime();
-        resolveTime = (miscStart-resolveStart + (T-1)*resolveTime)/T;
+        resolveTime = ( (miscStart-resolveStart) + (T-1)*resolveTime)/T;
 
         systems.render(targetPosition,int2(targetSize.x,16));
-        uint64 totalTime = miscTime+setupTime+rasterTime+resolveTime;
-        status.setText(ftoa(1e6f/totalTime,1)+"fps "_+str(totalTime/1000)+"ms "
-                       "misc="_+str(100*miscTime/totalTime)+"% "
-                       "setup="_+str(100*setupTime/totalTime)+"% "
-                       "raster="_+str(100*rasterTime/totalTime)+"% "
-                       "resolve="_+str(100*resolveTime/totalTime)+"% "_);
+        uint64 totalTime = miscTime+setupTime+renderTime+resolveTime;
+        status.setText(ftoa(1e6f/totalTime,1)+"fps "_+str(totalTime/1000)+"ms\n"
+                       "misc "_+str(100*miscTime/totalTime)+"%\n"
+                       "setup "_+str(100*setupTime/totalTime)+"%\n"
+                       "render "_+str(100*renderTime/totalTime)+"%\n"
+                       "- clear "_+str(100*pass.clearTime/pass.totalTime)+"%\n"
+                       "- raster "_+str(100*pass.rasterTime/pass.totalTime)+"%\n"
+                       "- pixel "_+str(100*(pass.pixelTime)/pass.totalTime)+"%\n"_
+                       "- sample "_+str(100*(pass.sampleTime)/pass.totalTime)+"%\n"_
+                       "- user "_+str(100*pass.userTime/pass.totalTime)+"%\n"
+                       "resolve "_+str(100*resolveTime/totalTime)+"%\n"_);
         status.render(int2(targetPosition+int2(16)));
         window.render(); //keep updating to get correct performance profile
     }
