@@ -203,6 +203,7 @@ struct LSystem {
 struct Editor : Widget {
     Folder folder = Folder(""_,cwd());
     Bar<Text> systems;
+    Text status __(dec(level),16);
 
     Window window __(this,int2(0,0),"L-System Editor"_);
     //Window window __(this,int2(256,256),"L-System Editor"_);
@@ -268,7 +269,7 @@ struct Editor : Widget {
 
     Editor() {
         window.localShortcut(Escape).connect(&exit);
-        window.backgroundCenter=window.backgroundColor=0xFF;
+        window.fillBackground=0;
 
         array<string> files = folder.list(Files);
         for(string& file : files) if(endsWith(file,".l"_)) systems << string(section(file,'.'));
@@ -309,13 +310,20 @@ struct Editor : Widget {
         return view;
     }
 
-    uint64 miscStart=cpuTime();
-    uint64 miscTime=0, setupTime=0, renderTime=500, resolveTime=100;
+    RenderTarget target;
+
+    uint64 frameEnd=cpuTime(), frameTime=0; // in microseconds
+    uint64 miscStart=rdtsc(), miscTime=0, setupTime=0, renderTime=0, resolveTime=0, uiTime=0; //in cycles
     const uint T=4; // exponential moving average
 
-    Text status __(dec(level),16);
     void render(int2 targetPosition, int2 targetSize) override {
-        RenderTarget target __(targetSize.x*4,targetSize.y*4);
+        uint64 setupStart=rdtsc();
+        miscTime = ( (setupStart-miscStart) + (T-1)*miscTime)/T;
+
+        if(targetSize != target.size) {
+            target.resize(targetSize);
+        }
+        target.clear();
 
         // Fit window
         {
@@ -335,8 +343,6 @@ struct Editor : Widget {
         struct FaceAttributes { vec3 Y,Z; };
         RenderPass<FaceAttributes,1> pass(target, cones.size()*2);
 
-        uint64 setupStart=cpuTime();
-        miscTime = ( (setupStart-miscStart) + (T-1)*miscTime)/T;
         for(Cone cone: cones) {
             // View transform
             vec3 A=(view*cone.A).xyz(); float wA = scale*cone.wA;
@@ -353,7 +359,7 @@ struct Editor : Widget {
             pass.submit(a,b,c,(vec3[]){vec3(-1,-1,1)},__(Y,Z));
             pass.submit(c,d,a,(vec3[]){vec3(1,1,-1)},__(Y,Z));
         }
-        uint64 renderStart=cpuTime();
+        uint64 renderStart=rdtsc();
         setupTime = (renderStart-setupStart + (T-1)*setupTime)/T;
 
         vec3 sky = normalize(normalMatrix*vec3(1,0,0));
@@ -373,15 +379,18 @@ struct Editor : Widget {
         };
         pass.render(shader);
 
-        uint64 resolveStart = cpuTime();
+        uint64 resolveStart = rdtsc();
         renderTime = ( (resolveStart-renderStart) + (T-1)*renderTime)/T;
         target.resolve(targetPosition,targetSize);
-        miscStart = cpuTime();
-        resolveTime = ( (miscStart-resolveStart) + (T-1)*resolveTime)/T;
+        uint64 uiStart = rdtsc();
+        resolveTime = ( (uiStart-resolveStart) + (T-1)*resolveTime)/T;
+        uint frameEnd = cpuTime();
 
         systems.render(targetPosition,int2(targetSize.x,16));
-        uint64 totalTime = miscTime+setupTime+renderTime+resolveTime;
-        status.setText(ftoa(1e6f/totalTime,1)+"fps "_+str(totalTime/1000)+"ms\n"
+        uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime; //in cycles
+        frameTime = ( (frameEnd-this->frameEnd) + (T-1)*frameTime)/T; ;
+        this->frameEnd=frameEnd;
+        status.setText(ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms\n"
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
                        "setup "_+str(100*setupTime/totalTime)+"%\n"
                        "render "_+str(100*renderTime/totalTime)+"%\n"
@@ -389,9 +398,19 @@ struct Editor : Widget {
                        "- raster "_+str(100*pass.rasterTime/pass.totalTime)+"%\n"
                        "- pixel "_+str(100*(pass.pixelTime)/pass.totalTime)+"%\n"_
                        "- sample "_+str(100*(pass.sampleTime)/pass.totalTime)+"%\n"_
-                       "- user "_+str(100*pass.userTime/pass.totalTime)+"%\n"
-                       "resolve "_+str(100*resolveTime/totalTime)+"%\n"_);
+                       "-- MSAA split "_+str(100*(pass.sampleFirstTime)/pass.totalTime)+"%\n"_
+                       "--- Z-Test & Centroid "_+str(100*(pass.sampleFirstZTestAndCentroidTime)/pass.totalTime)+"%\n"_
+                       "--- Output "_+str(100*(pass.sampleFirstOutputTime)/pass.totalTime)+"%\n"_
+                       "-- MSAA over "_+str(100*(pass.sampleOverTime)/pass.totalTime)+"%\n"_
+                       "--- Z-Test & Centroid "_+str(100*(pass.sampleOverZTestAndCentroidTime)/pass.totalTime)+"%\n"_
+                       "--- Output "_+str(100*(pass.sampleOverOutputTime)/pass.totalTime)+"%\n"_
+                       "- user "_+str(100*pass.userTime/totalTime)+"%\n"
+                       "resolve "_+str(100*resolveTime/totalTime)+"%\n"
+                       "ui "_+str(100*uiTime/totalTime)+"%\n"_);
         status.render(int2(targetPosition+int2(16)));
         window.render(); //keep updating to get correct performance profile
+        uiTime = ( (rdtsc()-uiStart) + (T-1)*uiTime)/T;
+        yield();
+        miscStart = rdtsc();
     }
 } application;
