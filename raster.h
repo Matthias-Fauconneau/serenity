@@ -11,8 +11,10 @@ struct Bin { // 16KB triangles (stream) + 64KB framebuffer (L1)
     uint16 cleared=0;
     uint16 faceCount=0;
     uint16 subsample[16]; //Per-pixel flag to trigger subpixel operations
-    uint16 faces[2*64*64-2-16]; // maximum virtual capacity
-    float depth[64*64], blue[64*64], green[64*64], red[64*64];
+    uint16 faces[2*64*64-2-16-2*16*16]; // maximum virtual capacity
+    float nearestSampleDepth[16*16];
+    float depth[16*16], blue[16*16], green[16*16], red[16*16];
+    float subDepth[64*64], subBlue[64*64], subGreen[64*64], subRed[64*64];
 };
 
 /// Tiled render target
@@ -197,7 +199,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         for(;blockCount<16;blockCount++)
                             blocks[blockCount] = DrawCommand __(binXY+16.f*XY[0][blockCount], blockCount*(4*4), 0xFFFF);
                     } else {
-                        // Loop on 4×4 blocks (TODO: vectorize, loop on coverage mask bitscan)
+                        // Loop on 4×4 blocks
                         for(uint blockI=0; blockI<4*4; blockI++) {
                             int blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
 
@@ -220,7 +222,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 continue;
                             }
 
-                            // Loop on 4×4 pixels (TODO: vectorize, loop on coverage mask bitscan)
+                            // Loop on 4×4 pixels
                             uint16 partialBlockMask=0; // partial block of full pixels
                             for(uint pixelI=0; pixelI<4*4; pixelI++) {
                                 int pixelReject[3]; for(int e=0;e<3;e++) pixelReject[e] = blockReject[e] + face.pixelRejectStep[e][pixelI];
@@ -247,13 +249,13 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
                                 uint16 mask=0;
                                 if(edgeCount==1) {
-                                    // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                    // Loop on 4×4 samples
                                     for(uint sampleI=0; sampleI<16; sampleI++) {
                                         if( pixelReject[0] <= sampleStep[0][sampleI] ) continue;
                                         mask |= (1<<sampleI);
                                     }
                                 } else if(edgeCount==2) {
-                                    // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                    // Loop on 4×4 samples
                                     for(uint sampleI=0; sampleI<16; sampleI++) {
                                         if(
                                                 pixelReject[0] <= sampleStep[0][sampleI] ||
@@ -261,7 +263,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                         mask |= (1<<sampleI);
                                     }
                                 } else {
-                                    // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                    // Loop on 4×4 samples
                                     for(uint sampleI=0; sampleI<16; sampleI++) {
                                         if(
                                                 pixelReject[0] <= sampleStep[0][sampleI] ||
@@ -292,24 +294,25 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             if(!(mask&(1<<pixelI))) continue; //vectorized code might actually mask output instead
                             const uint pixelPtr = blockPtr+pixelI; //not pixel*(4*4) since samples are planar
                             const vec2 pixelXY = blockXY+4.f*XY[0][pixelI];
-                            float* const pixel = buffer+pixelPtr;
-                            // Pixel coverage on single sample pixel
-                            if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
-                                vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
-                                float w = 1/dot(face.iw,XY1);
-                                float z = w*dot(face.iz,XY1);
 
-                                float& depth = *pixel;
-                                if(z < depth) continue;
-                                depth =z;
+                            vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
+                            float w = 1/dot(face.iw,XY1);
+                            float z = w*dot(face.iz,XY1);
+
+                            float* const pixel = buffer+pixelPtr;
+                            float& depth = *pixel;
+                            if(z < depth) continue; //Hi-Z reject
+
+                            if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
+                                depth = z;
                                 float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
                                 int64 start = rdtsc();
                                 vec4 bgra = shader(face.faceAttributes,centroid);
                                 userTime += rdtsc()-start;
                                 float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
-                                float& dstB = pixel[1*64*64];
-                                float& dstG = pixel[2*64*64];
-                                float& dstR = pixel[3*64*64];
+                                float& dstB = pixel[1*16*16];
+                                float& dstG = pixel[2*16*16];
+                                float& dstR = pixel[3*16*16];
                                 if(blend) {
                                     dstB=(1-srcA)*dstB+srcA*srcB;
                                     dstG=(1-srcA)*dstG+srcA*srcG;
@@ -320,18 +323,50 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstR=srcR;
                                 }
                             }
-                            else // Pixel coverage on subsampled pixel
-                            {
+                            else if(z > *(buffer-16*16+pixelPtr)) { // Full Z accept
+                                subsample[pixelPtr/16] &= ~(1<<(pixelPtr%16)); // Clear subsample flag
+
+                                depth = z;
+                                float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
+                                int64 start = rdtsc();
+                                vec4 bgra = shader(face.faceAttributes,centroid);
+                                userTime += rdtsc()-start;
+                                float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
+                                float& dstB = pixel[1*16*16];
+                                float& dstG = pixel[2*16*16];
+                                float& dstR = pixel[3*16*16];
+                                if(blend) {
+                                    float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
+                                    // Resolve pixel for blending
+                                    float avgB=0, avgG=0, avgR=0;
+                                    for(uint sampleI=0; sampleI<16; sampleI++) {
+                                        float* const sample = subpixel+sampleI;
+                                        avgB += sample[1*64*64];
+                                        avgG += sample[2*64*64];
+                                        avgR += sample[3*64*64];
+                                    }
+                                    avgB /= 4*4, avgG /=4*4, avgR /= 4*4;
+                                    dstB=(1-srcA)*avgB+srcA*srcB;
+                                    dstG=(1-srcA)*avgG+srcA*srcG;
+                                    dstR=(1-srcA)*avgR+srcA*srcR;
+                                } else {
+                                    dstB=srcB;
+                                    dstG=srcG;
+                                    dstR=srcR;
+                                }
+                                //dstG=1; //DEBUG: coalesced pixel
+                            } else { // Partial Z mask
+                                float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
                                 uint mask=0; float centroid[V] = {}; float samples=0;
-                                // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                                // Loop on 4×4 samples
                                 for(uint sampleI=0; sampleI<16; sampleI++) {
-                                    float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
                                     const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
 
                                     vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
                                     float w = 1/dot(face.iw,XY1);
                                     float z = w*dot(face.iz,XY1);
 
+                                    float* const sample = subpixel+sampleI;
                                     float& depth = *sample;
                                     if(z>=depth) {
                                         depth = z;
@@ -346,38 +381,20 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 vec4 bgra = shader(face.faceAttributes,centroid);
                                 userTime += rdtsc()-start;
                                 float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                                // Occluded subsampled pixel become whole again
-                                if(mask==(1<<16)-1) { //TODO: Hi-Z full pixel accept to avoid 16 Z-test + interpolation
-                                    subsample[pixelPtr/16] &= ~(1<<(pixelPtr%16));
-                                    float& dstB = pixel[1*64*64];
-                                    float& dstG = pixel[2*64*64];
-                                    float& dstR = pixel[3*64*64];
-                                    if(blend) {
-                                        dstB=(1-srcA)*dstB+srcA*srcB;
-                                        dstG=(1-srcA)*dstG+srcA*srcG;
-                                        dstR=(1-srcA)*dstR+srcA*srcR;
-                                    } else {
-                                        dstB=srcB;
-                                        dstG=srcG;
-                                        dstR=srcR;
-                                    }
-                                    dstG=1; //DEBUG: coalesced pixel
-                                } else {
-                                    for(uint sampleI=0;sampleI<16;sampleI++) {
-                                        float* const sample = 16*16*sampleI+pixel;
-                                        if(mask&(1<<sampleI)) {
-                                            float& dstB = sample[1*64*64];
-                                            float& dstG = sample[2*64*64];
-                                            float& dstR = sample[3*64*64];
-                                            if(blend) {
-                                                dstB=(1-srcA)*dstB+srcA*srcB;
-                                                dstG=(1-srcA)*dstG+srcA*srcG;
-                                                dstR=(1-srcA)*dstR+srcA*srcR;
-                                            } else {
-                                                dstB=srcB;
-                                                dstG=srcG;
-                                                dstR=srcR;
-                                            }
+                                for(uint sampleI=0;sampleI<16;sampleI++) {
+                                    float* const sample = subpixel+sampleI;
+                                    if(mask&(1<<sampleI)) {
+                                        float& dstB = sample[1*64*64];
+                                        float& dstG = sample[2*64*64];
+                                        float& dstR = sample[3*64*64];
+                                        if(blend) {
+                                            dstB=(1-srcA)*dstB+srcA*srcB;
+                                            dstG=(1-srcA)*dstG+srcA*srcG;
+                                            dstR=(1-srcA)*dstR+srcA*srcR;
+                                        } else {
+                                            dstB=srcB;
+                                            dstG=srcG;
+                                            dstR=srcR;
                                         }
                                     }
                                 }
@@ -394,25 +411,26 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         const DrawCommand& draw = pixels[i];
                         const uint pixelPtr = draw.ptr;
                         const vec2 pixelXY = draw.pos;
-                        float* const pixel = buffer+pixelPtr;
+                        float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
                         uint16 mask = draw.mask;
 
                         // Convert single sample pixel to subsampled pixel
                         if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
                             // Set subsampled pixel flag
                             subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
-                            // Broadcast pixel (first) sample to all (other) subsamples
-                            for(uint sampleI=1;sampleI<16;sampleI++) {
-                                float* const sample = 16*16*sampleI+pixel;
-                                sample[0*64*64]=pixel[0*64*64];
-                                sample[1*64*64]=pixel[1*64*64];
-                                sample[2*64*64]=pixel[2*64*64];
-                                sample[3*64*64]=pixel[3*64*64];
+                            // Broadcast pixel to subpixel samples
+                            float* const pixel = buffer+pixelPtr;
+                            for(uint sampleI=0;sampleI<16;sampleI++) {
+                                float* const sample = subpixel+sampleI;
+                                sample[0*64*64]=pixel[0*16*16];
+                                sample[1*64*64]=pixel[1*16*16];
+                                sample[2*64*64]=pixel[2*16*16];
+                                sample[3*64*64]=pixel[3*16*16];
                             }
                         }
 
                         float centroid[V] = {}; float samples=0;
-                        // Loop on 4×4 samples (TODO: vectorize, loop on coverage mask bitscan)
+                        // Loop on 4×4 samples
                         for(uint sampleI=0; sampleI<16; sampleI++) {
                             if(!(mask&(1<<sampleI))) continue; //vectorized code might actually mask output instead
 
@@ -421,7 +439,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             float w = 1/dot(face.iw,XY1);
                             float z = w*dot(face.iz,XY1);
 
-                            float* const sample = 16*16*sampleI+pixel; //planar samples (free cache on mostly non-subsampled patterns)
+                            float* const sample = subpixel+sampleI; //planar samples (free cache on mostly non-subsampled patterns)
                             float& depth = *sample;
                             if(z<depth) { mask &= ~(1<<sampleI); continue; }
                             depth = z;
@@ -435,7 +453,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         userTime += rdtsc()-start;
                         float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
                         for(uint sampleI=0;sampleI<16;sampleI++) {
-                            float* const sample = 16*16*sampleI+pixel;
+                            float* const sample = subpixel+sampleI;
                             if(mask&(1<<sampleI)) {
                                 float& dstB = sample[1*64*64];
                                 float& dstG = sample[2*64*64];
@@ -449,7 +467,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstG=srcG;
                                     dstR=srcR;
                                 }
-                                dstR=1; //DEBUG
+                                //dstR=1; //DEBUG
                             }
                         }
                     }
