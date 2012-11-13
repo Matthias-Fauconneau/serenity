@@ -7,21 +7,26 @@
 #include "text.h"
 #include "time.h"
 
-inline float acosf(float t) { return __builtin_acosf(t); }
-inline float sinf(float t) { return __builtin_sinf(t); }
+inline float acos(float t) { return __builtin_acosf(t); }
+inline float sin(float t) { return __builtin_sinf(t); }
 
 /// Directional light with angular diameter
-inline vec3 light(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor, float angularDiameter) {
-    float t = ::acosf(dot(lightDirection,surfaceNormal)); // angle between surface normal and light principal direction
+inline vec3 angularLight(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor, float angularDiameter) {
+    float t = ::acos(dot(lightDirection,surfaceNormal)); // angle between surface normal and light principal direction
     float a = min<float>(PI/2,max<float>(-PI/2,t-angularDiameter/2)); // lower bound of the light integral
     float b = min<float>(PI/2,max<float>(-PI/2,t+angularDiameter/2)); // upper bound of the light integral
-    float R = sinf(b) - sinf(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
-    R /= 2*sinf(angularDiameter/2); // normalize
+    float R = sin(b) - sin(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
+    R /= 2*sin(angularDiameter/2); // normalize
     return vec3(R*lightColor);
 }
-/// For an hemispheric light, the bounds
-inline vec3 light(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor) {
+/// For an hemispheric light, the integral bounds are always [t-PI/2,PI/2], thus R evaluates to (1-cos(t))/2
+inline vec3 hemisphericLight(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor) {
     float R = (1+dot(lightDirection,surfaceNormal))/2;
+    return vec3(R*lightColor);
+}
+/// This is the limit of angularLight when angularDiameter → 0
+inline vec3 directionnalLight(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor) {
+    float R = max(0.f,dot(lightDirection,surfaceNormal));
     return vec3(R*lightColor);
 }
 
@@ -96,7 +101,7 @@ struct LSystem {
     }
 
     LSystem(){}
-    LSystem(ref<byte> source) {
+    LSystem(const ref<byte>& source) {
         map<ref<byte>,float> constants;
         for(ref<byte> line: split(source,'\n')) {
             TextData s(line); if(line.contains(':')) s.until(':'); s.skip();
@@ -140,7 +145,7 @@ struct LSystem {
                             s.skip();
                             assert(s);
                         }
-                        module.arguments << e->evaluate(__());
+                        module.arguments << e->evaluate(ref<float>());
                     }
                     axiom << move(module);
                 }
@@ -320,6 +325,8 @@ struct Editor : Widget {
 
     RenderTarget target;
 
+    struct FaceAttributes { vec3 Y,Z; };
+
     uint64 frameEnd=cpuTime(), frameTime=130000; // in microseconds
     uint64 miscStart=rdtsc(), miscTime=0, setupTime=0, renderTime=0, resolveTime=0, uiTime=0; //in cycles
     const uint T=1; // exponential moving average
@@ -348,8 +355,23 @@ struct Editor : Widget {
         mat3 normalMatrix = view.normalMatrix();
 
         // Trees (cylinders)
-        struct FaceAttributes { vec3 Y,Z; };
-        RenderPass<FaceAttributes,1> pass(target, cones.size()*2);
+        struct TreeRenderPass : RenderPass<FaceAttributes,1> {
+            TreeRenderPass(RenderTarget& target, uint faceCapacity): RenderPass(target,faceCapacity){}
+            vec3 sky, sun;
+            vec4 shader(FaceAttributes face, float varying[1]) override{
+                //return vec4(0,0,0,1);
+                float d = clip(-1.f,varying[0],1.f);
+                vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
+
+                vec3 diffuseLight
+                        = hemisphericLight(N,sky,vec3(1./2,1./4,1./8))
+                        + directionnalLight(N,sun,vec3(1./2,3./4,7./8)); //angularLight(PI/2) is too slow (TODO: fast sine)
+
+                vec3 albedo = vec3(1,1,1);
+                vec3 diffuse = albedo*diffuseLight;
+                return vec4(diffuse,1.f);
+            }
+        } pass __(target, cones.size()*2);
 
         for(Cone cone: cones) {
             // View transform
@@ -366,32 +388,20 @@ struct Editor : Widget {
             //X /= 4; //extend branches a bit to avoid gaps
             //vec4 a(A + wA*(-X-Y), 1.f), b(B + wB*(+X-Y), 1.f), c(B + wB*(+X+Y), 1.f), d(A + wA*(-X+Y), 1.f);
             vec4 a(A - wA*Y, 1.f), b(B - wB*Y, 1.f), c(B + wB*Y, 1.f), d(A + wA*Y, 1.f);
-            pass.submit(a,b,c,(vec3[]){vec3(-1,-1,1)},__(Y,Z));
-            pass.submit(c,d,a,(vec3[]){vec3(1,1,-1)},__(Y,Z));
+            vec3 attributes[][1] = {{vec3(-1,-1,1)},{vec3(1,1,-1)}};
+            pass.submit(a,b,c,attributes[0],__(Y,Z));
+            pass.submit(c,d,a,attributes[1],__(Y,Z));
         }
 
-        vec3 sky = normalize(normalMatrix*vec3(1,0,0));
-        vec3 sun = normalize(normalMatrix*vec3(1,1,0));
-        function<vec4(FaceAttributes,float[1])> shader = [sky,sun](FaceAttributes face, float varying[1]){
-            //return vec4(0,0,0,1);
-            float d = clip(-1.f,varying[0],1.f);
-            vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
-
-            vec3 diffuseLight
-                    = light(N,sky,vec3(1./2,1./4,1./8))
-                    + light(N,sun,vec3(1./2,3./4,7./8), PI/2);
-
-            vec3 albedo = vec3(1,1,1);
-            vec3 diffuse = albedo*diffuseLight;
-            return vec4(diffuse,1.f);
-        };
+        pass.sky = normalize(normalMatrix*vec3(1,0,0));
+        pass.sun = normalize(normalMatrix*vec3(1,1,0));
 
         setupTime = (rdtsc()-setupStart + (T-1)*setupTime)/T;
 
         yield(); //avoid preemption while rendering
 
         uint64 renderStart=rdtsc();
-        pass.render(shader);
+        pass.render();
 
         uint64 resolveStart = rdtsc();
         renderTime = ( (resolveStart-renderStart) + (T-1)*renderTime)/T;

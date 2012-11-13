@@ -1,4 +1,21 @@
 #if 1
+#define __AVX__ 1
+#include "immintrin.h"
+#ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
+#include "avxintrin.h"
+#endif
+
+int main() {
+    float pixelReject;
+    __m256 pixelReject0;
+    uint mask = _mm256_movemask_ps(pixelReject0);
+    //mask |= (_mm256_movemask_ps(_mm256_cmp_ps(pixelReject0, sampleStep[0][2], _CMP_LE_OQ))&0xFF)<<8;
+    return mask;
+}
+
+#endif
+
+#if 0
 #include "window.h"
 #include "display.h"
 #include "text.h"
@@ -7,8 +24,8 @@ inline float acos(float t) { return __builtin_acosf(t); }
 inline float sin(float t) { return __builtin_sinf(t); }
 
 /// Directional light with angular diameter
-inline float light(float lightDirectionDotSurfaceNormal, float angularDiameter=PI) {
-    float t = ::acos(lightDirectionDotSurfaceNormal); // angle between surface normal and light principal direction
+inline float angularLight(float dotNL, float angularDiameter) {
+    float t = ::acos(dotNL); // angle between surface normal and light principal direction
     float a = min<float>(PI/2,max<float>(-PI/2,t-angularDiameter/2)); // lower bound of the light integral
     float b = min<float>(PI/2,max<float>(-PI/2,t+angularDiameter/2)); // upper bound of the light integral
     float R = sin(b) - sin(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
@@ -22,10 +39,8 @@ struct Plot : Widget {
     void render(int2, int2 size) {
         float Y[size.x+1]; float min=1, max=-1;
         for(int n=0;n<=size.x;n++) {
-            //log(((x-0.5)/size.x)*2-1,light(((x-0.5)/size.x)*2-1,PI/2));
             float x = ((n-0.5)/size.x)*2-1;
-            float y = light(x,3*PI/4);
-            //float y = sin(acos(x));
+            float y = angularLight(x,PI/2);
             Y[n]=y;
             min=::min(min,y);
             max=::max(max,y);

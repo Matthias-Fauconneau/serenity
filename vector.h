@@ -15,7 +15,7 @@ template<template<typename> class V, class T, uint N> struct vector : V<T> {
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Initializes components from a fixed size array
-    template<class... Args> explicit const vector(const T o[N]){ for(uint i=0;i<N;i++) at(i)=(T)o[i]; }
+    template<class... Args> explicit vector(const T o[N]){ for(uint i=0;i<N;i++) at(i)=(T)o[i]; }
     /// Initializes first components from another vector \a o and initializes remaining components with args...
     template<template<typename> class W, class... Args> vector(const vector<W,T,N-sizeof...(Args)>& o, Args... args){
         // Assumes the compiler will be able to remove this fluff

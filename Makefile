@@ -5,10 +5,13 @@ BUILD ?= release
 ifeq ($(CC),cc)
  ifeq ($(TARGET),music)
   CC := g++ -fabi-version=0
+ else ifeq ($(TARGET),lsystem)
+   CC := g++ -fabi-version=0
  else
   CC := clang++
  endif
 endif
+
 
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var -Wno-lambda-extensions -pipe -march=native $(FLAGS_$(BUILD))
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG

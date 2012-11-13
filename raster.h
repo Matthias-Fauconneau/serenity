@@ -3,9 +3,11 @@
 #include "matrix.h"
 #include "function.h"
 #include "time.h"
+#define __AVX__ 1
 #include "immintrin.h"
-
-template<class FaceAttributes, int V> using Shader = functor<vec4(FaceAttributes,float[V])>;
+#ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
+#include "avxintrin.h"
+#endif
 
 /// 64×64 pixels bin for L1 cache locality (64×64×RGBZ×float~64KB)
 struct Bin { // 16KB triangles (stream) + 64KB framebuffer (L1)
@@ -14,8 +16,9 @@ struct Bin { // 16KB triangles (stream) + 64KB framebuffer (L1)
     uint16 subsample[16]; //Per-pixel flag to trigger subpixel operations
     uint16 faces[2*64*64-2-16-2*16*16]; // maximum virtual capacity
     float nearestSampleDepth[16*16];
-    float depth[16*16], blue[16*16], green[16*16], red[16*16];
-    float subDepth[64*64], subBlue[64*64], subGreen[64*64], subRed[64*64];
+    /*float depth[16*16], blue[16*16], green[16*16], red[16*16];
+    float subDepth[64*64], subBlue[64*64], subGreen[64*64], subRed[64*64];*/
+    float buffer[4*16*16+4*64*64]; //silence array-bounds errors;
 };
 
 /// Tiled render target
@@ -79,11 +82,11 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
     // Rasterization "registers", varying (perspective-interpolated) vertex attributes and constant face attributes
     struct Face { //~1K (streamed)
         vec2 edges[3];
-        int binReject[3], binAccept[3];
+        float binReject[3], binAccept[3];
         float nearestZ;
-        int blockRejectStep[3][4*4], blockAcceptStep[3][4*4];
-        int pixelRejectStep[3][4*4], pixelAcceptStep[3][4*4];
-        int sampleStep[3][4*4];
+        float blockRejectStep[3][4*4], blockAcceptStep[3][4*4];
+        float pixelRejectStep[3][4*4], pixelAcceptStep[3][4*4];
+        float sampleStep[3][4*4];
         vec3 iw, iz;
         vec3 varyings[V];
         FaceAttributes faceAttributes; //custom constant face attributes
@@ -103,7 +106,9 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
     }
     ~RenderPass(){ unallocate(faces,faceCapacity); }
 
-    // Implementation is inline to allow per-pass face attributes specialization
+    // Implementation is inline to allow per-pass face attributes specialization and inline shader calls
+
+    virtual vec4 shader(FaceAttributes,float[V])=0;
 
     /// Submits triangles for bin binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..Width],[0..Height]
@@ -122,13 +127,13 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
         for(int e=0;e<3;e++) {
             const vec2& edge = face.edges[e] = E[e].xy();
             { //reject
-                int step0 = (edge.x>0?edge.x:0) + (edge.y>0?edge.y:0);
+                float step0 = (edge.x>0?edge.x:0) + (edge.y>0?edge.y:0);
                 // initial reject corner distance
                 face.binReject[e] = E[e].z + 64.f*step0;
                 // 4×4 reject corner steps
                 int rejectIndex = (edge.x>0)*2 + (edge.y>0);
                 for(int i=0;i<4*4;i++) { //TODO: vectorize
-                    int step = dot(edge, XY[rejectIndex][i]);
+                    float step = dot(edge, XY[rejectIndex][i]);
                     face.blockRejectStep[e][i] = 16.f*step;
                     face.pixelRejectStep[e][i] = 4.f*step;
                     face.sampleStep[e][i] = -(1.f*step-1.f/2*step0); //to center (reversed to allow direct comparison)
@@ -136,13 +141,13 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
             }
 
             { //accept
-                int step0 = (edge.x<=0?edge.x:0) + (edge.y<=0?edge.y:0);
+                float step0 = (edge.x<=0?edge.x:0) + (edge.y<=0?edge.y:0);
                 // accept corner distance
                 face.binAccept[e] = E[e].z + 64.f*step0;
                 // 4×4 accept corner steps
                 int acceptIndex = (edge.x<=0)*2 + (edge.y<=0);
                 for(int i=0;i<4*4;i++) {
-                    int step = dot(edge, XY[acceptIndex][i]);
+                    float step = dot(edge, XY[acceptIndex][i]);
                     face.blockAcceptStep[e][i] = 16.f*step;
                     face.pixelAcceptStep[e][i] = -4.f*step; //reversed to allow direct comparison
                 }
@@ -156,7 +161,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
         int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy())))/64);
         int2 max = ::min(int2(target.width-1,target.height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy())))/64);
-        // TODO: profile average bin count, if count>=16: add a hierarchy level
+
         for(int binY=min.y; binY<=max.y; binY++) for(int binX=min.x; binX<=max.x; binX++) {
             const vec2 binXY = 64.f*vec2(binX, binY);
 
@@ -167,15 +172,14 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                     face.binReject[2] + dot(face.edges[2], binXY) <= 0) continue;
 
             Bin& bin = target.bins[binY*target.width+binX];
-            //TODO: trivial accept
             if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) error("Index overflow");
             bin.faces[bin.faceCount++]=faceCount;
         }
         faceCount++;
     }
 
-    // For each bin, rasterizes and shade all triangles using given shader
-    void render(const Shader<FaceAttributes,V>& shader) {
+    // For each bin, rasterizes and shade all triangles
+    void render() {
         int64 start = rdtsc();
         // TODO: multithreaded tiles (4×4 bins (64×64 pixels))
         // Loop on all bins (64x64 samples (16x16 pixels))
@@ -185,15 +189,15 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
             if(!bin.cleared) {
                 int64 start=rdtsc();
                 clear(bin.subsample,16);
-                clear(bin.depth,16*16,target.depth);
-                clear(bin.blue,16*16,target.blue);
-                clear(bin.green,16*16,target.green);
-                clear(bin.red,16*16,target.red);
+                clear(bin.buffer+0*16*16,16*16,target.depth);
+                clear(bin.buffer+1*16*16,16*16,target.blue);
+                clear(bin.buffer+2*16*16,16*16,target.green);
+                clear(bin.buffer+3*16*16,16*16,target.red);
                 bin.cleared=1;
                 clearTime += rdtsc()-start;
             }
             uint16* const subsample = bin.subsample;
-            float* const buffer = bin.depth;
+            float* const buffer = bin.buffer;
             const vec2 binXY = 64.f*vec2(binJ,binI);
             // Loop on all faces in the bin
             for(uint faceI=0; faceI<bin.faceCount; faceI++) {
@@ -201,7 +205,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                 const Face& face = faces[bin.faces[faceI]];
                 {
                     int64 start=rdtsc();
-                    int binReject[3], binAccept[3];
+                    float binReject[3], binAccept[3];
                     for(int e=0;e<3;e++) {
                         binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
                         binAccept[e] = face.binAccept[e] + dot(face.edges[e], binXY);
@@ -219,7 +223,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                     } else {
                         // Loop on 4×4 blocks
                         for(uint blockI=0; blockI<4*4; blockI++) {
-                            int blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
+                            float blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
 
                             // trivial reject
                             if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
@@ -229,7 +233,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             const uint16 blockPtr = blockI*(4*4);
                             const vec2 blockXY = binXY+16.f*XY[0][blockI];
 
-                            int blockAccept[3]; for(int e=0;e<3;e++) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
+                            float blockAccept[3]; for(int e=0;e<3;e++) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
                             // Full block accept
                             if(
                                     blockAccept[0] > 0 &&
@@ -242,14 +246,14 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             // Loop on 4×4 pixels
                             uint16 partialBlockMask=0; // partial block of full pixels
                             for(uint pixelI=0; pixelI<4*4; pixelI++) {
-                                int pixelReject[3]; for(int e=0;e<3;e++) pixelReject[e] = blockReject[e] + face.pixelRejectStep[e][pixelI];
+                                float pixelReject[3]; for(int e=0;e<3;e++) pixelReject[e] = blockReject[e] + face.pixelRejectStep[e][pixelI];
 
                                 // trivial reject
                                 if(pixelReject[0] <= 0 || pixelReject[1] <= 0 || pixelReject[2] <= 0) continue;
 
 #if 0
                                 // Accept any trivial edge
-                                int const* sampleStep[3]; int edgeCount=0;
+                                float const* sampleStep[3]; int edgeCount=0;
                                 if(blockAccept[0] <= face.pixelAcceptStep[0][pixelI])
                                     pixelReject[edgeCount]=pixelReject[0], sampleStep[edgeCount]=face.sampleStep[0], edgeCount++;
                                 if(blockAccept[1] <= face.pixelAcceptStep[1][pixelI])
@@ -302,6 +306,13 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 {
                                     int64 start = rdtsc();
                                     // Loop on 4×4 samples
+#if __AVX__ && 0
+                                    typedef float float8 __attribute__ ((vector_size(32),may_alias));
+                                    float8 pixelReject0 = _mm256_broadcast_ss(&pixelReject[0]);
+                                    mask = _mm256_movemask_ps(_mm256_cmp_ps(pixelReject0, (float8&)face.sampleStep[0][0*4], _CMP_LE_OQ))&0xFF;
+                                    mask |= (_mm256_movemask_ps(_mm256_cmp_ps(pixelReject0, (float8&)face.sampleStep[0][2*4], _CMP_LE_OQ))&0xFF)<<8;
+#else
+
                                     for(uint sampleI=0; sampleI<16; sampleI++) {
                                         if(
                                                 pixelReject[0] <= face.sampleStep[0][sampleI] ||
@@ -309,6 +320,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                                 pixelReject[2] <= face.sampleStep[2][sampleI] ) continue;
                                         mask |= (1<<sampleI);
                                     }
+#endif
                                     subpixelRasterTime += rdtsc()-start;
                                 }
 #endif
