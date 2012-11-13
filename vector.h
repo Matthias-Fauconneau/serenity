@@ -46,6 +46,7 @@ template<template<typename> class V, class T, uint N> struct vector : V<T> {
 #define generic template <template <typename> class V, class T, uint N>
 #define vector vector<V,T,N>
 
+generic vector operator +(const vector& u) { return u; }
 generic vector operator -(const vector& u) { vector r; for(uint i=0;i<N;i++) r[i]=-u[i]; return r; }
 generic vector operator +(const vector& u, const vector& v) { vector r; for(uint i=0;i<N;i++) r[i]=u[i]+v[i]; return r; }
 generic vector operator -(const vector& u, const vector& v) { vector r; for(uint i=0;i<N;i++) r[i]=u[i]-v[i]; return r; }

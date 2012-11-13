@@ -54,6 +54,8 @@ template<class... Args> struct signal {
     void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args ___); }
     /// Connects an anonymous function
     template<class F> void connect(F f) { delegates<< f; }
+    /// Connects a function
+    void connect(void (*pf)(Args...)) { delegates<< function<void(Args...)>(pf); }
     /// Connects a class method
     template<class C, class B, predicate(__is_base_of(B,C))>
     void connect(C* object, void (B::*pmf)(Args...)) { delegates<< function<void(Args...)>(static_cast<B*>(object),pmf); }

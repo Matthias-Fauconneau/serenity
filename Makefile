@@ -27,8 +27,8 @@ SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%)
 SRCS_profile = profile
 
 LIBS_font = freetype
-LIBS_player = mpg123
-LIBS_ffmpeg = avformat avcodec
+#LIBS_player = mpg123
+LIBS_player = avformat avcodec
 LIBS_http = ssl
 LIBS_sequencer = asound
 LIBS_process = pthread

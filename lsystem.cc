@@ -7,14 +7,21 @@
 #include "text.h"
 #include "time.h"
 
-inline float acos(float t) { return __builtin_acos(t); }
+inline float acosf(float t) { return __builtin_acosf(t); }
+inline float sinf(float t) { return __builtin_sinf(t); }
+
 /// Directional light with angular diameter
-inline vec3 light(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor=vec3(1,1,1), float angularDiameter=PI) {
-    float t = ::acos(dot(lightDirection,surfaceNormal)); // angle between surface normal and light principal direction
-    float a = max<float>(-PI/2,-t-angularDiameter/2); // lower bound of the light integral
-    float b = min<float>(PI/2,angularDiameter/2-t); // upper bound of the light integral
-    float R = sin(b) - sin(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
-    R /= 2*sin(angularDiameter/2); // normalize
+inline vec3 light(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor, float angularDiameter) {
+    float t = ::acosf(dot(lightDirection,surfaceNormal)); // angle between surface normal and light principal direction
+    float a = min<float>(PI/2,max<float>(-PI/2,t-angularDiameter/2)); // lower bound of the light integral
+    float b = min<float>(PI/2,max<float>(-PI/2,t+angularDiameter/2)); // upper bound of the light integral
+    float R = sinf(b) - sinf(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
+    R /= 2*sinf(angularDiameter/2); // normalize
+    return vec3(R*lightColor);
+}
+/// For an hemispheric light, the bounds
+inline vec3 light(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor) {
+    float R = (1+dot(lightDirection,surfaceNormal))/2;
     return vec3(R*lightColor);
 }
 
@@ -268,7 +275,7 @@ struct Editor : Widget {
     }
 
     Editor() {
-        window.localShortcut(Escape).connect(&exit);
+        window.localShortcut(Escape).connect(&::exit);
         window.fillBackground=0;
 
         array<string> files = folder.list(Files);
@@ -278,6 +285,7 @@ struct Editor : Widget {
 
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; generate();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
+        //window.localShortcut(Key(' ')).connect([]{complicated=!complicated;});
     }
 
     int2 lastPos;
@@ -312,9 +320,9 @@ struct Editor : Widget {
 
     RenderTarget target;
 
-    uint64 frameEnd=cpuTime(), frameTime=0; // in microseconds
+    uint64 frameEnd=cpuTime(), frameTime=130000; // in microseconds
     uint64 miscStart=rdtsc(), miscTime=0, setupTime=0, renderTime=0, resolveTime=0, uiTime=0; //in cycles
-    const uint T=4; // exponential moving average
+    const uint T=1; // exponential moving average
 
     void render(int2 targetPosition, int2 targetSize) override {
         uint64 setupStart=rdtsc();
@@ -353,64 +361,73 @@ struct Editor : Widget {
             {float l = length(X);  if(l<0.01) return; X /= l;}
 
             // Normal basis to be interpolated
-            vec3 Y=cross(vec3(0,0,1),X), Z=cross(X,Y);
+            vec3 Y=normalize(cross(vec3(0,0,1),X)), Z=cross(X,Y);
 
-            vec4 a(A - Y*(wA/2), 1.f), b(B - Y*(wB/2), 1.f), c(B + Y*(wB/2), 1.f), d(A + Y*(wA/2), 1.f);
+            //X /= 4; //extend branches a bit to avoid gaps
+            //vec4 a(A + wA*(-X-Y), 1.f), b(B + wB*(+X-Y), 1.f), c(B + wB*(+X+Y), 1.f), d(A + wA*(-X+Y), 1.f);
+            vec4 a(A - wA*Y, 1.f), b(B - wB*Y, 1.f), c(B + wB*Y, 1.f), d(A + wA*Y, 1.f);
             pass.submit(a,b,c,(vec3[]){vec3(-1,-1,1)},__(Y,Z));
             pass.submit(c,d,a,(vec3[]){vec3(1,1,-1)},__(Y,Z));
         }
-        uint64 renderStart=rdtsc();
-        setupTime = (renderStart-setupStart + (T-1)*setupTime)/T;
 
         vec3 sky = normalize(normalMatrix*vec3(1,0,0));
         vec3 sun = normalize(normalMatrix*vec3(1,1,0));
         function<vec4(FaceAttributes,float[1])> shader = [sky,sun](FaceAttributes face, float varying[1]){
-            return vec4(0,0,0,1);
+            //return vec4(0,0,0,1);
             float d = clip(-1.f,varying[0],1.f);
             vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
 
-            vec3 diffuseLight =
-                    light(N,sky,vec3(1./2,1./4,1./8)) +
-                    light(N,sun,vec3(1./2,3./4,7./8), PI/2);
+            vec3 diffuseLight
+                    = light(N,sky,vec3(1./2,1./4,1./8))
+                    + light(N,sun,vec3(1./2,3./4,7./8), PI/2);
 
             vec3 albedo = vec3(1,1,1);
             vec3 diffuse = albedo*diffuseLight;
             return vec4(diffuse,1.f);
         };
+
+        setupTime = (rdtsc()-setupStart + (T-1)*setupTime)/T;
+
+        yield(); //avoid preemption while rendering
+
+        uint64 renderStart=rdtsc();
         pass.render(shader);
 
         uint64 resolveStart = rdtsc();
         renderTime = ( (resolveStart-renderStart) + (T-1)*renderTime)/T;
+
         target.resolve(targetPosition,targetSize);
+
         uint64 uiStart = rdtsc();
         resolveTime = ( (uiStart-resolveStart) + (T-1)*resolveTime)/T;
+
         uint frameEnd = cpuTime();
 
         systems.render(targetPosition,int2(targetSize.x,16));
         uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime; //in cycles
-        frameTime = ( (frameEnd-this->frameEnd) + (T-1)*frameTime)/T; ;
+        frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16;
         this->frameEnd=frameEnd;
         status.setText(ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms\n"
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
                        "setup "_+str(100*setupTime/totalTime)+"%\n"
                        "render "_+str(100*renderTime/totalTime)+"%\n"
-                       "- clear "_+str(100*pass.clearTime/pass.totalTime)+"%\n"
-                       "- raster "_+str(100*pass.rasterTime/pass.totalTime)+"%\n"
-                       "- pixel "_+str(100*(pass.pixelTime)/pass.totalTime)+"%\n"_
-                       "- sample "_+str(100*(pass.sampleTime)/pass.totalTime)+"%\n"_
-                       "-- MSAA split "_+str(100*(pass.sampleFirstTime)/pass.totalTime)+"%\n"_
-                       "--- Z-Test & Centroid "_+str(100*(pass.sampleFirstZTestAndCentroidTime)/pass.totalTime)+"%\n"_
-                       "--- Output "_+str(100*(pass.sampleFirstOutputTime)/pass.totalTime)+"%\n"_
-                       "-- MSAA over "_+str(100*(pass.sampleOverTime)/pass.totalTime)+"%\n"_
-                       "--- Z-Test & Centroid "_+str(100*(pass.sampleOverZTestAndCentroidTime)/pass.totalTime)+"%\n"_
-                       "--- Output "_+str(100*(pass.sampleOverOutputTime)/pass.totalTime)+"%\n"_
+                       "- clear "_+str(100*pass.clearTime/totalTime)+"%\n"
+                       "- raster "_+str(100*pass.rasterTime/totalTime)+"%\n"
+                       "-- subpixel "_+str(100*pass.subpixelRasterTime/totalTime)+"%\n"
+                       "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"_
+                       "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"_
+                       "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"_
+                       "--- Z-Test & Centroid "_+str(100*(pass.sampleFirstZTestAndCentroidTime)/totalTime)+"%\n"_
+                       "--- Output "_+str(100*(pass.sampleFirstOutputTime)/totalTime)+"%\n"_
+                       "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"_
+                       "--- Z-Test & Centroid "_+str(100*(pass.sampleOverZTestAndCentroidTime)/totalTime)+"%\n"_
+                       "--- Output "_+str(100*(pass.sampleOverOutputTime)/totalTime)+"%\n"_
                        "- user "_+str(100*pass.userTime/totalTime)+"%\n"
                        "resolve "_+str(100*resolveTime/totalTime)+"%\n"
                        "ui "_+str(100*uiTime/totalTime)+"%\n"_);
         status.render(int2(targetPosition+int2(16)));
-        window.render(); //keep updating to get correct performance profile
-        uiTime = ( (rdtsc()-uiStart) + (T-1)*uiTime)/T;
-        yield();
         miscStart = rdtsc();
+        uiTime = ( (miscStart-uiStart) + (T-1)*uiTime)/T;
+        window.render(); //keep updating to get correct performance profile
     }
 } application;

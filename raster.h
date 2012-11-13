@@ -3,6 +3,7 @@
 #include "matrix.h"
 #include "function.h"
 #include "time.h"
+#include "immintrin.h"
 
 template<class FaceAttributes, int V> using Shader = functor<vec4(FaceAttributes,float[V])>;
 
@@ -79,7 +80,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
     struct Face { //~1K (streamed)
         vec2 edges[3];
         int binReject[3], binAccept[3];
-        float minZ;
+        float nearestZ;
         int blockRejectStep[3][4*4], blockAcceptStep[3][4*4];
         int pixelRejectStep[3][4*4], pixelAcceptStep[3][4*4];
         int sampleStep[3][4*4];
@@ -92,6 +93,9 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
     uint16 faceCount=0, faceCapacity;
     Face* faces;
     int64 clearTime=0, rasterTime=0, pixelTime=0, sampleTime=0, userTime=0, totalTime=0;
+    //raster
+    int64 subpixelRasterTime=0;
+    //sample
     int64 sampleFirstTime=0, sampleFirstZTestAndCentroidTime=0, sampleFirstOutputTime=0;
     int64 sampleOverTime=0, sampleOverZTestAndCentroidTime=0, sampleOverOutputTime=0;
     RenderPass(RenderTarget& target, uint faceCapacity):target(target),faceCapacity(faceCapacity){
@@ -146,7 +150,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
         }
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
-        face.minZ = min(min(A.z,B.z),C.z);
+        face.nearestZ = max(max(A.z,B.z),C.z);
         for(int i=0;i<V;i++) face.varyings[i] = E*vertexAttributes[i];
         face.faceAttributes=faceAttributes;
 
@@ -243,12 +247,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 // trivial reject
                                 if(pixelReject[0] <= 0 || pixelReject[1] <= 0 || pixelReject[2] <= 0) continue;
 
-                                const uint16 pixelPtr = blockPtr+pixelI;
-                                if(face.minZ < buffer[pixelPtr]) {
-                                    //buffer[pixelPtr+1*16*16]=1; //DEBUG
-                                    continue; // Hi-Z reject
-                                }
-
+#if 0
                                 // Accept any trivial edge
                                 int const* sampleStep[3]; int edgeCount=0;
                                 if(blockAccept[0] <= face.pixelAcceptStep[0][pixelI])
@@ -289,10 +288,37 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                         mask |= (1<<sampleI);
                                     }
                                 }
+#else
+                                // Full pixel accept
+                                if(
+                                        blockAccept[0] <= face.pixelAcceptStep[0][pixelI] &&
+                                        blockAccept[1] <= face.pixelAcceptStep[1][pixelI] &&
+                                        blockAccept[2] <= face.pixelAcceptStep[2][pixelI] ) {
+                                    partialBlockMask |= 1<<pixelI;
+                                    continue;
+                                }
+
+                                uint16 mask=0;
+                                {
+                                    int64 start = rdtsc();
+                                    // Loop on 4×4 samples
+                                    for(uint sampleI=0; sampleI<16; sampleI++) {
+                                        if(
+                                                pixelReject[0] <= face.sampleStep[0][sampleI] ||
+                                                pixelReject[1] <= face.sampleStep[1][sampleI] ||
+                                                pixelReject[2] <= face.sampleStep[2][sampleI] ) continue;
+                                        mask |= (1<<sampleI);
+                                    }
+                                    subpixelRasterTime += rdtsc()-start;
+                                }
+#endif
                                 const vec2 pixelXY = 4.f*XY[0][pixelI];
+                                const uint16 pixelPtr = blockPtr+pixelI;
                                 pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, mask);
                             }
-                            blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, partialBlockMask);
+                            if(partialBlockMask)
+                                blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, partialBlockMask);
+                            //else all pixels were subsampled
                         }
                     }
                     rasterTime += rdtsc()-start;
@@ -311,18 +337,30 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             const uint pixelPtr = blockPtr+pixelI;
                             const vec2 pixelXY = blockXY+4.f*XY[0][pixelI];
 
-                            vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
+                            /*vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
                             float w = 1/dot(face.iw,XY1);
                             float z = w*dot(face.iz,XY1);
 
                             float* const pixel = buffer+pixelPtr;
-                            float& depth = *pixel;
+                            float& depth = *pixel; //furthest
                             if(z < depth) {
                                 //pixel[1*16*16]=1; //DEBUG
                                 continue; //Hi-Z reject
-                            }
+                            }*/
+
+                            float& nearest = *(buffer-16*16+pixelPtr);
 
                             if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
+                                vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
+                                float w = 1/dot(face.iw,XY1);
+                                float z = w*dot(face.iz,XY1);
+
+                                float* const pixel = buffer+pixelPtr;
+                                float& depth = *pixel; //furthest
+                                if(z < depth) {
+                                    //pixel[1*16*16]=1; //DEBUG
+                                    continue; //Hi-Z reject
+                                }
                                 depth = z;
                                 float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
                                 int64 start = rdtsc();
@@ -342,7 +380,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstR=srcR;
                                 }
                             }
-                            /*else if(z > *(buffer-16*16+pixelPtr)) { // Full Z accept
+                            /*else if(z >= *(buffer-16*16+pixelPtr)) { // Full Z accept
                                 subsample[pixelPtr/16] &= ~(1<<(pixelPtr%16)); // Clear subsample flag
 
                                 depth = z;
@@ -374,7 +412,8 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstR=srcR;
                                 }
                                 //dstG=1; //DEBUG: coalesced pixel
-                            }*/ else { // Partial Z mask
+                            }*/
+                            else { // Partial Z mask
                                 float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
                                 uint mask=0; float centroid[V] = {}; float samples=0;
                                 // Loop on 4×4 samples
@@ -389,6 +428,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     float& depth = *sample;
                                     if(z>=depth) {
                                         depth = z;
+                                        if(z > nearest) nearest=z;
                                         samples++;
                                         mask |= (1<<sampleI);
                                         for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
@@ -432,13 +472,21 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         const vec2 pixelXY = draw.pos;
                         float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
                         uint16 mask = draw.mask;
+                        float& nearest = *(buffer-16*16+pixelPtr);
 
                         // Convert single sample pixel to subsampled pixel
                         if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                            float* const pixel = buffer+pixelPtr;
+
+                            // early Z reject to avoid hidden MSAA splits
+                            /*if(face.nearestZ < *pixel) {
+                                continue; // Hi-Z reject
+                            }*/
+
                             // Set subsampled pixel flag
                             subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
 
-                            float* const pixel = buffer+pixelPtr;
+                            nearest = *pixel;
                             float centroid[V] = {}; float samples=0;
                             {
                                 int64 start = rdtsc();
@@ -454,6 +502,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
                                     if(z<*pixel) { mask &= ~(1<<sampleI); *sample=*pixel; continue; }
                                     *sample = z;
+                                    if(z > nearest) nearest=z;
                                     samples++;
                                     for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
                                 }
@@ -498,6 +547,11 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             continue;
                         }
 
+                        // early Z reject to avoid MSAA overdraw
+                        /*if(face.nearestZ < nearest) {
+                            continue; // Hi-Z reject
+                        }*/
+
                         float centroid[V] = {}; float samples=0;
                         {
                             int64 start = rdtsc();
@@ -512,7 +566,8 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
                                 float* const sample = subpixel+sampleI;
                                 float& depth = *sample;
-                                if(z<depth) { mask &= ~(1<<sampleI); continue; }
+                                if(z < depth) { mask &= ~(1<<sampleI); continue; }
+                                if(z > nearest) nearest=z;
                                 depth = z;
                                 samples++;
                                 for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);

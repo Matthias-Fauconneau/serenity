@@ -2,7 +2,7 @@
 /// \file core.h move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range, std::initializer_list (aka ref), fat string and basic operations
 // Attributes
 #define unused __attribute((unused))
-#define packed __attribute((packed))
+#define _packed __attribute((packed))
 
 // Move
 template<typename T> struct remove_reference { typedef T type; };

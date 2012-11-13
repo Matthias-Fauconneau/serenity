@@ -10,9 +10,21 @@
 #include "text.h"
 #include "simd.h"
 
-#include "linux.h"
-enum {MADV_RANDOM=1,MADV_SEQUENTIAL,MADV_WILLNEED,MADV_DONTNEED};
+/// Virtual audio decoder interface
+struct AudioMedia {
+    uint rate=0,channels=0;
+    /// Returns elapsed time in seconds
+    virtual uint position()=0;
+    /// Returns media duration in seconds
+    virtual uint duration()=0;
+    /// Seeks media to \a position (in seconds)
+    virtual void seek(uint position)=0;
+    /// Reads \a size frames into \a output
+    virtual int read(float2* output, uint size)=0;
+    virtual ~AudioMedia(){}
+};
 
+#if MPG123
 extern "C" {
 enum mpg123_flags { MPG123_ADD_FLAGS=2, MPG123_FORCE_FLOAT  = 0x400 };
 struct mpg123;
@@ -29,20 +41,6 @@ long mpg123_seek_frame(mpg123* mh, long frameoff, int whence);
 int mpg123_close(mpg123* mh);
 void mpg123_delete(mpg123* mh);
 }
-
-/// Virtual audio decoder interface
-struct AudioMedia {
-    uint rate=0,channels=0;
-    /// Returns elapsed time in seconds
-    virtual uint position()=0;
-    /// Returns media duration in seconds
-    virtual uint duration()=0;
-    /// Seeks media to \a position (in seconds)
-    virtual void seek(uint position)=0;
-    /// Reads \a size frames into \a output
-    virtual int read(float2* output, uint size)=0;
-    virtual ~AudioMedia(){}
-};
 
 /// MP3 audio decoder (using mpg123)
 struct MP3Media : AudioMedia {
@@ -69,6 +67,10 @@ struct MP3Media : AudioMedia {
     }
     ~MP3Media() { mpg123_close(mh); mpg123_delete(mh); }
 };
+#endif
+
+#include "linux.h"
+enum {MADV_RANDOM=1,MADV_SEQUENTIAL,MADV_WILLNEED,MADV_DONTNEED};
 
 /// FLAC audio decoder (using \a FLAC)
 struct FLACMedia : AudioMedia {
@@ -92,11 +94,101 @@ struct FLACMedia : AudioMedia {
     int read(float2* out, uint size) { return flac.read(out,size); }
 };
 
+/// Generic audio decoder (using ffmpeg)
+extern "C" {
+#define __STDC_CONSTANT_MACROS
+#include <stdint.h>
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+}
+struct FFmpegMedia : AudioMedia {
+    AVFormatContext* file=0;
+    AVStream* audioStream=0;
+    AVCodecContext* audio=0;
+    int audioPTS=0;
+
+    FFmpegMedia(){}
+    FFmpegMedia(const ref<byte>& path){
+        static int unused once=(av_register_all(), 0);
+        if(avformat_open_input(&file, strz(path), 0, 0)) { file=0; return; }
+        avformat_find_stream_info(file, 0);
+        if(file->duration <= 0) return;
+        for(uint i=0; i<file->nb_streams; i++) {
+            if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
+                audioStream = file->streams[i];
+                audio = audioStream->codec;
+                audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_FLT;
+                AVCodec* codec = avcodec_find_decoder(audio->codec_id);
+                if(codec && avcodec_open2(audio, codec, 0) >= 0 ) {
+                    this->rate = audio->sample_rate; this->channels = audio->channels;
+                    break;
+                }
+            }
+        }
+        assert(audio, path);
+        assert(audio->sample_fmt == AV_SAMPLE_FMT_FLT || audio->sample_fmt == AV_SAMPLE_FMT_S16);
+        assert(this->rate);
+        assert(this->channels == 2);
+    }
+    uint position() { return audioPTS/1000;  }
+    uint duration() { return file->duration/1000/1000; }
+    void seek(uint unused position) { av_seek_frame(file,-1,position*1000*1000,0); }
+    Buffer<float2> buffer __(8192);
+    int read(float2* output, uint outputSize) {
+        uint readSize = outputSize;
+        uint size = min(outputSize,buffer.size);
+        for(uint i: range(size)) output[i] = buffer[i];
+        for(uint i: range(buffer.size-size)) buffer[i] = buffer[size+i]; //FIXME: ring buffer
+        outputSize -= size; output+=size;
+        while(outputSize) {
+            AVPacket packet;
+            if(av_read_frame(file, &packet) < 0) return 0;
+            if(file->streams[packet.stream_index]==audioStream) {
+                AVFrame frame; avcodec_get_frame_defaults(&frame); int gotFrame=0;
+                int used = avcodec_decode_audio4(audio, &frame, &gotFrame, &packet);
+                if(used < 0 || !gotFrame) continue;
+                uint inputSize = frame.nb_samples;
+                assert(int(inputSize-outputSize)<int(buffer.capacity));
+                if(audio->sample_fmt == AV_SAMPLE_FMT_FLT) {
+                    float2* input = (float2*)frame.data[0];
+                    uint size = min(inputSize,outputSize);
+                    for(uint i: range(size)) output[i] = input[i]*(float2){32768,32768};
+                    if(inputSize > outputSize) {
+                        for(uint i: range(inputSize-outputSize)) buffer[i] = input[outputSize+i]*(float2){32768,32768};
+                        buffer.size = inputSize-outputSize;
+                    }
+                    outputSize -= size; output+=size;
+                } else {
+                    typedef int16 half2 __attribute((vector_size(4)));
+                    half2* input = (half2*)frame.data[0];
+                    uint size = min(inputSize,outputSize);
+                    for(uint i: range(size)) output[i][0] = input[i][0], output[i][1] = input[i][1];
+                    if(inputSize > outputSize) {
+                        for(uint i: range(inputSize-outputSize)) buffer[i][0] = input[outputSize+i][0], buffer[i][1] = input[outputSize+i][1];
+                        buffer.size = inputSize-outputSize;
+                    }
+                    outputSize -= size; output+=size;
+                }
+                audioPTS = packet.dts*audioStream->time_base.num*1000/audioStream->time_base.den;
+            }
+            av_free_packet(&packet);
+        }
+        assert(outputSize==0);
+        return readSize;
+    }
+    ~FFmpegMedia() { avformat_close_input(&file); }
+};
+
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
 // Pipeline: File -> AudioMedia -> [Resampler] -> AudioOutput
     static constexpr int channels=2;
-    AudioMedia* media=0; MP3Media mp3; FLACMedia flac;
+    AudioMedia* media=0;
+#if MPG123
+    MP3Media mp3;
+#endif
+    FLACMedia flac;
+    FFmpegMedia ffmpeg;
     Resampler resampler;
     AudioOutput audio __({this,&Player::read});
     bool read(ptr& swPointer, int16* output, uint size) {
@@ -199,9 +291,9 @@ struct Player {
         window.setTitle(titles[index].text);
         ref<byte> path = files[index];
         if(media) media->~AudioMedia(), media=0;
-        if(endsWith(path,".mp3"_)||endsWith(path,".MP3"_)) media=new (&mp3) MP3Media(File(path,"Music"_));
-        else if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path,"Music"_));
-        else warn("Unsupported format",path);
+        if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path,"Music"_));
+        //else if(endsWith(path,".mp3"_)||endsWith(path,".MP3"_)) media=new (&mp3) MP3Media(File(path,"Music"_));
+        else media=new (&ffmpeg) FFmpegMedia(string("/Music/"_+path));
         assert(audio.channels==media->channels);
         if(audio.rate!=media->rate) new (&resampler) Resampler(audio.channels, media->rate, audio.rate, audio.periodSize);
         setPlaying(true);

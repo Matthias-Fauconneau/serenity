@@ -103,8 +103,8 @@ void Window::event() {
                 shmdt(buffer.data);
                 shmctl(shm, IPC_RMID, 0);
             }
-            buffer.stride=buffer.width=size.x, buffer.height=size.y;
-            shm = check( shmget(IPC_NEW, buffer.height*buffer.width*sizeof(byte4) , IPC_CREAT | 0777) );
+            buffer.width=size.x, buffer.height=align(16,size.y), buffer.stride=align(16,size.x);
+            shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
             buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
@@ -138,7 +138,9 @@ void Window::event() {
             if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
         }
 
-        {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment; r.W=r.w=framebuffer.width; r.H=r.h=framebuffer.height; send(raw(r));}
+        {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+            r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
+            r.srcW=size.x; r.srcH=size.y; send(raw(r));}
         state=Server;
     } else {
         uint8 type = read<uint8>();

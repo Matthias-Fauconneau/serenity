@@ -1,6 +1,47 @@
 #if 1
 #include "window.h"
 #include "display.h"
+#include "text.h"
+
+inline float acos(float t) { return __builtin_acosf(t); }
+inline float sin(float t) { return __builtin_sinf(t); }
+
+/// Directional light with angular diameter
+inline float light(float lightDirectionDotSurfaceNormal, float angularDiameter=PI) {
+    float t = ::acos(lightDirectionDotSurfaceNormal); // angle between surface normal and light principal direction
+    float a = min<float>(PI/2,max<float>(-PI/2,t-angularDiameter/2)); // lower bound of the light integral
+    float b = min<float>(PI/2,max<float>(-PI/2,t+angularDiameter/2)); // upper bound of the light integral
+    float R = sin(b) - sin(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
+    R /= 2*sin(angularDiameter/2); // normalize
+    return R;
+}
+
+struct Plot : Widget {
+    Window window __(this,int2(0,1050),"Plot"_);
+    Plot(){ window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF; }
+    void render(int2, int2 size) {
+        float Y[size.x+1]; float min=1, max=-1;
+        for(int n=0;n<=size.x;n++) {
+            //log(((x-0.5)/size.x)*2-1,light(((x-0.5)/size.x)*2-1,PI/2));
+            float x = ((n-0.5)/size.x)*2-1;
+            float y = light(x,3*PI/4);
+            //float y = sin(acos(x));
+            Y[n]=y;
+            min=::min(min,y);
+            max=::max(max,y);
+        }
+        for(int x=0;x<size.x;x++) line(x-0.5,size.y-size.y*(Y[x]-min)/(max-min),x+0.5,size.y-size.y*(Y[x+1]-min)/(max-min));
+        for(int y=0;y<size.y;y+=100) for(int x=0;x<size.x;x+=100) {
+            Text(str(((x-0.5)/size.x)*2-1,min+(max-min)*y/size.y)).render(int2(x,size.y-y));
+        }
+    }
+} test;
+
+#endif
+
+#if 0
+#include "window.h"
+#include "display.h"
 #include "raster.h"
 
 // Test correct top-left rasterization rules using a simple triangle fan

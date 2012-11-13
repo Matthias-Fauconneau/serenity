@@ -256,7 +256,7 @@ void Sampler::recordWAV(const ref<byte>& path) {
     record = File(path,home(),WriteOnly);
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
         int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=48000; int32 bps=48000*4;
-        int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } packed header;
+        int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } _packed header;
     record.write(raw(header));
 }
 Sampler::~Sampler() {
