@@ -8,6 +8,7 @@
 #ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
 #include "avxintrin.h"
 #endif
+typedef float float8 __attribute__ ((vector_size(32),may_alias));
 
 /// 64×64 pixels bin for L1 cache locality (64×64×RGBZ×float~64KB)
 struct Bin { // 16KB triangles (stream) + 64KB framebuffer (L1)
@@ -302,17 +303,21 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     continue;
                                 }
 
-                                uint16 mask=0;
+                                uint16 mask;
                                 {
                                     int64 start = rdtsc();
                                     // Loop on 4×4 samples
-#if __AVX__ && 0
-                                    typedef float float8 __attribute__ ((vector_size(32),may_alias));
-                                    float8 pixelReject0 = _mm256_broadcast_ss(&pixelReject[0]);
-                                    mask = _mm256_movemask_ps(_mm256_cmp_ps(pixelReject0, (float8&)face.sampleStep[0][0*4], _CMP_LE_OQ))&0xFF;
-                                    mask |= (_mm256_movemask_ps(_mm256_cmp_ps(pixelReject0, (float8&)face.sampleStep[0][2*4], _CMP_LE_OQ))&0xFF)<<8;
+#if __AVX__ && 1
+                                    mask=0xFFFF;
+                                    for(int e=0;e<3;e++) {
+                                        float8 pixelRejectMM = _mm256_broadcast_ss(&pixelReject[e]);
+                                        mask &= _mm256_movemask_ps(
+                                                    _mm256_cmp_ps(pixelRejectMM, (float8&)face.sampleStep[e][0*4], _CMP_GT_OQ))|0xFF00;
+                                        mask &= ((_mm256_movemask_ps(
+                                                     _mm256_cmp_ps(pixelRejectMM, (float8&)face.sampleStep[e][2*4], _CMP_GT_OQ)))<<8)|0x00FF;
+                                    }
 #else
-
+                                    mask=0;
                                     for(uint sampleI=0; sampleI<16; sampleI++) {
                                         if(
                                                 pixelReject[0] <= face.sampleStep[0][sampleI] ||
