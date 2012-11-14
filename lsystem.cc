@@ -302,6 +302,7 @@ struct Editor : Widget {
 
         } else if(event==Motion && button==LeftButton) {
             rotation += vec2(delta)*float(PI)/vec2(size);
+            if(rotation.y<0) rotation.y=0; // Joints should not be seen from below
         } else if(event==Press && button==WheelDown) {
             scale *= 17.0/16;
         } else if(event==Press && button==WheelUp) {

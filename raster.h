@@ -3,12 +3,142 @@
 #include "matrix.h"
 #include "function.h"
 #include "time.h"
+
+// AVX intrinsics
 #define __AVX__ 1
 #include "immintrin.h"
 #ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
 #include "avxintrin.h"
 #endif
 typedef float float8 __attribute__ ((vector_size(32),may_alias));
+
+/// 16-wide Vector operations using 2 float8 AVX registers
+struct vec16 {
+    float8 r1,r2;
+    vec16(){}
+    vec16(const float8& r1, const float8& r2):r1(r1),r2(r2){}
+    vec16(float x0, float x1, float x2, float x3, float x4, float x5, float x6, float x7, float x8, float x9, float x10, float x11, float x12, float x13, float x14, float x15):r1(__extension__ (__m256){x7,x6,x5,x4,x3,x2,x1,x0}),r2(__extension__ (__m256){x15,x14,x13,x12,x11,x10,x9,x8}){}
+};
+
+inline vec16 operator +(const float& a, const vec16& b) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
+}
+inline vec16 operator +(const vec16& b, const float& a) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
+}
+inline vec16 operator +(const vec16& a, const vec16& b) {
+    return vec16(_mm256_add_ps(a.r1,b.r1),_mm256_add_ps(a.r2,b.r2));
+}
+
+inline vec16 operator *(const float& a, const vec16& b) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_mul_ps(A,b.r1),_mm256_mul_ps(A,b.r2));
+}
+inline vec16 operator *(const vec16& a, const vec16& b) {
+    return vec16(_mm256_mul_ps(a.r1,b.r1),_mm256_mul_ps(a.r2,b.r2));
+}
+inline vec16 operator /(const int one unused, const vec16& d) {
+    assert(one==1);
+    return vec16(_mm256_rcp_ps(d.r1),_mm256_rcp_ps(d.r2));
+}
+
+inline vec16 operator &(const vec16& a, const vec16& b) {
+    return vec16(_mm256_and_ps(a.r1,b.r1),_mm256_and_ps(a.r2,b.r2));
+}
+
+inline vec16 operator <(const float& a, const vec16& b) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LT_OQ));
+}
+inline vec16 operator <=(const float& a, const vec16& b) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LE_OQ));
+}
+inline vec16 operator >=(const float& a, const vec16& b) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GE_OQ));
+}
+inline vec16 operator >(const float& a, const vec16& b) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GT_OQ));
+}
+
+inline vec16 operator <(const vec16& b, const float& a) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_LT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LT_OQ));
+}
+inline vec16 operator <=(const vec16& b, const float& a) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_LE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LE_OQ));
+}
+inline vec16 operator >=(const vec16& b, const float& a) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_GE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GE_OQ));
+}
+inline vec16 operator >(const vec16& b, const float& a) {
+    float8 A=_mm256_broadcast_ss(&a);
+    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_GT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GT_OQ));
+}
+
+inline vec16 operator <(const vec16& a, const vec16& b) {
+    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LT_OQ));
+}
+inline vec16 operator <=(const vec16& a, const vec16& b) {
+    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LE_OQ));
+}
+inline vec16 operator >=(const vec16& a, const vec16& b) {
+    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GE_OQ));
+}
+inline vec16 operator >(const vec16& a, const vec16& b) {
+    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GT_OQ));
+}
+inline uint mask(const vec16& m) { return _mm256_movemask_ps(m.r1)|(_mm256_movemask_ps(m.r2)<<8); }
+
+inline float sum8(float8 x) {
+    // hiQuad = ( x7, x6, x5, x4 )
+    const __m128 hiQuad = _mm256_extractf128_ps(x, 1);
+    // loQuad = ( x3, x2, x1, x0 )
+    const __m128 loQuad = _mm256_castps256_ps128(x);
+    // sumQuad = ( x3 + x7, x2 + x6, x1 + x5, x0 + x4 )
+    const __m128 sumQuad = _mm_add_ps(loQuad, hiQuad);
+    // loDual = ( -, -, x1 + x5, x0 + x4 )
+    const __m128 loDual = sumQuad;
+    // hiDual = ( -, -, x3 + x7, x2 + x6 )
+    const __m128 hiDual = _mm_movehl_ps(sumQuad, sumQuad);
+    // sumDual = ( -, -, x1 + x3 + x5 + x7, x0 + x2 + x4 + x6 )
+    const __m128 sumDual = _mm_add_ps(loDual, hiDual);
+    // lo = ( -, -, -, x0 + x2 + x4 + x6 )
+    const __m128 lo = sumDual;
+    // hi = ( -, -, -, x1 + x3 + x5 + x7 )
+    const __m128 hi = _mm_shuffle_ps(sumDual, sumDual, 0x1);
+    // sum = ( -, -, -, x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 )
+    const __m128 sum = _mm_add_ss(lo, hi);
+    return _mm_cvtss_f32(sum);
+}
+
+inline float max8(float8 x) {
+    // hiQuad = ( x7, x6, x5, x4 )
+    const __m128 hiQuad = _mm256_extractf128_ps(x, 1);
+    // loQuad = ( x3, x2, x1, x0 )
+    const __m128 loQuad = _mm256_castps256_ps128(x);
+    // sumQuad = ( x3 + x7, x2 + x6, x1 + x5, x0 + x4 )
+    const __m128 sumQuad = _mm_max_ps(loQuad, hiQuad);
+    // loDual = ( -, -, x1 + x5, x0 + x4 )
+    const __m128 loDual = sumQuad;
+    // hiDual = ( -, -, x3 + x7, x2 + x6 )
+    const __m128 hiDual = _mm_movehl_ps(sumQuad, sumQuad);
+    // sumDual = ( -, -, x1 + x3 + x5 + x7, x0 + x2 + x4 + x6 )
+    const __m128 sumDual = _mm_max_ps(loDual, hiDual);
+    // lo = ( -, -, -, x0 + x2 + x4 + x6 )
+    const __m128 lo = sumDual;
+    // hi = ( -, -, -, x1 + x3 + x5 + x7 )
+    const __m128 hi = _mm_shuffle_ps(sumDual, sumDual, 0x1);
+    // sum = ( -, -, -, x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 )
+    const __m128 sum = _mm_max_ss(lo, hi);
+    return _mm_cvtss_f32(sum);
+}
 
 /// 64×64 pixels bin for L1 cache locality (64×64×RGBZ×float~64KB)
 struct Bin { // 16KB triangles (stream) + 64KB framebuffer (L1)
@@ -202,7 +332,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
             const vec2 binXY = 64.f*vec2(binJ,binI);
             // Loop on all faces in the bin
             for(uint faceI=0; faceI<bin.faceCount; faceI++) {
-                struct DrawCommand { vec2 pos; uint ptr; int mask; } blocks[4*4], pixels[16*16]; uint blockCount=0, pixelCount=0;
+                struct DrawCommand { vec2 pos; uint ptr; uint mask; vec16 mask256; } blocks[4*4], pixels[16*16]; uint blockCount=0, pixelCount=0;
                 const Face& face = faces[bin.faces[faceI]];
                 {
                     int64 start=rdtsc();
@@ -247,11 +377,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             // 4×4 pixel accept mask
                             uint16 pixelAcceptMask=0xFFFF; // partial block of full pixels
                             for(int e=0;e<3;e++) {
-                                float8 block = _mm256_broadcast_ss(&blockAccept[e]);
-                                pixelAcceptMask &= _mm256_movemask_ps(
-                                            _mm256_cmp_ps(block, (float8&)face.pixelAcceptStep[e][0*4], _CMP_GT_OQ))|0xFF00;
-                                pixelAcceptMask &= ((_mm256_movemask_ps(
-                                              _mm256_cmp_ps(block, (float8&)face.pixelAcceptStep[e][2*4], _CMP_GT_OQ)))<<8)|0x00FF;
+                                pixelAcceptMask &= mask(blockAccept[e] > *(vec16*)face.pixelAcceptStep[e]);
                             }
 
                             if(pixelAcceptMask)
@@ -260,15 +386,10 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
                             // 4×4 pixel reject mask
                             uint16 pixelRejectMask=0; // partial block of full pixels
-                            float8 pixelReject[3][2]; //used to reject samples
+                            vec16 pixelReject[3]; //used to reject samples
                             for(int e=0;e<3;e++) {
-                                float8 block = _mm256_broadcast_ss(&blockReject[e]);
-                                pixelReject[e][0] = _mm256_add_ps(block, (float8&)face.pixelRejectStep[e][0*4]);
-                                pixelReject[e][1] = _mm256_add_ps(block, (float8&)face.pixelRejectStep[e][2*4]);
-                                pixelRejectMask |= _mm256_movemask_ps(
-                                            _mm256_cmp_ps(pixelReject[e][0], _mm256_setzero_ps(), _CMP_LE_OQ))&0xFF;
-                                pixelRejectMask |= ((_mm256_movemask_ps(
-                                                          _mm256_cmp_ps(pixelReject[e][1], _mm256_setzero_ps(), _CMP_LE_OQ)))<<8)&0xFF00;
+                                pixelReject[e] = blockReject[e] + *(vec16*)face.pixelRejectStep[e];
+                                pixelRejectMask |= mask(pixelReject[e] <= 0);
                             }
 
                             // Process partial pixels
@@ -279,17 +400,22 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 partialPixelMask &= ~(1<<pixelI);
 
                                 // 4×4 samples mask
-                                uint16 sampleMask=0;
+                                /*uint16 sampleMask=0;
                                 for(int e=0;e<3;e++) {
-                                    float8 pixel = _mm256_broadcast_ss(((float*)&pixelReject[e])+pixelI);
-                                    sampleMask |= _mm256_movemask_ps(
-                                                _mm256_cmp_ps(pixel, (float8&)face.sampleStep[e][0*4], _CMP_LE_OQ))&0xFF;
-                                    sampleMask |= ((_mm256_movemask_ps(
-                                                  _mm256_cmp_ps(pixel, (float8&)face.sampleStep[e][2*4], _CMP_LE_OQ)))<<8)&0xFF00;
+                                    float pixel = ((float*)&pixelReject[e])[pixelI];
+                                    sampleMask |= mask(pixel <= *(vec16*)face.sampleStep[e]);
                                 }
                                 const vec2 pixelXY = 4.f*XY[0][pixelI];
                                 const uint16 pixelPtr = blockPtr+pixelI;
-                                pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, ~sampleMask);
+                                pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, ~sampleMask);*/
+                                // 4×4 samples mask
+                                vec16 sampleMask =
+                                        (((float*)&pixelReject[0])[pixelI] > *(vec16*)face.sampleStep[0]) &
+                                        (((float*)&pixelReject[1])[pixelI] > *(vec16*)face.sampleStep[1]) &
+                                        (((float*)&pixelReject[2])[pixelI] > *(vec16*)face.sampleStep[2]);
+                                const vec2 pixelXY = 4.f*XY[0][pixelI];
+                                const uint16 pixelPtr = blockPtr+pixelI;
+                                pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, mask(sampleMask), sampleMask);
                             }
                         }
                     }
@@ -320,13 +446,12 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 continue; //Hi-Z reject
                             }*/
 
+                            vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
+                            float w = 1/dot(face.iw,XY1);
+                            float z = w*dot(face.iz,XY1);
                             float& nearest = *(buffer-16*16+pixelPtr);
 
                             if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
-                                vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
-                                float w = 1/dot(face.iw,XY1);
-                                float z = w*dot(face.iz,XY1);
-
                                 float* const pixel = buffer+pixelPtr;
                                 float& depth = *pixel; //furthest
                                 if(z < depth) {
@@ -352,9 +477,10 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstR=srcR;
                                 }
                             }
-                            /*else if(z >= *(buffer-16*16+pixelPtr)) { // Full Z accept
+                            /*else if(z >= nearest) { // Full Z accept
                                 subsample[pixelPtr/16] &= ~(1<<(pixelPtr%16)); // Clear subsample flag
-
+                                float* const pixel = buffer+pixelPtr;
+                                float& depth = *pixel; //furthest
                                 depth = z;
                                 float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
                                 int64 start = rdtsc();
@@ -446,6 +572,10 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         uint16 mask = draw.mask;
                         float& nearest = *(buffer-16*16+pixelPtr);
 
+                        // 4×4 xy steps from pixel origin to sample center (TODO: latin square pattern)
+                        static const vec16 X = vec16(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)+1./2;
+                        static const vec16 Y = vec16(0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3)+1./2;
+
                         // Convert single sample pixel to subsampled pixel
                         if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
                             float* const pixel = buffer+pixelPtr;
@@ -524,10 +654,12 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             continue; // Hi-Z reject
                         }*/
 
-                        float centroid[V] = {}; float samples=0;
+                        float centroid[V] = {};
                         {
                             int64 start = rdtsc();
+#if 0
                             // Loop on 4×4 samples
+                            float visibleSampleCount=0;
                             for(uint sampleI=0; sampleI<16; sampleI++) {
                                 if(!(mask&(1<<sampleI))) continue; //vectorized code might actually mask output instead
 
@@ -541,13 +673,46 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 if(z < depth) { mask &= ~(1<<sampleI); continue; }
                                 if(z > nearest) nearest=z;
                                 depth = z;
-                                samples++;
+                                visibleSampleCount++;
                                 for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
                             }
+                            for(int i=0;i<V;i++) centroid[i] /= visibleSampleCount;
+#else
+                            // 2D coordinates vector
+                            const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
+                            // Interpolates w for perspective correction
+                            const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
+                            // Interpolates perspective correct z
+                            const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
+                            // Performs Z-Test (blending most negative Z instead of masking test to get correct maximum (nearest))
+                            float8 zFar = _mm256_set1_ps(-__builtin_inff());
+                            const vec16 visibleZ = vec16(
+                                        _mm256_blendv_ps(zFar,z.r1,draw.mask256.r1),
+                                        _mm256_blendv_ps(zFar,z.r2,draw.mask256.r2));
+                            const vec16 visibleMask =  (visibleZ >= *(vec16*)subpixel);
+
+                            // Stores accepted pixels in Z buffer
+                            _mm256_maskstore_ps(subpixel,(__m256i)visibleMask.r1,z.r1);
+                            _mm256_maskstore_ps(subpixel+8,(__m256i)visibleMask.r2,z.r2);
+                            // Computes nearest sample for pixel Hi-Z reject
+                            nearest = max(max8(visibleZ.r1),max8(visibleZ.r2));
+
+                            // Counts visible samples
+                            mask = ::mask(visibleMask);
+                            float visibleSampleCount = __builtin_popcount(mask);
+
+                            // Computes vertex attributes at all samples
+                            for(int i=0;i<V;i++) {
+                                const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                                // Zeroes hidden samples
+                                const vec16 visible = samples & visibleMask;
+                                // Averages on the visible samples
+                                centroid[i] = (sum8(visible.r1)+sum8(visible.r2)) / visibleSampleCount; //FIXME
+                            }
+#endif
                             sampleOverZTestAndCentroidTime += rdtsc()-start;
                         }
                         {
-                            for(uint i=0;i<V;i++) centroid[i] /= samples;
                             int64 userStart = rdtsc();
                             vec4 bgra = shader(face.faceAttributes,centroid);
                             uint64 userEnd = rdtsc();

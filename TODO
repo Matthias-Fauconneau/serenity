@@ -1,9 +1,12 @@
 CG:
 TBDR:
- vectorize rasterizer, interpolation, output, resolve
- quad polygon ?
+ vectorize rasterizer, interpolation, shader, output, resolve
+ remove uint16 mask from DrawCommand
  latin square
+ use step grids for vertex attribute interpolations
  check assembly and explicit optimizations as needed
+ quad polygon ?
+ float16 colors
  shadows
  herbaceous plants, colors, leaves, textures
  multithreading, scene (sky, grass, plants, forest, terrain...)
