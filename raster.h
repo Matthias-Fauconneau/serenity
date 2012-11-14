@@ -202,7 +202,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
             const vec2 binXY = 64.f*vec2(binJ,binI);
             // Loop on all faces in the bin
             for(uint faceI=0; faceI<bin.faceCount; faceI++) {
-                struct DrawCommand { vec2 pos; uint ptr; uint mask; } blocks[4*4], pixels[16*16]; uint blockCount=0, pixelCount=0;
+                struct DrawCommand { vec2 pos; uint ptr; int mask; } blocks[4*4], pixels[16*16]; uint blockCount=0, pixelCount=0;
                 const Face& face = faces[bin.faces[faceI]];
                 {
                     int64 start=rdtsc();
@@ -244,98 +244,53 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 continue;
                             }
 
-                            // Loop on 4×4 pixels
-                            uint16 partialBlockMask=0; // partial block of full pixels
-                            for(uint pixelI=0; pixelI<4*4; pixelI++) {
-                                float pixelReject[3]; for(int e=0;e<3;e++) pixelReject[e] = blockReject[e] + face.pixelRejectStep[e][pixelI];
+                            // 4×4 pixel accept mask
+                            uint16 pixelAcceptMask=0xFFFF; // partial block of full pixels
+                            for(int e=0;e<3;e++) {
+                                float8 block = _mm256_broadcast_ss(&blockAccept[e]);
+                                pixelAcceptMask &= _mm256_movemask_ps(
+                                            _mm256_cmp_ps(block, (float8&)face.pixelAcceptStep[e][0*4], _CMP_GT_OQ))|0xFF00;
+                                pixelAcceptMask &= ((_mm256_movemask_ps(
+                                              _mm256_cmp_ps(block, (float8&)face.pixelAcceptStep[e][2*4], _CMP_GT_OQ)))<<8)|0x00FF;
+                            }
 
-                                // trivial reject
-                                if(pixelReject[0] <= 0 || pixelReject[1] <= 0 || pixelReject[2] <= 0) continue;
+                            if(pixelAcceptMask)
+                                blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, pixelAcceptMask);
+                            //else all pixels were subsampled or rejected
 
-#if 0
-                                // Accept any trivial edge
-                                float const* sampleStep[3]; int edgeCount=0;
-                                if(blockAccept[0] <= face.pixelAcceptStep[0][pixelI])
-                                    pixelReject[edgeCount]=pixelReject[0], sampleStep[edgeCount]=face.sampleStep[0], edgeCount++;
-                                if(blockAccept[1] <= face.pixelAcceptStep[1][pixelI])
-                                    pixelReject[edgeCount]=pixelReject[1], sampleStep[edgeCount]=face.sampleStep[1], edgeCount++;
-                                if(blockAccept[2] <= face.pixelAcceptStep[2][pixelI])
-                                    pixelReject[edgeCount]=pixelReject[2], sampleStep[edgeCount]=face.sampleStep[2], edgeCount++;
+                            // 4×4 pixel reject mask
+                            uint16 pixelRejectMask=0; // partial block of full pixels
+                            float8 pixelReject[3][2]; //used to reject samples
+                            for(int e=0;e<3;e++) {
+                                float8 block = _mm256_broadcast_ss(&blockReject[e]);
+                                pixelReject[e][0] = _mm256_add_ps(block, (float8&)face.pixelRejectStep[e][0*4]);
+                                pixelReject[e][1] = _mm256_add_ps(block, (float8&)face.pixelRejectStep[e][2*4]);
+                                pixelRejectMask |= _mm256_movemask_ps(
+                                            _mm256_cmp_ps(pixelReject[e][0], _mm256_setzero_ps(), _CMP_LE_OQ))&0xFF;
+                                pixelRejectMask |= ((_mm256_movemask_ps(
+                                                          _mm256_cmp_ps(pixelReject[e][1], _mm256_setzero_ps(), _CMP_LE_OQ)))<<8)&0xFF00;
+                            }
 
-                                // Full pixel accept
-                                if(edgeCount==0) {
-                                    partialBlockMask |= 1<<pixelI;
-                                    continue;
+                            // Process partial pixels
+                            uint16 partialPixelMask = ~(pixelRejectMask | pixelAcceptMask);
+                            while(partialPixelMask) {
+                                uint pixelI = __builtin_ctz(partialPixelMask);
+                                if(pixelI>=16) break;
+                                partialPixelMask &= ~(1<<pixelI);
+
+                                // 4×4 samples mask
+                                uint16 sampleMask=0;
+                                for(int e=0;e<3;e++) {
+                                    float8 pixel = _mm256_broadcast_ss(((float*)&pixelReject[e])+pixelI);
+                                    sampleMask |= _mm256_movemask_ps(
+                                                _mm256_cmp_ps(pixel, (float8&)face.sampleStep[e][0*4], _CMP_LE_OQ))&0xFF;
+                                    sampleMask |= ((_mm256_movemask_ps(
+                                                  _mm256_cmp_ps(pixel, (float8&)face.sampleStep[e][2*4], _CMP_LE_OQ)))<<8)&0xFF00;
                                 }
-
-                                uint16 mask=0;
-                                if(edgeCount==1) {
-                                    // Loop on 4×4 samples
-                                    for(uint sampleI=0; sampleI<16; sampleI++) {
-                                        if( pixelReject[0] <= sampleStep[0][sampleI] ) continue;
-                                        mask |= (1<<sampleI);
-                                    }
-                                } else if(edgeCount==2) {
-                                    // Loop on 4×4 samples
-                                    for(uint sampleI=0; sampleI<16; sampleI++) {
-                                        if(
-                                                pixelReject[0] <= sampleStep[0][sampleI] ||
-                                                pixelReject[1] <= sampleStep[1][sampleI] ) continue;
-                                        mask |= (1<<sampleI);
-                                    }
-                                } else {
-                                    // Loop on 4×4 samples
-                                    for(uint sampleI=0; sampleI<16; sampleI++) {
-                                        if(
-                                                pixelReject[0] <= sampleStep[0][sampleI] ||
-                                                pixelReject[1] <= sampleStep[1][sampleI] ||
-                                                pixelReject[2] <= sampleStep[2][sampleI] ) continue;
-                                        mask |= (1<<sampleI);
-                                    }
-                                }
-#else
-                                // Full pixel accept
-                                if(
-                                        blockAccept[0] <= face.pixelAcceptStep[0][pixelI] &&
-                                        blockAccept[1] <= face.pixelAcceptStep[1][pixelI] &&
-                                        blockAccept[2] <= face.pixelAcceptStep[2][pixelI] ) {
-                                    partialBlockMask |= 1<<pixelI;
-                                    continue;
-                                }
-
-                                uint16 mask;
-                                {
-                                    int64 start = rdtsc();
-                                    // Loop on 4×4 samples
-#if __AVX__ && 1
-                                    mask=0xFFFF;
-                                    for(int e=0;e<3;e++) {
-                                        float8 pixelRejectMM = _mm256_broadcast_ss(&pixelReject[e]);
-                                        mask &= _mm256_movemask_ps(
-                                                    _mm256_cmp_ps(pixelRejectMM, (float8&)face.sampleStep[e][0*4], _CMP_GT_OQ))|0xFF00;
-                                        mask &= ((_mm256_movemask_ps(
-                                                     _mm256_cmp_ps(pixelRejectMM, (float8&)face.sampleStep[e][2*4], _CMP_GT_OQ)))<<8)|0x00FF;
-                                    }
-#else
-                                    mask=0;
-                                    for(uint sampleI=0; sampleI<16; sampleI++) {
-                                        if(
-                                                pixelReject[0] <= face.sampleStep[0][sampleI] ||
-                                                pixelReject[1] <= face.sampleStep[1][sampleI] ||
-                                                pixelReject[2] <= face.sampleStep[2][sampleI] ) continue;
-                                        mask |= (1<<sampleI);
-                                    }
-#endif
-                                    subpixelRasterTime += rdtsc()-start;
-                                }
-#endif
                                 const vec2 pixelXY = 4.f*XY[0][pixelI];
                                 const uint16 pixelPtr = blockPtr+pixelI;
-                                pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, mask);
+                                pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, ~sampleMask);
                             }
-                            if(partialBlockMask)
-                                blocks[blockCount++] = DrawCommand __(blockXY, blockPtr, partialBlockMask);
-                            //else all pixels were subsampled
                         }
                     }
                     rasterTime += rdtsc()-start;

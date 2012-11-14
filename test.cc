@@ -1,17 +1,11 @@
 #if 1
-#define __AVX__ 1
-#include "immintrin.h"
-#ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
-#include "avxintrin.h"
-#endif
+#include "core.h"
+#include "process.h"
+#include "string.h"
 
-int main() {
-    float pixelReject;
-    __m256 pixelReject0;
-    uint mask = _mm256_movemask_ps(pixelReject0);
-    //mask |= (_mm256_movemask_ps(_mm256_cmp_ps(pixelReject0, sampleStep[0][2], _CMP_LE_OQ))&0xFF)<<8;
-    return mask;
-}
+struct Main {
+    Main() { uint reg=0; reg=__builtin_ctz(0); log(reg); }
+} test;
 
 #endif
 
