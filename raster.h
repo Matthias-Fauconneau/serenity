@@ -10,91 +10,94 @@
 #ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
 #include "avxintrin.h"
 #endif
-typedef float float8 __attribute__ ((vector_size(32),may_alias));
+typedef float float8 __attribute((vector_size(32),may_alias));
 
 /// 16-wide Vector operations using 2 float8 AVX registers
 struct vec16 {
     float8 r1,r2;
     vec16(){}
+    vec16(float x){r1=r2= _mm256_set1_ps(x);}
     vec16(const float8& r1, const float8& r2):r1(r1),r2(r2){}
     vec16(float x0, float x1, float x2, float x3, float x4, float x5, float x6, float x7, float x8, float x9, float x10, float x11, float x12, float x13, float x14, float x15):r1(__extension__ (__m256){x7,x6,x5,x4,x3,x2,x1,x0}),r2(__extension__ (__m256){x15,x14,x13,x12,x11,x10,x9,x8}){}
+    float& operator [](uint i) { return ((float*)this)[i]; }
+    const float& operator [](uint i) const { return ((float*)this)[i]; }
 };
 
-inline vec16 operator +(const float& a, const vec16& b) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator +(float a, vec16 b) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
 }
-inline vec16 operator +(const vec16& b, const float& a) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator +(vec16 b, float a) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
 }
-inline vec16 operator +(const vec16& a, const vec16& b) {
+inline vec16 operator +(vec16 a, vec16 b) {
     return vec16(_mm256_add_ps(a.r1,b.r1),_mm256_add_ps(a.r2,b.r2));
 }
 
-inline vec16 operator *(const float& a, const vec16& b) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator *(float a, vec16 b) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_mul_ps(A,b.r1),_mm256_mul_ps(A,b.r2));
 }
-inline vec16 operator *(const vec16& a, const vec16& b) {
+inline vec16 operator *(vec16 a, vec16 b) {
     return vec16(_mm256_mul_ps(a.r1,b.r1),_mm256_mul_ps(a.r2,b.r2));
 }
-inline vec16 operator /(const int one unused, const vec16& d) {
+inline vec16 operator /(const int one unused, vec16 d) {
     assert(one==1);
     return vec16(_mm256_rcp_ps(d.r1),_mm256_rcp_ps(d.r2));
 }
 
-inline vec16 operator &(const vec16& a, const vec16& b) {
+inline vec16 operator &(vec16 a, vec16 b) {
     return vec16(_mm256_and_ps(a.r1,b.r1),_mm256_and_ps(a.r2,b.r2));
 }
 
-inline vec16 operator <(const float& a, const vec16& b) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator <(float a, vec16 b) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(A, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LT_OQ));
 }
-inline vec16 operator <=(const float& a, const vec16& b) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator <=(float a, vec16 b) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(A, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LE_OQ));
 }
-inline vec16 operator >=(const float& a, const vec16& b) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator >=(float a, vec16 b) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(A, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GE_OQ));
 }
-inline vec16 operator >(const float& a, const vec16& b) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator >(float a, vec16 b) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(A, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GT_OQ));
 }
 
-inline vec16 operator <(const vec16& b, const float& a) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator <(vec16 b, float a) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(b.r1, A, _CMP_LT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LT_OQ));
 }
-inline vec16 operator <=(const vec16& b, const float& a) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator <=(vec16 b, float a) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(b.r1, A, _CMP_LE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LE_OQ));
 }
-inline vec16 operator >=(const vec16& b, const float& a) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator >=(vec16 b, float a) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(b.r1, A, _CMP_GE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GE_OQ));
 }
-inline vec16 operator >(const vec16& b, const float& a) {
-    float8 A=_mm256_broadcast_ss(&a);
+inline vec16 operator >(vec16 b, float a) {
+    float8 A=_mm256_set1_ps(a);
     return vec16(_mm256_cmp_ps(b.r1, A, _CMP_GT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GT_OQ));
 }
 
-inline vec16 operator <(const vec16& a, const vec16& b) {
+inline vec16 operator <(vec16 a, vec16 b) {
     return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LT_OQ));
 }
-inline vec16 operator <=(const vec16& a, const vec16& b) {
+inline vec16 operator <=(vec16 a, vec16 b) {
     return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LE_OQ));
 }
-inline vec16 operator >=(const vec16& a, const vec16& b) {
+inline vec16 operator >=(vec16 a, vec16 b) {
     return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GE_OQ));
 }
-inline vec16 operator >(const vec16& a, const vec16& b) {
+inline vec16 operator >(vec16 a, vec16 b) {
     return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GT_OQ));
 }
-inline uint mask(const vec16& m) { return _mm256_movemask_ps(m.r1)|(_mm256_movemask_ps(m.r2)<<8); }
+inline uint mask(vec16 m) { return _mm256_movemask_ps(m.r1)|(_mm256_movemask_ps(m.r2)<<8); }
 
 inline float sum8(float8 x) {
     // hiQuad = ( x7, x6, x5, x4 )
@@ -117,39 +120,18 @@ inline float sum8(float8 x) {
     const __m128 sum = _mm_add_ss(lo, hi);
     return _mm_cvtss_f32(sum);
 }
+inline float sum16(vec16 v) { return sum8(v.r1)+sum8(v.r2); }
 
-inline float max8(float8 x) {
-    // hiQuad = ( x7, x6, x5, x4 )
-    const __m128 hiQuad = _mm256_extractf128_ps(x, 1);
-    // loQuad = ( x3, x2, x1, x0 )
-    const __m128 loQuad = _mm256_castps256_ps128(x);
-    // sumQuad = ( x3 + x7, x2 + x6, x1 + x5, x0 + x4 )
-    const __m128 sumQuad = _mm_max_ps(loQuad, hiQuad);
-    // loDual = ( -, -, x1 + x5, x0 + x4 )
-    const __m128 loDual = sumQuad;
-    // hiDual = ( -, -, x3 + x7, x2 + x6 )
-    const __m128 hiDual = _mm_movehl_ps(sumQuad, sumQuad);
-    // sumDual = ( -, -, x1 + x3 + x5 + x7, x0 + x2 + x4 + x6 )
-    const __m128 sumDual = _mm_max_ps(loDual, hiDual);
-    // lo = ( -, -, -, x0 + x2 + x4 + x6 )
-    const __m128 lo = sumDual;
-    // hi = ( -, -, -, x1 + x3 + x5 + x7 )
-    const __m128 hi = _mm_shuffle_ps(sumDual, sumDual, 0x1);
-    // sum = ( -, -, -, x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 )
-    const __m128 sum = _mm_max_ss(lo, hi);
-    return _mm_cvtss_f32(sum);
-}
+inline string str(const vec16 v) { return "vec16("_+str(ref<float>((float*)&v,16))+")"_; }
 
 /// 64×64 pixels bin for L1 cache locality (64×64×RGBZ×float~64KB)
 struct Bin { // 16KB triangles (stream) + 64KB framebuffer (L1)
+    vec16 depth[4*4],blue[4*4],green[4*4],red[4*4];
+    vec16 subdepth[16*16],subblue[16*16],subgreen[16*16],subred[16*16];
     uint16 cleared=0;
     uint16 faceCount=0;
     uint16 subsample[16]; //Per-pixel flag to trigger subpixel operations
-    uint16 faces[2*64*64-2-16-2*16*16]; // maximum virtual capacity
-    float nearestSampleDepth[16*16];
-    /*float depth[16*16], blue[16*16], green[16*16], red[16*16];
-    float subDepth[64*64], subBlue[64*64], subGreen[64*64], subRed[64*64];*/
-    float buffer[4*16*16+4*64*64]; //silence array-bounds errors;
+    uint16 faces[2*64*64-2-16]; // maximum virtual capacity
 };
 
 /// Tiled render target
@@ -165,7 +147,7 @@ struct RenderTarget {
         if(bins) unallocate(bins,width*height);
         width = align(64,size.x*4)/64;
         height = align(64,size.y*4)/64;
-        bins = allocate16<Bin>(width*height);
+        bins = allocate64<Bin>(width*height);
     }
 
     void clear(float depth=-0x1p16f, float blue=1, float green=1, float red=1) {
@@ -212,12 +194,9 @@ static constexpr vec2 XY[4][4*4] = {
 template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vertex varying attributes*/, bool blend=false> struct RenderPass {
     // Rasterization "registers", varying (perspective-interpolated) vertex attributes and constant face attributes
     struct Face { //~1K (streamed)
+        vec16 blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3];
         vec2 edges[3];
         float binReject[3], binAccept[3];
-        float nearestZ;
-        float blockRejectStep[3][4*4], blockAcceptStep[3][4*4];
-        float pixelRejectStep[3][4*4], pixelAcceptStep[3][4*4];
-        float sampleStep[3][4*4];
         vec3 iw, iz;
         vec3 varyings[V];
         FaceAttributes faceAttributes; //custom constant face attributes
@@ -233,7 +212,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
     int64 sampleFirstTime=0, sampleFirstZTestAndCentroidTime=0, sampleFirstOutputTime=0;
     int64 sampleOverTime=0, sampleOverZTestAndCentroidTime=0, sampleOverOutputTime=0;
     RenderPass(RenderTarget& target, uint faceCapacity):target(target),faceCapacity(faceCapacity){
-        faces = allocate16<Face>(faceCapacity);
+        faces = allocate64<Face>(faceCapacity);
     }
     ~RenderPass(){ unallocate(faces,faceCapacity); }
 
@@ -286,7 +265,6 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
         }
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
-        face.nearestZ = max(max(A.z,B.z),C.z);
         for(int i=0;i<V;i++) face.varyings[i] = E*vertexAttributes[i];
         face.faceAttributes=faceAttributes;
 
@@ -320,15 +298,14 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
             if(!bin.cleared) {
                 int64 start=rdtsc();
                 clear(bin.subsample,16);
-                clear(bin.buffer+0*16*16,16*16,target.depth);
-                clear(bin.buffer+1*16*16,16*16,target.blue);
-                clear(bin.buffer+2*16*16,16*16,target.green);
-                clear(bin.buffer+3*16*16,16*16,target.red);
+                clear(bin.depth,4*4,vec16(target.depth));
+                clear(bin.blue,4*4,vec16(target.blue));
+                clear(bin.green,4*4,vec16(target.green));
+                clear(bin.red,4*4,vec16(target.red));
                 bin.cleared=1;
                 clearTime += rdtsc()-start;
             }
-            uint16* const subsample = bin.subsample;
-            float* const buffer = bin.buffer;
+
             const vec2 binXY = 64.f*vec2(binJ,binI);
             // Loop on all faces in the bin
             for(uint faceI=0; faceI<bin.faceCount; faceI++) {
@@ -341,8 +318,6 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
                         binAccept[e] = face.binAccept[e] + dot(face.edges[e], binXY);
                     }
-
-                    // TODO: trivial edge accept
 
                     // Full bin accept
                     if(
@@ -358,8 +333,6 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
 
                             // trivial reject
                             if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
-
-                            // TODO: trivial edge accept
 
                             const uint16 blockPtr = blockI*(4*4);
                             const vec2 blockXY = binXY+16.f*XY[0][blockI];
@@ -377,7 +350,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             // 4×4 pixel accept mask
                             uint16 pixelAcceptMask=0xFFFF; // partial block of full pixels
                             for(int e=0;e<3;e++) {
-                                pixelAcceptMask &= mask(blockAccept[e] > *(vec16*)face.pixelAcceptStep[e]);
+                                pixelAcceptMask &= mask(blockAccept[e] > face.pixelAcceptStep[e]);
                             }
 
                             if(pixelAcceptMask)
@@ -388,7 +361,7 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                             uint16 pixelRejectMask=0; // partial block of full pixels
                             vec16 pixelReject[3]; //used to reject samples
                             for(int e=0;e<3;e++) {
-                                pixelReject[e] = blockReject[e] + *(vec16*)face.pixelRejectStep[e];
+                                pixelReject[e] = blockReject[e] + face.pixelRejectStep[e];
                                 pixelRejectMask |= mask(pixelReject[e] <= 0);
                             }
 
@@ -400,19 +373,10 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 partialPixelMask &= ~(1<<pixelI);
 
                                 // 4×4 samples mask
-                                /*uint16 sampleMask=0;
-                                for(int e=0;e<3;e++) {
-                                    float pixel = ((float*)&pixelReject[e])[pixelI];
-                                    sampleMask |= mask(pixel <= *(vec16*)face.sampleStep[e]);
-                                }
-                                const vec2 pixelXY = 4.f*XY[0][pixelI];
-                                const uint16 pixelPtr = blockPtr+pixelI;
-                                pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, ~sampleMask);*/
-                                // 4×4 samples mask
                                 vec16 sampleMask =
-                                        (((float*)&pixelReject[0])[pixelI] > *(vec16*)face.sampleStep[0]) &
-                                        (((float*)&pixelReject[1])[pixelI] > *(vec16*)face.sampleStep[1]) &
-                                        (((float*)&pixelReject[2])[pixelI] > *(vec16*)face.sampleStep[2]);
+                                        (pixelReject[0][pixelI] > face.sampleStep[0]) &
+                                        (pixelReject[1][pixelI] > face.sampleStep[1]) &
+                                        (pixelReject[2][pixelI] > face.sampleStep[2]);
                                 const vec2 pixelXY = 4.f*XY[0][pixelI];
                                 const uint16 pixelPtr = blockPtr+pixelI;
                                 pixels[pixelCount++] = DrawCommand __(blockXY+pixelXY, pixelPtr, mask(sampleMask), sampleMask);
@@ -421,7 +385,9 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                     }
                     rasterTime += rdtsc()-start;
                 }
-
+                // 4×4 xy steps from pixel origin to sample center (TODO: latin square pattern)
+                static const vec16 X = vec16(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)+1./2;
+                static const vec16 Y = vec16(0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3)+1./2;
                 {
                     int64 start = rdtsc();
                     int64 userTime=0;
@@ -430,43 +396,28 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         const uint blockPtr = draw.ptr;
                         const vec2 blockXY = draw.pos;
                         const uint16 mask = draw.mask;
-                        for(uint pixelI=0; pixelI<4*4; pixelI++) {
-                            if(!(mask&(1<<pixelI))) continue; //vectorized code might actually mask output instead
+                        for(uint pixelI=0; pixelI<4*4; pixelI++) { //TODO: vectorize
+                            if(!(mask&(1<<pixelI))) continue;
                             const uint pixelPtr = blockPtr+pixelI;
                             const vec2 pixelXY = blockXY+4.f*XY[0][pixelI];
 
-                            /*vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
-                            float w = 1/dot(face.iw,XY1);
-                            float z = w*dot(face.iz,XY1);
+                            if(!(bin.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
+                                vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
+                                float w = 1/dot(face.iw,XY1);
+                                float z = w*dot(face.iz,XY1);
 
-                            float* const pixel = buffer+pixelPtr;
-                            float& depth = *pixel; //furthest
-                            if(z < depth) {
-                                //pixel[1*16*16]=1; //DEBUG
-                                continue; //Hi-Z reject
-                            }*/
-
-                            vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
-                            float w = 1/dot(face.iw,XY1);
-                            float z = w*dot(face.iz,XY1);
-                            float& nearest = *(buffer-16*16+pixelPtr);
-
-                            if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
-                                float* const pixel = buffer+pixelPtr;
-                                float& depth = *pixel; //furthest
-                                if(z < depth) {
-                                    //pixel[1*16*16]=1; //DEBUG
-                                    continue; //Hi-Z reject
-                                }
+                                float& depth = bin.depth[pixelPtr/16][pixelPtr%16];
+                                if(z < depth) continue;
                                 depth = z;
+
                                 float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
                                 int64 start = rdtsc();
-                                vec4 bgra = shader(face.faceAttributes,centroid);
+                                vec4 bgra = shader(face.faceAttributes,centroid); //TODO: vectorize
                                 userTime += rdtsc()-start;
                                 float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
-                                float& dstB = pixel[1*16*16];
-                                float& dstG = pixel[2*16*16];
-                                float& dstR = pixel[3*16*16];
+                                float& dstB = bin.blue[pixelPtr/16][pixelPtr%16];
+                                float& dstG = bin.green[pixelPtr/16][pixelPtr%16];
+                                float& dstR = bin.red[pixelPtr/16][pixelPtr%16];
                                 if(blend) {
                                     dstB=(1-srcA)*dstB+srcA*srcB;
                                     dstG=(1-srcA)*dstG+srcA*srcG;
@@ -476,74 +427,47 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                     dstG=srcG;
                                     dstR=srcR;
                                 }
-                            }
-                            /*else if(z >= nearest) { // Full Z accept
-                                subsample[pixelPtr/16] &= ~(1<<(pixelPtr%16)); // Clear subsample flag
-                                float* const pixel = buffer+pixelPtr;
-                                float& depth = *pixel; //furthest
-                                depth = z;
-                                float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
-                                int64 start = rdtsc();
-                                vec4 bgra = shader(face.faceAttributes,centroid);
-                                userTime += rdtsc()-start;
-                                float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
-                                float& dstB = pixel[1*16*16];
-                                float& dstG = pixel[2*16*16];
-                                float& dstR = pixel[3*16*16];
-                                if(blend) {
-                                    float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
-                                    // Resolve pixel for blending
-                                    float avgB=0, avgG=0, avgR=0;
-                                    for(uint sampleI=0; sampleI<16; sampleI++) {
-                                        float* const sample = subpixel+sampleI;
-                                        avgB += sample[1*64*64];
-                                        avgG += sample[2*64*64];
-                                        avgR += sample[3*64*64];
-                                    }
-                                    avgB /= 4*4, avgG /=4*4, avgR /= 4*4;
-                                    dstB=(1-srcA)*avgB+srcA*srcB;
-                                    dstG=(1-srcA)*avgG+srcA*srcG;
-                                    dstR=(1-srcA)*avgR+srcA*srcR;
-                                } else {
-                                    dstB=srcB;
-                                    dstG=srcG;
-                                    dstR=srcR;
-                                }
-                                //dstG=1; //DEBUG: coalesced pixel
-                            }*/
-                            else { // Partial Z mask
-                                float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
-                                uint mask=0; float centroid[V] = {}; float samples=0;
-                                // Loop on 4×4 samples
-                                for(uint sampleI=0; sampleI<16; sampleI++) {
-                                    const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
+                            } else { // Partial Z mask
+                                uint mask=0; float centroid[V];
+                                {
+                                    // 2D coordinates vector
+                                    const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
+                                    // Interpolates w for perspective correction
+                                    const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
+                                    // Interpolates perspective correct z
+                                    const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
 
-                                    vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
-                                    float w = 1/dot(face.iw,XY1);
-                                    float z = w*dot(face.iz,XY1);
+                                    // Performs Z-Test
+                                    vec16& subpixel = bin.subdepth[pixelPtr];
+                                    const vec16 visibleMask = (z >= subpixel);
 
-                                    float* const sample = subpixel+sampleI;
-                                    float& depth = *sample;
-                                    if(z>=depth) {
-                                        depth = z;
-                                        if(z > nearest) nearest=z;
-                                        samples++;
-                                        mask |= (1<<sampleI);
-                                        for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
+                                    // Stores accepted pixels in Z buffer
+                                    _mm256_maskstore_ps(((float*)&subpixel)+0,(__m256i)visibleMask.r1,z.r1);
+                                    _mm256_maskstore_ps(((float*)&subpixel)+8,(__m256i)visibleMask.r2,z.r2);
+
+                                    // Counts visible samples
+                                    mask = ::mask(visibleMask);
+                                    float visibleSampleCount = __builtin_popcount(mask);
+
+                                    // Computes vertex attributes at all samples
+                                    for(int i=0;i<V;i++) {
+                                        const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                                        // Zeroes hidden samples
+                                        const vec16 visible = samples & visibleMask;
+                                        // Averages on the visible samples
+                                        centroid[i] = sum16(visible) / visibleSampleCount;
                                     }
                                 }
 
-                                for(uint i=0;i<V;i++) centroid[i] /= samples;
                                 int64 start = rdtsc();
-                                vec4 bgra = shader(face.faceAttributes,centroid);
+                                vec4 bgra = shader(face.faceAttributes,centroid); //TODO: vectorize
                                 userTime += rdtsc()-start;
                                 float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                                for(uint sampleI=0;sampleI<16;sampleI++) {
-                                    float* const sample = subpixel+sampleI;
+                                for(uint sampleI=0;sampleI<16;sampleI++) { //TODO: vectorize
                                     if(mask&(1<<sampleI)) {
-                                        float& dstB = sample[1*64*64];
-                                        float& dstG = sample[2*64*64];
-                                        float& dstR = sample[3*64*64];
+                                        float& dstB = bin.subblue[pixelPtr][sampleI];
+                                        float& dstG = bin.subgreen[pixelPtr][sampleI];
+                                        float& dstR = bin.subred[pixelPtr][sampleI];
                                         if(blend) {
                                             dstB=(1-srcA)*dstB+srcA*srcB;
                                             dstG=(1-srcA)*dstG+srcA*srcG;
@@ -568,65 +492,64 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                         const DrawCommand& draw = pixels[i];
                         const uint pixelPtr = draw.ptr;
                         const vec2 pixelXY = draw.pos;
-                        float* const subpixel = buffer+4*16*16+pixelPtr*4*4;
                         uint16 mask = draw.mask;
-                        float& nearest = *(buffer-16*16+pixelPtr);
 
-                        // 4×4 xy steps from pixel origin to sample center (TODO: latin square pattern)
-                        static const vec16 X = vec16(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)+1./2;
-                        static const vec16 Y = vec16(0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3)+1./2;
+                        // 2D coordinates vector
+                        const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
+                        // Interpolates w for perspective correction
+                        const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
+                        // Interpolates perspective correct z
+                        const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
 
                         // Convert single sample pixel to subsampled pixel
-                        if(!(subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
-                            float* const pixel = buffer+pixelPtr;
-
-                            // early Z reject to avoid hidden MSAA splits
-                            /*if(face.nearestZ < *pixel) {
-                                continue; // Hi-Z reject
-                            }*/
-
-                            // Set subsampled pixel flag
-                            subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
-
-                            nearest = *pixel;
-                            float centroid[V] = {}; float samples=0;
+                        if(!(bin.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                            float centroid[V];
                             {
                                 int64 start = rdtsc();
-                                // Loop on 4×4 samples
-                                for(uint sampleI=0; sampleI<16; sampleI++) {
-                                    float* const sample = subpixel+sampleI;
-                                    if(!(mask&(1<<sampleI))) { *sample=*pixel; continue; } //vectorized code might actually mask output instead
 
-                                    const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
-                                    vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
-                                    float w = 1/dot(face.iw,XY1);
-                                    float z = w*dot(face.iz,XY1);
+                                // Set subsampled pixel flag
+                                bin.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
 
-                                    if(z<*pixel) { mask &= ~(1<<sampleI); *sample=*pixel; continue; }
-                                    *sample = z;
-                                    if(z > nearest) nearest=z;
-                                    samples++;
-                                    for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
+                                // Performs Z-Test
+                                float pixel = bin.depth[pixelPtr/16][pixelPtr%16];
+                                const vec16 visibleMask =  (z >= pixel) & draw.mask256;
+
+                                // Blends accepted pixels in Z buffer
+                                float8 pixelZ = _mm256_set1_ps(pixel);
+                                vec16& subpixel = bin.subdepth[pixelPtr];
+                                subpixel.r1 = _mm256_blendv_ps(pixelZ,z.r1,visibleMask.r1);
+                                subpixel.r2 = _mm256_blendv_ps(pixelZ,z.r2,visibleMask.r2);
+
+                                // Counts visible samples
+                                mask = ::mask(visibleMask);
+                                float visibleSampleCount = __builtin_popcount(mask);
+
+                                // Computes vertex attributes at all samples
+                                for(int i=0;i<V;i++) {
+                                    const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                                    // Zeroes hidden samples
+                                    const vec16 visible = samples & visibleMask;
+                                    // Averages on the visible samples
+                                    centroid[i] = sum16(visible) / visibleSampleCount;
                                 }
+
                                 sampleFirstZTestAndCentroidTime += rdtsc()-start;
                             }
                             {
-                                for(uint i=0;i<V;i++) centroid[i] /= samples;
                                 int64 userStart = rdtsc();
-                                vec4 bgra = shader(face.faceAttributes,centroid);
+                                vec4 bgra = shader(face.faceAttributes,centroid); //TODO: vectorize
                                 uint64 userEnd = rdtsc();
                                 userTime += userEnd-userStart;
                                 float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                                for(uint sampleI=0;sampleI<16;sampleI++) {
-                                    float* const sample = subpixel+sampleI;
-                                    float& dstB = sample[1*64*64];
-                                    float& dstG = sample[2*64*64];
-                                    float& dstR = sample[3*64*64];
+                                for(uint sampleI=0;sampleI<16;sampleI++) { //TODO: vectorize
+                                    float& dstB = bin.subblue[pixelPtr][sampleI];
+                                    float& dstG = bin.subgreen[pixelPtr][sampleI];
+                                    float& dstR = bin.subred[pixelPtr][sampleI];
                                     if(mask&(1<<sampleI)) {
                                         if(blend) {
-                                            float pixelB = pixel[1*16*16];
-                                            float pixelG = pixel[2*16*16];
-                                            float pixelR = pixel[3*16*16];
+                                            float pixelB = bin.blue[pixelPtr/16][pixelPtr%16];
+                                            float pixelG = bin.green[pixelPtr/16][pixelPtr%16];
+                                            float pixelR = bin.red[pixelPtr/16][pixelPtr%16];
                                             dstB=(1-srcA)*pixelB+srcA*srcB;
                                             dstG=(1-srcA)*pixelG+srcA*srcG;
                                             dstR=(1-srcA)*pixelR+srcA*srcR;
@@ -636,9 +559,9 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                             dstR=srcR;
                                         }
                                     } else {
-                                        float pixelB = pixel[1*16*16];
-                                        float pixelG = pixel[2*16*16];
-                                        float pixelR = pixel[3*16*16];
+                                        float pixelB = bin.blue[pixelPtr/16][pixelPtr%16];
+                                        float pixelG = bin.green[pixelPtr/16][pixelPtr%16];
+                                        float pixelR = bin.red[pixelPtr/16][pixelPtr%16];
                                         dstB=pixelB;
                                         dstG=pixelG;
                                         dstR=pixelR;
@@ -646,97 +569,58 @@ template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vert
                                 }
                                 sampleFirstOutputTime += rdtsc()-userEnd;
                             }
-                            continue;
-                        }
+                        } else {
+                            float centroid[V];
+                            {
+                                int64 start = rdtsc();
+                                // Performs Z-Test
+                                vec16& subpixel = bin.subdepth[pixelPtr];
+                                const vec16 visibleMask =  (z >= subpixel) & draw.mask256;
 
-                        // early Z reject to avoid MSAA overdraw
-                        /*if(face.nearestZ < nearest) {
-                            continue; // Hi-Z reject
-                        }*/
+                                // Stores accepted pixels in Z buffer
+                                _mm256_maskstore_ps(((float*)&subpixel)+0,(__m256i)visibleMask.r1,z.r1);
+                                _mm256_maskstore_ps(((float*)&subpixel)+8,(__m256i)visibleMask.r2,z.r2);
 
-                        float centroid[V] = {};
-                        {
-                            int64 start = rdtsc();
-#if 0
-                            // Loop on 4×4 samples
-                            float visibleSampleCount=0;
-                            for(uint sampleI=0; sampleI<16; sampleI++) {
-                                if(!(mask&(1<<sampleI))) continue; //vectorized code might actually mask output instead
+                                // Counts visible samples
+                                mask = ::mask(visibleMask);
+                                float visibleSampleCount = __builtin_popcount(mask);
 
-                                const vec2 sampleXY = XY[0][sampleI]; //TODO: latin square pattern
-                                vec3 XY1 = vec3(pixelXY+sampleXY+vec2(1.f/2, 1.f/2), 1.f);
-                                float w = 1/dot(face.iw,XY1);
-                                float z = w*dot(face.iz,XY1);
-
-                                float* const sample = subpixel+sampleI;
-                                float& depth = *sample;
-                                if(z < depth) { mask &= ~(1<<sampleI); continue; }
-                                if(z > nearest) nearest=z;
-                                depth = z;
-                                visibleSampleCount++;
-                                for(int i=0;i<V;i++) centroid[i]+=w*dot(face.varyings[i],XY1);
-                            }
-                            for(int i=0;i<V;i++) centroid[i] /= visibleSampleCount;
-#else
-                            // 2D coordinates vector
-                            const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
-                            // Interpolates w for perspective correction
-                            const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
-                            // Interpolates perspective correct z
-                            const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
-                            // Performs Z-Test (blending most negative Z instead of masking test to get correct maximum (nearest))
-                            float8 zFar = _mm256_set1_ps(-__builtin_inff());
-                            const vec16 visibleZ = vec16(
-                                        _mm256_blendv_ps(zFar,z.r1,draw.mask256.r1),
-                                        _mm256_blendv_ps(zFar,z.r2,draw.mask256.r2));
-                            const vec16 visibleMask =  (visibleZ >= *(vec16*)subpixel);
-
-                            // Stores accepted pixels in Z buffer
-                            _mm256_maskstore_ps(subpixel,(__m256i)visibleMask.r1,z.r1);
-                            _mm256_maskstore_ps(subpixel+8,(__m256i)visibleMask.r2,z.r2);
-                            // Computes nearest sample for pixel Hi-Z reject
-                            nearest = max(max8(visibleZ.r1),max8(visibleZ.r2));
-
-                            // Counts visible samples
-                            mask = ::mask(visibleMask);
-                            float visibleSampleCount = __builtin_popcount(mask);
-
-                            // Computes vertex attributes at all samples
-                            for(int i=0;i<V;i++) {
-                                const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
-                                // Zeroes hidden samples
-                                const vec16 visible = samples & visibleMask;
-                                // Averages on the visible samples
-                                centroid[i] = (sum8(visible.r1)+sum8(visible.r2)) / visibleSampleCount; //FIXME
-                            }
-#endif
-                            sampleOverZTestAndCentroidTime += rdtsc()-start;
-                        }
-                        {
-                            int64 userStart = rdtsc();
-                            vec4 bgra = shader(face.faceAttributes,centroid);
-                            uint64 userEnd = rdtsc();
-                            userTime += userEnd-userStart;
-                            float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                            for(uint sampleI=0;sampleI<16;sampleI++) {
-                                float* const sample = subpixel+sampleI;
-                                if(mask&(1<<sampleI)) {
-                                    float& dstB = sample[1*64*64];
-                                    float& dstG = sample[2*64*64];
-                                    float& dstR = sample[3*64*64];
-                                    if(blend) {
-                                        dstB=(1-srcA)*dstB+srcA*srcB;
-                                        dstG=(1-srcA)*dstG+srcA*srcG;
-                                        dstR=(1-srcA)*dstR+srcA*srcR;
-                                    } else {
-                                        dstB=srcB;
-                                        dstG=srcG;
-                                        dstR=srcR;
-                                    }
-                                    //dstR=1; //DEBUG
+                                // Computes vertex attributes at all samples
+                                for(int i=0;i<V;i++) {
+                                    const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                                    // Zeroes hidden samples
+                                    const vec16 visible = samples & visibleMask;
+                                    // Averages on the visible samples
+                                    centroid[i] = sum16(visible) / visibleSampleCount; //FIXME
                                 }
+
+                                sampleOverZTestAndCentroidTime += rdtsc()-start;
                             }
-                            sampleOverOutputTime += rdtsc()-userEnd;
+                            {
+                                int64 userStart = rdtsc();
+                                vec4 bgra = shader(face.faceAttributes,centroid); //TODO: vectorize
+                                uint64 userEnd = rdtsc();
+                                userTime += userEnd-userStart;
+                                float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                                for(uint sampleI=0;sampleI<16;sampleI++) { //TODO: vectorize
+                                    if(mask&(1<<sampleI)) {
+                                        float& dstB = bin.subblue[pixelPtr][sampleI];
+                                        float& dstG = bin.subgreen[pixelPtr][sampleI];
+                                        float& dstR = bin.subred[pixelPtr][sampleI];
+                                        if(blend) {
+                                            dstB=(1-srcA)*dstB+srcA*srcB;
+                                            dstG=(1-srcA)*dstG+srcA*srcG;
+                                            dstR=(1-srcA)*dstR+srcA*srcR;
+                                        } else {
+                                            dstB=srcB;
+                                            dstG=srcG;
+                                            dstR=srcR;
+                                        }
+                                        //dstR=1; //DEBUG
+                                    }
+                                }
+                                sampleOverOutputTime += rdtsc()-userEnd;
+                            }
                         }
                     }
                     this->userTime += userTime;

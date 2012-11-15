@@ -32,7 +32,7 @@ template<class T> void reallocate(T*& buffer, int unused size, int need) { heapT
 template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); heapTrace(-size*sizeof(T)); free((void*)buffer); buffer=0; }
 #else
 template<class T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
-template<class T> T* allocate16(uint size) { void* buffer; if(posix_memalign(&buffer,16,size*sizeof(T))) error(""); return (T*)buffer; }
+template<class T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
 template<class T> void reallocate(T*& buffer, int unused size, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
 template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); free((void*)buffer); buffer=0; }
 #endif

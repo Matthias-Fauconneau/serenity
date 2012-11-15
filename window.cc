@@ -122,7 +122,7 @@ void Window::event() {
                 uint* dst=(uint*)framebuffer.data;
                 for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
                     int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (backgroundColor*t+backgroundCenter*(0xFF-t))/0xFF;
-                    dst[y*w+x]= a<<24 | g<<16 | g<<8 | g;
+                    dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
                 }
             }
         }

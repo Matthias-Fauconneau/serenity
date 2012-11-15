@@ -226,13 +226,13 @@ bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
         const uint period=size/2;
         assert(size%2==0);
 
-        float4* buffer = allocate16<float4>(period); clear(buffer, period);
+        float4* buffer = allocate64<float4>(period); clear(buffer, period);
         // Mix notes which don't need any resampling
         for(Note& note: notes[1]) note.read(buffer, period);
         // Mix pitch shifting layers
         for(int i=0;i<2;i++) {
             uint inSize=align(2,resampler[i].need(2*period))/2;
-            float4* layer = allocate16<float4>(inSize); clear(layer, inSize);
+            float4* layer = allocate64<float4>(inSize); clear(layer, inSize);
             for(Note& note: notes[i*2]) note.read(layer, inSize);
             resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, period*2);
             unallocate(layer,inSize);

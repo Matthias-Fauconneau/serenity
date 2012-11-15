@@ -94,7 +94,7 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
     // Allocates and clears aligned planar signal buffers
     this->bufferSize = bufferSize = max(bufferSize,sourceRate)+N-1;
     for(uint i: range(channelCount)) {
-        buffer[i] = allocate16<float>(bufferSize);
+        buffer[i] = allocate64<float>(bufferSize);
         clear(buffer[i],bufferSize,0.f);
     }
 
@@ -106,7 +106,7 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
     fractionalAdvance = sourceRate%targetRate;
 
     // Generates an N tap filter for each fractionnal position
-    kernel = allocate16<float>(targetRate*N);
+    kernel = allocate64<float>(targetRate*N);
     for(uint i: range(targetRate)) for(uint j: range(N)) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+j-N/2-1, N);
 }
 Resampler::~Resampler() {
