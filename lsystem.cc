@@ -328,7 +328,7 @@ struct Editor : Widget {
 
     struct FaceAttributes { vec3 Y,Z; };
 
-    uint64 frameEnd=cpuTime(), frameTime=130000; // in microseconds
+    uint64 frameEnd=cpuTime(), frameTime=60000; // in microseconds
     uint64 miscStart=rdtsc(), miscTime=0, setupTime=0, renderTime=0, resolveTime=0, uiTime=0; //in cycles
     const uint T=1; // exponential moving average
 
@@ -338,6 +338,10 @@ struct Editor : Widget {
 
         if(targetSize != target.size) {
             target.resize(targetSize);
+        } else {
+            //framebuffer background color is only regenerated as necessary, but UI rendering expects cleared framebuffer
+            fill(targetPosition+Rect(targetSize.x,16),white,false);
+            fill(targetPosition+Rect(256,256),white,false);
         }
         target.clear();
 
@@ -356,10 +360,9 @@ struct Editor : Widget {
         mat3 normalMatrix = view.normalMatrix();
 
         // Trees (cylinders)
-        struct TreeRenderPass : RenderPass<FaceAttributes,1> {
-            TreeRenderPass(RenderTarget& target, uint faceCapacity): RenderPass(target,faceCapacity){}
+        struct TreeShader {
             vec3 sky, sun;
-            vec4 shader(FaceAttributes face, float varying[1]) override{
+            vec4 operator()(FaceAttributes face, float varying[1]) const {
                 //return vec4(0,0,0,1);
                 float d = clip(-1.f,varying[0],1.f);
                 vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
@@ -372,7 +375,8 @@ struct Editor : Widget {
                 vec3 diffuse = albedo*diffuseLight;
                 return vec4(diffuse,1.f);
             }
-        } pass __(target, cones.size()*2);
+        } shader;
+         RenderPass<FaceAttributes,1,TreeShader> pass __(target, cones.size()*2, shader);
 
         for(Cone cone: cones) {
             // View transform
@@ -394,8 +398,8 @@ struct Editor : Widget {
             pass.submit(c,d,a,attributes[1],__(Y,Z));
         }
 
-        pass.sky = normalize(normalMatrix*vec3(1,0,0));
-        pass.sun = normalize(normalMatrix*vec3(1,1,0));
+        shader.sky = normalize(normalMatrix*vec3(1,0,0));
+        shader.sun = normalize(normalMatrix*vec3(1,1,0));
 
         setupTime = (rdtsc()-setupStart + (T-1)*setupTime)/T;
 
@@ -416,24 +420,19 @@ struct Editor : Widget {
 
         systems.render(targetPosition,int2(targetSize.x,16));
         uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime; //in cycles
-        frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16;
+        frameTime = ( (frameEnd-this->frameEnd) + (64-1)*frameTime)/64;
         this->frameEnd=frameEnd;
         status.setText(ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms\n"
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
                        "setup "_+str(100*setupTime/totalTime)+"%\n"
                        "render "_+str(100*renderTime/totalTime)+"%\n"
-                       "- clear "_+str(100*pass.clearTime/totalTime)+"%\n"
+                       profile(
                        "- raster "_+str(100*pass.rasterTime/totalTime)+"%\n"
-                       "-- subpixel "_+str(100*pass.subpixelRasterTime/totalTime)+"%\n"
                        "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"_
                        "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"_
                        "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"_
-                       "--- Z-Test & Centroid "_+str(100*(pass.sampleFirstZTestAndCentroidTime)/totalTime)+"%\n"_
-                       "--- Output "_+str(100*(pass.sampleFirstOutputTime)/totalTime)+"%\n"_
                        "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"_
-                       "--- Z-Test & Centroid "_+str(100*(pass.sampleOverZTestAndCentroidTime)/totalTime)+"%\n"_
-                       "--- Output "_+str(100*(pass.sampleOverOutputTime)/totalTime)+"%\n"_
-                       "- user "_+str(100*pass.userTime/totalTime)+"%\n"
+                       "- user "_+str(100*pass.userTime/totalTime)+"%\n")
                        "resolve "_+str(100*resolveTime/totalTime)+"%\n"
                        "ui "_+str(100*uiTime/totalTime)+"%\n"_);
         status.render(int2(targetPosition+int2(16)));
