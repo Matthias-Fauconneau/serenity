@@ -1,13 +1,8 @@
 CG:
-TBDR:
- multithreading
- use step grids for vertex attribute interpolations
- quad polygon ?
- float16 colors ?
- Hi-Z pixel reject ?
- latin square ?
- shadows
+ faster shadows, trunk cylinder cap
  herbaceous plants, colors, leaves, textures
+ use step grids for vertex attribute interpolations
+ coverage sampling ? Hi-Z pixel reject ? quad polygon ? float16 colors ?
  scene (sky, grass, plants, forest, terrain...)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

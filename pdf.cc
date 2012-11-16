@@ -230,7 +230,13 @@ void PDF::open(const ref<byte>& data) {
                             TextData s (cs.list[3].data);
                             for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
                             indexed=true;
-                        } else { log("Unsupported colorspace",cs); continue; }
+                        } else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceRGB"_ && cs.list[2].integer()==255) {
+                            Data s = cs.list[3].integer()?parse(xref[cs.list[3].integer()]).data:move(cs.list[3].data);
+                            for(int i=0;i<256;i++) {
+                                byte r=s.next(), g=s.next(), b=s.next();
+                                palette[i]=byte4(b,g,r,0xFF); }
+                            indexed=true;
+                        } else { log("Unsupported colorspace",cs,cs.list[1].integer()?parse(xref[cs.list[1].integer()]).data:""_); continue; }
                     }
                     const uint8* src = (uint8*)object.data.data(); assert(object.data.size()==image.height*image.width*depth);
                     byte4* dst = (byte4*)image.data;

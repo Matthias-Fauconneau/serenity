@@ -53,6 +53,7 @@ generic vector operator -(const vector& u, const vector& v) { vector r; for(uint
 generic vector operator *(const vector& u, const vector& v) { vector r; for(uint i=0;i<N;i++) r[i]=u[i]*v[i]; return r; }
 generic vector operator *(const vector& u, T s) { vector r; for(uint i=0;i<N;i++) r[i]=u[i]*s; return r; }
 generic vector operator *(T s, const vector& u) { vector r; for(uint i=0;i<N;i++) r[i]=s*u[i]; return r; }
+generic vector operator /(T s, const vector& u) { vector r; for(uint i=0;i<N;i++) r[i]=s/u[i]; return r; }
 generic vector operator /(const vector& u, T s) { vector r; for(uint i=0;i<N;i++) r[i]=u[i]/s; return r; }
 generic vector operator /(const vector& u, const vector& v) { vector r; for(uint i=0;i<N;i++) r[i]=u[i]/v[i]; return r; }
 generic bool operator <(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]>=v[i]) return false; return true; }

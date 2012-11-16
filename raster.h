@@ -1,7 +1,7 @@
 #pragma once
 /// \file raster.h 3D rasterizer (polygon, circle)
 #include "matrix.h"
-#include "function.h"
+#include "process.h"
 #include "time.h"
 
 // AVX intrinsics
@@ -207,8 +207,10 @@ static constexpr vec2 XY[4][4*4] = {
     }
 };
 
-template<class FaceAttributes /*per-face constant attributes*/, int V /*per-vertex varying attributes*/, class Shader, bool blend=false>
-struct RenderPass {
+template<class Shader> struct RenderPass {
+    typedef typename Shader::FaceAttributes FaceAttributes;
+    static constexpr int V = Shader::V;
+    static constexpr bool blend = Shader::blend;
     // Rasterization "registers", varying (perspective-interpolated) vertex attributes and constant face attributes
     struct Face { //~1K (streamed)
         vec16 blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3];
@@ -245,7 +247,7 @@ struct RenderPass {
         assert(A.w==1); assert(B.w==1); assert(C.w==1);
         mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
         float det = E.det();
-        if(det<=1) return; //small or back-facing triangle
+        if(det<1) return; //small or back-facing triangle
         E = E.cofactor(); //edge equations are now columns of E
         if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z++;
         if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
@@ -304,12 +306,25 @@ struct RenderPass {
         faceCount++;
     }
 
+    static void* start_routine(void* this_) { ((RenderPass*)this_)->run(); return 0; }
+    Lock binCounterLock;
+    uint nextBin=0;
     // For each bin, rasterizes and shade all triangles
     void render() {
-        profile( int64 start = rdtsc(); )
+        nextBin=0;
+        const int N=8;
+        pthread threads[N-1];
+        for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
+        run();
+        for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
+    }
+    void run() {
+        profile( int64 start = rdtsc(); );
         // Loop on all bins (64x64 samples (16x16 pixels))
-        for(uint binI=0; binI<target.height; binI++) for(uint binJ=0; binJ<target.width; binJ++) {
-            Bin& bin = target.bins[binI*target.width+binJ];
+        for(;;) {
+            uint binI = __sync_fetch_and_add(&nextBin,1);
+            if(binI>=target.width*target.height) break;
+            Bin& bin = target.bins[binI];
             if(!bin.faceCount) continue;
             if(!bin.cleared) {
                 clear(bin.subsample,16);
@@ -320,7 +335,7 @@ struct RenderPass {
                 bin.cleared=1;
             }
 
-            const vec2 binXY = 64.f*vec2(binJ,binI);
+            const vec2 binXY = 64.f*vec2(binI%target.width,binI/target.width);
             // Loop on all faces in the bin
             for(uint faceI=0; faceI<bin.faceCount; faceI++) {
                 struct DrawBlock { vec2 pos; uint ptr; uint mask; } blocks[4*4]; uint blockCount=0;
@@ -400,7 +415,7 @@ struct RenderPass {
                     }
                     profile( rasterTime += rdtsc()-start; )
                 }
-                // 4×4 xy steps from pixel origin to sample center (TODO: latin square pattern)
+                // 4×4 xy steps from pixel origin to sample center
                 static const vec16 X = vec16(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)+1./2;
                 static const vec16 Y = vec16(0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3)+1./2;
                 {

@@ -129,7 +129,7 @@ Image decodePNG(const ref<byte>& file) {
 }
 
 uint32 crc32(const ref<byte>& data) {
-    uint crc_table[256];
+    static uint crc_table[256];
     static bool unused once = ({for(uint n: range(256)){ uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } true;});
     uint crc = 0xFFFFFFFF;
     for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
@@ -147,7 +147,6 @@ uint adler32(const ref<byte> data) {
     return a | (b << 16);
 }
 
-
 array<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
     array<byte> data(w*h*4+h); data.setSize(data.capacity());
@@ -158,7 +157,7 @@ array<byte> filter(const Image& image) {
 
 array<byte> encodePNG(const Image& image) {
     array<byte> file = string("\x89PNG\r\n\x1A\n"_);
-    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr = __( .w=big32(image.width), .h=big32(image.height), .depth=8, .type=6 );
+    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr = __( .w=big32(image.width), .h=big32(image.height), .depth=8, .type=6, .compression=0, .filter=0, .interlace=0 );
     array<byte> IHDR = "IHDR"_+raw(ihdr);
     file<< raw(big32(IHDR.size()-4)) << IHDR << raw(big32(crc32(IHDR)));
 

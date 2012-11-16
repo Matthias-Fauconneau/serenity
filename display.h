@@ -37,3 +37,9 @@ void substract(int2 target, const Image& source, byte4 color=black);
 
 /// Draws a thin antialiased line from (x1, y1) to (x2,y2)
 void line(float x1, float y1, float x2, float y2, byte4 color=black);
+
+/// Draws a thin antialiased line from p1 to p2
+inline void line(vec2 p1, vec2 p2, byte4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
+
+/// Draws a thin antialiased line from p1 to p2
+inline void line(int2 p1, int2 p2, byte4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }

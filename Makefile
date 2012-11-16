@@ -12,7 +12,6 @@ ifeq ($(CC),cc)
  endif
 endif
 
-
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var -pipe -march=native $(FLAGS_$(BUILD))
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast= -O3 -g -fno-omit-frame-pointer

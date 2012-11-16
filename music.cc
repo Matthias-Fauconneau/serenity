@@ -33,6 +33,7 @@ struct PDFScore : PDF {
     signal<const ref<vec2>&> positionsChanged;
     void clear() { PDF::clear(); positions.clear(); }
     void loadPositions(const ref<byte>& data) {
+        positions.clear();
         for(vec2 pos: cast<vec2>(data)) {
             if(pos.x>0 && pos.y<-y2 && pos.x*scale<1280) {
                 positions << pos;

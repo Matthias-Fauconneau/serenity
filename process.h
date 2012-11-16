@@ -2,12 +2,12 @@
 /// \file process.h \link Thread threaded event loops\endlink, \link Semaphore synchronization\endlink, execute, process environment and arguments
 #include "array.h"
 #include "file.h"
-
 typedef unsigned long int pthread;
 struct pthread_mutex { int lock; uint count; int owner; uint nusers; int kind, spins; void* prev,*next; };
 struct pthread_cond { int lock; uint futex; uint64 total_seq, wakeup_seq, woken_seq; void* mutex; uint nwaiters; uint broadcast_seq; };
 extern "C" {
 int pthread_create(pthread* thread, void* attr, void *(*start_routine)(void*), void* arg);
+int pthread_join(pthread thread, void **status);
 int pthread_mutex_init(pthread_mutex* mutex, const void* attr);
 int pthread_mutex_trylock(pthread_mutex* mutex);
 int pthread_mutex_lock(pthread_mutex* mutex);

@@ -389,7 +389,7 @@ Image Window::getSnapshot() {
     readReply<Shm::GetImageReply>();
     {Shm::Detach r; r.seg=id+SnapshotSegment; send(raw(r));}
     Image image = copy(buffer);
-    for(uint y: range(image.height)) for(uint x: range(image.width)) {byte4& p=image(x,y); swap(p.r,p.b); p.a=0xFF;}
+    for(uint y: range(image.height)) for(uint x: range(image.width)) {byte4& p=image(x,y); p.a=0xFF;}
     shmdt(buffer.data);
     shmctl(shm, IPC_RMID, 0);
     return image;
