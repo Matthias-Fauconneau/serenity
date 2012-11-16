@@ -45,11 +45,13 @@ struct TreeShader {
 
     // 2D space partitioning to accelerate shadow ray casts
     struct Bin { uint16 faceCount=0; uint16 faces[2047]; };
-    static const int width=16, height=16;
+    int width, height;
     Bin* bins;
 
-    TreeShader(uint faceCapacity):faceCapacity(faceCapacity){
-        bins = allocate64<Bin>(width*height); //1MB
+    TreeShader(vec2 lightSpaceSize, uint faceCapacity):faceCapacity(faceCapacity){
+        width = ceil(lightSpaceSize.x);
+        height = ceil(lightSpaceSize.y);
+        bins = allocate64<Bin>(width*height);
         faces = allocate64<Face>(faceCapacity);
         for(uint i: range(width*height)) bins[i].faceCount=0;
     }
@@ -64,12 +66,14 @@ struct TreeShader {
         E = mat3(A.xyw(), B.xyw(), C.xyw());
         float det = E.det(); if(det<0.001f) return; //small or back-facing triangle
         E = (1/det) * E.cofactor(); //edge equations are now columns of E
+
         // Normalize edge functions for approximate shadow edge softening
         for(int e=0;e<3;e++) {
             float l = sqrt(E[e].x*E[e].x + E[e].y*E[e].y);
             if(l<0.001f) return;
             E[e] *= 1.f/l;
         }
+
         face.a=dot(E[0],vec3(A.xy(),1.f));
         face.b=dot(E[1],vec3(B.xy(),1.f));
         face.c=dot(E[2],vec3(C.xy(),1.f));
@@ -104,22 +108,22 @@ struct TreeShader {
                 vec3 XY1(lightPos.x,lightPos.y,1.f);
                 float a=dot(face.E[0],XY1), b=dot(face.E[1],XY1), c=dot(face.E[2],XY1);
                 float a2=face.a-a, b2=face.b-b, c2=face.c-c;
-                const float scale=16.f; //FIXME: scale light space to view space
+                const float scale=2.f;
                 a*=scale, b*=scale, c*=scale, a2*=scale, b2*=scale, c2*=scale;
-                float m = min(a,min(b,min(c,min(a2,min(b2,c2)))))+0.5f;
+                float m = min(min(a,min(b,c)), min(a2,min(b2,c2)))+0.5f;
                 if(m < 0) continue;
                 float w = 1/dot(face.iw,XY1);
                 float z = w*dot(face.iz,XY1);
-                if(lightPos.z<=z+0.5f) continue; //FIXME: bias to avoid selfshadowing from extrapolated Z
+                if(lightPos.z<=z+2.f) continue; //FIXME: bias to avoid selfshadowing from extrapolated Z
                 sunLight = max(0.f,sunLight-m);
             }
         }
-        if(!face.Y && !face.Z) return vec4(vec3(1./2,1./4,1./8)+(0.5f+sunLight/2.f)*vec3(1./2,3./4,7./8),1.f); //ground
+        if(!face.Y && !face.Z) return vec4(vec3(1./2,1./4,1./8)+sunLight*vec3(1./2,3./4,7./8),1.f); //ground
         vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
 
         vec3 diffuseLight
                 = hemisphericLight(N,sky,vec3(1./2,1./4,1./8))
-                + (0.5f+sunLight/2.f)*directionnalLight(N,sun,vec3(1./2,3./4,7./8)); //angularLight(PI/2) is too slow (TODO: fast sine)
+                + sunLight*directionnalLight(N,sun,vec3(1./2,3./4,7./8)); //angularLight(PI/2) is too slow (TODO: fast sine)
 
         vec3 albedo = vec3(1,1,1);
         vec3 diffuse = albedo*diffuseLight;
@@ -383,7 +387,7 @@ struct Editor : Widget {
         array<string> files = folder.list(Files);
         for(string& file : files) if(endsWith(file,".l"_)) systems << string(section(file,'.'));
         systems.activeChanged.connect(this,&Editor::openSystem);
-        systems.setActive(1);
+        systems.setActive(2);
 
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; generate();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
@@ -466,16 +470,16 @@ struct Editor : Widget {
             lightMax = max(lightMax,(sun*vec3((x?sceneMax:sceneMin).x,(y?sceneMax:sceneMin).y,(z?sceneMax:sceneMin).z)).xyz());
         }
         sun=mat4();
-        vec3 scale2 = 16.f/(lightMax-lightMin);
-        float lightScale = min(scale2.x, scale2.y);
-        sun.scale(lightScale); //use view scale and size bins as needed
+        float lightScale = scale/64.f;
+        sun.scale(lightScale);
         sun.translate(-lightMin);
         sun.rotateY(PI/4);
+        vec2 size = lightScale*(lightMax-lightMin).xy();
         mat4 viewToSun = sun*view.inverse();
         mat4 sunToView= view*sun.inverse();
 
         // Render shadowed tree (using view-aligned rectangle impostor to render branches as cylinders)
-        TreeShader shader(cones.size()*2);
+        TreeShader shader(size, cones.size()*2);
         RenderPass<TreeShader> pass __(target, cones.size()*2+2, shader);
 
         for(Cone cone: cones) {
@@ -516,7 +520,7 @@ struct Editor : Widget {
         if(shadow) {
         // Ground plane (Fit size to receive all shadows)
             mat4 sunToWorld = sun.inverse();
-            lightMin=vec3(0,0,0), lightMax=vec3(16,16,16);
+            lightMin=vec3(0,0,0), lightMax=vec3(shader.width,shader.height,0);
             vec3 lightRay = sunToWorld.normalMatrix()*vec3(0,0,1);
             float xMin=lightMin.x, xMax=lightMax.x, yMin=lightMin.y, yMax=lightMax.y;
             vec4 a = sunToWorld*vec3(xMin,yMin,0),

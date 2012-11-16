@@ -312,7 +312,7 @@ template<class Shader> struct RenderPass {
     // For each bin, rasterizes and shade all triangles
     void render() {
         nextBin=0;
-        const int N=8;
+        const int N=4;
         pthread threads[N-1];
         for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
         run();

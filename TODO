@@ -1,5 +1,4 @@
 CG:
- faster shadows, trunk cylinder cap
  herbaceous plants, colors, leaves, textures
  use step grids for vertex attribute interpolations
  coverage sampling ? Hi-Z pixel reject ? quad polygon ? float16 colors ?
