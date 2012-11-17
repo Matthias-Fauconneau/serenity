@@ -43,7 +43,7 @@ static struct Pattern {
         // jittered radial sample pattern
         Random random;
         for(int u=0;u<4;u++) for(int v=0;v<4;v++) {
-            float r = sqrt( (u + (random+1)/2.f) / 4.f ) / 4.f;
+            float r = sqrt( (u + (random+1)/2.f) / 4.f );
             float t = (v + (random+1)/2.f) / 4.f;
             X[u*4+v] = r*cos(2*PI*t);
             Y[u*4+v] = r*sin(2*PI*t);
@@ -82,12 +82,12 @@ struct TreeShader {
         E = mat3(A.xyw(), B.xyw(), C.xyw());
         float det = E.det(); if(det<0.001f) return; //small or back-facing triangle
         E = E.cofactor(); //edge equations are now columns of E
-        //TODO: step grids ?
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
 
         int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy()))));
         int2 max = ::min(int2(width-1,height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy()))));
+        //FIXME: This is not conservative enough for large sample patterns (far occluder)
         for(int binY=min.y; binY<=max.y; binY++) for(int binX=min.x; binX<=max.x; binX++) {
             Bin& bin = bins[binY*width+binX];
             if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) error("Index overflow",binX,binY,bin.faceCount);
@@ -104,14 +104,10 @@ struct TreeShader {
         vec3 lightPos = vec3(varying[1],varying[2],varying[3]);
         float d = clip(-1.f,varying[0],1.f);
         if(face.Y || face.Z) lightPos += sqrt(1-d*d)*face.N;
-        // 4×4 xy sample steps
-        //TODO: cone not cylinder (i.e angular not parallel) sampling (otherwise a shadow map would be much more efficient)
         const Pattern& pattern = patterns[randomPattern()%16];
-        vec16 lightX = lightPos.x + pattern.X, lightY = lightPos.y + pattern.Y;
-        int binX=lightPos.x, binY=lightPos.y;
         vec16 samples = 0;
-        //FIXME: better bounding box
-        for(int y=max(0,binY-1);y<=min(height-1,binY+1);y++) for(int x=max(0,binX-1);x<=min(width-1,binX+1);x++) {
+        uint x=lightPos.x, y=lightPos.y;
+        if(x<(uint)width && y<(uint)height) {
             const Bin& bin = bins[y*width+x];
             for(uint i: range(bin.faceCount)) {
                 uint index = bin.faces[i];
@@ -119,7 +115,12 @@ struct TreeShader {
                 const vec3 XY1(lightPos.x,lightPos.y,1.f);
                 float w = 1/dot(face.iw,XY1);
                 float z = w*dot(face.iz,XY1);
-                if(lightPos.z<=z) continue; //only Z-test midpoint
+                float d = lightPos.z-z;
+                if(d<=0) continue; //only Z-test midpoint
+
+                // scale sample pattern to soften shadow depending on occluder distance
+                const float A0=1/16.f, dzA=1/256.f; //FIXME: a should be pixel area in light space, b ~ tan(light angular diameter)
+                vec16 lightX = lightPos.x + (A0+dzA*d)*pattern.X, lightY = lightPos.y + (A0+dzA*d)*pattern.Y;
 
                 vec16 a = face.E[0].x * lightX + face.E[0].y * lightY + face.E[0].z;
                 vec16 b = face.E[1].x * lightX + face.E[1].y * lightY + face.E[1].z;
