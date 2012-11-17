@@ -20,12 +20,20 @@ My goal is to minimize any sampling artifacts:
 - Shadows are raycasted (and not sampled from a shadow map).
 
 For this simple scene, a shadow map would be a better choice, but I wanted to try to leverage the CPU in the shader.
+
 The main advantage of raycasting is that it allows to implement accurate contact-hardening soft shadows for scenes with arbitrary depth complexity.
-Shadow maps only allows to sample the furthest (nearest to light) occluder, while raycasting correctly handle penumbra affected by a nearer hidden occluder.
+Shadow maps only allows to sample the furthest (nearest to light) occluder, while raycasting correctly handle penumbra affected by a closer hidden occluder.
 Thus, given enough samples, raycasting can simulate much wider lights.
+
+The main issue of raycasting is that performance is already so awful while 16 samples is not enough to avoid noisy shadows.
+I guess there is much room for optimization, but actually I originally wanted to study L-Systems (I'm not through "The Algorithmic Beauty of Plants" yet).
 
 I worked on this project to have a more flexible real-time renderer for CG experiments.
 But also because working on improving performance is addictive. As in a game, you get a score (frame time) and you have to make the most out of your abilities to improve the score.
+
+My current results (8 threads on 4-core Ivy Bridge):
+- without shadows: 43-46 fps
+- with 16x raycasted shadows: 13-16 fps
 
 You can find the source code on github.
 Rasterizer code: https://github.com/Matthias-Fauconneau/serenity/blob/master/raster.h
