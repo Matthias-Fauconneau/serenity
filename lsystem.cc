@@ -96,40 +96,43 @@ struct TreeShader {
         faceCount++;
     }
 
-    vec3 sky, sun;
+    vec3 sky, sun; bool shadow;
     struct FaceAttributes { vec3 Y,Z,N; };
     static constexpr int V = 4;
     static constexpr bool blend=false;
     vec4 operator()(FaceAttributes face, float varying[4]) const {
         vec3 lightPos = vec3(varying[1],varying[2],varying[3]);
         float d = clip(-1.f,varying[0],1.f);
-        if(face.Y || face.Z) lightPos += sqrt(1-d*d)*face.N;
-        const Pattern& pattern = patterns[randomPattern()%16];
-        vec16 samples = 0;
-        uint x=lightPos.x, y=lightPos.y;
-        if(x<(uint)width && y<(uint)height) {
-            const Bin& bin = bins[y*width+x];
-            for(uint i: range(bin.faceCount)) {
-                uint index = bin.faces[i];
-                const Face& face = faces[index];
-                const vec3 XY1(lightPos.x,lightPos.y,1.f);
-                float w = 1/dot(face.iw,XY1);
-                float z = w*dot(face.iz,XY1);
-                float d = lightPos.z-z;
-                if(d<=0) continue; //only Z-test midpoint
+        float sunLight=1.f;
+        if( shadow ) {
+            if(face.Y || face.Z) lightPos += sqrt(1-d*d)*face.N;
+            const Pattern& pattern = patterns[randomPattern()%16];
+            vec16 samples = 0;
+            uint x=lightPos.x, y=lightPos.y;
+            if(x<(uint)width && y<(uint)height) {
+                const Bin& bin = bins[y*width+x];
+                for(uint i: range(bin.faceCount)) {
+                    uint index = bin.faces[i];
+                    const Face& face = faces[index];
+                    const vec3 XY1(lightPos.x,lightPos.y,1.f);
+                    float w = 1/dot(face.iw,XY1);
+                    float z = w*dot(face.iz,XY1);
+                    float d = lightPos.z-z;
+                    if(d<=0) continue; //only Z-test midpoint
 
-                // scale sample pattern to soften shadow depending on occluder distance
-                const float A0=1/16.f, dzA=1/256.f; //FIXME: a should be pixel area in light space, b ~ tan(light angular diameter)
-                vec16 lightX = lightPos.x + (A0+dzA*d)*pattern.X, lightY = lightPos.y + (A0+dzA*d)*pattern.Y;
+                    // scale sample pattern to soften shadow depending on occluder distance
+                    const float A0=1/16.f, dzA=1/256.f; //FIXME: a should be pixel area in light space, b ~ tan(light angular diameter)
+                    vec16 lightX = lightPos.x + (A0+dzA*d)*pattern.X, lightY = lightPos.y + (A0+dzA*d)*pattern.Y;
 
-                vec16 a = face.E[0].x * lightX + face.E[0].y * lightY + face.E[0].z;
-                vec16 b = face.E[1].x * lightX + face.E[1].y * lightY + face.E[1].z;
-                vec16 c = face.E[2].x * lightX + face.E[2].y * lightY + face.E[2].z;
-                samples = samples | ((a > 0.f) & (b > 0.f) & (c > 0.f));
+                    vec16 a = face.E[0].x * lightX + face.E[0].y * lightY + face.E[0].z;
+                    vec16 b = face.E[1].x * lightX + face.E[1].y * lightY + face.E[1].z;
+                    vec16 c = face.E[2].x * lightX + face.E[2].y * lightY + face.E[2].z;
+                    samples = samples | ((a > 0.f) & (b > 0.f) & (c > 0.f));
+                }
             }
+            sunLight = 1.f-__builtin_popcount(mask(samples))/16.f;
+            if(!face.Y && !face.Z) return vec4(vec3(1./2,1./4,1./8)+sunLight*vec3(1./2,3./4,7./8),1.f); //ground
         }
-        float sunLight = 1.f-__builtin_popcount(mask(samples))/16.f;
-        if(!face.Y && !face.Z) return vec4(vec3(1./2,1./4,1./8)+sunLight*vec3(1./2,3./4,7./8),1.f); //ground
         vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
 
         vec3 diffuseLight
@@ -440,7 +443,7 @@ struct Editor : Widget {
     RenderTarget target;
 
     uint64 frameEnd=cpuTime(), frameTime=50000; // in microseconds
-    uint64 miscStart=rdtsc();
+    profile( uint64 miscStart=rdtsc(); )
 
     void render(int2 targetPosition, int2 targetSize) override {
         profile( uint64 setupStart=rdtsc(); uint64 miscTime = setupStart-miscStart; )
@@ -450,7 +453,7 @@ struct Editor : Widget {
         } else {
             //framebuffer background color is only regenerated as necessary, but UI rendering expects cleared framebuffer
             fill(targetPosition+Rect(targetSize.x,16),white,false);
-            profile( fill(targetPosition+Rect(256,256),white,false); )
+            fill(targetPosition+int2(0,16)+Rect(128,128),white,false);
         }
         target.clear();
 
@@ -554,6 +557,7 @@ struct Editor : Widget {
             pass.submit(c,d,a,attributes[1],__(0,0));
         }
 
+        shader.shadow=shadow;
         shader.sky = normalize(normalMatrix*vec3(1,0,0));
         shader.sun = normalize(sunToView.normalMatrix()*vec3(0,0,-1));
 
@@ -563,28 +567,31 @@ struct Editor : Widget {
 
         target.resolve(targetPosition,targetSize);
 
-        profile( uint64 uiStart = rdtsc(); uint64 resolveTime = uiStart-resolveStart; uint frameEnd = cpuTime(); )
+        profile( uint64 uiStart = rdtsc(); uint64 resolveTime = uiStart-resolveStart; )
+        profile(uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime;)//in cycles
 
         systems.render(targetPosition,int2(targetSize.x,16));
-        profile(
-        uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime; //in cycles
+
+        uint frameEnd = cpuTime();
         frameTime = ( (frameEnd-this->frameEnd) + (64-1)*frameTime)/64;
         this->frameEnd=frameEnd;
         status.setText(ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms\n"
+                       profile(
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
                        "setup "_+str(100*setupTime/totalTime)+"%\n"
                        "render "_+str(100*renderTime/totalTime)+"%\n"
                        "- raster "_+str(100*pass.rasterTime/totalTime)+"%\n"
-                       "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"_
-                       "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"_
-                       "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"_
-                       "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"_
+                       "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"
+                       "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"
+                       "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"
+                       "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"
                        "- user "_+str(100*pass.userTime/totalTime)+"%\n"
                        "resolve "_+str(100*resolveTime/totalTime)+"%\n"
-                       "ui "_+str(100*uiTime/totalTime)+"%\n"_);
+                           "ui "_+str(100*uiTime/totalTime)+"%\n") ""_);
         status.render(int2(targetPosition+int2(16)));
-        miscStart = rdtsc();
-        uiTime = ( (miscStart-uiStart) + (T-1)*uiTime)/T;
-        window.render(); ) //keep updating to get maximum performance profile
+        profile( miscStart = rdtsc(); uiTime = ( (miscStart-uiStart) + (T-1)*uiTime)/T; )
+#if 1
+        window.render(); //keep updating to get maximum performance profile
+#endif
     }
 } application;
