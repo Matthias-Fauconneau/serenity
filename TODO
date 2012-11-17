@@ -1,15 +1,9 @@
 CG:
- herbaceous plants:
-  leaves
-   {  Start a polygon
-   . Record a vertex in the current polygon
-   G Move forward and draw a line. Do not record a vertex
-   } Complete a polygon
-  % cut off the remainder of the branch
-  colors
+ herbaceous plants, colors
  Renderer:
   use step grids for vertex attribute interpolations
   coverage sampling ? Hi-Z pixel reject ? float16 colors ?
+  merge passes
  scene (sky, grass, plants, forest, terrain, textures...)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

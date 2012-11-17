@@ -55,24 +55,18 @@ This is mostly for reference, since this application use my own framework (Linux
 inline float acos(float t) { return __builtin_acosf(t); }
 inline float sin(float t) { return __builtin_sinf(t); }
 /// Directional light with angular diameter
-inline vec3 angularLight(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor, float angularDiameter) {
+inline float angularLight(vec3 surfaceNormal, vec3 lightDirection, float angularDiameter) {
     float t = ::acos(dot(lightDirection,surfaceNormal)); // angle between surface normal and light principal direction
     float a = min<float>(PI/2,max<float>(-PI/2,t-angularDiameter/2)); // lower bound of the light integral
     float b = min<float>(PI/2,max<float>(-PI/2,t+angularDiameter/2)); // upper bound of the light integral
     float R = sin(b) - sin(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
     R /= 2*sin(angularDiameter/2); // normalize
-    return vec3(R*lightColor);
+    return R;
 }
 /// For an hemispheric light, the integral bounds are always [t-PI/2,PI/2], thus R evaluates to (1-cos(t))/2
-inline vec3 hemisphericLight(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor) {
-    float R = (1+dot(lightDirection,surfaceNormal))/2;
-    return vec3(R*lightColor);
-}
+inline float hemisphericLight(vec3 surfaceNormal, vec3 lightDirection) { return (1+dot(lightDirection,surfaceNormal))/2; }
 /// This is the limit of angularLight when angularDiameter → 0
-inline vec3 directionnalLight(vec3 surfaceNormal, vec3 lightDirection, vec3 lightColor) {
-    float R = max(0.f,dot(lightDirection,surfaceNormal));
-    return vec3(R*lightColor);
-}
+inline float directionnalLight(vec3 surfaceNormal, vec3 lightDirection) { return max(0.f,dot(lightDirection,surfaceNormal)); }
 
 // Shadow
 
@@ -96,8 +90,8 @@ static struct Pattern {
 } patterns[16];
 Random randomPattern;
 
-/// Abstract shader for shadow-receiving surfaces
-struct ShadowShader {
+/// Stores shadow occluders for shadow-receiving surfaces
+struct Shadow {
     // Occluders geometry (in light space)
     Face* faces;
     uint faceCapacity;
@@ -108,7 +102,7 @@ struct ShadowShader {
     int width, height;
     Bin* bins;
 
-    ShadowShader(vec2 lightSpaceSize, uint faceCapacity):faceCapacity(faceCapacity){
+    Shadow(vec2 lightSpaceSize, uint faceCapacity):faceCapacity(faceCapacity){
         width = ceil(lightSpaceSize.x);
         height = ceil(lightSpaceSize.y);
         bins = allocate64<Bin>(width*height);
@@ -116,10 +110,10 @@ struct ShadowShader {
         for(uint i: range(width*height)) bins[i].faceCount=0;
         randomPattern.reset(); //keep same pattern at each frame
     }
-    ~ShadowShader() { unallocate(bins,width*height); unallocate(faces,faceCapacity); }
+    ~Shadow() { unallocate(bins,width*height); unallocate(faces,faceCapacity); }
 
     void submit(vec4 A, vec4 B, vec4 C) {
-        assert(A.w==1); assert(B.w==1); assert(C.w==1);
+        assert(abs(A.w-1)<0.01); assert(abs(B.w-1)<0.01); assert(abs(C.w-1)<0.01);
         if(faceCount>=faceCapacity) error("Face overflow");
 
         Face& face = faces[faceCount];
@@ -141,12 +135,7 @@ struct ShadowShader {
         faceCount++;
     }
 
-    // Shader specification used by rasterizer (RenderPass)
-    struct FaceAttributes { vec3 Y,Z,N; };
-    static constexpr int V = 4; // number of interpolated vertex attributes
-    static constexpr bool blend=false;
-
-    inline float sampleShadow(vec3 lightPos) const {
+    inline float operator()(vec3 lightPos) const {
         const Pattern& pattern = patterns[randomPattern()%16];
         vec16 samples = 0;
         uint x=lightPos.x, y=lightPos.y;
@@ -159,7 +148,7 @@ struct ShadowShader {
                 float w = 1/dot(face.iw,XY1);
                 float z = w*dot(face.iz,XY1);
                 float d = lightPos.z-z;
-                if(d<=0) continue; //only Z-test midpoint
+                if(d<=1.f) continue; //only Z-test midpoint
 
                 // scale sample pattern to soften shadow depending on occluder distance
                 const float A0=1/16.f, dzA=1/256.f; //FIXME: a should be pixel area in light space, b ~ tan(light angular diameter)
@@ -175,27 +164,79 @@ struct ShadowShader {
     }
 };
 
-// Shader
+// Shaders
 
-/// Shader for view-aligned cone impostors (e.g tree branches) lit by hemispheric sky and shadow-casting sun lights.
-struct ConeShader : ShadowShader {
-    ConeShader(vec2 lightSpaceSize, uint faceCapacity):ShadowShader(lightSpaceSize,faceCapacity){} //FIXME: inherit constructor
+static constexpr vec3 skyColor = vec3(1./2,1./4,1./8);
+static constexpr vec3 sunColor = vec3(1./2,3./4,7./8);
 
+/// Base shader for shadow-receiving surfaces (e.g ground)
+struct ShadowShader {
     // Uniform attributes
-    vec3 sky, sun; bool shadow;
+    const Shadow& shadow;
+
+    // Shader specification (used by rasterizer)
+    struct FaceAttributes {};
+    static constexpr int V = 3; // number of interpolated vertex attributes (3D light space position)
+    static constexpr bool blend=false; // Disable unecessary blending
+
+    ShadowShader(const Shadow& shadow):shadow(shadow){}
+
+    // Default shader is a white shadow-receiving surface
+    vec4 operator()(FaceAttributes, float varying[V]) const {
+        float sunLight = 1.f-shadow(vec3(varying[0],varying[1],varying[2]));
+        return vec4(skyColor+sunLight*sunColor,1.f);
+    }
+};
+
+/// Shader for flat surfaces (e.g leaves) lit by hemispheric sky and shadow-casting sun lights.
+struct FlatShader : ShadowShader {
+    // Uniform attributes
+    vec3 sky, sun; bool enableShadow;
+
+    // Shader specification (used by rasterizer)
+    typedef vec3 FaceAttributes; // Surface normal for flat shading
+
+    FlatShader(const Shadow& shadow):ShadowShader(shadow){} //FIXME: inherit constructor
+
+    vec4 operator()(FaceAttributes N, float varying[V]) const {
+        float sunLight=1.f;
+        if(enableShadow) {
+            vec3 lightPos = vec3(varying[0],varying[1],varying[2]);
+            sunLight -= shadow(lightPos);
+        }
+
+        // Computes diffused light from hemispheric sky light and shadow-casting directionnal sun light
+        vec3 diffuseLight
+                = hemisphericLight(N,sky)*skyColor
+                + sunLight*directionnalLight(N,sun)*sunColor;
+
+        // albedo (white)
+        vec3 albedo = vec3(1,1,1);
+        vec3 diffuse = albedo*diffuseLight;
+        return vec4(diffuse,1.f);
+    }
+};
+
+/// Shader for view-aligned cone impostors (e.g stalk, branches) lit by hemispheric sky and shadow-casting sun lights.
+struct ConeShader : ShadowShader {
+    // Uniform attributes
+    vec3 sky, sun; bool enableShadow;
+
+    // Shader specification (used by rasterizer)
+    struct FaceAttributes { vec3 Y,Z,N; };
+    static constexpr int V = 4; // number of interpolated vertex attributes (cone position + 3D light space position)
+
+    ConeShader(const Shadow& shadow):ShadowShader(shadow){} //FIXME: inherit constructor
 
     vec4 operator()(FaceAttributes face, float varying[V]) const {
         // Clip to avoid negative square root
         float d = clip(-1.f,varying[0],1.f);
 
         float sunLight=1.f;
-        if( shadow ) {
+        if(enableShadow) {
             vec3 lightPos = vec3(varying[1],varying[2],varying[3]);
-            if(face.Y || face.Z) //if cone
-                lightPos += sqrt(1-d*d)*face.N; // fix light position
-            sunLight -= sampleShadow(lightPos);
-            if(!face.Y && !face.Z) // if ground
-                return vec4(vec3(1./2,1./4,1./8)+sunLight*vec3(1./2,3./4,7./8),1.f); //white shadow receiving ground
+            lightPos += sqrt(1-d*d)*face.N; // fix light position
+            sunLight -= shadow(lightPos);
         }
 
         // Reconstruct cone normal
@@ -203,10 +244,10 @@ struct ConeShader : ShadowShader {
 
         // Computes diffused light from hemispheric sky light and shadow-casting directionnal sun light
         vec3 diffuseLight
-                = hemisphericLight(N,sky,vec3(1./2,1./4,1./8))
-                + sunLight*directionnalLight(N,sun,vec3(1./2,3./4,7./8));
+                = hemisphericLight(N,sky)*skyColor
+                + sunLight*directionnalLight(N,sun)*sunColor;
 
-        // Tree branches albedo (white surface)
+        // albedo (white)
         vec3 albedo = vec3(1,1,1);
         vec3 diffuse = albedo*diffuseLight;
         return vec4(diffuse,1.f);
@@ -428,18 +469,22 @@ struct Editor : Widget {
     Folder folder = Folder(""_,cwd()); //L-Systems definitions are loaded from current working directory
     Bar<Text> systems; // Tab bar to select which L-System to view
     LSystem system; // Currently loaded L-System
-    uint level=20; // Current L-System generation maximum level
-    bool shadow=true; // Whether shadows are rendered
+    uint level=10; // Current L-System generation maximum level
+    bool enableShadow=true; // Whether shadows are rendered
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(PI,PI/4); // current view angles
     uint64 frameEnd=cpuTime(), frameTime=50000; // last frame end and initial frame time in microseconds
     profile( uint64 miscStart=rdtsc(); ) // profile cycles spent outside render
     RenderTarget target; // Render target (RenderPass renders on these tiles)
 
-    /// Cone from A to B with radius wA to wB
-    struct Cone { vec3 A,B; float wA,wB; };
-    array<Cone> cones; // Scene
-    vec3 sceneMin=0, sceneMax=0; // Scene bounding box
+    // Scene
+     vec3 sceneMin=0, sceneMax=0; // Scene bounding box
+     /// Cone from A to B with radius wA to wB (stalk, branches)
+     struct Cone { vec3 A,B; float wA,wB; };
+     array<Cone> cones;
+     /// Convex polygon (leaves)
+     typedef array<vec3> Polygon;
+     array<Polygon> polygons; uint triangleCount=0;
 
     /// Triggered by tab bar to load L-Systems
     void openSystem(uint index) {
@@ -450,39 +495,25 @@ struct Editor : Widget {
     }
     /// Generates the currently active L-System
     void generate() {
-        cones.clear(); sceneMin=0, sceneMax=0;
+        cones.clear(); polygons.clear(); triangleCount=0; sceneMin=0, sceneMax=0;
 
         array<Module> modules = system.generate(level);
 
         // Turtle interpretation of modules string generated by an L-system
-        array<mat4> stack;
-        mat4 state;
-        for(const Module& module : modules) { char symbol=module.symbol;
-            float a = module.arguments ? module.arguments[0]*PI/180 : 18*PI/180;
-            if(symbol=='\\'||symbol=='/') state.rotateX(symbol=='\\'?a:-a);
-            else if(symbol=='&'||symbol=='^') state.rotateY(symbol=='&'?a:-a);
-            else if(symbol=='-' ||symbol=='+') state.rotateZ(symbol=='+'?a:-a);
-            else if(symbol=='$') { //set Y horizontal (keeping X), Z=X×Y
-                vec3 X = state[0].xyz();
-                vec3 Y = cross(vec3(1,0,0),X);
-                float y = length(Y);
-                if(y<0.01) continue; //X is colinear to vertical (all possible Y are already horizontal)
-                Y /= y;
-                assert(Y.x==0);
-                vec3 Z = cross(X,Y);
-                state[1] = vec4(Y,0.f);
-                state[2] = vec4(Z,0.f);
-            }
-            else if(symbol=='[') stack << state;
-            else if(symbol==']') state = stack.pop();
-            else if(symbol=='f' || symbol=='F') {
+        array<mat4> stack; mat4 state; uint cut=0;
+        array<Polygon> polygonStack; Polygon polygon;
+        for(const Module& module : modules) {
+            char symbol=module.symbol;
+            if(cut) { if(symbol=='[') cut++; else if(symbol==']') cut--; else continue; }
+            if(symbol=='f' || symbol=='F' || symbol=='G') { // move forwards (optionally drawing a line)
                 float l = module.arguments.size()>0?module.arguments[0]:1,
                         wA = module.arguments.size()>1?module.arguments[1]:1,
                         wB = module.arguments.size()>2?module.arguments[2]:1;
                 vec3 A = state[3].xyz();
                 state.translate(vec3(l,0,0)); //forward axis is +X
                 vec3 B = state[3].xyz();
-                if(symbol=='F') cones << Cone __(A,B,wA,wB);
+                if(symbol=='F' && polygonStack) polygon << state[3].xyz();
+                else if(symbol=='G' || symbol=='F') cones << Cone __(A,B,wA,wB); //if no polygon is being defined
 
                 sceneMin=min(sceneMin,B);
                 sceneMax=max(sceneMax,B);
@@ -497,8 +528,33 @@ struct Editor : Widget {
                     assert(Y.x==0);
                     state.rotate(tropism,state.inverse().normalMatrix()*Y);
                 }
+            } else if(symbol=='.') polygon << state[3].xyz(); // Records a vertex in the current polygon
+            else if(symbol=='[') stack << state; // pushes turtle (current position and orientation) on stack
+            else if(symbol==']') state = stack.pop(); // pops turtle (current position and orientation) from stack
+            else if(symbol=='%') cut=1;
+            else if(symbol=='{') polygonStack << move(polygon); // pushes current polygon and starts a new one
+            else if(symbol=='}') { // stores current polygon and pop previous nesting level from stack
+                polygons << move(polygon);
+                polygon = polygonStack.pop();
+            }
+            else if(symbol=='$') { //set Y horizontal (keeping X), Z=X×Y
+                            vec3 X = state[0].xyz();
+                            vec3 Y = cross(vec3(1,0,0),X);
+                            float y = length(Y);
+                            if(y<0.01) continue; //X is colinear to vertical (all possible Y are already horizontal)
+                            Y /= y;
+                            assert(Y.x==0);
+                            vec3 Z = cross(X,Y);
+                            state[1] = vec4(Y,0.f);
+                            state[2] = vec4(Z,0.f);
+            } else {
+                float a = module.arguments ? module.arguments[0]*PI/180 : 18*PI/180;
+                if(symbol=='\\'||symbol=='/') state.rotateX(symbol=='\\'?a:-a);
+                else if(symbol=='&'||symbol=='^') state.rotateY(symbol=='&'?a:-a);
+                else if(symbol=='-' ||symbol=='+') state.rotateZ(symbol=='+'?a:-a);
             }
         }
+        for(const Polygon& polygon: polygons) if(polygon.size()>=3) triangleCount += polygon.size()-2;
         window.render();
     }
 
@@ -518,7 +574,7 @@ struct Editor : Widget {
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; generate();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
         window.localShortcut(Key(Return)).connect([this]{writeFile("snapshot.png"_,encodePNG(window.getSnapshot()),home());});
-        window.localShortcut(Key(' ')).connect([this]{shadow=!shadow; window.render();});
+        window.localShortcut(Key(' ')).connect([this]{enableShadow=!enableShadow; window.render();});
     }
 
     /// Orbital view control
@@ -546,7 +602,7 @@ struct Editor : Widget {
         target.clear();
 
         // Fits view
-        mat4 view; //view.rotateY(PI/2); //Always fit using side view (avoid jarring auto zoom)
+        mat4 view; //Always fit using side view (avoid jarring auto zoom)
         vec3 viewMin=(view*sceneMin).xyz(), viewMax=(view*sceneMax).xyz();
         for(int x=0;x<2;x++) for(int y=0;y<2;y++) for(int z=0;z<2;z++) {
             viewMin = min(viewMin,(view*vec3((x?sceneMax:sceneMin).x,(y?sceneMax:sceneMin).y,(z?sceneMax:sceneMin).z)).xyz());
@@ -554,7 +610,7 @@ struct Editor : Widget {
         }
         vec2 sceneSize = (viewMax-viewMin).xy();
         vec2 displaySize = vec2(targetSize.x*4,targetSize.y*4);
-        float scale = min(displaySize.x/sceneSize.x,displaySize.y/sceneSize.x)*0.75;
+        float scale = min(displaySize.x/sceneSize.x,displaySize.y/sceneSize.x);
         view = mat4();
         view.translate(vec3(displaySize.x/2,displaySize.y/4,0.f)); //center scene
         view.scale(scale); //normalize view space to fit display
@@ -562,6 +618,8 @@ struct Editor : Widget {
         view.rotateY(rotation.x); // yaw
         view.rotateZ(PI/2); //+X (heading) is up
         mat3 normalMatrix = view.normalMatrix();
+
+        vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
         // Fits light
         mat4 sun; sun.rotateY(PI/4);
@@ -578,13 +636,16 @@ struct Editor : Widget {
         vec2 size = lightScale*(lightMax-lightMin).xy();
         mat4 viewToSun = sun*view.inverse();
         mat4 sunToView= view*sun.inverse();
+        vec3 sunLightDirection = normalize(sunToView.normalMatrix()*vec3(0,0,-1));
 
-        // Renders shadowed tree (using view-aligned rectangle impostor to render branches as cylinders)
-        ConeShader shader(size, cones.size()*2);
-        shader.shadow=shadow;
-        shader.sky = normalize(normalMatrix*vec3(1,0,0));
-        shader.sun = normalize(sunToView.normalMatrix()*vec3(0,0,-1));
-        RenderPass<ConeShader> pass __(target, cones.size()*2+2, shader);
+        // Holds scene geometry projected in light space bins
+        Shadow sunShadow(size, cones.size()*2 + triangleCount);
+
+
+        // Setups branches (view-aligned rectangle impostors)
+        ConeShader coneShader (sunShadow);
+        coneShader.enableShadow=enableShadow, coneShader.sky = skyLightDirection, coneShader.sun =sunLightDirection;
+        RenderPass<ConeShader> conePass __(target, cones.size()*2, coneShader);
         for(Cone cone: cones) {
             // View transform
             vec3 A=(view*cone.A).xyz(); float wA = scale*cone.wA;
@@ -606,22 +667,56 @@ struct Editor : Widget {
                 {vec3(-1,-1,1),vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)},
                 {vec3(1,1,-1),vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
             };
-            pass.submit(a,b,c,attributes[0],__(Y,Z,N));
-            pass.submit(c,d,a,attributes[1],__(Y,Z,N));
+            conePass.submit(a,b,c,attributes[0],__(Y,Z,N));
+            conePass.submit(c,d,a,attributes[1],__(Y,Z,N));
 
-            if(shadow) { // Light aligned rectangle (for shadows)
+            if(enableShadow) { // Light aligned rectangle (for shadows)
                 float wA = lightScale*cone.wA; vec3 A=(sun*cone.A).xyz(); //-vec3(0,0,2*wA); //offset to prevent self shadowing
                 float wB = lightScale*cone.wB; vec3 B=(sun*cone.B).xyz(); //-vec3(0,0,2*wB);
                 vec3 X = B-A;  if(length(X.xy())<0.01) continue;
                 vec3 Y = normalize(cross(vec3(0,0,1),X));
                 vec4 a(A - wA*Y, 1.f), b(B - wB*Y, 1.f), c(B + wB*Y, 1.f), d(A + wA*Y, 1.f);
-                shader.submit(a,b,c);
-                shader.submit(c,d,a);
+                sunShadow.submit(a,b,c);
+                sunShadow.submit(c,d,a);
             }
         }
-        if(shadow) { // Ground plane (Fit size to receive all shadows)
+
+        // Setups leafs (convex polygons)
+        FlatShader flatShader (sunShadow);
+        flatShader.enableShadow=enableShadow, flatShader.sky = skyLightDirection, flatShader.sun =sunLightDirection;
+        RenderPass<FlatShader> flatPass __(target, 2*triangleCount, flatShader);
+        for(const Polygon& polygon: polygons) {
+            if(polygon.size()<3) continue;
+            vec3 A = polygon.first();
+            vec3 next = polygon[1];
+            for(vec3 current: polygon.slice(2)) {
+                vec3 B = next, C = current;
+                vec3 N = normalize(normalMatrix*cross(B-A,C-A));
+                vec4 as = sun*A, bs = sun*B, cs=sun*C;
+                sunShadow.submit(cs,bs,as);
+                {
+                    vec3 lightPos[3] = {vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)};
+                    flatPass.submit(view*A,view*B,view*C, lightPos, N);
+                }
+                {
+                    vec3 lightPos[3] = {vec3(cs.x,bs.x,as.x),vec3(cs.y,bs.y,as.y),vec3(cs.z,bs.z,as.z)};
+                    flatPass.submit(view*C,view*B,view*A, lightPos, -N);
+                }
+                next = current;
+            }
+        }
+
+        // Actual rendering happens there
+        profile( uint64 renderStart=rdtsc(); uint64 setupTime = renderStart-setupStart; )
+        flatPass.render();
+        conePass.render();
+        profile( uint64 resolveStart=rdtsc(); uint64 renderTime = resolveStart-renderStart; )
+
+        // Shadow-receiving ground plane
+        if(enableShadow) {
+            // Fit size to receive all shadows
             mat4 sunToWorld = sun.inverse();
-            lightMin=vec3(0,0,0), lightMax=vec3(shader.width,shader.height,0);
+            lightMin=vec3(0,0,0), lightMax=vec3(sunShadow.width,sunShadow.height,0);
             vec3 lightRay = sunToWorld.normalMatrix()*vec3(0,0,1);
             float xMin=lightMin.x, xMax=lightMax.x, yMin=lightMin.y, yMax=lightMax.y;
             vec4 a = sunToWorld*vec3(xMin,yMin,0),
@@ -637,16 +732,15 @@ struct Editor : Widget {
             a=view*a; b=view*b; c=view*c; d=view*d;
             vec4 as = viewToSun*a, bs = viewToSun*b, cs=viewToSun*c, ds=viewToSun*d;
             vec3 attributes[][4] = {
-                {vec3(-1,-1,1),vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)},
-                {vec3(1,1,-1),vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
+                {vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)},
+                {vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
             };
-            pass.submit(a,b,c,attributes[0],__(0,0));
-            pass.submit(c,d,a,attributes[1],__(0,0));
+            ShadowShader groundShader (sunShadow);
+            RenderPass<ShadowShader> groundPass __(target, 2, groundShader);
+            groundPass.submit(a,b,c,attributes[0],__());
+            groundPass.submit(c,d,a,attributes[1],__());
+            groundPass.render();
         }
-
-        profile( uint64 renderStart=rdtsc(); uint64 setupTime = renderStart-setupStart; )
-        pass.render(); // Actual rendering happens there
-        profile( uint64 resolveStart=rdtsc(); uint64 renderTime = resolveStart-renderStart; )
 
         target.resolve(targetPosition,targetSize); // Resolves RenderTarget to display
 
