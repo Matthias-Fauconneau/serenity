@@ -9,7 +9,7 @@ This architecture allows the rasterizer to leverage 16-wide vector units (on Ivy
 For each face, the rasterizer outputs pixel masks for each blocks (or sample masks for partial pixels).
 Then, pixels are depth-tested, shaded and blended in the local framebuffer.
 Finally, after all passes have been rendered, the tiles are resolved and copied to the application window buffer.
-**/
+*/
 #include "matrix.h"
 #include "process.h"
 #include "time.h"
@@ -252,12 +252,12 @@ template<class Shader> struct RenderPass {
 
     // Implementation is inline to allow per-pass face attributes specialization and inline shader calls
 
-    /// Submits triangles for bin binning, actual rendering is deferred until render
-    /// \note Device coordinates are not normalized, positions should be in [0..Width],[0..Height]
+    /// Submits triangles for binning, actual rendering is deferred until render
+    /// \note Device coordinates are not normalized, positions should be in [0..4×Width],[0..4×Height]
     void submit(vec4 A, vec4 B, vec4 C, vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
         if(faceCount>=faceCapacity) error("Face overflow");
         Face& face = faces[faceCount];
-        assert(A.w==1); assert(B.w==1); assert(C.w==1);
+        assert(A.w==1,A,B,C); assert(B.w==1,A,B,C); assert(C.w==1,A,B,C);
         mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
         float det = E.det();
         if(det<1) return; //small or back-facing triangle

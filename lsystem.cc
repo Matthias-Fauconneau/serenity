@@ -1,4 +1,4 @@
-/**
+/** \file lsystem.cc
 This is a demonstration of software rasterization as presented by Michael Abrash in "Rasterization on Larrabee".
 
 First, an L-System generates our "scene", i.e a list of branches (position+diameter at both end).
@@ -39,7 +39,7 @@ You can find the source code on github.
 Rasterizer code: https://github.com/Matthias-Fauconneau/serenity/blob/master/raster.h
 Setup and shader: https://github.com/Matthias-Fauconneau/serenity/blob/master/lsystem.cc
 This is mostly for reference, since this application use my own framework (Linux only).
- ***/
+*/
 #include "data.h"
 #include "matrix.h"
 #include "process.h"
@@ -243,10 +243,18 @@ struct Parameter : Expression {
     string str() const override { return "$"_+dec(index); }
 };
 struct Operator : Expression {
+    byte op;
     unique<Expression> left,right;
-    Operator(unique<Expression>&& left, unique<Expression>&& right):left(move(left)),right(move(right)){}
-    float evaluate(ref<float> a) const override { return left->evaluate(a)*right->evaluate(a); }
-    string str() const override { return left->str()+"*"_+right->str(); }
+    Operator(byte op, unique<Expression>&& left, unique<Expression>&& right):op(op),left(move(left)),right(move(right)){}
+    float evaluate(ref<float> a) const override {
+        float l=left->evaluate(a), r=right->evaluate(a);
+        /**/  if(op=='*') return l*r;
+        else if(op=='-') return l-r;
+        else if(op=='>') return l>r;
+        else if(op=='=') return l==r;
+        else error("Unimplemented",op);
+    }
+    string str() const override { return left->str()+::str(op)+right->str(); }
 };
 
 /// Produced by a Rule
@@ -264,7 +272,8 @@ string str(const Production& o) { return o.arguments?string(str(o.symbol)+"("_+s
 /// Context-sensitive L-System rule
 struct Rule {
     ref<byte> left; byte edge; ref<byte> right;
-    /*Expression condition=Immediate(true);*/ array<Production> productions;
+    unique<Expression> condition = unique<Immediate>(true);
+    array<Production> productions;
 };
 string str(const Rule& o) { return /*str(o.left)+"<"_+*/str(o.edge)/*+">"_+str(o.right)*/+" → "_+str(o.productions); }
 
@@ -272,37 +281,51 @@ string str(const Rule& o) { return /*str(o.left)+"<"_+*/str(o.edge)/*+">"_+str(o
 struct LSystem {
     array<Rule> rules;
     array<Module> axiom;
+    map<string,float> constants;
     //ref<byte> ignore;
 
-    unique<Expression> parse(const map<ref<byte>,float>& constants, const array<ref<byte> >& parameters,
-                             unique<Expression>&& e, TextData& s) {
+    unique<Expression> parse(const array<ref<byte> >& parameters, unique<Expression>&& e, TextData& s) const {
+        s.skip();
         char c = s.peek();
         if((c>='a'&&c<='z')||(c>='A'&&c<='Z')) {
             ref<byte> identifier = s.identifier();
             int i = parameters.indexOf(identifier);
             if(i>=0) return unique<Parameter>(i);
-            else return unique<Immediate>(constants.at(identifier));
+            else return unique<Immediate>(constants.at(string(identifier)));
         } else if(c>='0'&&c<='9') { return unique<Immediate>(s.decimal());
-        } else if(c=='*') { s.next(); return unique<Operator>(move(e),parse(constants,parameters,move(e),s));
-        } else error(s.untilEnd());
+        } else if(c=='*'||c=='-'||c=='>'||c=='=') { s.next(); return unique<Operator>(c, move(e), parse(parameters,move(e),s));
+        } else error("Unknown expression",s.untilEnd());
     }
 
     LSystem(){}
     LSystem(const ref<byte>& source) {
-        map<ref<byte>,float> constants;
         for(ref<byte> line: split(source,'\n')) {
             TextData s(line); if(line.contains(':')) s.until(':'); s.skip();
             if(!s) continue;
-            if(line.contains('=')) {
-                auto name = s.until('=');
-                constants.insert(name) = toDecimal(s.untilEnd());
+            if(find(line,"←"_)) {
+                ref<byte> name = trim(s.until("←"_));
+                s.skip();
+                constants.insert(string(name)) = toDecimal(s.untilEnd());
             } else if(find(line,"→"_)) {
                 Rule rule;
                 rule.edge = s.next();
                 array<ref<byte>> parameters;
                 if(s.match('(')) while(!s.match(')')) { parameters << s.identifier(); s.match(','); assert(s); }
                 s.skip();
-                s.match("→"_);
+                if(s.match(':')) { // condition
+                    s.skip();
+                    if(!s.match('*')) {
+                        unique<Expression> e;
+                        while(!s.match(',') && s.peek("→"_.size)!="→"_) {
+                            e = parse(parameters,move(e),s);
+                            s.skip();
+                            assert(s);
+                        }
+                        rule.condition = move(e);
+                    }
+                }
+                s.skip();
+                if(!s.match("→"_)) error("Expected → not \""_+s.untilEnd()+"\""_);
                 s.skip();
                 while(s) {
                     Production p;
@@ -310,7 +333,7 @@ struct LSystem {
                     if(s.match('(')) while(!s.match(')')) {
                         unique<Expression> e;
                         while(!s.match(',') && s.peek()!=')') {
-                            e = parse(constants,parameters,move(e),s);
+                            e = parse(parameters,move(e),s);
                             s.skip();
                             assert(s);
                         }
@@ -328,7 +351,7 @@ struct LSystem {
                     if(s.match('(')) while(!s.match(')')) {
                         unique<Expression> e;
                         while(!s.match(',') && s.peek()!=')') {
-                            e = parse(constants,parameters,move(e),s);
+                            e = parse(parameters,move(e),s);
                             s.skip();
                             assert(s);
                         }
@@ -373,14 +396,14 @@ struct LSystem {
                             }
                             if(path!=r.right) continue;
                         }
-                        //if(!r.condition(arguments)) continue;
+                        if(!r.condition->evaluate(arguments)) continue;
                         //if(!sensitive) matches.clear(), sensitive=true;
                         array<Module> modules;
                         for(const Production& production: r.productions) modules << production(c.arguments);
                         matches << modules;
                     } else {
                         //if(sensitive) continue;
-                        //if(!r.condition(c.arguments)) continue;
+                        if(!r.condition->evaluate(c.arguments)) continue;
                         array<Module> modules;
                         for(const Production& production: r.productions) modules << production(c.arguments);
                         matches << modules;
@@ -392,6 +415,7 @@ struct LSystem {
                     if(matches) next << copy(matches[0]);
                     else next << c;
             }
+            debug( if(code==next) error("L-System stalled at level"_,i,code); )
             code = move(next);
         }
         return code;
@@ -404,7 +428,7 @@ struct Editor : Widget {
     Folder folder = Folder(""_,cwd()); //L-Systems definitions are loaded from current working directory
     Bar<Text> systems; // Tab bar to select which L-System to view
     LSystem system; // Currently loaded L-System
-    uint level=6; // Current L-System generation maximum level
+    uint level=20; // Current L-System generation maximum level
     bool shadow=true; // Whether shadows are rendered
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(PI,PI/4); // current view angles
@@ -428,11 +452,13 @@ struct Editor : Widget {
     void generate() {
         cones.clear(); sceneMin=0, sceneMax=0;
 
+        array<Module> modules = system.generate(level);
+
         // Turtle interpretation of modules string generated by an L-system
         array<mat4> stack;
         mat4 state;
-        for(const Module& module : system.generate(level)) { char symbol=module.symbol;
-            float a = module.arguments?module.arguments[0]*PI/180:0;
+        for(const Module& module : modules) { char symbol=module.symbol;
+            float a = module.arguments ? module.arguments[0]*PI/180 : 18*PI/180;
             if(symbol=='\\'||symbol=='/') state.rotateX(symbol=='\\'?a:-a);
             else if(symbol=='&'||symbol=='^') state.rotateY(symbol=='&'?a:-a);
             else if(symbol=='-' ||symbol=='+') state.rotateZ(symbol=='+'?a:-a);
@@ -450,7 +476,9 @@ struct Editor : Widget {
             else if(symbol=='[') stack << state;
             else if(symbol==']') state = stack.pop();
             else if(symbol=='f' || symbol=='F') {
-                float l = module.arguments[0]?:1, wA = module.arguments[1]?:1, wB = module.arguments[2]?:1;
+                float l = module.arguments.size()>0?module.arguments[0]:1,
+                        wA = module.arguments.size()>1?module.arguments[1]:1,
+                        wB = module.arguments.size()>2?module.arguments[2]:1;
                 vec3 A = state[3].xyz();
                 state.translate(vec3(l,0,0)); //forward axis is +X
                 vec3 B = state[3].xyz();
@@ -460,12 +488,15 @@ struct Editor : Widget {
                 sceneMax=max(sceneMax,B);
 
                 // Apply tropism
-                vec3 X = state[0].xyz();
-                vec3 Y = cross(vec3(-1,0,0),X);
-                float y = length(Y);
-                if(y<0.01) continue; //X is colinear to tropism (all rotations are possible)
-                assert(Y.x==0);
-                state.rotate(0.22,state.inverse().normalMatrix()*Y);
+                if(system.constants.contains(string("tropism"_))) {
+                    float tropism = system.constants.at(string("tropism"_));
+                    vec3 X = state[0].xyz();
+                    vec3 Y = cross(vec3(-1,0,0),X);
+                    float y = length(Y);
+                    if(y<0.01) continue; //X is colinear to tropism (all rotations are possible)
+                    assert(Y.x==0);
+                    state.rotate(tropism,state.inverse().normalMatrix()*Y);
+                }
             }
         }
         window.render();
@@ -478,10 +509,11 @@ struct Editor : Widget {
 
         // Scans current folder for L-System definitions (.l files)
         array<string> files = folder.list(Files);
-        for(string& file : files) if(endsWith(file,".l"_)) systems << string(section(file,'.'));
+        for(string& file : files) if(endsWith(file,".l"_)) systems << string(section(file,'.',0,-2));
         systems.activeChanged.connect(this,&Editor::openSystem);
         // Loads last L-System
-        systems.setActive(systems.count()-1);
+        //systems.setActive(systems.count()-1);
+        systems.setActive(0);
 
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; generate();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
@@ -514,7 +546,7 @@ struct Editor : Widget {
         target.clear();
 
         // Fits view
-        mat4 view; view.rotateY(PI/2); //Always fit using top view (avoid jarring auto zoom)
+        mat4 view; //view.rotateY(PI/2); //Always fit using side view (avoid jarring auto zoom)
         vec3 viewMin=(view*sceneMin).xyz(), viewMax=(view*sceneMax).xyz();
         for(int x=0;x<2;x++) for(int y=0;y<2;y++) for(int z=0;z<2;z++) {
             viewMin = min(viewMin,(view*vec3((x?sceneMax:sceneMin).x,(y?sceneMax:sceneMin).y,(z?sceneMax:sceneMin).z)).xyz());
@@ -624,7 +656,7 @@ struct Editor : Widget {
 
         // Displays user interface
         systems.render(targetPosition,int2(targetSize.x,16));
-        Text(ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2)+" faces\n"
+        Text(str(level)+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2)+" faces\n"
                        profile(
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
                        "setup "_+str(100*setupTime/totalTime)+"%\n"
