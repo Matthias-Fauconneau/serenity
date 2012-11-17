@@ -35,8 +35,23 @@ inline vec3 directionnalLight(vec3 surfaceNormal, vec3 lightDirection, vec3 ligh
 struct Face {
     mat3 E; //edge functions
     vec3 iw, iz;
-    float a,b,c; //clip opposite corner
 };
+// Shadow sampling patterns
+static struct Pattern {
+    vec16 X,Y;
+    Pattern() {
+        // jittered radial sample pattern
+        Random random;
+        for(int u=0;u<4;u++) for(int v=0;v<4;v++) {
+            float r = sqrt( (u + (random+1)/2.f) / 4.f ) / 4.f;
+            float t = (v + (random+1)/2.f) / 4.f;
+            X[u*4+v] = r*cos(2*PI*t);
+            Y[u*4+v] = r*sin(2*PI*t);
+        }
+    }
+} patterns[16];
+Random randomPattern;
+
 struct TreeShader {
     // Occluders geometry (in light space)
     Face* faces;
@@ -54,6 +69,7 @@ struct TreeShader {
         bins = allocate64<Bin>(width*height);
         faces = allocate64<Face>(faceCapacity);
         for(uint i: range(width*height)) bins[i].faceCount=0;
+        randomPattern.reset(); //keep same pattern at each frame
     }
     ~TreeShader() { unallocate(bins,width*height); unallocate(faces,faceCapacity); }
 
@@ -65,18 +81,8 @@ struct TreeShader {
         mat3& E = face.E;
         E = mat3(A.xyw(), B.xyw(), C.xyw());
         float det = E.det(); if(det<0.001f) return; //small or back-facing triangle
-        E = (1/det) * E.cofactor(); //edge equations are now columns of E
-
-        // Normalize edge functions for approximate shadow edge softening
-        for(int e=0;e<3;e++) {
-            float l = sqrt(E[e].x*E[e].x + E[e].y*E[e].y);
-            if(l<0.001f) return;
-            E[e] *= 1.f/l;
-        }
-
-        face.a=dot(E[0],vec3(A.xy(),1.f));
-        face.b=dot(E[1],vec3(B.xy(),1.f));
-        face.c=dot(E[2],vec3(C.xy(),1.f));
+        E = E.cofactor(); //edge equations are now columns of E
+        //TODO: step grids ?
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
 
@@ -98,26 +104,30 @@ struct TreeShader {
         vec3 lightPos = vec3(varying[1],varying[2],varying[3]);
         float d = clip(-1.f,varying[0],1.f);
         if(face.Y || face.Z) lightPos += sqrt(1-d*d)*face.N;
-        int X=lightPos.x, Y=lightPos.y;
-        float sunLight=1; //TODO: fake soft shadow using nearest occluder edge distance
-        for(int y=max(0,Y-1);y<=min(height-1,Y+1);y++) for(int x=max(0,X-1);x<=min(width-1,X+1);x++) {
+        // 4×4 xy sample steps
+        //TODO: cone not cylinder (i.e angular not parallel) sampling (otherwise a shadow map would be much more efficient)
+        const Pattern& pattern = patterns[randomPattern()%16];
+        vec16 lightX = lightPos.x + pattern.X, lightY = lightPos.y + pattern.Y;
+        int binX=lightPos.x, binY=lightPos.y;
+        vec16 samples = 0;
+        //FIXME: better bounding box
+        for(int y=max(0,binY-1);y<=min(height-1,binY+1);y++) for(int x=max(0,binX-1);x<=min(width-1,binX+1);x++) {
             const Bin& bin = bins[y*width+x];
             for(uint i: range(bin.faceCount)) {
                 uint index = bin.faces[i];
                 const Face& face = faces[index];
-                vec3 XY1(lightPos.x,lightPos.y,1.f);
-                float a=dot(face.E[0],XY1), b=dot(face.E[1],XY1), c=dot(face.E[2],XY1);
-                float a2=face.a-a, b2=face.b-b, c2=face.c-c;
-                const float scale=2.f;
-                a*=scale, b*=scale, c*=scale, a2*=scale, b2*=scale, c2*=scale;
-                float m = min(min(a,min(b,c)), min(a2,min(b2,c2)))+0.5f;
-                if(m < 0) continue;
+                const vec3 XY1(lightPos.x,lightPos.y,1.f);
                 float w = 1/dot(face.iw,XY1);
                 float z = w*dot(face.iz,XY1);
-                if(lightPos.z<=z+2.f) continue; //FIXME: bias to avoid selfshadowing from extrapolated Z
-                sunLight = max(0.f,sunLight-m);
+                if(lightPos.z<=z) continue; //only Z-test midpoint
+
+                vec16 a = face.E[0].x * lightX + face.E[0].y * lightY + face.E[0].z;
+                vec16 b = face.E[1].x * lightX + face.E[1].y * lightY + face.E[1].z;
+                vec16 c = face.E[2].x * lightX + face.E[2].y * lightY + face.E[2].z;
+                samples = samples | ((a > 0.f) & (b > 0.f) & (c > 0.f));
             }
         }
+        float sunLight = 1.f-__builtin_popcount(mask(samples))/16.f;
         if(!face.Y && !face.Z) return vec4(vec3(1./2,1./4,1./8)+sunLight*vec3(1./2,3./4,7./8),1.f); //ground
         vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
 

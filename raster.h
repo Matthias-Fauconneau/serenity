@@ -47,6 +47,9 @@ inline vec16 operator /(const int one unused, vec16 d) {
     return vec16(_mm256_rcp_ps(d.r1),_mm256_rcp_ps(d.r2));
 }
 
+inline vec16 operator |(vec16 a, vec16 b) {
+    return vec16(_mm256_or_ps(a.r1,b.r1),_mm256_or_ps(a.r2,b.r2));
+}
 inline vec16 operator &(vec16 a, vec16 b) {
     return vec16(_mm256_and_ps(a.r1,b.r1),_mm256_and_ps(a.r2,b.r2));
 }
