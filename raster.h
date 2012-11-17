@@ -1,5 +1,15 @@
 #pragma once
-/// \file raster.h 3D rasterizer (polygon, circle)
+/** \file raster.h 3D rasterizer
+This rasterizer is an AVX implementation of a tile-based deferred renderer (cf http://www.drdobbs.com/parallel/rasterization-on-larrabee/217200602) :
+Triangles are not immediatly rendered but first sorted in 16x16 pixels (64x64 samples) bins.
+When all triangles have been setup, each tile is separately rendered.
+Tiles can be processed in parallel (I'm using 4 hyperthreaded cores) and only access their local framebuffer (which should fit L1).
+As presented in Abrash's article, rasterization is done recursively (4x4 blocks of 4x4 pixels of 4x4 samples) using precomputed step grids.
+This architecture allows the rasterizer to leverage 16-wide vector units (on Ivy Bride's 8-wide units, all operations have to be duplicated).
+For each face, the rasterizer outputs pixel masks for each blocks (or sample masks for partial pixels).
+Then, pixels are depth-tested, shaded and blended in the local framebuffer.
+Finally, after all passes have been rendered, the tiles are resolved and copied to the application window buffer.
+**/
 #include "matrix.h"
 #include "process.h"
 #include "time.h"

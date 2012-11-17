@@ -1,3 +1,37 @@
+/**
+This is a demonstration of software rasterization as presented by Michael Abrash in "Rasterization on Larrabee".
+
+First, an L-System generates our "scene", i.e a list of branches (position+diameter at both end).
+Then, for each frame, the branches are transformed to view-aligned quads (2 triangles per branch) and submitted to the rasterizer.
+
+This rasterizer is an AVX implementation of a tile-based deferred renderer (cf http://www.drdobbs.com/parallel/rasterization-on-larrabee/217200602) :
+Triangles are not immediatly rendered but first sorted in 16x16 pixels (64x64 samples) bins.
+When all triangles have been setup, each tile is separately rendered.
+Tiles can be processed in parallel (I'm using 4 hyperthreaded cores) and only access their local framebuffer (which should fit L1).
+As presented in Abrash's article, rasterization is done recursively (4x4 blocks of 4x4 pixels of 4x4 samples) using precomputed step grids.
+This architecture allows the rasterizer to leverage 16-wide vector units (on Ivy Bride's 8-wide units, all operations have to be duplicated).
+For each face, the rasterizer outputs pixel masks for each blocks (or sample masks for partial pixels).
+Then, pixels are depth-tested, shaded and blended in the local framebuffer.
+Finally, after all passes have been rendered, the tiles are resolved and copied to the application window buffer.
+
+My goal is to minimize any sampling artifacts:
+- The tiled renderer allows to use 16xMSAA without killing performance (since it is not bandwidth-limited)
+- The branches (actually cones) are not tesselated. They are rendered as view-aligned quads and shaded accordingly.
+- Shadows are raycasted (and not sampled from a shadow map).
+
+For this simple scene, a shadow map would be a better choice, but I wanted to try to leverage the CPU in the shader.
+The main advantage of raycasting is that it allows to implement accurate contact-hardening soft shadows for scenes with arbitrary depth complexity.
+Shadow maps only allows to sample the furthest (nearest to light) occluder, while raycasting correctly handle penumbra affected by a nearer hidden occluder.
+Thus, given enough samples, raycasting can simulate much wider lights.
+
+I worked on this project to have a more flexible real-time renderer for CG experiments.
+But also because working on improving performance is addictive. As in a game, you get a score (frame time) and you have to make the most out of your abilities to improve the score.
+
+You can find the source code on github.
+Rasterizer code: https://github.com/Matthias-Fauconneau/serenity/blob/master/raster.h
+Setup and shader: https://github.com/Matthias-Fauconneau/serenity/blob/master/lsystem.cc
+This is mostly for reference, since this application use my own framework (Linux only).
+ ***/
 #include "data.h"
 #include "matrix.h"
 #include "process.h"
@@ -453,7 +487,7 @@ struct Editor : Widget {
         } else {
             //framebuffer background color is only regenerated as necessary, but UI rendering expects cleared framebuffer
             fill(targetPosition+Rect(targetSize.x,16),white,false);
-            fill(targetPosition+int2(0,16)+Rect(128,128),white,false);
+            fill(targetPosition+int2(0,16)+Rect(256,256),white,false);
         }
         target.clear();
 
@@ -575,7 +609,7 @@ struct Editor : Widget {
         uint frameEnd = cpuTime();
         frameTime = ( (frameEnd-this->frameEnd) + (64-1)*frameTime)/64;
         this->frameEnd=frameEnd;
-        status.setText(ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms\n"
+        status.setText(ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2)+" faces\n"
                        profile(
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
                        "setup "_+str(100*setupTime/totalTime)+"%\n"
@@ -590,7 +624,7 @@ struct Editor : Widget {
                            "ui "_+str(100*uiTime/totalTime)+"%\n") ""_);
         status.render(int2(targetPosition+int2(16)));
         profile( miscStart = rdtsc(); uiTime = ( (miscStart-uiStart) + (T-1)*uiTime)/T; )
-#if 1
+#if 0
         window.render(); //keep updating to get maximum performance profile
 #endif
     }
