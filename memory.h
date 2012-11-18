@@ -59,4 +59,5 @@ template<class T> struct unique {
     T* operator &() { return pointer; }
     const T* operator &() const { return pointer; }
     explicit operator bool() { return pointer; }
+    bool operator !() const { return !pointer; }
 };

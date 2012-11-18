@@ -1,10 +1,11 @@
 CG:
- herbaceous plants, colors
- Renderer:
-  use step grids for vertex attribute interpolations
-  coverage sampling ? Hi-Z pixel reject ? float16 colors ?
-  merge passes
- scene (sky, grass, plants, forest, terrain, textures...)
+ Integrated Editor
+ Plants: Mycelys muralis, Lychnis coronaria, Mint, Crocus, Lily-of-the-valley, Apple twig, Lilac, Wild carrot, Zinnias, Water lily, Roses
+ Better trees using environment modeling (light and space competition)
+ Textures
+ Translucent leafs
+ Renderer: step grids for vertex attribute interpolations, coverage sampling ? Hi-Z pixel reject ? float16 colors ?, merge passes
+ Scene (sky, grass, plants, forest, terrain...)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, vorbis, truetype, ssl

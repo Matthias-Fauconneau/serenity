@@ -194,11 +194,14 @@ struct FlatShader : ShadowShader {
     vec3 sky, sun; bool enableShadow;
 
     // Shader specification (used by rasterizer)
-    typedef vec3 FaceAttributes; // Surface normal for flat shading
+    struct FaceAttributes {
+        vec3 N; // Surface normal for flat shading
+        vec3 albedo; // Surface color
+    };
 
     FlatShader(const Shadow& shadow):ShadowShader(shadow){} //FIXME: inherit constructor
 
-    vec4 operator()(FaceAttributes N, float varying[V]) const {
+    vec4 operator()(FaceAttributes face, float varying[V]) const {
         float sunLight=1.f;
         if(enableShadow) {
             vec3 lightPos = vec3(varying[0],varying[1],varying[2]);
@@ -207,12 +210,10 @@ struct FlatShader : ShadowShader {
 
         // Computes diffused light from hemispheric sky light and shadow-casting directionnal sun light
         vec3 diffuseLight
-                = hemisphericLight(N,sky)*skyColor
-                + sunLight*directionnalLight(N,sun)*sunColor;
+                = hemisphericLight(face.N,sky)*skyColor
+                + sunLight*directionnalLight(face.N,sun)*sunColor;
 
-        // albedo (white)
-        vec3 albedo = vec3(1,1,1);
-        vec3 diffuse = albedo*diffuseLight;
+        vec3 diffuse = face.albedo*diffuseLight;
         return vec4(diffuse,1.f);
     }
 };
@@ -223,7 +224,11 @@ struct ConeShader : ShadowShader {
     vec3 sky, sun; bool enableShadow;
 
     // Shader specification (used by rasterizer)
-    struct FaceAttributes { vec3 Y,Z,N; };
+    struct FaceAttributes {
+        vec3 Y,Z; // Normal basis to fix cone lighting
+        vec3 N; // Light space normal to fix position for shadow reception
+        vec3 albedo; // Surface color
+    };
     static constexpr int V = 4; // number of interpolated vertex attributes (cone position + 3D light space position)
 
     ConeShader(const Shadow& shadow):ShadowShader(shadow){} //FIXME: inherit constructor
@@ -247,9 +252,7 @@ struct ConeShader : ShadowShader {
                 = hemisphericLight(N,sky)*skyColor
                 + sunLight*directionnalLight(N,sun)*sunColor;
 
-        // albedo (white)
-        vec3 albedo = vec3(1,1,1);
-        vec3 diffuse = albedo*diffuseLight;
+        vec3 diffuse = face.albedo*diffuseLight;
         return vec4(diffuse,1.f);
     }
 };
@@ -278,9 +281,9 @@ struct Immediate : Expression {
     string str() const override { return ftoa(value); }
 };
 struct Parameter : Expression {
-    int index;
-    Parameter(int index):index(index){}
-    float evaluate(ref<float> a) const override { return a[index]; }
+    uint index;
+    Parameter(uint index):index(index){}
+    float evaluate(ref<float> a) const override { if(index>=a.size) error("Missing argument"); return a[index]; }
     string str() const override { return "$"_+dec(index); }
 };
 struct Operator : Expression {
@@ -288,11 +291,18 @@ struct Operator : Expression {
     unique<Expression> left,right;
     Operator(byte op, unique<Expression>&& left, unique<Expression>&& right):op(op),left(move(left)),right(move(right)){}
     float evaluate(ref<float> a) const override {
-        float l=left->evaluate(a), r=right->evaluate(a);
-        /**/  if(op=='*') return l*r;
+        if(!right) error("Missing right operand");
+        float r=right->evaluate(a);
+        if(op=='-' && !left) return -r;
+        if(!left) error("Missing left operand");
+        float l=left->evaluate(a);
+        /**/  if(op=='=') return l==r;
+        else if(op=='+') return l+r;
         else if(op=='-') return l-r;
         else if(op=='>') return l>r;
-        else if(op=='=') return l==r;
+        else if(op=='*') return l*r;
+        else if(op=='/') return l/r;
+        else if(op=='^') return pow(l,r);
         else error("Unimplemented",op);
     }
     string str() const override { return left->str()+::str(op)+right->str(); }
@@ -320,6 +330,7 @@ string str(const Rule& o) { return /*str(o.left)+"<"_+*/str(o.edge)/*+">"_+str(o
 
 /// Bracketed, Stochastic, context-sensitive, parametric L-System definition parser and generator
 struct LSystem {
+    string name;
     array<Rule> rules;
     array<Module> axiom;
     map<string,float> constants;
@@ -328,25 +339,38 @@ struct LSystem {
     unique<Expression> parse(const array<ref<byte> >& parameters, unique<Expression>&& e, TextData& s) const {
         s.skip();
         char c = s.peek();
-        if((c>='a'&&c<='z')||(c>='A'&&c<='Z')) {
-            ref<byte> identifier = s.identifier();
+        if(c>='0'&&c<='9') {
+            return unique<Immediate>(s.decimal());
+        } else if(c=='='||c=='+'||c=='-'||c=='>'||c=='*'||c=='/'||c=='^') {
+            s.next();
+            return unique<Operator>(c, move(e), parse(parameters,move(e),s));
+        } else {
+            ref<byte> identifier = s.whileNo("=+-><*/^(),:"_);
             int i = parameters.indexOf(identifier);
             if(i>=0) return unique<Parameter>(i);
-            else return unique<Immediate>(constants.at(string(identifier)));
-        } else if(c>='0'&&c<='9') { return unique<Immediate>(s.decimal());
-        } else if(c=='*'||c=='-'||c=='>'||c=='=') { s.next(); return unique<Operator>(c, move(e), parse(parameters,move(e),s));
-        } else error("Unknown expression",s.untilEnd());
+            else if(constants.contains(string(identifier))) return unique<Immediate>(constants.at(string(identifier)));
+            else error(name,"Unknown symbol",c,s.untilEnd(),constants);
+        }
     }
 
     LSystem(){}
-    LSystem(const ref<byte>& source) {
+    LSystem(string&& name, const ref<byte>& source):name(move(name)){
         for(ref<byte> line: split(source,'\n')) {
-            TextData s(line); if(line.contains(':')) s.until(':'); s.skip();
+            TextData s(line);
+            s.skip();
+            if(s.match('#')) continue;
+            if(line.contains(':')) s.until(':'); s.skip();
             if(!s) continue;
             if(find(line,"←"_)) {
                 ref<byte> name = trim(s.until("←"_));
                 s.skip();
-                constants.insert(string(name)) = toDecimal(s.untilEnd());
+                unique<Expression> e;
+                while(s) {
+                    e = parse(array<ref<byte> >(),move(e),s);
+                    s.skip();
+                }
+                assert(e);
+                constants.insert(string(name)) = e->evaluate(ref<float>());
             } else if(find(line,"→"_)) {
                 Rule rule;
                 rule.edge = s.next();
@@ -469,7 +493,7 @@ struct Editor : Widget {
     Folder folder = Folder(""_,cwd()); //L-Systems definitions are loaded from current working directory
     Bar<Text> systems; // Tab bar to select which L-System to view
     LSystem system; // Currently loaded L-System
-    uint level=10; // Current L-System generation maximum level
+    uint level=0; // Current L-System generation maximum level
     bool enableShadow=true; // Whether shadows are rendered
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(PI,PI/4); // current view angles
@@ -480,28 +504,30 @@ struct Editor : Widget {
     // Scene
      vec3 sceneMin=0, sceneMax=0; // Scene bounding box
      /// Cone from A to B with radius wA to wB (stalk, branches)
-     struct Cone { vec3 A,B; float wA,wB; };
+     struct Cone { vec3 A,B; float wA,wB; vec3 color; };
      array<Cone> cones;
      /// Convex polygon (leaves)
-     typedef array<vec3> Polygon;
+     struct Polygon { array<vec3> vertices; vec3 color; };
      array<Polygon> polygons; uint triangleCount=0;
 
     /// Triggered by tab bar to load L-Systems
     void openSystem(uint index) {
-        if(level>10) level=10;
+        level=0;
         ref<byte> name = systems[index].text;
-        system = LSystem(readFile(string(name+".l"_),folder));
+        system = LSystem(string(name), readFile(string(name+".l"_),folder));
         generate();
     }
     /// Generates the currently active L-System
     void generate() {
         cones.clear(); polygons.clear(); triangleCount=0; sceneMin=0, sceneMax=0;
 
+        if(!level) level=system.constants.at(string("N"_));
         array<Module> modules = system.generate(level);
 
         // Turtle interpretation of modules string generated by an L-system
         array<mat4> stack; mat4 state; uint cut=0;
         array<Polygon> polygonStack; Polygon polygon;
+        array<vec3> colorStack; vec3 color=vec3(1,1,1);
         for(const Module& module : modules) {
             char symbol=module.symbol;
             if(cut) { if(symbol=='[') cut++; else if(symbol==']') cut--; else continue; }
@@ -512,32 +538,43 @@ struct Editor : Widget {
                 vec3 A = state[3].xyz();
                 state.translate(vec3(l,0,0)); //forward axis is +X
                 vec3 B = state[3].xyz();
-                if(symbol=='F' && polygonStack) polygon << state[3].xyz();
-                else if(symbol=='G' || symbol=='F') cones << Cone __(A,B,wA,wB); //if no polygon is being defined
+                if(symbol=='F') {
+                    if(polygonStack) polygon.vertices << state[3].xyz();
+                    else {
+                        cones << Cone __(A,B,wA,wB,color);
 
-                sceneMin=min(sceneMin,B);
-                sceneMax=max(sceneMax,B);
-
-                // Apply tropism
-                if(system.constants.contains(string("tropism"_))) {
-                    float tropism = system.constants.at(string("tropism"_));
-                    vec3 X = state[0].xyz();
-                    vec3 Y = cross(vec3(-1,0,0),X);
-                    float y = length(Y);
-                    if(y<0.01) continue; //X is colinear to tropism (all rotations are possible)
-                    assert(Y.x==0);
-                    state.rotate(tropism,state.inverse().normalMatrix()*Y);
+                        // Apply tropism
+                        if(system.constants.contains(string("tropism"_))) {
+                            float tropism = system.constants.at(string("tropism"_));
+                            vec3 X = state[0].xyz();
+                            vec3 Y = cross(vec3(-1,0,0),X);
+                            float y = length(Y);
+                            if(y<0.01) continue; //X is colinear to tropism (all rotations are possible)
+                            assert(Y.x==0);
+                            state.rotate(tropism,state.inverse().normalMatrix()*Y);
+                        }
+                    }
+                    sceneMin=min(sceneMin,B);
+                    sceneMax=max(sceneMax,B);
                 }
-            } else if(symbol=='.') polygon << state[3].xyz(); // Records a vertex in the current polygon
-            else if(symbol=='[') stack << state; // pushes turtle (current position and orientation) on stack
-            else if(symbol==']') state = stack.pop(); // pops turtle (current position and orientation) from stack
-            else if(symbol=='%') cut=1;
-            else if(symbol=='{') polygonStack << move(polygon); // pushes current polygon and starts a new one
-            else if(symbol=='}') { // stores current polygon and pop previous nesting level from stack
+            } else if(symbol=='.') polygon.vertices << state[3].xyz(); // Records a vertex in the current polygon
+            else if(symbol=='[') {
+                stack << state; // pushes turtle (current position and orientation) on stack
+                colorStack << color;
+            } else if(symbol==']') {
+                state = stack.pop(); // pops turtle (current position and orientation) from stack
+                color = colorStack.pop();
+            } else if(symbol=='%') cut=1;
+            else if(symbol=='{') { // pushes current polygon and starts a new one
+                polygonStack << move(polygon);
+                polygon.color = color;
+            } else if(symbol=='}') { // stores current polygon and pop previous nesting level from stack
                 polygons << move(polygon);
                 polygon = polygonStack.pop();
-            }
-            else if(symbol=='$') { //set Y horizontal (keeping X), Z=X×Y
+            } else if(symbol=='!' || symbol=='\'') { // change current color
+                if(module.arguments.size()!=3) error("Expected !(b,g,r)");
+                color = clip(vec3(0.f),vec3(module.arguments[0],module.arguments[1],module.arguments[2]),vec3(1.f));
+            } else if(symbol=='$') { //set Y horizontal (keeping X), Z=X×Y
                             vec3 X = state[0].xyz();
                             vec3 Y = cross(vec3(1,0,0),X);
                             float y = length(Y);
@@ -547,14 +584,14 @@ struct Editor : Widget {
                             vec3 Z = cross(X,Y);
                             state[1] = vec4(Y,0.f);
                             state[2] = vec4(Z,0.f);
-            } else {
-                float a = module.arguments ? module.arguments[0]*PI/180 : 18*PI/180;
+            } else if(symbol=='\\'||symbol=='/'||symbol=='&'||symbol=='^'||symbol=='-' ||symbol=='+') {
+                float a = module.arguments ? module.arguments[0]*PI/180 : system.constants.at(string("angle"_))*PI/180;
                 if(symbol=='\\'||symbol=='/') state.rotateX(symbol=='\\'?a:-a);
                 else if(symbol=='&'||symbol=='^') state.rotateY(symbol=='&'?a:-a);
                 else if(symbol=='-' ||symbol=='+') state.rotateZ(symbol=='+'?a:-a);
             }
         }
-        for(const Polygon& polygon: polygons) if(polygon.size()>=3) triangleCount += polygon.size()-2;
+        for(const Polygon& polygon: polygons) if(polygon.vertices.size()>=3) triangleCount += polygon.vertices.size()-2;
         window.render();
     }
 
@@ -567,9 +604,8 @@ struct Editor : Widget {
         array<string> files = folder.list(Files);
         for(string& file : files) if(endsWith(file,".l"_)) systems << string(section(file,'.',0,-2));
         systems.activeChanged.connect(this,&Editor::openSystem);
-        // Loads last L-System
-        //systems.setActive(systems.count()-1);
-        systems.setActive(0);
+        // Loads L-System
+        systems.setActive(1);
 
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; generate();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
@@ -583,8 +619,8 @@ struct Editor : Widget {
 
         int2 delta = cursor-lastPos; lastPos=cursor;
         if(event==Motion && button==LeftButton) {
-            rotation += vec2(delta)*float(PI)/vec2(size);
-            if(rotation.y<0) rotation.y=0; // Joints should not be seen from below
+            rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
+            rotation.y= clip(0.f,rotation.y,float(PI/2)); // Keep pitch between [0,PI]
         } else return false;
         return true;
     }
@@ -610,7 +646,7 @@ struct Editor : Widget {
         }
         vec2 sceneSize = (viewMax-viewMin).xy();
         vec2 displaySize = vec2(targetSize.x*4,targetSize.y*4);
-        float scale = min(displaySize.x/sceneSize.x,displaySize.y/sceneSize.x);
+        float scale = min(displaySize.x/sceneSize.x,displaySize.y/sceneSize.y) * 0.75;
         view = mat4();
         view.translate(vec3(displaySize.x/2,displaySize.y/4,0.f)); //center scene
         view.scale(scale); //normalize view space to fit display
@@ -667,8 +703,8 @@ struct Editor : Widget {
                 {vec3(-1,-1,1),vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)},
                 {vec3(1,1,-1),vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
             };
-            conePass.submit(a,b,c,attributes[0],__(Y,Z,N));
-            conePass.submit(c,d,a,attributes[1],__(Y,Z,N));
+            conePass.submit(a,b,c,attributes[0],__(Y,Z,N,cone.color));
+            conePass.submit(c,d,a,attributes[1],__(Y,Z,N,cone.color));
 
             if(enableShadow) { // Light aligned rectangle (for shadows)
                 float wA = lightScale*cone.wA; vec3 A=(sun*cone.A).xyz(); //-vec3(0,0,2*wA); //offset to prevent self shadowing
@@ -686,21 +722,22 @@ struct Editor : Widget {
         flatShader.enableShadow=enableShadow, flatShader.sky = skyLightDirection, flatShader.sun =sunLightDirection;
         RenderPass<FlatShader> flatPass __(target, 2*triangleCount, flatShader);
         for(const Polygon& polygon: polygons) {
-            if(polygon.size()<3) continue;
-            vec3 A = polygon.first();
-            vec3 next = polygon[1];
-            for(vec3 current: polygon.slice(2)) {
+            if(polygon.vertices.size()<3) continue;
+            vec3 A = polygon.vertices.first();
+            vec3 next = polygon.vertices[1];
+            for(vec3 current: polygon.vertices.slice(2)) {
                 vec3 B = next, C = current;
                 vec3 N = normalize(normalMatrix*cross(B-A,C-A));
                 vec4 as = sun*A, bs = sun*B, cs=sun*C;
-                sunShadow.submit(cs,bs,as);
+                if(cross((bs-as).xyz(),(cs-as).xyz()).z < 0) sunShadow.submit(cs,bs,as);
+                else sunShadow.submit(as,bs,cs);
                 {
                     vec3 lightPos[3] = {vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)};
-                    flatPass.submit(view*A,view*B,view*C, lightPos, N);
+                    flatPass.submit(view*A,view*B,view*C, lightPos, __(N,polygon.color));
                 }
                 {
                     vec3 lightPos[3] = {vec3(cs.x,bs.x,as.x),vec3(cs.y,bs.y,as.y),vec3(cs.z,bs.z,as.z)};
-                    flatPass.submit(view*C,view*B,view*A, lightPos, -N);
+                    flatPass.submit(view*C,view*B,view*A, lightPos, __(-N,polygon.color));
                 }
                 next = current;
             }
@@ -750,7 +787,7 @@ struct Editor : Widget {
 
         // Displays user interface
         systems.render(targetPosition,int2(targetSize.x,16));
-        Text(str(level)+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2)+" faces\n"
+        Text(str(level)+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2 + triangleCount*2)+" faces\n"
                        profile(
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
                        "setup "_+str(100*setupTime/totalTime)+"%\n"
