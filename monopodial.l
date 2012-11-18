@@ -8,9 +8,9 @@ elongation rate : lr ← 1.109
 width increase rate : wr ← 2^0.5
 tropism factor : tropism ← 0.22
 
-main axis : A(l) → F(l,wr,1)[&(a0)B(l*r2)]/(d)A(l*r1)
-lateral branch : B(l) → F(l,wr,1)[-(a2)$C(l*r2)]C(l*r1)
-lateral branch (alternate) : C(l) → F(l,wr,1)[+(a2)$B(l*r2)]B(l*r1)
+main axis : A(l) → F(l,wr,1) [ &(a0) B(l*r2) ] /(d) A(l*r1)
+lateral branch : B(l) → F(l,wr,1) [ -(a2) $ C(l*r2) ] C(l*r1)
+lateral branch (alternate) : C(l) → F(l,wr,1) [ +(a2) $ B(l*r2) ] B(l*r1)
 growth : F(l,wA,wB) → F(l*lr,wA*wr,wB*wr)
 
 ω : A(100)
