@@ -28,12 +28,11 @@ ICONS_music := music
 SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%)
 SRCS_profile = profile
 
-LIBS_font = freetype
-#LIBS_player = mpg123
-LIBS_player = avformat avcodec
-LIBS_http = ssl
-LIBS_sequencer = asound
+LIBS_time = rt
 LIBS_process = pthread
+LIBS_font = freetype
+LIBS_http = ssl
+LIBS_player = avformat avcodec
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

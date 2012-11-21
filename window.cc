@@ -22,7 +22,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     sockaddr_un addr; copy(addr.path,path.data(),path.size());
-    if(check(connect(Socket::fd,&addr,2+path.size()),path)) error("X connection failed");
+    if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;
         string authority = getenv("HOME"_)+"/.Xauthority"_;
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));

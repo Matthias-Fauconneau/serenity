@@ -2,14 +2,13 @@
 #include "linux.h"
 #include "string.h"
 
-struct timespec { long sec,nsec; };
+#if NOLIBC
 #if __x86_64
-struct stat { long dev; long ino; long nlink; int mode,uid,gid; long rdev,size,blksize,blocks; timespec atime,mtime,ctime; long pad[3]; };
+struct stat { long dev; long ino; long nlink; int mode,uid,gid; long rdev,st_size,blksize,blocks; long atime,atimensec,st_mtime,mtimensec,ctime,ctimensec; long pad[3]; };
 #else
 struct stat { uint64 dev; int pad1; int ino; int mode; uint16 nlink; int uid,gid; uint64 rdev; int pad2;
-              uint64 size; int blksize; uint64 blocks; timespec atime,mtime,ctime; uint64 ino64; };
+              uint64 st_size; int blksize; uint64 blocks; long atime,atimensec,st_mtime,mtimensec,ctime,ctimensec; uint64 ino64; };
 #endif
-struct dirent { long ino, off; short len; char name[]; };
 enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000,
 #if __arm__
       O_DIRECTORY=040000
@@ -17,13 +16,19 @@ enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000,
       O_DIRECTORY=0200000
 #endif
 };
+enum {AT_FDCWD=-100};
+#else
+#include <sys/syscall.h>
+static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
+#endif
+struct dirent { long ino, off; short len; char name[]; };
 enum {DT_DIR=4, DT_REG=8};
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
 
 // Folder
-const Folder& cwd() { static const int AT_FDCWD=-100; return (const Folder&)AT_FDCWD; }
+const Folder& cwd() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
 const Folder& root() { static const Folder root = Folder("/"_,cwd()); return root; }
 Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0666), folder);
@@ -71,7 +76,7 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
 File::File(const ref<byte>& file, const Folder& at, uint flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
-int File::size() const { stat sb={}; check_(fstat(fd, &sb)); return sb.size; }
+int File::size() const { struct stat sb={}; check_(fstat(fd, &sb)); return sb.st_size; }
 //void File::seek(int index) { check_(::lseek(fd,index,0)); }
 int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
@@ -94,6 +99,6 @@ void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at) {
     unlinkat(at.fd,strz(name),0);
     check_(symlinkat(strz(target),at.fd,strz(name)), name,"->",target);
 }
-stat statFile(const ref<byte>& path, const Folder& at) { stat file; check_( fstat(File(path,at).fd, &file) ); return file; }
-long modifiedTime(const ref<byte>& path, const Folder& at) { return statFile(path,at).mtime.sec; }
+struct stat statFile(const ref<byte>& path, const Folder& at) { struct stat file; check_( fstat(File(path,at).fd, &file) ); return file; }
+long modifiedTime(const ref<byte>& path, const Folder& at) { return statFile(path,at).st_mtime; }
 void touchFile(const ref<byte>& path, const Folder& at) { utimensat(at.fd, strz(path), 0, 0); }

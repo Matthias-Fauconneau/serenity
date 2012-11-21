@@ -48,7 +48,7 @@ string toLower(const ref<byte>& s);
 /// Removes duplicate whitespace
 string simplify(string&& s);
 
-struct stringz : string { operator const char*(){return (char*)data();}};
+struct stringz : string { operator char*(){return (char*)data();}};
 /// Copies the reference and appends a null byte
 stringz strz(const ref<byte>& s);
 

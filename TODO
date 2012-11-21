@@ -1,9 +1,8 @@
 CG:
- Integrated Editor
- Plants: Mycelys muralis, Lychnis coronaria, Mint, Crocus, Lily-of-the-valley, Apple twig, Lilac, Wild carrot, Zinnias, Water lily, Roses
+ WM: tile two window / Integrated Editor, split lsystem.cc
+ Plants: Mycelys muralis, Lychnis coronaria, Mint, Crocus, Lily-of-the-valley, Apple twig, Lilac, Wild carrot, Zinnias, Water lily, Roses, Tree leafs
  Better trees using environment modeling (light and space competition)
  Textures
- Translucent leafs
  Renderer: step grids for vertex attribute interpolations, coverage sampling ? Hi-Z pixel reject ? float16 colors ?, merge passes
  Scene (sky, grass, plants, forest, terrain...)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git

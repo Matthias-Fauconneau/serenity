@@ -3,11 +3,17 @@
 #include "data.h"
 #include "string.h"
 
-struct timespec { long sec,nsec; };
+#if NOLIBC
+struct timespec { long tv_sec,tv_nsec; };
 enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
-long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec; }
-long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.sec*1000+ts.nsec/1000000; }
-uint64 cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.sec*1000000UL+ts.nsec/1000; }
+enum {TFD_CLOEXEC = 02000000};
+#else
+#include <time.h>
+#include <sys/timerfd.h>
+#endif
+long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
+long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
+uint64 cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000UL+ts.tv_nsec/1000; }
 
 int daysInMonth(int month, int year=0) {
     if(month==1 && leap(year)) { assert(year!=0); return 29; }
@@ -157,7 +163,6 @@ Date parse(TextData& s) {
     return date;
 }
 
-enum {TFD_CLOEXEC = 02000000};
 Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){registerPoll();}
 Timer::~Timer(){ close(fd); }
-void Timer::setAbsolute(uint date) { static timespec time[2]; time[1].sec=date; timerfd_settime(fd,1,time,0); }
+void Timer::setAbsolute(uint date) { static timespec time[2]; time[1].tv_sec=date; timerfd_settime(fd,1,(const itimerspec*)time,0); }

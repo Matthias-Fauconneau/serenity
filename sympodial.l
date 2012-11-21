@@ -1,4 +1,4 @@
-initial derivation count : N ← 6
+initial derivation count : N ← 10
 contraction ratio 1 : r1 ← 0.9
 contraction ratio 2 : r2 ← 0.7
 branching angle 1 : a1 ← 10

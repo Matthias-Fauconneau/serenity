@@ -2,6 +2,7 @@
 /// \file linux.h Linux kernel syscalls and error codes
 #include "core.h"
 
+#if NOLIBC
 #if __x86_64
 #define attribute __attribute((always_inline))
 #define rN rax
@@ -144,7 +145,7 @@ syscall3(int, symlinkat, const char*,target, int,fd, const char*,name)
 syscall4(int, utimensat, int,fd, const char*,name, const struct timespec*,times, int,flags)
 syscall2(int, timerfd_create, int,clock_id, int,flags)
 syscall4(int, timerfd_settime, int,ufd, int,flags, const struct timespec*,utmr, struct timespec*,otmr)
-syscall2(int, eventfd2, int,val, int,flags)
+syscall2(int, eventfd, int,val, int,flags)
 
 inline __attribute((noreturn)) void exit_thread(int status) {r(r0,status) r(rN,sys::exit); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
 inline __attribute((noreturn)) int exit_group(int status) {r(r0,status)  r(rN,sys::exit_group); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
@@ -190,6 +191,15 @@ inline int connect(int fd, struct sockaddr* addr, int len) { long a[]={fd,(long)
 #undef syscall4
 #undef syscall5
 #undef syscall6
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/shm.h>
+#endif
 
 /// Linux error code names
 enum Error {OK, PERM, NOENT, SRCH, INTR, EIO, NXIO, TOOBIG, NOEXEC, BADF, CHILD, AGAIN, NOMEM, ACCES, FAULT, NOTBLK, BUSY, EXIST, XDEV, NODEV, NOTDIR, ISDIR, INVAL, NFILE, MFILE, NOTTY, TXTBSY, FBIG, NOSPC, SPIPE, ROFS, MLINK, PIPE, DOM, RANGE, DEADLK, NAMETOOLONG, NOLCK, NOSYS, NOTEMPTY, LOOP, WOULDBLOCK, NOMSG, IDRM, CHRNG, L2NSYNC, L3HLT, L3RST, LNRNG, UNATCH, NOCSI, L2HLT, BADE, BADR, XFULL, NOANO, BADRQC, BADSLT, DEADLOCK, EBFONT, NOSTR, NODATA, TIME, NOSR, NONET, NOPKG, REMOTE, NOLINK, ADV, SRMNT, COMM, PROTO, MULTIHO, DOTDOT, BADMSG, OVERFLOW, NOTUNIQ, BADFD, REMCHG, LIBACC, LIBBAD, LIBSCN, LIBMAX, LIBEXEC, ILSEQ, RESTART, STRPIPE, USERS, NOTSOCK, DESTADDRREQ, MSGSIZE, PROTOTYPE, NOPROTOOPT, PROTONOSUPPORT, SOCKTNOSUPPORT, OPNOTSUPP, PFNOSUPPORT, AFNOSUPPORT, ADDRINUSE, ADDRNOTAVAIL, NETDOWN, NETUNREACH, NETRESET, CONNABORTED, CONNRESET, NOBUFS, ISCONN, NOTCONN, SHUTDOWN, TOOMANYREFS, TIMEDOUT, CONNREFUSED, HOSTDOWN, HOSTUNREACH, ALREADY, INPROGRESS, STALE, UCLEAN, NOTNAM, NAVAIL, ISNAM, REMOTEIO, DQUOT, NOMEDIUM, MEDIUMTYPE, CANCELED, NOKEY, KEYEXPIRED, KEYREVOKED, KEYREJECTED, OWNERDEAD, NOTRECOVERABLE, RFKILL, HWPOISON, LAST};

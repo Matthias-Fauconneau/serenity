@@ -50,6 +50,9 @@ This is mostly for reference, since this application use my own framework (Linux
 #include "time.h"
 #include "png.h"
 
+#include "linux.h"
+#include <sys/inotify.h>
+
 // Light
 
 inline float acos(float t) { return __builtin_acosf(t); }
@@ -312,6 +315,7 @@ struct Operator : Expression {
         else if(op=='+') return l+r;
         else if(op=='-') return l-r;
         else if(op=='>') return l>r;
+        else if(op=='<') return l<r;
         else if(op=='*') return l*r;
         else if(op=='/') return l/r;
         else if(op=='^') return pow(l,r);
@@ -356,7 +360,7 @@ struct LSystem {
         char c = s.peek();
         if(c>='0'&&c<='9') {
             return unique<Immediate>(s.decimal());
-        } else if(c=='='||c=='+'||c=='-'||c=='>'||c=='*'||c=='/'||c=='^') {
+        } else if(c=='='||c=='+'||c=='-'||c=='<'||c=='>'||c=='*'||c=='/'||c=='^') {
             s.next();
             return unique<Operator>(c, move(e), parse(parameters,move(e),s));
         } else {
@@ -508,9 +512,18 @@ struct LSystem {
     }
 };
 
+struct FileWatcher : Poll {
+    File inotify = inotify_init();
+    int watch=0;
+    FileWatcher(){fd=inotify.fd; events=POLLIN; registerPoll();}
+    void setPath(ref<byte> path) { watch = check(inotify_add_watch(inotify.fd, strz(path), IN_MODIFY)); }
+    signal<> fileModified;
+    void event() override { inotify.readUpTo(64); fileModified(); }
+};
+
 /// Generates and renders L-Systems
 struct Editor : Widget {
-    Window window __(this,int2(0,0),"L-System Editor"_);
+    Window window __(this,int2(0,1024),"L-System Editor"_);
     Folder folder = Folder(""_,cwd()); //L-Systems definitions are loaded from current working directory
     Bar<Text> systems; // Tab bar to select which L-System to view
     LSystem system; // Currently loaded L-System
@@ -521,6 +534,7 @@ struct Editor : Widget {
     uint64 frameEnd=cpuTime(), frameTime=50000; // last frame end and initial frame time in microseconds
     profile( uint64 miscStart=rdtsc(); ) // profile cycles spent outside render
     RenderTarget target; // Render target (RenderPass renders on these tiles)
+    FileWatcher watcher;
 
     // Scene
      vec3 sceneMin=0, sceneMax=0; // Scene bounding box
@@ -536,6 +550,7 @@ struct Editor : Widget {
         level=0;
         ref<byte> name = systems[index].text;
         system = LSystem(string(name), readFile(string(name+".l"_),folder));
+        watcher.setPath(string(name+".l"_));
         generate();
     }
     /// Generates the currently active L-System
@@ -578,8 +593,12 @@ struct Editor : Widget {
                     sceneMin=min(sceneMin,B);
                     sceneMax=max(sceneMax,B);
                 }
-            } else if(symbol=="."_) polygon.vertices << state[3].xyz(); // Records a vertex in the current polygon
-            else if(symbol=="["_) {
+            } else if(symbol=="."_) {
+                vec3 P = state[3].xyz();
+                polygon.vertices << P; // Records a vertex in the current polygon
+                sceneMin=min(sceneMin,P);
+                sceneMax=max(sceneMax,P);
+            } else if(symbol=="["_) {
                 stack << state; // pushes turtle (current position and orientation) on stack
                 colorStack << color;
             } else if(symbol=="]"_) {
@@ -626,12 +645,13 @@ struct Editor : Widget {
         for(string& file : files) if(endsWith(file,".l"_)) systems << string(section(file,'.',0,-2));
         systems.activeChanged.connect(this,&Editor::openSystem);
         // Loads L-System
-        systems.setActive(3);
+        systems.setActive(8);
 
         window.localShortcut(Key(KP_Sub)).connect([this]{if(level>0) level--; generate();});
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
         window.localShortcut(Key(Return)).connect([this]{writeFile("snapshot.png"_,encodePNG(window.getSnapshot()),home());});
         window.localShortcut(Key(' ')).connect([this]{enableShadow=!enableShadow; window.render();});
+        watcher.fileModified.connect([this]{openSystem(systems.index);});
     }
 
     /// Orbital view control
@@ -641,7 +661,7 @@ struct Editor : Widget {
         int2 delta = cursor-lastPos; lastPos=cursor;
         if(event==Motion && button==LeftButton) {
             rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
-            rotation.y= clip(0.f,rotation.y,float(PI/2)); // Keep pitch between [0,PI]
+            rotation.y= clip(float(-PI/2),rotation.y,float(PI/2)); // Keep pitch between [-PI/2,PI/2]
         } else return false;
         return true;
     }

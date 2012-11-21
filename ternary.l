@@ -9,4 +9,4 @@ tropism factor : tropism ← 0.22
 ternary branch : A → F(50,wr,wr) [ &(a) F(50,wr,1) A ] /(d1) [ &(a) F(50,wr,1) A ] /(d2) [ &(a) F(50,wr,1) A ]
 growth : F(l,wA,wB) → F(l*lr,wA*wr,wB*wr)
 
-ω : F(200,wr,1)/(45)A
+ω : !(0.0,0.6,1.0)F(200,wr,1)/(45)A

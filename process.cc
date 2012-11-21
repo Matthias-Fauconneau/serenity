@@ -4,15 +4,15 @@
 #include "data.h"
 #include "trace.h"
 
-// Linux
+#if NOLIBC
 struct rlimit { long cur,max; };
 enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
 enum {SIGHUP=1, SIGINT, SIGQUIT, SIGILL, SIGTRAP, SIGABRT, SIGBUS, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM, SIGIO=29};
-struct siginfo {
-    int signo,errno,code;
+struct siginfo_t {
+    int signo,errno,si_code;
     union {
         struct { long revents; int fd; } poll;
-        struct { void *addr; } fault;
+        struct { void *si_addr; };
     };
 };
 struct ucontext {
@@ -25,20 +25,36 @@ struct ucontext {
     long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,ip,cs,efl,uesp,ss;
 #endif
 };
+enum {EFD_SEMAPHORE=1};
+enum {SA_SIGINFO=4, SA_RESTORER=0x4000000, SA_RESTART=0x10000000};
+enum {WNOHANG=1};
+#else
+#include <sys/eventfd.h>
+#include <sched.h>
+#include <signal.h>
+#include <sys/resource.h>
+#include <sys/signal.h>
+#include <sys/syscall.h>
+#include <sys/wait.h>
+//FIXME: use pthread
+void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
+int exit_group(int status) { return syscall(SYS_exit_group, status); }
+int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
+int gettid() { return syscall(SYS_gettid); }
+#endif
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 
 // Log
-void log_(const ref<byte>& buffer) { write(1,buffer.data,buffer.size); }
+void log_(const ref<byte>& buffer) { check_(write(1,buffer.data,buffer.size)); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
 // Poll
 void Poll::registerPoll() { thread+=this; thread.post(); }
-void Poll::unregisterPoll() {Locker lock(thread.lock); thread.unregistered<<this;}
+void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue+= this; thread.post();}
 
 // EventFD
-enum{EFD_SEMAPHORE=1};
-EventFD::EventFD():Stream(eventfd2(0,EFD_SEMAPHORE)){}
+EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
 // Process-wide structures initialized on first usage
 // Lock access to thread list
@@ -89,7 +105,7 @@ bool Thread::processEvents() {
             }
         }
     }
-    while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
+    while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); removeOne(poll); queue.removeOne(poll);}
     return terminate;
 }
 void Thread::event() {
@@ -115,17 +131,18 @@ void traceAllThreads() {
 
 // Signal handler
 string trace(int skip, void* ip);
-static void handler(int sig, siginfo* info, ucontext* ctx) {
-    string s = trace(1,(void*)ctx->ip);
+static void handler(int sig, siginfo_t* info, void* ctx) {
+    string s = trace(1,(void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]);
     if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
-    if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->code],")", *(float*)info->fault.addr);
-    if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->fault.addr));
+    if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->si_code],")", *(float*)info->si_addr);
+    if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
     exit_thread(0);
 }
 
+#if NOLIBC
 #if __x86_64
 extern void restore_rt() asm ("__restore_rt"); asm(".text; .align 16; __restore_rt:; movq $15, %rax; syscall;");
 #elif __arm__
@@ -133,14 +150,16 @@ extern void restore_rt() asm ("__restore_rt"); asm(".text; .align 2; .fnstart; .
 #else
 #error Unsupported architecture
 #endif
+#endif
 
 void __attribute((constructor(101))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
+#if NOLIBC
     struct {
         void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
-        enum { SA_SIGINFO=4, SA_RESTORER=0x4000000, SA_RESTART=0x10000000 }; long flags = SA_SIGINFO|SA_RESTORER|SA_RESTART;
+        long flags = SA_SIGINFO|SA_RESTORER|SA_RESTART;
         void (*restorer)() = &restore_rt;
         uint mask[2] = {0,0};
     } sa;
@@ -149,6 +168,15 @@ void __attribute((constructor(101))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0, 8));
     check_(sigaction(SIGTERM, &sa, 0, 8));
     check_(sigaction(SIGTRAP, &sa, 0, 8));
+#else
+    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
+    check_(sigaction(SIGFPE, &sa, 0));
+    check_(sigaction(SIGABRT, &sa, 0));
+    check_(sigaction(SIGSEGV, &sa, 0));
+    check_(sigaction(SIGTERM, &sa, 0));
+    check_(sigaction(SIGTRAP, &sa, 0));
+#endif
+
 }
 
 static int recurse=0;
@@ -190,9 +218,9 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     envp[env0.size()]=0;
 
     int pid = fork();
-    if(pid==0) { if(!execve(strz(path),argv,envp)) exit_group(-1); }
+    if(pid==0) { if(!execve(strz(path),(char*const*)argv,(char*const*)envp)) exit_group(-1); }
     else if(wait) wait4(pid,0,0,0);
-    else { enum{WNOHANG=1}; wait4(pid,0,WNOHANG,0); }
+    else wait4(pid,0,WNOHANG,0);
 }
 
 string getenv(const ref<byte>& name) {

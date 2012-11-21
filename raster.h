@@ -1,4 +1,3 @@
-#pragma once
 /** \file raster.h 3D rasterizer
 This rasterizer is an AVX implementation of a tile-based deferred renderer (cf http://www.drdobbs.com/parallel/rasterization-on-larrabee/217200602) :
 Triangles are not immediatly rendered but first sorted in 16x16 pixels (64x64 samples) bins.
@@ -10,6 +9,7 @@ For each face, the rasterizer outputs pixel masks for each blocks (or sample mas
 Then, pixels are depth-tested, shaded and blended in the local framebuffer.
 Finally, after all passes have been rendered, the tiles are resolved and copied to the application window buffer.
 */
+#pragma once
 #include "matrix.h"
 #include "process.h"
 #include "time.h"
