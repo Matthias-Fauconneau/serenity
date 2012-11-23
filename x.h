@@ -80,6 +80,7 @@ struct SetInputFocus { int8 req=42,revertTo=1; uint16 size=3; uint window=1; uin
 struct CreatePixmap { int8 req=53,depth=32; uint16 size=4; uint pixmap,window; int16 w,h; };
 struct FreePixmap { int8 req=54,pad=0; uint16 size=2; uint pixmap; };
 struct CreateGC { int8 req=55,pad=0; uint16 size=4; uint context,window,mask=0; };
+struct FreeGC { int8 req=60,pad=0; uint16 size=2; uint context; };
 struct CopyArea { int8 req=62,pad=0; uint16 size=7; uint src,dst,gc; int16 srcX,srcY,dstX,dstY,w,h; };
 struct PutImage { int8 req=72,format=2; uint16 size=6; uint drawable,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad=0; };
 struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint colormap,window,visual; };

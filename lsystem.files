@@ -2,6 +2,7 @@ Makefile
 TODO
 core.h
 vector.h
+text.cc
 lsystem.cc
 monopodial.l
 sympodial.l

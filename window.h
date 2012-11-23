@@ -21,7 +21,7 @@ struct Window : Socket, Poll {
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
            const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread());
-    ~Window() { hide(); }
+    ~Window() { destroy(); }
 
     /// Event handler
     void event();
@@ -38,6 +38,10 @@ struct Window : Socket, Poll {
     /// Returns property \a name on \a window
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
 
+    /// Creates window.
+    void create();
+    /// Destroys window.
+    void destroy();
     /// Shows window.
     void show();
     /// Hides window.
@@ -84,6 +88,8 @@ struct Window : Socket, Poll {
 
     /// Widget managed by this window
     Widget* widget;
+     /// Whether this window is currently existing.
+    bool created = false;
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
     bool mapped = false;
     /// If set, this window will hide on leave events (e.g for dropdown menus)
@@ -101,6 +107,8 @@ struct Window : Socket, Poll {
 
     /// Root window
     uint root = 0;
+    /// Root visual
+    uint visual=0;
     /// This window base resource id
     uint id = 0;
 

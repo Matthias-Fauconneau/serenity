@@ -42,21 +42,36 @@ struct Text : Widget {
     int2 minSize=0;
 
     // Characters to render
-    struct Character { int2 pos; Image image; };
-    array<Character> characters;
+    struct Character { int2 pos; Image image; uint editIndex; int center;};
+    typedef array<Character> TextLine;
+    array<TextLine> textLines;
+
     // Underlines and strikes
     struct Line { int2 min,max; };
     array<Line> lines;
 
+    // Cursor
+    struct Cursor {
+        uint line=0,column=0;
+        Cursor(){}
+        Cursor(uint line, uint column):line(line),column(column){}
+        bool operator >(const Cursor& o)const{return line>o.line || (line==o.line && column>o.column);}
+    };
+    Cursor cursor;
+    Character& current() { return textLines[cursor.line][cursor.column]; }
+    uint index() {
+        return cursor.column<textLines[cursor.line].size() ? current().editIndex :
+                textLines[cursor.line][cursor.column-1].editIndex+1; // ' ', '\t' or '\n' immediatly after last character
+    }
+
     // Inline links
-    struct Link { uint begin,end; string identifier;};
+    struct Link { Cursor begin,end; string identifier;};
     array<Link> links;
+    bool activateLink(Cursor cursor);
 };
 
 /// TextInput is an editable \a Text
-//TODO: multiline
 struct TextInput : Text {
-    uint cursor=0;
     /// User edited this text
     signal<const ref<byte>&> textChanged;
     /// User pressed enter

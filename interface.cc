@@ -91,12 +91,12 @@ void HighlightSelection::render(int2 position, int2 size) {
 // TabSelection
 void TabSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
-    if(index>=count()) fill(position+Rect(size), darken); //no active tab
+    if(index>=count()) fill(position+Rect(size), darkGray); //no active tab
     else {
         Rect active = widgets[index];
-        if(index>0) fill(Rect(position, int2(active.min.x, position.y+size.y)), darken); //darken inactive tabs before current
-        //fill(active, lightGray); //light active tab
-        if(index<count()-1) fill(Rect(int2(active.max.x,position.y), position+size), darken); //darken inactive tabs after current
+        if(index>0) fill(Rect(position, int2(active.min.x, position.y+size.y)), darkGray); //darken inactive tabs before current
+        fill(active, lightGray); //light active tab
+        if(index<count()-1) fill(Rect(int2(active.max.x,position.y), position+size), darkGray); //darken inactive tabs after current
     }
     for(uint i: range(count()))  at(i).render(widgets[i]);
 }

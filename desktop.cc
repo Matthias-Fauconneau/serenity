@@ -96,15 +96,17 @@ struct Desktop {
         clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&Desktop::showPage);
-        browser.localShortcut(Escape).connect(&browser, &Window::hide);
+        browser.localShortcut(Escape).connect(&browser, &Window::destroy);
         browser.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);
     }
     void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
         if(!link) { exit(); return; } // Exits application to free any memory leaks (will be restarted by .xinitrc)
         page.delta=0;
         page.contentChanged.connect(&browser, &Window::render);
+        if(!browser.created) browser.create(); //might have been closed by user
         browser.setTitle(title);
         browser.setIcon(favicon);
+        browser.setType("_NET_WM_WINDOW_TYPE_NORMAL"_);
         page.go(link);
         browser.widget=&page.area(); browser.show();
     }

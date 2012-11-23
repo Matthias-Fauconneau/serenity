@@ -27,7 +27,6 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         string authority = getenv("HOME"_)+"/.Xauthority"_;
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
         else send(raw(r)); }
-    uint visual=0;
     {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
         read(align(4,r.vendorLength));
         read<XFormat>(r.numFormats);
@@ -73,17 +72,28 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     if(anchor==Bottom) position.y=display.y-size.y;
     this->size=size;
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
+    create();
+    setTitle(title);
+    setIcon(icon);
+    setType(type);
+    if(widget) show(); //asynchronous window are shown by default to avoid race conditions
+    registerPoll();
+}
+void Window::create() {
+    assert(!created);
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|ButtonPressMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
-    setTitle(title);
-    setIcon(icon);
-    setType(type);
-    if(widget) show(); //asynchronous window are shown by default to avoid race conditions
-    registerPoll();
+    created = true;
+}
+void Window::destroy() {
+    assert(created);
+    {FreeGC r; r.context=id+GContext; send(raw(r));}
+    {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
+    created = false;
 }
 
 // Render
@@ -243,7 +253,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             else widget->keyPress(Escape);
         }
         else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) queue(); state=Idle; }
-        else if(type==MappingNotify) {}
+        else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
 }
@@ -283,11 +293,8 @@ void Window::setGeometry(int2 position, int2 size) {
     else if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
     else if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
 }
-void Window::show() {
-    {MapWindow r; r.id=id; send(raw(r));}
-    {RaiseWindow r; r.id=id; send(raw(r));}
-}
-void Window::hide() { if(!mapped) return; {UnmapWindow r; r.id=id; send(raw(r));}}
+void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
+void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 void Window::render() { if(mapped) queue(); }
 
 // Keyboard

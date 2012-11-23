@@ -41,7 +41,7 @@ void HTML::load(const URL& url, Map&& document) {
         if(find(e["class"_],"comment"_)||find(e["class"_],"menu"_)) return true;
         if(find(e["id"_],"comment"_)||find(e["id"_],"menu"_)) return true;
         if(e["class"_]=="content"_||e["id"_]=="content"_) score += 600;
-        else if(e["class"_]=="comic"_||e["id"_]=="comic"_) score += 16200;
+        else if(e["class"_]=="comic"_||e["id"_]=="comic"_) score += 16400;
         else if(startsWith(e["style"_],"background-image:url("_)) score += 4000;
         if(e.name=="img"_ && e["src"_]) {
             URL src = url.relative(e["src"_]);
@@ -50,7 +50,7 @@ void HTML::load(const URL& url, Map&& document) {
                      find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(e["width"_])&&isInteger(e["height"_])) size = toInteger(e["width"_])*toInteger(e["height"_]);
-                score += size?: find(e["alt"_],"Comic"_)||find(e["alt"_],"Page"_)||find(e["alt"_],"Chapter"_)? 16800: 0;
+                score += size?: find(e["alt"_],"Comic"_) ? 16200 : find(e["alt"_],"Page"_)||find(e["alt"_],"Chapter"_)? 16800: 0;
             }
         } else if(!e.children) return false;
         e.mayVisit([&score](const Element& e)->bool{
@@ -61,7 +61,7 @@ void HTML::load(const URL& url, Map&& document) {
                 else if(!e.name.contains(':')) warn("Unknown HTML tag",e.name);
                 return false;
         });
-        if(score>=max) best=&e, second=max, max=score;
+        if(score>max) best=&e, second=max, max=score;
         else if(score>second) second=score;
         return true;
     });

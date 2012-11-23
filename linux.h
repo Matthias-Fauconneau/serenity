@@ -197,8 +197,9 @@ inline int connect(int fd, struct sockaddr* addr, int len) { long a[]={fd,(long)
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <sys/socket.h>
 #include <sys/shm.h>
+#include <sys/socket.h>
+#include <sys/inotify.h>
 #endif
 
 /// Linux error code names

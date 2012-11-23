@@ -523,9 +523,7 @@ struct FileWatcher : Poll {
 
 /// Generates and renders L-Systems
 struct Editor : Widget {
-    Window window __(this,int2(0,1024),"L-System Editor"_);
     Folder folder = Folder(""_,cwd()); //L-Systems definitions are loaded from current working directory
-    Bar<Text> systems; // Tab bar to select which L-System to view
     LSystem system; // Currently loaded L-System
     uint level=0; // Current L-System generation maximum level
     bool enableShadow=true; // Whether shadows are rendered
@@ -535,6 +533,11 @@ struct Editor : Widget {
     profile( uint64 miscStart=rdtsc(); ) // profile cycles spent outside render
     RenderTarget target; // Render target (RenderPass renders on these tiles)
     FileWatcher watcher;
+
+    Bar<Text> systems; // Tab bar to select which L-System to view
+    VBox layout;
+    TextInput editor;
+    Window window __(&layout,int2(0,0),"L-System Editor"_);
 
     // Scene
      vec3 sceneMin=0, sceneMax=0; // Scene bounding box
@@ -549,8 +552,10 @@ struct Editor : Widget {
     void openSystem(uint index) {
         level=0;
         ref<byte> name = systems[index].text;
-        system = LSystem(string(name), readFile(string(name+".l"_),folder));
         watcher.setPath(string(name+".l"_));
+        string source = readFile(string(name+".l"_),folder);
+        system = LSystem(string(name), source);
+        editor.setText(move(source));
         generate();
     }
     /// Generates the currently active L-System
@@ -637,6 +642,7 @@ struct Editor : Widget {
 
     /// Setups the application UI and shortcuts
     Editor() {
+        layout << &systems << this << &editor;
         window.localShortcut(Escape).connect(&::exit);
         window.fillBackground=0; //Disables background filling in Window::event
 
@@ -654,10 +660,11 @@ struct Editor : Widget {
         watcher.fileModified.connect([this]{openSystem(systems.index);});
     }
 
+    // Expanding
+    int2 sizeHint() override { return -1; }
+
     /// Orbital view control
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override {
-        if(systems.mouseEvent(cursor,int2(size.x,16),event,button)) return true; //Forward events to tabbar (custom layout)
-
         int2 delta = cursor-lastPos; lastPos=cursor;
         if(event==Motion && button==LeftButton) {
             rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
@@ -672,9 +679,8 @@ struct Editor : Widget {
         if(targetSize != target.size) {
             target.resize(targetSize);
         } else {
-            //RenderTarget::resolve regenerates framebuffer background color only as necessary, but UI rendering expects cleared framebuffer
-            fill(targetPosition+Rect(targetSize.x,16),white,false);
-            fill(targetPosition+int2(0,16)+Rect(256,256),white,false);
+            //RenderTarget::resolve regenerates framebuffer background color only when necessary, but overlay expects cleared framebuffer
+            fill(targetPosition+Rect(256,256),white,false);
         }
         target.clear();
 
@@ -826,8 +832,7 @@ struct Editor : Widget {
                     uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime; )
         uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (64-1)*frameTime)/64; this->frameEnd=frameEnd;
 
-        // Displays user interface
-        systems.render(targetPosition,int2(targetSize.x,16));
+        // Overlays profile information
         Text(str(level)+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2 + triangleCount*2)+" faces\n"
                        profile(
                        "misc "_+str(100*miscTime/totalTime)+"%\n"
@@ -845,5 +850,7 @@ struct Editor : Widget {
 #if 0
         window.render(); //keep updating to get maximum performance profile
 #endif
+        // HACK: Clear background for text editor (UI system expects full window clear)
+        fill(Rect(targetPosition+int2(0,targetSize.y),window.size),white,false);
     }
 } application;

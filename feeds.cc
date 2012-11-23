@@ -48,9 +48,9 @@ void Favicon::update() {
     imageChanged();
 }
 
-void Feeds::loadFeed(const URL&, Map&& document) {
+void Feeds::loadFeed(const URL& url, Map&& document) {
     Element feed = parseXML(document);
-    URL channel = URL(feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_])); //RSS ?: Atom
+    URL channel = URL(feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]) ?: (error(url),string()) ); //RSS ?: Atom
     assert(channel.host);
     Favicon* favicon=0;
     for(Favicon* f: favicons) if(f->host==channel.host) { favicon=f; break; }

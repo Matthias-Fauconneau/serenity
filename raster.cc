@@ -17,7 +17,7 @@ void RenderTarget::resolve(int2 position, int2 size) {
             if(tile.lastCleared) { //was already background on last frame (no need to regenerate)
                 for(uint y=0;y<16;y++) for(uint x=0;x<16;x++) {
                     uint tx = x0+tileX*16+x, ty = y0+size.y-1-(tileY*16+y);
-                    ::framebuffer(tx,ty) = backgroundColor;
+                    if(ty>=y0) ::framebuffer(tx,ty) = backgroundColor;
                 }
             }
             continue;
@@ -39,7 +39,7 @@ void RenderTarget::resolve(int2 position, int2 size) {
                     red =  sum16(tile.subred[pixelPtr]) * 255.f/(4*4);
                 }
                 uint x = x0+(tileX*4+blockX)*4+pixelX, y = y0+size.y-1-((tileY*4+blockY)*4+pixelY);
-                ::framebuffer(x,y)=byte4(sRGB[uint(blue)%256],sRGB[uint(green)%256],sRGB[uint(red)%256],255);
+                 if(y>=y0) ::framebuffer(x,y)=byte4(sRGB[uint(blue)%256],sRGB[uint(green)%256],sRGB[uint(red)%256],255);
             }
         }
     }

@@ -127,7 +127,7 @@ string Element::text(const ref<byte>& path) const {
 }
 
 string Element::str(const ref<byte>& prefix) const {
-    assert(name||content||children);
+    assert(name||content||children||attributes);
     string line; line<< prefix;
     if(name||attributes) line << "<"_+name;
     for(auto attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;

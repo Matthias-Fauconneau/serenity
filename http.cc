@@ -8,17 +8,22 @@
 #include "process.h"
 #include "string.h"
 
-struct sockaddr { uint16 family; uint16 port; uint host; int pad[2]; };
+#if NOLIBC
+enum {F_SETFL=4};
+#endif
+struct sockaddress { uint16 family; uint16 port; uint host; int pad[2]; };
 
 // UDPSocket
 struct UDPSocket : Socket {
-    UDPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_DGRAM) { sockaddr addr = {PF_INET, big16(port), host}; check_(::connect(fd, &addr, sizeof(addr))); }
+    UDPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_DGRAM) {
+        sockaddress addr = {PF_INET, big16(port), host}; check_(::connect(fd, (const sockaddr*)&addr, sizeof(addr)));
+    }
 };
 // TCPSocket
 TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|O_NONBLOCK) {
     assert(host!=uint(-1));
-    sockaddr addr = {PF_INET,big16(port),host}; connect(Socket::fd, &addr, sizeof(addr));
-    enum {F_SETFL=4}; fcntl(Socket::fd,F_SETFL,0);
+    sockaddress addr = {PF_INET,big16(port),host}; connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
+    fcntl(Socket::fd,F_SETFL,0);
 }
 // SSLSocket
 extern "C" {
