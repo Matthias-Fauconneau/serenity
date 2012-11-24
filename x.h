@@ -7,7 +7,7 @@ enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
 
 #define fixed(T) _packed ; static_assert(sizeof(T)==31,"")
 
-enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, Cursor=1<<14 };
+enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, CursorMask=1<<14 };
 enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3, EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15, StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, FocusChangeMask=1<<21, PropertyChangeMask=1<<22 };
 enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify };
 enum ModifierMask { ShiftMask=1<<0, LockMask=1<<1, ControlMask=1<<2, Mod1Mask=1<<3, Mod2Mask=1<<4, Mod3Mask=1<<5, Mod4Mask=1<<6, Mod5Mask=1<<7, Button1Mask=1<<8, Button2Mask=1<<9, Button3Mask=1<<10, Button4Mask=1<<11, Button5Mask=1<<12, AnyModifier=1<<15 };
@@ -44,7 +44,7 @@ struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; 
                       uint mask=BackgroundPixmap|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
                                         uint backgroundPixmap=0,borderPixel=0, bitGravity=10, winGravity=10, overrideRedirect, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
-struct SetWindowCursor { int8 req=2, pad=0; uint16 size=4; uint window, mask=Cursor; uint cursor; };
+struct SetWindowCursor { int8 req=2, pad=0; uint16 size=4; uint window, mask=CursorMask; uint cursor; };
 struct GetWindowAttributes { int8 req=3; uint16 size=2; uint window; };
 struct GetWindowAttributesReply { int8 backingStore; uint16 seq; uint length, visual; int16 class_; int8 bit,win; uint planes, pixel; int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; uint colormap, allEventMask, yourEventMask; int16 nopropagate, pad; } _packed;
 struct DestroyWindow { int8 req=4; uint16 size=2; uint id; };

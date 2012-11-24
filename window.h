@@ -74,14 +74,14 @@ struct Window : Socket, Poll {
     /// \note The selection owner might lock this process if it fails to notify
     string getSelection();
 
-    /// Cursor icons
-    enum Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Cross };
     /// Returns cursor icon for \a cursor
     const Image& cursorIcon(Cursor cursor);
     /// Returns cursor hotspot for \a cursor
-    int2 cursorHotspot(Window::Cursor cursor);
+    int2 cursorHotspot(Cursor cursor);
     /// Sets window cursor
     void setCursor(Cursor cursor, uint window=0);
+    /// Sets window cursor if cursor is inside region
+    void setCursor(Rect region, Cursor cursor);
 
     /// Returns a snapshot of the root window
     Image getSnapshot();
@@ -140,7 +140,9 @@ private:
     template<class T> T readReply();
 
     /// Current cursor
-    Cursor cursor = Cross;
+    Cursor cursor = Cursor::Arrow;
+    /// Current cursor position
+    int2 cursorPosition;
     /// Drag state
     int2 dragStart, dragPosition, dragSize;
 };

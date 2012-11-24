@@ -27,3 +27,17 @@ string utf8(uint c) {
     else assert(0);
     return utf8;
 }
+
+array<uint> toUTF32(ref<byte> utf8) {
+    array<uint> utf32(utf8.size);
+    for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) {
+        utf32 << *it;
+    }
+    return utf32;
+}
+
+string toUTF8(ref<uint> utf32) {
+    string utf8(utf32.size);
+    for(uint c: utf32) utf8 << ::utf8(c);
+    return utf8;
+}

@@ -11,5 +11,11 @@ struct utf8_iterator {
     const utf8_iterator& operator++();
 };
 
-/// Convert Unicode code point to UTF-8
+/// Converts Unicode code point to UTF-8
 string utf8(uint code);
+
+/// Converts UTF8 string to UTF32
+array<uint> toUTF32(ref<byte> utf8);
+
+/// Converts UTF32 string to UTF8
+string toUTF8(ref<uint> utf32);

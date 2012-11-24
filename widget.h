@@ -44,5 +44,11 @@ struct Widget {
 extern Widget* focus;
 /// Current widget that has the drag focus
 extern Widget* drag;
+
 /// Returns last text selection (middle-click paste)
 string getSelection();
+
+/// Cursor icons
+enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
+/// Sets cursor to be shown when mouse is in the given rectangle
+void setCursor(Rect region, Cursor cursor);

@@ -1,5 +1,5 @@
 CG:
- integrated text editor, split lsystem.cc
+ syntax highlighting, split lsystem.cc
  Plants: Mycelys muralis, Lychnis coronaria, Mint, Crocus, Lily-of-the-valley, Apple twig, Lilac, Wild carrot, Zinnias, Water lily, Roses, Tree leafs
  Better trees using environment modeling (light and space competition)
  Textures

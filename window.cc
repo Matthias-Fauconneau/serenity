@@ -16,6 +16,7 @@ Widget* focus;
 Widget* drag;
 Window* current;
 string getSelection() { assert(current); return current->getSelection(); }
+void setCursor(Rect region, Cursor cursor) { assert(current); return current->setCursor(region,cursor); }
 
 // Creates X window
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread)
@@ -190,6 +191,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     else if(type==1) error("Unexpected reply");
     else { const XEvent& e=event; type&=0b01111111; //msb set if sent by SendEvent
         /**/ if(type==MotionNotify) {
+            cursorPosition = int2(e.x,e.y);
+            Cursor lastCursor = cursor; cursor=Cursor::Arrow;
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) queue();
             else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) queue();
             else if(anchor==Float) {
@@ -210,13 +213,13 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                     position=clip(int2(0,16),position,display), size=clip(int2(16,16),size,display-int2(0,16));
                     setGeometry(position,size);
                 } else {
-                    if((top && left)||(bottom && right)) setCursor(FDiagonal);
-                    else if((top && right)||(bottom && left)) setCursor(BDiagonal);
-                    else if(top || bottom) setCursor(Vertical);
-                    else if(left || right) setCursor(Horizontal);
-                    else setCursor(Arrow);
+                    if((top && left)||(bottom && right)) cursor=Cursor::FDiagonal;
+                    else if((top && right)||(bottom && left)) cursor=Cursor::BDiagonal;
+                    else if(top || bottom) cursor=Cursor::Vertical;
+                    else if(left || right) cursor=Cursor::Horizontal;
                 }
             }
+            if(cursor!=lastCursor) setCursor(cursor);
         }
         else if(type==ButtonPress) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
@@ -360,15 +363,16 @@ string Window::getSelection() {
 }
 
 // Cursor
-ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move)
-const Image& Window::cursorIcon(Window::Cursor cursor) {
-    static const Image icons[] = { arrowIcon(), horizontalIcon(), verticalIcon(), fdiagonalIcon(), bdiagonalIcon(), moveIcon() }; return icons[cursor];
+ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move) ICON(text)
+const Image& Window::cursorIcon(Cursor cursor) {
+    static const Image icons[] = { arrowIcon(), horizontalIcon(), verticalIcon(), fdiagonalIcon(), bdiagonalIcon(), moveIcon(), textIcon() };
+    return icons[(uint)cursor];
 }
-int2 Window::cursorHotspot(Window::Cursor cursor) {
-    static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15) }; return hotspots[cursor];
+int2 Window::cursorHotspot(Cursor cursor) {
+    static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15), int2(4,9) };
+    return hotspots[(uint)cursor];
 }
 void Window::setCursor(Cursor cursor, uint window) {
-    if(cursor==this->cursor) return; this->cursor=cursor;
     const Image& image = cursorIcon(cursor); int2 hotspot = cursorHotspot(cursor);
     Image premultiplied(image.width,image.height);
     for(uint y: range(image.height)) for(uint x: range(image.width)) {
@@ -384,6 +388,7 @@ void Window::setCursor(Cursor cursor, uint window) {
     {FreePicture r; r.picture=id+Picture; send(raw(r));}
     {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}
 }
+void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
 
 // Snapshot
 Image Window::getSnapshot() {

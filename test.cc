@@ -1,12 +1,14 @@
 #if 1
-#include "core.h"
-#include "process.h"
-#include "string.h"
+#include "window.h"
+#include "text.h"
+struct TextInputTest {
+    TextInput input __(readFile("ternary.l"_,cwd()));
+    Window window __(&input,int2(525,525),"TextInput"_);
 
-struct Main {
-    Main() { uint reg=0; reg=__builtin_ctz(0); log(reg); }
+    TextInputTest() {
+        window.localShortcut(Escape).connect(&exit);
+    }
 } test;
-
 #endif
 
 #if 0

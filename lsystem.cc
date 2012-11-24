@@ -551,10 +551,11 @@ struct Editor : Widget {
     /// Triggered by tab bar to load L-Systems
     void openSystem(uint index) {
         level=0;
-        ref<byte> name = systems[index].text;
-        watcher.setPath(string(name+".l"_));
-        string source = readFile(string(name+".l"_),folder);
-        system = LSystem(string(name), source);
+        string name = toUTF8(systems[index].text);
+        string path = name+".l"_;
+        watcher.setPath(path);
+        string source = readFile(path, folder);
+        system = LSystem(move(name), source);
         editor.setText(move(source));
         generate();
     }
@@ -648,7 +649,7 @@ struct Editor : Widget {
 
         // Scans current folder for L-System definitions (.l files)
         array<string> files = folder.list(Files);
-        for(string& file : files) if(endsWith(file,".l"_)) systems << string(section(file,'.',0,-2));
+        for(string& file : files) if(endsWith(file,".l"_)) systems << section(file,'.',0,-2);
         systems.activeChanged.connect(this,&Editor::openSystem);
         // Loads L-System
         systems.setActive(8);
@@ -658,6 +659,7 @@ struct Editor : Widget {
         window.localShortcut(Key(Return)).connect([this]{writeFile("snapshot.png"_,encodePNG(window.getSnapshot()),home());});
         window.localShortcut(Key(' ')).connect([this]{enableShadow=!enableShadow; window.render();});
         watcher.fileModified.connect([this]{openSystem(systems.index);});
+        editor.textChanged.connect([this](const ref<byte>& text){writeFile(string(system.name+".l"_),text,cwd());});
     }
 
     // Expanding
@@ -833,19 +835,20 @@ struct Editor : Widget {
         uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (64-1)*frameTime)/64; this->frameEnd=frameEnd;
 
         // Overlays profile information
-        Text(str(level)+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2 + triangleCount*2)+" faces\n"
-                       profile(
-                       "misc "_+str(100*miscTime/totalTime)+"%\n"
-                       "setup "_+str(100*setupTime/totalTime)+"%\n"
-                       "render "_+str(100*renderTime/totalTime)+"%\n"
-                       "- raster "_+str(100*pass.rasterTime/totalTime)+"%\n"
-                       "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"
-                       "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"
-                       "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"
-                       "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"
-                       "- user "_+str(100*pass.userTime/totalTime)+"%\n"
-                       "resolve "_+str(100*resolveTime/totalTime)+"%\n"
-                           "ui "_+str(100*uiTime/totalTime)+"%\n") ""_).render(int2(targetPosition+int2(16)));
+        string text = str(level)+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2 + triangleCount*2)+" faces\n"
+                               profile(
+                               "misc "_+str(100*miscTime/totalTime)+"%\n"
+                               "setup "_+str(100*setupTime/totalTime)+"%\n"
+                               "render "_+str(100*renderTime/totalTime)+"%\n"
+                               "- raster "_+str(100*pass.rasterTime/totalTime)+"%\n"
+                               "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"
+                               "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"
+                               "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"
+                               "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"
+                               "- user "_+str(100*pass.userTime/totalTime)+"%\n"
+                               "resolve "_+str(100*resolveTime/totalTime)+"%\n"
+                                   "ui "_+str(100*uiTime/totalTime)+"%\n") ""_;
+        Text(text).render(int2(targetPosition+int2(16)));
         profile( miscStart = rdtsc(); uiTime = ( (miscStart-uiStart) + (T-1)*uiTime)/T; )
 #if 0
         window.render(); //keep updating to get maximum performance profile

@@ -19,7 +19,7 @@ FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
 
-ICONS = arrow horizontal vertical fdiagonal bdiagonal move $(ICONS_$(TARGET))
+ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar := button
 ICONS_desktop := feeds network shutdown
 ICONS_player := play pause next

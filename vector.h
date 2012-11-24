@@ -111,7 +111,7 @@ typedef vector<xyzw,float,4> vec4;
 struct Rect {
     int2 min,max;
     explicit Rect(int2 max):min(0,0),max(max){}
-    Rect(float x, float y):min(0,0),max(x,y){}
+    Rect(int x, int y):min(0,0),max(x,y){}
     Rect(int2 min, int2 max):min(min),max(max){}
     bool contains(int2 p) { return p>=min && p<max; }
     bool contains(Rect r) { return r.min>=min && r.max<=max; }
