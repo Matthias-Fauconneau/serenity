@@ -26,6 +26,7 @@ struct TextLayout {
     uint lineNumber=0,column=0;
     Text::Cursor current() { return Text::Cursor __(lineNumber, column); }
 
+    uint lastIndex=-1;
     void nextLine(bool justify) {
         //if(!line) { pen.y+=size; return; }
         //justify
@@ -37,14 +38,16 @@ struct TextLayout {
 
         //layout
         column=0; pen.x=0;
-        lineNumber++; text << TextLine(); uint lastIndex=-1;
+        lineNumber++; text << TextLine();
         for(uint i: range(line.size())) { Word& word=line[i];
             //assert(word);
             for(Character& c: word) text.last() << Character __(c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex);
             if(word) pen.x += word.last().pos.x+word.last().advance;
-            if(i!=line.size()-1) text.last() << Character __(0,pen+vec2(0,-this->size),0,0,spaceAdvance,lastIndex+1); //editable justified space
+            if(i!=line.size()-1) //editable justified space
+                text.last() << Character __(0,pen+vec2(0,-this->size),0,0,spaceAdvance,lastIndex=lastIndex+1);
             pen.x += space;
         }
+        lastIndex++;
         line.clear();
         pen.x=0; pen.y+=size;
     }
@@ -211,9 +214,10 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
     if(event!=Press) return false;
     focus=this;
     if(button==MiddleButton) {
-        string selection=getSelection();
-        //text.insert(cursor,move(selection)); cursor+=selection.size(); TODO
-        text<<toUTF32(getSelection()); layout(); cursor=Cursor(textLines.size(),textLines.last().size());
+        array<uint> selection = toUTF32(getSelection());
+        editIndex=index()+selection.size(); array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
+        textSize=0;
+        if(textChanged) textChanged(toUTF8(text));
         return true;
     }
     if(cursor.line!=last.line || cursor.column!=last.column) {
@@ -246,7 +250,7 @@ bool TextInput::keyPress(Key key unused) {
         else if(key==End) cursor.column=textLine.size();
         else if(key==Delete) {
             if(cursor.column<textLine.size() || cursor.line<textLines.size()-1) {
-                editIndex=index(); text.removeAt(index()); textSize=0; if(textChanged) textChanged(toUTF8(text));
+                text.removeAt(editIndex=index()); textSize=0; if(textChanged) textChanged(toUTF8(text));
             }
         }
         else if(key==BackSpace) { //LeftArrow+Delete
@@ -254,7 +258,7 @@ bool TextInput::keyPress(Key key unused) {
             else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size();
             else return false;
             if(index()<text.size()) {
-                editIndex=index();  text.removeAt(index()); textSize=0; if(textChanged) textChanged(toUTF8(text));
+                text.removeAt(editIndex=index()); textSize=0; if(textChanged) textChanged(toUTF8(text));
             }
         }
         else if(key==Return) {
@@ -264,10 +268,10 @@ bool TextInput::keyPress(Key key unused) {
             }
         }
         else {
-            //prevent repeated whitespace
+            /*//prevent repeated whitespace
             if(" \t"_.contains(key)  &&
                     ((cursor.column<textLines[cursor.line].size() && " \t"_.contains(text[index()]))
-                     || (index()>0 && " \t"_.contains(text[index()-1]))) ) return false;
+                     || (index()>0 && " \t"_.contains(text[index()-1]))) ) return false;*/
             char c=0;
             if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
             else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';

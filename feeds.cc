@@ -89,7 +89,7 @@ void Feeds::setRead(uint index) {
 
 void Feeds::readEntry(uint index) {
     if(index==0) {load(); return; } //:refresh
-    pageChanged( array::at(index).link, array::at(index).text.text, array::at(index).icon.image );
+    pageChanged( array::at(index).link, toUTF8(array::at(index).text.text), array::at(index).icon.image );
     if(index+1<count()-1) getURL(URL(array::at(index+1).link)); //preload next entry (TODO: preload image)
 }
 

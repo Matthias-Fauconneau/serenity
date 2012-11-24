@@ -250,6 +250,7 @@ template<class Shader> struct RenderPass {
 #else
 #define profile(s)
 #endif
+    string errors;
 
     RenderPass(RenderTarget& target, uint faceCapacity, const Shader& shader):target(target),faceCapacity(faceCapacity),shader(shader){
         faces = allocate64<Face>(faceCapacity);
@@ -263,6 +264,7 @@ template<class Shader> struct RenderPass {
     /// Submits triangles for binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..4×Width],[0..4×Height]
     void submit(vec4 A, vec4 B, vec4 C, vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
+        if(errors) return;
         if(faceCount>=faceCapacity) error("Face overflow");
         Face& face = faces[faceCount];
         assert(abs(A.w-1)<0.01); assert(abs(B.w-1)<0.01); assert(abs(C.w-1)<0.01);
@@ -321,7 +323,7 @@ template<class Shader> struct RenderPass {
                     face.binReject[2] + dot(face.edges[2], binXY) <= 0) continue;
 
             Bin& bin = bins[binY*target.width+binX];
-            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) error("Index overflow");
+            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { log("Index overflow"); errors<<"Index overflow"_; return; }
             bin.faces[bin.faceCount++]=faceCount;
         }
         faceCount++;
@@ -331,6 +333,7 @@ template<class Shader> struct RenderPass {
     uint nextBin=0;
     // For each bin, rasterizes and shade all triangles
     void render() {
+        if(errors) return;
         nextBin=0;
         const int N=8;
         pthread threads[N-1];

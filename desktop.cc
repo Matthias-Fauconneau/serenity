@@ -12,7 +12,7 @@ struct Search : TextInput {
 
 bool Search::keyPress(Key key) {
     if(key == Return) {
-        array<string> args; args<<string("google.com/search?q="_+text); execute("/usr/bin/chromium-browser"_,args,false);
+        array<string> args; args<<string("google.com/search?q="_+toUTF8(text)); execute("/usr/bin/chromium-browser"_,args,false);
         setText(string()); triggered(); return true;
     }
     else return TextInput::keyPress(key);

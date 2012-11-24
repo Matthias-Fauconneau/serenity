@@ -23,7 +23,7 @@ template<class K, class V> struct map {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : V(forward<Args>(args)___);
     }*/
-    const V& value(const K& key, const V& value=V()) {
+    V value(const K& key, const V& value=V()) {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : value;
     }

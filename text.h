@@ -15,8 +15,10 @@ inline Format format(uint f) { assert(f<32); return Format(f); }
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(const ref<byte>& text=""_, int size=16, uint8 opacity=255, uint wrap=0);
+    // Resolves cat overloading
+    Text(const string& text, int size=16, uint8 opacity=255, uint wrap=0):Text((ref<byte>)text,size,opacity,wrap){}
 
-    void setText(ref<byte> text) { this->text=toUTF32(text); textSize=0; }
+    void setText(ref<byte> text) { this->text=toUTF32(text); textSize=0; editIndex=min(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
 
     /// Displayed text in UTF32

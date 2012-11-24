@@ -262,6 +262,10 @@ struct ConeShader : ShadowShader {
 
 // L-System
 
+static uint currentLine=0;
+static string userErrors;
+template<class... Args> void userError(const Args&... args) { userErrors << str(str(currentLine)+":"_,args ___); }
+
 /// word is an index in a string table allowing fast move/copy/compare
 static array<string> pool;
 struct word {
@@ -298,7 +302,7 @@ struct Immediate : Expression {
 struct Parameter : Expression {
     uint index;
     Parameter(uint index):index(index){}
-    float evaluate(ref<float> a) const override { if(index>=a.size) error("Missing argument"); return a[index]; }
+    float evaluate(ref<float> a) const override { if(index>=a.size) { userError("Missing argument"); return 0; } return a[index]; }
     string str() const override { return "$"_+dec(index); }
 };
 struct Operator : Expression {
@@ -306,10 +310,10 @@ struct Operator : Expression {
     unique<Expression> left,right;
     Operator(byte op, unique<Expression>&& left, unique<Expression>&& right):op(op),left(move(left)),right(move(right)){}
     float evaluate(ref<float> a) const override {
-        if(!right) error("Missing right operand");
+        if(!right) { userError("Missing right operand"); return 0; }
         float r=right->evaluate(a);
         if(op=='-' && !left) return -r;
-        if(!left) error("Missing left operand");
+        if(!left) { userError("Missing left operand"); return 0; }
         float l=left->evaluate(a);
         /**/  if(op=='=') return l==r;
         else if(op=='+') return l+r;
@@ -355,7 +359,7 @@ struct LSystem {
     map<string,float> constants;
     //ref<byte> ignore;
 
-    unique<Expression> parse(const array<ref<byte> >& parameters, unique<Expression>&& e, TextData& s) const {
+    unique<Expression> parse(const array<ref<byte> >& parameters, unique<Expression>&& e, TextData& s) {
         s.skip();
         char c = s.peek();
         if(c>='0'&&c<='9') {
@@ -364,17 +368,18 @@ struct LSystem {
             s.next();
             return unique<Operator>(c, move(e), parse(parameters,move(e),s));
         } else {
-            ref<byte> identifier = s.whileNo("=+-><*/^(),:"_);
+            ref<byte> identifier = s.whileNo(" →=+-><*/^(),:"_);
             int i = parameters.indexOf(identifier);
             if(i>=0) return unique<Parameter>(i);
             else if(constants.contains(string(identifier))) return unique<Immediate>(constants.at(string(identifier)));
-            else error(name,"Unknown symbol",c,s.untilEnd(),constants);
+            else { userError(name,"Unknown identifier",identifier,constants); return move(e); }
         }
     }
 
     LSystem(){}
     LSystem(string&& name, const ref<byte>& source):name(move(name)){
-        for(ref<byte> line: split(source,'\n')) {
+        userErrors.clear(); currentLine=0;
+        for(ref<byte> line: split(source,'\n')) { currentLine++;
             TextData s(line);
             s.skip();
             if(s.match('#')) continue;
@@ -386,16 +391,26 @@ struct LSystem {
                 unique<Expression> e;
                 while(s) {
                     e = parse(array<ref<byte> >(),move(e),s);
+                    if(userErrors) return;
                     s.skip();
                 }
-                assert(e);
+                if(!e) { userError("Expected expression"); return; }
                 constants.insert(string(name)) = e->evaluate(ref<float>());
             } else if(find(line,"→"_)) {
                 ref<byte> symbol = s.identifier();
-                if(!symbol) error("Expected symbol",s.untilEnd());
+                if(!symbol) { userError("Expected symbol",s.untilEnd()); return; }
                 Rule rule(symbol);
                 array<ref<byte>> parameters;
-                if(s.match('(')) while(!s.match(')')) { parameters << s.identifier(); s.match(','); assert(s); }
+                if(s.match('(')) {
+                    while(!s.match(')')) {
+                        s.skip();
+                        ref<byte> symbol = s.identifier();
+                        if(!symbol) { userError("Expected symbol",s.untilEnd()); return; }
+                        parameters << symbol;
+                        s.skip();
+                        if(!s.match(',') && s.peek()!=')') { userError("Expected , or ) got",s.untilEnd()); return; }
+                    }
+                }
                 s.skip();
                 if(s.match(':')) { // condition
                     s.skip();
@@ -403,19 +418,21 @@ struct LSystem {
                         unique<Expression> e;
                         while(!s.match(',') && s.peek("→"_.size)!="→"_) {
                             e = parse(parameters,move(e),s);
+                            if(userErrors) return;
                             s.skip();
                             assert(s);
                         }
+                        if(!e) { userError("Expected condition"); return; }
                         rule.condition = move(e);
                     }
                 }
                 s.skip();
-                if(!s.match("→"_)) error("Expected → not \""_+s.untilEnd()+"\""_);
+                if(!s.match("→"_)) { userError("Expected → not \""_+s.untilEnd()+"\""_); return; }
                 s.skip();
                 while(s) {
                     s.skip();
                     ref<byte> symbol = s.identifier("$-+&^%.![]\\/|{}"_);
-                    if(!symbol) error("Expected symbol",s.untilEnd());
+                    if(!symbol) { userError("Expected symbol",s.untilEnd()); return; }
                     Production p(symbol);
                     s.skip();
                     if(s.match('(')) while(!s.match(')')) {
@@ -423,6 +440,7 @@ struct LSystem {
                         s.skip();
                         while(!s.match(',') && s.peek()!=')') {
                             e = parse(parameters,move(e),s);
+                            if(userErrors) return;
                             assert(s);
                         }
                         p.arguments << move(e);
@@ -436,12 +454,13 @@ struct LSystem {
                 for(;s;) {
                     s.skip();
                     ref<byte> symbol = s.identifier("$-+&^%.![]\\/|{}"_);
-                    if(!symbol) error("Expected symbol",s.untilEnd());
+                    if(!symbol) { userError("Expected symbol",s.untilEnd()); return; }
                     Module module (symbol);
                     if(s.match('(')) while(!s.match(')')) {
                         unique<Expression> e;
                         while(!s.match(',') && s.peek()!=')') {
                             e = parse(parameters,move(e),s);
+                            if(userErrors) return;
                             s.skip();
                             assert(s);
                         }
@@ -453,8 +472,9 @@ struct LSystem {
         }
     }
 
-    array<Module> generate(int level) const {
+    array<Module> generate(int level) {
         array<Module> code = copy(axiom);
+        if(userErrors) return code;
         for(int unused i: range(level)) {
             array<Module> next;
             for(uint i: range(code.size())) { const Module& c = code[i];
@@ -505,7 +525,7 @@ struct LSystem {
                     if(matches) next << copy(matches[0]);
                     else next << c;
             }
-            debug( if(code==next) error("L-System stalled at level"_,i,code); )
+            if(code==next) { error("L-System stalled at level"_,i,code); return code; }
             code = move(next);
         }
         return code;
@@ -561,6 +581,8 @@ struct Editor : Widget {
     }
     /// Generates the currently active L-System
     void generate() {
+        if(userErrors) return;
+
         cones.clear(); polygons.clear(); triangleCount=0; sceneMin=0, sceneMax=0;
 
         if(!level) level=system.constants.at(string("N"_));
@@ -618,7 +640,7 @@ struct Editor : Widget {
                 polygons << move(polygon);
                 polygon = polygonStack.pop();
             } else if(symbol=="!"_ || symbol=="\""_) { // change current color
-                if(module.arguments.size()!=3) error("Expected !(b,g,r)");
+                if(module.arguments.size()!=3) userError("Expected !(b,g,r)");
                 color = clip(vec3(0.f),vec3(module.arguments[0],module.arguments[1],module.arguments[2]),vec3(1.f));
             } else if(symbol=="$"_) { //set Y horizontal (keeping X), Z=X×Y
                             vec3 X = state[0].xyz();
@@ -631,7 +653,7 @@ struct Editor : Widget {
                             state[1] = vec4(Y,0.f);
                             state[2] = vec4(Z,0.f);
             } else if(symbol=="\\"_||symbol=="/"_||symbol=="&"_||symbol=="^"_||symbol=="-"_ ||symbol=="+"_) {
-                float a = module.arguments ? module.arguments[0]*PI/180 : system.constants.at(string("angle"_))*PI/180;
+                float a = module.arguments ? module.arguments[0]*PI/180 : system.constants.value(string("angle"_),90)*PI/180;
                 if(symbol=="\\"_||symbol=="/"_) state.rotateX(symbol=="\\"_?a:-a);
                 else if(symbol=="&"_||symbol=="^"_) state.rotateY(symbol=="&"_?a:-a);
                 else if(symbol=="-"_ ||symbol=="+"_) state.rotateZ(symbol=="+"_?a:-a);
@@ -671,7 +693,9 @@ struct Editor : Widget {
         if(event==Motion && button==LeftButton) {
             rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
             rotation.y= clip(float(-PI/2),rotation.y,float(PI/2)); // Keep pitch between [-PI/2,PI/2]
-        } else return false;
+        }
+        else if(event == Press) focus = this;
+        else return false;
         return true;
     }
 
@@ -682,7 +706,7 @@ struct Editor : Widget {
             target.resize(targetSize);
         } else {
             //RenderTarget::resolve regenerates framebuffer background color only when necessary, but overlay expects cleared framebuffer
-            fill(targetPosition+Rect(256,256),white,false);
+            fill(targetPosition+Rect(targetSize.x,256),white,false);
         }
         target.clear();
 
@@ -848,6 +872,7 @@ struct Editor : Widget {
                                "- user "_+str(100*pass.userTime/totalTime)+"%\n"
                                "resolve "_+str(100*resolveTime/totalTime)+"%\n"
                                    "ui "_+str(100*uiTime/totalTime)+"%\n") ""_;
+        if(userErrors) text=copy(userErrors);
         Text(text).render(int2(targetPosition+int2(16)));
         profile( miscStart = rdtsc(); uiTime = ( (miscStart-uiStart) + (T-1)*uiTime)/T; )
 #if 0
