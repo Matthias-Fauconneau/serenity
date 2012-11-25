@@ -1,9 +1,15 @@
 CG:
- copy-paste, XCompose, syntax highlighting, split lsystem.cc
+ correct shadow setup: max depth scale
+ tesselate cylinders
+ precompute all attributes (light pos), only 16x vectorized view matrix multiply.
+ Renderer: step grids for vertex attribute interpolations ? coverage sampling ? Hi-Z pixel reject ? float16 colors ?
+ copy-paste
+ hardware rendering
+ export .obj
+ Textures (bark,leafs,twigs),
+ XCompose, syntax highlighting
  Plants: Mycelys muralis, Lychnis coronaria, Mint, Crocus, Lily-of-the-valley, Apple twig, Lilac, Wild carrot, Zinnias, Water lily, Roses, Tree leafs
  Better trees using environment modeling (light and space competition)
- Textures
- Renderer: step grids for vertex attribute interpolations, coverage sampling ? Hi-Z pixel reject ? float16 colors ?, merge passes
  Scene (sky, grass, plants, forest, terrain...)
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

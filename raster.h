@@ -14,6 +14,13 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #include "process.h"
 #include "time.h"
 
+// Non-fatal errors shown in UI
+extern string uiErrors;
+template<class... Args> void uiError(const ref<byte>& name, const Args&... args) {
+    if(!uiErrors) //avoid overflow
+        uiErrors<<name<<": "_<<str(args ___);
+}
+
 // AVX intrinsics
 #define __AVX__ 1
 #include "immintrin.h"
@@ -152,6 +159,13 @@ inline void maskstore(vec16& P, vec16 M, vec16 A) {
 
 inline string str(const vec16 v) { return "vec16("_+str(ref<float>((float*)&v,16))+")"_; }
 
+#define PROFILE
+#ifdef PROFILE
+#define profile(s) s
+#else
+#define profile(s)
+#endif
+
 /// 64×64 pixels tile for L1 cache locality (64×64×RGBZ×float~64KB)
 struct Tile { //64KB framebuffer (L1)
     vec16 depth[4*4],blue[4*4],green[4*4],red[4*4];
@@ -166,6 +180,7 @@ struct RenderTarget {
     uint width = 0, height = 0; //in tiles
     Tile* tiles = 0;
     float depth, blue, green, red;
+    uint nextBin=0;
 
     // Allocates all bins and flags them to be cleared before first render
     void resize(int2 size) {
@@ -218,10 +233,29 @@ static constexpr vec2 XY[4][4*4] = {
     }
 };
 
-template<class Shader> struct RenderPass {
+// Used by Scheduler
+struct RenderPassBase {
+    uint width, height;
+
+    struct Bin {
+        uint16 faceCount=0;
+        uint16 faces[127];
+    };
+    Bin* bins=0;
+
+    uint faceCount=0;
+
+    profile(int64 rasterTime=0; int64 pixelTime=0; int64 sampleTime=0; int64 sampleFirstTime=0; int64 sampleOverTime=0; int64 userTime=0;)
+    uint64 totalTime=0;
+
+    virtual void render(Tile& tile, const Bin& bin, const vec2 binXY)=0;
+};
+
+template<class Shader> struct RenderPass : RenderPassBase {
     typedef typename Shader::FaceAttributes FaceAttributes;
     static constexpr int V = Shader::V;
     static constexpr bool blend = Shader::blend;
+
     // Rasterization "registers", varying (perspective-interpolated) vertex attributes and constant face attributes
     struct Face { //~1K (streamed)
         vec16 blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3];
@@ -232,42 +266,34 @@ template<class Shader> struct RenderPass {
         FaceAttributes faceAttributes; //custom constant face attributes
     };
 
-    RenderTarget& target;
     uint faceCapacity;
+    Face* faces=0;
     const Shader& shader;
-    Face* faces;
-    uint faceCount=0;
+    string name;
 
-    struct Bin {
-        uint16 faceCount=0;
-        uint16 faces[32*32-1];
-    };
-    Bin* bins;
-
-#ifdef PROFILE
-#define profile(s) s
-    int64 rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;
-#else
-#define profile(s)
-#endif
-    string errors;
-
-    RenderPass(RenderTarget& target, uint faceCapacity, const Shader& shader):target(target),faceCapacity(faceCapacity),shader(shader){
-        faces = allocate64<Face>(faceCapacity);
-        bins = allocate64<Bin>(target.width*target.height);
-        for(uint bin: range(target.width*target.height)) { bins[bin].faceCount=0; }
+    RenderPass(const Shader& shader, const ref<byte>& name=""_) : shader(shader), name(name) {}
+    void resize(const RenderTarget& target, uint faceCapacity) {
+         if(bins) unallocate(bins,width*height);
+         if(faces) unallocate(faces,faceCapacity);
+         width=target.width, height=target.height;
+         bins = allocate64<Bin>(width*height);
+         faces = allocate64<Face>(this->faceCapacity=faceCapacity);
     }
-    ~RenderPass(){ unallocate(faces,faceCapacity); unallocate(bins,target.width*target.height); }
+    void clear() {
+        rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;
+        for(uint bin: range(width*height)) { bins[bin].faceCount=0; }
+        faceCount=0;
+    }
+    ~RenderPass(){ unallocate(bins,width*height); unallocate(faces,faceCapacity); }
 
     // Implementation is inline to allow per-pass face attributes specialization and inline shader calls
 
     /// Submits triangles for binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..4×Width],[0..4×Height]
     void submit(vec4 A, vec4 B, vec4 C, vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
-        if(errors) return;
-        if(faceCount>=faceCapacity) error("Face overflow");
+        if(faceCount>=faceCapacity) { uiError(name,"Face overflow"_); return; }
         Face& face = faces[faceCount];
-        assert(abs(A.w-1)<0.01); assert(abs(B.w-1)<0.01); assert(abs(C.w-1)<0.01);
+        //assert(abs(A.w-1)<0.01,A.w); assert(abs(B.w-1)<0.01,B.w); assert(abs(C.w-1)<0.01,C.w);
         mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
         float det = E.det();
         if(det<1) return; //small or back-facing triangle
@@ -311,7 +337,7 @@ template<class Shader> struct RenderPass {
         face.faceAttributes=faceAttributes;
 
         int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy())))/64);
-        int2 max = ::min(int2(target.width-1,target.height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy())))/64);
+        int2 max = ::min(int2(width-1,height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy())))/64);
 
         for(int binY=min.y; binY<=max.y; binY++) for(int binX=min.x; binX<=max.x; binX++) {
             const vec2 binXY = 64.f*vec2(binX, binY);
@@ -322,289 +348,154 @@ template<class Shader> struct RenderPass {
                     face.binReject[1] + dot(face.edges[1], binXY) <= 0 ||
                     face.binReject[2] + dot(face.edges[2], binXY) <= 0) continue;
 
-            Bin& bin = bins[binY*target.width+binX];
-            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { log("Index overflow"); errors<<"Index overflow"_; return; }
+            Bin& bin = bins[binY*width+binX];
+            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { uiError(name,"Index overflow"); return; }
             bin.faces[bin.faceCount++]=faceCount;
         }
         faceCount++;
     }
 
-    static void* start_routine(void* this_) { ((RenderPass*)this_)->run(); return 0; }
-    uint nextBin=0;
-    // For each bin, rasterizes and shade all triangles
-    void render() {
-        if(errors) return;
-        nextBin=0;
-        const int N=8;
-        pthread threads[N-1];
-        for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
-        run();
-        for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
-    }
-    void run() {
-        profile( int64 start = rdtsc(); );
-        // Loop on all bins (64x64 samples (16x16 pixels))
-        for(;;) {
-            uint binI = __sync_fetch_and_add(&nextBin,1);
-            if(binI>=target.width*target.height) break;
-            Bin& bin = bins[binI];
-            Tile& tile = target.tiles[binI];
-            if(!bin.faceCount) continue;
-            if(!tile.cleared) {
-                clear(tile.subsample,16);
-                clear(tile.depth,4*4,vec16(target.depth));
-                clear(tile.blue,4*4,vec16(target.blue));
-                clear(tile.green,4*4,vec16(target.green));
-                clear(tile.red,4*4,vec16(target.red));
-                tile.cleared=1;
+    void render(Tile& tile, const Bin& bin, const vec2 binXY) override {
+        // Loop on all faces in the bin
+        for(uint faceI=0; faceI<bin.faceCount; faceI++) {
+            struct DrawBlock { vec2 pos; uint ptr; uint mask; } blocks[4*4]; uint blockCount=0;
+            struct DrawPixel { vec16 mask; vec2 pos; uint ptr; } pixels[16*16]; uint pixelCount=0;
+            const Face& face = faces[bin.faces[faceI]];
+            {
+                profile( int64 start=rdtsc(); );
+                float binReject[3], binAccept[3];
+                for(int e=0;e<3;e++) {
+                    binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
+                    binAccept[e] = face.binAccept[e] + dot(face.edges[e], binXY);
+                }
+
+                // Full bin accept
+                if(
+                        binAccept[0] > 0 &&
+                        binAccept[1] > 0 &&
+                        binAccept[2] > 0 ) {
+                    for(;blockCount<16;blockCount++)
+                        blocks[blockCount] = DrawBlock __(binXY+16.f*XY[0][blockCount], blockCount*(4*4), 0xFFFF);
+                } else {
+                    // Loop on 4×4 blocks
+                    for(uint blockI=0; blockI<4*4; blockI++) {
+                        float blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
+
+                        // trivial reject
+                        if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
+
+                        const uint16 blockPtr = blockI*(4*4);
+                        const vec2 blockXY = binXY+16.f*XY[0][blockI];
+
+                        float blockAccept[3]; for(int e=0;e<3;e++) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
+                        // Full block accept
+                        if(
+                                blockAccept[0] > 0 &&
+                                blockAccept[1] > 0 &&
+                                blockAccept[2] > 0 ) {
+                            blocks[blockCount++] = DrawBlock __(blockXY, blockPtr, 0xFFFF);
+                            continue;
+                        }
+
+                        // 4×4 pixel accept mask
+                        uint16 pixelAcceptMask=0xFFFF; // partial block of full pixels
+                        for(int e=0;e<3;e++) {
+                            pixelAcceptMask &= mask(blockAccept[e] > face.pixelAcceptStep[e]);
+                        }
+
+                        if(pixelAcceptMask)
+                            blocks[blockCount++] = DrawBlock __(blockXY, blockPtr, pixelAcceptMask);
+                        //else all pixels were subsampled or rejected
+
+                        // 4×4 pixel reject mask
+                        uint16 pixelRejectMask=0; // partial block of full pixels
+                        vec16 pixelReject[3]; //used to reject samples
+                        for(int e=0;e<3;e++) {
+                            pixelReject[e] = blockReject[e] + face.pixelRejectStep[e];
+                            pixelRejectMask |= mask(pixelReject[e] <= 0);
+                        }
+
+                        // Process partial pixels
+                        uint16 partialPixelMask = ~(pixelRejectMask | pixelAcceptMask);
+                        while(partialPixelMask) {
+                            uint pixelI = __builtin_ctz(partialPixelMask);
+                            if(pixelI>=16) break;
+                            partialPixelMask &= ~(1<<pixelI);
+
+                            // 4×4 samples mask
+                            vec16 sampleMask =
+                                    (pixelReject[0][pixelI] > face.sampleStep[0]) &
+                                    (pixelReject[1][pixelI] > face.sampleStep[1]) &
+                                    (pixelReject[2][pixelI] > face.sampleStep[2]);
+                            const vec2 pixelXY = 4.f*XY[0][pixelI];
+                            const uint16 pixelPtr = blockPtr+pixelI;
+                            pixels[pixelCount++] = DrawPixel __(sampleMask, blockXY+pixelXY, pixelPtr);
+                        }
+                    }
+                }
+                profile( rasterTime += rdtsc()-start; )
             }
+            // 4×4 xy steps from pixel origin to sample center
+            static const vec16 X = vec16(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)+1./2;
+            static const vec16 Y = vec16(0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3)+1./2;
+            {
+                profile( int64 start = rdtsc(); int64 userTime=0; )
+                for(uint i=0; i<blockCount; i++) { //Blocks of fully covered pixels
+                    const DrawBlock& draw = blocks[i];
+                    const uint blockPtr = draw.ptr;
+                    const vec2 blockXY = draw.pos;
+                    const uint16 mask = draw.mask;
+                    for(uint pixelI=0; pixelI<4*4; pixelI++) {
+                        if(!(mask&(1<<pixelI))) continue;
+                        const uint pixelPtr = blockPtr+pixelI;
+                        const vec2 pixelXY = blockXY+4.f*XY[0][pixelI];
 
-            const vec2 binXY = 64.f*vec2(binI%target.width,binI/target.width);
-            // Loop on all faces in the bin
-            for(uint faceI=0; faceI<bin.faceCount; faceI++) {
-                struct DrawBlock { vec2 pos; uint ptr; uint mask; } blocks[4*4]; uint blockCount=0;
-                struct DrawPixel { vec16 mask; vec2 pos; uint ptr; } pixels[16*16]; uint pixelCount=0;
-                const Face& face = faces[bin.faces[faceI]];
-                {
-                    profile( int64 start=rdtsc(); )
-                    float binReject[3], binAccept[3];
-                    for(int e=0;e<3;e++) {
-                        binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
-                        binAccept[e] = face.binAccept[e] + dot(face.edges[e], binXY);
-                    }
+                        if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
+                            vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
+                            float w = 1/dot(face.iw,XY1);
+                            float z = w*dot(face.iz,XY1);
 
-                    // Full bin accept
-                    if(
-                            binAccept[0] > 0 &&
-                            binAccept[1] > 0 &&
-                            binAccept[2] > 0 ) {
-                        for(;blockCount<16;blockCount++)
-                            blocks[blockCount] = DrawBlock __(binXY+16.f*XY[0][blockCount], blockCount*(4*4), 0xFFFF);
-                    } else {
-                        // Loop on 4×4 blocks
-                        for(uint blockI=0; blockI<4*4; blockI++) {
-                            float blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
+                            float& depth = tile.depth[pixelPtr/16][pixelPtr%16];
+                            if(z < depth) continue;
+                            depth = z;
 
-                            // trivial reject
-                            if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
-
-                            const uint16 blockPtr = blockI*(4*4);
-                            const vec2 blockXY = binXY+16.f*XY[0][blockI];
-
-                            float blockAccept[3]; for(int e=0;e<3;e++) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
-                            // Full block accept
-                            if(
-                                    blockAccept[0] > 0 &&
-                                    blockAccept[1] > 0 &&
-                                    blockAccept[2] > 0 ) {
-                                blocks[blockCount++] = DrawBlock __(blockXY, blockPtr, 0xFFFF);
-                                continue;
-                            }
-
-                            // 4×4 pixel accept mask
-                            uint16 pixelAcceptMask=0xFFFF; // partial block of full pixels
-                            for(int e=0;e<3;e++) {
-                                pixelAcceptMask &= mask(blockAccept[e] > face.pixelAcceptStep[e]);
-                            }
-
-                            if(pixelAcceptMask)
-                                blocks[blockCount++] = DrawBlock __(blockXY, blockPtr, pixelAcceptMask);
-                            //else all pixels were subsampled or rejected
-
-                            // 4×4 pixel reject mask
-                            uint16 pixelRejectMask=0; // partial block of full pixels
-                            vec16 pixelReject[3]; //used to reject samples
-                            for(int e=0;e<3;e++) {
-                                pixelReject[e] = blockReject[e] + face.pixelRejectStep[e];
-                                pixelRejectMask |= mask(pixelReject[e] <= 0);
-                            }
-
-                            // Process partial pixels
-                            uint16 partialPixelMask = ~(pixelRejectMask | pixelAcceptMask);
-                            while(partialPixelMask) {
-                                uint pixelI = __builtin_ctz(partialPixelMask);
-                                if(pixelI>=16) break;
-                                partialPixelMask &= ~(1<<pixelI);
-
-                                // 4×4 samples mask
-                                vec16 sampleMask =
-                                        (pixelReject[0][pixelI] > face.sampleStep[0]) &
-                                        (pixelReject[1][pixelI] > face.sampleStep[1]) &
-                                        (pixelReject[2][pixelI] > face.sampleStep[2]);
-                                const vec2 pixelXY = 4.f*XY[0][pixelI];
-                                const uint16 pixelPtr = blockPtr+pixelI;
-                                pixels[pixelCount++] = DrawPixel __(sampleMask, blockXY+pixelXY, pixelPtr);
-                            }
-                        }
-                    }
-                    profile( rasterTime += rdtsc()-start; )
-                }
-                // 4×4 xy steps from pixel origin to sample center
-                static const vec16 X = vec16(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)+1./2;
-                static const vec16 Y = vec16(0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3)+1./2;
-                {
-                    profile( int64 start = rdtsc(); int64 userTime=0; )
-                    for(uint i=0; i<blockCount; i++) { //Blocks of fully covered pixels
-                        const DrawBlock& draw = blocks[i];
-                        const uint blockPtr = draw.ptr;
-                        const vec2 blockXY = draw.pos;
-                        const uint16 mask = draw.mask;
-                        for(uint pixelI=0; pixelI<4*4; pixelI++) {
-                            if(!(mask&(1<<pixelI))) continue;
-                            const uint pixelPtr = blockPtr+pixelI;
-                            const vec2 pixelXY = blockXY+4.f*XY[0][pixelI];
-
-                            if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
-                                vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
-                                float w = 1/dot(face.iw,XY1);
-                                float z = w*dot(face.iz,XY1);
-
-                                float& depth = tile.depth[pixelPtr/16][pixelPtr%16];
-                                if(z < depth) continue;
-                                depth = z;
-
-                                float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
-                                profile( int64 start = rdtsc(); )
-                                vec4 bgra = shader(face.faceAttributes,centroid);
-                                profile( userTime += rdtsc()-start; )
-                                float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
-                                float& dstB = tile.blue[pixelPtr/16][pixelPtr%16];
-                                float& dstG = tile.green[pixelPtr/16][pixelPtr%16];
-                                float& dstR = tile.red[pixelPtr/16][pixelPtr%16];
-                                if(blend) {
-                                    dstB=(1-srcA)*dstB+srcA*srcB;
-                                    dstG=(1-srcA)*dstG+srcA*srcG;
-                                    dstR=(1-srcA)*dstR+srcA*srcR;
-                                } else {
-                                    dstB=srcB;
-                                    dstG=srcG;
-                                    dstR=srcR;
-                                }
-                            } else { // Subsample Z-Test
-                                // 2D coordinates vector
-                                const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
-                                // Interpolates w for perspective correction
-                                const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
-                                // Interpolates perspective correct z
-                                const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
-
-                                // Performs Z-Test
-                                vec16& subpixel = tile.subdepth[pixelPtr];
-                                const vec16 visibleMask = (z >= subpixel);
-
-                                // Stores accepted pixels in Z buffer
-                                maskstore(subpixel, visibleMask, z);
-
-                                // Counts visible samples
-                                float centroid[V];
-                                float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
-
-                                // Computes vertex attributes at all samples
-                                for(int i=0;i<V;i++) {
-                                    const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
-                                    // Zeroes hidden samples
-                                    const vec16 visible = samples & visibleMask;
-                                    // Averages on the visible samples
-                                    centroid[i] = sum16(visible) / visibleSampleCount;
-                                }
-
-                                profile( int64 start = rdtsc(); )
-                                vec4 bgra = shader(face.faceAttributes,centroid);
-                                profile( userTime += rdtsc()-start; )
-                                float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                                vec16& dstB = tile.subblue[pixelPtr];
-                                vec16& dstG = tile.subgreen[pixelPtr];
-                                vec16& dstR = tile.subred[pixelPtr];
-                                if(blend) {
-                                    maskstore(dstB, visibleMask, (1-srcA)*dstB+srcA*srcB);
-                                    maskstore(dstG, visibleMask, (1-srcA)*dstG+srcA*srcG);
-                                    maskstore(dstR, visibleMask, (1-srcA)*dstR+srcA*srcR);
-                                } else {
-                                    maskstore(dstB, visibleMask, srcB);
-                                    maskstore(dstG, visibleMask, srcG);
-                                    maskstore(dstR, visibleMask, srcR);
-                                }
-                            }
-                        }
-                    }
-                    profile( this->userTime+=userTime; pixelTime += rdtsc()-start - userTime; )
-                }
-                {
-                    profile( int64 start = rdtsc(); int64 userTime=0; )
-                    for(uint i=0; i<pixelCount; i++) { // Partially covered pixel of samples
-                        const DrawPixel& draw = pixels[i];
-                        const uint pixelPtr = draw.ptr;
-                        const vec2 pixelXY = draw.pos;
-
-                        // 2D coordinates vector
-                        const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
-                        // Interpolates w for perspective correction
-                        const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
-                        // Interpolates perspective correct z
-                        const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
-
-                        // Convert single sample pixel to subsampled pixel
-                        if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                            float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
                             profile( int64 start = rdtsc(); )
-
-                            // Set subsampled pixel flag
-                            tile.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
-
-                            // Performs Z-Test
-                            float pixelZ = tile.depth[pixelPtr/16][pixelPtr%16];
-                            const vec16 visibleMask =  (z >= pixelZ) & draw.mask;
-
-                            // Blends accepted pixels in subsampled Z buffer
-                            tile.subdepth[pixelPtr] = blend16(pixelZ, z, visibleMask);
-
-                            // Counts visible samples
-                            float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
-
-                            // Computes vertex attributes at all samples
-                            float centroid[V];
-                            for(int i=0;i<V;i++) {
-                                const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
-                                // Zeroes hidden samples
-                                const vec16 visible = samples & visibleMask;
-                                // Averages on the visible samples
-                                centroid[i] = sum16(visible) / visibleSampleCount;
-                            }
-
-                            profile( int64 userStart = rdtsc(); )
-                            vec4 bgra = shader(face.faceAttributes,centroid);
-                            profile( int64 userEnd = rdtsc(); userTime += userEnd-userStart; )
-                            float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
-                            vec16& dstB = tile.subblue[pixelPtr];
-                            vec16& dstG = tile.subgreen[pixelPtr];
-                            vec16& dstR = tile.subred[pixelPtr];
-                            float pixelB = tile.blue[pixelPtr/16][pixelPtr%16];
-                            float pixelG = tile.green[pixelPtr/16][pixelPtr%16];
-                            float pixelR = tile.red[pixelPtr/16][pixelPtr%16];
+                                    vec4 bgra = shader(face.faceAttributes,centroid);
+                            profile( userTime += rdtsc()-start; )
+                                    float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
+                            float& dstB = tile.blue[pixelPtr/16][pixelPtr%16];
+                            float& dstG = tile.green[pixelPtr/16][pixelPtr%16];
+                            float& dstR = tile.red[pixelPtr/16][pixelPtr%16];
                             if(blend) {
-                                dstB = blend16(pixelB, (1-srcA)*pixelB+srcA*srcB, visibleMask);
-                                dstG = blend16(pixelG, (1-srcA)*pixelG+srcA*srcG, visibleMask);
-                                dstR = blend16(pixelR, (1-srcA)*pixelR+srcA*srcR, visibleMask);
+                                dstB=(1-srcA)*dstB+srcA*srcB;
+                                dstG=(1-srcA)*dstG+srcA*srcG;
+                                dstR=(1-srcA)*dstR+srcA*srcR;
                             } else {
-                                dstB = blend16(pixelB, srcB, visibleMask);
-                                dstG = blend16(pixelG, srcG, visibleMask);
-                                dstR = blend16(pixelR, srcR, visibleMask);
+                                dstB=srcB;
+                                dstG=srcG;
+                                dstR=srcR;
                             }
-                            profile( sampleFirstTime += (userStart-start) + (rdtsc()-userEnd); )
-                        } else {
-                            profile( int64 start = rdtsc(); )
+                        } else { // Subsample Z-Test
+                            // 2D coordinates vector
+                            const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
+                            // Interpolates w for perspective correction
+                            const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
+                            // Interpolates perspective correct z
+                            const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
 
                             // Performs Z-Test
                             vec16& subpixel = tile.subdepth[pixelPtr];
-                            const vec16 visibleMask =  (z >= subpixel) & draw.mask;
+                            const vec16 visibleMask = (z >= subpixel);
 
                             // Stores accepted pixels in Z buffer
                             maskstore(subpixel, visibleMask, z);
 
                             // Counts visible samples
+                            float centroid[V];
                             float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
 
                             // Computes vertex attributes at all samples
-                            float centroid[V];
                             for(int i=0;i<V;i++) {
                                 const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
                                 // Zeroes hidden samples
@@ -613,10 +504,10 @@ template<class Shader> struct RenderPass {
                                 centroid[i] = sum16(visible) / visibleSampleCount;
                             }
 
-                            profile( int64 userStart = rdtsc(); )
-                            vec4 bgra = shader(face.faceAttributes,centroid);
-                            profile( int64 userEnd = rdtsc(); userTime += userEnd-userStart; )
-                            float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                            profile( int64 start = rdtsc(); )
+                                    vec4 bgra = shader(face.faceAttributes,centroid);
+                            profile( userTime += rdtsc()-start; )
+                                    float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
                             vec16& dstB = tile.subblue[pixelPtr];
                             vec16& dstG = tile.subgreen[pixelPtr];
                             vec16& dstR = tile.subred[pixelPtr];
@@ -629,16 +520,176 @@ template<class Shader> struct RenderPass {
                                 maskstore(dstG, visibleMask, srcG);
                                 maskstore(dstR, visibleMask, srcR);
                             }
-                            profile( sampleOverTime += (userStart-start) + (rdtsc()-userEnd); )
                         }
                     }
-                    profile( this->userTime += userTime; sampleTime += rdtsc()-start - userTime; )
                 }
+                profile( this->userTime+=userTime; pixelTime += rdtsc()-start - userTime; )
             }
-            bin.faceCount=0;
+            {
+                profile( int64 start = rdtsc(); int64 userTime=0; )
+                for(uint i=0; i<pixelCount; i++) { // Partially covered pixel of samples
+                    const DrawPixel& draw = pixels[i];
+                    const uint pixelPtr = draw.ptr;
+                    const vec2 pixelXY = draw.pos;
+
+                    // 2D coordinates vector
+                    const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
+                    // Interpolates w for perspective correction
+                    const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
+                    // Interpolates perspective correct z
+                    const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
+
+                    // Convert single sample pixel to subsampled pixel
+                    if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                        profile( int64 start = rdtsc(); )
+
+                                // Set subsampled pixel flag
+                                tile.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
+
+                        // Performs Z-Test
+                        float pixelZ = tile.depth[pixelPtr/16][pixelPtr%16];
+                        const vec16 visibleMask =  (z >= pixelZ) & draw.mask;
+
+                        // Blends accepted pixels in subsampled Z buffer
+                        tile.subdepth[pixelPtr] = blend16(pixelZ, z, visibleMask);
+
+                        // Counts visible samples
+                        float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
+
+                        // Computes vertex attributes at all samples
+                        float centroid[V];
+                        for(int i=0;i<V;i++) {
+                            const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                            // Zeroes hidden samples
+                            const vec16 visible = samples & visibleMask;
+                            // Averages on the visible samples
+                            centroid[i] = sum16(visible) / visibleSampleCount;
+                        }
+
+                        profile( int64 userStart = rdtsc(); )
+                                vec4 bgra = shader(face.faceAttributes,centroid);
+                        profile( int64 userEnd = rdtsc(); userTime += userEnd-userStart; )
+                        float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                        vec16& dstB = tile.subblue[pixelPtr];
+                        vec16& dstG = tile.subgreen[pixelPtr];
+                        vec16& dstR = tile.subred[pixelPtr];
+                        float pixelB = tile.blue[pixelPtr/16][pixelPtr%16];
+                        float pixelG = tile.green[pixelPtr/16][pixelPtr%16];
+                        float pixelR = tile.red[pixelPtr/16][pixelPtr%16];
+                        if(blend) {
+                            dstB = blend16(pixelB, (1-srcA)*pixelB+srcA*srcB, visibleMask);
+                            dstG = blend16(pixelG, (1-srcA)*pixelG+srcA*srcG, visibleMask);
+                            dstR = blend16(pixelR, (1-srcA)*pixelR+srcA*srcR, visibleMask);
+                        } else {
+                            dstB = blend16(pixelB, srcB, visibleMask);
+                            dstG = blend16(pixelG, srcG, visibleMask);
+                            dstR = blend16(pixelR, srcR, visibleMask);
+                        }
+                        profile( sampleFirstTime += (userStart-start) + (rdtsc()-userEnd); )
+                    } else {
+                        profile( int64 start = rdtsc(); )
+
+                                // Performs Z-Test
+                                vec16& subpixel = tile.subdepth[pixelPtr];
+                        const vec16 visibleMask =  (z >= subpixel) & draw.mask;
+
+                        // Stores accepted pixels in Z buffer
+                        maskstore(subpixel, visibleMask, z);
+
+                        // Counts visible samples
+                        float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
+
+                        // Computes vertex attributes at all samples
+                        float centroid[V];
+                        for(int i=0;i<V;i++) {
+                            const vec16 samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                            // Zeroes hidden samples
+                            const vec16 visible = samples & visibleMask;
+                            // Averages on the visible samples
+                            centroid[i] = sum16(visible) / visibleSampleCount;
+                        }
+
+                        profile( int64 userStart = rdtsc(); )
+                                vec4 bgra = shader(face.faceAttributes,centroid);
+                        profile( int64 userEnd = rdtsc(); userTime += userEnd-userStart; )
+                        float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                        vec16& dstB = tile.subblue[pixelPtr];
+                        vec16& dstG = tile.subgreen[pixelPtr];
+                        vec16& dstR = tile.subred[pixelPtr];
+                        if(blend) {
+                            maskstore(dstB, visibleMask, (1-srcA)*dstB+srcA*srcB);
+                            maskstore(dstG, visibleMask, (1-srcA)*dstG+srcA*srcG);
+                            maskstore(dstR, visibleMask, (1-srcA)*dstR+srcA*srcR);
+                        } else {
+                            maskstore(dstB, visibleMask, srcB);
+                            maskstore(dstG, visibleMask, srcG);
+                            maskstore(dstR, visibleMask, srcR);
+                        }
+                        profile( sampleOverTime += (userStart-start) + (rdtsc()-userEnd); )
+                    }
+                }
+                profile( this->userTime += userTime; sampleTime += rdtsc()-start - userTime; )
+            }
         }
-        faceCount=0;
-        profile( totalTime = rdtsc()-start; )
     }
 };
 
+/// Runs all passes on all tiles
+struct RenderScheduler {
+    RenderTarget& target;
+    array<RenderPassBase*> passes;
+    profile( int64 totalTime; )
+    profile(int64 rasterTime; int64 pixelTime; int64 sampleTime; int64 sampleFirstTime; int64 sampleOverTime; int64 userTime;)
+    RenderScheduler(RenderTarget& target):target(target){}
+
+    static void* start_routine(void* this_) { ((RenderScheduler*)this_)->run(); return 0; }
+    // For each bin, for each pass, rasterizes and shade all triangles
+    void render() {
+        target.nextBin=0;
+
+        const int N=8;
+        pthread threads[N-1];
+        for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
+        run();
+        for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
+
+        profile(({
+                    rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0;
+                    for(RenderPassBase* pass: passes) {
+                        rasterTime+=pass->rasterTime, pixelTime+=pass->pixelTime, sampleTime+=pass->sampleTime;
+                        sampleFirstTime+=pass->sampleFirstTime, sampleOverTime+=pass->sampleOverTime; userTime+=pass->userTime;
+                    }
+                }));
+    }
+    void run() {
+        profile( int64 start = rdtsc(); );
+        // Loop on all bins (64x64 samples (16x16 pixels)) then on passes (improve framebuffer access, passes have less locality)
+        for(;;) {
+            uint binI = __sync_fetch_and_add(&target.nextBin,1);
+            if(binI>=target.width*target.height) break;
+            for(RenderPassBase* pass: passes) {
+                if(pass->bins[binI].faceCount) goto break_;
+            }
+            /*else*/ continue;
+            break_:;
+            Tile& tile = target.tiles[binI];
+            if(!tile.cleared) {
+                clear(tile.subsample,16);
+                clear(tile.depth,4*4,vec16(target.depth));
+                clear(tile.blue,4*4,vec16(target.blue));
+                clear(tile.green,4*4,vec16(target.green));
+                clear(tile.red,4*4,vec16(target.red));
+                tile.cleared=1;
+            }
+
+            const vec2 binXY = 64.f*vec2(binI%target.width,binI/target.width);
+            for(RenderPassBase* pass: passes) {
+                profile( int64 start = rdtsc(); );
+                pass->render(tile,pass->bins[binI],binXY);
+                pass->bins[binI].faceCount=0;
+                profile( pass->totalTime += rdtsc()-start; );
+            }
+        }
+        profile( totalTime += rdtsc()-start; );
+    }
+};

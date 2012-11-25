@@ -43,7 +43,6 @@ This is mostly for reference, since this application use my own framework (Linux
 #include "data.h"
 #include "matrix.h"
 #include "process.h"
-#include "raster.h"
 #include "window.h"
 #include "interface.h"
 #include "text.h"
@@ -52,6 +51,10 @@ This is mostly for reference, since this application use my own framework (Linux
 
 #include "linux.h"
 #include <sys/inotify.h>
+
+#include "raster.h"
+
+string uiErrors;
 
 // Light
 
@@ -82,7 +85,12 @@ static struct Pattern {
     vec16 X,Y;
     Pattern() {
         // jittered radial sample pattern
+#define RANDOM 1
+#if RANDOM
         Random random;
+#else
+        float random=0;
+#endif
         for(int u=0;u<4;u++) for(int v=0;v<4;v++) {
             float r = sqrt( (u + (random+1)/2.f) / 4.f );
             float t = (v + (random+1)/2.f) / 4.f;
@@ -96,28 +104,34 @@ Random randomPattern;
 /// Stores shadow occluders for shadow-receiving surfaces
 struct Shadow {
     // Occluders geometry (in light space)
-    Face* faces;
-    uint faceCapacity;
+    Face* faces=0;
+    uint faceCapacity=0;
     uint faceCount=0;
 
     // 2D space partitioning to accelerate shadow ray casts
-    struct Bin { uint16 faceCount=0; uint16 faces[2047]; };
-    int width, height;
-    Bin* bins;
+    struct Bin { uint16 faceCount=0; uint16 faces[63]; };
+    int width=0, height=0;
+    Bin* bins=0;
 
-    Shadow(vec2 lightSpaceSize, uint faceCapacity):faceCapacity(faceCapacity){
-        width = ceil(lightSpaceSize.x);
-        height = ceil(lightSpaceSize.y);
+    void resize(int2 size, uint faceCapacity) {
+        if(bins) unallocate(bins,width*height);
+        if(faces) unallocate(faces,faceCapacity);
+        width = size.x, height = size.y;
         bins = allocate64<Bin>(width*height);
-        faces = allocate64<Face>(faceCapacity);
-        for(uint i: range(width*height)) bins[i].faceCount=0;
-        randomPattern.reset(); //keep same pattern at each frame
+        faces = allocate64<Face>(this->faceCapacity=faceCapacity);
     }
-    ~Shadow() { unallocate(bins,width*height); unallocate(faces,faceCapacity); }
+    ~Shadow() {
+        if(bins) unallocate(bins,width*height);
+        if(faces) unallocate(faces,faceCapacity);
+    }
+    void clear() {
+        faceCount = 0;
+        for(uint i: range(width*height)) bins[i].faceCount=0;
+    }
 
     void submit(vec4 A, vec4 B, vec4 C) {
         assert(abs(A.w-1)<0.01); assert(abs(B.w-1)<0.01); assert(abs(C.w-1)<0.01);
-        if(faceCount>=faceCapacity) error("Face overflow");
+        if(faceCount>=faceCapacity) { uiError("shadow"_,"Face overflow"_); return; }
 
         Face& face = faces[faceCount];
         mat3& E = face.E;
@@ -127,19 +141,49 @@ struct Shadow {
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
 
-        int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy()))));
-        int2 max = ::min(int2(width-1,height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy()))));
+        float binReject[3];
+        for(int e=0;e<3;e++) {
+            const vec2& edge = E[e].xy();
+            float step0 = (edge.x>0?edge.x:0) + (edge.y>0?edge.y:0); //conserve whole bin
+            float step1 = abs(edge.x) + abs(edge.y); //add margin for soft shadow sampling
+            // initial reject corner distance
+            binReject[e] = E[e].z + step0 + step1;
+        }
+
+        int2 min = ::max(int2(1,1),int2(floor(::min(::min(A.xy(),B.xy()),C.xy()))));
+        int2 max = ::min(int2(width-1-1,height-1-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy()))));
         //FIXME: This is not conservative enough for large sample patterns (far occluder)
-        for(int binY=min.y; binY<=max.y; binY++) for(int binX=min.x; binX<=max.x; binX++) {
+        for(int binY=min.y-1; binY<=max.y+1; binY++) for(int binX=min.x-1; binX<=max.x+1; binX++) {
+            const vec2 binXY = vec2(binX, binY);
+            // trivial reject
+            if(
+                    binReject[0] + dot(E[0].xy(), binXY) <= 0 ||
+                    binReject[1] + dot(E[1].xy(), binXY) <= 0 ||
+                    binReject[2] + dot(E[2].xy(), binXY) <= 0) continue;
             Bin& bin = bins[binY*width+binX];
-            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) error("Index overflow",binX,binY,bin.faceCount);
+            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { uiError("shadow"_,"Index overflow"); return; }
             bin.faces[bin.faceCount++]=faceCount;
         }
         faceCount++;
     }
 
+    string depthComplexity() {
+        uint sum=0, N=0, max=0;
+        for(int binY=0; binY<height; binY++) for(int binX=0; binX<width; binX++) {
+            uint faceCount = bins[binY*width+binX].faceCount;
+            if(faceCount) N++, sum += faceCount, max=::max(max,faceCount);
+        }
+        return str(sum / N, max);
+    }
+
     inline float operator()(vec3 lightPos) const {
+#define SOFT 1
+#if SOFT
+#if RANDOM
         const Pattern& pattern = patterns[randomPattern()%16];
+#else
+        const Pattern& pattern = patterns[0];
+#endif
         vec16 samples = 0;
         uint x=lightPos.x, y=lightPos.y;
         if(x<(uint)width && y<(uint)height) {
@@ -164,6 +208,27 @@ struct Shadow {
             }
         }
         return __builtin_popcount(mask(samples))/16.f;
+#else
+        uint x=lightPos.x, y=lightPos.y;
+        if(x<(uint)width && y<(uint)height) {
+            const Bin& bin = bins[y*width+x];
+            for(uint i: range(bin.faceCount)) {
+                uint index = bin.faces[i];
+                const Face& face = faces[index];
+                const vec3 XY1(lightPos.x,lightPos.y,1.f);
+                float w = 1/dot(face.iw,XY1);
+                float z = w*dot(face.iz,XY1);
+                float d = lightPos.z-z;
+                if(d<=1.f) continue; //only Z-test midpoint
+
+                float a = face.E[0].x * lightPos.x + face.E[0].y * lightPos.y + face.E[0].z;
+                float b = face.E[1].x * lightPos.x + face.E[1].y * lightPos.y + face.E[1].z;
+                float c = face.E[2].x * lightPos.x + face.E[2].y * lightPos.y + face.E[2].z;
+                if((a > 0.f) && (b > 0.f) && (c > 0.f)) return 1;
+            }
+        }
+        return 0;
+#endif
     }
 };
 
@@ -263,8 +328,7 @@ struct ConeShader : ShadowShader {
 // L-System
 
 static uint currentLine=0;
-static string userErrors;
-template<class... Args> void userError(const Args&... args) { userErrors << str(str(currentLine)+":"_,args ___); }
+template<class... Args> void userError(const Args&... args) { uiError(string(str(currentLine)+":"_),args ___); }
 
 /// word is an index in a string table allowing fast move/copy/compare
 static array<string> pool;
@@ -302,7 +366,7 @@ struct Immediate : Expression {
 struct Parameter : Expression {
     uint index;
     Parameter(uint index):index(index){}
-    float evaluate(ref<float> a) const override { if(index>=a.size) { userError("Missing argument"); return 0; } return a[index]; }
+    float evaluate(ref<float> a) const override { if(index>=a.size) { userError("Missing argument"_); return 0; } return a[index]; }
     string str() const override { return "$"_+dec(index); }
 };
 struct Operator : Expression {
@@ -378,7 +442,7 @@ struct LSystem {
 
     LSystem(){}
     LSystem(string&& name, const ref<byte>& source):name(move(name)){
-        userErrors.clear(); currentLine=0;
+        uiErrors.clear(); currentLine=0;
         for(ref<byte> line: split(source,'\n')) { currentLine++;
             TextData s(line);
             s.skip();
@@ -391,7 +455,7 @@ struct LSystem {
                 unique<Expression> e;
                 while(s) {
                     e = parse(array<ref<byte> >(),move(e),s);
-                    if(userErrors) return;
+                    if(uiErrors) return;
                     s.skip();
                 }
                 if(!e) { userError("Expected expression"); return; }
@@ -418,7 +482,7 @@ struct LSystem {
                         unique<Expression> e;
                         while(!s.match(',') && s.peek("→"_.size)!="→"_) {
                             e = parse(parameters,move(e),s);
-                            if(userErrors) return;
+                            if(uiErrors) return;
                             s.skip();
                             assert(s);
                         }
@@ -440,7 +504,7 @@ struct LSystem {
                         s.skip();
                         while(!s.match(',') && s.peek()!=')') {
                             e = parse(parameters,move(e),s);
-                            if(userErrors) return;
+                            if(uiErrors) return;
                             assert(s);
                         }
                         p.arguments << move(e);
@@ -460,10 +524,11 @@ struct LSystem {
                         unique<Expression> e;
                         while(!s.match(',') && s.peek()!=')') {
                             e = parse(parameters,move(e),s);
-                            if(userErrors) return;
+                            if(uiErrors) return;
                             s.skip();
                             assert(s);
                         }
+                        if(!e) { userError("Expected argument"); return; }
                         module.arguments << e->evaluate(ref<float>());
                     }
                     axiom << move(module);
@@ -474,7 +539,7 @@ struct LSystem {
 
     array<Module> generate(int level) {
         array<Module> code = copy(axiom);
-        if(userErrors) return code;
+        if(uiErrors) return code;
         for(int unused i: range(level)) {
             array<Module> next;
             for(uint i: range(code.size())) { const Module& c = code[i];
@@ -546,18 +611,30 @@ struct Editor : Widget {
     Folder folder = Folder(""_,cwd()); //L-Systems definitions are loaded from current working directory
     LSystem system; // Currently loaded L-System
     uint level=0; // Current L-System generation maximum level
-    bool enableShadow=true; // Whether shadows are rendered
-    int2 lastPos; // last cursor position to compute relative mouse movements
-    vec2 rotation=vec2(PI,PI/4); // current view angles
-    uint64 frameEnd=cpuTime(), frameTime=50000; // last frame end and initial frame time in microseconds
-    profile( uint64 miscStart=rdtsc(); ) // profile cycles spent outside render
-    RenderTarget target; // Render target (RenderPass renders on these tiles)
-    FileWatcher watcher;
 
+    FileWatcher watcher;
     Bar<Text> systems; // Tab bar to select which L-System to view
     VBox layout;
     TextInput editor;
     Window window __(&layout,int2(0,0),"L-System Editor"_);
+
+    bool enableShadow=true; // Whether shadows are rendered
+    int2 lastPos; // last cursor position to compute relative mouse movements
+    vec2 rotation=vec2(0,PI/4); // current view angles (yaw,pitch)
+    uint64 frameEnd=cpuTime(), frameTime=106000; // last frame end and initial frame time in microseconds
+    profile( uint64 miscStart=rdtsc(); uint64 uiTime=0; ) // profile cycles spent outside render
+
+    RenderTarget target; // Render target (RenderPass renders on these tiles)
+    // Holds scene geometry projected in light space bins
+    Shadow sunShadow;
+
+    RenderScheduler scheduler __(target);
+    ConeShader coneShader __(sunShadow);
+    RenderPass<ConeShader> conePass __(coneShader);
+    FlatShader flatShader __(sunShadow);
+    RenderPass<FlatShader> flatPass __(flatShader);
+    ShadowShader groundShader __(sunShadow);
+    RenderPass<ShadowShader> groundPass __(groundShader);
 
     // Scene
      vec3 sceneMin=0, sceneMax=0; // Scene bounding box
@@ -581,7 +658,7 @@ struct Editor : Widget {
     }
     /// Generates the currently active L-System
     void generate() {
-        if(userErrors) return;
+        if(uiErrors) return;
 
         cones.clear(); polygons.clear(); triangleCount=0; sceneMin=0, sceneMax=0;
 
@@ -630,6 +707,7 @@ struct Editor : Widget {
                 stack << state; // pushes turtle (current position and orientation) on stack
                 colorStack << color;
             } else if(symbol=="]"_) {
+                if(!stack) { userError("Unbalanced []"); return; }
                 state = stack.pop(); // pops turtle (current position and orientation) from stack
                 color = colorStack.pop();
             } else if(symbol=="%"_) cut=1;
@@ -682,6 +760,8 @@ struct Editor : Widget {
         window.localShortcut(Key(' ')).connect([this]{enableShadow=!enableShadow; window.render();});
         watcher.fileModified.connect([this]{openSystem(systems.index);});
         editor.textChanged.connect([this](const ref<byte>& text){writeFile(string(system.name+".l"_),text,cwd());});
+
+        scheduler.passes << &flatPass << &conePass <<&groundPass;
     }
 
     // Expanding
@@ -699,17 +779,8 @@ struct Editor : Widget {
         return true;
     }
 
-    void render(int2 targetPosition, int2 targetSize) override {
-        profile( uint64 setupStart=rdtsc(); uint64 miscTime = setupStart-miscStart; )
-
-        if(targetSize != target.size) {
-            target.resize(targetSize);
-        } else {
-            //RenderTarget::resolve regenerates framebuffer background color only when necessary, but overlay expects cleared framebuffer
-            fill(targetPosition+Rect(targetSize.x,256),white,false);
-        }
-        target.clear();
-
+    float scale=1;
+    void fitView(int2 targetSize) {
         // Fits view
         mat4 view; //Always fit using side view (avoid jarring auto zoom)
         vec3 viewMin=(view*sceneMin).xyz(), viewMax=(view*sceneMax).xyz();
@@ -719,18 +790,31 @@ struct Editor : Widget {
         }
         vec2 sceneSize = (viewMax-viewMin).xy();
         vec2 displaySize = vec2(targetSize.x*4,targetSize.y*4);
-        float scale = min(displaySize.x/sceneSize.x,displaySize.y/sceneSize.y) * 0.75;
-        view = mat4();
-        view.translate(vec3(displaySize.x/2,displaySize.y/4,0.f)); //center scene
-        view.scale(scale); //normalize view space to fit display
-        view.rotateX(rotation.y); // pitch
-        view.rotateY(rotation.x); // yaw
-        view.rotateZ(PI/2); //+X (heading) is up
-        mat3 normalMatrix = view.normalMatrix();
+        scale = min(displaySize.x/sceneSize.x,displaySize.y/sceneSize.y) * 0.75;
+    }
 
-        vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
+    void render(int2 targetPosition, int2 targetSize) override {
+        profile( uint64 setupStart=rdtsc(); uint64 miscTime = setupStart-miscStart; )
 
-        // Fits light
+        // Prepares render target
+        if(targetSize != target.size) {
+            target.resize(targetSize);
+            fitView(targetSize);
+        } else {
+            //RenderTarget::resolve regenerates framebuffer background color only when necessary, but overlay expects cleared framebuffer
+            fill(targetPosition+Rect(targetSize.x,256),white,false);
+        }
+        target.clear();
+
+        // Prepares render passes
+        if(targetSize != target.size || conePass.faceCapacity != cones.size()*2)
+            conePass.resize(target, cones.size()*2);
+        if(targetSize != target.size || flatPass.faceCapacity != 2*triangleCount)
+            flatPass.resize(target, triangleCount*2);
+        if(targetSize != target.size || groundPass.faceCapacity != 2)
+            groundPass.resize(target, 2);
+
+        // Prepares sun shadow
         mat4 sun; sun.rotateY(PI/4);
         vec3 lightMin=(sun*sceneMin).xyz(), lightMax=(sun*sceneMax).xyz();
         for(int x=0;x<2;x++) for(int y=0;y<2;y++) for(int z=0;z<2;z++) {
@@ -738,23 +822,64 @@ struct Editor : Widget {
             lightMax = max(lightMax,(sun*vec3((x?sceneMax:sceneMin).x,(y?sceneMax:sceneMin).y,(z?sceneMax:sceneMin).z)).xyz());
         }
         sun=mat4();
-        float lightScale = scale/64.f;
+        float lightScale = scale/8.f;
         sun.scale(lightScale);
         sun.translate(-lightMin);
         sun.rotateY(PI/4);
-        vec2 size = lightScale*(lightMax-lightMin).xy();
+        if(enableShadow) {
+            int2 sunShadowSize = int2(ceil(lightScale*(lightMax-lightMin).xy()));
+            uint faceCount = cones.size()*2 + triangleCount;
+            if(sunShadow.faceCapacity != faceCount || sunShadowSize != int2(sunShadow.width,sunShadow.height)) {
+                sunShadow.resize(sunShadowSize, faceCount);
+                sunShadow.clear();
+
+                // Setups branches (view-aligned rectangle impostors)
+                for(Cone cone: cones) {
+                    if(enableShadow) { // Light aligned rectangle (for shadows)
+                        float wA = lightScale*cone.wA; vec3 A=(sun*cone.A).xyz(); //-vec3(0,0,2*wA); //offset to prevent self shadowing
+                        float wB = lightScale*cone.wB; vec3 B=(sun*cone.B).xyz(); //-vec3(0,0,2*wB);
+                        vec3 X = B-A;  if(length(X.xy())<0.01) continue;
+                        vec3 Y = normalize(cross(vec3(0,0,1),X));
+                        vec4 a(A - wA*Y, 1.f), b(B - wB*Y, 1.f), c(B + wB*Y, 1.f), d(A + wA*Y, 1.f);
+                        sunShadow.submit(a,b,c);
+                        sunShadow.submit(c,d,a);
+                    }
+                }
+
+                // Setups leafs (convex polygons)
+                for(const Polygon& polygon: polygons) {
+                    if(polygon.vertices.size()<3) continue;
+                    vec3 A = polygon.vertices.first();
+                    vec3 next = polygon.vertices[1];
+                    for(vec3 current: polygon.vertices.slice(2)) {
+                        vec3 B = next, C = current;
+                        vec4 as = sun*A, bs = sun*B, cs=sun*C;
+                        if(cross((bs-as).xyz(),(cs-as).xyz()).z < 0)
+                            sunShadow.submit(cs,bs,as);
+                        else
+                            sunShadow.submit(as,bs,cs);
+                    }
+                }
+            }
+        }
+
+        mat4 view;
+        vec2 displaySize = vec2(targetSize.x*4,targetSize.y*4);
+        view.translate(vec3(displaySize.x/2,displaySize.y/3,0.f)); //center scene
+        view.scale(scale); //normalize view space to fit display
+        view.rotateX(rotation.y); // pitch
+        view.rotateY(rotation.x); // yaw
+        view.rotateZ(PI/2); //+X (heading) is up
+        mat3 normalMatrix = view.normalMatrix();
+
         mat4 viewToSun = sun*view.inverse();
         mat4 sunToView= view*sun.inverse();
         vec3 sunLightDirection = normalize(sunToView.normalMatrix()*vec3(0,0,-1));
-
-        // Holds scene geometry projected in light space bins
-        Shadow sunShadow(size, cones.size()*2 + triangleCount);
-
+        vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
         // Setups branches (view-aligned rectangle impostors)
-        ConeShader coneShader (sunShadow);
         coneShader.enableShadow=enableShadow, coneShader.sky = skyLightDirection, coneShader.sun =sunLightDirection;
-        RenderPass<ConeShader> conePass __(target, cones.size()*2, coneShader);
+        conePass.clear();
         for(Cone cone: cones) {
             // View transform
             vec3 A=(view*cone.A).xyz(); float wA = scale*cone.wA;
@@ -778,22 +903,11 @@ struct Editor : Widget {
             };
             conePass.submit(a,b,c,attributes[0],__(Y,Z,N,cone.color));
             conePass.submit(c,d,a,attributes[1],__(Y,Z,N,cone.color));
-
-            if(enableShadow) { // Light aligned rectangle (for shadows)
-                float wA = lightScale*cone.wA; vec3 A=(sun*cone.A).xyz(); //-vec3(0,0,2*wA); //offset to prevent self shadowing
-                float wB = lightScale*cone.wB; vec3 B=(sun*cone.B).xyz(); //-vec3(0,0,2*wB);
-                vec3 X = B-A;  if(length(X.xy())<0.01) continue;
-                vec3 Y = normalize(cross(vec3(0,0,1),X));
-                vec4 a(A - wA*Y, 1.f), b(B - wB*Y, 1.f), c(B + wB*Y, 1.f), d(A + wA*Y, 1.f);
-                sunShadow.submit(a,b,c);
-                sunShadow.submit(c,d,a);
-            }
         }
 
         // Setups leafs (convex polygons)
-        FlatShader flatShader (sunShadow);
         flatShader.enableShadow=enableShadow, flatShader.sky = skyLightDirection, flatShader.sun =sunLightDirection;
-        RenderPass<FlatShader> flatPass __(target, 2*triangleCount, flatShader);
+        flatPass.clear();
         for(const Polygon& polygon: polygons) {
             if(polygon.vertices.size()<3) continue;
             vec3 A = polygon.vertices.first();
@@ -802,8 +916,6 @@ struct Editor : Widget {
                 vec3 B = next, C = current;
                 vec3 N = normalize(normalMatrix*cross(B-A,C-A));
                 vec4 as = sun*A, bs = sun*B, cs=sun*C;
-                if(cross((bs-as).xyz(),(cs-as).xyz()).z < 0) sunShadow.submit(cs,bs,as);
-                else sunShadow.submit(as,bs,cs);
                 {
                     vec3 lightPos[3] = {vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)};
                     flatPass.submit(view*A,view*B,view*C, lightPos, __(N,polygon.color));
@@ -816,69 +928,76 @@ struct Editor : Widget {
             }
         }
 
-        // Actual rendering happens there
-        profile( uint64 renderStart=rdtsc(); uint64 setupTime = renderStart-setupStart; )
-        flatPass.render();
-        conePass.render();
-        profile( uint64 resolveStart=rdtsc(); uint64 renderTime = resolveStart-renderStart; )
-
         // Shadow-receiving ground plane
+        groundPass.clear();
         if(enableShadow) {
             // Fit size to receive all shadows
             mat4 sunToWorld = sun.inverse();
             lightMin=vec3(0,0,0), lightMax=vec3(sunShadow.width,sunShadow.height,0);
             vec3 lightRay = sunToWorld.normalMatrix()*vec3(0,0,1);
             float xMin=lightMin.x, xMax=lightMax.x, yMin=lightMin.y, yMax=lightMax.y;
-            vec4 a = sunToWorld*vec3(xMin,yMin,0),
-                    b = sunToWorld*vec3(xMin,yMax,0),
-                    c = sunToWorld*vec3(xMax,yMax,0),
-                    d = sunToWorld*vec3(xMax,yMin,0);
+            vec3 A = (sunToWorld*vec3(xMin,yMin,0)).xyz(),
+                    B = (sunToWorld*vec3(xMin,yMax,0)).xyz(),
+                    C = (sunToWorld*vec3(xMax,yMax,0)).xyz(),
+                    D = (sunToWorld*vec3(xMax,yMin,0)).xyz();
             // Project light view corners on ground plane
             float dotNL = dot(lightRay,vec3(1,0,0));
-            a -= vec4(lightRay*dot(a.xyz(),vec3(1,0,0))/dotNL,0.f);
-            b -= vec4(lightRay*dot(b.xyz(),vec3(1,0,0))/dotNL,0.f);
-            c -= vec4(lightRay*dot(c.xyz(),vec3(1,0,0))/dotNL,0.f);
-            d -= vec4(lightRay*dot(d.xyz(),vec3(1,0,0))/dotNL,0.f);
-            a=view*a; b=view*b; c=view*c; d=view*d;
-            vec4 as = viewToSun*a, bs = viewToSun*b, cs=viewToSun*c, ds=viewToSun*d;
-            vec3 attributes[][4] = {
+            A -= lightRay*dot(A,vec3(1,0,0))/dotNL;
+            B -= lightRay*dot(B,vec3(1,0,0))/dotNL;
+            C -= lightRay*dot(C,vec3(1,0,0))/dotNL;
+            D -= lightRay*dot(D,vec3(1,0,0))/dotNL;
+
+            vec4 as = sun*A, bs = sun*B, cs=sun*C, ds=sun*D;
+            vec3 lightPos[][3] = {
                 {vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)},
                 {vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
             };
-            ShadowShader groundShader (sunShadow);
-            RenderPass<ShadowShader> groundPass __(target, 2, groundShader);
-            groundPass.submit(a,b,c,attributes[0],__());
-            groundPass.submit(c,d,a,attributes[1],__());
-            groundPass.render();
+
+            /*const vec3 N = normalize(normalMatrix*cross(B-A,C-A));
+            flatPass.submit(view*A,view*B,view*C,lightPos[0],__(N,vec3(1,1,1)));
+            flatPass.submit(view*C,view*D,view*A,lightPos[1],__(N,vec3(1,1,1)));*/
+            groundPass.submit(view*A,view*B,view*C,lightPos[0],__());
+            groundPass.submit(view*C,view*D,view*A,lightPos[1],__());
         }
+
+        profile( uint64 renderStart=rdtsc(); uint64 setupTime = renderStart-setupStart; )
+
+        // Actual rendering happens there
+        scheduler.render();
+
+        profile( uint64 resolveStart=rdtsc(); uint64 renderTime = resolveStart-renderStart; )
 
         target.resolve(targetPosition,targetSize); // Resolves RenderTarget to display
 
         profile( uint64 uiStart = rdtsc(); uint64 resolveTime = uiStart-resolveStart;
                     uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime; )
-        uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (64-1)*frameTime)/64; this->frameEnd=frameEnd;
+        uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
 
-        // Overlays profile information
-        string text = str(level)+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2 + triangleCount*2)+" faces\n"
+        // Overlays errors / profile information
+        string text;
+        if(uiErrors) {
+            text=move(uiErrors);
+        } else {
+            text = (enableShadow?sunShadow.depthComplexity():string())+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2 + triangleCount*2)+" faces\n"
                                profile(
                                "misc "_+str(100*miscTime/totalTime)+"%\n"
                                "setup "_+str(100*setupTime/totalTime)+"%\n"
                                "render "_+str(100*renderTime/totalTime)+"%\n"
-                               "- raster "_+str(100*pass.rasterTime/totalTime)+"%\n"
-                               "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"
-                               "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"
-                               "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"
-                               "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"
-                               "- user "_+str(100*pass.userTime/totalTime)+"%\n"
+                               "- raster "_+str(100*scheduler.rasterTime/totalTime)+"%\n"
+                               "- pixel "_+str(100*(scheduler.pixelTime)/totalTime)+"%\n"
+                               "- sample "_+str(100*(scheduler.sampleTime)/totalTime)+"%\n"
+                               "-- MSAA split "_+str(100*(scheduler.sampleFirstTime)/totalTime)+"%\n"
+                               "-- MSAA over "_+str(100*(scheduler.sampleOverTime)/totalTime)+"%\n"
+                               "- user "_+str(100*scheduler.userTime/totalTime)+"%\n"
                                "resolve "_+str(100*resolveTime/totalTime)+"%\n"
                                    "ui "_+str(100*uiTime/totalTime)+"%\n") ""_;
-        if(userErrors) text=copy(userErrors);
+        }
         Text(text).render(int2(targetPosition+int2(16)));
-        profile( miscStart = rdtsc(); uiTime = ( (miscStart-uiStart) + (T-1)*uiTime)/T; )
-#if 0
+#if 1
         window.render(); //keep updating to get maximum performance profile
 #endif
         // HACK: Clear background for text editor (UI system expects full window clear)
         fill(Rect(targetPosition+int2(0,targetSize.y),window.size),white,false);
+        profile( miscStart = rdtsc(); uiTime = miscStart-uiStart; )
     }
 } application;
