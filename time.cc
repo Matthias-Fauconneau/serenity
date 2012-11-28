@@ -24,7 +24,7 @@ int daysInMonth(int month, int year=0) {
 template<class T> bool inRange(T min, T x, T max) { return x>=min && x<max; }
 debug(void Date::invariant() const {
     //Date
-    if(year>=0) { assert(inRange(2012, year, 2013)); }
+    if(year>=0) { assert(inRange(2012, year, 2099)); }
     if(month>=0) { assert(year>=0); assert(inRange(0, month, 12)); }
     if(day>=0) { assert(month>=0); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
     if(weekDay>=0) {
@@ -151,7 +151,9 @@ Date parse(TextData& s) {
         }
     }
     if(date.year<0 && (date.month>=0 || date.day>=0)) {
-        date.year=Date(currentTime()).year;
+        Date now(currentTime());
+        date.year=now.year;
+        if(date.month>=0 && now.month-date.month > 6) date.year++; //implicit next year for dates otherwise >6 month in the past
         if(date.month<0) {
             date.month=Date(currentTime()).month;
             if(date.day<0) {

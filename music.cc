@@ -91,7 +91,7 @@ struct Music {
         array<string> files = folder.list(Files);
         for(string& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
-                for(const Text& text: sheets) if(text.text==section(file,'.')) goto break_;
+                for(const Text& text: sheets) if(text.text==toUTF32(section(file,'.'))) goto break_;
                 /*else*/ sheets << string(section(file,'.'));
                 break_:;
             }
@@ -161,7 +161,7 @@ struct Music {
     }
 
     /// Opens the given PDF+MIDI sheet
-    void openSheet(uint index) { openSheet(sheets[index].text); }
+    void openSheet(uint index) { openSheet(toUTF8(sheets[index].text)); }
     string name;
     void openSheet(const ref<byte>& name) {
         if(play) togglePlay();

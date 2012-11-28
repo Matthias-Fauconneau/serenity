@@ -1,7 +1,6 @@
 #pragma once
 /// \file map.h Associative array (using linear search)
 #include "array.h"
-#include "meta.h" //perfect forwarding
 #include "string.h"
 
 template<class K, class V> struct const_pair { const K& key; const V& value; };
@@ -19,38 +18,49 @@ template<class K, class V> struct map {
 
     const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
     V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
-    /*template<class... Args> V value(const K& key, Args&&... args) {
-        int i = keys.indexOf(key);
-        return i>=0 ? values[i] : V(forward<Args>(args)___);
-    }*/
-    V value(const K& key, const V& value=V()) {
+
+    const V& value(const K& key, V&& value) {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : value;
     }
+    V value(const K& key, const V& value) {
+        int i = keys.indexOf(key);
+        return i>=0 ? values[i] : value;
+    }
+
     V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
 
-    template<perfect(K)> V& insert(Kf&& key) {
-        assert(!contains(key),key);
-        keys << forward<Kf>(key); values << V(); return values.last();
-    }
-    template<perfect2(K,V)>
-    V& insert(Kf&& key, Vf&& value) {
+    V& insert(K&& key) { assert(!contains(key),key); keys << move(key); values << V(); return values.last(); }
+    V& insert(const K& key) { assert(!contains(key),key); keys << key; values << V(); return values.last(); }
+
+    V& insert(K&& key, V&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
-        keys << forward<Kf>(key); values << forward<Vf>(value); return values.last();
+        keys << move(key); values << move(value); return values.last();
     }
-    template<perfect2(K,V)>
-    V& insertSorted(Kf&& key, Vf&& value) {
+    V& insert(K&& key, const V& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
-        return  values.insertAt(keys.insertSorted(forward<Kf>(key)),forward<Vf>(value));
+        keys << move(key); values << value; return values.last();
     }
-    template<perfect2(K,V)>
-    V& insertMulti(Kf&& key, Vf&& value) {
-        keys << forward<Kf>(key); values << forward<Vf>(value); return values.last();
+    V& insert(const K& key, V&& value) {
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        keys << key; values << move(value); return values.last();
+    }
+    V& insert(const K& key, const V& value) {
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        keys << key; values << value; return values.last();
+    }
+
+    V& insertSorted(const K& key, const V& value) {
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        return  values.insertAt(keys.insertSorted(key),value);
+    }
+    V& insertMulti(const K& key, const V& value) {
+        keys << key; values << value; return values.last();
     }
 
     V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
-    template<perfect(K)> V& sorted(Kf&& key) {
+    V& sorted(const K& key) {
         int i = keys.indexOf(key); if(i>=0) return values[i];
         return values.insertAt(keys.insertSorted(key),V());
     }

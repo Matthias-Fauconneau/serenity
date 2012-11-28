@@ -110,13 +110,14 @@ struct Shadow {
 
     // 2D space partitioning to accelerate shadow ray casts
     struct Bin { uint16 faceCount=0; uint16 faces[63]; };
-    int width=0, height=0;
+    int width=0, height=0; float maxZ=0;
     Bin* bins=0;
 
-    void resize(int2 size, uint faceCapacity) {
+    // Resizes light space
+    void resize(int2 size, float maxZ, uint faceCapacity) {
         if(bins) unallocate(bins,width*height);
         if(faces) unallocate(faces,faceCapacity);
-        width = size.x, height = size.y;
+        width = size.x, height = size.y; this->maxZ=maxZ;
         bins = allocate64<Bin>(width*height);
         faces = allocate64<Face>(this->faceCapacity=faceCapacity);
     }
@@ -129,6 +130,9 @@ struct Shadow {
         for(uint i: range(width*height)) bins[i].faceCount=0;
     }
 
+    // scale sample pattern to soften shadow depending on occluder distance
+    const float A0=1/16.f, dzA=1/256.f; //FIXME: a should be pixel area in light space, b ~ tan(light angular diameter)
+
     void submit(vec4 A, vec4 B, vec4 C) {
         assert(abs(A.w-1)<0.01); assert(abs(B.w-1)<0.01); assert(abs(C.w-1)<0.01);
         if(faceCount>=faceCapacity) { uiError("shadow"_,"Face overflow"_); return; }
@@ -140,6 +144,7 @@ struct Shadow {
         E = E.cofactor(); //edge equations are now columns of E
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
+        float meanZ = (A.z+B.z+C.z)/3;
 
         float binReject[3];
         for(int e=0;e<3;e++) {
@@ -147,7 +152,9 @@ struct Shadow {
             float step0 = (edge.x>0?edge.x:0) + (edge.y>0?edge.y:0); //conserve whole bin
             float step1 = abs(edge.x) + abs(edge.y); //add margin for soft shadow sampling
             // initial reject corner distance
-            binReject[e] = E[e].z + step0 + step1;
+            float d = maxZ-meanZ;
+            float spread = A0+dzA*d;
+            binReject[e] = E[e].z + step0 + spread*step1;
         }
 
         int2 min = ::max(int2(1,1),int2(floor(::min(::min(A.xy(),B.xy()),C.xy()))));
@@ -197,9 +204,8 @@ struct Shadow {
                 float d = lightPos.z-z;
                 if(d<=1.f) continue; //only Z-test midpoint
 
-                // scale sample pattern to soften shadow depending on occluder distance
-                const float A0=1/16.f, dzA=1/256.f; //FIXME: a should be pixel area in light space, b ~ tan(light angular diameter)
-                vec16 lightX = lightPos.x + (A0+dzA*d)*pattern.X, lightY = lightPos.y + (A0+dzA*d)*pattern.Y;
+                float spread = A0+dzA*d;
+                vec16 lightX = lightPos.x + spread*pattern.X, lightY = lightPos.y + spread*pattern.Y;
 
                 vec16 a = face.E[0].x * lightX + face.E[0].y * lightY + face.E[0].z;
                 vec16 b = face.E[1].x * lightX + face.E[1].y * lightY + face.E[1].z;
@@ -816,8 +822,8 @@ struct Editor : Widget {
 
         // Prepares sun shadow
         mat4 sun; sun.rotateY(PI/4);
-        vec3 lightMin=(sun*sceneMin).xyz(), lightMax=(sun*sceneMax).xyz();
-        for(int x=0;x<2;x++) for(int y=0;y<2;y++) for(int z=0;z<2;z++) {
+        vec3 lightMin=(sun*sceneMin).xyz(), lightMax=(sun*sceneMax).xyz(); //Bounding in light space
+        for(int x=0;x<2;x++) for(int y=0;y<2;y++) for(int z=0;z<2;z++) { //TODO: bounding world space box is not tight
             lightMin = min(lightMin,(sun*vec3((x?sceneMax:sceneMin).x,(y?sceneMax:sceneMin).y,(z?sceneMax:sceneMin).z)).xyz());
             lightMax = max(lightMax,(sun*vec3((x?sceneMax:sceneMin).x,(y?sceneMax:sceneMin).y,(z?sceneMax:sceneMin).z)).xyz());
         }
@@ -827,10 +833,11 @@ struct Editor : Widget {
         sun.translate(-lightMin);
         sun.rotateY(PI/4);
         if(enableShadow) {
-            int2 sunShadowSize = int2(ceil(lightScale*(lightMax-lightMin).xy()));
+            vec3 lightSpace = lightScale*(lightMax-lightMin);
+            int2 sunShadowSize = int2(ceil(lightSpace.xy()));
             uint faceCount = cones.size()*2 + triangleCount;
             if(sunShadow.faceCapacity != faceCount || sunShadowSize != int2(sunShadow.width,sunShadow.height)) {
-                sunShadow.resize(sunShadowSize, faceCount);
+                sunShadow.resize(sunShadowSize, lightSpace.z, faceCount); //FIXME: incorrect Zmax (ground plane receiver is not in lightSpace)
                 sunShadow.clear();
 
                 // Setups branches (view-aligned rectangle impostors)

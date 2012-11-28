@@ -69,10 +69,10 @@ static Variant parse(TextData& s) {
             }
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
-                int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,Variant(1)).integer();
+                int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,1).integer();
                 if(predictor != 12) error("Unsupported predictor",predictor);
                 int size = stream.size();
-                int w = v.dict.at("DecodeParms"_).dict.value("Columns"_,Variant(1)).integer();
+                int w = v.dict.at("DecodeParms"_).dict.value("Columns"_,1).integer();
                 int h = size/(w+1);
                 assert(size == (w+1)*h);
                 const byte* src = stream.data();
