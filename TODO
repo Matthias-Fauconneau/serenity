@@ -1,5 +1,4 @@
 CG:
- Cylinders: vertex lighting
  hardware rendering: faces, MSAA, raycasted soft shadows (shadow map if still too slow))
  Editor: copy-paste, XCompose, syntax highlighting
  Export .obj [release]

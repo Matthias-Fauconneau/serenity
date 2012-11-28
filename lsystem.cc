@@ -87,13 +87,8 @@ struct Face {
 static struct Pattern {
     vec16 X,Y;
     Pattern() {
-        // jittered radial sample pattern
-#define RANDOM 1
-#if RANDOM
+        // jittered radial sample pattern (TODO: spatial [+temporal?] filter)
         Random random;
-#else
-        float random=0;
-#endif
         for(int u=0;u<4;u++) for(int v=0;v<4;v++) {
             float r = sqrt( (u + (random+1)/2.f) / 4.f );
             float t = (v + (random+1)/2.f) / 4.f;
@@ -143,7 +138,6 @@ struct Shadow {
         Face& face = faces[faceCount];
         mat3& E = face.E;
         E = mat3(A.xyw(), B.xyw(), C.xyw());
-        //float det = E.det(); if(det<0.001f) return; //cull backward faces. Let user cull to avoid some setup
         E = E.cofactor(); //edge equations are now columns of E
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
@@ -162,7 +156,6 @@ struct Shadow {
 
         int2 min = ::max(int2(1,1),int2(floor(::min(::min(A.xy(),B.xy()),C.xy()))));
         int2 max = ::min(int2(width-1-1,height-1-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy()))));
-        //FIXME: This is not conservative enough for large sample patterns (far occluder)
         for(int binY=min.y-1; binY<=max.y+1; binY++) for(int binX=min.x-1; binX<=max.x+1; binX++) {
             const vec2 binXY = vec2(binX, binY);
             // trivial reject
@@ -187,13 +180,7 @@ struct Shadow {
     }
 
     inline float operator()(vec3 lightPos) const {
-#define SOFT 1
-#if SOFT
-#if RANDOM
         const Pattern& pattern = patterns[randomPattern()%16];
-#else
-        const Pattern& pattern = patterns[0];
-#endif
         vec16 samples = 0;
         uint x=lightPos.x, y=lightPos.y;
         if(x<(uint)width && y<(uint)height) {
@@ -205,7 +192,7 @@ struct Shadow {
                 float w = 1/dot(face.iw,XY1);
                 float z = w*dot(face.iz,XY1);
                 float d = lightPos.z-z;
-                if(d<=1.f) continue; //only Z-test midpoint
+                if(d<=0.f) continue; //only Z-test midpoint
 
                 float spread = A0+dzA*d;
                 vec16 lightX = lightPos.x + spread*pattern.X, lightY = lightPos.y + spread*pattern.Y;
@@ -217,27 +204,6 @@ struct Shadow {
             }
         }
         return __builtin_popcount(mask(samples))/16.f;
-#else
-        uint x=lightPos.x, y=lightPos.y;
-        if(x<(uint)width && y<(uint)height) {
-            const Bin& bin = bins[y*width+x];
-            for(uint i: range(bin.faceCount)) {
-                uint index = bin.faces[i];
-                const Face& face = faces[index];
-                const vec3 XY1(lightPos.x,lightPos.y,1.f);
-                float w = 1/dot(face.iw,XY1);
-                float z = w*dot(face.iz,XY1);
-                float d = lightPos.z-z;
-                if(d<=1.f) continue; //only Z-test midpoint
-
-                float a = face.E[0].x * lightPos.x + face.E[0].y * lightPos.y + face.E[0].z;
-                float b = face.E[1].x * lightPos.x + face.E[1].y * lightPos.y + face.E[1].z;
-                float c = face.E[2].x * lightPos.x + face.E[2].y * lightPos.y + face.E[2].z;
-                if((a > 0.f) && (b > 0.f) && (c > 0.f)) return 1;
-            }
-        }
-        return 0;
-#endif
     }
 };
 
@@ -289,45 +255,6 @@ struct FlatShader : ShadowShader {
         vec3 diffuseLight
                 = hemisphericLight(face.N,sky)*skyColor
                 + sunLight*directionnalLight(face.N,sun)*sunColor;
-
-        vec3 diffuse = face.albedo*diffuseLight;
-        return vec4(diffuse,1.f);
-    }
-};
-
-/// Shader for view-aligned cone impostors (e.g stalk, branches) lit by hemispheric sky and shadow-casting sun lights.
-struct ConeShader : ShadowShader {
-    // Uniform attributes
-    vec3 sky, sun; bool enableShadow;
-
-    // Shader specification (used by rasterizer)
-    struct FaceAttributes {
-        vec3 Y,Z; // Normal basis to fix cone lighting
-        vec3 N; // Light space normal to fix position for shadow reception
-        vec3 albedo; // Surface color
-    };
-    static constexpr int V = 4; // number of interpolated vertex attributes (cone position + 3D light space position)
-
-    ConeShader(const Shadow& shadow):ShadowShader(shadow){} //FIXME: inherit constructor
-
-    vec4 operator()(FaceAttributes face, float varying[V]) const {
-        // Clip to avoid negative square root
-        float d = clip(-1.f,varying[0],1.f);
-
-        float sunLight=1.f;
-        if(enableShadow) {
-            vec3 lightPos = vec3(varying[1],varying[2],varying[3]);
-            lightPos += sqrt(1-d*d)*face.N; // fix light position
-            sunLight -= shadow(lightPos);
-        }
-
-        // Reconstruct cone normal
-        vec3 N = d*face.Y + sqrt(1-d*d)*face.Z;
-
-        // Computes diffused light from hemispheric sky light and shadow-casting directionnal sun light
-        vec3 diffuseLight
-                = hemisphericLight(N,sky)*skyColor
-                + sunLight*directionnalLight(N,sun)*sunColor;
 
         vec3 diffuse = face.albedo*diffuseLight;
         return vec4(diffuse,1.f);
@@ -640,8 +567,6 @@ struct Editor : Widget {
     Shadow sunShadow;
 
     RenderScheduler scheduler __(target);
-    ConeShader coneShader __(sunShadow); //TODO: tesselate, merge with generic face pass
-    RenderPass<ConeShader> conePass __(coneShader);
     FlatShader flatShader __(sunShadow);
     RenderPass<FlatShader> flatPass __(flatShader); //TODO: vertex normals
     ShadowShader groundShader __(sunShadow);
@@ -649,10 +574,7 @@ struct Editor : Widget {
 
     // Scene
      vec3 sceneMin=0, sceneMax=0; // Scene bounding box
-     /// Cone between disks A, B (stalk, branches)
-     struct Cone { mat4 A,B; vec3 color; };
-     array<Cone> cones;
-     /// Faces (leaves, TODO: tesselate cones; merge ground plane in generic flat shaded faces pass; vertex normals)
+     /// Faces (leaves, merge ground plane in generic shaded faces pass; vertex normals)
      struct Face {
          vec3 A,B,C; // World-space position
          vec3 N; // World-space surface normal
@@ -676,7 +598,7 @@ struct Editor : Widget {
     void generate() {
         if(uiErrors) return;
 
-        cones.clear(); faces.clear(); sceneMin=0, sceneMax=0;
+        faces.clear(); sceneMin=0, sceneMax=0;
 
         if(!level) level=system.constants.at(string("N"_));
         array<Module> modules = system.generate(level);
@@ -715,7 +637,29 @@ struct Editor : Widget {
                 if(symbol=="F"_) {
                     vec3 P = state[3].xyz();
                     if(polygonStack) polygon.vertices << P;
-                    else cones << Cone __(A,B,color);
+                    else { // Tesselated branch
+                        vec3 a = (A*vec3(0,1,0)).xyz() - A[3].xyz(), b = (B*vec3(0,1,0)).xyz() - B[3].xyz();
+                        const int Na = max(3,int(length(a))), Nb = max(3,int(length(b)));
+                        for(int i=0;i<Na;i++) {
+                            float ta0 = 2*PI*i/Na, ta1 = 2*PI*(i+1)/Na;
+                            vec3 a0 = (A * (vec3(0, cos(ta0), sin(ta0)))).xyz();
+                            vec3 a1 = (A * (vec3(0, cos(ta1), sin(ta1)))).xyz();
+                            int bestJ=-1; float bestD=__FLT_MAX__;
+                            for(int j=0;j<Na;j++) { //FIXME: find out the smarter way to solve this
+                                float tb0 = 2*PI*j/Nb, tb1 = 2*PI*(j+1)/Nb;
+                                vec3 b0 = (B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
+                                vec3 b1 = (B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
+                                vec3 a = A[3].xyz(), b = B[3].xyz();
+                                float d = length((a0-a)-(b0-b))+length((a1-a)-(b1-b));
+                                if(d<bestD) bestJ=j, bestD=d;
+                            }
+                            float tb0 = 2*PI*bestJ/Nb, tb1 = 2*PI*(bestJ+1)/Nb;
+                            vec3 b0 = (B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
+                            vec3 b1 = (B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
+                            faces << Face __(a0,a1,b0, normalize(cross(a1-a0,b0-a0)), color);
+                            faces << Face __(a1,b1,b0, normalize(cross(b1-a1,b0-a1)), color);
+                        }
+                    }
                     sceneMin=min(sceneMin,P);
                     sceneMax=max(sceneMax,P);
                 }
@@ -738,13 +682,14 @@ struct Editor : Widget {
                 polygonStack << move(polygon);
                 polygon.color = color;
             } else if(symbol=="}"_) { // stores current polygon and pop previous nesting level from stack
-                if(0 && polygon.vertices.size()>=3) {
+                if(polygon.vertices.size()>=3) {
                     vec3 A = polygon.vertices.first();
                     vec3 B = polygon.vertices[1];
                     for(vec3 C: polygon.vertices.slice(2)) {
                         vec3 N = normalize(cross(B-A,C-A));
-                        faces << Face __(A, B, C, N, polygon.color);
-                        faces << Face __(C, B, A, -N, polygon.color); //Two-sided (backface culling is always on)
+                        vec3 dn = 0.1f*N; // avoid self-shadowing
+                        faces << Face __(A+dn, B+dn, C+dn, N, polygon.color);
+                        faces << Face __(C-dn, B-dn, A-dn, -N, polygon.color); //Two-sided (backface culling is always on)
                         B = C;
                     }
                 }
@@ -826,33 +771,6 @@ struct Editor : Widget {
     void render(int2 targetPosition, int2 targetSize) override {
         profile( uint64 setupStart=rdtsc(); uint64 miscTime = setupStart-miscStart; )
 
-        if(testToggle) { //Tesselates cones
-            for(const Cone& cone: cones) {
-                vec3 A = (cone.A*vec3(0,1,0)).xyz() - cone.A[3].xyz(), B = (cone.B*vec3(0,1,0)).xyz() - cone.B[3].xyz();
-                const int Na = max(3,int(length(A))), Nb = max(3,int(length(B)));
-                for(int i=0;i<Na;i++) {
-                    float ta0 = 2*PI*i/Na, ta1 = 2*PI*(i+1)/Na;
-                    vec3 a0 = (cone.A * (vec3(0, cos(ta0), sin(ta0)))).xyz();
-                    vec3 a1 = (cone.A * (vec3(0, cos(ta1), sin(ta1)))).xyz();
-                    int bestJ=-1; float bestD=__FLT_MAX__;
-                    for(int j=0;j<Na;j++) { //FIXME: find out the smarter way to solve this
-                        float tb0 = 2*PI*j/Nb, tb1 = 2*PI*(j+1)/Nb;
-                        vec3 b0 = (cone.B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
-                        vec3 b1 = (cone.B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
-                        vec3 A = cone.A[3].xyz(), B = cone.B[3].xyz();
-                        float d = length((a0-A)-(b0-B))+length((a1-A)-(b1-B));
-                        if(d<bestD) bestJ=j, bestD=d;
-                    }
-                    float tb0 = 2*PI*bestJ/Nb, tb1 = 2*PI*(bestJ+1)/Nb;
-                    vec3 b0 = (cone.B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
-                    vec3 b1 = (cone.B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
-                    faces << Face __(a0,a1,b0, normalize(cross(a1-a0,b0-a0)), cone.color);
-                    faces << Face __(a1,b1,b0, normalize(cross(b1-a1,b0-a1)), cone.color);
-                }
-            }
-            cones.clear(); //only once
-        }
-
         // Prepares render target
         if(targetSize != target.size) {
             target.resize(targetSize);
@@ -864,8 +782,6 @@ struct Editor : Widget {
         target.clear();
 
         // Prepares render passes
-        if(targetSize != target.size || conePass.faceCapacity != cones.size()*2) //TODO: tesselate
-            conePass.resize(target, cones.size()*2);
         if(targetSize != target.size || flatPass.faceCapacity != faces.size())
             flatPass.resize(target, faces.size());
         if(targetSize != target.size || groundPass.faceCapacity != 2)
@@ -886,9 +802,8 @@ struct Editor : Widget {
         if(enableShadow) {
             vec3 lightSpace = lightScale*(lightMax-lightMin);
             int2 sunShadowSize = int2(ceil(lightSpace.xy()));
-            uint faceCount = cones.size()*2 + faces.size();
-            if(sunShadow.faceCapacity != faceCount || sunShadowSize != int2(sunShadow.width,sunShadow.height)) {
-                sunShadow.resize(sunShadowSize, lightSpace.z, faceCount); //FIXME: incorrect Zmax (ground plane receiver is not in lightSpace)
+            if(sunShadow.faceCapacity != faces.size() || sunShadowSize != int2(sunShadow.width,sunShadow.height)) {
+                sunShadow.resize(sunShadowSize, lightSpace.z, faces.size()); //FIXME: incorrect Zmax (ground plane receiver is not in lightSpace)
                 sunShadow.clear();
 
                 // Setups faces (TODO: vectorize)
@@ -896,6 +811,7 @@ struct Editor : Widget {
                     vec4 a = sun*face.A, b = sun*face.B, c=sun*face.C;
                     if(cross((b-a).xyz(),(c-a).xyz()).z > 0) { //backward cull
                         sunShadow.submit(a,b,c);
+                    } else {
                         // Precomputes light space position to be interpolated as a vertex attribute
                         face.lightPos[0] = vec3(a.x,b.x,c.x);
                         face.lightPos[1] = vec3(a.y,b.y,c.y);
@@ -909,8 +825,8 @@ struct Editor : Widget {
         vec2 displaySize = vec2(targetSize.x*4,targetSize.y*4);
         view.translate(vec3(displaySize.x/2,displaySize.y/3,0.f)); //center scene
         view.scale(scale); //normalize view space to fit display
-        view.rotateX(rotation.y); // pitch
-        view.rotateY(rotation.x); // yaw
+        view.rotateX(rotation.y); // yaw
+        view.rotateY(rotation.x); // pitch
         view.rotateZ(PI/2); //+X (heading) is up
 
         // View-space lighting
@@ -927,7 +843,7 @@ struct Editor : Widget {
         for(const Face& face: faces) {
             vec4 A = view*face.A, B = view*face.B, C = view*face.C;
             if(cross((B-A).xyz(),(C-A).xyz()).z > 0) {
-                vec3 N = normalMatrix*face.N; // per-face normal for flat shading
+                vec3 N = normalize(normalMatrix*face.N); // per-face normal for flat shading
                 flatPass.submit(A,B,C, face.lightPos, __(N,face.color));
             }
         }
@@ -980,7 +896,7 @@ struct Editor : Widget {
         if(uiErrors) {
             text=move(uiErrors);
         } else {
-            text = (enableShadow?sunShadow.depthComplexity():string())+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(cones.size()*2 + faces.size())+" faces\n"
+            text = (enableShadow?sunShadow.depthComplexity():string())+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(faces.size())+" faces\n"
                                profile(
                                "misc "_+str(100*miscTime/totalTime)+"%\n"
                                "setup "_+str(100*setupTime/totalTime)+"%\n"
