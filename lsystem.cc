@@ -58,8 +58,10 @@ string uiErrors;
 
 // Light
 
-inline float acos(float t) { return __builtin_acosf(t); }
+inline float cos(float t) { return __builtin_cosf(t); }
 inline float sin(float t) { return __builtin_sinf(t); }
+inline float acos(float t) { return __builtin_acosf(t); }
+inline float asin(float t) { return __builtin_asinf(t); }
 /// Directional light with angular diameter
 inline float angularLight(vec3 surfaceNormal, vec3 lightDirection, float angularDiameter) {
     float t = ::acos(dot(lightDirection,surfaceNormal)); // angle between surface normal and light principal direction
@@ -626,7 +628,7 @@ struct Editor : Widget {
     Window window __(&layout,int2(0,0),"L-System Editor"_);
 
     bool enableShadow=true; // Whether shadows are rendered
-    bool testToggle=false; // Toggle boolean for testing
+    bool testToggle=true; // Toggle boolean for testing
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(0,PI/4); // current view angles (yaw,pitch)
     uint64 frameEnd=cpuTime(), frameTime=106000; // last frame end and initial frame time in microseconds
@@ -646,8 +648,8 @@ struct Editor : Widget {
 
     // Scene
      vec3 sceneMin=0, sceneMax=0; // Scene bounding box
-     /// Cone from A to B with radius wA to wB (stalk, branches)
-     struct Cone { vec3 A,B; float wA,wB; vec3 color; };
+     /// Cone from A to B (stalk, branches)
+     struct Cone { mat4 A,B; vec3 color; };
      array<Cone> cones;
      /// Faces (leaves, TODO: tesselate cones; merge ground plane in generic flat shaded faces pass; vertex normals)
      struct Face {
@@ -690,27 +692,28 @@ struct Editor : Widget {
                 float l = module.arguments.size()>0?module.arguments[0]:4,
                         wA = module.arguments.size()>1?module.arguments[1]:1,
                         wB = module.arguments.size()>2?module.arguments[2]:1;
-                vec3 A = state[3].xyz();
+                mat4 A = state;
+                mat4 sA; sA.scale(wA); A = sA * A;
+                // Move forward
                 state.translate(vec3(l,0,0)); //forward axis is +X
-                vec3 B = state[3].xyz();
+                // Apply tropism
+                if(system.constants.contains(string("tropism"_))) {
+                    float tropism = system.constants.at(string("tropism"_));
+                    vec3 X = state[0].xyz();
+                    vec3 Y = cross(vec3(-1,0,0),X);
+                    float y = length(Y);
+                    if(y<0.01) continue; //X is colinear to tropism (all rotations are possible)
+                    assert(Y.x==0);
+                    state.rotate(tropism,state.inverse().normalMatrix()*Y);
+                }
+                mat4 B = state;
+                mat4 sB; sB.scale(wB); B = sB * B;
                 if(symbol=="F"_) {
-                    if(polygonStack) polygon.vertices << state[3].xyz();
-                    else {
-                        cones << Cone __(A,B,wA,wB,color);
-
-                        // Apply tropism
-                        if(system.constants.contains(string("tropism"_))) {
-                            float tropism = system.constants.at(string("tropism"_));
-                            vec3 X = state[0].xyz();
-                            vec3 Y = cross(vec3(-1,0,0),X);
-                            float y = length(Y);
-                            if(y<0.01) continue; //X is colinear to tropism (all rotations are possible)
-                            assert(Y.x==0);
-                            state.rotate(tropism,state.inverse().normalMatrix()*Y);
-                        }
-                    }
-                    sceneMin=min(sceneMin,B);
-                    sceneMax=max(sceneMax,B);
+                    vec3 P = state[3].xyz();
+                    if(polygonStack) polygon.vertices << P;
+                    else cones << Cone __(A,B,color);
+                    sceneMin=min(sceneMin,P);
+                    sceneMax=max(sceneMax,P);
                 }
             } else if(symbol=="."_) {
                 vec3 P = state[3].xyz();
@@ -779,7 +782,7 @@ struct Editor : Widget {
         window.localShortcut(Key(KP_Add)).connect([this]{if(level<256) level++; generate();});
         window.localShortcut(Key(Return)).connect([this]{writeFile("snapshot.png"_,encodePNG(window.getSnapshot()),home());});
         window.localShortcut(Key('s')).connect([this]{enableShadow=!enableShadow; window.render();});
-        window.localShortcut(Key(' ')).connect([this]{testToggle=!testToggle; window.render();});
+        window.localShortcut(Key(' ')).connect([this]{testToggle=!testToggle; generate();});
         watcher.fileModified.connect([this]{openSystem(systems.index);});
         editor.textChanged.connect([this](const ref<byte>& text){writeFile(string(system.name+".l"_),text,cwd());});
     }
@@ -815,6 +818,26 @@ struct Editor : Widget {
 
     void render(int2 targetPosition, int2 targetSize) override {
         profile( uint64 setupStart=rdtsc(); uint64 miscTime = setupStart-miscStart; )
+
+        if(testToggle) { //Tesselates cones
+            for(const Cone& cone: cones) {
+                const float R = 1./4;
+                //const int Na = max(3,int(l*R)), Nb = max(3,int(cone.wB*R));
+                const int Na = 3, Nb = 3;
+                const int N = max(Na,Nb);
+                for(int i=0;i<N;i++) {
+                    float ta0 = 2*PI*(i*Na/N)/Na, ta1 = 2*PI*((i+1)*Na/N)/Na;
+                    float tb0 = 2*PI*(i*Nb/N)/Nb, tb1 = 2*PI*((i+1)*Nb/N)/Nb;
+                    vec3 a0 = cone.A *  + cone.wA * ( cos(ta0) * Y + sin(ta0) * Z );
+                    vec3 a1 = cone.A + cone.wA * ( cos(ta1) * Y + sin(ta1) * Z );
+                    vec3 b0 = cone.B + cone.wB * ( cos(tb0) * Y + sin(tb0) * Z );
+                    vec3 b1 = cone.B + cone.wB * ( cos(tb1) * Y + sin(tb1) * Z );
+                    faces << Face __(a0,a1,b0, normalize(cross(a1-a0,b0-a0)), cone.color);
+                    faces << Face __(a1,b1,b0, normalize(cross(b1-a1,b0-a1)), cone.color);
+                }
+            }
+            cones.clear(); //only once
+        }
 
         // Prepares render target
         if(targetSize != target.size) {
@@ -896,37 +919,43 @@ struct Editor : Widget {
         vec3 sunLightDirection = normalize(sunToView.normalMatrix()*vec3(0,0,-1));
         vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
-        // Setups branches (view-aligned rectangle impostors)
-        coneShader.enableShadow=enableShadow, coneShader.sky = skyLightDirection, coneShader.sun =sunLightDirection;
-        conePass.clear();
-        for(Cone cone: cones) {
-            // View transform
-            vec3 A=(view*cone.A).xyz(); float wA = scale*cone.wA;
-            vec3 B=(view*cone.B).xyz(); float wB = scale*cone.wB;
+        scheduler.passes.clear();
 
-            // Principal axis
-            vec3 X = B-A; {float l = length(X);  if(l<1) continue; X /= l;}
+        // Setups branches
+        if(!testToggle) { //or as view-aligned rectangle impostors
+            scheduler.passes << &conePass;
+            coneShader.enableShadow=enableShadow, coneShader.sky = skyLightDirection, coneShader.sun = sunLightDirection;
+            conePass.clear();
+            for(const Cone& cone: cones) {
+                // View transform
+                vec3 A=(view*cone.A).xyz(); float wA = scale*cone.wA;
+                vec3 B=(view*cone.B).xyz(); float wB = scale*cone.wB;
 
-            // Normal basis to be interpolated
-            vec3 Y=normalize(cross(vec3(0,0,1),X)), Z=cross(X,Y);
-            // Normal in light space (scaled with radius) to fix light position
-            vec3 N = normalize(viewToSun.normalMatrix()*Z)*lightScale*max(cone.wA,cone.wB);
+                // Principal axis
+                vec3 X = B-A; {float l = length(X);  if(l<1) continue; X /= l;}
 
-            // View aligned rectangle
-            vec4 a(A - wA*Y, 1.f), b(B - wB*Y, 1.f), c(B + wB*Y, 1.f), d(A + wA*Y, 1.f);
-            // View aligned rectangle position in light space (interpolate light space coordinates)
-            vec4 as = viewToSun*a, bs = viewToSun*b, cs=viewToSun*c, ds=viewToSun*d;
-            vec3 attributes[][4] = {
-                {vec3(-1,-1,1),vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)},
-                {vec3(1,1,-1),vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
-            };
-            conePass.submit(a,b,c,attributes[0],__(Y,Z,N,cone.color));
-            conePass.submit(c,d,a,attributes[1],__(Y,Z,N,cone.color));
+                // Normal basis to be interpolated
+                vec3 Y=normalize(cross(vec3(0,0,1),X)), Z=cross(X,Y);
+                // Normal in light space (scaled with radius) to fix light position
+                vec3 N = normalize(viewToSun.normalMatrix()*Z)*lightScale*max(cone.wA,cone.wB);
+
+                // View aligned rectangle
+                vec4 a(A - wA*Y, 1.f), b(B - wB*Y, 1.f), c(B + wB*Y, 1.f), d(A + wA*Y, 1.f);
+                // View aligned rectangle position in light space (interpolate light space coordinates)
+                vec4 as = viewToSun*a, bs = viewToSun*b, cs=viewToSun*c, ds=viewToSun*d;
+                vec3 attributes[][4] = {
+                    {vec3(-1,-1,1),vec3(as.x,bs.x,cs.x),vec3(as.y,bs.y,cs.y),vec3(as.z,bs.z,cs.z)},
+                    {vec3(1,1,-1),vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
+                };
+                conePass.submit(a,b,c,attributes[0],__(Y,Z,N,cone.color));
+                conePass.submit(c,d,a,attributes[1],__(Y,Z,N,cone.color));
+            }
         }
 
         // Setups leafs (convex polygons)
-        flatShader.enableShadow=enableShadow, flatShader.sky = skyLightDirection, flatShader.sun = sunLightDirection;
+        scheduler.passes << &flatPass;
         flatPass.clear();
+        flatShader.enableShadow=enableShadow, flatShader.sky = skyLightDirection, flatShader.sun = sunLightDirection;
         for(const Face& face: faces) {
             vec4 A = view*face.A, B = view*face.B, C = view*face.C;
             if(cross((B-A).xyz(),(C-A).xyz()).z > 0) {
@@ -936,7 +965,6 @@ struct Editor : Widget {
         }
 
         // Shadow-receiving ground plane
-        if(testToggle) groundPass.clear();
         if(enableShadow) {
             // Fit size to receive all shadows
             mat4 sunToWorld = sun.inverse();
@@ -960,22 +988,15 @@ struct Editor : Widget {
                 {vec3(cs.x,ds.x,as.x),vec3(cs.y,ds.y,as.y),vec3(cs.z,ds.z,as.z)}
             };
 
-            if(testToggle) {
-                groundPass.submit(view*A,view*B,view*C,lightPos[0],__());
-                groundPass.submit(view*C,view*D,view*A,lightPos[1],__());
-            } else {
-                const vec3 N = normalize(normalMatrix*cross(B-A,C-A));
-                flatPass.submit(view*A,view*B,view*C,lightPos[0],__(N,vec3(1,1,1)));
-                flatPass.submit(view*C,view*D,view*A,lightPos[1],__(N,vec3(1,1,1)));
-            }
+            scheduler.passes <<&groundPass;
+            groundPass.clear();
+            groundPass.submit(view*A,view*B,view*C,lightPos[0],__());
+            groundPass.submit(view*C,view*D,view*A,lightPos[1],__());
         }
 
         profile( uint64 renderStart=rdtsc(); uint64 setupTime = renderStart-setupStart; )
 
         // Actual rendering happens there
-        scheduler.passes.clear();
-        if(testToggle) scheduler.passes << &flatPass << &conePass <<&groundPass;
-        else scheduler.passes << &flatPass << &conePass;
         scheduler.render();
 
         profile( uint64 resolveStart=rdtsc(); uint64 renderTime = resolveStart-renderStart; )
