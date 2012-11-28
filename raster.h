@@ -239,7 +239,7 @@ struct RenderPassBase {
 
     struct Bin {
         uint16 faceCount=0;
-        uint16 faces[127];
+        uint16 faces[255];
     };
     Bin* bins=0;
 

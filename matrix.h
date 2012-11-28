@@ -46,6 +46,9 @@ struct mat3 {
 
     mat3 translate(vec2 v) const { mat3 r=*this; for(int i=0;i<2;i++) r(i,2) += m(i,0)*v.x + m(i,1)*v.y; return r; }
     mat3 scale(float f) const { mat3 r=*this; for(int j=0;j<2;j++)for(int i=0;i<3;i++) r(i,j)*=f; return r; }
+    void rotateX(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.m(1,1) = c; r.m(2,2) = c; r.m(1,2) = -s; r.m(2,1) = s; *this = *this * r; }
+    void rotateY(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.m(0,0) = c; r.m(2,2) = c; r.m(2,0) = -s; r.m(0,2) = s; *this = *this * r; }
+    void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.m(0,0) = c; r.m(1,1) = c; r.m(0,1) = -s; r.m(1,0) = s; *this = *this * r; }
 };
 inline mat3 operator*(float s, mat3 m) {mat3 r(0); for(int j=0;j<3;j++) for(int i=0;i<3;i++) r.m(i,j)=s*m(i,j); return r; }
 
@@ -59,6 +62,7 @@ struct mat4 {
     float operator()(int i, int j) const { return m(i,j); }
     float& operator()(int i, int j) { return m(i,j); }
     vec4& operator[](int j) { return (vec4&)data[j*4]; }
+    const vec4& operator[](int j) const { return (vec4&)data[j*4]; }
 
     vec4 operator*(vec3 v) const { vec4 r(0,0,0,0); for(int i=0;i<4;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+1*m(i,3); return r; }
     vec4 operator*(vec4 v) const { vec4 r(0,0,0,0); for(int i=0;i<4;i++) r[i] = v.x*m(i,0)+v.y*m(i,1)+v.z*m(i,2)+v.w*m(i,3); return r; }

@@ -1,6 +1,6 @@
 CG:
- Cylinders: tesselate
- hardware rendering (faces, per-pixel cylinders, raycasted soft shadows (shadow map if still too slow))
+ Cylinders: vertex lighting
+ hardware rendering: faces, MSAA, raycasted soft shadows (shadow map if still too slow))
  Editor: copy-paste, XCompose, syntax highlighting
  Export .obj [release]
  Soft Shadows: tighter light view scene bounds, check culling, image space filter
