@@ -1,11 +1,10 @@
 CG:
- Faces: pretriangulate, precompute all attributes (light pos) -> leave only view matrix multiply (vectorized) to compute each frame.
  Cylinders: tesselate
  hardware rendering (faces, per-pixel cylinders, raycasted soft shadows (shadow map if still too slow))
  Editor: copy-paste, XCompose, syntax highlighting
  Export .obj [release]
  Soft Shadows: tighter light view scene bounds, check culling, image space filter
- Rasterizer: step grids for vertex attribute interpolations ? coverage sampling ? Hi-Z pixel reject ? float16 colors ?
+ Rasterizer: vectorize setup, step grids for vertex attribute interpolations ? coverage sampling ? Hi-Z pixel reject ? float16 colors ?
  Textures: bark,leafs,twigs
  Trees: improve leafs, improve branches using environment modeling (light and space competition)
  Scene: sky, terrain, grass, plants, forest...

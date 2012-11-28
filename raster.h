@@ -284,19 +284,18 @@ template<class Shader> struct RenderPass : RenderPassBase {
         for(uint bin: range(width*height)) { bins[bin].faceCount=0; }
         faceCount=0;
     }
-    ~RenderPass(){ unallocate(bins,width*height); unallocate(faces,faceCapacity); }
+    ~RenderPass(){ if(bins) unallocate(bins,width*height); if(faces) unallocate(faces,faceCapacity); }
 
     // Implementation is inline to allow per-pass face attributes specialization and inline shader calls
 
     /// Submits triangles for binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..4×Width],[0..4×Height]
-    void submit(vec4 A, vec4 B, vec4 C, vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
+    void submit(vec4 A, vec4 B, vec4 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
         if(faceCount>=faceCapacity) { uiError(name,"Face overflow"_); return; }
         Face& face = faces[faceCount];
         //assert(abs(A.w-1)<0.01,A.w); assert(abs(B.w-1)<0.01,B.w); assert(abs(C.w-1)<0.01,C.w);
         mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
-        float det = E.det();
-        if(det<1) return; //small or back-facing triangle
+        //float det = E.det(); if(det<1) return; //cull backward faces. Let user cull to avoid some setup
         E = E.cofactor(); //edge equations are now columns of E
         if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z++;
         if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
@@ -668,7 +667,7 @@ struct RenderScheduler {
             uint binI = __sync_fetch_and_add(&target.nextBin,1);
             if(binI>=target.width*target.height) break;
             for(RenderPassBase* pass: passes) {
-                if(pass->bins[binI].faceCount) goto break_;
+                if(pass->bins && pass->bins[binI].faceCount) goto break_;
             }
             /*else*/ continue;
             break_:;
