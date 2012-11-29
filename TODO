@@ -1,5 +1,5 @@
 CG:
- vertex interpolated lighting, optimize render, optimize geometry
+ indexed vertices, smooth vertex normals, optimize render, optimize geometry
  Editor: copy-paste, XCompose, syntax highlighting
  Soft Shadows: image space filter, tighter light view scene bounds, check culling
  Trees: improve branches using environment modeling (light and space competition)
