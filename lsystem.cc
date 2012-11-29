@@ -62,17 +62,17 @@ LSystem::LSystem(string&& name, const ref<byte>& source):name(move(name)){
             constants.insert(string(name)) = e->evaluate(*this, ref<float>());
         } else if(find(line,"→"_)) {
             ref<byte> symbol = s.identifier();
-            if(!symbol) { parseError("Expected symbol",s.untilEnd()); return; }
+            if(!symbol) { parseError("Expected rule identifier, got '"_+s.untilEnd()+"'"_); return; }
             Rule rule(symbol);
             array<ref<byte>> parameters;
             if(s.match('(')) {
                 while(!s.match(')')) {
                     s.skip();
                     ref<byte> symbol = s.identifier();
-                    if(!symbol) { parseError("Expected symbol",s.untilEnd()); return; }
+                    if(!symbol) { parseError("Expected parameter, got '"_+s.untilEnd()+"'"_); return; }
                     parameters << symbol;
                     s.skip();
-                    if(!s.match(',') && s.peek()!=')') { parseError("Expected , or ) got",s.untilEnd()); return; }
+                    if(!s.match(',') && s.peek()!=')') { parseError("Expected , or ), got '"_+s.untilEnd()+"'"_); return; }
                 }
             }
             s.skip();
@@ -91,12 +91,12 @@ LSystem::LSystem(string&& name, const ref<byte>& source):name(move(name)){
                 }
             }
             s.skip();
-            if(!s.match("→"_)) { parseError("Expected → not \""_+s.untilEnd()+"\""_); return; }
+            if(!s.match("→"_)) { parseError("Expected →, got '"_+s.untilEnd()+"'"_); return; }
             s.skip();
             while(s) {
                 s.skip();
                 ref<byte> symbol = s.identifier("$-+&^%.![]\\/|{}"_);
-                if(!symbol) { parseError("Expected symbol",s.untilEnd()); return; }
+                if(!symbol) { parseError("Expected production, got '"_+s.untilEnd()+"'"_); return; }
                 Production p(symbol);
                 s.skip();
                 if(s.match('(')) while(!s.match(')')) {
@@ -119,7 +119,7 @@ LSystem::LSystem(string&& name, const ref<byte>& source):name(move(name)){
             for(;s;) {
                 s.skip();
                 ref<byte> symbol = s.identifier("$-+&^%.![]\\/|{}"_);
-                if(!symbol) { parseError("Expected symbol",s.untilEnd()); return; }
+                if(!symbol) { parseError("Expected module, got '"_+s.untilEnd()+"'"_); return; }
                 Module module (symbol);
                 if(s.match('(')) while(!s.match(')')) {
                     unique<Expression> e;

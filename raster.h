@@ -116,10 +116,8 @@ template<class Shader> struct RenderPass {
     // Profiling counters
     profile(int64 rasterTime=0; int64 pixelTime=0; int64 sampleTime=0; int64 sampleFirstTime=0; int64 sampleOverTime=0; int64 userTime=0;)
     uint64 totalTime=0;
-    // Debug information
-    string name;
 
-    RenderPass(const Shader& shader, const ref<byte>& name=""_) : shader(shader), name(name) {}
+    RenderPass(const Shader& shader) : shader(shader) {}
     /// Resets bins and faces for a new setup.
     void setup(const RenderTarget& target, uint faceCapacity) {
         if(width != target.width || height != target.height) {
@@ -143,7 +141,7 @@ template<class Shader> struct RenderPass {
     /// Submits triangles for binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..4×Width],[0..4×Height]
     void submit(vec4 A, vec4 B, vec4 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
-        if(faceCount>=faceCapacity) { userError(name,"Face overflow"_); return; }
+        if(faceCount>=faceCapacity) { userError("Face overflow"_); return; }
         Face& face = faces[faceCount];
         //assert(abs(A.w-1)<0.01,A.w); assert(abs(B.w-1)<0.01,B.w); assert(abs(C.w-1)<0.01,C.w);
         mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
@@ -200,7 +198,7 @@ template<class Shader> struct RenderPass {
                     face.binReject[2] + dot(face.edges[2], binXY) <= 0) continue;
 
             Bin& bin = bins[binY*width+binX];
-            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { userError(name,"Index overflow"); return; }
+            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { userError("Index overflow"); return; }
             bin.faces[bin.faceCount++]=faceCount;
         }
         faceCount++;
