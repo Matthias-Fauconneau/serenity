@@ -240,3 +240,5 @@ array< ref<byte> > arguments() {
 const Folder& home() { static Folder home(getenv("HOME"_)); return home; }
 const Folder& config() { static Folder config=Folder(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache=Folder(".cache"_,home(),true); return cache; }
+
+string userErrors;

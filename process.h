@@ -119,3 +119,7 @@ array< ref<byte> > arguments();
 const Folder& home(); //$HOME
 const Folder& config(); //$HOME/.config
 const Folder& cache(); //$HOME/.cache
+
+// Aggregates non-fatal errors shown to user
+extern string userErrors;
+template<class... Args> void userError(const Args&... args) { if(!userErrors) userErrors << str(args ___)+"\n"_; }

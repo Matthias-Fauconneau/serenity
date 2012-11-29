@@ -13,151 +13,7 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #include "matrix.h"
 #include "process.h"
 #include "time.h"
-
-// Non-fatal errors shown in UI
-extern string uiErrors;
-template<class... Args> void uiError(const ref<byte>& name, const Args&... args) {
-    if(!uiErrors) //avoid overflow
-        uiErrors<<name<<": "_<<str(args ___);
-}
-
-// AVX intrinsics
-#define __AVX__ 1
-#include "immintrin.h"
-#ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
-#include "avxintrin.h"
-#endif
-typedef float float8 __attribute((vector_size(32),may_alias));
-
-/// 16-wide Vector operations using 2 float8 AVX registers
-struct vec16 {
-    float8 r1,r2;
-    vec16(){}
-    vec16(float x){r1=r2= _mm256_set1_ps(x);}
-    vec16(const float8& r1, const float8& r2):r1(r1),r2(r2){}
-    vec16(float x0, float x1, float x2, float x3, float x4, float x5, float x6, float x7, float x8, float x9, float x10, float x11, float x12, float x13, float x14, float x15):r1(__extension__ (__m256){x7,x6,x5,x4,x3,x2,x1,x0}),r2(__extension__ (__m256){x15,x14,x13,x12,x11,x10,x9,x8}){}
-    float& operator [](uint i) { return ((float*)this)[i]; }
-    const float& operator [](uint i) const { return ((float*)this)[i]; }
-};
-
-inline vec16 operator +(float a, vec16 b) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
-}
-inline vec16 operator +(vec16 b, float a) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
-}
-inline vec16 operator +(vec16 a, vec16 b) {
-    return vec16(_mm256_add_ps(a.r1,b.r1),_mm256_add_ps(a.r2,b.r2));
-}
-
-inline vec16 operator *(float a, vec16 b) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_mul_ps(A,b.r1),_mm256_mul_ps(A,b.r2));
-}
-inline vec16 operator *(vec16 a, vec16 b) {
-    return vec16(_mm256_mul_ps(a.r1,b.r1),_mm256_mul_ps(a.r2,b.r2));
-}
-inline vec16 operator /(const int one unused, vec16 d) {
-    assert(one==1);
-    return vec16(_mm256_rcp_ps(d.r1),_mm256_rcp_ps(d.r2));
-}
-
-inline vec16 operator |(vec16 a, vec16 b) {
-    return vec16(_mm256_or_ps(a.r1,b.r1),_mm256_or_ps(a.r2,b.r2));
-}
-inline vec16 operator &(vec16 a, vec16 b) {
-    return vec16(_mm256_and_ps(a.r1,b.r1),_mm256_and_ps(a.r2,b.r2));
-}
-
-inline vec16 operator <(float a, vec16 b) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LT_OQ));
-}
-inline vec16 operator <=(float a, vec16 b) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LE_OQ));
-}
-inline vec16 operator >=(float a, vec16 b) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GE_OQ));
-}
-inline vec16 operator >(float a, vec16 b) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(A, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GT_OQ));
-}
-
-inline vec16 operator <(vec16 b, float a) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_LT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LT_OQ));
-}
-inline vec16 operator <=(vec16 b, float a) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_LE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LE_OQ));
-}
-inline vec16 operator >=(vec16 b, float a) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_GE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GE_OQ));
-}
-inline vec16 operator >(vec16 b, float a) {
-    float8 A=_mm256_set1_ps(a);
-    return vec16(_mm256_cmp_ps(b.r1, A, _CMP_GT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GT_OQ));
-}
-
-inline vec16 operator <(vec16 a, vec16 b) {
-    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LT_OQ));
-}
-inline vec16 operator <=(vec16 a, vec16 b) {
-    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LE_OQ));
-}
-inline vec16 operator >=(vec16 a, vec16 b) {
-    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GE_OQ));
-}
-inline vec16 operator >(vec16 a, vec16 b) {
-    return vec16(_mm256_cmp_ps(a.r1, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GT_OQ));
-}
-inline uint mask(vec16 m) { return _mm256_movemask_ps(m.r1)|(_mm256_movemask_ps(m.r2)<<8); }
-
-inline float sum8(float8 x) {
-    // hiQuad = ( x7, x6, x5, x4 )
-    const __m128 hiQuad = _mm256_extractf128_ps(x, 1);
-    // loQuad = ( x3, x2, x1, x0 )
-    const __m128 loQuad = _mm256_castps256_ps128(x);
-    // sumQuad = ( x3 + x7, x2 + x6, x1 + x5, x0 + x4 )
-    const __m128 sumQuad = _mm_add_ps(loQuad, hiQuad);
-    // loDual = ( -, -, x1 + x5, x0 + x4 )
-    const __m128 loDual = sumQuad;
-    // hiDual = ( -, -, x3 + x7, x2 + x6 )
-    const __m128 hiDual = _mm_movehl_ps(sumQuad, sumQuad);
-    // sumDual = ( -, -, x1 + x3 + x5 + x7, x0 + x2 + x4 + x6 )
-    const __m128 sumDual = _mm_add_ps(loDual, hiDual);
-    // lo = ( -, -, -, x0 + x2 + x4 + x6 )
-    const __m128 lo = sumDual;
-    // hi = ( -, -, -, x1 + x3 + x5 + x7 )
-    const __m128 hi = _mm_shuffle_ps(sumDual, sumDual, 0x1);
-    // sum = ( -, -, -, x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 )
-    const __m128 sum = _mm_add_ss(lo, hi);
-    return _mm_cvtss_f32(sum);
-}
-inline float sum16(vec16 v) { return sum8(v.r1)+sum8(v.r2); }
-
-inline vec16 blend16(float a, vec16 b, vec16 mask) {
-    float8 A = _mm256_set1_ps(a);
-    return vec16(_mm256_blendv_ps(A,b.r1,mask.r1),_mm256_blendv_ps(A,b.r2,mask.r2));
-}
-inline vec16 blend16(float a, float b, vec16 mask) {
-    float8 A = _mm256_set1_ps(a);
-    float8 B = _mm256_set1_ps(b);
-    return vec16(_mm256_blendv_ps(A,B,mask.r1),_mm256_blendv_ps(A,B,mask.r2));
-}
-
-inline void maskstore(vec16& P, vec16 M, vec16 A) {
-    _mm256_maskstore_ps((float*)&P.r1,(__m256i)M.r1,A.r1);
-    _mm256_maskstore_ps((float*)&P.r2,(__m256i)M.r2,A.r2);
-}
-
-inline string str(const vec16 v) { return "vec16("_+str(ref<float>((float*)&v,16))+")"_; }
+#include "vec16.h"
 
 #define PROFILE
 #ifdef PROFILE
@@ -180,19 +36,16 @@ struct RenderTarget {
     uint width = 0, height = 0; //in tiles
     Tile* tiles = 0;
     float depth, blue, green, red;
-    uint nextBin=0;
 
-    // Allocates all bins and flags them to be cleared before first render
-    void resize(int2 size) {
-        this->size=size;
-        if(tiles) unallocate(tiles,width*height);
-        width = align(64,size.x*4)/64;
-        height = align(64,size.y*4)/64;
-        tiles = allocate64<Tile>(width*height);
-        for(int i: range(this->width*this->height)) { Tile& tile = tiles[i]; tile.cleared=1; } //force initial background blit
-    }
-
-    void clear(float depth=-0x1p16f, float blue=1, float green=1, float red=1) {
+    // Allocates all bins, flags them to be cleared
+    void setup(int2 size, float depth=-0x1p16f, float blue=1, float green=1, float red=1) {
+        if(this->size != size) {
+            if(tiles) unallocate(tiles,width*height);
+            width = align(64,size.x*4)/64;
+            height = align(64,size.y*4)/64;
+            tiles = allocate64<Tile>(width*height);
+            for(int i: range(this->width*this->height)) { Tile& tile = tiles[i]; tile.cleared=1; } //force initial background blit
+        }
         this->depth=depth;
         this->blue=blue;
         this->green=green;
@@ -233,54 +86,53 @@ static constexpr vec2 XY[4][4*4] = {
     }
 };
 
-// Used by Scheduler
-struct RenderPassBase {
-    uint width, height;
-
-    struct Bin {
-        uint16 faceCount=0;
-        uint16 faces[255];
-    };
-    Bin* bins=0;
-
-    uint faceCount=0;
-
-    profile(int64 rasterTime=0; int64 pixelTime=0; int64 sampleTime=0; int64 sampleFirstTime=0; int64 sampleOverTime=0; int64 userTime=0;)
-    uint64 totalTime=0;
-
-    virtual void render(Tile& tile, const Bin& bin, const vec2 binXY)=0;
-};
-
-template<class Shader> struct RenderPass : RenderPassBase {
+template<class Shader> struct RenderPass {
+    // Shading parameters
     typedef typename Shader::FaceAttributes FaceAttributes;
     static constexpr int V = Shader::V;
     static constexpr bool blend = Shader::blend;
+    const Shader& shader;
 
-    // Rasterization "registers", varying (perspective-interpolated) vertex attributes and constant face attributes
-    struct Face { //~1K (streamed)
-        vec16 blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3];
-        vec2 edges[3];
-        float binReject[3], binAccept[3];
-        vec3 iw, iz;
-        vec3 varyings[V];
+    // Geometry to rasterize
+    struct Face { //~1K/face (streamed)
+        vec16 blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3]; // Precomputed step grids
+        vec2 edges[3]; // triangle edge equations
+        float binReject[3], binAccept[3]; // Initial distance step at a bin reject/accept corner
+        vec3 iw, iz; vec3 varyings[V]; //varying (perspective-interpolated) vertex attributes
         FaceAttributes faceAttributes; //custom constant face attributes
     };
-
     uint faceCapacity;
     Face* faces=0;
-    const Shader& shader;
+    uint faceCount=0;
+
+    // Bins to sort faces
+    uint width, height;
+    struct Bin {
+        uint16 faceCount=0;
+        uint16 faces[511];
+    };
+    Bin* bins=0;
+
+    // Profiling counters
+    profile(int64 rasterTime=0; int64 pixelTime=0; int64 sampleTime=0; int64 sampleFirstTime=0; int64 sampleOverTime=0; int64 userTime=0;)
+    uint64 totalTime=0;
+    // Debug information
     string name;
 
     RenderPass(const Shader& shader, const ref<byte>& name=""_) : shader(shader), name(name) {}
-    void resize(const RenderTarget& target, uint faceCapacity) {
-         if(bins) unallocate(bins,width*height);
-         if(faces) unallocate(faces,faceCapacity);
-         width=target.width, height=target.height;
-         bins = allocate64<Bin>(width*height);
-         faces = allocate64<Face>(this->faceCapacity=faceCapacity);
-    }
-    void clear() {
-        rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;
+    /// Resets bins and faces for a new setup.
+    void setup(const RenderTarget& target, uint faceCapacity) {
+        if(width != target.width || height != target.height) {
+            if(bins) unallocate(bins,width*height);
+            width=target.width, height=target.height;
+            bins = allocate64<Bin>(width*height);
+        }
+        if(this->faceCapacity != faceCapacity) {
+            if(faceCapacity>65536) { error("Too many faces",faceCapacity); return; }
+            if(faces) unallocate(faces,this->faceCapacity);
+            this->faceCapacity = faceCapacity;
+            faces = allocate64<Face>(this->faceCapacity);
+        }
         for(uint bin: range(width*height)) { bins[bin].faceCount=0; }
         faceCount=0;
     }
@@ -291,7 +143,7 @@ template<class Shader> struct RenderPass : RenderPassBase {
     /// Submits triangles for binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..4×Width],[0..4×Height]
     void submit(vec4 A, vec4 B, vec4 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
-        if(faceCount>=faceCapacity) { uiError(name,"Face overflow"_); return; }
+        if(faceCount>=faceCapacity) { userError(name,"Face overflow"_); return; }
         Face& face = faces[faceCount];
         //assert(abs(A.w-1)<0.01,A.w); assert(abs(B.w-1)<0.01,B.w); assert(abs(C.w-1)<0.01,C.w);
         mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
@@ -348,13 +200,14 @@ template<class Shader> struct RenderPass : RenderPassBase {
                     face.binReject[2] + dot(face.edges[2], binXY) <= 0) continue;
 
             Bin& bin = bins[binY*width+binX];
-            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { uiError(name,"Index overflow"); return; }
+            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { userError(name,"Index overflow"); return; }
             bin.faces[bin.faceCount++]=faceCount;
         }
         faceCount++;
     }
 
-    void render(Tile& tile, const Bin& bin, const vec2 binXY) override {
+    /// Renders one tile
+    void render(Tile& tile, const Bin& bin, const vec2 binXY) {
         // Loop on all faces in the bin
         for(uint faceI=0; faceI<bin.faceCount; faceI++) {
             struct DrawBlock { vec2 pos; uint ptr; uint mask; } blocks[4*4]; uint blockCount=0;
@@ -631,63 +484,45 @@ template<class Shader> struct RenderPass : RenderPassBase {
             }
         }
     }
-};
 
-/// Runs all passes on all tiles
-struct RenderScheduler {
-    RenderTarget& target;
-    array<RenderPassBase*> passes;
-    profile( int64 totalTime; )
-    profile(int64 rasterTime; int64 pixelTime; int64 sampleTime; int64 sampleFirstTime; int64 sampleOverTime; int64 userTime;)
-    RenderScheduler(RenderTarget& target):target(target){}
-
-    static void* start_routine(void* this_) { ((RenderScheduler*)this_)->run(); return 0; }
-    // For each bin, for each pass, rasterizes and shade all triangles
-    void render() {
-        target.nextBin=0;
-
+    /// Renders all tiles
+    RenderTarget* target;
+    uint nextBin;
+    static void* start_routine(void* this_) { ((RenderPass*)this_)->run(); return 0; }
+    // For each bin, rasterizes and shade all triangles
+    void render(RenderTarget& target) {
+        if(!bins || !faces) return;
+        this->target = &target;
+        // Reset counters
+        nextBin=0;
+        rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;
+        // Schedules all cores to process tiles
         const int N=8;
         pthread threads[N-1];
         for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
         run();
         for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
-
-        profile(({
-                    rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0;
-                    for(RenderPassBase* pass: passes) {
-                        rasterTime+=pass->rasterTime, pixelTime+=pass->pixelTime, sampleTime+=pass->sampleTime;
-                        sampleFirstTime+=pass->sampleFirstTime, sampleOverTime+=pass->sampleOverTime; userTime+=pass->userTime;
-                    }
-                }));
     }
     void run() {
         profile( int64 start = rdtsc(); );
         // Loop on all bins (64x64 samples (16x16 pixels)) then on passes (improve framebuffer access, passes have less locality)
         for(;;) {
-            uint binI = __sync_fetch_and_add(&target.nextBin,1);
-            if(binI>=target.width*target.height) break;
-            for(RenderPassBase* pass: passes) {
-                if(pass->bins && pass->bins[binI].faceCount) goto break_;
-            }
-            /*else*/ continue;
-            break_:;
-            Tile& tile = target.tiles[binI];
+            uint binI = __sync_fetch_and_add(&nextBin,1);
+            if(binI>=width*height) break;
+            if(!bins[binI].faceCount) continue;
+
+            Tile& tile = target->tiles[binI];
             if(!tile.cleared) {
                 clear(tile.subsample,16);
-                clear(tile.depth,4*4,vec16(target.depth));
-                clear(tile.blue,4*4,vec16(target.blue));
-                clear(tile.green,4*4,vec16(target.green));
-                clear(tile.red,4*4,vec16(target.red));
+                clear(tile.depth,4*4,vec16(target->depth));
+                clear(tile.blue,4*4,vec16(target->blue));
+                clear(tile.green,4*4,vec16(target->green));
+                clear(tile.red,4*4,vec16(target->red));
                 tile.cleared=1;
             }
 
-            const vec2 binXY = 64.f*vec2(binI%target.width,binI/target.width);
-            for(RenderPassBase* pass: passes) {
-                profile( int64 start = rdtsc(); );
-                pass->render(tile,pass->bins[binI],binXY);
-                pass->bins[binI].faceCount=0;
-                profile( pass->totalTime += rdtsc()-start; );
-            }
+            const vec2 binXY = 64.f*vec2(binI%target->width,binI/target->width);
+            render(tile,bins[binI],binXY);
         }
         profile( totalTime += rdtsc()-start; );
     }

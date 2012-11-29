@@ -5,7 +5,7 @@ BUILD ?= release
 ifeq ($(CC),cc)
  ifeq ($(TARGET),music)
   CC := g++ -fabi-version=0
- else ifeq ($(TARGET),lsystem)
+ else ifeq ($(TARGET),editor)
    CC := g++ -fabi-version=0
  else
   CC := clang++ -Wno-lambda-extensions
