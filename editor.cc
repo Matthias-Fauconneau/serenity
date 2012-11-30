@@ -120,7 +120,7 @@ struct Shadow {
     }
 
     // Scales sample pattern to soften shadow depending on occluder distance
-    float A0=0; // pixel area in light space
+    float A0=1; // pixel area in light space
     float dzA=1/256.f; // tan(light angular diameter)
 
     // Setups a shadow-casting face
@@ -496,8 +496,6 @@ struct Editor : Widget {
         { vec3 lightP = (sun*B).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*C).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*D).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
-        vec3 lightSpace = lightMax-lightMin;
-        lightScale = 512.f/max(lightSpace.x,lightSpace.y);
 
         window.render();
     }
@@ -527,11 +525,12 @@ struct Editor : Widget {
         vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
         // Setups sun shadow
-        float A0 = scale/4*lightScale; //scales shadow sampling to view pixel
+        float A0 = scale/4; //scales shadow sampling to view pixel
         if(A0 != sunShadow.A0) {
             sunShadow.A0 = A0;
             sun=mat4();
-            sun.scale(lightScale); // Bins the polygon in a 256 grid
+            float lightScale = A0/2;
+            sun.scale(lightScale); // Bins the polygon
             sun.translate(-lightMin);
             sun.rotateY(PI/4);
 

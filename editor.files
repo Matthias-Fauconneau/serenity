@@ -4,14 +4,7 @@ core.h
 vector.h
 text.cc
 lsystem.cc
-monopodial.l
-sympodial.l
-ternary.l
-raster.h
-capsella.bursa-pastoris.l
-bush.l
-plant.l
-leaf.l
-rose.leaf.l
-lily-of-the-valley.l
 vec16.h
+raster.h
+editor.cc
+ternary.l

@@ -1,14 +1,13 @@
 CG:
- Shadow map
  Hardware rendering: faces, MSAA, soft shadows
- Optimize render, optimize geometry, indexed vertices
- Editor: copy-paste, XCompose, syntax highlighting
- Soft Shadows: image space filter, tighter light view scene bounds, check culling
+ Spheres test scene
+ Editor: copy-paste, parse ->, XCompose, syntax highlighting
  Trees: improve branches using environment modeling (light and space competition)
- Textures: bark,leafs,twigs
- Scene: sky, terrain, grass, plants, forest...
  Export .obj [release]
- Software rasterizer: vectorize setup, step grids for vertex attribute interpolations ? coverage sampling ? Hi-Z pixel reject ? float16 colors ?
+ Textures: bark,leafs,twigs
+ Optimize render, optimize geometry, indexed vertices
+ Scene: sky, terrain, grass, plants, forest...
+
 Desktop: fix links, desktop calculator
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

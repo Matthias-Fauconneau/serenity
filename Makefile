@@ -33,6 +33,7 @@ LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_player = avformat avcodec
+LIBS_test = EGL GLESv2
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
