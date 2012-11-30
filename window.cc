@@ -108,51 +108,55 @@ void Window::event() {
         assert(mapped); assert(size);
         if(state!=Idle) { state=Wait; return; }
 
-        if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
-            if(shm) {
-                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                shmdt(buffer.data);
-                shmctl(shm, IPC_RMID, 0);
+        if(softwareRendering) {
+            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
+                if(shm) {
+                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                    shmdt(buffer.data);
+                    shmctl(shm, IPC_RMID, 0);
+                }
+                buffer.width=size.x, buffer.height=align(16,size.y), buffer.stride=align(16,size.x);
+                shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+                buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+                {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
             }
-            buffer.width=size.x, buffer.height=align(16,size.y), buffer.stride=align(16,size.x);
-            shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
-            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
-        }
-        framebuffer=share(buffer);
-        currentClip=Rect(size);
+            framebuffer=share(buffer);
+            currentClip=Rect(size);
 
-        if(fillBackground) {
-            if(backgroundCenter==backgroundColor)
-                fill(Rect(size),byte4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity),false);
-            else { // Oxygen-like radial gradient background
-                constexpr int radius=256;
-                int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                        a=backgroundOpacity, scale = (radius*radius)/a;
-                if(x0>0 || x1<w || h<size.y) fill(Rect(size),byte4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity),false);
-                uint* dst=(uint*)framebuffer.data;
-                for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                    int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (backgroundColor*t+backgroundCenter*(0xFF-t))/0xFF;
-                    dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+            if(fillBackground) {
+                if(backgroundCenter==backgroundColor)
+                    fill(Rect(size),byte4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity),false);
+                else { // Oxygen-like radial gradient background
+                    constexpr int radius=256;
+                    int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
+                            a=backgroundOpacity, scale = (radius*radius)/a;
+                    if(x0>0 || x1<w || h<size.y) fill(Rect(size),byte4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity),false);
+                    uint* dst=(uint*)framebuffer.data;
+                    for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                        int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (backgroundColor*t+backgroundCenter*(0xFF-t))/0xFF;
+                        dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+                    }
                 }
             }
+
+            widget->render(0,size);
+            assert(!clipStack);
+
+            if(featherBorder) { //feather borders
+                const bool corner = 1;
+                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+                if(position.x+size.x<display.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
+                if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+            }
+
+            {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+                r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
+                r.srcW=size.x; r.srcH=size.y; send(raw(r));}
+            state=Server;
+        } else {
+            widget->render(0,size);
         }
-
-        widget->render(0,size);
-        assert(!clipStack);
-
-        if(featherBorder) { //feather borders
-            const bool corner = 1;
-            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-            if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-            if(position.x+size.x<display.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-            if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-        }
-
-        {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-            r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
-            r.srcW=size.x; r.srcH=size.y; send(raw(r));}
-        state=Server;
     } else {
         uint8 type = read<uint8>();
         processEvent(type, read<XEvent>());

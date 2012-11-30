@@ -1,56 +1,19 @@
 #if 1
 #include "process.h"
 #include "string.h"
+#include "window.h"
 
-#include  <X11/Xlib.h>
+#define MESA_EGL_NO_X11_HEADERS
 #include  <EGL/egl.h>
 #include  <GLES2/gl2.h>
 
-const char vertex_src [] =
-        "                                        \
-        attribute vec4        position;       \
-varying mediump vec2  pos;            \
-uniform vec4          offset;         \
-\
-void main()                           \
-{                                     \
-    gl_Position = position + offset;   \
-    pos = position.xy;                 \
-}                                     \
-";
-
-
-const char fragment_src [] =
-        "                                                      \
-        varying mediump vec2    pos;                        \
-uniform mediump float   phase;                      \
-\
-void  main()                                        \
-{                                                   \
-    gl_FragColor  =  vec4(1., 0.9, 0.7, 1.0) *     \
-            cos(30.*sqrt(pos.x*pos.x + 1.5*pos.y*pos.y)   \
-                 + atan(pos.y,pos.x) - phase);            \
-}                                                   \
-";
-
-const float vertexArray[] = {
-    0.0,  0.5,  0.0,
-    -0.5,  0.0,  0.0,
-    0.0, -0.5,  0.0,
-    0.5,  0.0,  0.0,
-    0.0,  0.5,  0.0
-};
-
-struct EGLTest {
-    uint load_shader(const char  *shader_source, GLenum type) {
-       uint  shader = glCreateShader(type);
-
-       glShaderSource (shader , 1 , &shader_source , 0);
+struct EGLTest : Widget {
+    uint compile(const char* source, uint type) {
+       uint shader = glCreateShader(type);
+       glShaderSource (shader , 1 , &source , 0);
        glCompileShader(shader);
-
        int length;
        glGetShaderiv(shader , GL_INFO_LOG_LENGTH , &length);
-
        if(length) {
           char* buffer  =  new char[length];
           glGetShaderInfoLog(shader , length , 0, buffer);
@@ -60,72 +23,75 @@ struct EGLTest {
           glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
           assert(success == GL_TRUE);
        }
-
        return shader;
     }
 
+    Window window __(this,int2(525,525),"EGL Test"_);
+    EGLDisplay display;
+    EGLSurface surface;
+    EGLContext context;
+    uint shader;
+    uint _phase,_position,_offset;
     EGLTest() {
-        const int width  = 800, height = 480;
-        Display* x = XOpenDisplay(0);
-        XSetWindowAttributes  swa; swa.event_mask  =  ExposureMask | PointerMotionMask | KeyPressMask;
-        Window window  =  XCreateWindow(x, DefaultRootWindow(x), 0, 0, width, height, 0, 0, InputOutput, 0, CWEventMask, &swa);
-        XMapWindow(x , window);
-        XStoreName(x , window, "EGL Test");
-
-        EGLDisplay display  =  eglGetDisplay(x);
+        window.localShortcut(Escape).connect(&exit);
+        window.softwareRendering = false; //disable software rendering
+        display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
         eglInitialize(display, 0, 0);
         EGLConfig config; EGLint matchingConfigurationCount;
         eglChooseConfig(display, (int[]){EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_NONE}, &config, 1, &matchingConfigurationCount);
         assert(matchingConfigurationCount == 1);
 
-        EGLSurface surface = eglCreateWindowSurface(display, config, window, 0);
-        EGLContext context = eglCreateContext(display, config, 0, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
+        surface = eglCreateWindowSurface(display, config, window.id, 0);
+        context = eglCreateContext(display, config, 0, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
         eglMakeCurrent(display, surface, surface, context);
 
-        uint vertexShader = load_shader(vertex_src, GL_VERTEX_SHADER);
-        uint fragmentShader = load_shader(fragment_src, GL_FRAGMENT_SHADER);
-        uint shaderProgram  = glCreateProgram();
-        glAttachShader(shaderProgram, vertexShader);
-        glAttachShader(shaderProgram, fragmentShader);
-        glLinkProgram(shaderProgram);
-        glUseProgram(shaderProgram);
-
-        int position_loc = glGetAttribLocation (shaderProgram , "position"),
-                phase_loc = glGetUniformLocation(shaderProgram , "phase"),
-                offset_loc = glGetUniformLocation(shaderProgram , "offset");
-
-        float cursorX=0, cursorY=0, phase = 0;
-        for(bool quit = false;!quit;) {
-            while(XPending(x)) {   // check for events from the x-server
-                XEvent  xev;
-                XNextEvent(x, &xev);
-                if(xev.type == MotionNotify) {
-                    cursorX =  2.f*xev.xmotion.x/width-1;
-                    cursorY = 1-2.f*xev.xmotion.y/height;
-                }
-                if(xev.type == KeyPress) quit = true;
-            }
-
-            glViewport(0, 0, width, height);
-            glClear(GL_COLOR_BUFFER_BIT);
-
-            glUniform1f(phase_loc , phase);
-            phase += 0.5f;
-
-            glUniform4f(offset_loc, cursorX, cursorY , 0.0 , 0.0);
-
-            glVertexAttribPointer(position_loc, 3, GL_FLOAT, false, 0, vertexArray);
-            glEnableVertexAttribArray(position_loc);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 5);
-
-            eglSwapBuffers(display, surface);
-        }
-
+        shader = glCreateProgram();
+        glAttachShader(shader, compile(
+                           "uniform vec4 offset; attribute vec4 position; varying vec2 pos;\n"
+                           "void main() { gl_Position = position + offset; pos = position.xy; }"
+                           , GL_VERTEX_SHADER));
+        glAttachShader(shader, compile(
+                           "uniform float phase; varying vec2 pos;\n"
+                           "void main(){ gl_FragColor = vec4(1.,0.9,0.7,1.) * cos(30.*sqrt(pos.x*pos.x+1.5*pos.y*pos.y) + atan(pos.y,pos.x) - phase);}"
+                           , GL_FRAGMENT_SHADER));
+        glLinkProgram(shader);
+        glUseProgram(shader);
+        _phase = glGetUniformLocation(shader, "phase");
+        _offset = glGetUniformLocation(shader, "offset");
+        _position = glGetAttribLocation(shader , "position");
+    }
+    ~EGLTest() {
         eglDestroyContext(display, context);
         eglDestroySurface(display, surface);
         eglTerminate(display);
-        XDestroyWindow(x, window);
-        XCloseDisplay(x);
+    }
+
+    int2 cursor;
+    bool mouseEvent(int2 cursor, int2, Event, Button) override { this->cursor=cursor; return true; }
+
+    float phase = 0;
+    void render(int2 position, int2 size) override {
+        glViewport(position.x, position.y, size.x, size.y);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glUniform1f(_phase, phase);
+        phase += 0.5f;
+
+        float cursorX = 2.f*cursor.x/size.x-1, cursorY = 1-2.f*cursor.y/size.y;
+        glUniform4f(_offset, cursorX, cursorY , 0.0 , 0.0);
+
+        const float vertexArray[] = {
+            0.0,  0.5,  0.0,
+            -0.5,  0.0,  0.0,
+            0.0, -0.5,  0.0,
+            0.5,  0.0,  0.0,
+            0.0,  0.5,  0.0
+        };
+        glVertexAttribPointer(_position, 3, GL_FLOAT, false, 0, vertexArray);
+        glEnableVertexAttribArray(_position);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 5);
+
+        eglSwapBuffers(display, surface);
     }
 } test;
 #endif
