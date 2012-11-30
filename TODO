@@ -1,12 +1,12 @@
 CG:
- indexed vertices, smooth vertex normals, optimize render, optimize geometry
+ Shadow map
+ Hardware rendering: faces, MSAA, soft shadows
+ Optimize render, optimize geometry, indexed vertices
  Editor: copy-paste, XCompose, syntax highlighting
  Soft Shadows: image space filter, tighter light view scene bounds, check culling
  Trees: improve branches using environment modeling (light and space competition)
  Textures: bark,leafs,twigs
  Scene: sky, terrain, grass, plants, forest...
- Shadow map, LOD
- Hardware rendering: faces, MSAA, raycasted soft shadows (shadow map if still too slow))
  Export .obj [release]
  Software rasterizer: vectorize setup, step grids for vertex attribute interpolations ? coverage sampling ? Hi-Z pixel reject ? float16 colors ?
 Desktop: fix links, desktop calculator

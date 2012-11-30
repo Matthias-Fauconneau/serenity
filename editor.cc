@@ -370,7 +370,8 @@ struct Editor : Widget {
                 if(symbol=="F"_) {
                     vec3 P = state[3].xyz();
                     if(polygonStack) polygon.vertices << P;
-                    else { // Tesselated branch
+                    else { // Tesselated branch (TODO: indexing)
+                        array<Face> faces;
                         vec3 a = (A*vec3(0,1,0)).xyz() - A[3].xyz(), b = (B*vec3(0,1,0)).xyz() - B[3].xyz();
                         const int Na = max(3,int(length(a))), Nb = max(3,int(length(b)));
                         for(int i=0;i<Na;i++) {
@@ -393,6 +394,18 @@ struct Editor : Widget {
                             {vec3 N = normalize(cross(a1-a0,b0-a0)); faces << Face __({a0,a1,b0},{N,N,N}, color); }
                             {vec3 N = normalize(cross(b1-a1,b0-a1)); faces << Face __({a1,b1,b0},{N,N,N}, color); }
                         }
+
+                        // Computes smoothed normals (weighted by triangle areas)
+                        for(Face& face: faces) for(uint i: range(3)) {
+                            vec3 N=0; vec3 O = face.position[i];
+                            for(const Face& face: faces) for(const vec3& P : ref<vec3>__(face.position, 3)) {
+                                if(length(P-O)<1) {
+                                    N += cross(face.position[1]-face.position[0],face.position[2]-face.position[0]);
+                                }
+                            }
+                            face.normal[i] = normalize(N);
+                        }
+                        this->faces << faces;
                     }
                 }
             } else if(symbol=="."_) {
