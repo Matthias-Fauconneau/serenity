@@ -19,13 +19,16 @@ FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
 
-ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
-ICONS_taskbar := button
-ICONS_desktop := feeds network shutdown
-ICONS_player := play pause next
-ICONS_music := music
+SHADERS = $(SHADERS_$(TARGET))
+SHADERS_editor = shader
 
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%)
+ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
+ICONS_taskbar = button
+ICONS_desktop = feeds network shutdown
+ICONS_player = play pause next
+ICONS_music = music
+
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert %.frag)
 SRCS_profile = profile
 
 LIBS_time = rt
@@ -33,7 +36,8 @@ LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_player = avformat avcodec
-LIBS_test = EGL GLESv2
+LIBS_gl = EGL GL
+LIBS_test = EGL GL
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -69,6 +73,15 @@ $(BUILD)/%.o : %.cc
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
+
+#Build GLSL compiler frontend
+$(BUILD)/glsl: string.cc file.cc glsl.cc
+	$(CC) $(FLAGS) $^ -lEGL -lGL -o $(BUILD)/glsl
+
+$(BUILD)/%.vert.o: %.vert $(BUILD)/glsl
+	$(BUILD)/glsl $< | ld -r -b binary -o $@ -
+$(BUILD)/%.frag.o: %.frag $(BUILD)/glsl
+	$(BUILD)/glsl $< | ld -r -b binary -o $@ -
 
 $(BUILD)/%.o: %.png
 	@echo $<

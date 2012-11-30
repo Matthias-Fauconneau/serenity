@@ -8,3 +8,4 @@ vec16.h
 raster.h
 editor.cc
 ternary.l
+shader.vert

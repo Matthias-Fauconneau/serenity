@@ -50,8 +50,9 @@ This is mostly for reference, since this application use my own framework (Linux
 #include "png.h"
 #include "filewatcher.h"
 #include "lsystem.h"
-#include "raster.h"
+#include "gl.h"
 
+#if 0
 // Light
 
 /// Directional light with angular diameter
@@ -238,41 +239,41 @@ struct Shader {
         return vec4(diffuse,1.f);
     }
 };
+#endif
 
 /// Flat shaded face to be submitted to rasterizer
 struct Face {
     vec3 position[3]; // World-space positions
     vec3 normal[3]; // World-space vertex normals
-    vec3 color; // BGR albedo //TODO: vertex interpolated
-    vec3 lightPosition[3]; // Light-space position (to receive shadows) (in vertex attribute layout [abc][xyz])
+    vec3 color[3]; // BGR albedo (TODO: texture mapping)
 };
 
 /// Generates and renders L-Systems
 struct Editor : Widget {
-    // File system
+    // L-System
     Folder folder = Folder(""_,cwd()); //L-Systems definitions are loaded from current working directory
     FileWatcher watcher; // Watch the loaded definition for changes
-
-    // User interface
-    Bar<Text> systems; // Tab bar to select which L-System to view
-    VBox layout;
-    TextInput editor;
-    Window window __(&layout,int2(0,0),"L-System Editor"_);
-
-    // User interaction
     LSystem system; // Currently loaded L-System
     uint level=0; // Current L-System generation level
+
+    // View
     bool enableShadow=true; // Whether shadows are rendered
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(0,PI/4); // current view angles (yaw,pitch)
     float scale=1; // current view scale
     mat4 sun; // sun light transform (TODO: interactive)
 
+    // User interface
+    Bar<Text> systems; // Tab bar to select which L-System to view
+    VBox layout;
+    TextInput editor;
+    Window window __(&layout,int2(0,0),"L-System Editor"_);
+    GLContext context __(window);
+
     // Renderer
-    RenderTarget target; // Render target (RenderPass renders on these tiles)
-    Shadow sunShadow; // Holds scene geometry projected in light space bins
-    Shader shader __(sunShadow);
-    RenderPass<Shader> pass __(shader);
+    //Shadow sunShadow; // Holds scene geometry projected in light space bins
+    GLBuffer buffer;
+    SHADER(shader);
 
     // Scene
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
@@ -285,7 +286,6 @@ struct Editor : Widget {
      Editor() {
          layout << &systems << this << &editor;
          window.localShortcut(Escape).connect(&::exit);
-         window.fillBackground=0; //Disables background filling in Window::event
 
          // Scans current folder for L-System definitions (.l files)
          array<string> files = folder.list(Files);
@@ -391,8 +391,8 @@ struct Editor : Widget {
                             vec3 b0 = (B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
                             vec3 b1 = (B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
                             if(isNaN(a0) || isNaN(a1) || isNaN(b0) || isNaN(b1)) { userError("NaN"); continue; }
-                            {vec3 N = normalize(cross(a1-a0,b0-a0)); faces << Face __({a0,a1,b0},{N,N,N}, color); }
-                            {vec3 N = normalize(cross(b1-a1,b0-a1)); faces << Face __({a1,b1,b0},{N,N,N}, color); }
+                            {vec3 N = normalize(cross(a1-a0,b0-a0)); faces << Face __({a0,a1,b0},{N,N,N}, {color,color,color}); }
+                            {vec3 N = normalize(cross(b1-a1,b0-a1)); faces << Face __({a1,b1,b0},{N,N,N}, {color,color,color}); }
                         }
 
                         // Computes smoothed normals (weighted by triangle areas)
@@ -435,8 +435,8 @@ struct Editor : Widget {
                         N /= area;
                         vec3 dn = 0.1f*N; // avoid self-shadowing
                         if(isNaN(A) || isNaN(B) || isNaN(C)) { userError("NaN"); continue; }
-                        faces << Face __({A+dn, B+dn, C+dn}, {N,N,N}, polygon.color);
-                        faces << Face __({C-dn, B-dn, A-dn}, {-N,-N,-N}, polygon.color); //Two-sided (backface culling is always on)
+                        faces << Face __({A+dn, B+dn, C+dn}, {N,N,N}, {polygon.color,polygon.color,polygon.color});
+                        faces << Face __({C-dn, B-dn, A-dn}, {-N,-N,-N}, {polygon.color,polygon.color,polygon.color}); //Two-sided
                         B = C;
                     }
                 }
@@ -489,41 +489,38 @@ struct Editor : Widget {
         D -= lightRay*dot(D,vec3(1,0,0))/dotNL;
         // Add ground plane to scene
         vec3 N = vec3(1,0,0);
-        faces << Face __ ({A,B,C},{N,N,N},vec3(1,1,1));
-        faces << Face __ ({A,C,D},{N,N,N},vec3(1,1,1));
+        faces << Face __ ({A,B,C},{N,N,N},{vec3(1,1,1),vec3(1,1,1),vec3(1,1,1)});
+        faces << Face __ ({A,C,D},{N,N,N},{vec3(1,1,1),vec3(1,1,1),vec3(1,1,1)});
         // Update light bounds (Z far)
         { vec3 lightP = (sun*A).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*B).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*C).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*D).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
 
+        // Submits geometry
+
+
         window.render();
     }
 
-    // Profile counters
     uint64 frameEnd=cpuTime(), frameTime=180000; // last frame end and initial frame time in microseconds
-    profile( uint64 miscStart=rdtsc(); uint64 uiTime=0; ) // profile cycles spent outside render
 
-    void render(int2 targetPosition, int2 targetSize) override {
-        //RenderTarget::resolve regenerates framebuffer background color only when necessary, but UI overlay expects cleared framebuffer
-        fill(targetPosition+Rect(targetSize.x,256),white,false);
-
-        profile( uint64 setupStart=rdtsc(); uint64 miscTime = setupStart-miscStart; )
-
+    void render(int2 position, int2 size) override {
         // Computes view transform
         mat4 view;
-        int2 viewSize = targetSize*4; // view-space maps to samples
-        view.translate(vec3(viewSize.x/2,viewSize.y/3,0.f)); //center origin
-        float scale = this->scale*max(viewSize.x,viewSize.y)/worldRadius/2; //normalize view space to fit display
+        view.scale(vec3(1.f/size.x, 1.f/size.y, 1.f));
+        view.translate(vec3(size.x/2,size.y/3,0)); //center origin
+        float scale = this->scale*max(size.x,size.y)/worldRadius/2; //normalize view space to fit display
         view.scale(scale);
         view.rotateX(rotation.y); // yaw
         view.rotateY(rotation.x); // pitch
         view.rotateZ(PI/2); //+X (heading) is up
         // View-space lighting
-        mat3 normalMatrix = view.normalMatrix();
-        vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
-        vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
+        //mat3 normalMatrix = view.normalMatrix();
+        //vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
+        //vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
+#if 0
         // Setups sun shadow
         float A0 = scale/4; //scales shadow sampling to view pixel
         if(A0 != sunShadow.A0) {
@@ -551,56 +548,21 @@ struct Editor : Widget {
                 }
             }
         }
+#endif
 
-        // Setups main rendering pass (flat faces)
-        target.setup(targetSize);
-        pass.setup(target, faces.size()); // Resize if necessary and clears
-        shader.enableShadow=enableShadow, shader.sky = skyLightDirection, shader.sun = sunLightDirection;
-        for(const Face& face: faces) {
-            vec4 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
-            if(cross((B-A).xyz(),(C-A).xyz()).z > 0) {
-                vec3 N[3];
-                for(int i=0;i<3;i++) N[i] = normalize(normalMatrix*face.normal[i]);
-                vec3 attributes[6];
-                for(int i=0;i<3;i++) attributes[i]=vec3(N[0][i],N[1][i],N[2][i]);
-                for(int i=3;i<6;i++) attributes[i]=face.lightPosition[i-3];
-                pass.submit(A,B,C, attributes, __(face.color));
-            }
-        }
+        glViewport(position, size);
+        glClear();
 
-        // Actual rendering
-        profile( uint64 renderStart=rdtsc(); uint64 setupTime = renderStart-setupStart; )
-        pass.render(target);
-        profile( uint64 resolveStart=rdtsc(); uint64 renderTime = resolveStart-renderStart; )
-
-        // Resolves render target to display
-        target.resolve(targetPosition,targetSize);
-
-        profile( uint64 uiStart = rdtsc(); uint64 resolveTime = uiStart-resolveStart;
-                    uint64 totalTime = miscTime+setupTime+renderTime+resolveTime+uiTime; )
+        context.swapBuffers();
         uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
 
-        // Overlays errors / profile information
-        Text( system.parseErrors ? copy(userErrors) :
-                    userErrors ? move(userErrors) :
-                        sunShadow.depthComplexity()+" "_+ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(faces.size())+" faces\n"
-                        profile(
-                            "misc "_+str(100*miscTime/totalTime)+"%\n"
-                            "setup "_+str(100*setupTime/totalTime)+"%\n"
-                            "render "_+str(100*renderTime/totalTime)+"%\n"
-                            "- raster "_+str(100*pass.rasterTime/totalTime)+"%\n"
-                            "- pixel "_+str(100*(pass.pixelTime)/totalTime)+"%\n"
-                            "- sample "_+str(100*(pass.sampleTime)/totalTime)+"%\n"
-                            "-- MSAA split "_+str(100*(pass.sampleFirstTime)/totalTime)+"%\n"
-                            "-- MSAA over "_+str(100*(pass.sampleOverTime)/totalTime)+"%\n"
-                            "- user "_+str(100*pass.userTime/totalTime)+"%\n"
-                            "resolve "_+str(100*resolveTime/totalTime)+"%\n"
-                            "ui "_+str(100*uiTime/totalTime)+"%\n") ""_).render(int2(targetPosition+int2(16)));
-#if 1
+        // Overlays errors / profile information (FIXME: software rendered overlay)
+        Text(system.parseErrors ? copy(userErrors) :
+                                  userErrors ? move(userErrors) :
+                                               ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(faces.size())+" faces\n"_)
+                .render(int2(position+int2(16)));
+#if 0
         window.render(); //keep updating to get maximum performance profile
 #endif
-        // HACK: Clear background for text editor (UI system expects full window clear)
-        fill(Rect(targetPosition+int2(0,targetSize.y),window.size),white,false);
-        profile( miscStart = rdtsc(); uiTime = miscStart-uiStart; )
     }
 } application;

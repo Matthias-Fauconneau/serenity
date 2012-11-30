@@ -45,7 +45,7 @@ int gettid() { return syscall(SYS_gettid); }
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 
 // Log
-void log_(const ref<byte>& buffer) { check_(write(1,buffer.data,buffer.size)); }
+void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
 // Poll

@@ -1,5 +1,6 @@
 CG:
  Hardware rendering: faces, MSAA, soft shadows
+ Software rendered UI overlay
  Spheres test scene
  Editor: copy-paste, parse ->, XCompose, syntax highlighting
  Trees: improve branches using environment modeling (light and space competition)
