@@ -251,13 +251,14 @@ struct Editor : Widget {
     Bar<Text> systems; // Tab bar to select which L-System to view
     TextInput editor;
     VBox layout;
-    Window window __(&layout,int2(0,0),"L-System Editor"_);
+    Window window __(this/*&layout*/,int2(0,0),"L-System Editor"_);
     GLContext context __(window);
 
     // Renderer
     GLFrameBuffer framebuffer;
     GLBuffer buffer;
     SHADER(shader);
+    SHADER(resolve);
     //Shadow sunShadow; // Holds scene geometry projected in light space bins
 
     // Scene
@@ -381,7 +382,7 @@ struct Editor : Widget {
                         }
 
                         // Computes smoothed normals (weighted by triangle areas)
-                        /*for(Face& face: faces) for(uint i: range(3)) {
+                        for(Face& face: faces) for(uint i: range(3)) {
                             vec3 N=0; vec3 O = face.vertices[i].position;
                             for(const Face& face: faces) for(const Vertex& V : ref<Vertex>__(face.vertices, 3)) {
                                 if(length(V.position-O)<1) {
@@ -389,7 +390,7 @@ struct Editor : Widget {
                                 }
                             }
                             face.vertices[i].normal = normalize(N);
-                        }*/
+                        }
                         this->faces << faces;
                     }
                 }
@@ -505,7 +506,7 @@ struct Editor : Widget {
         view.rotateX(rotation.y); // yaw
         view.rotateY(rotation.x); // pitch
         view.rotateZ(PI/2); //+X (heading) is up
-        view.translate(-worldCenter); //center origin
+        view.translate(vec3(-worldCenter.x,0,0)); //view.translate(-worldCenter); //center origin
         // View-space lighting
         mat3 normalMatrix = view.normalMatrix();
         vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
@@ -542,7 +543,8 @@ struct Editor : Widget {
 #endif
 
         if(framebuffer.depth.width != width || framebuffer.depth.height != height)
-            framebuffer=GLFrameBuffer(GLTexture(width,height,GLTexture::Depth),GLTexture(width,height,GLTexture::Depth)); //TODO: MSAA
+            //framebuffer=GLFrameBuffer(GLTexture(width,height,GLTexture::RGB16F)); //TODO: MSAA
+            framebuffer=GLFrameBuffer(GLTexture(width,height,GLTexture::sRGB)); //TODO: MSAA
         framebuffer.bind(true);
         glDepthTest(true);
         glCullFace(true);
@@ -558,6 +560,8 @@ struct Editor : Widget {
         buffer.draw();
 
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
+        resolve.bindSamplers("framebuffer"); GLTexture::bindSamplers(framebuffer.color);
+        glQuad(resolve,vec2(-1,-1),vec2(1,1));
         context.swapBuffers();
 
         /*uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;

@@ -11,14 +11,14 @@ void MidiScore::parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint 
         }
         this->ticksPerBeat=ticksPerBeat;
         beatsPerMeasure = this->timeSignature[0]*this->timeSignature[1];
-        staffTime = 5*beatsPerMeasure;
+        staffTime = measuresPerStaff*beatsPerMeasure;
     }
 
 int2 MidiScore::sizeHint() { return int2(1280,systemHeight*(notes.keys.last()/staffTime+1)); }
 
 // Returns staff coordinates from note  (for a given clef and key)
 int MidiScore::staffY(Clef clef, int note) {
-    assert(key>=-1 && key<=0);
+    assert(key==-1 || key==0 || key==2, key);
     int h=note/12*7; for(int i=0;i<note%12;i++) h+=keys[key+1][i];
     const int trebleOffset = 6*7+3; // C0 position in intervals from top line
     const int bassOffset = 4*7+5; // C0 position in intervals from top line
@@ -33,7 +33,7 @@ int MidiScore::staffX(int t) { return systemHeader+t%staffTime*(size.x-systemHea
 int2 MidiScore::page(int staff, int t, int h) { return position+int2(staffX(t),t/staffTime*systemHeight+(!staff)*staffHeight+2*staffMargin+h*staffInterval/2); }
 
 static void glyph(int2 position, const ref<byte> name, byte4 color=black) {
-    static Font font __("/usr/share/lilypond/2.16.0/fonts/otf/emmentaler-20.otf"_,128);
+    static Font font __("/usr/share/lilypond/2.16.1/fonts/otf/emmentaler-20.otf"_,128);
     const Glyph& glyph = font.glyph(font.index(name));
     substract(position+glyph.offset,glyph.image,color);
 }

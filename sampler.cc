@@ -159,7 +159,7 @@ void Sampler::noteEvent(int key, int velocity) {
             note.level=(float4)__(level,level,level,level);
             {Locker lock(noteReadLock);
                 array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
-                if(notes.size()==notes.capacity()) {Locker lock(noteWriteLock); notes.reserve(notes.capacity()+1); log("size",notes.capacity());}
+                if(notes.size()==notes.capacity()) { error("too many ",notes.capacity(),"active notes"); return;}
                 notes << move(note);
             }
             queue(); //queue background decoder in main thread
@@ -239,7 +239,7 @@ bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
         }
 
         for(uint i: range(period/2)) {
-            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),9), sra(cvtps(buffer[i*2+1]),9) ); //8 samples = 4 frames
+            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),10), sra(cvtps(buffer[i*2+1]),10) ); //8 samples = 4 frames
         }
         unallocate(buffer,period);
 

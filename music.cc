@@ -130,6 +130,8 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
+        openSheet("Skyrim"_);
+        toggleAnnotations();
     }
 
     /// Called by score to scroll PDF as needed when playing

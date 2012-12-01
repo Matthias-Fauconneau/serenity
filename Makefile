@@ -14,13 +14,10 @@ endif
 
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var -pipe -march=native $(FLAGS_$(BUILD))
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
-FLAGS_fast= -O3 -g -fno-omit-frame-pointer
+FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
-
-SHADERS = $(SHADERS_$(TARGET))
-SHADERS_editor = shader
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -28,7 +25,13 @@ ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next
 ICONS_music = music
 
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert) $(SHADERS:%=%.frag)
+SHADERS = $(SHADERS_$(TARGET))
+SHADERS_editor = shader resolve
+
+FONTS = $(FONTS_$(TARGET))
+#FONTS_music = emmentaler-20
+
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert) $(SHADERS:%=%.frag) $(FONTS:%=%.otf)
 SRCS_profile = profile
 
 LIBS_time = rt
@@ -36,7 +39,8 @@ LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_player = avformat avcodec
-LIBS_gl = EGL GL GLU
+LIBS_gl = EGL GL
+LIBS_test = EGL GL
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -73,17 +77,22 @@ $(BUILD)/%.o : %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
 
+$(BUILD)/%.o: %.png
+	@echo $<
+	@test -e $(dir $@) || mkdir -p $(dir $@)
+	@ld -r -b binary -o $@ $<
+
+$(BUILD)/%.otf.o: %.otf
+	@echo $<
+	@test -e $(dir $@) || mkdir -p $(dir $@)
+	@ld -r -b binary -o $@ $<
+
 $(BUILD)/%.vert.o: %.vert
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<
 
 $(BUILD)/%.frag.o: %.frag
-	@echo $<
-	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@ld -r -b binary -o $@ $<
-
-$(BUILD)/%.o: %.png
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<

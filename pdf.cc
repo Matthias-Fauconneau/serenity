@@ -333,10 +333,11 @@ void PDF::open(const ref<byte>& data) {
                     OP3('S','C','N') ;
                     OP3('s','c','n') ;
                     OP2('T','*') Tm=Tlm=mat32(0,-leading)*Tlm;
+                    OP2('T','c') spacing=f(0);
                     OP2('T','d') Tm=Tlm=mat32(f(0),f(1))*Tlm;
                     OP2('T','D') Tm=Tlm=mat32(f(0),f(1))*Tlm; leading=-f(1);
                     OP2('T','L') leading=f(0);
-                    OP2('T','c') spacing=f(0);
+                    OP2('T','r') ; //set render mode
                     OP2('T','z') ; //set horizontal scaling
                     OP('\'') { Tm=Tlm=mat32(0,-leading)*Tlm; drawText(font,fontSize,spacing,wordSpacing,args[0].data); }
                     OP2('T','j') drawText(font,fontSize,spacing,wordSpacing,args[0].data);

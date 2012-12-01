@@ -31,7 +31,7 @@ template<class T> struct Buffer {
     uint capacity=0,size=0;
     Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
     Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy16(data,o.data,size*sizeof(T)/16);}
-    move_operator(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
+    move_operator_(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     ~Buffer(){if(data){unallocate(data,capacity);}}
     operator T*() { return data; }
 };

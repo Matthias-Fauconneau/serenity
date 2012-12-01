@@ -10,3 +10,7 @@ editor.cc
 ternary.l
 shader.vert
 shader.frag
+resolve.vert
+resolve.frag
+gl.h
+gl.cc

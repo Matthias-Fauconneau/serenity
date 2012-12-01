@@ -59,6 +59,11 @@ struct EGLTest : Widget {
         _phase = glGetUniformLocation(shader, "phase");
         _offset = glGetUniformLocation(shader, "offset");
         _position = glGetAttribLocation(shader , "position");
+
+        uint id;
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,512,512,0,GL_RGB,GL_FLOAT,0);
     }
     ~EGLTest() {
         eglDestroyContext(display, context);

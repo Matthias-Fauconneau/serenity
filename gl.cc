@@ -8,14 +8,13 @@
 
 /// Context
 
-#define glCheck ({uint e=glGetError(); if(e) error(str((const char*)gluErrorString(e))); })
-
+//static void glDebugMessage(uint, uint, uint, uint, int, const char* message, void*) { error(message); }
 GLContext::GLContext(Window& window) {
     window.softwareRendering = false; //disable software rendering
     display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     eglInitialize(display, 0, 0);
     EGLConfig config; EGLint matchingConfigurationCount;
-    {int attributes[] ={EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_DEPTH_SIZE, 24, EGL_NONE};
+    {int attributes[] ={EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_NONE};
         eglChooseConfig(display, attributes, &config, 1, &matchingConfigurationCount);
     }
     if(matchingConfigurationCount != 1) error("No matching configuration", matchingConfigurationCount);
@@ -24,6 +23,8 @@ GLContext::GLContext(Window& window) {
     {int attributes[]={EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
         context = eglCreateContext(display, config, 0, attributes);}
     eglMakeCurrent(display, surface, surface, context);
+    //glDebugMessageCallbackARB(&glDebugMessage,this);
+    //glDebugMessageControlARB(GL_DONT_CARE,GL_DONT_CARE,GL_DONT_CARE,0,0,true);
 }
 
 GLContext::~GLContext() {
@@ -33,7 +34,6 @@ GLContext::~GLContext() {
 }
 
 void GLContext::swapBuffers() {
-    glCheck;
     eglSwapBuffers(display, surface);
 }
 
@@ -49,6 +49,7 @@ void GLUniform::operator=(vec2 v) { glProgramUniform2f(program,location,v.x,v.y)
 void GLUniform::operator=(vec4 v) { glProgramUniform4f(program,location,v.x,v.y,v.z,v.w); }
 void GLUniform::operator=(mat4 m) { glProgramUniformMatrix4fv(program,location,1,0,m.data); }
 #else
+void GLUniform::operator=(int v) { glUseProgram(program); glUniform1i(location,v); }
 void GLUniform::operator=(float v) { glUseProgram(program); glUniform1f(location,v); }
 void GLUniform::operator=(vec2 v) { glUseProgram(program); glUniform2f(location,v.x,v.y); }
 void GLUniform::operator=(vec3 v) { glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
@@ -58,7 +59,6 @@ void GLUniform::operator=(mat4 m) { glUseProgram(program); glUniformMatrix4fv(lo
 #endif
 GLUniform GLShader::operator[](const char* name) {
     int location = uniformLocations.value(name,-1);
-    glCheck;
     if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
     if(location<0) error("Unknown uniform"_,name);
     return GLUniform(id,location);
@@ -136,6 +136,7 @@ void GLBuffer::upload(const ref<byte> &vertices) {
     if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, vertices.size, vertices.data, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertexCount = vertices.size/vertexSize;
 }
 void GLBuffer::bindAttribute(GLShader& program, const char* name, int elementSize, uint64 offset) {
@@ -147,7 +148,6 @@ void GLBuffer::bindAttribute(GLShader& program, const char* name, int elementSiz
     glEnableVertexAttribArray(location);
 }
 void GLBuffer::draw() {
-    glCheck;
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     /*if (primitiveType == Point) {
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
@@ -170,7 +170,6 @@ void GLBuffer::draw() {
 }
 
 void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
-    glCheck;
     shader.bind();
     glBindBuffer(GL_ARRAY_BUFFER,0);
     uint positionIndex = shader.attribLocation("position");
@@ -201,21 +200,24 @@ GLTexture::GLTexture(const Image& image) {
 GLTexture::GLTexture(int width, int height, int format) : width(width), height(height) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
+    if((format&3)==sRGB)
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGB,GL_UNSIGNED_BYTE,0); //FIXME: sRGB
+    if((format&3)==Depth24)
+        glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT32,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_BYTE,0);
+    if((format&3)==RGB16F)
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGB,GL_FLOAT,0); //FIXME: float
+    if((format&3)==Multisample)
+        //glTexImage2DMultisample(GL_TEXTURE_2D,4,GL_RGB,width,height,false); //FIXME: multisample
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGB,GL_FLOAT,0); //FIXME: float
     if(format&Shadow) {
-        glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT32,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_GEQUAL );
-    } else if(format&Depth) {
-        glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT32,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,0);
-    } else if(format&Gamma) glTexImage2D(GL_TEXTURE_2D,0,GL_SRGB8,width,height,0,GL_SRGB,GL_UNSIGNED_BYTE,0);
-    else if(format&Float) glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA16F,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,0);
-    else if(format&RG16) glTexImage2D(GL_TEXTURE_2D,0,GL_RG16,width,height,0,GL_RG,GL_UNSIGNED_SHORT,0);
-    else glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,0);
+    }
     if(format&Bilinear) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     } else {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_LINEAR_MIPMAP_NEAREST:GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_NEAREST_MIPMAP_NEAREST:GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
     if(format&Anisotropic) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 2.0);
@@ -224,26 +226,34 @@ GLTexture::GLTexture(int width, int height, int format) : width(width), height(h
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 }
-GLTexture::~GLTexture() { assert(id); glDeleteTextures(1,&id); id=0; }
+GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); }
 void GLTexture::bind(uint sampler) const { assert(id); glActiveTexture(GL_TEXTURE0+sampler); glBindTexture(GL_TEXTURE_2D, id); }
 void GLTexture::bindSamplers(const GLTexture& tex0) { tex0.bind(0); }
 
 /// Framebuffer
 
-GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color):depth(move(depth)),color(move(color)){
+GLFrameBuffer::GLFrameBuffer(GLTexture&& color):color(move(color)){
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     if(this->depth.id) glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,this->depth.id,0);
+    else {
+        glGenRenderbuffers(1, &depthBuffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, color.width, color.height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
+    }
     if(this->color.id) glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,this->color.id,0);
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("");
 }
-GLFrameBuffer::~GLFrameBuffer() { glDeleteFramebuffers(1,&id); }
+GLFrameBuffer::~GLFrameBuffer() { if(depthBuffer) glDeleteRenderbuffers(1, &depthBuffer); glDeleteFramebuffers(1,&id); }
 void GLFrameBuffer::bind(bool clear, vec4 clearColor) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER,id);
   if(depth.id) glViewport(0,0,depth.width,depth.height); else glViewport(0,0,color.width,color.height);
   if(clear) {
       glClearColor(clearColor.x,clearColor.y,clearColor.z,clearColor.w);
-      glClear( (depth.id?GL_DEPTH_BUFFER_BIT:0) | (color.id?GL_COLOR_BUFFER_BIT:0) );
+      glClear( ((depth.id||depthBuffer)?GL_DEPTH_BUFFER_BIT:0) | (color.id?GL_COLOR_BUFFER_BIT:0) );
   }
+  if(depth.id||depthBuffer) glDepthMask(true);
 }
 void GLFrameBuffer::bindWindow(int2 position, int2 size) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

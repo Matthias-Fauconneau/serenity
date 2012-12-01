@@ -1,10 +1,9 @@
 CG:
- Hardware rendering: MSAA, sRGB, UI overlay, soft shadows
- Editor: copy-paste, parse ->, XCompose, syntax highlighting
- Trees: improve branches using environment modeling (light and space competition)
+ Hardware rendering: UI overlay, MSAA, float, soft shadows
+ Editor: copy-paste, parse "->", .XCompose, syntax highlighting
  Export .obj [release]
+ Trees: improve branches using environment modeling (light and space competition)
  Textures: bark,leafs,twigs
- Optimize render, optimize geometry, indexed vertices
  Scene: sky, terrain, grass, plants, forest...
 
 Desktop: fix links, desktop calculator

@@ -21,6 +21,7 @@ void glBlend(bool enable);
 
 struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
+    void operator=(int);
     void operator=(float);
     void operator=(vec2);
     void operator=(vec3);
@@ -94,10 +95,11 @@ void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord=false);
 struct GLTexture {
     uint id=0;
     uint width=0, height=0;
-
     GLTexture(){}
-    enum Format { RGBA=0,Depth=1,Shadow=2,Bilinear=4,Anisotropic=8,Gamma=16,Float=32,Mipmap=64,Clamp=128,RG16=256 };
-    GLTexture(int width,int height,int format=RGBA);
+    enum Format {
+        sRGB=0,Depth24=1,RGB16F=2,Multisample=3,
+        Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
+    GLTexture(int width,int height,int format=sRGB);
     GLTexture(const Image& image);
     move_operator(GLTexture):id(o.id),width(o.width),height(o.height){o.id=0;}
     ~GLTexture();
@@ -108,15 +110,15 @@ struct GLTexture {
 };
 
 struct GLFrameBuffer {
-    move_operator(GLFrameBuffer):id(o.id),depth(move(o.depth)),color(move(o.color)){o.id=0;}
+    move_operator(GLFrameBuffer):id(o.id),depthBuffer(o.depthBuffer),depth(move(o.depth)),color(move(o.color)){o.id=o.depthBuffer=0;}
     GLFrameBuffer(){}
-    GLFrameBuffer(GLTexture&& depth,GLTexture&& color=GLTexture());
+    GLFrameBuffer(GLTexture&& color);
     ~GLFrameBuffer();
 
     operator bool() const { return id; }
     void bind(bool clear=false, vec4 color=1);
     static void bindWindow(int2 position, int2 size);
 
-    uint id=0;
+    uint id=0, depthBuffer=0;
     GLTexture depth, color;
 };

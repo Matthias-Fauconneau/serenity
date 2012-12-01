@@ -12,7 +12,7 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[3]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(span.y>2 && span.x<355 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<20) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
+        if(span.y>2 && span.x<355 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<22) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
             //debug[center]="V"_+str(span);
             ties+= Line(vec2(min.x,p[0].y),vec2(max.x,p[3].y));
         } //else debug[center]="!"_+str(span);
@@ -43,7 +43,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
         } else if(font=="OpusStd"_) {
             if(code==3/*treble*/||code==5/*bass*/) {
-                if(pos.y-lastClef.y>202) {
+                if(pos.y-lastClef.y>159) {
                     staffs << (lastClef.y+pos.y)/2;//(lastClef.y+100);
                     //{ static uint min=-1; int y=pos.y-lastClef.y; if(uint(y)<min) min=y, log(pos.y-lastClef.y); }
                 }
@@ -131,13 +131,14 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
             if(code==41 && trills && abs(trills.last().b.y-pos.y)<16) { trills.last().b=pos; debug[pos]=string("Trill"_); } //trill tail
             else if(code==56) { trills << Line(pos,pos); debug[pos]=string("Trill"_); } //trill head
-            else if(code==58) { //dot
+            else if(code==58 || (font=="OpusSpecialStd"_ && code==1)) { //dot
                 dots[i] << pos;
                 map<float, vec2> matches;
                 for(vec2 dot : dots[i]) if(abs(dot.x-pos.x)<1) matches[dot.y]=dot;
                 const array<float>& y = matches.keys; const array<vec2>& m = matches.values;
-                if(m.size()==4 && abs(y[0]-y[1])<13 && abs(y[1]-y[2])>=122 && abs(y[2]-y[3])<13 ) {
+                if(m.size()==4 && abs(y[0]-y[1])<15 && abs(y[1]-y[2])>121 && abs(y[2]-y[3])<15 ) {
                     vec2 pos = (m[0]+m[1]+m[2]+m[3])/4.f;
+                    debug[pos]=string(":"_);
                     uint i=0; for(;i<repeats.size() && repeats[i].y*1000+repeats[i].x < pos.y*1000+pos.x;i++) {} repeats.insertAt(i,pos);
                 }
             } else if(code==77) { //tremolo
@@ -238,7 +239,7 @@ alreadyTied: ;
                         tied << t; //defer remove for double ties
                         //debug[vec2(x,-y-24)]=string("R"_+str(rx,ry));
                         goto staffDone;
-                    } //else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug.insertMulti(vec2(x,-y+16),str("!R"_,rx,ry));
+                    } else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug.insertMulti(vec2(x,-y+16),str("!R"_,rx,ry));
                 }
             }
 staffDone: ;
@@ -284,7 +285,7 @@ trillCancelTie: ;
                                     abs(x-lastX)<2 ||
                                     (abs(x-lastX)<10 && abs(y-y2)<180 && (staff[lastX].size()>1 || staff[x].size()>1)) ||
                                     ((abs(x-lastX)<18 && abs(y-y2)<20) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1))
-                                    //|| (abs(x-lastX)<19/*25*/ && abs(y-y2)<6) //TODO: relative to average note distance
+                                    || (abs(x-lastX)<=19 && abs(y-y2)<=7) //TODO: relative to average note distance
                                     )) {
                             if(staff[lastX].size()>=staff[x].size()) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
@@ -383,18 +384,18 @@ spurious: ;
     uint n=0; for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) { positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; }
 
     /// Detect and explicit repeats
-    int startIndex=-1;
+    int startIndex=-2;
     for(vec2 pos : repeats) {
         uint i=0; for(;i<staffs.size()-1 && pos.y>staffs[i];i++) {}
         int index=notes[i].values[0].values[0].scoreIndex-1;
         for(int x : notes[i].keys) { if(x>pos.x) break; index=notes[i][x].values[0].scoreIndex; }
-        if(startIndex < 0) {
+        if(startIndex < -1) {
             startIndex=index; debug[pos]=dec(startIndex)+"{"_;
         } else {
             assert(index>startIndex);
             { array<vec2> cat; cat<<positions.slice(0,index+1)<<positions.slice(startIndex+1); positions = move(cat); }
             { array<int> cat; cat<<indices.slice(0,index+1)<<indices.slice(startIndex+1); indices = move(cat); }
-            startIndex=-1;
+            startIndex=-2;
             debug[pos]="}"_+dec(index);
         }
     }
@@ -420,10 +421,10 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
             debug[pos]=string("////"_);
             positions.removeAt(i); indices.removeAt(i);
         } else*/
-        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
+        /*if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
             debug[pos]=string("++++"_);
             positions.removeAt(i); indices.removeAt(i);
-        } else if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
+        } else*/ if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
             debug.insertMulti(pos,str("----"_,lastPos.x-pos.x,lastPos.y-pos.y));
             notes.removeAt(i);
         } else {
