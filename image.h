@@ -11,7 +11,6 @@ struct Image {
     uint width=0, height=0, stride=0;
     bool own=false, alpha=false;
 
-    no_copy(Image);
     move_operator(Image):data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
 
     Image(){}

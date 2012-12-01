@@ -4,7 +4,6 @@
 
 /// Unix file descriptor
 struct Handle {
-    no_copy(Handle);
     int fd;
     Handle(int fd):fd(fd){}
     move_operator(Handle):fd(o.fd){ o.fd=0; }
@@ -111,7 +110,6 @@ struct Device : File {
 
 /// Managed memory mapping
 struct Map : ref<byte> {
-    no_copy(Map);
     Map(){}
     Map(const File& file);
     Map(const ref<byte>& file, const Folder& at=root()):Map(File(file,at)){}

@@ -51,24 +51,9 @@ This is mostly for reference, since this application use my own framework (Linux
 #include "filewatcher.h"
 #include "lsystem.h"
 #include "gl.h"
+#include "data.h" //cast
 
 #if 0
-// Light
-
-/// Directional light with angular diameter
-inline float angularLight(vec3 surfaceNormal, vec3 lightDirection, float angularDiameter) {
-    float t = ::acos(dot(lightDirection,surfaceNormal)); // angle between surface normal and light principal direction
-    float a = min<float>(PI/2,max<float>(-PI/2,t-angularDiameter/2)); // lower bound of the light integral
-    float b = min<float>(PI/2,max<float>(-PI/2,t+angularDiameter/2)); // upper bound of the light integral
-    float R = sin(b) - sin(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
-    R /= 2*sin(angularDiameter/2); // normalize
-    return R;
-}
-/// For an hemispheric light, the integral bounds are always [t-PI/2,PI/2], thus R evaluates to (1-cos(t))/2
-inline float hemisphericLight(vec3 surfaceNormal, vec3 lightDirection) { return (1+dot(lightDirection,surfaceNormal))/2; }
-/// This is the limit of angularLight when angularDiameter → 0
-inline float directionnalLight(vec3 surfaceNormal, vec3 lightDirection) { return max(0.f,dot(lightDirection,surfaceNormal)); }
-
 // Shadow
 
 /// Shadow sampling patterns
@@ -241,12 +226,12 @@ struct Shader {
 };
 #endif
 
-/// Flat shaded face to be submitted to rasterizer
-struct Face {
-    vec3 position[3]; // World-space positions
-    vec3 normal[3]; // World-space vertex normals
-    vec3 color[3]; // BGR albedo (TODO: texture mapping)
+struct Vertex {
+    vec3 position; // World-space position
+    vec3 color; // BGR albedo (TODO: texture mapping)
+    vec3 normal; // World-space vertex normals
 };
+struct Face { Vertex vertices[3]; };
 
 /// Generates and renders L-Systems
 struct Editor : Widget {
@@ -260,20 +245,20 @@ struct Editor : Widget {
     bool enableShadow=true; // Whether shadows are rendered
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(0,PI/4); // current view angles (yaw,pitch)
-    float scale=1; // current view scale
     mat4 sun; // sun light transform (TODO: interactive)
 
     // User interface
     Bar<Text> systems; // Tab bar to select which L-System to view
-    VBox layout;
     TextInput editor;
+    VBox layout;
     Window window __(&layout,int2(0,0),"L-System Editor"_);
     GLContext context __(window);
 
     // Renderer
-    //Shadow sunShadow; // Holds scene geometry projected in light space bins
+    GLFrameBuffer framebuffer;
     GLBuffer buffer;
     SHADER(shader);
+    //Shadow sunShadow; // Holds scene geometry projected in light space bins
 
     // Scene
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
@@ -331,6 +316,7 @@ struct Editor : Widget {
 
         // Clears previous scene
         faces.clear(); worldMin=0, worldMax=0, worldCenter=0, worldRadius=0, lightMin=0, lightMax=0;
+
         // Generates new L-system
         if(!level) level=system.constants.at(string("N"_));
         array<Module> modules = system.generate(level);
@@ -390,21 +376,20 @@ struct Editor : Widget {
                             float tb0 = 2*PI*bestJ/Nb, tb1 = 2*PI*(bestJ+1)/Nb;
                             vec3 b0 = (B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
                             vec3 b1 = (B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
-                            if(isNaN(a0) || isNaN(a1) || isNaN(b0) || isNaN(b1)) { userError("NaN"); continue; }
-                            {vec3 N = normalize(cross(a1-a0,b0-a0)); faces << Face __({a0,a1,b0},{N,N,N}, {color,color,color}); }
-                            {vec3 N = normalize(cross(b1-a1,b0-a1)); faces << Face __({a1,b1,b0},{N,N,N}, {color,color,color}); }
+                            {vec3 N = normalize(cross(a1-a0,b0-a0)); faces << Face __({{a0,color,N},{a1,color,N},{b0,color,N}}); }
+                            {vec3 N = normalize(cross(b1-a1,b0-a1)); faces << Face __({{a1,color,N},{b1,color,N},{b0,color,N}}); }
                         }
 
                         // Computes smoothed normals (weighted by triangle areas)
-                        for(Face& face: faces) for(uint i: range(3)) {
-                            vec3 N=0; vec3 O = face.position[i];
-                            for(const Face& face: faces) for(const vec3& P : ref<vec3>__(face.position, 3)) {
-                                if(length(P-O)<1) {
-                                    N += cross(face.position[1]-face.position[0],face.position[2]-face.position[0]);
+                        /*for(Face& face: faces) for(uint i: range(3)) {
+                            vec3 N=0; vec3 O = face.vertices[i].position;
+                            for(const Face& face: faces) for(const Vertex& V : ref<Vertex>__(face.vertices, 3)) {
+                                if(length(V.position-O)<1) {
+                                    N += cross(face.vertices[1].position-face.vertices[0].position,face.vertices[2].position-face.vertices[0].position);
                                 }
                             }
-                            face.normal[i] = normalize(N);
-                        }
+                            face.vertices[i].normal = normalize(N);
+                        }*/
                         this->faces << faces;
                     }
                 }
@@ -434,16 +419,15 @@ struct Editor : Widget {
                         if(area<0.01) { userError("degenerate"); continue; } //discard degenerate triangles
                         N /= area;
                         vec3 dn = 0.1f*N; // avoid self-shadowing
-                        if(isNaN(A) || isNaN(B) || isNaN(C)) { userError("NaN"); continue; }
-                        faces << Face __({A+dn, B+dn, C+dn}, {N,N,N}, {polygon.color,polygon.color,polygon.color});
-                        faces << Face __({C-dn, B-dn, A-dn}, {-N,-N,-N}, {polygon.color,polygon.color,polygon.color}); //Two-sided
+                        faces << Face __({{A+dn,polygon.color,N},{B+dn,polygon.color,N},{C+dn,polygon.color,N}});
+                        faces << Face __({{C-dn,polygon.color,-N},{B-dn,polygon.color,-N},{A-dn,polygon.color,-N}}); //Two-sided
                         B = C;
                     }
                 }
                 polygon = polygonStack.pop();
             } else if(symbol=="!"_ || symbol=="\""_) { // change current color
                 if(module.arguments.size()!=3) userError("Expected !(b,g,r)");
-                color = clip(vec3(0.f),vec3(module.arguments[0],module.arguments[1],module.arguments[2]),vec3(1.f));
+                color = clip(vec3(0.f),vec3(module.arguments[2],module.arguments[1],module.arguments[0]),vec3(1.f));
             } else if(symbol=="$"_) { //set Y horizontal (keeping X), Z=X×Y
                             vec3 X = state[0].xyz();
                             vec3 Y = cross(vec3(1,0,0),X);
@@ -462,16 +446,13 @@ struct Editor : Widget {
             } else if(symbol=="|"_) state.rotateZ(PI);
         }
 
-        // Compute scene bounds (in world space to fit view, and in light space to fit shadow)
+        // Compute scene bounds in light space to fit shadow
         sun=mat4(); sun.rotateY(PI/4);
-        for(const Face& face: faces) for(const vec3& P : ref<vec3>__(face.position, 3)) {
-            worldMin=min(worldMin,P);
-            worldMax=max(worldMax,P);
-            vec3 lightP = (sun*P).xyz();
-            lightMin=min(lightMin,lightP);
-            lightMax=max(lightMax,lightP);
+        for(const Face& face: faces) for(const Vertex& V : ref<Vertex>__(face.vertices, 3)) {
+            vec3 P = (sun*V.position).xyz();
+            lightMin=min(lightMin,P);
+            lightMax=max(lightMax,P);
         }
-        worldCenter = (worldMax+worldMin)/2.f; worldRadius=length(worldMax-worldMin)/2.f; //FIXME: compute smallest enclosing sphere
 
         // Fit size to receive all shadows
         mat4 sunToWorld = sun.inverse();
@@ -489,16 +470,23 @@ struct Editor : Widget {
         D -= lightRay*dot(D,vec3(1,0,0))/dotNL;
         // Add ground plane to scene
         vec3 N = vec3(1,0,0);
-        faces << Face __ ({A,B,C},{N,N,N},{vec3(1,1,1),vec3(1,1,1),vec3(1,1,1)});
-        faces << Face __ ({A,C,D},{N,N,N},{vec3(1,1,1),vec3(1,1,1),vec3(1,1,1)});
+        faces << Face __ ({{A,vec3(1,1,1),N},{B,vec3(1,1,1),N},{C,vec3(1,1,1),N}});
+        faces << Face __ ({{A,vec3(1,1,1),N},{C,vec3(1,1,1),N},{D,vec3(1,1,1),N}});
         // Update light bounds (Z far)
         { vec3 lightP = (sun*A).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*B).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*C).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*D).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
 
-        // Submits geometry
+        // Compute scene bounds in world space to fit view
+        for(const Face& face: faces) for(const Vertex& V : ref<Vertex>__(face.vertices, 3)) {
+            worldMin=min(worldMin,V.position);
+            worldMax=max(worldMax,V.position);
+        }
+        worldCenter = (worldMax+worldMin)/2.f; worldRadius=length(worldMax.yz()-worldMin.yz())/2.f; //FIXME: compute smallest enclosing sphere
 
+        // Submits geometry (TODO: indexed)
+        buffer.upload<Vertex>(cast<Vertex>(ref<Face>(faces)));
 
         window.render();
     }
@@ -506,19 +494,22 @@ struct Editor : Widget {
     uint64 frameEnd=cpuTime(), frameTime=180000; // last frame end and initial frame time in microseconds
 
     void render(int2 position, int2 size) override {
+        uint width=size.x, height = size.y;
+        // Computes projection transform
+        mat4 projection;
+        projection.perspective(PI/4,width,height,1,4);
         // Computes view transform
         mat4 view;
-        view.scale(vec3(1.f/size.x, 1.f/size.y, 1.f));
-        view.translate(vec3(size.x/2,size.y/3,0)); //center origin
-        float scale = this->scale*max(size.x,size.y)/worldRadius/2; //normalize view space to fit display
-        view.scale(scale);
+        view.scale(1.f/worldRadius); // fit scene (isometric approximation)
+        view.translate(vec3(0,0,-2*worldRadius)); // step back
         view.rotateX(rotation.y); // yaw
         view.rotateY(rotation.x); // pitch
         view.rotateZ(PI/2); //+X (heading) is up
+        view.translate(-worldCenter); //center origin
         // View-space lighting
-        //mat3 normalMatrix = view.normalMatrix();
-        //vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
-        //vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
+        mat3 normalMatrix = view.normalMatrix();
+        vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
+        vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
 #if 0
         // Setups sun shadow
@@ -550,17 +541,32 @@ struct Editor : Widget {
         }
 #endif
 
-        glViewport(position, size);
-        glClear();
+        if(framebuffer.depth.width != width || framebuffer.depth.height != height)
+            framebuffer=GLFrameBuffer(GLTexture(width,height,GLTexture::Depth),GLTexture(width,height,GLTexture::Depth)); //TODO: MSAA
+        framebuffer.bind(true);
+        glDepthTest(true);
+        glCullFace(true);
 
+        shader["modelViewProjectionTransform"] = projection*view;
+        shader["normalMatrix"] = normalMatrix;
+        //shader["sunLightTransform"] = sun;
+        shader["sunLightDirection"] = sunLightDirection;
+        shader["skyLightDirection"] = skyLightDirection;
+        buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
+        buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
+        buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
+        buffer.draw();
+
+        GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
         context.swapBuffers();
-        uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
+
+        /*uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
 
         // Overlays errors / profile information (FIXME: software rendered overlay)
         Text(system.parseErrors ? copy(userErrors) :
                                   userErrors ? move(userErrors) :
                                                ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(faces.size())+" faces\n"_)
-                .render(int2(position+int2(16)));
+                .render(int2(position+int2(16)));*/
 #if 0
         window.render(); //keep updating to get maximum performance profile
 #endif

@@ -93,13 +93,14 @@ inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
 
 template<class T> struct xyz {
     T x,y,z;
-    vector<xy,T,2> xy()const{return vector< ::xy,T,2>(x,y);}
+    vector< ::xy,T,2> xy()const{return vector< ::xy,T,2>(x,y);}
+    vector< ::xy,T,2> yz()const{return vector< ::xy,T,2>(y,z);}
 };
 /// Integer x,y,z vector
 typedef vector<xyz,int,3> int3;
 /// Floating-point x,y,z vector
 typedef vector<xyz,float,3> vec3;
-inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
 
 template<class T> struct xyzw {
     T x,y,z,w;

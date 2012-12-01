@@ -1,7 +1,5 @@
 CG:
- Hardware rendering: faces, MSAA, soft shadows
- Software rendered UI overlay
- Spheres test scene
+ Hardware rendering: MSAA, sRGB, UI overlay, soft shadows
  Editor: copy-paste, parse ->, XCompose, syntax highlighting
  Trees: improve branches using environment modeling (light and space competition)
  Export .obj [release]

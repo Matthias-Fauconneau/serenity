@@ -28,7 +28,7 @@ ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next
 ICONS_music = music
 
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert %.frag)
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert) $(SHADERS:%=%.frag)
 SRCS_profile = profile
 
 LIBS_time = rt
@@ -36,8 +36,7 @@ LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_player = avformat avcodec
-LIBS_gl = EGL GL
-LIBS_test = EGL GL
+LIBS_gl = EGL GL GLU
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -74,14 +73,15 @@ $(BUILD)/%.o : %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
 
-#Build GLSL compiler frontend
-$(BUILD)/glsl: string.cc file.cc glsl.cc
-	$(CC) $(FLAGS) $^ -lEGL -lGL -o $(BUILD)/glsl
+$(BUILD)/%.vert.o: %.vert
+	@echo $<
+	@test -e $(dir $@) || mkdir -p $(dir $@)
+	@ld -r -b binary -o $@ $<
 
-$(BUILD)/%.vert.o: %.vert $(BUILD)/glsl
-	$(BUILD)/glsl $< | ld -r -b binary -o $@ -
-$(BUILD)/%.frag.o: %.frag $(BUILD)/glsl
-	$(BUILD)/glsl $< | ld -r -b binary -o $@ -
+$(BUILD)/%.frag.o: %.frag
+	@echo $<
+	@test -e $(dir $@) || mkdir -p $(dir $@)
+	@ld -r -b binary -o $@ $<
 
 $(BUILD)/%.o: %.png
 	@echo $<

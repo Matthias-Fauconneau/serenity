@@ -24,7 +24,6 @@ template<class T> struct array {
 
     // Prevents creation of independent handle, as they might become dangling when this handle free the buffer.
     // \note Handle to unacquired ressources still might become dangling if the referenced buffer is freed before this handle.
-    no_copy(array);
     move_operator(array) { if(o.tag<0) tag=o.tag, buffer=o.buffer; else copy((byte*)this,(byte*)&o,sizeof(array)); o.tag=0; }
 
     /// Default constructs an empty inline array

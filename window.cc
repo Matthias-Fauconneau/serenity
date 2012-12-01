@@ -157,11 +157,11 @@ void Window::event() {
         } else {
             widget->render(0,size);
         }
-    } else {
+    } else do {
         uint8 type = read<uint8>();
         processEvent(type, read<XEvent>());
         while(eventQueue) { QEvent e=eventQueue.take(0); processEvent(e.type, e.event); }
-    }
+    } while(poll());
     current=0;
 }
 
