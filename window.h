@@ -8,7 +8,7 @@
 #include "x.h"
 
 /// Display size
-extern int2 display;
+extern int2 displaySize;
 
 enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
               Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
@@ -103,7 +103,8 @@ struct Window : Socket, Poll {
     /// Window position and size
     int2 position, size;
     /// Window background intensity and opacity
-    int fillBackground=1, backgroundColor=0xE0, backgroundCenter=0xF0, backgroundOpacity=0xFF, featherBorder=1;
+    float backgroundColor=14./16, backgroundCenter=15./16, backgroundOpacity=1;
+    bool featherBorder=false;
 
     /// Root window
     uint root = 0;
@@ -112,24 +113,24 @@ struct Window : Socket, Poll {
     /// This window base resource id
     uint id = 0;
 
+#if EGL
+    void* display;
+    void* surface;
+    void* context;
+#else
+    void* display;
+    void* context;
+#endif
+
     /// Shortcuts triggered when a key is pressed
     map<uint16, signal<> > shortcuts;
 
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;
     /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment };
+    enum Resource { XWindow, GContext, Colormap, Pixmap, Picture, XCursor, SnapshotSegment };
 
-    /// Whether to use shared memory to display software rendered content
-    bool softwareRendering = true;
-    /// System V shared memory
-    int shm = 0;
-    /// Shared window back buffer
-    Image buffer;
-    /// Shared window buffer state
-    enum { Idle, Server, Wait } state = Idle;
-
-    /// bgra32 Render PictFormat
+    /// bgra32 Render PictFormat (for Cursor)
     uint format=0;
 
     uint16 sequence=-1;

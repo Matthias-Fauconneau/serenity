@@ -1,7 +1,8 @@
 #pragma once
-/// \file display.h Graphics primitives (fill, blit, substract, line)
+/// \file display.h 2D graphics primitives (fill, blit, substract, line)
 #include "vector.h"
 #include "image.h"
+#include "gl.h"
 
 // Clip
 extern array<Rect> clipStack;
@@ -9,39 +10,34 @@ extern Rect currentClip;
 inline void push(Rect clip) { clipStack << currentClip; currentClip=currentClip & clip; }
 inline void pop() { currentClip=clipStack.pop(); }
 
-/// Current window framebuffer (X11 shared memory mapped by Window::render)
-extern Image framebuffer;
-
-constexpr byte4 black __(0, 0, 0, 0xFF);
-constexpr byte4 darkGray __(0xD0, 0xD0, 0xD0, 0xFF);
-constexpr byte4 lightGray __(0xF0, 0xF0, 0xF0, 0xFF);
-constexpr byte4 white __(0xFF, 0xFF, 0xFF, 0xFF);
-constexpr byte4 darken __(0x00, 0x00, 0x00, 0x40);
-constexpr byte4 lighten __(0xFF, 0xFF, 0xFF, 0x40);
-constexpr byte4 highlight __(0xE0, 0xC0, 0x80, 0xFF);
-constexpr byte4 blue __(0xFF, 0, 0, 0xFF);
-constexpr byte4 cyan __(0xFF, 0xFF, 0, 0xFF);
-constexpr byte4 green __(0, 0xFF, 0, 0xFF);
-constexpr byte4 yellow __(0, 0xFF, 0xFF, 0xFF);
-constexpr byte4 red __(0, 0, 0xFF, 0xFF);
-constexpr byte4 magenta __(0xFF, 0, 0xFF, 0xFF);
+// Colors
+constexpr vec4 black __(0, 0, 0, 1);
+constexpr vec4 darkGray __(13./16, 13./16, 13./16, 1);
+constexpr vec4 lightGray __(15./16, 15./16, 15./16, 1);
+constexpr vec4 white __(1, 1, 1, 1);
+constexpr vec4 darken __(0, 0, 0, 0);
+constexpr vec4 lighten __(1, 1, 1, 1./4);
+constexpr vec4 highlight __(14./16, 12./16, 8./16, 1);
+constexpr vec4 blue __(1, 0, 0, 1);
+constexpr vec4 cyan __(1, 1, 0, 1);
+constexpr vec4 green __(0, 1, 0, 1);
+constexpr vec4 yellow __(0, 1, 1, 1);
+constexpr vec4 red __(0, 0, 1, 1);
+constexpr vec4 magenta __(1, 0, 1, 1);
 
 // Graphics primitives
 
 /// Fills pixels inside \a rect with \a color
-void fill(Rect rect, byte4 color=black, bool blend=true);
+void fill(Rect rect, vec4 color=black, bool blend=true);
 
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
 /// \a opacity multiplies alpha channel by opacity/255, alpha is accumulated in framebuffer
-void blit(int2 target, const Image& source, uint8 opacity=255);
+void blit(int2 target, const GLTexture& source, float opacity=1);
+inline void blit(int2 target, const Image& source, float opacity=1) { blit(target,GLTexture(source),opacity); } //FIXME
 /// Substracts \a source from \a target
-void substract(int2 target, const Image& source, byte4 color=black);
-
-/// Draws a thin antialiased line from (x1, y1) to (x2,y2)
-void line(float x1, float y1, float x2, float y2, byte4 color=black);
+void substract(int2 target, const GLTexture& source, vec4 color=black);
+inline void substract(int2 target, const Image& source, vec4 color=black) { substract(target,GLTexture(source),color); } //FIXME
 
 /// Draws a thin antialiased line from p1 to p2
-inline void line(vec2 p1, vec2 p2, byte4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
-
-/// Draws a thin antialiased line from p1 to p2
-inline void line(int2 p1, int2 p2, byte4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
+void line(vec2 p1, vec2 p2, vec4 color=black);
+inline void line(int2 p1, int2 p2, vec4 color=black) { line(vec2(p1),vec2(p2),color); }

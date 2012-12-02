@@ -1,45 +1,25 @@
 #include "gl.h"
 
-#define MESA_EGL_NO_X11_HEADERS
-#include  <EGL/egl.h>
 #define GL_GLEXT_PROTOTYPES
 #include  <GL/gl.h>
 #include <GL/glu.h>
 
 /// Context
 
-//static void glDebugMessage(uint, uint, uint, uint, int, const char* message, void*) { error(message); }
-GLContext::GLContext(Window& window) {
-    window.softwareRendering = false; //disable software rendering
-    display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    eglInitialize(display, 0, 0);
-    EGLConfig config; EGLint matchingConfigurationCount;
-    {int attributes[] ={EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_NONE};
-        eglChooseConfig(display, attributes, &config, 1, &matchingConfigurationCount);
-    }
-    if(matchingConfigurationCount != 1) error("No matching configuration", matchingConfigurationCount);
-
-    surface = eglCreateWindowSurface(display, config, window.id, 0);
-    {int attributes[]={EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-        context = eglCreateContext(display, config, 0, attributes);}
-    eglMakeCurrent(display, surface, surface, context);
-    //glDebugMessageCallbackARB(&glDebugMessage,this);
-    //glDebugMessageControlARB(GL_DONT_CARE,GL_DONT_CARE,GL_DONT_CARE,0,0,true);
-}
-
-GLContext::~GLContext() {
-    eglDestroyContext(display, context);
-    eglDestroySurface(display, surface);
-    eglTerminate(display);
-}
-
-void GLContext::swapBuffers() {
-    eglSwapBuffers(display, surface);
-}
-
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
-void glBlend(bool enable) { if(enable) glEnable(GL_BLEND); else glDisable(GL_BLEND); }
+void glBlend(bool enable, bool add) {
+    if(enable) {
+        glEnable(GL_BLEND);
+        if(add) {
+            glBlendEquation(GL_FUNC_ADD);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // alpha blend
+        } else {
+            glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+            glBlendFunc(GL_ONE,GL_ONE); // substractive blend
+        }
+    } else glDisable(GL_BLEND);
+}
 
 /// Shader
 
@@ -77,7 +57,7 @@ void GLShader::compile(uint type, const ref<byte>& source) {
     }
     int success=0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if(!success) error(success);
+    if(!success) error("Compile failed");
     glAttachShader(id, shader);
 }
 GLShader::GLShader(const ref<byte> &vertex, const ref<byte> &fragment) {
@@ -85,7 +65,16 @@ GLShader::GLShader(const ref<byte> &vertex, const ref<byte> &fragment) {
     compile(GL_VERTEX_SHADER, vertex);
     compile(GL_FRAGMENT_SHADER, fragment);
     glLinkProgram(id);
-    int success=0; glGetProgramiv(id, GL_LINK_STATUS, &success); if(!success) error("");
+    int length;
+    glGetProgramiv(id , GL_INFO_LOG_LENGTH , &length);
+    if(length>1) {
+        string buffer(length); buffer.setSize(length-1);
+        glGetProgramInfoLog(id, length, 0, buffer.data());
+        if(buffer) log(buffer);
+    }
+    int success=0;
+    glGetProgramiv(id, GL_LINK_STATUS, &success);
+    if(!success) error("Link failed");
 }
 void GLShader::bind() { glUseProgram(id); }
 uint GLShader::attribLocation(const char* name) {
@@ -94,10 +83,7 @@ uint GLShader::attribLocation(const char* name) {
     if(location<0) error("Unknown attribute"_,name);
     return (uint)location;
 }
-void GLShader::bindSamplers(const char* tex0, const char* tex1) {
-  if(tex0) operator[](tex0) = 0;
-  if(tex1) operator[](tex1) = 1;
-}
+void GLShader::bindSamplers(const char* tex0) { operator[](tex0) = 0; }
 
 /// Buffer
 
@@ -169,7 +155,7 @@ void GLBuffer::draw() {
     }
 }
 
-void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
+void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     shader.bind();
     glBindBuffer(GL_ARRAY_BUFFER,0);
     uint positionIndex = shader.attribLocation("position");
@@ -179,7 +165,7 @@ void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     uint texCoordIndex;
     if(texCoord) {
         texCoordIndex = shader.attribLocation("texCoord");
-        vec2 texCoords[] = { vec2(0,0), vec2(1,0), vec2(0,1), vec2(1,1) };
+        vec2 texCoords[] = { vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0) }; //flip Y
         glVertexAttribPointer(texCoordIndex,2,GL_FLOAT,0,0,texCoords);
         glEnableVertexAttribArray(texCoordIndex);
     }
@@ -188,12 +174,19 @@ void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     if(texCoord) glDisableVertexAttribArray(texCoordIndex);
 }
 
+vec2 viewportSize;
+vec2 project(int x, int y) { return vec2(2*x/viewportSize.x-1,1-2*y/viewportSize.y); }
+void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord) {
+    glDrawRectangle(shader, project(rect.min.x,rect.max.y), project(rect.max.x,rect.min.y), texCoord);
+}
+
 /// Texture
 
-GLTexture::GLTexture(const Image& image) {
+GLTexture::GLTexture(const Image& image) : width(image.width), height(image.height), alpha(image.alpha) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    glTexImage2D(GL_TEXTURE_2D,0,4,image.width,image.height,0,image.alpha?GL_BGRA:GL_BGR,GL_UNSIGNED_BYTE,image.data);
+    assert(width==image.stride);
+    glTexImage2D(GL_TEXTURE_2D,0,alpha?GL_RGBA:GL_RGB,width,height,0,alpha?GL_RGBA:GL_RGB,GL_UNSIGNED_BYTE,image.data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
@@ -226,7 +219,7 @@ GLTexture::GLTexture(int width, int height, int format) : width(width), height(h
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 }
-GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); }
+GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
 void GLTexture::bind(uint sampler) const { assert(id); glActiveTexture(GL_TEXTURE0+sampler); glBindTexture(GL_TEXTURE_2D, id); }
 void GLTexture::bindSamplers(const GLTexture& tex0) { tex0.bind(0); }
 
@@ -248,14 +241,19 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& color):color(move(color)){
 GLFrameBuffer::~GLFrameBuffer() { if(depthBuffer) glDeleteRenderbuffers(1, &depthBuffer); glDeleteFramebuffers(1,&id); }
 void GLFrameBuffer::bind(bool clear, vec4 clearColor) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER,id);
-  if(depth.id) glViewport(0,0,depth.width,depth.height); else glViewport(0,0,color.width,color.height);
+  if(depth.id) glViewport(0,0,depth.width,depth.height), viewportSize = vec2(depth.size());
+  else glViewport(0,0,color.width,color.height), viewportSize = vec2(color.size());
   if(clear) {
       glClearColor(clearColor.x,clearColor.y,clearColor.z,clearColor.w);
       glClear( ((depth.id||depthBuffer)?GL_DEPTH_BUFFER_BIT:0) | (color.id?GL_COLOR_BUFFER_BIT:0) );
   }
-  if(depth.id||depthBuffer) glDepthMask(true);
 }
-void GLFrameBuffer::bindWindow(int2 position, int2 size) {
+void GLFrameBuffer::bindWindow(int2 position, int2 size, bool clear, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
   glViewport(position.x,position.y,size.x,size.y);
+  viewportSize = vec2(size);
+  if(clear) {
+      glClearColor(color.x,color.y,color.z,color.w);
+      glClear(GL_COLOR_BUFFER_BIT);
+  }
 }

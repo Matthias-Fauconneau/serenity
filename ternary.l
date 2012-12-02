@@ -12,7 +12,7 @@ delayed twigs : F1(l,wA,wB) → F(l,wA,wB)
 growth : F(l,wA,wB) → F(l*lr,wA*wr,wB*wr)
 
 leaf size: size ← 20
-leaf : L(g) : g>0 → [ !(0,0.7,0) ^ [ { . - f(size) . + f(size) . + f(size) . } ] [ { . + f(size) . - f(size) . - f(size) . } ] ]
+leaf : L(g) : g>2→ [ !(0,0.7,0) ^ [ { . - f(size) . + f(size) . + f(size) . } ] [ { . + f(size) . - f(size) . - f(size) . } ] ]
 
 ω : !(0.3,0.4,0.7) F1(200,1,1) /(45) A(0)
 

@@ -251,14 +251,13 @@ struct Editor : Widget {
     Bar<Text> systems; // Tab bar to select which L-System to view
     TextInput editor;
     VBox layout;
-    Window window __(this/*&layout*/,int2(0,0),"L-System Editor"_);
-    GLContext context __(window);
+    Window window __(&layout, int2(0,0), "L-System Editor"_);
 
     // Renderer
     GLFrameBuffer framebuffer;
     GLBuffer buffer;
-    SHADER(shader);
-    SHADER(resolve);
+    SHADER(shader) GLShader& shader = shaderShader();
+    SHADER(resolve) GLShader& resolve = resolveShader();
     //Shadow sunShadow; // Holds scene geometry projected in light space bins
 
     // Scene
@@ -492,7 +491,7 @@ struct Editor : Widget {
         window.render();
     }
 
-    uint64 frameEnd=cpuTime(), frameTime=180000; // last frame end and initial frame time in microseconds
+    uint64 frameEnd=cpuTime(), frameTime=20000; // last frame end and initial frame time in microseconds
 
     void render(int2 position, int2 size) override {
         uint width=size.x, height = size.y;
@@ -548,6 +547,7 @@ struct Editor : Widget {
         framebuffer.bind(true);
         glDepthTest(true);
         glCullFace(true);
+        glBlend(false);
 
         shader["modelViewProjectionTransform"] = projection*view;
         shader["normalMatrix"] = normalMatrix;
@@ -560,17 +560,21 @@ struct Editor : Widget {
         buffer.draw();
 
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
-        resolve.bindSamplers("framebuffer"); GLTexture::bindSamplers(framebuffer.color);
-        glQuad(resolve,vec2(-1,-1),vec2(1,1));
-        context.swapBuffers();
+        glDepthTest(false);
+        glCullFace(false);
 
-        /*uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
+        resolve.bindSamplers("framebuffer"); GLTexture::bindSamplers(framebuffer.color);
+        glDrawRectangle(resolve,vec2(-1,-1),vec2(1,1));
+
+        GLFrameBuffer::bindWindow(0, window.size);
+
+        uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
 
         // Overlays errors / profile information (FIXME: software rendered overlay)
         Text(system.parseErrors ? copy(userErrors) :
                                   userErrors ? move(userErrors) :
                                                ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(faces.size())+" faces\n"_)
-                .render(int2(position+int2(16)));*/
+                .render(int2(position+int2(16)));
 #if 0
         window.render(); //keep updating to get maximum performance profile
 #endif

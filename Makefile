@@ -25,7 +25,7 @@ ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next
 ICONS_music = music
 
-SHADERS = $(SHADERS_$(TARGET))
+SHADERS = $(SHADERS_$(TARGET)) fill blit
 SHADERS_editor = shader resolve
 
 FONTS = $(FONTS_$(TARGET))
@@ -39,8 +39,8 @@ LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_player = avformat avcodec
-LIBS_gl = EGL GL
-LIBS_test = EGL GL
+LIBS_gl = GL
+LIBS_window = X11
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

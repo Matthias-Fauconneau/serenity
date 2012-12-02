@@ -1,5 +1,4 @@
 #include "window.h"
-#include "x.h"
 #include "display.h"
 #include "widget.h"
 #include "file.h"
@@ -7,11 +6,30 @@
 #include "linux.h"
 #include "time.h"
 #include "png.h"
+#include "gl.h"
+#include "x.h"
+
+#if EGL
+#define MESA_EGL_NO_X11_HEADERS
+#include  <EGL/egl.h>
+#else
+//#include <GL/glx.h> conflicts with our X protocol definitions
+extern "C" {
+void* XOpenDisplay(const char*);
+int XCloseDisplay(void*);
+void* glXChooseVisual(void* dpy, int screen, int *attribList );
+void* glXCreateContext(void* dpy,void* vis, void* shareList, bool direct);
+void glXDestroyContext(void* dpy, void* ctx );
+bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
+void glXSwapBuffers(void* dpy, uint drawable);
+}
+#define GLX_RGBA 4
+#endif
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace Render { int EXT, event, errorBase; } using namespace Render;
-int2 display;
+int2 displaySize;
 Widget* focus;
 Widget* drag;
 Window* current;
@@ -34,7 +52,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>();
             for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>();
                 if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(depth.numVisualTypes)) {
-                    if(!visual && depth.depth==32) { display=int2(screen.width,screen.height); root = screen.root; visual=visualType.id; }
+                    if(!visual && depth.depth==32) { displaySize=int2(screen.width,screen.height); root = screen.root; visual=visualType.id; }
                 }
             }
         }
@@ -67,10 +85,10 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
-    if(size.x==0) size.x=display.x;
-    if(size.y==0) size.y=display.y-16;
+    if(size.x==0) size.x=displaySize.x;
+    if(size.y==0) size.y=displaySize.y-16;
     position=0;
-    if(anchor==Bottom) position.y=display.y-size.y;
+    if(anchor==Bottom) position.y=displaySize.y-size.y;
     this->size=size;
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
     create();
@@ -79,6 +97,27 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     setType(type);
     if(widget) show(); //asynchronous window are shown by default to avoid race conditions
     registerPoll();
+
+#if EGL
+    display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    eglInitialize(display, 0, 0);
+    EGLConfig config; EGLint matchingConfigurationCount;
+    {int attributes[] ={EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_NONE};
+        eglChooseConfig(display, attributes, &config, 1, &matchingConfigurationCount);
+    }
+    if(matchingConfigurationCount != 1) error("No matching configuration", matchingConfigurationCount);
+
+    surface = eglCreateWindowSurface(display, config, id, 0);
+    {int attributes[]={EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+        context = eglCreateContext(display, config, 0, attributes);}
+    eglMakeCurrent(display, surface, surface, context);
+#else
+    display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
+    int attributes[] = {GLX_RGBA,0};
+    void* visual = glXChooseVisual(display,0,attributes); assert(visual);
+    context = glXCreateContext(display,visual,0,1); assert(context);
+    glXMakeCurrent(display, id, context);
+#endif
 }
 void Window::create() {
     assert(!created);
@@ -92,6 +131,14 @@ void Window::create() {
 }
 void Window::destroy() {
     assert(created);
+#if EGL
+    eglDestroyContext(display, context);
+    eglDestroySurface(display, surface);
+    eglTerminate(display);
+#else
+    glXDestroyContext(display,context);
+    XCloseDisplay(display);
+#endif
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
     created = false;
@@ -106,57 +153,35 @@ void Window::event() {
             if(hint != size) { setSize(hint); return; }
         }
         assert(mapped); assert(size);
-        if(state!=Idle) { state=Wait; return; }
 
-        if(softwareRendering) {
-            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
-                if(shm) {
-                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                    shmdt(buffer.data);
-                    shmctl(shm, IPC_RMID, 0);
-                }
-                buffer.width=size.x, buffer.height=align(16,size.y), buffer.stride=align(16,size.x);
-                shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-                buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
-                {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
+        currentClip=Rect(size);
+        GLFrameBuffer::bindWindow(0,size,true,vec4(vec3(backgroundColor),backgroundOpacity));
+        /*if(backgroundCenter!=backgroundColor) { // Oxygen-like radial gradient background
+            constexpr int radius=256;
+            int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
+                    a=backgroundOpacity, scale = (radius*radius)/a;
+            uint* dst=(uint*)framebuffer.data;
+            for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (backgroundColor*t+backgroundCenter*(0xFF-t))/0xFF;
+                dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
             }
-            framebuffer=share(buffer);
-            currentClip=Rect(size);
+        }*/
 
-            if(fillBackground) {
-                if(backgroundCenter==backgroundColor)
-                    fill(Rect(size),byte4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity),false);
-                else { // Oxygen-like radial gradient background
-                    constexpr int radius=256;
-                    int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                            a=backgroundOpacity, scale = (radius*radius)/a;
-                    if(x0>0 || x1<w || h<size.y) fill(Rect(size),byte4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity),false);
-                    uint* dst=(uint*)framebuffer.data;
-                    for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                        int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (backgroundColor*t+backgroundCenter*(0xFF-t))/0xFF;
-                        dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
-                    }
-                }
-            }
+        widget->render(0,size);
+        assert(!clipStack);
 
-            widget->render(0,size);
-            assert(!clipStack);
-
-            if(featherBorder) { //feather borders
-                const bool corner = 1;
-                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-                if(position.x+size.x<display.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-                if(position.y+size.y>16 && position.y+size.y<display.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-            }
-
-            {Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-                r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
-                r.srcW=size.x; r.srcH=size.y; send(raw(r));}
-            state=Server;
-        } else {
-            widget->render(0,size);
-        }
+        /*if(featherBorder) { //feather borders
+            const bool corner = 1;
+            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+            if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+            if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
+            if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+        }*/
+#if EGL
+        eglSwapBuffers(display, surface);
+#else
+        glXSwapBuffers(display, id);
+#endif
     } else do {
         uint8 type = read<uint8>();
         processEvent(type, read<XEvent>());
@@ -214,7 +239,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                     else if(left) position.x+=delta.x, size.x-=delta.x;
                     else if(right) size.x+=delta.x;
                     else position+=delta;
-                    position=clip(int2(0,16),position,display), size=clip(int2(16,16),size,display-int2(0,16));
+                    position=clip(int2(0,16),position,displaySize), size=clip(int2(16,16),size,displaySize-int2(0,16));
                     setGeometry(position,size);
                 } else {
                     if((top && left)||(bottom && right)) cursor=Cursor::FDiagonal;
@@ -259,7 +284,6 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
         }
-        else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) queue(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
@@ -275,8 +299,8 @@ template<class T> T Window::readReply() {
 
 // Configuration
 void Window::setPosition(int2 position) {
-    if(position.x<0) position.x=display.x+position.x;
-    if(position.y<0) position.y=display.y+position.y;
+    if(position.x<0) position.x=displaySize.x+position.x;
+    if(position.y<0) position.y=displaySize.y+position.y;
     setGeometry(position,this->size);
 }
 void Window::setSize(int2 size) {
@@ -285,17 +309,17 @@ void Window::setSize(int2 size) {
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
-    if(size.x==0 || size.x>display.x) size.x=display.x;
-    if(size.y==0 || size.x>display.x-16) size.y=display.y-16;
+    if(size.x==0 || size.x>displaySize.x) size.x=displaySize.x;
+    if(size.y==0 || size.x>displaySize.x-16) size.y=displaySize.y-16;
     setGeometry(this->position,size);
 }
 void Window::setGeometry(int2 position, int2 size) {
-    if(anchor&Left && anchor&Right) position.x=(display.x-size.x)/2;
+    if(anchor&Left && anchor&Right) position.x=(displaySize.x-size.x)/2;
     else if(anchor&Left) position.x=0;
-    else if(anchor&Right) position.x=display.x-size.x;
-    if(anchor&Top && anchor&Bottom) position.y=16+(display.y-16-size.y)/2;
+    else if(anchor&Right) position.x=displaySize.x-size.x;
+    if(anchor&Top && anchor&Bottom) position.y=16+(displaySize.y-16-size.y)/2;
     else if(anchor&Top) position.y=16;
-    else if(anchor&Bottom) position.y=display.y-size.y;
+    else if(anchor&Bottom) position.y=displaySize.y-size.y;
     if(position!=this->position && size!=this->size) {SetGeometry r; r.id=id+XWindow; r.x=position.x; r.y=position.y; r.w=size.x, r.h=size.y; send(raw(r));}
     else if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
     else if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
@@ -397,7 +421,7 @@ void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPo
 // Snapshot
 Image Window::getSnapshot() {
     Image buffer;
-    buffer.stride=buffer.width=display.x, buffer.height=display.y;
+    buffer.stride=buffer.width=displaySize.x, buffer.height=displaySize.y;
     int shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
     buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
     {Shm::Attach r; r.seg=id+SnapshotSegment; r.shm=shm; send(raw(r));}

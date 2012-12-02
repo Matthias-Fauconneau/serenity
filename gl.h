@@ -6,18 +6,9 @@
 #include "image.h"
 #include "window.h"
 
-struct GLContext {
-    void* display;
-    void* surface;
-    void* context;
-    GLContext(Window&);
-    ~GLContext();
-    void swapBuffers();
-};
-
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
-void glBlend(bool enable);
+void glBlend(bool enable, bool add=true);
 
 struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
@@ -37,7 +28,7 @@ struct GLShader {
     void bind();
     uint attribLocation(const char*);
     GLUniform operator[](const char*);
-    void bindSamplers(const char* tex0, const char* tex1=0);
+    void bindSamplers(const char* tex0);
 
     uint id=0;
     //using pointer comparison (only works with string literals)
@@ -46,15 +37,15 @@ struct GLShader {
 };
 
 #define SHADER(name) \
-static GLShader name ## Shader() { \
+static GLShader& name ## Shader() { \
     extern char _binary_## name ##_vert_start[]; \
     extern char _binary_## name ##_vert_end[]; \
     extern char _binary_## name ##_frag_start[]; \
     extern char _binary_## name ##_frag_end[]; \
-    return GLShader( ref<byte>(_binary_## name ##_vert_start,_binary_## name ##_vert_end), \
+    static GLShader shader = GLShader( ref<byte>(_binary_## name ##_vert_start,_binary_## name ##_vert_end), \
     ref<byte>(_binary_## name ##_frag_start,_binary_## name ##_frag_end)); \
-} \
-GLShader name = name ## Shader()
+    return shader; \
+}
 
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
 struct GLBuffer {
@@ -90,11 +81,13 @@ struct GLBuffer {
     bool primitiveRestart=false;
 };
 
-void glQuad(GLShader& shader, vec2 min, vec2 max, bool texCoord=false);
+void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord=false);
+void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord=false);
 
 struct GLTexture {
     uint id=0;
     uint width=0, height=0;
+    bool alpha=false;
     GLTexture(){}
     enum Format {
         sRGB=0,Depth24=1,RGB16F=2,Multisample=3,
@@ -104,9 +97,11 @@ struct GLTexture {
     move_operator(GLTexture):id(o.id),width(o.width),height(o.height){o.id=0;}
     ~GLTexture();
 
-    operator bool() const { return id; }
     void bind(uint sampler=0) const;
     static void bindSamplers(const GLTexture& tex0);
+
+    operator bool() const { return id; }
+    int2 size() const { return int2(width,height); }
 };
 
 struct GLFrameBuffer {
@@ -117,7 +112,7 @@ struct GLFrameBuffer {
 
     operator bool() const { return id; }
     void bind(bool clear=false, vec4 color=1);
-    static void bindWindow(int2 position, int2 size);
+    static void bindWindow(int2 position, int2 size, bool clear=false, vec4 color=1);
 
     uint id=0, depthBuffer=0;
     GLTexture depth, color;

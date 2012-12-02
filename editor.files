@@ -14,3 +14,7 @@ resolve.vert
 resolve.frag
 gl.h
 gl.cc
+blit.vert
+blit.frag
+fill.vert
+fill.frag

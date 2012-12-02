@@ -1,5 +1,5 @@
 CG:
- Hardware rendering: UI overlay, MSAA, float, soft shadows
+ Hardware rendering: GLX, float, MSAA, soft shadows
  Editor: copy-paste, parse "->", .XCompose, syntax highlighting
  Export .obj [release]
  Trees: improve branches using environment modeling (light and space competition)
