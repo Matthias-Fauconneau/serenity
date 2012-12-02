@@ -90,7 +90,7 @@ struct GLTexture {
     bool alpha=false;
     GLTexture(){}
     enum Format {
-        sRGB=0,Depth24=1,RGB16F=2,Multisample=3,
+        sRGB=0,Depth24=1,RGB16F=2,
         Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
     GLTexture(int width,int height,int format=sRGB);
     GLTexture(const Image& image);
@@ -105,15 +105,17 @@ struct GLTexture {
 };
 
 struct GLFrameBuffer {
-    move_operator(GLFrameBuffer):id(o.id),depthBuffer(o.depthBuffer),depth(move(o.depth)),color(move(o.color)){o.id=o.depthBuffer=0;}
+    move_operator(GLFrameBuffer):id(o.id),depthBuffer(o.depthBuffer),colorBuffer(o.colorBuffer),width(o.width),height(o.height)
+    { o.id=o.depthBuffer=o.colorBuffer=0;}
     GLFrameBuffer(){}
-    GLFrameBuffer(GLTexture&& color);
+    GLFrameBuffer(uint width, uint height);
     ~GLFrameBuffer();
 
     operator bool() const { return id; }
     void bind(bool clear=false, vec4 color=1);
     static void bindWindow(int2 position, int2 size, bool clear=false, vec4 color=1);
+    void blit(GLTexture&);
 
-    uint id=0, depthBuffer=0;
-    GLTexture depth, color;
+    uint id=0, depthBuffer=0, colorBuffer=0;
+    uint width=0, height=0;
 };

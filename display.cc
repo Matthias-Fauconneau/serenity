@@ -13,17 +13,17 @@ void fill(Rect rect, vec4 color, bool blend) {
 }
 
 void blit(int2 target, const GLTexture& source, float opacity unused) {
-    /*Rect rect = (target+Rect(source.size())) & currentClip;
+    Rect rect = (target+Rect(source.size())) & currentClip;
     glBlend(source.alpha, true);
     //blitShader()["color"] = vec4(1,1,1,opacity);
     blitShader().bindSamplers("sampler"); GLTexture::bindSamplers(source);
-    glDrawRectangle(blitShader(), rect, true);*/
+    glDrawRectangle(blitShader(), rect, true);
 }
 
 void substract(int2 target, const GLTexture& source, vec4 color unused) {
     Rect rect = (target+Rect(source.size())) & currentClip;
     glBlend(true, false);
-    //displayShader()["color"] = vec4(1)-color;
+    //blitShader()["color"] = vec4(1)-color;
     blitShader().bindSamplers("sampler"); GLTexture::bindSamplers(source);
     glDrawRectangle(blitShader(), rect, true);
 }

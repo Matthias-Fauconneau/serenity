@@ -186,22 +186,16 @@ GLTexture::GLTexture(const Image& image) : width(image.width), height(image.heig
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
     assert(width==image.stride);
-    glTexImage2D(GL_TEXTURE_2D,0,alpha?GL_RGBA:GL_RGB,width,height,0,alpha?GL_RGBA:GL_RGB,GL_UNSIGNED_BYTE,image.data);
+    glTexImage2D(GL_TEXTURE_2D,0,alpha?GL_RGBA:GL_RGB,width,height,0,alpha?GL_BGRA:GL_BGR,GL_UNSIGNED_BYTE,image.data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 GLTexture::GLTexture(int width, int height, int format) : width(width), height(height) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    if((format&3)==sRGB)
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGB,GL_UNSIGNED_BYTE,0); //FIXME: sRGB
-    if((format&3)==Depth24)
-        glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT32,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_BYTE,0);
-    if((format&3)==RGB16F)
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGB,GL_FLOAT,0); //FIXME: float
-    if((format&3)==Multisample)
-        //glTexImage2DMultisample(GL_TEXTURE_2D,4,GL_RGB,width,height,false); //FIXME: multisample
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGB,GL_FLOAT,0); //FIXME: float
+    if((format&3)==sRGB) glTexImage2D(GL_TEXTURE_2D,0,GL_SRGB8,width,height,0,0,GL_UNSIGNED_BYTE,0);
+    if((format&3)==Depth24) glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT32,width,height,0,0,GL_UNSIGNED_INT,0);
+    if((format&3)==RGB16F) glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,width,height,0,GL_RGB,GL_FLOAT,0);
     if(format&Shadow) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_GEQUAL );
@@ -225,27 +219,35 @@ void GLTexture::bindSamplers(const GLTexture& tex0) { tex0.bind(0); }
 
 /// Framebuffer
 
-GLFrameBuffer::GLFrameBuffer(GLTexture&& color):color(move(color)){
+GLFrameBuffer::GLFrameBuffer(uint width, uint height):width(width),height(height){
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
-    if(this->depth.id) glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,this->depth.id,0);
-    else {
-        glGenRenderbuffers(1, &depthBuffer);
-        glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, color.width, color.height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
-    }
-    if(this->color.id) glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,this->color.id,0);
+
+    glGenRenderbuffers(1, &depthBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+    int maxSamples; glGetIntegerv(GL_MAX_SAMPLES,&maxSamples);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, maxSamples, GL_DEPTH_COMPONENT24, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
+
+    glGenRenderbuffers(1, &colorBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, maxSamples, GL_RGB16F, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
+
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("");
 }
-GLFrameBuffer::~GLFrameBuffer() { if(depthBuffer) glDeleteRenderbuffers(1, &depthBuffer); glDeleteFramebuffers(1,&id); }
-void GLFrameBuffer::bind(bool clear, vec4 clearColor) {
+GLFrameBuffer::~GLFrameBuffer() {
+    if(depthBuffer) glDeleteRenderbuffers(1, &depthBuffer);
+    if(colorBuffer) glDeleteRenderbuffers(1, &colorBuffer);
+    if(id) glDeleteFramebuffers(1,&id);
+}
+void GLFrameBuffer::bind(bool clear, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER,id);
-  if(depth.id) glViewport(0,0,depth.width,depth.height), viewportSize = vec2(depth.size());
-  else glViewport(0,0,color.width,color.height), viewportSize = vec2(color.size());
+  viewportSize = vec2(width,height);
+  glViewport(0,0,width,height);
   if(clear) {
-      glClearColor(clearColor.x,clearColor.y,clearColor.z,clearColor.w);
-      glClear( ((depth.id||depthBuffer)?GL_DEPTH_BUFFER_BIT:0) | (color.id?GL_COLOR_BUFFER_BIT:0) );
+      glClearColor(color.x,color.y,color.z,color.w);
+      glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
   }
 }
 void GLFrameBuffer::bindWindow(int2 position, int2 size, bool clear, vec4 color) {
@@ -256,4 +258,14 @@ void GLFrameBuffer::bindWindow(int2 position, int2 size, bool clear, vec4 color)
       glClearColor(color.x,color.y,color.z,color.w);
       glClear(GL_COLOR_BUFFER_BIT);
   }
+}
+void GLFrameBuffer::blit(GLTexture& color) {
+    uint target;
+    glGenFramebuffers(1,&target);
+    glBindFramebuffer(GL_FRAMEBUFFER,target);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,color.id,0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
+    glBlitFramebuffer(0,0,width,height,0,0,color.width,color.height,GL_COLOR_BUFFER_BIT,GL_LINEAR);
+    glDeleteFramebuffers(1,&target);
 }

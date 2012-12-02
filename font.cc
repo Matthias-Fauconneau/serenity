@@ -51,6 +51,7 @@ const Glyph& Font::glyph(uint16 index, int) {
     if(glyph.valid) return glyph;
     glyph.valid=true;
 
+#if SUBPIXEL
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_LCD);
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
@@ -62,6 +63,19 @@ const Glyph& Font::glyph(uint16 index, int) {
         uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
         image(x,y) = byte4(rgb[2],rgb[1],rgb[0],min(255,rgb[0]+rgb[1]+rgb[2]));
     }
+#else
+    FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL);
+    FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+    glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
+    FT_Bitmap bitmap=face->glyph->bitmap;
+    if(!bitmap.buffer) return glyph;
+    int width = bitmap.width, height = bitmap.rows;
+    Image image(width,height,true);
+    for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
+        uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x];
+        image(x,y) = byte4(rgb[0]);
+    }
+#endif
     glyph.image = move(image);
     return glyph;
 }

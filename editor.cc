@@ -541,9 +541,7 @@ struct Editor : Widget {
         }
 #endif
 
-        if(framebuffer.depth.width != width || framebuffer.depth.height != height)
-            //framebuffer=GLFrameBuffer(GLTexture(width,height,GLTexture::RGB16F)); //TODO: MSAA
-            framebuffer=GLFrameBuffer(GLTexture(width,height,GLTexture::sRGB)); //TODO: MSAA
+        if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
         framebuffer.bind(true);
         glDepthTest(true);
         glCullFace(true);
@@ -559,11 +557,14 @@ struct Editor : Widget {
         buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
         buffer.draw();
 
+        GLTexture color(width,height,GLTexture::RGB16F);
+        framebuffer.blit(color);
+
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
         glDepthTest(false);
         glCullFace(false);
 
-        resolve.bindSamplers("framebuffer"); GLTexture::bindSamplers(framebuffer.color);
+        resolve.bindSamplers("framebuffer"); GLTexture::bindSamplers(color);
         glDrawRectangle(resolve,vec2(-1,-1),vec2(1,1));
 
         GLFrameBuffer::bindWindow(0, window.size);
