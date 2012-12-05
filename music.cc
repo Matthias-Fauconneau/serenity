@@ -130,8 +130,6 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
-        openSheet("Skyrim - Dragonborn 3 (Andrew Wrangell)"_);
-        toggleAnnotations();
     }
 
     /// Called by score to scroll PDF as needed when playing

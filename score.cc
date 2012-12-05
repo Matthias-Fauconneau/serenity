@@ -247,23 +247,30 @@ staffDone: ;
             /// Detect notes tied over a line wrap
             if(t.ly && (!noteBetween || (noteBetween<2 && l>150)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
                 debug[tie.a]=string("W"_);
-                for(int x=0;x<2;x++) {
+                float ly = -t.ly-staffs[i]+14;
+                //debug[vec2(notes[i+1].keys.first(),staffs[i+1]+ly)]=string("R"_);
+                for(int x=0;x<1;x++) {
                     int rx = notes[i+1].keys[x];
                     int ry = notes[i+1].values[x].keys[0];
                     for(Line trill : trills) if(abs(rx-trill.a.x)<8 && -ry-trill.a.y>0 && -ry-trill.a.y<200) goto trillCancelTie;
-                    float min=12;
-                    for(float y2 : notes[i+1].values[x].keys) {float dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]); if(dy>=0) min=::min(min, abs(dy));}
+                    float min=14;
                     for(float y2 : notes[i+1].values[x].keys) {
-                        int dy = (-y2-staffs[i+1])-(-t.ly-staffs[i]);
+                        float dy = (-y2-staffs[i+1])-ly;
+                        for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied1;
+                        if(dy>=0) min=::min(min, abs(dy));
+alreadyTied1: ;
+                    }
+                    for(float y2 : notes[i+1].values[x].keys) {
+                        float dy = (-y2-staffs[i+1])-ly;
                         if(dy>=-12 && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
-                            debug[vec2(rx,-y2)]=string("W"_);
+                            debug[vec2(rx,-y2)]<<str("W"_,dy);
                             for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
                                 //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
                                 goto alreadyTied2;
                             tied << t;
                             goto tieFound;
-                        } else if(abs((-t.ly-staffs[i])-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2+16)]<<"Y"_+str(dy,min);
+                        } else if(abs(ly-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2+12)]<<"Y"_+str(dy,min);
 alreadyTied2: ;
                     }
                 }
@@ -439,7 +446,7 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        //debug[positions[i]+vec2(12,0)]<<str(notes[i].key);
+        debug[positions[i]+vec2(12,0)]<<str(notes[i].key);
         //debug[positions[i]+vec2(12,0)]<<str(i);
     }
 }
