@@ -119,7 +119,7 @@ void HTML::parse(const URL& url, const Element &e) {
 void HTML::flushText() {
     string paragraph = simplify(move(text));
     if(!paragraph) return; paragraphCount++;
-    Text& textLayout = heap<Text>(move(paragraph), 16, 255, 640 /*60 characters*/);
+    Text& textLayout = heap<Text>(move(paragraph), 16, vec4(0,0,0,1), 640 /*60 characters*/);
     textLayout.linkActivated.connect(this, &HTML::go);
     VBox::operator<<(&textLayout);
 }

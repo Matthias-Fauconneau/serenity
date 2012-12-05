@@ -97,7 +97,7 @@ void Sampler::open(const ref<byte>& path) {
     // Predecode 4K (10ms) and lock compressed samples in memory
     for(Sample& s: samples) s.cache.decode(1<<12), s.map.lock();
 
-#if 0
+#if 1
     array<byte> reverbFile = readFile("reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
     assert(reverbMedia.rate == 48000);
@@ -107,9 +107,10 @@ void Sampler::open(const ref<byte>& path) {
         uint read = reverbMedia.read(reverbFilter+i,reverbSize-i);
         i+=read;
     }
-    float scale = 1.0f/(1<<16); //(1<<reverbFile.sampleSize);
-    float2 scale2 = {scale,scale};
-    for(uint i: range(reverbSize)) reverbFilter[i] *= scale2; //normalize
+    float2 sum={0,0};
+    for(uint i: range(reverbSize)) sum+= reverbFilter[i]*reverbFilter[i];
+    float2 scale = {0x1p-30,0x1p-30}; //= 19 + 8 + 3 = FIR normalization + 24bit->16bit + 8 notes
+    for(uint i: range(reverbSize)) reverbFilter[i] *= scale; //normalize
     reverbBuffer = allocate64<float2>(reverbSize+4); clear(reverbBuffer,reverbSize+4);
 #endif
 }
@@ -254,7 +255,7 @@ bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
             unallocate(layer,inSize);
         }
 
-#if 0
+#if 1
         // Reverb
         for(uint i: range(size)) { //TODO: better locality | fourier convolution
             reverbBuffer[reverbIndex] = ((float2*)buffer)[i];
@@ -272,7 +273,7 @@ bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
 #endif
 
         for(uint i: range(frameSize/2)) {
-            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),10), sra(cvtps(buffer[i*2+1]),10) ); //8 samples = 4 frameSizes
+            ((half8*)output)[i] = packs( cvtps(buffer[i*2+0]), cvtps(buffer[i*2+1]) ); //8 samples = 4 frames
         }
         unallocate(buffer,frameSize);
 

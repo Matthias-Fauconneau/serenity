@@ -28,10 +28,7 @@ ICONS_music = music
 SHADERS = $(SHADERS_$(TARGET)) fill blit
 SHADERS_editor = shader resolve
 
-FONTS = $(FONTS_$(TARGET))
-#FONTS_music = emmentaler-20
-
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert) $(SHADERS:%=%.frag) $(FONTS:%=%.otf)
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert) $(SHADERS:%=%.frag)
 SRCS_profile = profile
 
 LIBS_time = rt
@@ -78,11 +75,6 @@ $(BUILD)/%.o : %.cc
 	@$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
 
 $(BUILD)/%.o: %.png
-	@echo $<
-	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@ld -r -b binary -o $@ $<
-
-$(BUILD)/%.otf.o: %.otf
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<

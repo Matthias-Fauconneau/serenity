@@ -14,9 +14,9 @@ inline Format format(uint f) { assert(f<32); return Format(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const ref<byte>& text=""_, int size=16, vec4 color=vec4(1), uint wrap=0);
+    Text(const ref<byte>& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0);
     // Resolves cat overloading
-    Text(const string& text, int size=16, vec4 color=vec4(1), uint wrap=0):Text((ref<byte>)text,size,color,wrap){}
+    Text(const string& text, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text((ref<byte>)text,size,color,wrap){}
 
     void setText(ref<byte> text) { this->text=toUTF32(text); textSize=0; editIndex=min(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
@@ -91,7 +91,7 @@ struct Text : Widget {
 
 /// TextInput is an editable \a Text
 struct TextInput : Text {
-    TextInput(const ref<byte>& text=""_, int size=16, uint8 opacity=255, uint wrap=0):Text(text,size,opacity,wrap){} //FIXME: inherit
+    TextInput(const ref<byte>& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text(text,size,color,wrap){} //FIXME: inherit
     /// User edited this text
     signal<const ref<byte>&> textChanged;
     /// User pressed enter

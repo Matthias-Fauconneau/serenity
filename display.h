@@ -31,7 +31,6 @@ constexpr vec4 magenta __(1, 0, 1, 1);
 void fill(Rect rect, vec4 color=black);
 
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
-/// \a opacity multiplies alpha channel by opacity/255, alpha is accumulated in framebuffer
 void blit(int2 target, const GLTexture& source, vec4 color=black);
 inline void blit(int2 target, const Image& source, vec4 color=black) { blit(target,GLTexture(source),color); } //FIXME
 /// Substracts \a source from \a target
