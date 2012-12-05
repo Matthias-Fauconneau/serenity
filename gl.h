@@ -83,6 +83,7 @@ struct GLBuffer {
 
 void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord=false);
 void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord=false);
+void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);
 
 struct GLTexture {
     uint id=0;

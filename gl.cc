@@ -175,9 +175,26 @@ void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
 }
 
 vec2 viewportSize;
-vec2 project(int x, int y) { return vec2(2*x/viewportSize.x-1,1-2*y/viewportSize.y); }
+vec2 project(vec2 p) { return vec2(2*p.x/viewportSize.x-1,1-2*p.y/viewportSize.y); }
 void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord) {
-    glDrawRectangle(shader, project(rect.min.x,rect.max.y), project(rect.max.x,rect.min.y), texCoord);
+    glDrawRectangle(shader, project(vec2(rect.min.x,rect.max.y)), project(vec2(rect.max.x,rect.min.y)), texCoord);
+}
+
+void glDrawLine(GLShader& shader, vec2 p1, vec2 p2) {
+    shader.bind();
+    glBindBuffer(GL_ARRAY_BUFFER,0);
+    uint positionIndex = shader.attribLocation("position");
+    vec2 positions[] = { project(p1+vec2(0.5)), project(p2+vec2(0.5)) };
+    glVertexAttribPointer(positionIndex,2,GL_FLOAT,0,0,positions);
+    glEnableVertexAttribArray(positionIndex);
+    glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glEnable(GL_BLEND);
+    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glEnable(GL_LINE_SMOOTH);
+    glLineWidth(2);
+    glDrawArrays(GL_LINES,0,2);
+    glDisableVertexAttribArray(positionIndex);
 }
 
 /// Texture
@@ -186,7 +203,7 @@ GLTexture::GLTexture(const Image& image) : width(image.width), height(image.heig
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
     assert(width==image.stride);
-    glTexImage2D(GL_TEXTURE_2D,0,alpha?GL_RGBA:GL_RGB,width,height,0,alpha?GL_BGRA:GL_BGR,GL_UNSIGNED_BYTE,image.data);
+    glTexImage2D(GL_TEXTURE_2D,0,alpha?GL_RGBA:GL_RGB,width,height,0,GL_BGRA,GL_UNSIGNED_BYTE,image.data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }

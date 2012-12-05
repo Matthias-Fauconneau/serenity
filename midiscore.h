@@ -50,7 +50,7 @@ struct MidiScore : Widget {
     void drawLedger(int staff, int t, int h);
 
     void render(int2 position, int2 size);
-    map<int,byte4> colors;
+    map<int,vec4> colors;
     signal<> contentChanged;
-    void setColors(const map<int,byte4>& colors) { this->colors=copy(colors); contentChanged(); }
+    void setColors(const map<int,vec4>& colors) { this->colors=copy(colors); contentChanged(); }
 };

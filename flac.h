@@ -29,6 +29,7 @@ struct BitReader {
 template<class T> struct Buffer {
     T* data=0;
     uint capacity=0,size=0;
+    Buffer(){}
     Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
     Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy16(data,o.data,size*sizeof(T)/16);}
     move_operator_(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
@@ -53,5 +54,5 @@ struct FLAC : BitReader {
     /// Decodes next FLAC frame
     void decodeFrame();
     /// Reads \a size samples synchronously buffering new frames as needed
-    int read(float2* out, uint size);
+    uint read(float2* out, uint size);
 };

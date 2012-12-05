@@ -96,6 +96,22 @@ void Sampler::open(const ref<byte>& path) {
 
     // Predecode 4K (10ms) and lock compressed samples in memory
     for(Sample& s: samples) s.cache.decode(1<<12), s.map.lock();
+
+#if 0
+    array<byte> reverbFile = readFile("reverb.flac"_,folder);
+    FLAC reverbMedia(reverbFile);
+    assert(reverbMedia.rate == 48000);
+    reverbSize = 8192; log(reverbSize,reverbMedia.duration);
+    reverbFilter = allocate64<float2>(reverbSize+4); clear(reverbFilter,reverbSize+4);
+    for(uint i=0;i<reverbSize;) {
+        uint read = reverbMedia.read(reverbFilter+i,reverbSize-i);
+        i+=read;
+    }
+    float scale = 1.0f/(1<<16); //(1<<reverbFile.sampleSize);
+    float2 scale2 = {scale,scale};
+    for(uint i: range(reverbSize)) reverbFilter[i] *= scale2; //normalize
+    reverbBuffer = allocate64<float2>(reverbSize+4); clear(reverbBuffer,reverbSize+4);
+#endif
 }
 
 /// Input events (realtime thread)
@@ -223,31 +239,48 @@ void Note::read(float4* out, uint size) {
 }
 bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
     {Locker lock(noteReadLock);
-        const uint period=size/2;
         assert(size%2==0);
+        const uint frameSize=size/2; // output frame size in float4 vectors
 
-        float4* buffer = allocate64<float4>(period); clear(buffer, period);
+        float4* buffer = allocate64<float4>(frameSize); clear(buffer, frameSize);
         // Mix notes which don't need any resampling
-        for(Note& note: notes[1]) note.read(buffer, period);
+        for(Note& note: notes[1]) note.read(buffer, frameSize);
         // Mix pitch shifting layers
         for(int i=0;i<2;i++) {
-            uint inSize=align(2,resampler[i].need(2*period))/2;
+            uint inSize=align(2,resampler[i].need(size))/2;
             float4* layer = allocate64<float4>(inSize); clear(layer, inSize);
             for(Note& note: notes[i*2]) note.read(layer, inSize);
-            resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, period*2);
+            resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, size);
             unallocate(layer,inSize);
         }
 
-        for(uint i: range(period/2)) {
-            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),10), sra(cvtps(buffer[i*2+1]),10) ); //8 samples = 4 frames
+#if 0
+        // Reverb
+        for(uint i: range(size)) { //TODO: better locality | fourier convolution
+            reverbBuffer[reverbIndex] = ((float2*)buffer)[i];
+            float8 sum = {0,0,0,0,0,0,0,0};
+            {float8* kernel = (float8*)reverbFilter; float* signal = (float*)(reverbBuffer+reverbIndex);
+                for(uint i: range((reverbSize-reverbIndex+3)/4)) sum += kernel[i]*_mm256_loadu_ps(signal+i*8);
+            }
+            {float* kernel = (float*)(reverbFilter+reverbSize-reverbIndex); float8* signal = (float8*)reverbBuffer;
+                for(uint i: range(reverbIndex/4)) sum += _mm256_loadu_ps((float*)&kernel[i*8])*signal[i];
+            }
+            _mm_storel_epi64((__m128i*)&((float2*)buffer)[i],(__m128i)sum8to2(sum));
+            if(reverbIndex==0) reverbIndex=reverbSize;
+            reverbIndex--;
         }
-        unallocate(buffer,period);
+#endif
+
+        for(uint i: range(frameSize/2)) {
+            ((half8*)output)[i] = packs( sra(cvtps(buffer[i*2+0]),10), sra(cvtps(buffer[i*2+1]),10) ); //8 samples = 4 frameSizes
+        }
+        unallocate(buffer,frameSize);
 
         swPointer += size;
     }
     time+=size;
     queue(); //queue background decoder in main thread
-    //if(record) record.write(ref<byte>((byte*)output,period*2*sizeof(int16))); time+=period;
+    //if(record) record.write(ref<byte>((byte*)output,frameSize*2*sizeof(int16))); time+=frameSize;
     return true;
 }
 
@@ -260,6 +293,8 @@ void Sampler::recordWAV(const ref<byte>& path) {
     record.write(raw(header));
 }
 Sampler::~Sampler() {
+    if(reverbFilter) unallocate(reverbFilter,reverbSize+4);
+    if(reverbBuffer) unallocate(reverbBuffer,reverbSize+4);
     if(!record) return;
     error("Recording unsupported");
     //record.seek(4); write(record,raw<int32>(36+time));

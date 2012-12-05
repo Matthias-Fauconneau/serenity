@@ -459,7 +459,7 @@ void PDF::render(int2 position, int2 size) {
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
         if(a.y > currentClip.max.y+100 && b.y > currentClip.max.y+100) break;
         if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
-        line(a.x,a.y,b.x,b.y);
+        line(a,b);
     }
 
     int i=characters.binarySearch(Character __(0,0,0,vec2(-position)/scale));
@@ -478,6 +478,6 @@ void PDF::render(int2 position, int2 size) {
         int2 pos = position+int2(text.key*scale/normalizedScale);
         if(pos.y<=currentClip.min.y) continue;
         if(pos.y>=currentClip.max.y) continue; //break;
-        Text(copy(text.value)).render(pos,int2(0,0));
+        Text(copy(text.value),12,vec4(1,0,0,1)).render(pos,int2(0,0));
     }
 }

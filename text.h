@@ -14,9 +14,9 @@ inline Format format(uint f) { assert(f<32); return Format(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const ref<byte>& text=""_, int size=16, uint8 opacity=255, uint wrap=0);
+    Text(const ref<byte>& text=""_, int size=16, vec4 color=vec4(1), uint wrap=0);
     // Resolves cat overloading
-    Text(const string& text, int size=16, uint8 opacity=255, uint wrap=0):Text((ref<byte>)text,size,opacity,wrap){}
+    Text(const string& text, int size=16, vec4 color=vec4(1), uint wrap=0):Text((ref<byte>)text,size,color,wrap){}
 
     void setText(ref<byte> text) { this->text=toUTF32(text); textSize=0; editIndex=min(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
@@ -25,8 +25,8 @@ struct Text : Widget {
     array<uint> text;
     /// Font size
     int size;
-    /// Opacity
-    uint8 opacity;
+    /// Text color
+    vec4 color;
     /// Line wrap limit in pixels (0: no wrap)
     uint wrap=0;
     /// User clicked on this Text

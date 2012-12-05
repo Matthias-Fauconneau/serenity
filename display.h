@@ -17,7 +17,7 @@ constexpr vec4 lightGray __(15./16, 15./16, 15./16, 1);
 constexpr vec4 white __(1, 1, 1, 1);
 constexpr vec4 darken __(0, 0, 0, 0);
 constexpr vec4 lighten __(1, 1, 1, 1./4);
-constexpr vec4 highlight __(14./16, 12./16, 8./16, 1);
+constexpr vec4 highlight __(8./16, 12./16, 14./16, 1);
 constexpr vec4 blue __(1, 0, 0, 1);
 constexpr vec4 cyan __(1, 1, 0, 1);
 constexpr vec4 green __(0, 1, 0, 1);
@@ -28,12 +28,12 @@ constexpr vec4 magenta __(1, 0, 1, 1);
 // Graphics primitives
 
 /// Fills pixels inside \a rect with \a color
-void fill(Rect rect, vec4 color=black, bool blend=true);
+void fill(Rect rect, vec4 color=black);
 
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
 /// \a opacity multiplies alpha channel by opacity/255, alpha is accumulated in framebuffer
-void blit(int2 target, const GLTexture& source, float opacity=1);
-inline void blit(int2 target, const Image& source, float opacity=1) { blit(target,GLTexture(source),opacity); } //FIXME
+void blit(int2 target, const GLTexture& source, vec4 color=black);
+inline void blit(int2 target, const Image& source, vec4 color=black) { blit(target,GLTexture(source),color); } //FIXME
 /// Substracts \a source from \a target
 void substract(int2 target, const GLTexture& source, vec4 color=black);
 inline void substract(int2 target, const Image& source, vec4 color=black) { substract(target,GLTexture(source),color); } //FIXME

@@ -91,7 +91,7 @@ FLAC::FLAC(const ref<byte>& data) {
 
 enum { Independent=1, LeftSide=8, RightSide=9, MidSide=10 };
 void FLAC::parseFrame() {
-    int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync));
+    int unused sync = binary(15); assert(sync==0b111111111111100,bin(sync),index,bsize);
     bool unused variable = bit();
     int blockSize_[16] = {0, 192, 576,1152,2304,4608, -8,-16, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768};
     int blockSize = blockSize_[binary(4)];
@@ -103,6 +103,7 @@ void FLAC::parseFrame() {
     int unused zero = bit(); assert(zero==0);
     uint unused frameNumber = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;
+    assert(blockSize>0);
     skip(8);
     this->blockSize = blockSize;
 }
@@ -263,7 +264,7 @@ void FLAC::decodeFrame() {
     //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }
 
-int FLAC::read(float2 *out, uint size) {
+uint FLAC::read(float2 *out, uint size) {
     while(buffer.size<size){ if(blockSize==0) { size=buffer.size; break; } decodeFrame(); }
     uint beforeWrap = buffer.capacity-readIndex;
     if(size>beforeWrap) {

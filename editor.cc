@@ -53,179 +53,6 @@ This is mostly for reference, since this application use my own framework (Linux
 #include "gl.h"
 #include "data.h" //cast
 
-#if 0
-// Shadow
-
-/// Shadow sampling patterns
-static struct Pattern {
-    vec16 X,Y;
-    Pattern() {
-        // jittered radial sample pattern (TODO: spatial [+temporal?] filter)
-        Random random;
-        for(int u=0;u<4;u++) for(int v=0;v<4;v++) {
-            float r = sqrt( (u + (random+1)/2.f) / 4.f );
-            float t = (v + (random+1)/2.f) / 4.f;
-            X[u*4+v] = r*cos(2*PI*t);
-            Y[u*4+v] = r*sin(2*PI*t);
-        }
-    }
-} patterns[16];
-
-/// Stores shadow occluders for shadow-receiving surfaces
-struct Shadow {
-    struct Face {
-        mat3 E; //edge functions
-        vec3 iw, iz;
-    };
-    // Occluders geometry (in light space)
-    Face* faces=0;
-    uint faceCapacity=0;
-    uint faceCount=0;
-
-    // 2D space partitioning to accelerate shadow ray casts
-    struct Bin { uint16 faceCount=0; uint16 faces[63]; };
-    int width=0, height=0; float maxZ=0;
-    Bin* bins=0;
-
-    // Randomly select one of the precomputed jittered patterns
-    Random randomPattern;
-
-    // Resizes light space
-    void setup(int2 size, float maxZ, uint faceCapacity) {
-        if(bins) unallocate(bins,width*height);
-        if(faces) unallocate(faces,faceCapacity);
-        width = size.x, height = size.y; this->maxZ=maxZ;
-        bins = allocate64<Bin>(width*height);
-        faces = allocate64<Face>(this->faceCapacity=faceCapacity);
-        for(uint i: range(width*height)) bins[i].faceCount=0;
-        faceCount = 0;
-    }
-    ~Shadow() {
-        if(bins) unallocate(bins,width*height);
-        if(faces) unallocate(faces,faceCapacity);
-    }
-
-    // Scales sample pattern to soften shadow depending on occluder distance
-    float A0=1; // pixel area in light space
-    float dzA=1/256.f; // tan(light angular diameter)
-
-    // Setups a shadow-casting face
-    void submit(vec4 A, vec4 B, vec4 C) {
-        assert(abs(A.w-1)<0.01); assert(abs(B.w-1)<0.01); assert(abs(C.w-1)<0.01);
-        if(faceCount>=faceCapacity) { userError("Face overflow"_); return; }
-
-        Face& face = faces[faceCount];
-        mat3& E = face.E;
-        E = mat3(A.xyw(), B.xyw(), C.xyw());
-        E = E.cofactor(); //edge equations are now columns of E
-
-        face.iw = E[0]+E[1]+E[2];
-        face.iz = E*vec3(A.z,B.z,C.z);
-        float meanZ = (A.z+B.z+C.z)/3;
-
-        float binReject[3];
-        for(int e=0;e<3;e++) {
-            const vec2& edge = E[e].xy();
-            float step0 = (edge.x>0?edge.x:0) + (edge.y>0?edge.y:0); //conserve whole bin
-            float step1 = abs(edge.x) + abs(edge.y); //add margin for soft shadow sampling
-            // initial reject corner distance
-            float d = maxZ-meanZ;
-            float spread = A0+dzA*d;
-            binReject[e] = E[e].z + step0 + spread*step1;
-        }
-
-        int2 min = ::max(int2(1,1),int2(floor(::min(::min(A.xy(),B.xy()),C.xy()))));
-        int2 max = ::min(int2(width-1-1,height-1-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy()))));
-        for(int binY=min.y-1; binY<=max.y+1; binY++) for(int binX=min.x-1; binX<=max.x+1; binX++) {
-            const vec2 binXY = vec2(binX, binY);
-            // trivial reject
-            if(
-                    binReject[0] + dot(E[0].xy(), binXY) <= 0 ||
-                    binReject[1] + dot(E[1].xy(), binXY) <= 0 ||
-                    binReject[2] + dot(E[2].xy(), binXY) <= 0) continue;
-            Bin& bin = bins[binY*width+binX];
-            if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { userError("Index overflow"); return; }
-            bin.faces[bin.faceCount++]=faceCount;
-        }
-        faceCount++;
-    }
-
-    // Computes light occlusion
-    inline float operator()(vec3 lightPos) {
-        const Pattern& pattern = patterns[randomPattern()%16]; // FIXME: race
-        vec16 samples = 0;
-        uint x=lightPos.x, y=lightPos.y;
-        if(x<(uint)width && y<(uint)height) {
-            const Bin& bin = bins[y*width+x];
-            for(uint i: range(bin.faceCount)) {
-                uint index = bin.faces[i];
-                const Face& face = faces[index];
-                const vec3 XY1(lightPos.x,lightPos.y,1.f);
-                float w = 1/dot(face.iw,XY1);
-                float z = w*dot(face.iz,XY1);
-                float d = lightPos.z-z;
-                if(d<=0.f) continue; //only Z-test midpoint
-
-                float spread = A0+dzA*d;
-                vec16 lightX = lightPos.x + spread*pattern.X, lightY = lightPos.y + spread*pattern.Y;
-
-                vec16 a = face.E[0].x * lightX + face.E[0].y * lightY + face.E[0].z;
-                vec16 b = face.E[1].x * lightX + face.E[1].y * lightY + face.E[1].z;
-                vec16 c = face.E[2].x * lightX + face.E[2].y * lightY + face.E[2].z;
-                samples = samples | ((a > 0.f) & (b > 0.f) & (c > 0.f));
-            }
-        }
-        return __builtin_popcount(mask(samples))/16.f;
-    }
-
-    // Reports profiling information
-    string depthComplexity() {
-        uint sum=0, N=0, max=0;
-        for(int binY=0; binY<height; binY++) for(int binX=0; binX<width; binX++) {
-            uint faceCount = bins[binY*width+binX].faceCount;
-            if(faceCount) N++, sum += faceCount, max=::max(max,faceCount);
-        }
-        return N ? str(sum / N, max) : string("-"_);
-    }
-};
-
-// Shaders
-
-/// Shader for flat surfaces (e.g leaves) lit by hemispheric sky and shadow-casting sun lights.
-struct Shader {
-    // Shader specification (used by rasterizer)
-    struct FaceAttributes {
-        vec3 albedo; // Surface color  //TODO: vertex interpolated
-    };
-    static constexpr int V = 6; // number of interpolated vertex attributes (3D light space position, 3D view-space normal)
-    static constexpr bool blend=false; // Disable unecessary blending
-
-    // Uniform attributes
-    static constexpr vec3 skyColor = vec3(1./2,1./4,1./8);
-    static constexpr vec3 sunColor = vec3(1./2,3./4,7./8);
-    vec3 sky, sun; // View-space sky and sun light direction
-    bool enableShadow; // Whether shadow are casts
-    Shadow& shadow; // Occluders
-
-    Shader(Shadow& shadow):shadow(shadow){} //FIXME: inherit constructor
-
-    // Computes diffused light from hemispheric sky light and shadow-casting directionnal sun light
-    vec4 operator()(FaceAttributes face, float varying[V]) const {
-        vec3 N = normalize(vec3(varying[0],varying[1],varying[2]));
-
-        float sunLight=1.f;
-        if(enableShadow) {
-            vec3 lightPos = vec3(varying[3],varying[4],varying[5]);
-            sunLight -= shadow(lightPos);
-        }
-
-        vec3 diffuseLight = hemisphericLight(N,sky)*skyColor + sunLight*directionnalLight(N,sun)*sunColor;
-        vec3 diffuse = face.albedo*diffuseLight;
-        return vec4(diffuse,1.f);
-    }
-};
-#endif
-
 struct Vertex {
     vec3 position; // World-space position
     vec3 color; // BGR albedo (TODO: texture mapping)
@@ -254,6 +81,7 @@ struct Editor : Widget {
     Window window __(&layout, int2(0,0), "L-System Editor"_);
 
     // Renderer
+    GLFrameBuffer sunShadow;
     GLFrameBuffer framebuffer;
     GLBuffer buffer;
     SHADER(shader) GLShader& shader = shaderShader();
@@ -264,7 +92,6 @@ struct Editor : Widget {
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
     vec3 worldCenter=0; float worldRadius=0; // Scene bounding sphere in world space
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
-    float lightScale=0;
     array<Face> faces; // Generated scene geometry data
 
      /// Setups the application UI and shortcuts
@@ -511,35 +338,13 @@ struct Editor : Widget {
         vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
         vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
-#if 0
-        // Setups sun shadow
-        float A0 = scale/4; //scales shadow sampling to view pixel
-        if(A0 != sunShadow.A0) {
-            sunShadow.A0 = A0;
-            sun=mat4();
-            float lightScale = A0/2;
-            sun.scale(lightScale); // Bins the polygon
-            sun.translate(-lightMin);
-            sun.rotateY(PI/4);
-
-            vec3 lightSpace = lightScale*(lightMax-lightMin);
-            int2 sunShadowSize = int2(ceil(lightSpace.xy()));
-            sunShadow.setup(sunShadowSize, lightSpace.z, faces.size()); //FIXME: incorrect Zmax (ground plane receiver is not in lightSpace)
-
-            // Setups shadow casting faces (TODO: vectorize)
-            for(Face& face: faces) {
-                vec4 a = sun*face.position[0], b = sun*face.position[1], c=sun*face.position[2];
-                if(cross((b-a).xyz(),(c-a).xyz()).z > 0) { //backward cull
-                    sunShadow.submit(a,b,c);
-                } else {
-                    // Precomputes light space position to be interpolated as a vertex attribute
-                    face.lightPosition[0] = vec3(a.x,b.x,c.x);
-                    face.lightPosition[1] = vec3(a.y,b.y,c.y);
-                    face.lightPosition[2] = vec3(a.z,b.z,c.z);
-                }
-            }
-        }
-#endif
+        // Render sun shadow map
+        sunShadow = GLFrameBuffer()
+        sun=mat4();
+        sun.scale(lightMax-lightMin);
+        sun.translate(-lightMin);
+        sun.rotateY(PI/4);
+        buffer.draw();
 
         if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
         framebuffer.bind(true);

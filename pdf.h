@@ -55,9 +55,9 @@ struct PDF : Widget {
     array< array<vec2> > paths;
     float normalizedScale = 0; // scale semantic positions to "pixels" (normalize width to 1280)
 
-    map<int,byte4> colors;
+    map<int,vec4> colors;
     /// Overrides color for the given characters
-    void setColors(const map<int,byte4>& colors) { this->colors=copy(colors); contentChanged(); }
+    void setColors(const map<int,vec4>& colors) { this->colors=copy(colors); contentChanged(); }
     map<vec2, string> annotations;
     /// Renders additionnal text annotations
     void setAnnotations(const map<vec2, string>& annotations) { this->annotations=copy(annotations); contentChanged(); }

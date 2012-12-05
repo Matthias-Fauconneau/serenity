@@ -50,13 +50,18 @@ struct Sampler : Poll {
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer (TODO: reverb)
     bool read(ptr& swPointer, int16* output, uint size);
     Resampler resampler[2];
+    float2* reverbFilter=0;
+    float2* reverbBuffer=0;
+    uint reverbIndex=0, reverbSize=0; //ring buffer index and filter size
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
     uint64 lastTime=0, time = 0;
 
     /// Records performance to WAV file
-    void recordWAV(const ref<byte>& path); File record=0; int16* pcm = 0; ~Sampler();
+    void recordWAV(const ref<byte>& path);
+    File record=0; int16* pcm = 0;
+    ~Sampler();
 
     operator bool() const { return samples.size(); }
 };

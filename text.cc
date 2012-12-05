@@ -44,7 +44,7 @@ struct TextLayout {
             for(Character& c: word) text.last() << Character __(c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex);
             if(word) pen.x += word.last().pos.x+word.last().advance;
             if(i!=line.size()-1) //editable justified space
-                text.last() << Character __(0,pen+vec2(0,-this->size),0,0,spaceAdvance,lastIndex=lastIndex+1);
+                text.last() << Character __(0,pen,0,0,spaceAdvance,lastIndex=lastIndex+1);
             pen.x += space;
         }
         lastIndex++;
@@ -68,6 +68,7 @@ struct TextLayout {
         for(uint i=0; i<text.size; i++) {
             uint c = text[i];
             if(c==' '||c=='\t'||c=='\n') { //next word/line
+                column++;
                 previous = spaceIndex;
                 float length=0; for(const Word& word: line) if(word) length+=word.last().pos.x+word.last().advance+spaceAdvance;
                 if(word) length += word.last().pos.x+word.last().width; //last word
@@ -125,7 +126,7 @@ struct TextLayout {
     }
 };
 
-Text::Text(const ref<byte>& text, int size, uint8 opacity, uint wrap) : text(toUTF32(text)), size(size), opacity(opacity), wrap(wrap) {}
+Text::Text(const ref<byte>& text, int size, vec4 color, uint wrap) : text(toUTF32(text)), size(size), color(color), wrap(wrap) {}
 void Text::layout() {
     textSize=int2(0,size);
     TextLayout layout(text, size, wrap);
@@ -156,12 +157,13 @@ void Text::layout() {
     else if(currentIndex==editIndex) cursor = Cursor __(textLines.size()-1, textLines.last().size()); //end of text
     links = move(layout.links);
     for(TextLayout::Line layoutLine: layout.lines) {
-        for(uint line: range(layoutLine.begin.line,layoutLine.end.line)) {
+        for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {
             const TextLayout::TextLine& textLine = layout.text[line];
             if(layoutLine.begin.column<textLine.size()) {
-                TextLayout::Character first = line==layoutLine.begin.line ? textLine[layoutLine.begin.column] : textLine.first();
-                TextLayout::Character last = line==layoutLine.end.line ? textLine[layoutLine.end.column] : textLine.last();
-                lines << Line __( int2(first.pos+vec2(0,2)), int2(last.pos+vec2(last.font?last.font->advance(last.index),2:0)));
+                TextLayout::Character first = (line==layoutLine.begin.line) ? textLine[layoutLine.begin.column] : textLine.first();
+                TextLayout::Character last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size()) ? textLine[layoutLine.end.column] : textLine.last();
+                assert(first.pos.y == last.pos.y, first.pos, last.pos, textLine.size(), textLine[1].pos);
+                lines << Line __( int2(first.pos+vec2(0,1)), int2(last.pos+vec2(last.font?last.font->advance(last.index):0,2)));
             }
         }
     }
@@ -173,8 +175,8 @@ int2 Text::sizeHint() {
 void Text::render(int2 position, int2 size) {
     if(!textSize) layout();
     int2 offset = position+max(int2(0),(size-textSize)/2);
-    for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) substract(offset+b.pos, b.image, 0xFF-opacity);
-    for(const Line& l: lines) fill(offset+Rect(l.min-int2(0,1),l.max), black);
+    for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) blit(offset+b.pos, b.image, color);
+    for(const Line& l: lines) fill(offset+Rect(l.min,l.max), black);
 }
 
 bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {

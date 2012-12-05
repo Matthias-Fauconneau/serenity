@@ -13,6 +13,7 @@ struct Score {
 
     array<float> staffs;
     vec2 lastClef=0, lastPos=0;
+    uint staffCount=0;
     array<vec2> repeats;
 
     struct Line {
@@ -54,7 +55,7 @@ struct Score {
     void remove();
     void seek(uint time);
     void noteEvent(int,int);
-    signal<const map<int,byte4>&> activeNotesChanged;
+    signal<const map<int,vec4>&> activeNotesChanged;
     signal<float,float,float> nextStaff;
     map<vec2, string> debug;
     int pass=-1;

@@ -65,7 +65,7 @@ struct PDFScore : PDF {
     void render(int2 position, int2 size) override {
         PDF::render(position,size);
         if(annotations) for(vec2 pos: positions) fill(position+int2(scale*pos)-int2(2)+Rect(4),red);
-        if(positions) for(pair<int,byte4> highlight: colors) {
+        if(positions) for(pair<int,vec4> highlight: colors) {
             fill(position+int2(scale*positions[highlight.key])-int2(3)+Rect(6),green);
         }
     }
@@ -130,7 +130,7 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
-        openSheet("Skyrim"_);
+        openSheet("Skyrim - Dragonborn 3 (Andrew Wrangell)"_);
         toggleAnnotations();
     }
 
@@ -181,7 +181,6 @@ struct Music {
             score.parse();
             if(midi.notes) score.synchronize(copy(midi.notes));
             else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
-            //pdfScore.setAnnotations(score.debug);
             window.widget = &pdfScore.area();
             pdfScore.delta = 0;
         } else {

@@ -24,76 +24,6 @@ struct AudioMedia {
     virtual ~AudioMedia(){}
 };
 
-#if MPG123
-extern "C" {
-enum mpg123_flags { MPG123_ADD_FLAGS=2, MPG123_FORCE_FLOAT  = 0x400 };
-struct mpg123;
-int mpg123_init();
-mpg123* mpg123_new(const char* decoder, int* error);
-int mpg123_param(mpg123* mh, enum mpg123_flags type, long value, double fvalue);
-int mpg123_open_fd(mpg123* mh, int fd);
-int mpg123_getformat(mpg123* mh, long* rate, int* channels, int* encoding);
-int mpg123_read(mpg123* mh, float* buffer, long bufferSizeInBytes, long* decodedSizeInBytes);
-long mpg123_tell(mpg123* mh);
-long mpg123_length(mpg123* mh);
-long mpg123_timeframe(mpg123* mh, double sec);
-long mpg123_seek_frame(mpg123* mh, long frameoff, int whence);
-int mpg123_close(mpg123* mh);
-void mpg123_delete(mpg123* mh);
-}
-
-/// MP3 audio decoder (using mpg123)
-struct MP3Media : AudioMedia {
-    Handle file = 0;
-    mpg123* mh = 0;
-    MP3Media(){}
-    MP3Media(Handle&& file):file(move(file)){
-        static int unused once=mpg123_init();
-        mh = mpg123_new(0,0);
-        mpg123_param(mh, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.);
-        if(mpg123_open_fd(mh,this->file.fd)) { log("mpg123_open_fd failed"); mh=0; return; }
-        long rate; int channels,encoding;
-        if(mpg123_getformat(mh,&rate,&channels,&encoding)) { log("mpg123_getformat failed"); mh=0; return; }
-        this->rate=rate; this->channels=channels; assert(channels==2);
-    }
-    uint position() { return int(mpg123_tell(mh)/rate); }
-    uint duration() { return int(mpg123_length(mh)/rate); }
-    void seek(uint unused position) { mpg123_seek_frame(mh,mpg123_timeframe(mh,position),0); }
-    int read(float2* output, uint size) {
-        long done;
-        mpg123_read(mh,(float*)output,size*sizeof(float2),&done);
-        for(uint i: range(size)) output[i] *= (float2){32768,32768};
-        return done>0?done/(channels*sizeof(float)):done;
-    }
-    ~MP3Media() { mpg123_close(mh); mpg123_delete(mh); }
-};
-#endif
-
-#include "linux.h"
-enum {MADV_RANDOM=1,MADV_SEQUENTIAL,MADV_WILLNEED,MADV_DONTNEED};
-
-/// FLAC audio decoder (using \a FLAC)
-struct FLACMedia : AudioMedia {
-    Map map;
-    FLAC flac;
-    FLACMedia(){}
-    FLACMedia(File&& file):map(file),flac(map){ madvise(map.data,map.size,MADV_SEQUENTIAL); AudioMedia::rate=flac.rate; AudioMedia::channels=2; }
-    uint position() { return flac.position/rate; }
-    uint duration() { return flac.duration/rate; }
-    void seek(uint position) {
-        if(position>=duration()) return;
-        if(position<this->position()) { flac.~FLAC(); flac=FLAC(map); }
-        while(this->position()<position) {
-            flac.decodeFrame();
-            flac.position+=flac.buffer.size;
-            flac.readIndex+=flac.buffer.size;
-            if(flac.readIndex>flac.buffer.capacity) flac.readIndex-=flac.buffer.capacity;
-            flac.buffer.size=0;
-        }
-    }
-    int read(float2* out, uint size) { return flac.read(out,size); }
-};
-
 /// Generic audio decoder (using ffmpeg)
 extern "C" {
 #define __STDC_CONSTANT_MACROS
@@ -184,10 +114,6 @@ struct Player {
 // Pipeline: File -> AudioMedia -> [Resampler] -> AudioOutput
     static constexpr int channels=2;
     AudioMedia* media=0;
-#if MPG123
-    MP3Media mp3;
-#endif
-    FLACMedia flac;
     FFmpegMedia ffmpeg;
     Resampler resampler;
     AudioOutput audio __({this,&Player::read});
@@ -284,16 +210,14 @@ struct Player {
     }
     void playAlbum(uint index) {
         files.clear(); titles.clear();
-        window.setTitle(albums[index].text);
+        window.setTitle(toUTF8(albums[index].text));
         playAlbum(folders[index]);
     }
     void playTitle(uint index) {
-        window.setTitle(titles[index].text);
+        window.setTitle(toUTF8(titles[index].text));
         ref<byte> path = files[index];
         if(media) media->~AudioMedia(), media=0;
-        if(endsWith(path,".flac"_)) media=new (&flac) FLACMedia(File(path,"Music"_));
-        //else if(endsWith(path,".mp3"_)||endsWith(path,".MP3"_)) media=new (&mp3) MP3Media(File(path,"Music"_));
-        else media=new (&ffmpeg) FFmpegMedia(string("/Music/"_+path));
+        media = new (&ffmpeg) FFmpegMedia(string("/Music/"_+path));
         assert(audio.channels==media->channels);
         if(audio.rate!=media->rate) new (&resampler) Resampler(audio.channels, media->rate, audio.rate, audio.periodSize);
         setPlaying(true);
@@ -326,8 +250,8 @@ struct Player {
         writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));
         if(!window.mapped) return;
         slider.value = position; slider.maximum=duration;
-        elapsed.setText(dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2));
-        remaining.setText(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2));
+        elapsed.setText(string(dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2)));
+        remaining.setText(string(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2)));
         window.render();
     }
 } application;

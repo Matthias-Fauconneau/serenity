@@ -29,6 +29,8 @@ void glXSwapBuffers(void* dpy, uint drawable);
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace Render { int EXT, event, errorBase; } using namespace Render;
+void* Window::display=0;
+void* Window::context=0;
 int2 displaySize;
 Widget* focus;
 Widget* drag;
@@ -112,10 +114,12 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         context = eglCreateContext(display, config, 0, attributes);}
     eglMakeCurrent(display, surface, surface, context);
 #else
-    display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
-    int attributes[] = {GLX_RGBA,0};
-    void* visual = glXChooseVisual(display,0,attributes); assert(visual);
-    context = glXCreateContext(display,visual,0,1); assert(context);
+    if(!display) display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
+    if(!context) {
+        int attributes[] = {GLX_RGBA,0};
+        void* visual = glXChooseVisual(display,0,attributes); assert(visual);
+        context = glXCreateContext(display,visual,0,1); assert(context);
+    }
     glXMakeCurrent(display, id, context);
 #endif
 }
@@ -136,8 +140,8 @@ void Window::destroy() {
     eglDestroySurface(display, surface);
     eglTerminate(display);
 #else
-    glXDestroyContext(display,context);
-    XCloseDisplay(display);
+    //glXDestroyContext(display,context);
+    //XCloseDisplay(display);
 #endif
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
@@ -155,6 +159,7 @@ void Window::event() {
         assert(mapped); assert(size);
 
         currentClip=Rect(size);
+        glXMakeCurrent(display, id, context);
         GLFrameBuffer::bindWindow(0,size,true,vec4(vec3(backgroundColor),backgroundOpacity));
         /*if(backgroundCenter!=backgroundColor) { // Oxygen-like radial gradient background
             constexpr int radius=256;

@@ -118,8 +118,8 @@ struct Window : Socket, Poll {
     void* surface;
     void* context;
 #else
-    void* display;
-    void* context;
+    static void* display;
+    static void* context;
 #endif
 
     /// Shortcuts triggered when a key is pressed

@@ -1,11 +1,18 @@
 CG:
- Hardware rendering: soft shadows
+ Soft shadows
+  2003 - Assarsson - Soft shadow volumes (+accurate, +simple, -fillrate bottleneck on detailled geometry)
+  2005 - Fernando - Percentage Closer Soft Shadows (+realtime, -approximate, -aliasing) (+[L][E][SAT]VSM?)
+  2007 - Guennebaud (+Stamminger) - Backprojection + Bitmask (-expensive, -intricate, -leak/overlap)
+  2008 - Annen - Convolution shadow maps
+  2009 - Johnson - Soft Irregular Shadow Mapping (+accurate, +efficient, -adapted to Larrabee) (+Sintorn 2008 (++2011))
+
  Editor: copy-paste, parse "->", .XCompose, syntax highlighting
  Export .obj [release]
  Trees: improve branches using environment modeling (light and space competition)
  Textures: bark,leafs,twigs
  Scene: sky, terrain, grass, plants, forest...
 
+Music: reverb, violin, DRC
 Desktop: fix links, desktop calculator
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition

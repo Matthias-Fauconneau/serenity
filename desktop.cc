@@ -100,7 +100,7 @@ struct Desktop {
         browser.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);
     }
     void showPage(const ref<byte>& link, const ref<byte>& title, const Image& favicon) {
-        if(!link) { exit(); return; } // Exits application to free any memory leaks (will be restarted by .xinitrc)
+        if(!link) { browser.destroy(); exit(); return; } // Exits application to free any memory leaks (will be restarted by .xinitrc)
         page.delta=0;
         page.contentChanged.connect(&browser, &Window::render);
         if(!browser.created) browser.create(); //might have been closed by user
