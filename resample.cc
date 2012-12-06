@@ -34,14 +34,14 @@
 #if __clang__
 inline float4 loadu(const float *p) { struct float4u { float4 v; } __attribute((packed, may_alias)); return ((float4u*)p)->v; }
 #else
-#define loadu __builtin_ia32_loadups
+#define load4u __builtin_ia32_loadups
 #define movhlps __builtin_ia32_movhlps
 #define shuffle_ps __builtin_ia32_shufps
 #endif
 
 inline float product(const float* kernel, const float* signal, int len) {
     float4 sum = {0,0,0,0};
-    for(int i=0;i<len;i+=4) sum += load(kernel+i) * loadu(signal+i);
+    for(int i=0;i<len;i+=4) sum += load4(kernel+i) * load4u(signal+i);
 #if __clang__
     return sum[0]+sum[1]+sum[2]+sum[3];
 #else

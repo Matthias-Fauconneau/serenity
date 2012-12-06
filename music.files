@@ -45,3 +45,5 @@ score.cc
 music.cc
 midiscore.h
 midiscore.cc
+reverb.h
+reverb.cc

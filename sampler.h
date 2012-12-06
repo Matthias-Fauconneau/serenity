@@ -48,11 +48,12 @@ struct Sampler : Poll {
     void event() override;
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer (TODO: reverb)
-    bool read(ptr& swPointer, int16* output, uint size);
+    bool read(ptr& swPointer, int32* output, uint size);
     Resampler resampler[2];
     float2* reverbFilter=0;
     float2* reverbBuffer=0;
     uint reverbIndex=0, reverbSize=0; //ring buffer index and filter size
+    static constexpr uint periodSize = 32;
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;

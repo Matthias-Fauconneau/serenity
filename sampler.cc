@@ -97,22 +97,25 @@ void Sampler::open(const ref<byte>& path) {
     // Predecode 4K (10ms) and lock compressed samples in memory
     for(Sample& s: samples) s.cache.decode(1<<12), s.map.lock();
 
-#if 1
     array<byte> reverbFile = readFile("reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
     assert(reverbMedia.rate == 48000);
-    reverbSize = 8192; log(reverbSize,reverbMedia.duration);
-    reverbFilter = allocate64<float2>(reverbSize+4); clear(reverbFilter,reverbSize+4);
+    reverbSize = reverbMedia.duration/periodSize*periodSize;
+    reverbFilter = allocate64<float2>(reverbSize); clear(reverbFilter,reverbSize);
     for(uint i=0;i<reverbSize;) {
         uint read = reverbMedia.read(reverbFilter+i,reverbSize-i);
         i+=read;
     }
-    float2 sum={0,0};
-    for(uint i: range(reverbSize)) sum+= reverbFilter[i]*reverbFilter[i];
-    float2 scale = {0x1p-30,0x1p-30}; //= 19 + 8 + 3 = FIR normalization + 24bit->16bit + 8 notes
-    for(uint i: range(reverbSize)) reverbFilter[i] *= scale; //normalize
-    reverbBuffer = allocate64<float2>(reverbSize+4); clear(reverbBuffer,reverbSize+4);
-#endif
+    float2 sum={0,0}; for(uint i: range(reverbSize)) sum += reverbFilter[i]*reverbFilter[i];
+    float scale = 0x1p5f/(sqrt(extract2(sum,0))+sqrt(extract2(sum,1))/2);
+    float2 scale2 = {scale,scale}; //8 - 3 = 24bit->32bit - 8 notes
+    for(uint i: range((reverbSize+1)/2)) { //normalize and reverse
+        float2& a=reverbFilter[i];
+        float2& b=reverbFilter[reverbSize-1-i] ;
+        float2 t = a; a=scale2*b; b=scale2*t;
+    }
+    reverbBuffer = allocate64<float2>(reverbSize+periodSize); clear(reverbBuffer,reverbSize+periodSize);
+    reverbIndex = periodSize;
 }
 
 /// Input events (realtime thread)
@@ -238,50 +241,62 @@ void Note::read(float4* out, uint size) {
     buffer.size-=size*2; writeCount.release(size*2); //allow decoder to continue
     position+=size*2; //keep track of position for release sample level matching
 }
-bool Sampler::read(ptr& swPointer, int16* output, uint size) { // Audio thread
+bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio thread
     {Locker lock(noteReadLock);
-        assert(size%2==0);
-        const uint frameSize=size/2; // output frame size in float4 vectors
+        if(size!=periodSize) error(size,periodSize);
 
-        float4* buffer = allocate64<float4>(frameSize); clear(buffer, frameSize);
-        // Mix notes which don't need any resampling
-        for(Note& note: notes[1]) note.read(buffer, frameSize);
-        // Mix pitch shifting layers
+        // Targets reverb buffer
+        float8* buffer = (float8*)&reverbBuffer[reverbIndex];
+
+        // Clears buffer
+        clear(buffer, periodSize/4);
+        // Mixes notes which don't need any resampling
+        for(Note& note: notes[1]) note.read((float4*)buffer, periodSize/2); //FIXME
+        // Mixes pitch shifting layers
         for(int i=0;i<2;i++) {
-            uint inSize=align(2,resampler[i].need(size))/2;
-            float4* layer = allocate64<float4>(inSize); clear(layer, inSize);
-            for(Note& note: notes[i*2]) note.read(layer, inSize);
-            resampler[i].filter<true>((float*)layer, inSize*2, (float*)buffer, size);
-            unallocate(layer,inSize);
+            uint inSize=align(2,resampler[i].need(periodSize));
+            float4* layer = allocate64<float4>(inSize); clear(layer, inSize/2);
+            for(Note& note: notes[i*2]) note.read(layer, inSize/2);
+            resampler[i].filter<true>((float*)layer, inSize, (float*)buffer, periodSize);
+            unallocate(layer,inSize/2);
         }
 
 #if 1
         // Reverb
-        for(uint i: range(size)) { //TODO: better locality | fourier convolution
-            reverbBuffer[reverbIndex] = ((float2*)buffer)[i];
-            float8 sum = {0,0,0,0,0,0,0,0};
-            {float8* kernel = (float8*)reverbFilter; float* signal = (float*)(reverbBuffer+reverbIndex);
-                for(uint i: range((reverbSize-reverbIndex+3)/4)) sum += kernel[i]*_mm256_loadu_ps(signal+i*8);
-            }
-            {float* kernel = (float*)(reverbFilter+reverbSize-reverbIndex); float8* signal = (float8*)reverbBuffer;
-                for(uint i: range(reverbIndex/4)) sum += _mm256_loadu_ps((float*)&kernel[i*8])*signal[i];
-            }
-            _mm_storel_epi64((__m128i*)&((float2*)buffer)[i],(__m128i)sum8to2(sum));
-            if(reverbIndex==0) reverbIndex=reverbSize;
-            reverbIndex--;
+        if(reverbIndex==reverbSize) { // Wrap buffer with periodSize overlap
+            copy(reverbBuffer,reverbBuffer+reverbIndex,periodSize);
+            reverbIndex=0;
         }
+        reverbIndex+=periodSize;
+        // Convolves frame (32 samples) * filter (24000 taps) //TODO: fourier convolution
+        float8 sum[periodSize/4] = {}; //Keeps whole frame (32 samples) in registers
+        {
+            float2* filter = reverbFilter; float2* signal = reverbBuffer+reverbIndex-periodSize;
+            for(uint t: range(reverbSize-reverbIndex+periodSize)) { // Convolves kernel with oldest part
+                float8 kernel = (float8)_mm256_broadcast_sd((double*)(filter+t)); // Broadcasts stereo filter coefficient
+                float2* source = signal+t;
+                for(uint i: range(periodSize/4)) sum[i] += kernel * load8(source+4*i); // Accumulates all shifts over frame
+            }
+        }
+        {
+            float2* filter = reverbFilter+reverbSize-reverbIndex; float2* signal = reverbBuffer-periodSize;
+            for(uint t: range(periodSize,reverbIndex)) { // Convolves kernel with newest part
+                float8 kernel = (float8)_mm256_broadcast_sd((double*)(filter+t)); // Broadcasts stereo filter coefficient
+                float2* source = signal+t;
+                for(uint i: range(periodSize/4)) sum[i] += kernel * load8(source+4*i); // Accumulates all shifts over frame
+            }
+        }
+        for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(sum[i]);
+#else
+        float8 scale = {0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f};
+        for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(buffer[i]*scale);
 #endif
 
-        for(uint i: range(frameSize/2)) {
-            ((half8*)output)[i] = packs( cvtps(buffer[i*2+0]), cvtps(buffer[i*2+1]) ); //8 samples = 4 frames
-        }
-        unallocate(buffer,frameSize);
-
-        swPointer += size;
+        swPointer += periodSize;
     }
-    time+=size;
+    time+=periodSize;
     queue(); //queue background decoder in main thread
-    //if(record) record.write(ref<byte>((byte*)output,frameSize*2*sizeof(int16))); time+=frameSize;
+    //if(record) record.write(ref<byte>((byte*)output,periodSize*sizeof(int32)));
     return true;
 }
 
@@ -300,3 +315,4 @@ Sampler::~Sampler() {
     error("Recording unsupported");
     //record.seek(4); write(record,raw<int32>(36+time));
 }
+constexpr uint Sampler::periodSize;

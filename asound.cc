@@ -3,12 +3,11 @@
 
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
-enum Format { S16_LE=2 };
+enum Format { S16_LE=2, S32_LE=10 };
 enum SubFormat { Standard=0 };
 enum Masks { Access, Format, SubFormat };
 enum Intervals { SampleBits, FrameBits, Channels, Rate, PeriodTime, PeriodSize, PeriodBytes, Periods, BufferTime, BufferSize };
 enum Flags { NoResample=1, ExportBuffer=2, NoPeriodWakeUp=4 };
-
 struct Interval {
     uint min, max; uint openmin:1, openmax:1, integer:1, empty:1, pad:28;
     Interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0),pad(0){}
@@ -17,7 +16,7 @@ struct Interval {
 };
 struct Mask {
     int bits[8] = {~0,~0,0,0,0,0,0,0};
-    void set(uint bit) { assert(bit < 256); bits[0] = bits[1] = 0; bits[bit >> 5] |= (1 << (bit & 31)); }
+    Mask& set(uint bit) { assert(bit < 256); bits[0] = bits[1] = 0; bits[bit >> 5] |= (1 << (bit & 31)); return *this; }
 };
 struct HWParams {
     uint flags = NoResample;
@@ -46,22 +45,22 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-AudioOutput::AudioOutput(function<bool(ptr& swPointer, int16* output, uint size)> read, Thread& thread, bool realtime)
+AudioOutput::AudioOutput(function<bool(ptr& swPointer, int32* output, uint size)> read, Thread& thread, bool realtime)
     : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
-    hparams.mask(Format).set(S16_LE);
+    hparams.mask(Format).set(S32_LE);
     hparams.mask(SubFormat).set(Standard);
-    hparams.interval(SampleBits) = 16;
-    hparams.interval(FrameBits) = 16*channels;
+    hparams.interval(SampleBits) = 32;
+    hparams.interval(FrameBits) = 32*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=128/*~1x resampler latency*/, hparams.interval(Periods).max=2;
+    if(realtime) hparams.interval(PeriodSize)=32/*8 x float8 / stereo ~ 0.6ms*/, hparams.interval(Periods).max=2;
     else hparams.interval(PeriodSize).min=8192, hparams.interval(Periods).min=2;
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * periodSize;
-    buffer= (int16*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * sizeof(int16), Map::Write)).data);
+    buffer= (int32*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * sizeof(int32), Map::Write)).data);
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Read|Map::Write)).data);
 }
