@@ -51,7 +51,7 @@ struct Sampler : Poll {
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
     bool read(ptr& swPointer, int32* output, uint size);
     Resampler resampler[2];
-    static constexpr uint periodSize = 128;
+    static constexpr uint periodSize = 2048;
     float* buffer; // Interleaved mixing buffer
 
     /// Convolution reverb
@@ -63,9 +63,13 @@ struct Sampler : Poll {
     //uint reverbIndex=0; //ring buffer index TODO
     float* input=0; // Buffer to hold transform of reverbBuffer
     float* product=0; // Buffer to hold multiplication of signal and reverbFilter
+    float* buffers[2]; // Buffer for reordered complex multiplication
 
     fftwf_plan forward[2]; // FFTW plan to forward transform reverb buffer
     fftwf_plan backward; // FFTW plan to backward transform product
+
+#define profile(statement)
+    profile( uint64 forwardTime=0; uint64 shiftTime=0; uint64 productTime=0; uint64 backwardTime=0; uint64 totalTime=0; )
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;

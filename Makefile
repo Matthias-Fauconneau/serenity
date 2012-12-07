@@ -38,7 +38,7 @@ LIBS_http = ssl
 LIBS_player = avformat avcodec
 LIBS_gl = GL
 LIBS_window = X11
-LIBS_sampler = fftw3f
+LIBS_sampler = fftw3f_threads
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
