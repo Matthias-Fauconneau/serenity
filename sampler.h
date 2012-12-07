@@ -51,7 +51,7 @@ struct Sampler : Poll {
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
     bool read(ptr& swPointer, int32* output, uint size);
     Resampler resampler[2];
-    static constexpr uint periodSize = 2048;
+    static constexpr uint periodSize = 256;
     float* buffer; // Interleaved mixing buffer
 
     /// Convolution reverb
