@@ -18,6 +18,7 @@ FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
+FLAGS_reverb =  -I/usr/include/libfreeverb3-2/
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -39,7 +40,6 @@ LIBS_player = avformat avcodec
 LIBS_gl = GL
 LIBS_window = X11
 LIBS_sampler = fftw3f_threads
-LIBS_test = fftw3f_threads
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

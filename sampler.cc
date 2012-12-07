@@ -103,9 +103,9 @@ void Sampler::open(const ref<byte>& path) {
     assert(reverbMedia.rate == 48000);
     reverbSize = reverbMedia.duration;
     N = reverbSize+periodSize;
-    float* stereoFilter = allocate64<float>(2*N); clear(stereoFilter,2*N);
+    float* stereoFilter = allocate64<float>(2*reverbSize); clear(stereoFilter,2*reverbSize);
     for(uint i=0;i<reverbSize;) {
-        uint read = reverbMedia.read((float2*)(stereoFilter+2*i),reverbSize-i);
+        uint read = reverbMedia.read((float2*)(stereoFilter+2*i),min(1u<<16,reverbSize-i));
         i+=read;
     }
 
@@ -115,23 +115,8 @@ void Sampler::open(const ref<byte>& path) {
 
     // Reverses, scales and deinterleaves filter
     float* filter[2];
-    for(int c=0;c<2;c++) filter[c] = allocate64<float>(N), clear(filter[c],N);
-    for(uint i: range(reverbSize)) {
-        for(int c=0;c<2;c++) filter[c][N-1-i] = scale*stereoFilter[2*i+c];
-        //for(int c=0;c<2;c++) filter[c][periodSize+i] = scale*stereoFilter[2*i+c];
-    }
-    /*for(uint i: range(reverbSize/2)) {
-        //for(int c=0;c<2;c++) filter[c][N-1-i] = scale*stereoFilter[2*i+c];
-        for(int c=0;c<2;c++) filter[c][periodSize+reverbSize/2+i] = scale*stereoFilter[2*i+c];
-        for(int c=0;c<2;c++) filter[c][periodSize+i] = scale*stereoFilter[2*(reverbSize/2+i)+c];
-    }*/
-
-    //DEBUG
-    /*for(int c=0;c<2;c++) {
-        clear(filter[c],N);
-        //filter[c][N-1] = 1;
-        filter[c][periodSize] = 1;
-    }*/
+    for(int c=0;c<2;c++) filter[c] = allocate64<float>(N),  clear(filter[c],N);
+    for(uint i: range(reverbSize)) for(int c=0;c<2;c++) filter[c][i] = scale*stereoFilter[2*i+c];
 
     fftwf_init_threads();
     fftwf_plan_with_nthreads(4);
@@ -155,7 +140,6 @@ void Sampler::open(const ref<byte>& path) {
     }
     product = allocate64<float>(N);
     backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, 0);
-    //reverbIndex = periodSize; //TODO: ring buffer
 
     fftwf_export_wisdom_to_filename("/Samples/wisdom");
 }
@@ -286,7 +270,6 @@ void Note::read(float4* out, uint size) {
 bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio thread
     {Locker lock(noteReadLock);
         if(size!=periodSize) error(size,periodSize);
-        if(reverbSize%8) error("reverbSize",reverbSize);
 
         // Setups mixing buffer
         clear(buffer, periodSize*2);
@@ -302,8 +285,6 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
         }
 
         // Applies convolution reverb
-        //TODO if(reverbIndex==reverbSize) reverbIndex=0; reverbIndex += periodSize; // Wrap buffer with periodSize overlap
-
         // Deinterleaves mixed signal into reverb buffer
         for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = buffer[2*i+c]; //TODO: ring buffer (reverbIndex)
 
@@ -311,11 +292,9 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
             // Transforms reverb buffer to frequency-domain ( reverbBuffer -> input )
             fftwf_execute(forward[c]);
 
-            /*{float8* reverb = (float8*)reverbBuffer[c];
+            {float8* reverb = (float8*)reverbBuffer[c];
                 for(uint i: range(reverbSize/8)) reverb[i] = reverb[i+periodSize/8]; // Shifts buffer for next frame (FIXME: ring buffer)
-            }*/
-            //for(uint i=reverbSize+periodSize-1;i>=periodSize;i--) reverbBuffer[c][i] = reverbBuffer[c][i-periodSize]; // Shifts buffer for next frame
-            for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
+            }
 
             // Complex multiplies input (reverb buffer) with kernel (reverb filter)
 
@@ -336,13 +315,12 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
             fftwf_execute(backward);
 
             for(uint i: range(periodSize)) { // Normalizes and writes samples back in output buffer
-                //buffer[2*i+c] = (1.f/N)*input[reverbSize-periodSize-1+i]; //TODO: ring buffer (reverbIndex)
-                buffer[2*i+c] = (1.f/N)*input[N/2-periodSize+i]; //TODO: ring buffer (reverbIndex)
+                buffer[2*i+c] = (1.f/N)*input[reverbSize-periodSize-1+i]; //TODO: ring buffer (reverbIndex)
+                //buffer[2*i+c] = (1.f/N)*input[N/2-periodSize+i]; //TODO: ring buffer (reverbIndex)
                 //buffer[2*i+c] = (1.f/N)*input[reverbSize/2-1+i]; //TODO: ring buffer (reverbIndex)
                 //buffer[2*i+c] = (1.f/N)*input[periodSize+i]; //TODO: ring buffer (reverbIndex)
             }
         }
-
         // Scales 24->32bit (-3bit head room)
         for(uint i: range(periodSize*2)) buffer[i]*=0x1p5f;
         // Converts mixing buffer to signed 32bit output
@@ -369,6 +347,7 @@ void Sampler::recordWAV(const ref<byte>& path) {
     record.write(raw(header));
 }
 Sampler::~Sampler() {
+#if 0
     for(uint c=0;c<2;c++) {
         if(reverbFilter[c]) unallocate(reverbFilter[c],N);
         if(reverbBuffer[c]) unallocate(reverbBuffer[c],N);
@@ -377,6 +356,7 @@ Sampler::~Sampler() {
     fftwf_destroy_plan(backward);
     unallocate(input,N);
     unallocate(product,N);
+#endif
     unallocate(buffer,periodSize*2);
     if(!record) return;
     error("Recording unsupported");

@@ -65,7 +65,7 @@ struct Sampler : Poll {
     float* product=0; // Buffer to hold multiplication of signal and reverbFilter
 
     fftwf_plan forward[2]; // FFTW plan to forward transform reverb buffer
-    fftwf_plan backward; // FFTW plan to backward transform product
+    fftwf_plan backward; // FFTW plan to backward transform product*/
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
