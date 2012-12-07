@@ -82,19 +82,19 @@ struct FFmpegMedia : AudioMedia {
                 if(audio->sample_fmt == AV_SAMPLE_FMT_FLT) {
                     float2* input = (float2*)frame.data[0];
                     uint size = min(inputSize,outputSize);
-                    for(uint i: range(size)) output[i] = input[i]*(float2){32768,32768};
+                    for(uint i: range(size)) output[i] = input[i]*(float2){0x1p31,0x1p31};
                     if(inputSize > outputSize) {
-                        for(uint i: range(inputSize-outputSize)) buffer[i] = input[outputSize+i]*(float2){32768,32768};
+                        for(uint i: range(inputSize-outputSize)) buffer[i] = input[outputSize+i]*(float2){0x1p31,0x1p31};
                         buffer.size = inputSize-outputSize;
                     }
                     outputSize -= size; output+=size;
                 } else {
-                    typedef int16 half2 __attribute((vector_size(4)));
-                    half2* input = (half2*)frame.data[0];
+                    int16* input = (int16*)frame.data[0];
                     uint size = min(inputSize,outputSize);
-                    for(uint i: range(size)) output[i][0] = input[i][0], output[i][1] = input[i][1];
+                    for(uint i: range(size)) output[i] = (float2){0x1p16f*input[2*i+0], 0x1p16f*input[2*i+1]};
                     if(inputSize > outputSize) {
-                        for(uint i: range(inputSize-outputSize)) buffer[i][0] = input[outputSize+i][0], buffer[i][1] = input[outputSize+i][1];
+                        for(uint i: range(inputSize-outputSize))
+                            buffer[i] = (float2){0x1p8f*input[2*(outputSize+i)+0], 0x1p16f*input[2*(outputSize+i)+1]};
                         buffer.size = inputSize-outputSize;
                     }
                     outputSize -= size; output+=size;
@@ -117,10 +117,10 @@ struct Player {
     FFmpegMedia ffmpeg;
     Resampler resampler;
     AudioOutput audio __({this,&Player::read});
-    bool read(ptr& swPointer, int16* output, uint size) {
-        float2 buffer[size];
+    bool read(ptr& swPointer, int32* output, uint size) {
+        float buffer[2*size];
         uint inputSize = resampler?resampler.need(size):size;
-        {int size=inputSize; for(float2* input=buffer;;) {
+        {int size=inputSize; for(float2* input=(float2*)buffer;;) {
             if(!media) return false;
             int read=media->read(input,size);
             if(read==size) break;
@@ -128,9 +128,9 @@ struct Player {
             if(read>0) input+=read, size-=read;
             next();
         }}
-        if(resampler) resampler.filter<false>((float*)buffer,inputSize,(float*)buffer,size);
+        if(resampler) resampler.filter<false>(buffer,inputSize,buffer,size);
         assert(size%4==0);
-        for(uint i: range(size/4)) ((half8*)output)[i] = packs(cvtps(load(buffer+i*4+0)), cvtps(load(buffer+i*4+2))); //8 samples = 4 frames
+        for(uint i: range(size*2)) output[i] = buffer[i];
         swPointer += size;
         update(media->position(),media->duration());
         return true;

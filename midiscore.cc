@@ -35,7 +35,7 @@ int2 MidiScore::page(int staff, int t, int h) { return position+int2(staffX(t),t
 static void glyph(int2 position, const ref<byte> name, vec4 color=black) {
     static Font font __("/usr/share/lilypond/2.16.1/fonts/otf/emmentaler-20.otf"_,128);
     const Glyph& glyph = font.glyph(font.index(name));
-    substract(position+glyph.offset,glyph.image,color);
+    blit(position+glyph.offset,glyph.image,color);
 }
 
 // Draws a staff

@@ -111,7 +111,7 @@ void Sampler::open(const ref<byte>& path) {
 
     // Computes normalization
     float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
-    const float scale = 1.f/sqrt(sum); //8 (24bit->32bit) - 3 (head room)
+    const float scale = 0x1p5f/sqrt(sum); // Normalizes and scales 24->32bit (-3bit head room)
 
     // Reverses, scales and deinterleaves filter
     float* filter[2];
@@ -125,7 +125,7 @@ void Sampler::open(const ref<byte>& path) {
     // Transform reverb filter to frequency domain
     for(int c=0;c<2;c++) {
         reverbFilter[c] = allocate64<float>(N); clear(reverbFilter[c],N);
-        fftwf_plan p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, 0);
+        fftwf_plan p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
         fftwf_execute(p);
         fftwf_destroy_plan(p);
         unallocate(filter[c],N); // release time domain filter
@@ -136,10 +136,10 @@ void Sampler::open(const ref<byte>& path) {
     input = allocate64<float>(N);
     for(int c=0;c<2;c++) {
         reverbBuffer[c] = allocate64<float>(N), clear(reverbBuffer[c],N);
-        forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c], input, FFTW_R2HC, 0);
+        forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c], input, FFTW_R2HC, FFTW_ESTIMATE);
     }
     product = allocate64<float>(N);
-    backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, 0);
+    backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, FFTW_ESTIMATE);
 
     fftwf_export_wisdom_to_filename("/Samples/wisdom");
 }
@@ -270,7 +270,7 @@ void Note::read(float4* out, uint size) {
 bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio thread
     {Locker lock(noteReadLock);
         if(size!=periodSize) error(size,periodSize);
-
+        if(reverbSize%8!=0) error(reverbSize%8,reverbSize);
         // Setups mixing buffer
         clear(buffer, periodSize*2);
         // Mixes notes which don't need any resampling
@@ -297,7 +297,6 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
             }
 
             // Complex multiplies input (reverb buffer) with kernel (reverb filter)
-
             float* x = input;
             float* y = reverbFilter[c];
             product[0] = x[0] * y[0];
@@ -315,11 +314,9 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
             fftwf_execute(backward);
 
             for(uint i: range(periodSize)) { // Normalizes and writes samples back in output buffer
-                buffer[2*i+c] = (1.f/N)*input[reverbSize-periodSize-1+i];
+                buffer[2*i+c] = (1.f/N)*input[reverbSize+i];
             }
         }
-        // Scales 24->32bit (-3bit head room)
-        for(uint i: range(periodSize*2)) buffer[i]*=0x1p5f;
         // Converts mixing buffer to signed 32bit output
         for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(((float8*)buffer)[i]);
 

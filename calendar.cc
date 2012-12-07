@@ -60,7 +60,7 @@ void Calendar::setActive(Date active) {
         int previousMonth = (active.month+11)%12;
         int day = daysInMonth(previousMonth,active.year-(active.month==0))-first+i;
         dates << Date(day, previousMonth, active.year-(active.month==0), count()%7);
-        *this<< Text(format(Italic)+dec(day+1,2),16,128);
+        *this<< Text(format(Italic)+dec(day+1,2),16, 1./2);
     }
     Date today = currentTime();
     for(int i=0;i<daysInMonth(active.month,active.year);i++) { //current month
@@ -71,7 +71,7 @@ void Calendar::setActive(Date active) {
     }
     for(int i=0;count()<7*8;i++) { //next month
         dates << Date(i, (active.month+1)%12, active.year+(active.month==11), count()%7);
-        *this<< Text(format(Italic)+dec(i+1,2),16,128);
+        *this<< Text(format(Italic)+dec(i+1,2),16, 1./2);
     }
     Selection::setActive(todayIndex);
 }

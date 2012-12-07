@@ -2,6 +2,15 @@
 /// file matrix.h 3x3 and 4x4 homogeneous transformation matrices
 #include "vector.h"
 
+// Trigonometric operations
+const double PI = 3.14159265358979323846;
+inline double cos(double t) { return __builtin_cos(t); }
+inline double sin(double t) { return __builtin_sin(t); }
+inline float cos(float t) { return __builtin_cosf(t); }
+inline float sin(float t) { return __builtin_sinf(t); }
+inline float acos(float t) { return __builtin_acosf(t); }
+inline float asin(float t) { return __builtin_asinf(t); }
+
 struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
 struct mat3 {

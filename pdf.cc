@@ -469,7 +469,7 @@ void PDF::render(int2 position, int2 size) {
         if(pos.y>=currentClip.max.y) break;
         c.font->font.setSize(scale*c.size);
         const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
-        if(glyph.image) substract(pos+glyph.offset,glyph.image,colors.value(i,black));
+        if(glyph.image) blit(pos+glyph.offset,glyph.image,colors.value(i,black));
         i++;
     }
 

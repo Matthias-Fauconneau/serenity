@@ -395,12 +395,13 @@ spurious: ;
     int startIndex=-2;
     for(vec2 pos : repeats) {
         uint i=0; for(;i<staffs.size()-1 && pos.y>staffs[i];i++) {}
+        if(!notes[i].values) continue;
         int index=notes[i].values[0].values[0].scoreIndex-1;
         for(int x : notes[i].keys) { if(x>pos.x) break; index=notes[i][x].values[0].scoreIndex; }
         if(startIndex < -1) {
             startIndex=index; debug[pos]=dec(startIndex)+"{"_;
         } else {
-            assert(index>startIndex);
+            if(index>startIndex) continue;
             { array<vec2> cat; cat<<positions.slice(0,index+1)<<positions.slice(startIndex+1); positions = move(cat); }
             { array<int> cat; cat<<indices.slice(0,index+1)<<indices.slice(startIndex+1); indices = move(cat); }
             startIndex=-2;
