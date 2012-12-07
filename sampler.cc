@@ -100,22 +100,53 @@ void Sampler::open(const ref<byte>& path) {
     array<byte> reverbFile = readFile("reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
     assert(reverbMedia.rate == 48000);
-    reverbSize = reverbMedia.duration/periodSize*periodSize;
-    reverbFilter = allocate64<float2>(reverbSize); clear(reverbFilter,reverbSize);
+    reverbSize = reverbMedia.duration/8; log(reverbSize);
+    N = reverbSize+periodSize;
+    float* stereoFilter = allocate64<float>(2*N); clear(stereoFilter,2*N);
     for(uint i=0;i<reverbSize;) {
-        uint read = reverbMedia.read(reverbFilter+i,reverbSize-i);
+        uint read = reverbMedia.read((float2*)stereoFilter+i,reverbSize-i);
         i+=read;
     }
-    float2 sum={0,0}; for(uint i: range(reverbSize)) sum += reverbFilter[i]*reverbFilter[i];
-    float scale = 0x1p5f/(sqrt(extract2(sum,0))+sqrt(extract2(sum,1))/2);
-    float2 scale2 = {scale,scale}; //8 - 3 = 24bit->32bit - 8 notes
-    for(uint i: range((reverbSize+1)/2)) { //normalize and reverse
-        float2& a=reverbFilter[i];
-        float2& b=reverbFilter[reverbSize-1-i] ;
-        float2 t = a; a=scale2*b; b=scale2*t;
+
+    // Computes normalization
+    float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
+    const float scale = 0x1p5f/sqrt(sum); //8 (24bit->32bit) - 3 (head room)
+
+    // Reverses, scales and deinterleaves filter
+    float* filter[2];
+    for(int c=0;c<2;c++) filter[c] = allocate64<float>(N), clear(filter[c],N);
+    for(uint i: range(reverbSize)) {
+        for(int c=0;c<2;c++) filter[c][N-1-i] = scale*((float*)stereoFilter)[2*i+c];
     }
-    reverbBuffer = allocate64<float2>(reverbSize+periodSize); clear(reverbBuffer,reverbSize+periodSize);
-    reverbIndex = periodSize;
+
+    //DEBUG
+    for(int c=0;c<2;c++) {
+        clear(filter[c],N);
+        filter[c][N-1] = 1;
+        //filter[c][0] = 1;
+    }
+
+    // Transform reverb filter to frequency domain
+    for(int c=0;c<2;c++) {
+        reverbFilter[c] = allocate64<float>(N); clear(reverbFilter[c],N);
+        fftwf_plan p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
+        //{string s; for(uint i: range(N)) s<<str(filter[c][i])<<'\t'; log("f",s);}
+        fftwf_execute(p);
+        //{string s; for(uint i: range(N)) s<<str(reverbFilter[c][i])<<'\t'; log("F",s);}
+        fftwf_destroy_plan(p);
+        unallocate(filter[c],N); // release time domain filter
+    }
+
+    // Allocates reverb buffer and temporary buffers
+    buffer = allocate64<float>(periodSize*2);
+    input = allocate64<float>(N);
+    for(int c=0;c<2;c++) {
+        reverbBuffer[c] = allocate64<float>(N), clear(reverbBuffer[c],N);
+        forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c], input, FFTW_R2HC, FFTW_ESTIMATE);
+    }
+    product = allocate64<float>(N);
+    backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, FFTW_ESTIMATE);
+    //reverbIndex = periodSize; //TODO: ring buffer
 }
 
 /// Input events (realtime thread)
@@ -244,53 +275,125 @@ void Note::read(float4* out, uint size) {
 bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio thread
     {Locker lock(noteReadLock);
         if(size!=periodSize) error(size,periodSize);
+        if(reverbSize%8) error("reverbSize",reverbSize);
 
-        // Targets reverb buffer
-        float8* buffer = (float8*)&reverbBuffer[reverbIndex];
-
-        // Clears buffer
-        clear(buffer, periodSize/4);
+        // Setups mixing buffer
+        clear(buffer, periodSize*2);
         // Mixes notes which don't need any resampling
-        for(Note& note: notes[1]) note.read((float4*)buffer, periodSize/2); //FIXME
+        for(Note& note: notes[1]) note.read((float4*)buffer, periodSize/2);
         // Mixes pitch shifting layers
         for(int i=0;i<2;i++) {
             uint inSize=align(2,resampler[i].need(periodSize));
             float4* layer = allocate64<float4>(inSize); clear(layer, inSize/2);
             for(Note& note: notes[i*2]) note.read(layer, inSize/2);
-            resampler[i].filter<true>((float*)layer, inSize, (float*)buffer, periodSize);
+            resampler[i].filter<true>((float*)layer, inSize, buffer, periodSize);
             unallocate(layer,inSize/2);
         }
 
 #if 1
-        // Reverb
-        if(reverbIndex==reverbSize) { // Wrap buffer with periodSize overlap
-            copy(reverbBuffer,reverbBuffer+reverbIndex,periodSize);
-            reverbIndex=0;
+        // Applies convolution reverb
+        //TODO if(reverbIndex==reverbSize) reverbIndex=0; reverbIndex += periodSize; // Wrap buffer with periodSize overlap
+
+        // Deinterleaves mixed signal into reverb buffer
+        for(uint i: range(periodSize)) {
+            for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = buffer[2*i+c]; //TODO: ring buffer (reverbIndex)
         }
-        reverbIndex+=periodSize;
-        // Convolves frame (32 samples) * filter (24000 taps) //TODO: fourier convolution
-        float8 sum[periodSize/4] = {}; //Keeps whole frame (32 samples) in registers
-        {
-            float2* filter = reverbFilter; float2* signal = reverbBuffer+reverbIndex-periodSize;
-            for(uint t: range(reverbSize-reverbIndex+periodSize)) { // Convolves kernel with oldest part
-                float8 kernel = (float8)_mm256_broadcast_sd((double*)(filter+t)); // Broadcasts stereo filter coefficient
-                float2* source = signal+t;
-                for(uint i: range(periodSize/4)) sum[i] += kernel * load8(source+4*i); // Accumulates all shifts over frame
+
+        for(int c=0;c<2;c++) {
+            // Transforms reverb buffer to frequency-domain ( reverbBuffer -> input )
+            fftwf_execute(forward[c]);
+
+            /*{float8* reverb = (float8*)reverbBuffer[c];
+                for(uint i: range(reverbSize/8)) reverb[i] = reverb[i+periodSize/8]; // Shifts buffer for next frame (FIXME: ring buffer)
+            }*/
+            for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
+
+            // Complex multiplies input (reverb buffer) with kernel (reverb filter)
+#if 1
+            clear(product,N); //FIXME
+            float* x = input;
+            float* y = reverbFilter[c];
+            product[0] = x[0] * y[0];
+            for(uint j = 1; j < N/2; j++) {
+                float a = x[j];
+                float b = x[N - j];
+                float c = y[j];
+                float d = y[N - j];
+                if(product[j] != 0) error(j,product[j]);
+                if(product[N-j] != 0) error(j,product[N-j]);
+                product[j] = a*c-b*d; // Re
+                product[N - j] = a*d+b*c; // Im
+                //assert(!__builtin_isnan(product[j])); assert(!__builtin_isnan(product[N - j]));
             }
-        }
-        {
-            float2* filter = reverbFilter+reverbSize-reverbIndex; float2* signal = reverbBuffer-periodSize;
-            for(uint t: range(periodSize,reverbIndex)) { // Convolves kernel with newest part
-                float8 kernel = (float8)_mm256_broadcast_sd((double*)(filter+t)); // Broadcasts stereo filter coefficient
-                float2* source = signal+t;
-                for(uint i: range(periodSize/4)) sum[i] += kernel * load8(source+4*i); // Accumulates all shifts over frame
-            }
-        }
-        for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(sum[i]);
+            product[N/2] = x[N/2] * y[N/2];
+#elif 1
+            {
+                float* original[2] = {input, reverbFilter[c]};
+                float* buffer[2];
+                for(int i=0;i<2;i++) {
+                    buffer[i] = allocate64<float>(N);
+                    float* orig = original[i];
+                    float* out = buffer[i];
+                    out[0] = orig[0];
+                    out[1] = orig[N/2];
+                    for(uint t=1; t<N/2; t++) {
+                        out[2*t+0] = orig[t];
+                        out[2*t+1] = orig[N-t];
+                    }
+                }
+                float* x = buffer[0];
+                float* y = buffer[1];
+                clear(product,N); //FIXME
+                float* out = product;
+                out[0] = x[0] * y[0];
+                //out[1] = x[1] * y[1];
+                for(uint j = 1; j < N/2; j++) {
+                    float a = x[j*2];
+                    float b = x[j*2+1];
+                    float c = y[j*2];
+                    float d = y[j*2+1];
+#if 0
+                    out[j*2] += a*c-b*d; // Re
+                    out[j*2+1] += a*d+b*c; // Im
 #else
-        float8 scale = {0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f,0x1p8f};
-        for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(buffer[i]*scale);
+                    out[j] += a*c-b*d; // Re
+                    out[N-j] += a*d+b*c; // Im
 #endif
+                }
+                out[N/2] = x[1] * y[1]; // r(N/2)
+                for(int i=0;i<2;i++) unallocate(buffer[i],N);
+            }
+#else
+            for(uint i: range(N)) product[i] = input[i];
+#endif
+            /*for(uint i: range(N)) {
+                if(product[i] != input[i]) {
+                    string s1; for(uint i: range(periodSize)) s1<<str(product[i])<<'\t'; log("S1",s1);
+                    string s2; for(uint i: range(periodSize)) s2<<str(input[i])<<'\t'; log("S2",s2);
+                    string s3; for(uint i: range(periodSize)) s3<<str(product[i]/input[i])<<'\t'; log("S3",s3);
+                    error(i,product[i],input[i],product[i]/input[i]);
+                }
+            }*/
+
+            // Transforms product back to time-domain ( product -> input )
+            fftwf_execute(backward);
+
+            for(uint i: range(periodSize)) { // Normalizes and writes samples back in output buffer
+                float a=buffer[2*i+c], b=(1.f/N)*input[reverbSize-1+i];
+                if(abs(a-b)>2) {
+                    string s1; for(uint i: range(periodSize)) s1<<str(buffer[2*i+c])<<'\t'; log("S1",s1);
+                    string s2; for(uint i: range(periodSize)) s2<<str((1.f/N)*input[reverbSize-1+i])<<'\t'; log("S2",s2);
+                    string s3; for(uint i: range(periodSize)) s3<<str((((1.f/N)*input[reverbSize-1+i]))/buffer[2*i+c])<<'\t'; log("S3",s3);
+                    error(c,i,a,b);
+                }
+                buffer[2*i+c] = (1.f/N)*input[reverbSize-1+i]; //TODO: ring buffer (reverbIndex)
+            }
+        }
+#endif
+        // Scales to 32bit
+        for(uint i: range(periodSize*2)) buffer[i]*=0x1p8f;
+        // Converts mixing buffer to signed 32bit output
+        for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(((float8*)buffer)[i]);
 
         swPointer += periodSize;
     }
@@ -309,8 +412,15 @@ void Sampler::recordWAV(const ref<byte>& path) {
     record.write(raw(header));
 }
 Sampler::~Sampler() {
-    if(reverbFilter) unallocate(reverbFilter,reverbSize+4);
-    if(reverbBuffer) unallocate(reverbBuffer,reverbSize+4);
+    for(uint c=0;c<2;c++) {
+        if(reverbFilter[c]) unallocate(reverbFilter[c],N);
+        if(reverbBuffer[c]) unallocate(reverbBuffer[c],N);
+        fftwf_destroy_plan(forward[c]);
+    }
+    fftwf_destroy_plan(backward);
+    unallocate(input,N);
+    unallocate(product,N);
+    unallocate(buffer,periodSize/4);
     if(!record) return;
     error("Recording unsupported");
     //record.seek(4); write(record,raw<int32>(36+time));

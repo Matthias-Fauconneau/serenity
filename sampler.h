@@ -5,6 +5,7 @@
 #include "resample.h"
 #include "flac.h"
 #include "process.h"
+#include <fftw3.h>
 
 typedef float float4 __attribute((vector_size(16)));
 struct Note : FLAC {
@@ -47,13 +48,24 @@ struct Sampler : Poll {
     /// Callback to decode samples
     void event() override;
 
-    /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer (TODO: reverb)
+    /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
     bool read(ptr& swPointer, int32* output, uint size);
     Resampler resampler[2];
-    float2* reverbFilter=0;
-    float2* reverbBuffer=0;
-    uint reverbIndex=0, reverbSize=0; //ring buffer index and filter size
-    static constexpr uint periodSize = 32;
+    static constexpr uint periodSize = 128;
+    float* buffer; // Interleaved mixing buffer
+
+    /// Convolution reverb
+    uint reverbSize=0; // Reverb filter size
+    uint N=0; // reverbSize+periodSize
+    float* reverbFilter[2]={}; // Convolution reverb filter in frequency-domain
+    float* reverbBuffer[2]={}; // Mixer output in time-domain
+
+    //uint reverbIndex=0; //ring buffer index TODO
+    float* input=0; // Buffer to hold transform of reverbBuffer
+    float* product=0; // Buffer to hold multiplication of signal and reverbFilter
+
+    fftwf_plan forward[2]; // FFTW plan to forward transform reverb buffer
+    fftwf_plan backward; // FFTW plan to backward transform product
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
