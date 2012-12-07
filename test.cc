@@ -1,3 +1,181 @@
+#if 1
+#include "window.h"
+#include "display.h"
+#include "time.h"
+#include "flac.h"
+#include <fftw3.h>
+
+struct SignalTimer : Timer {
+    signal<> timeout;
+    void event() override { timeout(); }
+};
+
+struct Plot : Widget {
+    Window window __(this,int2(1050,3*1050/2),"Plot"_);
+
+    static constexpr uint periodSize = 128;
+    float* input; // Input signal
+    float* output; // Output signal
+
+    /// Convolution reverb
+    uint reverbSize=0; // Reverb filter size
+    uint N=0; // reverbSize+periodSize
+    float* filter[2];
+    float* reverbFilter[2]={}; // Convolution reverb filter in frequency-domain
+    float* reverbBuffer[2]={}; // Mixer output in time-domain
+
+    float* inputBuffer=0; // Buffer to hold transform of reverbBuffer
+    float* product=0; // Buffer to hold multiplication of signal and reverbFilter
+    float* outputBuffer=0; // Buffer to hold transform of reverbBuffer
+
+    fftwf_plan forward[2]; // FFTW plan to forward transform reverb buffer
+    fftwf_plan backward; // FFTW plan to backward transform product
+
+    SignalTimer animation;
+
+    Plot(){
+        window.localShortcut(Escape).connect(&exit);
+        window.backgroundCenter=window.backgroundColor=0xFF;
+
+        /// Loads filter
+        array<byte> reverbFile = readFile("/Samples/reverb.flac"_);
+        FLAC reverbMedia(reverbFile);
+        assert(reverbMedia.rate == 48000);
+        reverbSize = reverbMedia.duration;
+        N = reverbSize+periodSize;
+        float* stereoFilter = allocate64<float>(2*reverbSize); clear(stereoFilter,2*reverbSize);
+        for(uint i=0;i<reverbSize;) {
+            uint read = reverbMedia.read((float2*)(stereoFilter+2*i),min(1u<<16,reverbSize-i));
+            i+=read;
+        }
+
+        // Computes normalization
+        float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
+        const float scale = 1.f/sqrt(sum); //8 (24bit->32bit) - 3 (head room)
+
+        // Reverses, scales and deinterleaves filter
+
+        for(int c=0;c<2;c++) filter[c] = allocate64<float>(N), clear(filter[c],N);
+        for(uint i: range(reverbSize)) {
+            for(int c=0;c<2;c++) assert(filter[c][i]==0);
+            //for(int c=0;c<2;c++) filter[c][i] = scale*stereoFilter[2*i+c];
+        }
+#if 0
+        //DEBUG
+        /*for(int c=0;c<2;c++) {
+            clear(filter[c],N);
+            //filter[c][N-1] = 1;
+            filter[c][periodSize] = 1;
+        }*/
+
+        /// Transforms filter
+        fftwf_init_threads();
+        fftwf_plan_with_nthreads(4);
+        fftwf_import_wisdom_from_filename("/Samples/wisdom");
+
+        // Transform reverb filter to frequency domain
+        for(int c=0;c<2;c++) {
+            reverbFilter[c] = allocate64<float>(N); clear(reverbFilter[c],N);
+            fftwf_plan p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
+            fftwf_execute(p);
+            fftwf_destroy_plan(p);
+        }
+
+        // Allocates reverb buffer and temporary buffers
+        input = allocate64<float>(periodSize*2);
+        output = allocate64<float>(periodSize*2);
+        inputBuffer = allocate64<float>(N);
+        for(int c=0;c<2;c++) {
+            reverbBuffer[c] = allocate64<float>(N), clear(reverbBuffer[c],N);
+            forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c], inputBuffer, FFTW_R2HC, FFTW_ESTIMATE);
+        }
+        product = allocate64<float>(N);
+        outputBuffer = allocate64<float>(N);
+        backward = fftwf_plan_r2r_1d(N, product, outputBuffer, FFTW_HC2R, FFTW_ESTIMATE);
+
+        fftwf_export_wisdom_to_filename("/Samples/wisdom");
+        animation.timeout.connect(&window,&Window::render);
+#endif
+    }
+
+
+    void plot(int2 position, int2 size, float* Y, uint N, uint stride=1) {
+        float min=-1, max=1;
+        for(uint x=0;x<N;x++) {
+            float y = Y[stride*x];
+            min=::min(min,y);
+            max=::max(max,y);
+        }
+        for(uint x=0;x<N-1;x++)
+            line( vec2(position)+vec2((float)(x-0.5)*size.x/N,  size.y-size.y*(Y[stride*x]-min)/(max-min)),
+                    vec2(position)+vec2((float)(x+0.5)*size.x/N, size.y-size.y*(Y[stride*(x+1)]-min)/(max-min)));
+    }
+
+    float t=0;
+    void render(int2 position, int2 size) {
+#if 0
+        clear(input, periodSize*2);
+        for(uint i: range(periodSize)) {
+            /*input[2*i+0]=sin(2*PI*t)*i/periodSize;
+            input[2*i+1]=sin(2*PI*t)*i/periodSize;*/
+            input[2*i+0]=sin(2*PI*t)*sin(2*PI*i/periodSize);
+            input[2*i+1]=sin(2*PI*t)*sin(2*PI*i/periodSize);
+        }
+
+        // Deinterleaves mixed signal into reverb buffer
+        for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = input[2*i+c];
+
+        for(int c=0;c<1;c++) {
+            // Transforms reverb buffer to frequency-domain ( reverbBuffer -> inputBuffer )
+            fftwf_execute(forward[c]);
+
+            for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
+
+            // Complex multiplies input (reverb buffer) with kernel (reverb filter)
+            float* x = inputBuffer;
+            float* y = reverbFilter[c];
+            product[0] = x[0] * y[0];
+            for(uint j = 1; j < N/2; j++) {
+                float a = x[j];
+                float b = x[N - j];
+                float c = y[j];
+                float d = y[N - j];
+                product[j] = a*c-b*d;
+                product[N - j] = a*d+b*c;
+            }
+            product[N/2] = x[N/2] * y[N/2];
+
+            // Transforms product back to time-domain ( product -> outputBuffer )
+            fftwf_execute(backward);
+
+            for(uint i: range(N))  outputBuffer[i]/=N; // Normalizes
+            for(uint i: range(periodSize)) { //Writes samples back in output buffer
+                output[2*i+c] = outputBuffer[N-periodSize-1+i];
+                //output[2*i+c] = (1.f/N)*outputBuffer[reverbSize/2-1+i];
+            }
+        }
+#endif
+
+        //int2 plotSize = int2(size.x/2,size.y/3);
+        int2 plotSize = int2(size.x,size.y);
+        // Filter / Time - Frequency
+        plot(position+int2(0,0)*plotSize,plotSize,filter[0],N,2);
+        /*plot(position+int2(1,0)*plotSize,plotSize,reverbFilter[0],N,2);
+        // Signal / Input - Output
+        //plot(position+int2(0,0)*plotSize,plotSize,input,periodSize,2); plot(position+int2(1,0)*plotSize,plotSize,output,periodSize,2);
+        // Buffer / Time - Frequency
+        plot(position+int2(0,1)*plotSize,plotSize,reverbBuffer[0],N); plot(position+int2(1,1)*plotSize,plotSize,inputBuffer,N);
+        // Product / Time - Frequency
+        plot(position+int2(1,2)*plotSize,plotSize,outputBuffer,N); plot(position+int2(0,2)*plotSize,plotSize,product,N);*/
+
+        t+=1./100;
+        //animation.setAbsolute((realTime()+500)/1000,(realTime()+500)%1000*1000000);
+        //window.render();
+    }
+} test;
+
+#endif
+
 #if 0
 #include "window.h"
 #include "text.h"
@@ -9,45 +187,6 @@ struct TextInputTest {
         window.localShortcut(Escape).connect(&exit);
     }
 } test;
-#endif
-
-#if 0
-#include "window.h"
-#include "display.h"
-#include "text.h"
-
-inline float acos(float t) { return __builtin_acosf(t); }
-inline float sin(float t) { return __builtin_sinf(t); }
-
-/// Directional light with angular diameter
-inline float angularLight(float dotNL, float angularDiameter) {
-    float t = ::acos(dotNL); // angle between surface normal and light principal direction
-    float a = min<float>(PI/2,max<float>(-PI/2,t-angularDiameter/2)); // lower bound of the light integral
-    float b = min<float>(PI/2,max<float>(-PI/2,t+angularDiameter/2)); // upper bound of the light integral
-    float R = sin(b) - sin(a); // evaluate integral on [a,b] of cos(t-dt)dt (lambert reflectance model) //TODO: Oren-Nayar
-    R /= 2*sin(angularDiameter/2); // normalize
-    return R;
-}
-
-struct Plot : Widget {
-    Window window __(this,int2(0,1050),"Plot"_);
-    Plot(){ window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF; }
-    void render(int2, int2 size) {
-        float Y[size.x+1]; float min=1, max=-1;
-        for(int n=0;n<=size.x;n++) {
-            float x = ((n-0.5)/size.x)*2-1;
-            float y = angularLight(x,PI/2);
-            Y[n]=y;
-            min=::min(min,y);
-            max=::max(max,y);
-        }
-        for(int x=0;x<size.x;x++) line(x-0.5,size.y-size.y*(Y[x]-min)/(max-min),x+0.5,size.y-size.y*(Y[x+1]-min)/(max-min));
-        for(int y=0;y<size.y;y+=100) for(int x=0;x<size.x;x+=100) {
-            Text(str(((x-0.5)/size.x)*2-1,min+(max-min)*y/size.y)).render(int2(x,size.y-y));
-        }
-    }
-} test;
-
 #endif
 
 #if 0
@@ -279,7 +418,7 @@ struct ImageTest : ImageView {
 } test;
 #endif
 
-#if 1
+#if 0
 #include "window.h"
 #include "html.h"
 struct HTMLTest {

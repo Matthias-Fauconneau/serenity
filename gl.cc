@@ -266,6 +266,7 @@ void GLFrameBuffer::bind(bool clear, vec4 color) {
       glClearColor(color.x,color.y,color.z,color.w);
       glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
   }
+  glDisable(GL_FRAMEBUFFER_SRGB);
 }
 void GLFrameBuffer::bindWindow(int2 position, int2 size, bool clear, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -275,6 +276,7 @@ void GLFrameBuffer::bindWindow(int2 position, int2 size, bool clear, vec4 color)
       glClearColor(color.x,color.y,color.z,color.w);
       glClear(GL_COLOR_BUFFER_BIT);
   }
+  glEnable(GL_FRAMEBUFFER_SRGB);
 }
 void GLFrameBuffer::blit(GLTexture& color) {
     uint target;

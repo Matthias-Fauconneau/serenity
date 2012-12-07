@@ -13,7 +13,6 @@
 #define MESA_EGL_NO_X11_HEADERS
 #include  <EGL/egl.h>
 #else
-//#include <GL/glx.h> conflicts with our X protocol definitions
 extern "C" {
 void* XOpenDisplay(const char*);
 int XCloseDisplay(void*);
@@ -24,6 +23,7 @@ bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
 void glXSwapBuffers(void* dpy, uint drawable);
 }
 #define GLX_RGBA 4
+#define GLX_FRAMEBUFFER_SRGB_CAPABLE 0x20B2
 #endif
 
 // Globals
@@ -116,7 +116,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
 #else
     if(!display) display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
     if(!context) {
-        int attributes[] = {GLX_RGBA,0};
+        int attributes[] = {GLX_RGBA,GLX_FRAMEBUFFER_SRGB_CAPABLE,0};
         void* visual = glXChooseVisual(display,0,attributes); assert(visual);
         context = glXCreateContext(display,visual,0,1); assert(context);
     }

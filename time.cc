@@ -167,4 +167,4 @@ Date parse(TextData& s) {
 
 Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){registerPoll();}
 Timer::~Timer(){ close(fd); }
-void Timer::setAbsolute(uint date) { static timespec time[2]; time[1].tv_sec=date; timerfd_settime(fd,1,(const itimerspec*)time,0); }
+void Timer::setAbsolute(long sec, long nsec) { timespec time[2]={{0,0},{sec,nsec}}; timerfd_settime(fd,1,(const itimerspec*)time,0); }

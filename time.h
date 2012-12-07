@@ -59,7 +59,7 @@ inline Date parse(const ref<byte>& s) { TextData t(s); return parse(t); }
 struct Timer : Poll {
     Timer();
     ~Timer();
-    void setAbsolute(uint date);
+    void setAbsolute(long sec, long nsec=0);
     virtual void event() =0;
 };
 
