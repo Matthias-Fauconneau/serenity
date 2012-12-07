@@ -5,22 +5,18 @@
 #include "flac.h"
 #include <fftw3.h>
 
-struct SignalTimer : Timer {
-    signal<> timeout;
-    void event() override { timeout(); }
-};
-
 struct Plot : Widget {
     Window window __(this,int2(1050,3*1050/2),"Plot"_);
 
     static constexpr uint periodSize = 128;
+    uint reverbSize=0; // Reverb filter size
+    uint N=0; // reverbSize+periodSize
+
+    float* filter[2];
+
     float* input; // Input signal
     float* output; // Output signal
 
-    /// Convolution reverb
-    uint reverbSize=0; // Reverb filter size
-    uint N=0; // reverbSize+periodSize
-    float* filter[2];
     float* reverbFilter[2]={}; // Convolution reverb filter in frequency-domain
     float* reverbBuffer[2]={}; // Mixer output in time-domain
 
@@ -31,7 +27,8 @@ struct Plot : Widget {
     fftwf_plan forward[2]; // FFTW plan to forward transform reverb buffer
     fftwf_plan backward; // FFTW plan to backward transform product
 
-    SignalTimer animation;
+    uint signalSize=0;
+    float* signal[2];
 
     Plot(){
         window.localShortcut(Escape).connect(&exit);
@@ -43,30 +40,22 @@ struct Plot : Widget {
         assert(reverbMedia.rate == 48000);
         reverbSize = reverbMedia.duration;
         N = reverbSize+periodSize;
-        float* stereoFilter = allocate64<float>(2*reverbSize); clear(stereoFilter,2*reverbSize);
+        float* stereoFilter = allocate64<float>(2*reverbSize);
         for(uint i=0;i<reverbSize;) {
             uint read = reverbMedia.read((float2*)(stereoFilter+2*i),min(1u<<16,reverbSize-i));
             i+=read;
         }
 
-        // Computes normalization
-        float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
-        const float scale = 1.f/sqrt(sum); //8 (24bit->32bit) - 3 (head room)
+        {
+            // Computes normalization
+            float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
+            const float scale = 1.f/sqrt(sum); //8 (24bit->32bit) - 3 (head room)
 
-        // Reverses, scales and deinterleaves filter
-
-        for(int c=0;c<2;c++) filter[c] = allocate64<float>(N), clear(filter[c],N);
-        for(uint i: range(reverbSize)) {
-            for(int c=0;c<2;c++) assert(filter[c][i]==0);
-            //for(int c=0;c<2;c++) filter[c][i] = scale*stereoFilter[2*i+c];
+            // Reverses, scales and deinterleaves filter
+            for(int c=0;c<2;c++) filter[c] = allocate64<float>(N), clear(filter[c],N);
+            for(uint i: range(reverbSize)) for(int c=0;c<2;c++) filter[c][N-1-i] = scale*stereoFilter[2*i+c];
+            unallocate(stereoFilter,reverbSize);
         }
-#if 0
-        //DEBUG
-        /*for(int c=0;c<2;c++) {
-            clear(filter[c],N);
-            //filter[c][N-1] = 1;
-            filter[c][periodSize] = 1;
-        }*/
 
         /// Transforms filter
         fftwf_init_threads();
@@ -94,10 +83,29 @@ struct Plot : Widget {
         backward = fftwf_plan_r2r_1d(N, product, outputBuffer, FFTW_HC2R, FFTW_ESTIMATE);
 
         fftwf_export_wisdom_to_filename("/Samples/wisdom");
-        animation.timeout.connect(&window,&Window::render);
-#endif
-    }
 
+        /// Loads signal
+        array<byte> signalFile = readFile("/Samples/Salamander/A4v8.flac"_);
+        FLAC signalMedia(signalFile);
+        assert(signalMedia.rate == 48000);
+        signalSize = min(signalMedia.duration,reverbSize);
+        float* stereoSignal = allocate64<float>(2*signalSize); clear(stereoSignal,2*signalSize);
+        for(uint i=0;i<24000;) {
+            uint read = signalMedia.read((float2*)(stereoSignal+2*i),min(1u<<16,24000-i));
+            i+=read;
+        }
+
+        {
+            // Computes normalization
+            float sum=0; for(uint i: range(2*signalSize)) sum += stereoSignal[i]*stereoSignal[i];
+            const float scale = 1/sqrt(sum/signalSize); //8 (24bit->32bit) - 3 (head room)
+
+            // Reverses, scales and deinterleaves filter
+            for(int c=0;c<2;c++) signal[c] = allocate64<float>(signalSize), clear(signal[c],signalSize);
+            for(uint i: range(signalSize)) for(int c=0;c<2;c++) signal[c][i] = scale*stereoSignal[2*i+c];
+            unallocate(stereoSignal,signalSize);
+        }
+    }
 
     void plot(int2 position, int2 size, float* Y, uint N, uint stride=1) {
         float min=-1, max=1;
@@ -106,20 +114,28 @@ struct Plot : Widget {
             min=::min(min,y);
             max=::max(max,y);
         }
-        for(uint x=0;x<N-1;x++)
-            line( vec2(position)+vec2((float)(x-0.5)*size.x/N,  size.y-size.y*(Y[stride*x]-min)/(max-min)),
-                    vec2(position)+vec2((float)(x+0.5)*size.x/N, size.y-size.y*(Y[stride*(x+1)]-min)/(max-min)));
+        GLBuffer buffer(Line);
+        buffer.allocate(0,2*(N-1),sizeof(vec2));
+        vec2* vertices = (vec2*)buffer.mapVertexBuffer();
+        for(uint x=0;x<N-1;x++) {
+            vertices[2*x+0] = project(vec2(position)+vec2((float)(x-0.5)*size.x/N,  size.y-size.y*(Y[stride*x]-min)/(max-min)));
+            vertices[2*x+1] = project(vec2(position)+vec2((float)(x+0.5)*size.x/N, size.y-size.y*(Y[stride*(x+1)]-min)/(max-min)));
+        }
+        buffer.unmapVertexBuffer();
+        fillShader().bind();
+        fillShader()["color"] = vec4(1,1,1,1);
+        buffer.bindAttribute(fillShader(),"position",2);
+        buffer.draw();
     }
 
-    float t=0;
+    uint t=0;
     void render(int2 position, int2 size) {
-#if 0
         clear(input, periodSize*2);
         for(uint i: range(periodSize)) {
-            /*input[2*i+0]=sin(2*PI*t)*i/periodSize;
-            input[2*i+1]=sin(2*PI*t)*i/periodSize;*/
-            input[2*i+0]=sin(2*PI*t)*sin(2*PI*i/periodSize);
-            input[2*i+1]=sin(2*PI*t)*sin(2*PI*i/periodSize);
+            input[2*i+0]=signal[0][t];
+            input[2*i+1]=signal[1][t];
+            t++;
+            if(t==signalSize) t=0;
         }
 
         // Deinterleaves mixed signal into reverb buffer
@@ -148,29 +164,24 @@ struct Plot : Widget {
             // Transforms product back to time-domain ( product -> outputBuffer )
             fftwf_execute(backward);
 
-            for(uint i: range(N))  outputBuffer[i]/=N; // Normalizes
+            for(uint i: range(N)) outputBuffer[i]/=N; // Normalizes
             for(uint i: range(periodSize)) { //Writes samples back in output buffer
-                output[2*i+c] = outputBuffer[N-periodSize-1+i];
+                output[2*i+c] = outputBuffer[/*N-periodSize-1+*/periodSize+i];
                 //output[2*i+c] = (1.f/N)*outputBuffer[reverbSize/2-1+i];
             }
         }
-#endif
 
-        //int2 plotSize = int2(size.x/2,size.y/3);
-        int2 plotSize = int2(size.x,size.y);
+        int2 plotSize = int2(size.x/2,size.y/3);
         // Filter / Time - Frequency
-        plot(position+int2(0,0)*plotSize,plotSize,filter[0],N,2);
-        /*plot(position+int2(1,0)*plotSize,plotSize,reverbFilter[0],N,2);
+        //plot(position+int2(0,0)*plotSize,plotSize,filter[0],N); plot(position+int2(1,0)*plotSize,plotSize,reverbFilter[0],N);
         // Signal / Input - Output
-        //plot(position+int2(0,0)*plotSize,plotSize,input,periodSize,2); plot(position+int2(1,0)*plotSize,plotSize,output,periodSize,2);
+        plot(position+int2(0,0)*plotSize,plotSize,input,periodSize,2); plot(position+int2(1,0)*plotSize,plotSize,output,periodSize,2);
         // Buffer / Time - Frequency
         plot(position+int2(0,1)*plotSize,plotSize,reverbBuffer[0],N); plot(position+int2(1,1)*plotSize,plotSize,inputBuffer,N);
         // Product / Time - Frequency
-        plot(position+int2(1,2)*plotSize,plotSize,outputBuffer,N); plot(position+int2(0,2)*plotSize,plotSize,product,N);*/
+        plot(position+int2(0,2)*plotSize,plotSize,outputBuffer,N); plot(position+int2(1,2)*plotSize,plotSize,product,N);
 
-        t+=1./100;
-        //animation.setAbsolute((realTime()+500)/1000,(realTime()+500)%1000*1000000);
-        //window.render();
+        window.render();
     }
 } test;
 

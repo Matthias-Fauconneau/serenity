@@ -37,7 +37,7 @@ struct GLShader {
 };
 
 #define SHADER(name) \
-static GLShader& name ## Shader() { \
+GLShader& name ## Shader() { \
     extern char _binary_## name ##_vert_start[]; \
     extern char _binary_## name ##_vert_end[]; \
     extern char _binary_## name ##_frag_start[]; \
@@ -81,6 +81,7 @@ struct GLBuffer {
     bool primitiveRestart=false;
 };
 
+vec2 project(vec2 p);
 void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord=false);
 void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord=false);
 void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);

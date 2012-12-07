@@ -25,8 +25,10 @@ constexpr vec4 yellow __(0, 1, 1, 1);
 constexpr vec4 red __(0, 0, 1, 1);
 constexpr vec4 magenta __(1, 0, 1, 1);
 
-// Graphics primitives
+// Shaders
+extern GLShader& fillShader();
 
+// Primitives
 /// Fills pixels inside \a rect with \a color
 void fill(Rect rect, vec4 color=black);
 

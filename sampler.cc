@@ -117,8 +117,8 @@ void Sampler::open(const ref<byte>& path) {
     float* filter[2];
     for(int c=0;c<2;c++) filter[c] = allocate64<float>(N), clear(filter[c],N);
     for(uint i: range(reverbSize)) {
-        //for(int c=0;c<2;c++) filter[c][N-1-i] = scale*stereoFilter[2*i+c];
-        for(int c=0;c<2;c++) filter[c][periodSize+i] = scale*stereoFilter[2*i+c];
+        for(int c=0;c<2;c++) filter[c][N-1-i] = scale*stereoFilter[2*i+c];
+        //for(int c=0;c<2;c++) filter[c][periodSize+i] = scale*stereoFilter[2*i+c];
     }
     /*for(uint i: range(reverbSize/2)) {
         //for(int c=0;c<2;c++) filter[c][N-1-i] = scale*stereoFilter[2*i+c];
@@ -336,9 +336,10 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
             fftwf_execute(backward);
 
             for(uint i: range(periodSize)) { // Normalizes and writes samples back in output buffer
-                buffer[2*i+c] = (1.f/N)*input[N-periodSize-1+i]; //TODO: ring buffer (reverbIndex)
-                //buffer[2*i+c] = (1.f/N)*input[N/2-1+i]; //TODO: ring buffer (reverbIndex)
+                //buffer[2*i+c] = (1.f/N)*input[reverbSize-periodSize-1+i]; //TODO: ring buffer (reverbIndex)
+                buffer[2*i+c] = (1.f/N)*input[N/2-periodSize+i]; //TODO: ring buffer (reverbIndex)
                 //buffer[2*i+c] = (1.f/N)*input[reverbSize/2-1+i]; //TODO: ring buffer (reverbIndex)
+                //buffer[2*i+c] = (1.f/N)*input[periodSize+i]; //TODO: ring buffer (reverbIndex)
             }
         }
 

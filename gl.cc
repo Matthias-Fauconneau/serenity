@@ -93,7 +93,7 @@ void GLBuffer::allocate(int indexCount, int vertexCount, int vertexSize) {
     this->vertexSize = vertexSize;
     if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount*vertexSize, 0, GL_STATIC_DRAW );
+    glBufferData(GL_ARRAY_BUFFER, vertexCount*vertexSize, 0, GL_STATIC_DRAW);
     this->indexCount = indexCount;
     if(indexCount) {
         if(!indexBuffer) glGenBuffers(1, &indexBuffer);
@@ -139,6 +139,14 @@ void GLBuffer::draw() {
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
         glEnable(GL_POINT_SPRITE);
     }*/
+    if(primitiveType == Line) {
+        glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glEnable(GL_BLEND);
+        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+        glEnable(GL_LINE_SMOOTH);
+        glLineWidth(2);
+    }
     if (indexBuffer) {
         if(primitiveRestart) {
             glEnable(GL_PRIMITIVE_RESTART);

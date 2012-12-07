@@ -27,6 +27,7 @@ void substract(int2 target, const GLTexture& source, vec4 color) {
 }
 
 void line(vec2 p1, vec2 p2, vec4 color) {
+    glBlend(true, false);
     fillShader()["color"] = vec4(vec3(1)-color.xyz(),1.f);
     glDrawLine(fillShader(), p1, p2);
 }
