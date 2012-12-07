@@ -2,9 +2,6 @@
 /// \file x.h X11 protocol
 #include "core.h"
 
-struct sockaddr_un { uint16 family=1; char path[108]={}; };
-enum {IPC_NEW=0, IPC_RMID=0, IPC_CREAT=01000};
-
 #define fixed(T) _packed ; static_assert(sizeof(T)==31,"")
 
 enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, CursorMask=1<<14 };

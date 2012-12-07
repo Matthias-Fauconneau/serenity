@@ -1,3 +1,5 @@
+Music: Violin
+
 CG:
  Soft shadows
   2003 - Assarsson - Soft shadow volumes (+accurate, +simple, -fillrate bottleneck on detailled geometry)
@@ -12,8 +14,6 @@ CG:
  Textures: bark,leafs,twigs
  Scene: sky, terrain, grass, plants, forest...
 
-Music: violin, DRC
-Desktop: fix links, desktop calculator
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
 Standards: deflate, jpeg, mp3, vorbis, truetype, ssl

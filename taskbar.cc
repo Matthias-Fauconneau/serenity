@@ -3,7 +3,6 @@
 #include "file.h"
 #include "time.h"
 #include "linux.h"
-#include "x.h"
 #include "interface.h"
 #include "window.h"
 #include "calendar.h"
@@ -23,7 +22,7 @@ struct Taskbar : Socket, Poll {
         Task(Taskbar* parent, uint id, Image&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
         bool mouseEvent(int2, int2, Event event, Button button) override {
             if(event==Press && button==LeftButton) {
-                if(parent->tasks.index!=uint(-1) && &parent->tasks.active()==this) {SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=display.x; r.h=display.y-16; parent->send(raw(r));}
+                if(parent->tasks.index!=uint(-1) && &parent->tasks.active()==this) {SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=displaySize.x; r.h=displaySize.y-16; parent->send(raw(r));}
                 parent->hasFocus=true;
             }
             return false;
@@ -48,8 +47,8 @@ struct Taskbar : Socket, Poll {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
-        sockaddr_un addr; copy(addr.path,path.data(),path.size());
-        check_(connect(Socket::fd,&addr,2+path.size()),path);
+        struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
+        check_(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path);
         {ConnectionSetup r;
             string authority = getenv("HOME"_)+"/.Xauthority"_;
             if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
@@ -59,7 +58,7 @@ struct Taskbar : Socket, Poll {
 
         {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask; send(raw(r));}
         {SetWindowEventMask r; r.window=root; r.eventMask=SubstructureNotifyMask|SubstructureRedirectMask; send(raw(r));}
-        window.setCursor(Window::Arrow,root);
+        window.setCursor(Cursor::Arrow,root);
 
         array<uint> windows;
         {QueryTree r; r.id=root; send(raw(r));}
@@ -71,8 +70,8 @@ struct Taskbar : Socket, Poll {
             {GetGeometry r; r.id=id; send(raw(r));} GetGeometryReply g=readReply<GetGeometryReply>(); int x=g.x,y=g.y,w=g.w,h=g.h;
             array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
             if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                w=min<int16>(display.x,w); h=min<int16>(display.y-16,h);
-                x = (display.x-w)/2; y = 16+(display.y-16-h)/2;
+                w=min<int16>(displaySize.x,w); h=min<int16>(displaySize.y-16,h);
+                x = (displaySize.x-w)/2; y = 16+(displaySize.y-16-h)/2;
             }
             if(x!=g.x || y!=g.y || w!=g.w || h!=g.h){SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}
         }
@@ -126,8 +125,8 @@ struct Taskbar : Socket, Poll {
             {GetGeometry r; r.id=id; send(raw(r));} GetGeometryReply g=readReply<GetGeometryReply>(); int x=g.x,y=g.y,w=g.w,h=g.h;
             array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
             if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                w=min<int16>(display.x,w); h=min<int16>(display.y-16,h);
-                x = (display.x-w)/2; y = 16+(display.y-16-h)/2;
+                w=min<int16>(displaySize.x,w); h=min<int16>(displaySize.y-16,h);
+                x = (displaySize.x-w)/2; y = 16+(displaySize.y-16-h)/2;
             }
             if(x!=g.x || y!=g.y || w!=g.w || h!=g.h){SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}
             {MapWindow r; r.id=id; send(raw(r));}
@@ -138,8 +137,8 @@ struct Taskbar : Socket, Poll {
             if(c.valueMask & X) x=c.x; if(c.valueMask & Y) y=c.y; if(c.valueMask & W) w=c.w; if(c.valueMask & H) h=c.h;
             array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
             if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_) || type[0]==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                w=min<int16>(display.x,w); h=min<int16>(display.y-16,h);
-                x = (display.x - w)/2; y = 16+(display.y-16-h)/2;
+                w=min<int16>(displaySize.x,w); h=min<int16>(displaySize.y-16,h);
+                x = (displaySize.x - w)/2; y = 16+(displaySize.y-16-h)/2;
             }
             if(c.valueMask&StackMode) {ConfigureWindow r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; r.stackMode=e.configure_request.stackMode; send(raw(r));}
             else {SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}

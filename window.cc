@@ -37,7 +37,7 @@ void setCursor(Rect region, Cursor cursor) { assert(current); return current->se
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread)
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true) {
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
-    sockaddr_un addr; copy(addr.path,path.data(),path.size());
+    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;
         string authority = getenv("HOME"_)+"/.Xauthority"_;
@@ -164,7 +164,7 @@ void Window::event() {
                     shmctl(shm, IPC_RMID, 0);
                 }
                 buffer.width=size.x, buffer.height=align(16,size.y), buffer.stride=align(16,size.x);
-                shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+                shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
                 buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
                 {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
             }
@@ -450,7 +450,7 @@ void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPo
 Image Window::getSnapshot() {
     Image buffer;
     buffer.stride=buffer.width=displaySize.x, buffer.height=displaySize.y;
-    int shm = check( shmget(IPC_NEW, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+    int shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
     buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
     {Shm::Attach r; r.seg=id+SnapshotSegment; r.shm=shm; send(raw(r));}
     {Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment; send(raw(r));}
