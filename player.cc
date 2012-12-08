@@ -66,10 +66,12 @@ struct FFmpegMedia : AudioMedia {
     Buffer<float2> buffer __(8192);
     int read(float2* output, uint outputSize) {
         uint readSize = outputSize;
+
         uint size = min(outputSize,buffer.size);
         for(uint i: range(size)) output[i] = buffer[i];
         for(uint i: range(buffer.size-size)) buffer[i] = buffer[size+i]; //FIXME: ring buffer
-        outputSize -= size; output+=size;
+        buffer.size -= size, outputSize -= size; output+=size;
+
         while(outputSize) {
             AVPacket packet;
             if(av_read_frame(file, &packet) < 0) return 0;
@@ -85,7 +87,7 @@ struct FFmpegMedia : AudioMedia {
                     for(uint i: range(size)) output[i] = input[i]*(float2){0x1p31,0x1p31};
                     if(inputSize > outputSize) {
                         for(uint i: range(inputSize-outputSize)) buffer[i] = input[outputSize+i]*(float2){0x1p31,0x1p31};
-                        buffer.size = inputSize-outputSize;
+                        buffer.size += inputSize-outputSize;
                     }
                     outputSize -= size; output+=size;
                 } else {
@@ -94,16 +96,16 @@ struct FFmpegMedia : AudioMedia {
                     for(uint i: range(size)) output[i] = (float2){0x1p16f*input[2*i+0], 0x1p16f*input[2*i+1]};
                     if(inputSize > outputSize) {
                         for(uint i: range(inputSize-outputSize))
-                            buffer[i] = (float2){0x1p8f*input[2*(outputSize+i)+0], 0x1p16f*input[2*(outputSize+i)+1]};
-                        buffer.size = inputSize-outputSize;
+                            buffer[i] = (float2){0x1p16f*input[2*(outputSize+i)+0], 0x1p16f*input[2*(outputSize+i)+1]};
+                        buffer.size += inputSize-outputSize;
                     }
                     outputSize -= size; output+=size;
+
                 }
                 audioPTS = packet.dts*audioStream->time_base.num*1000/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
-        assert(outputSize==0);
         return readSize;
     }
     ~FFmpegMedia() { avformat_close_input(&file); }

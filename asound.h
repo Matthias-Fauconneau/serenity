@@ -16,7 +16,7 @@ struct AudioOutput : Device, Poll {
     /// Callback for poll events
     void event();
 
-    const uint channels = 2, rate = 48000;
+    const uint channels = 2, rate = 44100;
     uint periodSize, bufferSize;
 private:
     Map maps[3];

@@ -95,28 +95,15 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     if(widget) show(); //asynchronous window are shown by default to avoid race conditions
     registerPoll();
 
-#if EGL
-    display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    eglInitialize(display, 0, 0);
-    EGLConfig config; EGLint matchingConfigurationCount;
-    {int attributes[] ={EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_NONE};
-        eglChooseConfig(display, attributes, &config, 1, &matchingConfigurationCount);
+    if(!softwareRendering) {
+        if(!display) display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
+        if(!context) {
+            int attributes[] = {GLX_RGBA,GLX_FRAMEBUFFER_SRGB_CAPABLE,0};
+            void* visual = glXChooseVisual(display,0,attributes); assert(visual);
+            context = glXCreateContext(display,visual,0,1); assert(context);
+        }
+        glXMakeCurrent(display, id, context);
     }
-    if(matchingConfigurationCount != 1) error("No matching configuration", matchingConfigurationCount);
-
-    surface = eglCreateWindowSurface(display, config, id, 0);
-    {int attributes[]={EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-        context = eglCreateContext(display, config, 0, attributes);}
-    eglMakeCurrent(display, surface, surface, context);
-#else
-    if(!display) display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
-    if(!context) {
-        int attributes[] = {GLX_RGBA,GLX_FRAMEBUFFER_SRGB_CAPABLE,0};
-        void* visual = glXChooseVisual(display,0,attributes); assert(visual);
-        context = glXCreateContext(display,visual,0,1); assert(context);
-    }
-    glXMakeCurrent(display, id, context);
-#endif
 }
 void Window::create() {
     assert(!created);

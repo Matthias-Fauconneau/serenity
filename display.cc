@@ -51,8 +51,47 @@ void blit(int2 target, const Image& source, vec4 color) {
     }
 }
 
+inline void plot(uint x, uint y, float c, bool transpose, int4 invert) {
+    if(transpose) swap(x,y);
+    if(x<framebuffer.width && y<framebuffer.height) {
+        byte4& d = framebuffer(x,y);
+        d=byte4(max<int>(0,d.b-c*invert.b),max<int>(0,d.g-c*invert.g),max<int>(0,d.r-c*invert.r),min<int>(255,d.a+c*invert.a));
+    }
+}
+inline float fpart(float x) { return x-int(x); }
+inline float rfpart(float x) { return 1 - fpart(x); }
+
 void line(vec2 p1, vec2 p2, vec4 color) {
-    if(!softwareRendering) {
+    if(softwareRendering) {
+        float x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
+        int4 invert = int4(0xFF*(1-color.z),0xFF*(1-color.y),0xFF*(1-color.x),0xFF*color.w);
+        float dx = x2 - x1, dy = y2 - y1;
+        bool transpose=false;
+        if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
+        if(x2 < x1) swap(x1, x2), swap(y1, y2);
+        float gradient = dy / dx;
+        int i1,i2; float intery;
+        {
+            float xend = round(x1), yend = y1 + gradient * (xend - x1);
+            float xgap = rfpart(x1 + 0.5);
+            plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, invert);
+            plot(int(xend), int(yend)+1, fpart(yend) * xgap, transpose, invert);
+            i1 = int(xend);
+            intery = yend + gradient;
+        }
+        {
+            float xend = round(x2), yend = y2 + gradient * (xend - x2);
+            float xgap = fpart(x2 + 0.5);
+            plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, invert);
+            plot(int(xend), int(yend) + 1, fpart(yend) * xgap, transpose, invert);
+            i2 = int(xend);
+        }
+        for(int x=i1+1;x<i2;x++) {
+            plot(x, int(intery), rfpart(intery), transpose, invert);
+            plot(x, int(intery)+1, fpart(intery), transpose, invert);
+            intery += gradient;
+        }
+    } else {
         glBlend(true, false);
         fillShader()["color"] = vec4(vec3(1)-color.xyz(),1.f);
         glDrawLine(fillShader(), p1, p2);

@@ -29,7 +29,7 @@ struct Note : FLAC {
 };
 
 struct Sample {
-    Map map; Note cache; array<float> envelope; //Sample data
+    Map map; Note data; array<float> envelope; //Sample data
     int16 trigger=0; int16 lovel=0; int16 hivel=127; int16 lokey=0; int16 hikey=127; //Input controls
     int16 pitch_keycenter=60; uint16 releaseTime=0; int16 amp_veltrack=100; /*int16 rt_decay=0;*/ int16 volume=1; //Performance parameters
 };
@@ -51,7 +51,8 @@ struct Sampler : Poll {
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
     bool read(ptr& swPointer, int32* output, uint size);
     Resampler resampler[2];
-    static constexpr uint periodSize = 512;
+    uint rate = 0;
+    static constexpr uint periodSize = 1024;
     float* buffer; // Interleaved mixing buffer
 
     /// Convolution reverb

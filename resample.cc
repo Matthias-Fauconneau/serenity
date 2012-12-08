@@ -31,9 +31,7 @@
 #include "simd.h"
 
 /// SIMD
-#if __clang__
-inline float4 loadu(const float *p) { struct float4u { float4 v; } __attribute((packed, may_alias)); return ((float4u*)p)->v; }
-#else
+#ifndef __clang__
 #define load4u __builtin_ia32_loadups
 #define movhlps __builtin_ia32_movhlps
 #define shuffle_ps __builtin_ia32_shufps

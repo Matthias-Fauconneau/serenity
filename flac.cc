@@ -243,7 +243,7 @@ void FLAC::decodeFrame() {
         #define o(n) case n: convolve<n>(predictor,even,odd,signal,end); break;
         switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
         #undef o
-        int t=rice*48000/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
+        int t=rice*rate/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
     }
     setRoundMode(Even);
     index=align(8,index);

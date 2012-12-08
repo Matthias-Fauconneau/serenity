@@ -133,7 +133,7 @@ string Element::str(const ref<byte>& prefix) const {
     for(auto attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
     if(content||children) {
         if(name||attributes) line << ">\n"_;
-        if(content) { assert(!children); line<< "'"_+content+"'"_; }
+        if(trim(content)) { assert(!children); line<< "'"_+content+"'"_; }
         if(children) for(const Element& e: children) line << e.str(string(prefix+" "_));
         if(name||attributes) line << prefix+"</"_+name+">\n"_;
     } else if(name||attributes) line << "/>\n"_;

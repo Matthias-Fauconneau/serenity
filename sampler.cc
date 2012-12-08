@@ -44,7 +44,7 @@ void Sampler::open(const ref<byte>& path) {
     Sample group;
     TextData s = readFile(path);
     Folder folder = section(path,'/',0,-2);
-    Sample* sample=0;
+    Sample* sample=&group;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
@@ -60,9 +60,9 @@ void Sampler::open(const ref<byte>& path) {
             if(key=="sample"_) {
                 string path = replace(value,"\\"_,"/"_);
                 sample->map = Map(path,folder);
-                sample->cache = sample->map;
+                sample->data = Note(sample->map);
                 if(!existsFile(string(path+".env"_),folder)) {
-                    Note copy = sample->cache;
+                    Note copy = sample->data;
                     array<float> envelope; uint size=0;
                     while(copy.blockSize!=0) {
                         const uint period=1<<8;
@@ -73,7 +73,9 @@ void Sampler::open(const ref<byte>& path) {
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->cache.envelope = sample->envelope;
+                sample->data.envelope = sample->envelope;
+                if(!rate) rate=sample->data.rate;
+                else if(rate!=sample->data.rate) error("Sample rate mismatch",rate,sample->data.rate);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -81,6 +83,7 @@ void Sampler::open(const ref<byte>& path) {
             else if(key=="lokey"_) sample->lokey=toInteger(value);
             else if(key=="hikey"_) sample->hikey=toInteger(value);
             else if(key=="pitch_keycenter"_) sample->pitch_keycenter=toInteger(value);
+            else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=toInteger(value);
             else if(key=="ampeg_release"_) sample->releaseTime=toInteger(value);
             else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
             else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);
@@ -96,11 +99,11 @@ void Sampler::open(const ref<byte>& path) {
     for(int i=0;i<3;i++) notes[i].reserve(128);
 
     // Predecode 4K (10ms) and lock compressed samples in memory
-    for(Sample& s: samples) s.cache.decode(1<<12), s.map.lock();
+    for(Sample& s: samples) s.data.decode(1<<12), s.map.lock();
 
     array<byte> reverbFile = readFile("reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
-    assert(reverbMedia.rate == 48000);
+    assert(reverbMedia.rate == rate);
     reverbSize = reverbMedia.duration;
     N = reverbSize+periodSize;
     float* stereoFilter = allocate64<float>(2*reverbSize); clear(stereoFilter,2*reverbSize);
@@ -111,7 +114,7 @@ void Sampler::open(const ref<byte>& path) {
 
     // Computes normalization
     float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
-    const float scale = 0x1p5f/sqrt(sum); // Normalizes and scales 24->32bit (-3bit head room)
+    const float scale = 0x1p6f/sqrt(sum); // Normalizes and scales 24->32bit (-3bit head room)
 
     // Reverses, scales and deinterleaves filter
     float* filter[2];
@@ -179,10 +182,9 @@ void Sampler::noteEvent(int key, int velocity) {
     if(velocity==0) {
         for(int i=0;i<3;i++) for(Note& note: notes[i]) if(note.key==key) {
             current=&note; //schedule release sample
-            if(note.releaseTime) { //release fade out current note
-                float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(48000*note.releaseTime)));
-                note.step=(float4)__(step,step,step,step);
-            }
+            //release fade out current note
+            float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(rate*note.releaseTime)));
+            note.step=(float4)__(step,step,step,step);
         }
         if(!current) return; //already fully decayed
     }
@@ -190,22 +192,23 @@ void Sampler::noteEvent(int key, int velocity) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
             float level;
             if(current) { //rt_decay is unreliable, matching levels works better
-                level = current->actualLevel(1<<14) / s.cache.actualLevel(1<<11);
+                level = current->actualLevel(1<<14) / s.data.actualLevel(1<<11);
                 level *= extract(current->level,0);
                 if(level>8) level=8;
             } else {
                 level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
             }
             if(level<0x1p-15) return;
-            Note note = s.cache;
+            Note note = s.data;
             if(!current) note.key=key;
             note.step=(float4)__(1,1,1,1);
             note.releaseTime=s.releaseTime;
             note.envelope=s.envelope;
             note.level=(float4)__(level,level,level,level);
             {Locker lock(noteReadLock);
+                if(abs(key-s.pitch_keycenter)>1) { log("Unsupported pitch shift",s.pitch_keycenter,"->",key); return; }
                 array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
-                if(notes.size()==notes.capacity()) { error("too many ",notes.capacity(),"active notes"); return;}
+                if(notes.size()==notes.capacity()) { log("too many ",notes.capacity(),"active notes"); return;}
                 notes << move(note);
             }
             queue(); //queue background decoder in main thread
@@ -213,7 +216,7 @@ void Sampler::noteEvent(int key, int velocity) {
         }
     }
     if(current) return; //release samples are not mandatory
-    error("Missing sample"_,key,velocity);
+    log("Missing sample"_,key,velocity);
 }
 
 /// Background decoder (background thread)
@@ -270,7 +273,6 @@ void Note::read(float4* out, uint size) {
 bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio thread
     {Locker lock(noteReadLock);
         if(size!=periodSize) error(size,periodSize);
-        if(reverbSize%8!=0) error(reverbSize%8,reverbSize);
         // Setups mixing buffer
         clear(buffer, periodSize*2);
         // Mixes notes which don't need any resampling
@@ -292,9 +294,7 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
             // Transforms reverb buffer to frequency-domain ( reverbBuffer -> input )
             fftwf_execute(forward[c]);
 
-            {float8* reverb = (float8*)reverbBuffer[c];
-                for(uint i: range(reverbSize/8)) reverb[i] = reverb[i+periodSize/8]; // Shifts buffer for next frame
-            }
+            for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
 
             // Complex multiplies input (reverb buffer) with kernel (reverb filter)
             float* x = input;
@@ -332,7 +332,7 @@ void Sampler::recordWAV(const ref<byte>& path) {
     error("Recording unsupported");
     record = File(path,home(),WriteOnly);
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
-        int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=48000; int32 bps=48000*4;
+        int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=this->rate; int32 bps=rate*4;
         int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } _packed header;
     record.write(raw(header));
 }

@@ -98,7 +98,7 @@ struct Music {
         }
         sheets.itemPressed.connect(this,&Music::openSheet);
 
-        sampler.open("/Samples/Salamander.sfz"_);
+        sampler.open("/Samples/Boesendorfer.sfz"_);
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&score,&Score::noteEvent);
@@ -169,7 +169,7 @@ struct Music {
         this->name=string(name);
         window.setTitle(name);
         if(existsFile(string(name+".mid"_),folder)) midi.open(readFile(string(name+".mid"_),folder));
-        window.backgroundCenter=window.backgroundColor=0xFF;
+        window.backgroundCenter=window.backgroundColor=1;
         if(existsFile(string(name+".pdf"_),folder)) {
             pdfScore.open(readFile(string(name+".pdf"_),folder));
             if(existsFile(string(name+".pos"_),folder)) {

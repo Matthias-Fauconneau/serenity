@@ -1,4 +1,56 @@
 #if 1
+#include "process.h"
+#include "file.h"
+#include "inflate.h"
+#include "xml.h"
+
+struct NKI {
+    NKI() {
+        Element root = parseXML(inflate(readFile("/Samples/Boesendorfer.nki"_).slice(170),true));
+        string sfz;
+        root.xpath("K2_Container/Programs/K2_Program/Zones/K2_Zone"_, [&sfz](const Element& zone){
+            uint lowKey=0, highKey=0, rootKey=0, lowVelocity=0, highVelocity=0;
+            zone.xpath("Parameters/V"_, [&](const Element& V){
+                ref<byte> name = V["name"_];
+#define value toInteger(V["value"_]);
+                if(name=="lowKey"_) lowKey=value;
+                if(name=="highKey"_) highKey=value;
+                if(name=="rootKey"_) rootKey=value;
+                if(name=="lowVelocity"_) lowVelocity=value;
+                if(name=="highVelocity"_) highVelocity=value;
+            });
+            if(highKey < 21) return;
+            if(zone["groupIdx"_]=="1"_) return; // Hammer noise
+            if(zone["groupIdx"_]=="3"_) return; // Sustain
+
+            sfz<<"<region> "_;
+            if(zone["groupIdx"_]=="2"_) sfz<<"trigger=release "_;
+
+            string path; for(TextData s (zone("Sample"_)("V"_)["value"_]);s;) {
+                if(s.match("@b"_)) {}
+                else if(s.match(" "_)) {}
+                else if(s.match("F-00"_)) s.advance(8), path<<'/';
+                else if(s.match("d0"_)) s.advance(2), path<<'/';
+                else if(s.match("WAV"_)) path<<"flac"_;
+                else if(s.match("wav"_)) path<<"flac"_;
+                else path << s.next();
+            }
+            sfz<<"sample="_+path+" "_;
+
+            if(lowKey == highKey) sfz<<"key="_+str(lowKey)+" "_;
+            else sfz<<"lokey="_+str(lowKey)+" hikey="_+str(highKey);
+            if(rootKey && (rootKey!=lowKey || rootKey!=highKey)) sfz<<" pitch_keycenter="_+str(rootKey)+" "_;
+            sfz<<"lovel="_+str(lowVelocity)+" hivel="_+str(highVelocity)<<" "_;
+            sfz<<"ampeg_release=1"_;
+            sfz<<'\n';
+        });
+        log(sfz);
+        writeFile("/Samples/Boesendorfer.sfz"_,sfz);
+    }
+} test;
+#endif
+
+#if 0
 #include "window.h"
 #include "display.h"
 #include "time.h"
