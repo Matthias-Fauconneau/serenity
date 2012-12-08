@@ -36,6 +36,8 @@ struct Sample {
 
 /// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {
+    ~Sampler();
+
     /// Opens a .sfz instrument and maps all its samples
     void open(const ref<byte>& path); array<Sample> samples;
 
@@ -51,7 +53,7 @@ struct Sampler : Poll {
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
     bool read(ptr& swPointer, int32* output, uint size);
     Resampler resampler[2];
-    uint rate = 0;
+    uint64 rate = 0;
     static constexpr uint periodSize = 1024;
     float* buffer; // Interleaved mixing buffer
 
@@ -70,12 +72,12 @@ struct Sampler : Poll {
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
-    uint64 lastTime=0, time = 0;
+    uint64 lastTime=0, time=0, recordStart=0;
 
     /// Records performance to WAV file
-    void recordWAV(const ref<byte>& path);
-    File record=0; int16* pcm = 0;
-    ~Sampler();
+    void startRecord(const ref<byte>& path);
+    void stopRecord();
+    File record=0;
 
     operator bool() const { return samples.size(); }
 };

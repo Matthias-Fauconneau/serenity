@@ -13,6 +13,13 @@
 #include "score.h"
 #include "midiscore.h"
 
+extern "C" {
+#define __STDC_CONSTANT_MACROS
+#include <stdint.h>
+#include <x264.h>
+#include <libswscale/swscale.h>
+}
+
 // Simple human readable/editable format for score synchronization annotations
 map<uint, Chord> parseAnnotations(string&& annotations) {
     map<uint, Chord> chords;
@@ -77,6 +84,7 @@ struct Music {
     ICON(music) Window window __(&sheets,int2(0,0),"Piano"_,musicIcon());
     List<Text> sheets;
 
+    string name;
     MidiFile midi;
     Scroll<PDFScore> pdfScore;
     Scroll<MidiScore> midiScore;
@@ -121,11 +129,13 @@ struct Music {
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
+        window.localShortcut(Key('r')).connect(this,&Music::toggleRecord);
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);
         window.localShortcut(Delete).connect(&score,&Score::remove);
         window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
+        window.frameReady.connect(this,&Music::recordFrame);
 
         showSheetList();
         audio.start();
@@ -150,6 +160,85 @@ struct Music {
         if(play) { midi.seek(0); score.seek(0); sampler.timeChanged.connect(&midi,&MidiFile::update); } else sampler.timeChanged.delegates.clear();
     }
 
+    bool record=false;
+    void toggleRecord() {
+        if(!name) name=string("Piano"_);
+        if(record) {
+            record = false;
+            sampler.stopRecord();
+            stopVideoRecord();
+            window.setTitle(name);
+        } else {
+            record = true;
+            startVideoRecord(name);
+            sampler.startRecord(name);
+            window.setTitle(string(name+"*"_));
+        }
+    }
+
+    x264_t* encoder;
+    x264_picture_t pic_in, pic_out;
+    uint width=1270, height=720, fps=30;
+    SwsContext* swsContext;
+    File recordFile=0;
+
+    void startVideoRecord(const ref<byte>& name) {
+        window.setSize(int2(1280,720));
+        string path = name+".mp4"_;
+        if(existsFile(path,home())) { error(path,"already exists"); return; }
+        recordFile = File(path,home(),WriteOnly|Create|Truncate);
+        x264_param_t param;
+        x264_param_default_preset(&param, "veryfast", "stillimage");
+        param.i_width = width;
+        param.i_height = height;
+        log(param.i_timebase_num); param.i_timebase_num = 1;
+        param.i_timebase_den = sampler.rate;
+        log(param.rc.i_rc_method); param.rc.i_rc_method = X264_RC_CRF;
+        log(param.rc.f_rf_constant); param.rc.f_rf_constant = 20;
+        log(param.rc.f_rf_constant_max); param.rc.f_rf_constant_max = 29;
+        log(param.b_repeat_headers); param.b_repeat_headers = 1;
+        log(param.b_annexb); param.b_annexb = 1;
+        x264_param_apply_profile(&param, "high");
+        encoder = x264_encoder_open(&param);
+        x264_encoder_parameters( encoder, &param);
+
+        x264_picture_alloc(&pic_in, X264_CSP_I420, width, height);
+
+        x264_nal_t* nals; int nalCount;
+        int size = x264_encoder_headers(encoder, &nals, &nalCount);
+        if(size < 0) error("x264_encoder_headers");
+        recordFile.write((byte*)nals->p_payload, size);
+
+        swsContext = sws_getContext(width, height, PIX_FMT_BGR0, width, height, PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
+    }
+
+    void recordFrame() {
+        if(!record) return;
+        const Image& image = framebuffer;
+        if(width!=image.width || height!=image.height) { error("Window size changed while recording"); return; }
+
+        int stride = image.stride*4;
+        sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, width, pic_in.img.plane, pic_in.img.i_stride);
+        x264_nal_t* nals; int nalCount;
+        pic_in.i_pts = sampler.time;
+        int size = x264_encoder_encode(encoder, &nals, &nalCount, &pic_in, &pic_out);
+        if(size < 0) error("x264_encoder_encode");
+        recordFile.write((byte*)nals->p_payload, size);
+    }
+
+    void stopVideoRecord() {
+        x264_nal_t* nals; int nalCount;
+        for(;;) {
+            int frame_size = x264_encoder_encode(encoder, &nals, &nalCount, 0, &pic_out);
+            if(frame_size < 0) break;
+            for(const x264_nal_t& nal: ref<x264_nal_t>(nals,nalCount)) {
+                recordFile.write(ref<byte>((byte*)nal.p_payload, nal.i_payload));
+            }
+        }
+        x264_encoder_close(encoder);
+        recordFile = 0;
+    }
+
     /// Shows PDF+MIDI sheets selection to open
     void showSheetList() {
         window.widget=&sheets;
@@ -162,7 +251,6 @@ struct Music {
 
     /// Opens the given PDF+MIDI sheet
     void openSheet(uint index) { openSheet(toUTF8(sheets[index].text)); }
-    string name;
     void openSheet(const ref<byte>& name) {
         if(play) togglePlay();
         score.clear(); midi.clear(); pdfScore.clear();

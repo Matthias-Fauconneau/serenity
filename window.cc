@@ -181,6 +181,8 @@ void Window::event() {
         widget->render(0,size);
         assert(!clipStack);
 
+        frameReady();
+
         if(softwareRendering) {
             if(featherBorder) { //feather borders
                 const bool corner = 1;

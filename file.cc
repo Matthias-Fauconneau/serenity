@@ -71,13 +71,14 @@ array<byte> Stream::readUpTo(uint capacity) {
     return buffer;
 }
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd __(fd,POLLIN); return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
-void Stream::write(const ref<byte>& buffer) { int unused wrote=check(::write(fd,buffer.data,buffer.size)); assert(wrote==(int)buffer.size); }
+void Stream::write(const byte* data, uint size) { int unused wrote=check(::write(fd,data,size)); assert(wrote==(int)size); }
+void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
 File::File(const ref<byte>& file, const Folder& at, uint flags):Stream(check(openat(at.fd, strz(file), flags, 0666),file)){}
 int File::size() const { struct stat sb={}; check_(fstat(fd, &sb)); return sb.st_size; }
-//void File::seek(int index) { check_(::lseek(fd,index,0)); }
+void File::seek(int index) { check_(::lseek(fd,index,0)); }
 int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
 array<byte> readFile(const ref<byte>& path, const Folder& at) {

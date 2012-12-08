@@ -57,6 +57,8 @@ struct Stream : Handle {
     }
     /// Polls whether reading would block
     bool poll(int timeout=0);
+    /// Writes \a buffer of \a size bytes
+    void write(const byte* data, uint size);
     /// Writes \a buffer
     void write(const ref<byte>& buffer);
 };
@@ -80,7 +82,7 @@ struct File : Stream {
     /// Returns file size
     int size() const;
     /// Seeks to \a index
-    //void seek(int index);
+    void seek(int index);
 };
 /// Returns whether \a file exists (as a file)
 bool existsFile(const ref<byte>& file, const Folder& at=root());

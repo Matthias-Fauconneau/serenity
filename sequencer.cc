@@ -48,7 +48,10 @@ void Sequencer::event() {
     }
 }
 
-void Sequencer::recordMID(const ref<byte>& path) { record=File(path,home(),WriteOnly); }
+void Sequencer::recordMID(const ref<byte>& path) {
+    if(existsFile(path,home())) { log(path,"already exists"); return; }
+    record=File(path,home(),WriteOnly|Create|Truncate);
+}
 Sequencer::~Sequencer() {
     if(!record) return;
     array<byte> track;

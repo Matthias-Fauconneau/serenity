@@ -123,7 +123,7 @@ void Sampler::open(const ref<byte>& path) {
 
     fftwf_init_threads();
     fftwf_plan_with_nthreads(4);
-    fftwf_import_wisdom_from_filename("/Samples/wisdom");
+    //fftwf_import_wisdom_from_filename("/Samples/wisdom");
 
     // Transform reverb filter to frequency domain
     for(int c=0;c<2;c++) {
@@ -144,7 +144,7 @@ void Sampler::open(const ref<byte>& path) {
     product = allocate64<float>(N);
     backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, FFTW_ESTIMATE);
 
-    fftwf_export_wisdom_to_filename("/Samples/wisdom");
+    //fftwf_export_wisdom_to_filename("/Samples/wisdom");
 }
 
 /// Input events (realtime thread)
@@ -324,20 +324,25 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
     }
     time+=periodSize;
     queue(); //queue background decoder in main thread
-    //if(record) record.write(ref<byte>((byte*)output,periodSize*sizeof(int32)));
+    if(record) record.write(ref<byte>((byte*)output,2*periodSize*sizeof(int32)));
     return true;
 }
 
-void Sampler::recordWAV(const ref<byte>& path) {
-    error("Recording unsupported");
-    record = File(path,home(),WriteOnly);
+void Sampler::startRecord(const ref<byte>& name) {
+    string path = name+".wav"_;
+    record = File(path,home(),WriteOnly|Create|Truncate);
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
-        int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=this->rate; int32 bps=rate*4;
-        int16 stride=4; int16 bitdepth=16; char data[4]={'d','a','t','a'}; /*size?*/ } _packed header;
+             int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=44100; int32 bps=rate*channels*sizeof(int32);
+        int16 stride=channels*sizeof(int32); int16 bitdepth=32; char data[4]={'d','a','t','a'}; /*size?*/ } _packed header;
     record.write(raw(header));
+    recordStart = time;
 }
+void Sampler::stopRecord() {
+    if(record) { record.seek(4); record.write(raw<int32>(36+time)); record=0; }
+}
+
 Sampler::~Sampler() {
-#if 0
+    stopRecord();
     for(uint c=0;c<2;c++) {
         if(reverbFilter[c]) unallocate(reverbFilter[c],N);
         if(reverbBuffer[c]) unallocate(reverbBuffer[c],N);
@@ -346,10 +351,6 @@ Sampler::~Sampler() {
     fftwf_destroy_plan(backward);
     unallocate(input,N);
     unallocate(product,N);
-#endif
     unallocate(buffer,periodSize*2);
-    if(!record) return;
-    error("Recording unsupported");
-    //record.seek(4); write(record,raw<int32>(36+time));
 }
 constexpr uint Sampler::periodSize;

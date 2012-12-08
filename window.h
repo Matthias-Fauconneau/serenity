@@ -150,4 +150,7 @@ struct Window : Socket, Poll {
     int2 cursorPosition;
     /// Drag state
     int2 dragStart, dragPosition, dragSize;
+
+    /// Signals when a render request completed
+    signal<> frameReady;
 };

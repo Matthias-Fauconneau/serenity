@@ -125,7 +125,7 @@ struct Taskbar : Socket, Poll {
             {GetGeometry r; r.id=id; send(raw(r));} GetGeometryReply g=readReply<GetGeometryReply>(); int x=g.x,y=g.y,w=g.w,h=g.h;
             array<uint> motif = getProperty<uint>(id,"_MOTIF_WM_HINTS"_), type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
             if((!type || type[0]==Atom("_NET_WM_WINDOW_TYPE_NORMAL"_)) && (!motif || motif[0]!=3 || motif[1]!=0)) {
-                w=min<int16>(displaySize.x,w); h=min<int16>(displaySize.y-16,h);
+                w=min<int16>(max(1280,displaySize.x),w); h=min<int16>(displaySize.y-16,h);
                 x = (displaySize.x-w)/2; y = 16+(displaySize.y-16-h)/2;
             }
             if(x!=g.x || y!=g.y || w!=g.w || h!=g.h){SetGeometry r; r.id=id; r.x=x, r.y=y; r.w=w; r.h=h; send(raw(r));}
