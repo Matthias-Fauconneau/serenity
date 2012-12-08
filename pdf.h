@@ -49,6 +49,9 @@ struct PDF : Widget {
     struct Blit { vec2 pos,size; Image image; Image resized; bool operator <(const Blit& o) const{return pos.y<o.pos.y;}};
     array<Blit> blits;
 
+    struct Polygon { vec2 min,max; array<Line> edges; };
+    array<Polygon> polygons;
+
     /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document
     signal<int /*index*/, vec2 /*position*/, float /*size*/,const ref<byte>& /*font*/, int /*code*/> onGlyph;
     signal<const ref<vec2>&> onPath;

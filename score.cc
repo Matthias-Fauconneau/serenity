@@ -565,15 +565,17 @@ void Score::seek(uint unused time) {
             expected.insertMulti(note.key, i);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                 assert(currentStaff<staffs.size());
-                if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
+                nextStaff(staffs[currentStaff],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
                 currentStaff++;
             }
             i++;
         }
     }
-    map<int,vec4> activeNotes;
-    for(int i: expected.values) activeNotes.insert(indices?indices[i]:i,blue);
-    activeNotesChanged(activeNotes);
+    if(!showActive) {
+        map<int,vec4> activeNotes;
+        for(int i: expected.values) activeNotes.insert(indices?indices[i]:i,blue);
+        activeNotesChanged(activeNotes);
+    }
 }
 
 void Score::noteEvent(int key, int vel) {
@@ -608,7 +610,6 @@ void Score::noteEvent(int key, int vel) {
             else return;
         } else if(key) {
             if(active.contains(key)) active.remove(key);
-            return;
         }
         if(!expected && chordIndex<chords.size()-1) {
             noteIndex+=chords.values[chordIndex].size();
@@ -617,7 +618,7 @@ void Score::noteEvent(int key, int vel) {
                 expected.insertMulti(note.key, i);
                 while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                     assert(currentStaff<staffs.size());
-                    if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)]);
+                    if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
                     currentStaff++;
                 }
                 i++;

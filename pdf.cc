@@ -194,7 +194,8 @@ void PDF::open(const ref<byte>& data) {
     y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
     for(uint i=0; i<pages.size(); i++) {
         const Variant& page = pages[i];
-        uint pageFirstBlit = blits.size(), pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size();
+        uint pageFirstBlit = blits.size(), pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size(),
+                pageFirstPolygon=polygons.size();
         auto dict = parse(xref[page.integer()]).dict;
         if(dict.contains("Resources"_)) {
             auto resources = toDict(xref,move(dict.at("Resources"_)));
@@ -362,15 +363,25 @@ void PDF::open(const ref<byte>& data) {
         for(uint i: range(pageFirstLine,lines.size())) lines[i].a += offset, lines[i].b += offset;
         for(uint i: range(pageFirstCharacter,characters.size())) characters[i].pos += offset;
         for(uint i: range(pageFirstPath,paths.size())) for(vec2& pos: paths[i]) pos += offset;
+        for(uint i: range(pageFirstPolygon,polygons.size())) {
+            polygons[i].min+=offset; polygons[i].max+=offset;
+            for(Line& l: polygons[i].edges) l.a += offset, l.b += offset;
+        }
         // add any children
         pages << move(dict["Kids"_].list);
     }
     y2=pageOffset.y;
 
     for(Blit& b: blits) b.pos.x-=x1, b.pos.y=-b.pos.y;
-    for(Line& l: lines) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; assert(l.a!=l.b,l.a,l.b); }
+    for(Line& l: lines) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; }
     for(Character& c: characters) c.pos.x-=x1, c.pos.y=-c.pos.y;
     for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
+    for(Polygon& polygon: polygons) {
+        float t = polygon.min.y;
+        polygon.min.x-=x1, polygon.min.y=-polygon.max.y;
+        polygon.max.x-=x1, polygon.max.y=-t;
+        for(Line& l: polygon.edges) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; }
+    }
 
     // insertion sorts blits for culling
     if(blits) for(int i : range(1,blits.size())) {
@@ -413,6 +424,7 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
             }
         }
         polyline << copy(path.last());
+        array<Line> lines;
         if((flags&Stroke) || (flags&Fill) || polyline.size()>16) {
             for(uint i: range(polyline.size()-1)) {
                 if(polyline[i] != polyline[i+1])
@@ -420,6 +432,16 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
             }
             if(flags&Close) lines << Line __( polyline.last(), polyline.first() );
         }
+        if(flags&Fill) {
+            Polygon polygon;
+            polygon.min=path.first(), polygon.max=path.first();
+            for(vec2 p : path) {
+                polygon.min=min(polygon.min,p);
+                polygon.max=max(polygon.max,p);
+            }
+            polygon.edges = move(lines);
+            polygons << move(polygon);
+        } else this->lines<<lines;
         if(flags&Trace) this->paths << move(path);
     }
     paths.clear();
@@ -453,7 +475,7 @@ void PDF::render(int2 position, int2 size) {
         ::blit(position+int2(scale*blit.pos),blit.resized);
     }
 
-    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position)/scale,vec2(-position)/scale)))) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position-int2(0,100))/scale,vec2(-position-int2(0,100))/scale)))) {
         vec2 a = scale*l.a, b = scale*l.b;
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
@@ -462,10 +484,24 @@ void PDF::render(int2 position, int2 size) {
         line(a,b);
     }
 
+    for(const Polygon& polygon: polygons) {
+        int2 min=position+int2(scale*polygon.min), max=position+int2(scale*polygon.max);
+        Rect rect = Rect(min,max) & currentClip;
+        for(int y=rect.min.y; y<=rect.max.y; y++) for(int x=rect.min.x; x<=rect.max.x; x++) {
+            vec2 p = vec2(x,y);
+            for(const Line& e: polygon.edges) {
+                vec2 a = vec2(position)+scale*e.a, b=vec2(position)+scale*e.b;
+                if(cross(p-a,b-a)>0) goto outside;
+            }
+            /*else*/ framebuffer(x,y) = 0;
+            outside:;
+        }
+    }
+
     int i=characters.binarySearch(Character __(0,0,0,vec2(-position)/scale));
     for(const Character& c: characters.slice(i)) {
         int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
-        if(pos.y<=currentClip.min.y) continue;
+        if(pos.y<=currentClip.min.y) { i++; continue; }
         if(pos.y>=currentClip.max.y) break;
         c.font->font.setSize(scale*c.size);
         const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup

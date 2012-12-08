@@ -78,12 +78,53 @@ struct PDFScore : PDF {
     }
 };
 
+/// Displays active notes on a keyboard representation
+struct Keyboard : Widget {
+    array<int> midi, input;
+    signal<> contentChanged;
+    void inputNoteEvent(int key, int vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
+    void midiNoteEvent(int key, int vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
+    int2 sizeHint() { return int2(-1,120); }
+    void render(int2 position, int2 size) {
+        int y0 = position.y;
+        int y1 = y0+size.y*2/3;
+        int y2 = y0+size.y;
+        int margin = (size.x-size.x/88*88)/2;
+        for(int key=0; key<88; key++) {
+            vec4 white = midi.contains(key+21)?red:input.contains(key+21)?blue: ::white;
+            int dx = size.x/88;
+            int x0 = position.x + margin + key*dx;
+            int x1 = x0 + dx;
+            line(x0,y0, x0,y1-1, black);
+
+            int notch[12] = { 3, 1, 4, 0, 1, 2, 1, 4, 0, 1, 2, 1 };
+            int l = notch[key%12], r = notch[(key+1)%12];
+            if(key==0) l=0; //A-1 has no left notch
+            if(l==1) { // black key
+                line(x0,y1-1, x1,y1-1, black);
+                fill(x0+1,y0, x1+1,y1-1, midi.contains(key+21)?red:input.contains(key+21)?blue: ::black);
+            } else {
+                fill(x0+1,y0, x1,y2, white); // white key
+                line(x0-l*dx/6,y1-1, x0-l*dx/6, y2, black); //left edge
+                fill(x0+1-l*dx/6,y1, x1,y2, white); //left notch
+                if(key!=87) fill(x1,y1, x1-1+(6-r)*dx/6,y2, white); //right notch
+                //right edge will be next left edge
+            }
+            if(key==87) { //C7 has no right notch
+                line(x1+dx/2,y0,x1+dx/2,y2, black);
+                fill(x1,y0, x1+dx/2,y1-1, white);
+            }
+        }
+    }
+};
+
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
     Folder folder __("Sheets"_);
     ICON(music)
-    //Window window __(&sheets,int2(0,0),"Piano"_,musicIcon());
-    Window window __(&sheets,int2(1280,720),"Piano"_,musicIcon());
+    VBox layout;
+    Window window __(&layout,int2(1050,590),"Piano"_,musicIcon());
+    //Window window __(&layout,int2(1280,720),"Piano"_,musicIcon());
     List<Text> sheets;
 
     string name;
@@ -91,6 +132,7 @@ struct Music {
     Scroll<PDFScore> pdfScore;
     Scroll<MidiScore> midiScore;
     Score score;
+    Keyboard keyboard;
 
     Sampler sampler;
     Thread thread __(-20);
@@ -98,6 +140,9 @@ struct Music {
     Sequencer input __(thread);
 
     Music() {
+        layout << &sheets << &keyboard;
+        sampler.open("/Samples/Boesendorfer.sfz"_);
+
         array<string> files = folder.list(Files);
         for(string& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
@@ -108,24 +153,28 @@ struct Music {
         }
         sheets.itemPressed.connect(this,&Music::openSheet);
 
-        sampler.open("/Samples/Boesendorfer.sfz"_);
-        input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        midi.noteEvent.connect(&score,&Score::noteEvent);
+        midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
+
+        input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&score,&Score::noteEvent);
+        input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+
         sampler.frameReady.connect(this,&Music::recordFrame);
 
+        keyboard.contentChanged.connect(&window,&Window::render);
+        midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
+
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);
         pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
-
-        midiScore.contentChanged.connect(&window,&Window::render);
 
         score.activeNotesChanged.connect(&pdfScore,&PDF::setColors);
         score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);
         score.annotationsChanged.connect(this,&Music::annotationsChanged);
-        midi.noteEvent.connect(&score,&Score::noteEvent);
 
         window.localShortcut(Escape).connect(&exit);
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
@@ -142,15 +191,19 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
-        openSheet("Skyrim - Dragonborn 3 (Andrew Wrangell)"_);
+        score.showActive=true; openSheet("Skyrim - Dragonborn 3 (Andrew Wrangell)"_); //DEBUG
     }
     ~Music() { stopRecord(); }
 
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float unused previous, float current, float unused next) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
+            if(!pdfScore.size) pdfScore.size=window.size; //FIXME: called before first render, no layout
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
-            pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.ScrollArea::size.y));
+            pdfScore.delta.y = -min(scale*current, // prevent scrolling past current
+                                    max(scale*previous, //scroll to see at least previous
+                                        scale*next-pdfScore.ScrollArea::size.y) //and at least next
+                                    );
             //pdfScore.center(int2(0,scale*current));
         }
         //midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
@@ -334,7 +387,7 @@ struct Music {
 
     /// Shows PDF+MIDI sheets selection to open
     void showSheetList() {
-        window.widget=&sheets;
+        layout.first()=&sheets;
         window.render();
     }
 
@@ -360,11 +413,11 @@ struct Music {
             score.parse();
             if(midi.notes) score.synchronize(copy(midi.notes));
             else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
-            window.widget = &pdfScore.area();
+            layout.first()= &pdfScore.area();
             pdfScore.delta = 0;
         } else {
             midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature,midi.ticksPerBeat);
-            window.widget = &midiScore.area();
+            layout.first()= &midiScore.area();
             midiScore.delta=0;
             midiScore.widget().render(int2(0,0),int2(1280,0)); //compute note positions for score scrolling
             score.chords = copy(midiScore.notes);

@@ -5,7 +5,11 @@
 void Layout::render(int2 position, int2 size) {
     push(position+Rect(size));
     array<Rect> widgets = layout(position,size);
-    for(uint i: range(count())) at(i).render(widgets[i]);
+    for(uint i: range(count())) {
+        push(widgets[i]);
+        at(i).render(widgets[i]);
+        pop();
+    }
     pop();
 }
 

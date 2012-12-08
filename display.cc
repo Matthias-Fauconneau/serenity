@@ -51,9 +51,9 @@ void blit(int2 target, const Image& source, vec4 color) {
     }
 }
 
-inline void plot(uint x, uint y, float c, bool transpose, int4 invert) {
+inline void plot(int x, int y, float c, bool transpose, int4 invert) {
     if(transpose) swap(x,y);
-    if(x<framebuffer.width && y<framebuffer.height) {
+    if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
         byte4& d = framebuffer(x,y);
         d=byte4(max<int>(0,d.b-c*invert.b),max<int>(0,d.g-c*invert.g),max<int>(0,d.r-c*invert.r),min<int>(255,d.a+c*invert.a));
     }

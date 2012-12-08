@@ -32,6 +32,7 @@ constexpr vec4 magenta __(1, 0, 1, 1);
 // Primitives
 /// Fills pixels inside \a rect with \a color
 void fill(Rect rect, vec4 color=black);
+inline void fill(int x1, int y1, int x2, int y2, vec4 color=black) { fill(Rect(int2(x1,y1),int2(x2,y2)),color); }
 
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
 void blit(int2 target, const Image& source, vec4 color=white);
@@ -39,3 +40,4 @@ void blit(int2 target, const Image& source, vec4 color=white);
 /// Draws a thin antialiased line from p1 to p2
 void line(vec2 p1, vec2 p2, vec4 color=black);
 inline void line(int2 p1, int2 p2, vec4 color=black) { line(vec2(p1),vec2(p2),color); }
+inline void line(int x1, int y1, int x2, int y2, vec4 color=black) { line(vec2(x1,y1),vec2(x2,y2),color); }
