@@ -27,6 +27,7 @@ namespace Render { int EXT, event, errorBase; } using namespace Render;
 void* Window::display=0;
 void* Window::context=0;
 int2 displaySize;
+Lock framebufferLock;
 Widget* focus;
 Widget* drag;
 Window* current;
@@ -142,6 +143,8 @@ void Window::event() {
         currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
+
+        Locker framebufferLocker(framebufferLock);
 
         if(softwareRendering) {
             if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
@@ -326,8 +329,9 @@ void Window::setSize(int2 size) {
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
-    if(size.x==0 || size.x>displaySize.x) size.x=displaySize.x;
-    if(size.y==0 || size.x>displaySize.x-16) size.y=displaySize.y-16;
+    if(size.x==0) size.x=displaySize.x;
+    if(size.x>displaySize.x) size.x=max(1280,displaySize.x);
+    if(size.y==0 || size.y>displaySize.y-16) size.y=displaySize.y-16;
     setGeometry(this->position,size);
 }
 void Window::setGeometry(int2 position, int2 size) {

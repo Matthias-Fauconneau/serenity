@@ -478,6 +478,6 @@ void PDF::render(int2 position, int2 size) {
         int2 pos = position+int2(text.key*scale/normalizedScale);
         if(pos.y<=currentClip.min.y) continue;
         if(pos.y>=currentClip.max.y) continue; //break;
-        Text(copy(text.value),12,vec4(1,0,0,1)).render(pos,int2(0,0));
+        Text(text.value,12,vec4(1,0,0,1)).render(pos,int2(0,0));
     }
 }

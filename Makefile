@@ -40,7 +40,7 @@ LIBS_player = avformat avcodec
 LIBS_gl = GL
 LIBS_window = X11
 LIBS_sampler = fftw3f_threads
-LIBS_music = swscale x264
+LIBS_music = swscale avformat
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -97,7 +97,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
 	@$(CC) $(LFLAGS) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
-	@echo $(BUILD)/$(TARGET) $(LIBS)
+	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
 	cp $< $(PREFIX)/share/icons/hicolor/32x32/apps

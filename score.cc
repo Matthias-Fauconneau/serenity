@@ -301,8 +301,8 @@ trillCancelTie: ;
                             } else if(staff[lastX].size()>=staff[x].size() && abs(x-lastX)<=14 && abs(y-y2)<=5) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
                                 staff[x].remove(y); debug[vec2(x,-y)]<<string("<-"_); goto again;
-                            } //else debug[vec2(x,-y)]<<str("?"_,x-lastX,y-y2);
-                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
+                            } else debug[vec2(x,-y)]<<str("?"_,x-lastX,y-y2);
+                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
                     }
                 }
             }
@@ -389,7 +389,10 @@ spurious: ;
     }*/
 
     /// Flatten sorted notes
-    uint n=0; for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) { positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++; }
+    for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) {
+        staff.at(x).at(y).scoreIndex=indices.size();
+        positions<<vec2(x,-y); indices<<staff.at(x).at(y).index;
+    }
 
     /// Detect and explicit repeats
     int startIndex=-2;
@@ -447,8 +450,9 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]+vec2(12,0)]<<str(notes[i].key);
+        //debug[positions[i]+vec2(12,0)]<<str(notes[i].key);
         //debug[positions[i]+vec2(12,0)]<<str(i);
+        debug[positions[i]+vec2(12,0)]<<str(indices[i]);
     }
 }
 
@@ -599,7 +603,7 @@ void Score::noteEvent(int key, int vel) {
             if(expected.contains(key)) {
                 active.insertMulti(key,expected.at(key));
                 expected.remove(key);
-                if(expected.size()==1 && chordSize>=4) miss=move(expected);
+                //if(expected.size()==1 && chordSize>=4) miss=move(expected);
             } else if(miss.contains(key)) miss.remove(key);
             else return;
         } else if(key) {
@@ -622,8 +626,11 @@ void Score::noteEvent(int key, int vel) {
         }
     }
     map<int,vec4> activeNotes;
-    for(int i: expected.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
-    for(int i: miss.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
-    //for(int i: active.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,red);
+    if(showActive) {
+        for(int i: active.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,red);
+    } else { // show expected notes
+        for(int i: expected.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
+        for(int i: miss.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
+    }
     activeNotesChanged(activeNotes);
 }

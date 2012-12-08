@@ -16,7 +16,7 @@
 extern "C" {
 #define __STDC_CONSTANT_MACROS
 #include <stdint.h>
-#include <x264.h>
+#include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
 }
 
@@ -81,7 +81,9 @@ struct PDFScore : PDF {
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
     Folder folder __("Sheets"_);
-    ICON(music) Window window __(&sheets,int2(0,0),"Piano"_,musicIcon());
+    ICON(music)
+    //Window window __(&sheets,int2(0,0),"Piano"_,musicIcon());
+    Window window __(&sheets,int2(1280,720),"Piano"_,musicIcon());
     List<Text> sheets;
 
     string name;
@@ -110,6 +112,7 @@ struct Music {
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&score,&Score::noteEvent);
+        sampler.frameReady.connect(this,&Music::recordFrame);
 
         pdfScore.contentChanged.connect(&window,&Window::render);
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
@@ -135,19 +138,20 @@ struct Music {
         window.localShortcut(Insert).connect(&score,&Score::insert);
         window.localShortcut(Delete).connect(&score,&Score::remove);
         window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
-        window.frameReady.connect(this,&Music::recordFrame);
 
         showSheetList();
         audio.start();
         thread.spawn();
+        openSheet("Skyrim - Dragonborn 3 (Andrew Wrangell)"_);
     }
+    ~Music() { stopRecord(); }
 
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float unused previous, float current, float unused next) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
-            //pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.ScrollArea::size.y));
-            pdfScore.center(int2(0,scale*current));
+            pdfScore.delta.y = -min(scale*current, max(scale*previous, scale*next-pdfScore.ScrollArea::size.y));
+            //pdfScore.center(int2(0,scale*current));
         }
         //midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
         midiScore.center(int2(0,current));
@@ -157,86 +161,175 @@ struct Music {
     bool play=false;
     void togglePlay() {
         play=!play;
-        if(play) { midi.seek(0); score.seek(0); sampler.timeChanged.connect(&midi,&MidiFile::update); } else sampler.timeChanged.delegates.clear();
+        if(play) { midi.seek(0); score.seek(0); score.showActive=true; sampler.timeChanged.connect(&midi,&MidiFile::update); }
+        else { score.showActive=false; sampler.timeChanged.delegates.clear(); }
     }
 
     bool record=false;
     void toggleRecord() {
         if(!name) name=string("Piano"_);
-        if(record) {
-            record = false;
-            sampler.stopRecord();
-            stopVideoRecord();
-            window.setTitle(name);
-        } else {
-            record = true;
-            startVideoRecord(name);
-            sampler.startRecord(name);
-            window.setTitle(string(name+"*"_));
-        }
+        if(record) { stopRecord(); window.setTitle(name); }
+        else startRecord(name);
     }
 
-    x264_t* encoder;
-    x264_picture_t pic_in, pic_out;
-    uint width=1270, height=720, fps=30;
+    uint width=1280, height=720, fps=30;
+
+    AVFormatContext* context;
+    AVStream* videoStream;
+    AVCodecContext* videoCodec;
+    AVStream* audioStream;
+    AVCodecContext* audioCodec;
     SwsContext* swsContext;
-    File recordFile=0;
 
-    void startVideoRecord(const ref<byte>& name) {
-        window.setSize(int2(1280,720));
-        string path = name+".mp4"_;
-        if(existsFile(path,home())) { error(path,"already exists"); return; }
-        recordFile = File(path,home(),WriteOnly|Create|Truncate);
-        x264_param_t param;
-        x264_param_default_preset(&param, "veryfast", "stillimage");
-        param.i_width = width;
-        param.i_height = height;
-        log(param.i_timebase_num); param.i_timebase_num = 1;
-        param.i_timebase_den = sampler.rate;
-        log(param.rc.i_rc_method); param.rc.i_rc_method = X264_RC_CRF;
-        log(param.rc.f_rf_constant); param.rc.f_rf_constant = 20;
-        log(param.rc.f_rf_constant_max); param.rc.f_rf_constant_max = 29;
-        log(param.b_repeat_headers); param.b_repeat_headers = 1;
-        log(param.b_annexb); param.b_annexb = 1;
-        x264_param_apply_profile(&param, "high");
-        encoder = x264_encoder_open(&param);
-        x264_encoder_parameters( encoder, &param);
+    uint videoTime = 0, audioTime = 0;
+    uint videoEncodedTime = 0;
 
-        x264_picture_alloc(&pic_in, X264_CSP_I420, width, height);
+    void startRecord(const ref<byte>& name) {
+        if(record) return;
 
-        x264_nal_t* nals; int nalCount;
-        int size = x264_encoder_headers(encoder, &nals, &nalCount);
-        if(size < 0) error("x264_encoder_headers");
-        recordFile.write((byte*)nals->p_payload, size);
+        window.setTitle(string(name+"*"_));
+        window.setSize(int2(width,height));
+
+        av_register_all();
+
+        string path = getenv("HOME"_)+"/"_+name+".mp4"_;
+        avformat_alloc_output_context2(&context, 0, 0, strz(path));
+
+        { // Video
+            AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+            videoStream = avformat_new_stream(context, codec);
+            videoStream->id = 0;
+            videoCodec = videoStream->codec;
+            avcodec_get_context_defaults3(videoCodec, codec);
+            videoCodec->codec_id = AV_CODEC_ID_H264;
+            videoCodec->bit_rate = 3000000; //FIXME: lossless
+            videoCodec->width = width;
+            videoCodec->height = height;
+            videoCodec->time_base.num = 1;
+            videoCodec->time_base.den = fps;
+            videoCodec->pix_fmt = PIX_FMT_YUV420P;
+            if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+            avcodec_open2(videoCodec, codec, 0);
+        }
+
+        { // Audio
+            AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
+            audioStream = avformat_new_stream(context, codec);
+            audioStream->id = 1;
+            audioCodec = audioStream->codec;
+            audioCodec->codec_id = AV_CODEC_ID_AAC;
+            audioCodec->sample_fmt  = AV_SAMPLE_FMT_S16;
+            audioCodec->bit_rate = 192000;
+            audioCodec->sample_rate = sampler.rate;
+            audioCodec->channels = 2;
+            audioCodec->channel_layout = AV_CH_LAYOUT_STEREO;
+            if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+            avcodec_open2(audioCodec, codec, 0);
+        }
+
+        //av_dump_format(oc, 0, strz(path), 1);
+        avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
+        avformat_write_header(context, 0);
 
         swsContext = sws_getContext(width, height, PIX_FMT_BGR0, width, height, PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
+
+        videoTime = 0;
+        record = true;
     }
 
-    void recordFrame() {
+    void recordFrame(float* audio, uint audioSize) {
         if(!record) return;
-        const Image& image = framebuffer;
-        if(width!=image.width || height!=image.height) { error("Window size changed while recording"); return; }
 
-        int stride = image.stride*4;
-        sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, width, pic_in.img.plane, pic_in.img.i_stride);
-        x264_nal_t* nals; int nalCount;
-        pic_in.i_pts = sampler.time;
-        int size = x264_encoder_encode(encoder, &nals, &nalCount, &pic_in, &pic_out);
-        if(size < 0) error("x264_encoder_encode");
-        recordFile.write((byte*)nals->p_payload, size);
+        if(videoTime*audioCodec->sample_rate <= audioStream->pts.val*videoStream->time_base.den) {
+            const Image& image = framebuffer;
+            if(width!=image.width || height!=image.height) {
+                log("Window size",image.width,"x",image.height,"changed while recording at", width,"x", height); return;
+            }
+            int stride = image.stride*4;
+            AVFrame* frame = avcodec_alloc_frame();
+            avpicture_alloc((AVPicture*)frame, PIX_FMT_YUV420P, videoCodec->width, videoCodec->height);
+            {Locker framebufferLocker(framebufferLock); //FIXME: encode in main thread
+                sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, width, frame->data, frame->linesize);
+            }
+            frame->pts = videoTime;
+
+            AVPacket pkt = {}; av_init_packet(&pkt);
+            int gotVideoPacket;
+            avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
+            av_free(frame->data[0]);
+            av_free(frame);
+            if(gotVideoPacket) {
+                if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
+                pkt.stream_index = videoStream->index;
+                av_interleaved_write_frame(context, &pkt);
+                videoEncodedTime++;
+            }
+
+            videoTime++;
+        }
+
+        {
+            AVFrame *frame = avcodec_alloc_frame();
+            frame->nb_samples = audioSize;
+            int16* audio16 = allocate64<int16>(audioSize*2);
+            for(uint i: range(audioSize*2)) audio16[i] = int(audio[i])>>16;
+            avcodec_fill_audio_frame(frame, audioCodec->channels, AV_SAMPLE_FMT_S16, (uint8*)audio16, audioSize * 2 * sizeof(int16), 1);
+            frame->pts = audioTime;
+
+            AVPacket pkt={}; av_init_packet(&pkt);
+            int gotAudioPacket;
+            avcodec_encode_audio2(audioCodec, &pkt, frame, &gotAudioPacket);
+            avcodec_free_frame(&frame);
+            unallocate(audio16,audioSize*2);
+            if (gotAudioPacket) {
+                pkt.stream_index = audioStream->index;
+                av_interleaved_write_frame(context, &pkt);
+            }
+
+            audioTime += audioSize;
+        }
     }
 
-    void stopVideoRecord() {
-        x264_nal_t* nals; int nalCount;
+    void stopRecord() {
+        if(!record) return;
+        record = false;
+
+        //FIXME: video lags on final frames
         for(;;) {
-            int frame_size = x264_encoder_encode(encoder, &nals, &nalCount, 0, &pic_out);
-            if(frame_size < 0) break;
-            for(const x264_nal_t& nal: ref<x264_nal_t>(nals,nalCount)) {
-                recordFile.write(ref<byte>((byte*)nal.p_payload, nal.i_payload));
+            int gotVideoPacket;
+            {AVPacket pkt = {}; av_init_packet(&pkt);
+                avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);
+                if(gotVideoPacket) {
+                    pkt.pts = av_rescale_q(videoEncodedTime, videoCodec->time_base, videoStream->time_base);
+                    if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
+                    pkt.stream_index = videoStream->index;
+                    av_interleaved_write_frame(context, &pkt);
+                    videoEncodedTime++;
+                }
             }
+
+            if(!gotVideoPacket) break;
         }
-        x264_encoder_close(encoder);
-        recordFile = 0;
+
+        for(;;) {
+            int gotAudioPacket;
+            {AVPacket pkt={}; av_init_packet(&pkt);
+                avcodec_encode_audio2(audioCodec, &pkt, 0, &gotAudioPacket);
+                if(gotAudioPacket) {
+                    pkt.stream_index = audioStream->index;
+                    av_interleaved_write_frame(context, &pkt);
+                }
+            }
+
+            if(!gotAudioPacket) break;
+        }
+
+        av_write_trailer(context);
+        avcodec_close(videoStream->codec);
+        avcodec_close(audioStream->codec);
+        for(uint i=0; i<context->nb_streams; i++) { av_free(context->streams[i]->codec); av_free(context->streams[i]); }
+        avio_close(context->pb);
+        av_free(context);
     }
 
     /// Shows PDF+MIDI sheets selection to open
@@ -279,7 +372,6 @@ struct Music {
             score.positions = move(midiScore.positions);
         }
         score.seek(0);
-        window.setSize(int2(0,0));
         window.render();
     }
 

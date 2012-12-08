@@ -325,6 +325,7 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
     time+=periodSize;
     queue(); //queue background decoder in main thread
     if(record) record.write(ref<byte>((byte*)output,2*periodSize*sizeof(int32)));
+    frameReady(buffer, periodSize);
     return true;
 }
 

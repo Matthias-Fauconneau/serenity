@@ -48,6 +48,7 @@ struct Score {
     map<int,int> miss;
     map<int,int> expected;
     bool editMode=false;
+    bool showActive=false; // Toggles between active or expected notes highlighting
     void toggleEdit();
     void previous();
     void next();
