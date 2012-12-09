@@ -7,6 +7,8 @@ ifeq ($(CC),cc)
   CC := g++ -fabi-version=0
  else ifeq ($(TARGET),editor)
    CC := g++ -fabi-version=0
+ else ifeq ($(TARGET),test)
+     CC := g++ -fabi-version=0
  else
   CC := clang++ -Wno-lambda-extensions
  endif

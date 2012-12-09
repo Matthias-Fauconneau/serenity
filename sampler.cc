@@ -286,36 +286,39 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
             unallocate(layer,inSize/2);
         }
 
-        // Applies convolution reverb
-        // Deinterleaves mixed signal into reverb buffer
-        for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = buffer[2*i+c];
+        if(enableReverb) { // Convolution reverb
+            // Deinterleaves mixed signal into reverb buffer
+            for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = buffer[2*i+c];
 
-        for(int c=0;c<2;c++) {
-            // Transforms reverb buffer to frequency-domain ( reverbBuffer -> input )
-            fftwf_execute(forward[c]);
+            for(int c=0;c<2;c++) {
+                // Transforms reverb buffer to frequency-domain ( reverbBuffer -> input )
+                fftwf_execute(forward[c]);
 
-            for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
+                for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
 
-            // Complex multiplies input (reverb buffer) with kernel (reverb filter)
-            float* x = input;
-            float* y = reverbFilter[c];
-            product[0] = x[0] * y[0];
-            for(uint j = 1; j < N/2; j++) {
-                float a = x[j];
-                float b = x[N - j];
-                float c = y[j];
-                float d = y[N - j];
-                product[j] = a*c-b*d;
-                product[N - j] = a*d+b*c;
+                // Complex multiplies input (reverb buffer) with kernel (reverb filter)
+                float* x = input;
+                float* y = reverbFilter[c];
+                product[0] = x[0] * y[0];
+                for(uint j = 1; j < N/2; j++) {
+                    float a = x[j];
+                    float b = x[N - j];
+                    float c = y[j];
+                    float d = y[N - j];
+                    product[j] = a*c-b*d;
+                    product[N - j] = a*d+b*c;
+                }
+                product[N/2] = x[N/2] * y[N/2];
+
+                // Transforms product back to time-domain ( product -> input )
+                fftwf_execute(backward);
+
+                for(uint i: range(periodSize)) { // Normalizes and writes samples back in output buffer
+                    buffer[2*i+c] = (1.f/N)*input[reverbSize+i];
+                }
             }
-            product[N/2] = x[N/2] * y[N/2];
-
-            // Transforms product back to time-domain ( product -> input )
-            fftwf_execute(backward);
-
-            for(uint i: range(periodSize)) { // Normalizes and writes samples back in output buffer
-                buffer[2*i+c] = (1.f/N)*input[reverbSize+i];
-            }
+        } else {
+            for(uint i: range(2*periodSize)) buffer[i] *= 0x1p6f;
         }
         // Converts mixing buffer to signed 32bit output
         for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(((float8*)buffer)[i]);

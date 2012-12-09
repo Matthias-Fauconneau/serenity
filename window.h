@@ -22,7 +22,11 @@ struct Window : Socket, Poll {
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
-           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread());
+           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread(), bool softwareRendering=true);
+    /// Creates an initially hidden window for \a widget, use \a show to display
+    /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
+    Window(Widget* widget, int2 size, const ref<byte>& name, bool softwareRendering) :
+        Window(widget, size, name, Image(),"_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread(), softwareRendering){}
     ~Window() { destroy(); }
 
     /// Event handler

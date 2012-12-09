@@ -1,3 +1,52 @@
+#if 0
+#include "window.h"
+#include "display.h"
+#include "gl.h"
+
+inline float log2(float x) { return __builtin_log2f(x); }
+inline float exp2(float x) { return __builtin_exp2f(x); }
+struct Plot : Widget {
+    Window window __(this,int2(1050,1050),"Plot"_,false);
+
+    Plot(){
+        window.localShortcut(Escape).connect(&exit);
+        window.backgroundCenter=window.backgroundColor=0xFF;
+    }
+
+    void plot(int2 position, int2 size, float* Y, uint N) {
+        /*float min=-1, max=1;
+        for(uint x=0;x<N;x++) {
+            float y = Y[x];
+            min=::min(min,y);
+            max=::max(max,y);
+        }*/
+        float min=0, max=1;
+        GLBuffer buffer(Line);
+        buffer.allocate(0,2*(N-1),sizeof(vec2));
+        vec2* vertices = (vec2*)buffer.mapVertexBuffer();
+        for(uint x=0;x<N-1;x++) {
+            vertices[2*x+0] = project(vec2(position)+vec2((float)(x)*size.x/(N-1),  size.y-size.y*(Y[x]-min)/(max-min)));
+            vertices[2*x+1] = project(vec2(position)+vec2((float)(x+1)*size.x/(N-1), size.y-size.y*(Y[x+1]-min)/(max-min)));
+        }
+        buffer.unmapVertexBuffer();
+        extern GLShader& fillShader();
+        fillShader().bind();
+        fillShader()["color"] = vec4(1,1,1,1);
+        buffer.bindAttribute(fillShader(),"position",2);
+        buffer.draw();
+    }
+
+    uint t=0;
+    void render(int2 position, int2 size) {
+        const uint N = 1050;
+        float Y[N]; for(uint x: range(N)) Y[x] = exp2(log2(N)*(float(x)/N))/N;
+        plot(position,size,Y,N);
+        window.render();
+    }
+} test;
+#endif
+
+
 #if 1
 #include "process.h"
 #include "window.h"
@@ -48,8 +97,20 @@ struct Keyboard : Widget {
     }
 };
 
+struct sRGB {
+    uint8 lookup[256];
+    inline float evaluate(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; }
+    sRGB() { for(uint i=0;i<256;i++) { uint l = round(255*evaluate(i/255.f)); assert(l<256); lookup[i]=l; } }
+    inline uint8 operator [](uint c) { assert(c<256,c); return lookup[c]; }
+} sRGB;
+
+const double PI = 3.14159265358979323846;
+inline double cos(double t) { return __builtin_cos(t); }
+inline float log2(float x) { return __builtin_log2f(x); }
+inline float exp2(float x) { return __builtin_exp2f(x); }
+
 /// Displays information on the played samples
-struct SFZViewer {
+struct SFZViewer : Widget {
     Thread thread;
     Sequencer input __(thread);
     Sampler sampler;
@@ -58,11 +119,24 @@ struct SFZViewer {
     Text text;
     Keyboard keyboard;
     VBox layout;
-    Window window __(&layout,int2(0,120),"SFZ Viewer"_);
+    Window window __(&layout,int2(0,0),"SFZ Viewer"_);
+
+    float* buffer;
+    float* hann;
+    float* windowed;
+    float* spectrum;
+    const uint T = 1050;
+    uint N = audio.rate;
+    const uint Y = 1680-16-16-120;
+    uint t=0;
+    float max=0x1p24f;
+    Image spectrogram __(T,Y);
 
     SFZViewer() {
-        layout << &text << &keyboard;
+        layout << this << &text << &keyboard;
+
         sampler.open("/Samples/Boesendorfer.sfz"_);
+        sampler.frameReady.connect(this,&SFZViewer::viewFrame);
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(this,&SFZViewer::noteEvent);
@@ -71,10 +145,55 @@ struct SFZViewer {
 
         window.backgroundCenter=window.backgroundColor=1;
         window.localShortcut(Escape).connect(&exit);
+        window.localShortcut(Key('r')).connect(this,&SFZViewer::toggleReverb);
+
+        fftwf_init_threads();
+        fftwf_plan_with_nthreads(4);
+        buffer = allocate64<float>(N); clear(buffer,N);
+        hann = allocate64<float>(N); for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2;
+        windowed = allocate64<float>(N);
+        spectrum = allocate64<float>(N);
 
         audio.start();
         thread.spawn();
     }
+    void viewFrame(float* data, uint size) {
+        for(uint i: range(N-size)) buffer[i] = buffer[i+size]; // Shifts buffer
+        for(uint i: range(size)) buffer[N-size+i] = data[i*2+0]+data[i*2+1]; // Appends latest frame
+        for(uint i: range(N)) windowed[i] = hann[i]*buffer[i]; // Multiplies window
+        // Transforms
+        fftwf_plan p = fftwf_plan_r2r_1d(N, windowed, spectrum, FFTW_R2HC, FFTW_ESTIMATE);
+        fftwf_execute(p);
+        fftwf_destroy_plan(p);
+        for(int i: range(N)) spectrum[i] /= N; // Normalizes
+
+        float Nmax = /*(1./2) **/ (N/2); //1/2 -> Nyquist, N/2 -> only real part
+        float Nmin = 27.0*(N/2)/sampler.rate;
+
+        uint nyquist = Y*(1-1/log2(N)); //Nyquist frequency (N/2) on Y scale
+
+        // Updates spectrogram
+        for(uint y: range(Y)) {
+            uint n0 = floor(Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y))), n1=ceil(Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y)));
+            //FIXME: all bins in a pixel will have same contribution
+            float a=0;
+            for(uint n=n0; n<n1; n++) {
+                a += spectrum[n]; // amplitude
+            }
+            a /= n1-n0;
+            if(y>nyquist) a *= 0x1p8f;
+            int v = sRGB[clip(0,int(255*((log2(a)-16)/8)),255)]; // Logarithmic scale from 16-24bit //TODO: color ramp
+            spectrogram(t,Y-1-y) = byte4(v,v,v,1);
+        }
+
+        spectrogram(t,Y-1-nyquist) = byte4(0xFF,0,0,1);
+
+        t++; if(t>=T) t=0;
+        window.render();
+    }
+    int2 sizeHint() { return int2(T,Y); }
+    void render(int2 position, int2) { blit(position,spectrogram); }
+
     void noteEvent(int key, int velocity) {
         if(!velocity) return;
         string text;
@@ -93,6 +212,10 @@ struct SFZViewer {
             last = lovel;
         }
         this->text.setText(text);
+    }
+    void toggleReverb() {
+        sampler.enableReverb=!sampler.enableReverb;
+        window.setTitle(sampler.enableReverb?"Wet"_:"Dry"_);
     }
 } test;
 

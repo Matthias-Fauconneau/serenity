@@ -14,8 +14,8 @@ struct Image {
     move_operator(Image):data(o.data), width(o.width), height(o.height), stride(o.stride), own(o.own), alpha(o.alpha) { o.data=0; }
 
     Image(){}
-    Image(byte4* data, int width, int height, int stride, bool own, bool alpha) : data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
-    Image(int width, int height, bool alpha=false, int stride=0)
+    Image(byte4* data, uint width, uint height, uint stride, bool own, bool alpha) : data(data),width(width),height(height),stride(stride),own(own),alpha(alpha){}
+    Image(uint width, uint height, bool alpha=false, int stride=0)
         : data(allocate<byte4>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true), alpha(alpha) {
         assert(width); assert(height);
     }

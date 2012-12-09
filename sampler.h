@@ -58,6 +58,7 @@ struct Sampler : Poll {
     float* buffer; // Interleaved mixing buffer
 
     /// Convolution reverb
+    bool enableReverb=true;
     uint reverbSize=0; // Reverb filter size
     uint N=0; // reverbSize+periodSize
     float* reverbFilter[2]={}; // Convolution reverb filter in frequency-domain
