@@ -440,8 +440,15 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
                 polygon.max=max(polygon.max,p);
             }
             polygon.edges = move(lines);
+            float area=0;
+            for(uint i: range(polyline.size())) {
+                area += cross(polyline[(i+1)%polyline.size()]-polyline[i], polyline[(i+2)%polyline.size()]-polyline[i]);
+            }
+            if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b);
             polygons << move(polygon);
-        } else this->lines<<lines;
+        } else {
+            this->lines<<lines;
+        }
         if(flags&Trace) this->paths << move(path);
     }
     paths.clear();
@@ -487,14 +494,16 @@ void PDF::render(int2 position, int2 size) {
     for(const Polygon& polygon: polygons) {
         int2 min=position+int2(scale*polygon.min), max=position+int2(scale*polygon.max);
         Rect rect = Rect(min,max) & currentClip;
-        for(int y=rect.min.y; y<=rect.max.y; y++) for(int x=rect.min.x; x<=rect.max.x; x++) {
-            vec2 p = vec2(x,y);
-            for(const Line& e: polygon.edges) {
-                vec2 a = vec2(position)+scale*e.a, b=vec2(position)+scale*e.b;
-                if(cross(p-a,b-a)>0) goto outside;
+        for(int y=rect.min.y; y<=::min<int>(framebuffer.height-1,rect.max.y); y++) {
+            for(int x=rect.min.x; x<=::min<int>(framebuffer.width-1,rect.max.x); x++) {
+                vec2 p = vec2(x,y);
+                for(const Line& e: polygon.edges) {
+                    vec2 a = vec2(position)+scale*e.a, b=vec2(position)+scale*e.b;
+                    if(cross(p-a,b-a)>0) goto outside;
+                }
+                /*else*/ framebuffer(x,y) = 0;
+                outside:;
             }
-            /*else*/ framebuffer(x,y) = 0;
-            outside:;
         }
     }
 

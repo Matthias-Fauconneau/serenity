@@ -123,8 +123,7 @@ struct Music {
     Folder folder __("Sheets"_);
     ICON(music)
     VBox layout;
-    Window window __(&layout,int2(1050,590),"Piano"_,musicIcon());
-    //Window window __(&layout,int2(1280,720),"Piano"_,musicIcon());
+    Window window __(&layout,int2(0,0),"Piano"_,musicIcon());
     List<Text> sheets;
 
     string name;
@@ -140,7 +139,7 @@ struct Music {
     Sequencer input __(thread);
 
     Music() {
-        layout << &sheets << &keyboard;
+        layout << &sheets;// << &keyboard;
         sampler.open("/Samples/Boesendorfer.sfz"_);
 
         array<string> files = folder.list(Files);
@@ -191,7 +190,6 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
-        score.showActive=true; openSheet("Skyrim - Dragonborn 3 (Andrew Wrangell)"_); //DEBUG
     }
     ~Music() { stopRecord(); }
 
@@ -200,11 +198,11 @@ struct Music {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             if(!pdfScore.size) pdfScore.size=window.size; //FIXME: called before first render, no layout
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
-            pdfScore.delta.y = -min(scale*current, // prevent scrolling past current
+            /*pdfScore.delta.y = -min(scale*current, // prevent scrolling past current
                                     max(scale*previous, //scroll to see at least previous
                                         scale*next-pdfScore.ScrollArea::size.y) //and at least next
-                                    );
-            //pdfScore.center(int2(0,scale*current));
+                                    );*/
+            pdfScore.center(int2(0,scale*current));
         }
         //midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
         midiScore.center(int2(0,current));
@@ -280,7 +278,6 @@ struct Music {
             avcodec_open2(audioCodec, codec, 0);
         }
 
-        //av_dump_format(oc, 0, strz(path), 1);
         avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
         avformat_write_header(context, 0);
 
@@ -288,6 +285,7 @@ struct Music {
 
         videoTime = 0;
         record = true;
+        if(!play) togglePlay();
     }
 
     void recordFrame(float* audio, uint audioSize) {
@@ -415,7 +413,7 @@ struct Music {
             else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
             layout.first()= &pdfScore.area();
             pdfScore.delta = 0;
-        } else {
+        } else if(existsFile(string(name+".mid"_),folder)) {
             midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature,midi.ticksPerBeat);
             layout.first()= &midiScore.area();
             midiScore.delta=0;

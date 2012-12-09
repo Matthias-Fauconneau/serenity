@@ -21,7 +21,7 @@ struct mat32 {
 
 /// Portable Document Format renderer
 struct PDF : Widget {
-    void clear() { blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); annotations.clear(); }
+    void clear() { blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear(); annotations.clear(); }
     void open(const ref<byte>& data);
     int2 sizeHint() override;
     void render(int2 position, int2 size) override;
