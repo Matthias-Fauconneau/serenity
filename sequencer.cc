@@ -30,7 +30,7 @@ void Sequencer::event() {
             sustained.removeAll(key);
             assert(!pressed.contains(key));
             pressed << key;
-            noteEvent(key, min(127,value*3/2)); //x3/2 to use reach maximum velocity without destroying the keyboard
+            noteEvent(key, min(127,(int)value*4/3)); //x4/3 to reach maximum velocity without destroying the keyboard
             if(record) {
                 int tick = realTime();
                 events << Event((int16)(tick-lastTick), (uint8)key, (uint8)value);

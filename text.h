@@ -18,7 +18,7 @@ struct Text : Widget {
     // Resolves cat overloading
     Text(const string& text, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text((ref<byte>)text,size,color,wrap){}
 
-    void setText(ref<byte> text) { this->text=toUTF32(text); textSize=0; editIndex=min(editIndex,text.size); }
+    void setText(const ref<byte>& text) { this->text=toUTF32(text); textSize=0; editIndex=min(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
 
     /// Displayed text in UTF32

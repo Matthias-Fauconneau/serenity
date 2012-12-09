@@ -1,5 +1,105 @@
 #if 1
 #include "process.h"
+#include "window.h"
+#include "display.h"
+#include "sequencer.h"
+#include "sampler.h"
+#include "asound.h"
+#include "text.h"
+#include "layout.h"
+
+/// Displays active notes on a keyboard representation
+struct Keyboard : Widget {
+    array<int> midi, input;
+    signal<> contentChanged;
+    void inputNoteEvent(int key, int vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
+    void midiNoteEvent(int key, int vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
+    int2 sizeHint() { return int2(-1,120); }
+    void render(int2 position, int2 size) {
+        int y0 = position.y;
+        int y1 = y0+size.y*2/3;
+        int y2 = y0+size.y;
+        int margin = (size.x-size.x/88*88)/2;
+        for(int key=0; key<88; key++) {
+            vec4 white = midi.contains(key+21)?red:input.contains(key+21)?blue: ::white;
+            int dx = size.x/88;
+            int x0 = position.x + margin + key*dx;
+            int x1 = x0 + dx;
+            line(x0,y0, x0,y1-1, black);
+
+            int notch[12] = { 3, 1, 4, 0, 1, 2, 1, 4, 0, 1, 2, 1 };
+            int l = notch[key%12], r = notch[(key+1)%12];
+            if(key==0) l=0; //A-1 has no left notch
+            if(l==1) { // black key
+                line(x0,y1-1, x1,y1-1, black);
+                fill(x0+1,y0, x1+1,y1-1, midi.contains(key+21)?red:input.contains(key+21)?blue: ::black);
+            } else {
+                fill(x0+1,y0, x1,y2, white); // white key
+                line(x0-l*dx/6,y1-1, x0-l*dx/6, y2, black); //left edge
+                fill(x0+1-l*dx/6,y1, x1,y2, white); //left notch
+                if(key!=87) fill(x1,y1, x1-1+(6-r)*dx/6,y2, white); //right notch
+                //right edge will be next left edge
+            }
+            if(key==87) { //C7 has no right notch
+                line(x1+dx/2,y0,x1+dx/2,y2, black);
+                fill(x1,y0, x1+dx/2,y1-1, white);
+            }
+        }
+    }
+};
+
+/// Displays information on the played samples
+struct SFZViewer {
+    Thread thread;
+    Sequencer input __(thread);
+    Sampler sampler;
+    AudioOutput audio __({&sampler, &Sampler::read},thread,true);
+
+    Text text;
+    Keyboard keyboard;
+    VBox layout;
+    Window window __(&layout,int2(0,120),"SFZ Viewer"_);
+
+    SFZViewer() {
+        layout << &text << &keyboard;
+        sampler.open("/Samples/Boesendorfer.sfz"_);
+
+        input.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        input.noteEvent.connect(this,&SFZViewer::noteEvent);
+        input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+        keyboard.contentChanged.connect(&window,&Window::render);
+
+        window.backgroundCenter=window.backgroundColor=1;
+        window.localShortcut(Escape).connect(&exit);
+
+        audio.start();
+        thread.spawn();
+    }
+    void noteEvent(int key, int velocity) {
+        if(!velocity) return;
+        string text;
+        for(int last=0;;) {
+            int lovel=0xFF; int hivel;
+            for(const Sample& s : sampler.samples) {
+                if(s.trigger == 0 && s.lokey <= key && key <= s.hikey) {
+                    if(s.lovel>last && s.lovel<lovel) lovel=s.lovel, hivel=s.hivel;
+                }
+            }
+            if(lovel==0xFF) break;
+            if(lovel <= velocity && velocity <= hivel)
+                text << str(lovel)<<"<"_<<format(Bold)<<dec(velocity,2)<<format(Regular)<<"<"_;
+            else
+                text << str(lovel)<<"    "_;
+            last = lovel;
+        }
+        this->text.setText(text);
+    }
+} test;
+
+#endif
+
+#if 0
+#include "process.h"
 #include "file.h"
 #include "inflate.h"
 #include "xml.h"
