@@ -6,7 +6,7 @@
 inline float log2(float x) { return __builtin_log2f(x); }
 inline float exp2(float x) { return __builtin_exp2f(x); }
 struct Plot : Widget {
-    Window window __(this,int2(1050,1050),"Plot"_,false);
+    Window window __(this,int2(0,0),"Plot"_,false);
 
     Plot(){
         window.localShortcut(Escape).connect(&exit);
@@ -14,13 +14,12 @@ struct Plot : Widget {
     }
 
     void plot(int2 position, int2 size, float* Y, uint N) {
-        /*float min=-1, max=1;
+        float min=0, max=1;
         for(uint x=0;x<N;x++) {
             float y = Y[x];
             min=::min(min,y);
             max=::max(max,y);
-        }*/
-        float min=0, max=1;
+        }
         GLBuffer buffer(Line);
         buffer.allocate(0,2*(N-1),sizeof(vec2));
         vec2* vertices = (vec2*)buffer.mapVertexBuffer();
@@ -38,14 +37,17 @@ struct Plot : Widget {
 
     uint t=0;
     void render(int2 position, int2 size) {
-        const uint N = 1050;
-        float Y[N]; for(uint x: range(N)) Y[x] = exp2(log2(N)*(float(x)/N))/N;
-        plot(position,size,Y,N);
+        const uint N = 48000;
+        const uint Y = 1680-16-16-120;
+        float Nmax = (N/2);
+        float Nmin = 27.5*(N/2)/48000;
+        float f[Y]; for(uint y: range(Y)) f[y] = Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y));
+        f[Y-1] = Nmax;
+        plot(position,size,f,Y);
         window.render();
     }
 } test;
 #endif
-
 
 #if 1
 #include "process.h"
@@ -126,7 +128,7 @@ struct SFZViewer : Widget {
     float* windowed;
     float* spectrum;
     const uint T = 1050;
-    uint N = audio.rate;
+    uint N = audio.rate; //*8 to get lowest notes
     const uint Y = 1680-16-16-120;
     uint t=0;
     float max=0x1p24f;
@@ -167,26 +169,23 @@ struct SFZViewer : Widget {
         fftwf_destroy_plan(p);
         for(int i: range(N)) spectrum[i] /= N; // Normalizes
 
-        float Nmax = /*(1./2) **/ (N/2); //1/2 -> Nyquist, N/2 -> only real part
+        float Nmax = N/2; //only real part
         float Nmin = 27.0*(N/2)/sampler.rate;
-
-        uint nyquist = Y*(1-1/log2(N)); //Nyquist frequency (N/2) on Y scale
 
         // Updates spectrogram
         for(uint y: range(Y)) {
             uint n0 = floor(Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y))), n1=ceil(Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y)));
             //FIXME: all bins in a pixel will have same contribution
-            float a=0;
+            float sum=0;
             for(uint n=n0; n<n1; n++) {
-                a += spectrum[n]; // amplitude
+                float a = spectrum[n]; // amplitude
+                if(n>N/4) a *= 0x1p8f;
+                sum += a;
             }
-            a /= n1-n0;
-            if(y>nyquist) a *= 0x1p8f;
-            int v = sRGB[clip(0,int(255*((log2(a)-16)/8)),255)]; // Logarithmic scale from 16-24bit //TODO: color ramp
+            sum /= n1-n0;
+            int v = sRGB[clip(0,int(255*((log2(sum)-16)/8)),255)]; // Logarithmic scale from 16-24bit
             spectrogram(t,Y-1-y) = byte4(v,v,v,1);
         }
-
-        spectrogram(t,Y-1-nyquist) = byte4(0xFF,0,0,1);
 
         t++; if(t>=T) t=0;
         window.render();

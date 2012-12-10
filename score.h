@@ -9,7 +9,7 @@
 
 struct Score {
     void onPath(const ref<vec2>&);
-    void onGlyph(int, vec2, float,const ref<byte>&, int);
+    void onGlyph(int, vec2, float,const ref<byte>&, int, int);
 
     array<float> staffs;
     vec2 lastClef=0, lastPos=0;

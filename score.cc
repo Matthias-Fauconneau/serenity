@@ -24,7 +24,7 @@ void Score::onPath(const ref<vec2>& p) {
     }
 }
 
-void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int code) {
+void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int code, int fontIndex) {
     if(index == 0) pass++;
     //TODO: OCR glyphs and factorize logic
     if(pass==0) { // first pass: split in staffs
@@ -49,10 +49,11 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 lastClef=pos;
             }
         } else if(endsWith(font,"Opus"_)) {
-            if(code==71/*treble*/||code==11/*bass*/) {
-                if(pos.y-lastClef.y>159) {
-                    staffs << (lastClef.y+pos.y)/2;
-                }
+            if(fontIndex==71/*treble*/||fontIndex==11/*bass*/) {
+                if(pos.y-lastClef.y>110 && staffCount!=1) {
+                    staffs << (lastClef.y+pos.y)/2-18;
+                    staffCount=1;
+                } else staffCount++;
                 lastClef=pos;
             }
          } else if(find(font,"DUCRGK"_)) { //TODO: glyph OCR
@@ -60,14 +61,14 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+110);
                 lastClef=pos;
             }
-        } else if(find(font,"ZVBUUH"_)) { //TODO: glyph OCR
+        } else if(find(font,"ZVBUUH"_)||find(font,"JDAHFL"_)) { //TODO: glyph OCR
             if(code==1/*treble*/||code==2/*bass*/) {
-                if(lastClef.y != 0 && pos.y-lastClef.y>159) staffs << (lastClef.y+pos.y)/2;//(lastClef.y+110);
+                if(lastClef.y != 0 && pos.y-lastClef.y>159) staffs << (lastClef.y+pos.y)/2;
                 lastClef=pos;
             }
         } else if(find(font,"Inkpen2"_)) { //TODO: glyph OCR
             if(code==3/*treble*/||code==12/*bass*/) {
-                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+pos.y)/2;//(lastClef.y+110);
+                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+pos.y)/2;
                 lastClef=pos;
             }
         } else if(find(font,"NWCV15"_)) { //TODO: glyph OCR
@@ -86,8 +87,10 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             break_:;
         }
     } else if(pass==1) {
+        //log(font); debug[pos]=str(code,fontIndex);
         uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
         if(i>=notes.size()) notes.grow(i+1);
+        //debug[pos]=str(pos.y-staffs[i]);
         int duration=-1;
         if(font=="MScore-20"_) { //TODO: glyph OCR
             if(msScore) {
@@ -113,9 +116,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==60) duration = 16; //whole
         } else if(find(font,"Opus"_)) {
             if(font=="OpusStd"_) { //FIXME: OCR
-                //debug[pos]=dec(code);
                 if(code==7 /*|| code==8*/) {
-                    //debug[pos]=str(pos.y-staffs[i-1]);
                     if(size<30) duration= 0; //grace
                     else duration = 4; //quarter
                 }
@@ -123,12 +124,12 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 //else if(code==9) duration = 8; //half
                 //else if(code==16) duration = 16; //whole
             } else if(endsWith(font,"Opus"_)) {
-                if(code==53) {
+                if(fontIndex==53) {
                     if(size<30) duration= 0; //grace
                     else duration = 4; //quarter
                 }
-                else if(code==66) duration = 8; //half
-                else if(code==39) duration = 16; //whole
+                else if(fontIndex==66) duration = 8; //half
+                else if(fontIndex==39) duration = 16; //whole
             }
             if(code==41 && trills && abs(trills.last().b.y-pos.y)<16) { trills.last().b=pos; debug[pos]=string("Trill"_); } //trill tail
             else if(code==56) { trills << Line(pos,pos); debug[pos]=string("Trill"_); } //trill head
@@ -158,7 +159,14 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
             else if(code==8) duration = 8; //half
             else if(code==9) duration = 16; //whole
-        } else if(find(font,"Inkpen2"_)) { //TODO: glyph OCR
+        }  else if(find(font,"JDAHFL"_)) { //TODO: glyph OCR
+            if(code==7) {
+                if(size<2) duration = 0; //grace
+                else duration = 4; //quarter
+            }
+            else if(code==13) duration = 8; //half
+        }
+        else if(find(font,"Inkpen2"_)) { //TODO: glyph OCR
             if(code==5) {
                 if(size<2) duration = 0; //grace
                 else duration = 4; //quarter
@@ -297,12 +305,12 @@ trillCancelTie: ;
                                     )) {
                             if(staff[lastX].size()<=staff[x].size()) {
                                 if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
-                                staff[lastX].remove(y2); debug[vec2(lastX,-y2)]=string("->"_); goto again;
-                            } else if(staff[lastX].size()>=staff[x].size() && abs(x-lastX)<=14 && abs(y-y2)<=5) {
+                                staff[lastX].remove(y2); debug[vec2(lastX,-y2)]<<string("->"_); goto again;
+                            } else if(staff[lastX].size()>=staff[x].size() && abs(x-lastX)<=16 && abs(y-y2)<=6) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
                                 staff[x].remove(y); debug[vec2(x,-y)]<<string("<-"_); goto again;
                             } else debug[vec2(x,-y)]<<str("?"_,x-lastX,y-y2);
-                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y+16)]="?"_+str(x-lastX,y-y2);
+                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y)]<<"?"_+str(x-lastX,y-y2);
                     }
                 }
             }
@@ -451,8 +459,6 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
         //debug[positions[i]+vec2(12,0)]<<str(notes[i].key);
-        //debug[positions[i]+vec2(12,0)]<<str(i);
-        debug[positions[i]+vec2(12,0)]<<str(indices[i]);
     }
 }
 

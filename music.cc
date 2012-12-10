@@ -47,7 +47,7 @@ struct PDFScore : PDF {
             }
         }
         int i=0; for(vec2 position: positions) {
-            onGlyph(i++,position*scale,32,"Manual"_,0);
+            onGlyph(i++,position*scale,32,"Manual"_,0,0);
         }
     }
     bool editMode=false;

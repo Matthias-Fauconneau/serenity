@@ -53,7 +53,7 @@ struct PDF : Widget {
     array<Polygon> polygons;
 
     /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document
-    signal<int /*index*/, vec2 /*position*/, float /*size*/,const ref<byte>& /*font*/, int /*code*/> onGlyph;
+    signal<int /*index*/, vec2 /*position*/, float /*size*/,const ref<byte>& /*font*/, int /*code*/, int /*fontIndex*/> onGlyph;
     signal<const ref<vec2>&> onPath;
     array< array<vec2> > paths;
     float normalizedScale = 0; // scale semantic positions to "pixels" (normalize width to 1280)

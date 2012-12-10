@@ -125,13 +125,14 @@ void Sampler::open(const ref<byte>& path) {
     fftwf_plan_with_nthreads(4);
     //fftwf_import_wisdom_from_filename("/Samples/wisdom");
 
-    // Transform reverb filter to frequency domain
+    // Transforms reverb filter to frequency domain
     for(int c=0;c<2;c++) {
         reverbFilter[c] = allocate64<float>(N); clear(reverbFilter[c],N);
         fftwf_plan p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
         fftwf_execute(p);
         fftwf_destroy_plan(p);
-        unallocate(filter[c],N); // release time domain filter
+        unallocate(filter[c],N); // Releases time domain filter
+        for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; //Cuts frequencies higher than nyquist (FIXME: is this smart?)
     }
 
     // Allocates reverb buffer and temporary buffers
