@@ -27,7 +27,7 @@ void Score::onPath(const ref<vec2>& p) {
 void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int code, int fontIndex) {
     if(index == 0) pass++;
     //TODO: OCR glyphs and factorize logic
-    if(pass==0) { // first pass: split in staffs
+    if(pass==0) { // 1st pass: split score in staves
         if(font=="MScore-20"_) { //TODO: glyph OCR
             if((code==1||code==12/*treble*/||code==2||code==13/*bass*/) && pos.x<200) {
                 if(pos.y-lastClef.y>170) staffs << (lastClef.y+pos.y)/2;
@@ -41,7 +41,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 if(pos.y>lastClef.y) lastClef=pos;
             }
         } else if(font=="OpusStd"_) {
-            if(code==3/*treble*/||code==5/*bass*/||code==6/*bass*/) {
+            if((code==3||code==6/*||code==5||code==7*/) && pos.x<200) { //FIXME: OCR
                 if(pos.y-lastClef.y>130 && staffCount!=1) {
                     staffs << (lastClef.y+pos.y)/2+12;
                     staffCount=1;
@@ -49,9 +49,9 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 lastClef=pos;
             }
         } else if(endsWith(font,"Opus"_)) {
-            if(fontIndex==71/*treble*/||fontIndex==11/*bass*/) {
+            if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200) {
                 if(pos.y-lastClef.y>110 && staffCount!=1) {
-                    staffs << (lastClef.y+pos.y)/2-18;
+                    staffs << (lastClef.y+pos.y)/2; //+14 //-6; //-18; FIXME
                     staffCount=1;
                 } else staffCount++;
                 lastClef=pos;
@@ -86,11 +86,10 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
             break_:;
         }
-    } else if(pass==1) {
+    } else if(pass==1) { // 2nd pass: detect notes and assign to staves
         //log(font); debug[pos]=str(code,fontIndex);
         uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
         if(i>=notes.size()) notes.grow(i+1);
-        //debug[pos]=str(pos.y-staffs[i]);
         int duration=-1;
         if(font=="MScore-20"_) { //TODO: glyph OCR
             if(msScore) {
@@ -120,8 +119,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                     if(size<30) duration= 0; //grace
                     else duration = 4; //quarter
                 }
-                else if(code==11) duration = 8; //half
-                //else if(code==9) duration = 8; //half
+                else if(code==11 /*|| code==9*/) duration = 8; //half
                 //else if(code==16) duration = 16; //whole
             } else if(endsWith(font,"Opus"_)) {
                 if(fontIndex==53) {
@@ -181,7 +179,15 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==106) duration = 8; //half
             else if(code==105) duration = 16; //whole
         }
-        if(duration>=0 && !notes[i].sorted(pos.x).contains(-pos.y)) notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
+        if(duration<0) return;
+        if(notes[i].sorted(pos.x).contains(-pos.y)) return;
+        float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
+        if(nearestStaffCut<6) {
+            nearStaffLimit.insert(pos,Note(index,duration)); //defer staff assignment until all unambiguous notes are assigned
+            /*if(abs(pos.y-staffs[max(int(i)-1,0)])<abs(pos.y-staffs[i])) debug[pos]=str(pos.y-staffs[max(int(i)-1,0)]);
+            else debug[pos]=str(pos.y-staffs[i]);*/
+        }
+        else notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
     }
 }
 
@@ -190,8 +196,16 @@ string str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)
 void Score::parse() {
     if(!staffs) return; assert(staffs);
     staffs << (lastClef.y+110); //add a last split at the bottom of the last page
-    //uint i=0; for(Staff& staff: notes) { for(int x : staff.keys) for(int y : staff.at(x).keys) debug[vec2(x+16,-y)]=str(i); i++; } //assert proper staff sorting
-
+    for(pair<vec2,Note> note: nearStaffLimit) {
+        float min=1000; Staff* bestStaff=0;
+        for(Staff& staff: notes) { for(int x : staff.keys) for(int y : staff.at(x).keys) {
+                float d = length(note.key-vec2(x,-y));
+                if(d < min) min=d, bestStaff=&staff;
+            }
+        }
+        if(!bestStaff) { error("Unable to assign note to staff"); continue; }
+        bestStaff->sorted(note.key.x).insertSorted(-note.key.y, note.value);
+    }
     /// Lengthens dotted notes
     for(pair< int,array<vec2> > dots: this->dots) {
         for(vec2 pos: dots.value) for(int x : notes[dots.key].keys) {
@@ -309,8 +323,8 @@ trillCancelTie: ;
                             } else if(staff[lastX].size()>=staff[x].size() && abs(x-lastX)<=16 && abs(y-y2)<=6) {
                                 if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
                                 staff[x].remove(y); debug[vec2(x,-y)]<<string("<-"_); goto again;
-                            } else debug[vec2(x,-y)]<<str("?"_,x-lastX,y-y2);
-                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y)]<<"?"_+str(x-lastX,y-y2);
+                            } //else debug[vec2(x,-y)]<<str("?"_,x-lastX,y-y2);
+                        } //else if(abs(x-lastX)<10 || (abs(x-lastX)<20 && abs(y-y2)<20)) debug[vec2(x,-y)]<<"?"_+str(x-lastX,y-y2);
                     }
                 }
             }
@@ -430,6 +444,7 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     /// Synchronize notes to MIDI track
     array<MidiNote> notes; //flatten chords for robust MIDI synchronization
     for(const Chord& chord: MIDI.values) notes<<chord;
+#if 0
     vec2 lastPos=vec2(0,0); int lastKey=0;
     for(uint i=0; i<notes.size() && i<positions.size();) {
         vec2 pos=positions[i]; MidiNote note = notes[i];
@@ -444,21 +459,21 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
         /*if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
             debug[pos]=string("++++"_);
             positions.removeAt(i); indices.removeAt(i);
-        } else*/ if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
+        } else*//* if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
             debug[pos]<<str("----"_,lastPos.x-pos.x,lastPos.y-pos.y);
             notes.removeAt(i);
-        } else {
+        } else*/ {
             //debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
             i++;
         }
         lastPos=pos; lastKey=note.key;
     }
-
+#endif
     chords.clear();
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        //debug[positions[i]+vec2(12,0)]<<str(notes[i].key);
+        debug[positions[i]]<<str(notes[i].key);
     }
 }
 
@@ -467,7 +482,7 @@ void Score::annotate(map<uint,Chord>&& chords) {
     array<MidiNote> notes; //flatten chords for robust annotations
     for(const Chord& chord: chords.values) notes<<chord;
     for(uint i=0; i<notes.size() && i<positions.size();) {
-        debug[positions[i]+vec2(12,0)]<<str(notes[i].key);
+        debug[positions[i]]<<str(notes[i].key);
         i++;
     }
     this->chords=move(chords);
@@ -522,7 +537,7 @@ void Score::insert() {
             uint t=-1; for(uint i: range(notes.size())) {
                 if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
                 chords.at(t) << notes[i];
-                debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
+                debug[positions[i]]<<str(notes[i].key);
             }
             annotationsChanged(chords);
         }
@@ -599,7 +614,7 @@ void Score::noteEvent(int key, int vel) {
                 uint t=-1; for(uint i: range(notes.size())) {
                     if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
                     chords.at(t) << notes[i];
-                    debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
+                    debug[positions[i]]<<str(notes[i].key);
                 }
                 annotationsChanged(chords);
 
@@ -617,11 +632,13 @@ void Score::noteEvent(int key, int vel) {
         } else if(key) {
             if(active.contains(key)) active.remove(key);
         }
-        if(!expected && chordIndex<chords.size()-1) {
+        while(!expected && chordIndex<chords.size()-1) {
             noteIndex+=chords.values[chordIndex].size();
             chordIndex++;
             int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-                expected.insertMulti(note.key, i);
+                if(note.duration > 1 && //skip graces
+                        !expected.contains(note.key) //skip double notes
+                        ) expected.insert(note.key, i);
                 while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                     assert(currentStaff<staffs.size());
                     if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);

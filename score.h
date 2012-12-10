@@ -33,6 +33,7 @@ struct Score {
     typedef map<int, map< int, Note> > Staff;
     array<Staff> notes; //[staff][x][y]
     map<int, array<vec2> > dots;
+    map<vec2,Note> nearStaffLimit;
 
     void parse();
     void synchronize(const map<uint,Chord>& MIDI);
@@ -62,5 +63,5 @@ struct Score {
     int pass=-1;
     int msScore=0;
 
-    void clear() { staffs.clear(); lastClef=lastPos=0; repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; active.clear(); miss.clear(); expected.clear(); debug.clear(); pass=-1; }
+    void clear() { staffs.clear(); lastClef=lastPos=0; repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; active.clear(); miss.clear(); expected.clear(); debug.clear(); pass=-1; nearStaffLimit.clear(); }
 };
