@@ -41,3 +41,6 @@ void blit(int2 target, const Image& source, vec4 color=white);
 void line(vec2 p1, vec2 p2, vec4 color=black);
 inline void line(int2 p1, int2 p2, vec4 color=black) { line(vec2(p1),vec2(p2),color); }
 inline void line(int x1, int y1, int x2, int y2, vec4 color=black) { line(vec2(x1,y1),vec2(x2,y2),color); }
+
+/// Draws a disk
+void disk(vec2 p, float r=1, vec4 color=black);

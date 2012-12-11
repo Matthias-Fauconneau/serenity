@@ -11,6 +11,7 @@ enum {TFD_CLOEXEC = 02000000};
 #include <time.h>
 #include <sys/timerfd.h>
 #endif
+
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
 long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
 uint64 cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000UL+ts.tv_nsec/1000; }

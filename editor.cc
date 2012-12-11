@@ -318,7 +318,7 @@ struct Editor : Widget {
         window.render();
     }
 
-    uint64 frameEnd=cpuTime(), frameTime=20000; // last frame end and initial frame time in microseconds
+    uint64 frameEnd=cpuTime(), frameTime=20000; // last frame end and initial frame time estimation in microseconds
 
     void render(int2 position, int2 size) override {
         uint width=size.x, height = size.y;

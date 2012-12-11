@@ -176,7 +176,7 @@ string ftoa(double n, int precision, int exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
-    uint32 e=0; if(exponent) while(int64(n)==0) n*=exponent, e++;
+    uint32 e=0; if(exponent) while(n!=0 && abs(n)<1) n*=exponent, e++;
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
-    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+(precision?"."_+utoa<10>(uint64(m*abs(n))%m,precision):string())+(e?"·"_+dec(exponent)+"^-"_+str(e):string());
+    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+(precision?"."_+utoa<10>(uint64(m*abs(n))%m,precision):string())+(e?"e-"_+str(e):string());
 }

@@ -37,6 +37,21 @@ template<class T> void reallocate(T*& buffer, int unused size, int need) { buffe
 template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); free((void*)buffer); buffer=0; }
 #endif
 
+/// Simple writable fixed-capacity memory reference
+template<class T> struct Buffer {
+    T* data=0;
+    uint capacity=0,size=0;
+    Buffer(){}
+    Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
+    Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy16(data,o.data,size*sizeof(T)/16);}
+    move_operator_(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
+    ~Buffer(){if(data){unallocate(data,capacity);}}
+    operator T*() { return data; }
+    operator ref<T>() const { return ref<T>(data,size); }
+    constexpr const T* begin() const { return data; }
+    constexpr const T* end() const { return data+size; }
+};
+
 /// Dynamic object allocation (using constructor and destructor)
 inline void* operator new(size_t, void* p) { return p; } //placement new
 template<class T, class... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }

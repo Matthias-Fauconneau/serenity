@@ -73,7 +73,7 @@ inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 
 /// Converts floating-point numbers
-string ftoa(double number, int precision=2, int exponent=0);
+string ftoa(double number, int precision=2, int exponent=10);
 inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
@@ -87,6 +87,9 @@ template<class T> string dec(const ref<T>& a, char separator=' ') { string s; fo
 template<class T> string dec(const array<T>& a, char separator=' ') { return dec(ref<T>(a),separator); }
 template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string hex(const array<T>& a, char separator=' ') { return hex(ref<T>(a),separator); }
+
+/// Converts static arrays
+template<class T, size_t N> string str(const T (&a)[N]) { return str(ref<T>(a,N)); }
 
 /// Expression template to manage recursive concatenation operations
 template<class A, class B> struct cat {

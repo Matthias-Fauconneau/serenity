@@ -47,3 +47,5 @@ midiscore.h
 midiscore.cc
 reverb.h
 reverb.cc
+mnp.h
+mnp.cc

@@ -97,3 +97,13 @@ void line(vec2 p1, vec2 p2, vec4 color) {
         glDrawLine(fillShader(), p1, p2);
     }
 }
+
+void disk(vec2 p, float r, vec4 color) {
+    if(!softwareRendering) error("Unsupported");
+    Rect rect = Rect(int2(p-vec2(r)),int2(ceil(p+vec2(r)))) & currentClip;
+    byte4 color8 = byte4(color.z*255,color.y*255,color.x*255,color.w*255);
+    for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+        float d = (x-p.x)*(x-p.x)+(y-p.y)*(y-p.y);
+        if(d<r*r) framebuffer(x,y) = color8; //TODO: antialising
+    }
+}

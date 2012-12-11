@@ -179,7 +179,7 @@ void __attribute((constructor(101))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    //setExceptions(Invalid|DivisionByZero);
+    setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);
 #endif
 
 }

@@ -157,4 +157,5 @@ inline int round(float f) { return __builtin_roundf(f); }
 inline int ceil(float f) { return __builtin_ceilf(f); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 
-inline float pow(float x, float y) { return __builtin_pow(x,y); }
+inline float pow(float x, float y) { return __builtin_powf(x,y); }
+inline float powi(float x, int y) { return __builtin_powif(x,y); }
