@@ -12,10 +12,10 @@ struct Resampler {
     void write(const float* source, uint sourceSize);
     /// Convolves buffered samples with the resampling kernel to produce \a targetSize samples
     /// \note If mix is true, samples are mixed with \a target (instead of overwriting the \a target buffer).
-    template<bool mix> void read(float* target, uint targetSize);
+    template<bool mix=false> void read(float* target, uint targetSize);
     /// Resamples \a sourceSize samples from \a source to \a targetSize samples in \a target
     /// \note If mix is true, samples are mixed with \a target (instead of overwriting the \a target buffer).
-    template<bool mix> void filter(const float* source, uint sourceSize, float* target, uint targetSize);
+    template<bool mix=false> void filter(const float* source, uint sourceSize, float* target, uint targetSize);
 
     explicit operator bool() const { return kernel; }
     ~Resampler();

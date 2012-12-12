@@ -60,7 +60,8 @@ struct Timer : Poll {
     Timer();
     ~Timer();
     void setAbsolute(long sec, long nsec=0);
-    virtual void event() =0;
+    signal<> timeout;
+    virtual void event() { timeout(); }
 };
 
 /// Generates a sequence of uniformly distributed pseudo-random 64bit integers

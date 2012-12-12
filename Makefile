@@ -8,7 +8,9 @@ ifeq ($(CC),cc)
  else ifeq ($(TARGET),editor)
    CC := g++ -fabi-version=0
  else ifeq ($(TARGET),test)
-     CC := g++ -fabi-version=0
+   CC := g++ -fabi-version=0
+ else ifeq ($(TARGET),mnp)
+   CC := g++ -fabi-version=0
  else
   CC := clang++ -Wno-lambda-extensions
  endif
@@ -42,7 +44,7 @@ LIBS_player = avformat avcodec
 LIBS_gl = GL
 LIBS_window = X11
 LIBS_sampler = fftw3f_threads
-LIBS_music = swscale avformat
+LIBS_record = swscale avformat
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

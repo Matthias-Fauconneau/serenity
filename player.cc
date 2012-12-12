@@ -119,7 +119,7 @@ struct Player {
     FFmpegMedia ffmpeg;
     Resampler resampler;
     AudioOutput audio __({this,&Player::read});
-    bool read(ptr& swPointer, int32* output, uint size) {
+    bool read(int32* output, uint size) {
         float buffer[2*size];
         uint inputSize = resampler?resampler.need(size):size;
         {int size=inputSize; for(float2* input=(float2*)buffer;;) {
@@ -133,7 +133,6 @@ struct Player {
         if(resampler) resampler.filter<false>(buffer,inputSize,buffer,size);
         assert(size%4==0);
         for(uint i: range(size*2)) output[i] = buffer[i];
-        swPointer += size;
         update(media->position(),media->duration());
         return true;
     }

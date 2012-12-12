@@ -271,7 +271,7 @@ void Note::read(float4* out, uint size) {
     buffer.size-=size*2; writeCount.release(size*2); //allow decoder to continue
     position+=size*2; //keep track of position for release sample level matching
 }
-bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio thread
+bool Sampler::read(int32* output, uint size) { // Audio thread
     {Locker lock(noteReadLock);
         if(size!=periodSize) error(size,periodSize);
         // Setups mixing buffer
@@ -323,8 +323,6 @@ bool Sampler::read(ptr& swPointer, int32* output, uint size unused) { // Audio t
         }
         // Converts mixing buffer to signed 32bit output
         for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(((float8*)buffer)[i]);
-
-        swPointer += periodSize;
     }
     time+=periodSize;
     queue(); //queue background decoder in main thread
