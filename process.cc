@@ -31,9 +31,9 @@ enum {WNOHANG=1};
 #else
 #include <sys/eventfd.h>
 #include <sched.h>
+#define signal signal_
 #include <signal.h>
 #include <sys/resource.h>
-#include <sys/signal.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 //FIXME: use pthread

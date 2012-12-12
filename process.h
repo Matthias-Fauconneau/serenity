@@ -2,6 +2,7 @@
 /// \file process.h \link Thread threaded event loops\endlink, \link Semaphore synchronization\endlink, execute, process environment and arguments
 #include "array.h"
 #include "file.h"
+#include "function.h"
 typedef unsigned long int pthread;
 struct pthread_mutex { int lock; uint count; int owner; uint nusers; int kind, spins; void* prev,*next; };
 struct pthread_cond { int lock; uint futex; uint64 total_seq, wakeup_seq, woken_seq; void* mutex; uint nwaiters; uint broadcast_seq; };
@@ -98,6 +99,26 @@ struct Thread : array<Poll*>, EventFD, Poll {
     bool processEvents();
     /// Processes one queued task
     void event();
+};
+
+/// Runs a loop in parallel
+template<int N=8> struct parallel {
+    uint iterationCount;
+    function<void(uint)> delegate;
+    uint counter=0;
+    static void* start_routine(parallel* this_) {
+        for(;;) { uint i=__sync_fetch_and_add(&this_->counter,1);
+            if(i>=this_->iterationCount) break;
+            this_->delegate(i);
+        }
+        return 0;
+    }
+    template<class F> parallel(uint iterationCount, F f) : iterationCount(iterationCount), delegate(f) {
+        pthread threads[N-1];
+        for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,(void*(*)(void*))start_routine,this);
+        start_routine(this);
+        for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
+    }
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all file-scope objects and exits process.
