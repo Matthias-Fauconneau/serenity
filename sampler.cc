@@ -13,31 +13,24 @@ inline float exp10(float x) { return exp2(x*log2(10)); }
 inline float log10(float x) { return log2(x)/log2(10); }
 inline float dB(float x) { return 10*log10(x); }
 
-/// Raw memory copy
-typedef int m128 __attribute((vector_size(16)));
-void copy16(void* target,const void* source, int size) {
-    m128* dst=(m128*)target, *src=(m128*)source, *end=(m128*)source+size;
-    constexpr uint unroll=4; assert(size%unroll==0);
-    while(src<end) {
-        __builtin_prefetch(src+32,0,0);
-        __builtin_prefetch(dst+32,0,0);
-        for(uint i: range(unroll)) dst[i]=src[i];
-        src+=unroll; dst+=unroll;
-    }
-}
-
-#include "map.h"
-uint availableMemory() {
-    map<string, uint> info;
-    for(TextData s = File("/proc/meminfo"_).readUpTo(4096);s;) {
-        ref<byte> key=s.until(':'); s.skip();
-        uint value=toInteger(s.untilAny(" \n"_)); s.line();
-        info.insert(string(key), value);
-    }
-    return info.at(string("MemFree"_))+info.at(string("Inactive"_))+info.at(string("Active(file)"_));
-}
+inline string str(const Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
 
 /// SFZ
+
+int noteToMIDI(const ref<byte>& value) {
+    int note=24;
+    int i=0;
+    assert(value[i]>='a' && value[i]<='g');
+    note += "c#d#ef#g#a#b"_.indexOf(value[i]);
+    i++;
+    if(value.size==3) {
+        if(value[i]=='#') { note++; i++; }
+        else error(value);
+    }
+    assert(value[i]>='0' && value[i]<='8', value);
+    note += 12*(value[i]-'0');
+    return note;
+}
 
 void Sampler::open(const ref<byte>& path) {
     // parse sfz and map samples
@@ -58,7 +51,7 @@ void Sampler::open(const ref<byte>& path) {
             ref<byte> key = s.until('=');
             ref<byte> value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
-                string path = replace(value,"\\"_,"/"_);
+                string path = replace(replace(value,"\\"_,"/"_),".wav"_,".flac"_);
                 sample->map = Map(path,folder);
                 sample->data = Note(sample->map);
                 if(!existsFile(string(path+".env"_),folder)) {
@@ -80,14 +73,23 @@ void Sampler::open(const ref<byte>& path) {
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
             else if(key=="hivel"_) sample->hivel=toInteger(value);
-            else if(key=="lokey"_) sample->lokey=toInteger(value);
-            else if(key=="hikey"_) sample->hikey=toInteger(value);
-            else if(key=="pitch_keycenter"_) sample->pitch_keycenter=toInteger(value);
-            else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=toInteger(value);
-            else if(key=="ampeg_release"_) sample->releaseTime=toInteger(value);
+            else if(key=="lokey"_) sample->lokey=isInteger(value)?toInteger(value):noteToMIDI(value);
+            else if(key=="hikey"_) sample->hikey=isInteger(value)?toInteger(value):noteToMIDI(value);
+            else if(key=="pitch_keycenter"_) {
+                sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
+                assert(sample->pitch_keycenter>=sample->lokey,sample->pitch_keycenter,value);
+                assert(sample->pitch_keycenter<=sample->hikey,sample->pitch_keycenter,value);
+            }
+            else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
+            else if(key=="ampeg_release"_) sample->releaseTime=toDecimal(value);
             else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
             else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);
             else if(key=="volume"_) sample->volume=toInteger(value);
+            else if(key=="tune"_) {} //FIXME
+            else if(key=="ampeg_attack"_) {} //FIXME
+            else if(key=="ampeg_vel2attack"_) {} //FIXME
+            else if(key=="fil_type"_) {} //FIXME
+            else if(key=="cutoff"_) {} //FIXME
             else error("Unknown opcode"_,key);
         }
     }
@@ -205,6 +207,7 @@ void Sampler::noteEvent(int key, int velocity) {
             note.step=(float4)__(1,1,1,1);
             note.releaseTime=s.releaseTime;
             note.envelope=s.envelope;
+            if(note.sampleSize==16) level*=0x1p8;
             note.level=(float4)__(level,level,level,level);
             {Locker lock(noteReadLock);
                 if(abs(key-s.pitch_keycenter)>1) { log("Unsupported pitch shift",s.pitch_keycenter,"->",key); return; }
@@ -217,7 +220,8 @@ void Sampler::noteEvent(int key, int velocity) {
         }
     }
     if(current) return; //release samples are not mandatory
-    log("Missing sample"_,key,velocity);
+    log("Missing sample"_,key);
+    log(samples);
 }
 
 /// Background decoder (background thread)

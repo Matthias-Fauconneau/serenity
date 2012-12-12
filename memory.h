@@ -12,8 +12,6 @@ template<class T> void clear(T* buffer, int size, const T& value=T()) { for(int 
 
 /// Raw memory copy
 inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
-/// Aligned raw memory copy
-void copy16(void* dst,const void* src, int size);
 /// Buffer explicit copy
 template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
 
@@ -43,7 +41,7 @@ template<class T> struct Buffer {
     uint capacity=0,size=0;
     Buffer(){}
     Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
-    Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy16(data,o.data,size*sizeof(T)/16);}
+    Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy(data,o.data,size*sizeof(T));}
     move_operator_(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     ~Buffer(){if(data){unallocate(data,capacity);}}
     operator T*() { return data; }

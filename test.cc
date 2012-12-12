@@ -121,7 +121,7 @@ struct SFZViewer : Widget {
     Text text;
     Keyboard keyboard;
     VBox layout;
-    Window window __(&layout,int2(0,0),"SFZ Viewer"_);
+    Window window __(&layout,int2(0,1050),"SFZ Viewer"_);
 
     float* buffer;
     float* hann;
@@ -137,7 +137,8 @@ struct SFZViewer : Widget {
     SFZViewer() {
         layout << this << &text << &keyboard;
 
-        sampler.open("/Samples/Boesendorfer.sfz"_);
+        //sampler.open("/Samples/Boesendorfer.sfz"_);
+        sampler.open("/Samples/Sonatina/Strings - Violin Solo.sfz"_);
         sampler.frameReady.connect(this,&SFZViewer::viewFrame);
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);

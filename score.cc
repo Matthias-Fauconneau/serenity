@@ -181,7 +181,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         }
         if(duration<0) return;
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
-        float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
+        float nearestStaffCut = staffs?6:min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
         if(nearestStaffCut<6) {
             nearStaffLimit.insert(pos,Note(index,duration)); //defer staff assignment until all unambiguous notes are assigned
             /*if(abs(pos.y-staffs[max(int(i)-1,0)])<abs(pos.y-staffs[i])) debug[pos]=str(pos.y-staffs[max(int(i)-1,0)]);
@@ -413,7 +413,7 @@ spurious: ;
     /// Flatten sorted notes
     for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) {
         staff.at(x).at(y).scoreIndex=indices.size();
-        positions<<vec2(x,-y); indices<<staff.at(x).at(y).index;
+        positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
     }
 
     /// Detect and explicit repeats
@@ -429,6 +429,7 @@ spurious: ;
             if(index>startIndex) continue;
             { array<vec2> cat; cat<<positions.slice(0,index+1)<<positions.slice(startIndex+1); positions = move(cat); }
             { array<int> cat; cat<<indices.slice(0,index+1)<<indices.slice(startIndex+1); indices = move(cat); }
+            { array<int> cat; cat<<durations.slice(0,index+1)<<durations.slice(startIndex+1); durations = move(cat); }
             startIndex=-2;
             debug[pos]="}"_+dec(index);
         }
@@ -481,11 +482,16 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
 void Score::annotate(map<uint,Chord>&& chords) {
     array<MidiNote> notes; //flatten chords for robust annotations
     for(const Chord& chord: chords.values) notes<<chord;
-    for(uint i=0; i<notes.size() && i<positions.size();) {
-        debug[positions[i]]<<str(notes[i].key);
+    for(uint i=0; i<notes.size() && i<durations.size();) {
+        notes[i].duration = durations[i];
         i++;
     }
-    this->chords=move(chords);
+    this->chords.clear();
+    uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
+        if(i==0 || positions[i-1].x != positions[i].x) this->chords.insert(++t);
+        this->chords.at(t) << notes[i];
+        debug[positions[i]]<<str(notes[i].key);
+    }
 }
 
 void Score::toggleEdit() {
@@ -583,7 +589,9 @@ void Score::seek(uint unused time) {
     } else if(chords) {
         chordIndex=0, noteIndex=0; currentStaff=0; expected.clear(); active.clear();
         int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-            expected.insertMulti(note.key, i);
+            if(note.duration > 0 && //skip graces
+                    !expected.contains(note.key) //skip double notes
+                    ) expected.insert(note.key, i);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                 assert(currentStaff<staffs.size());
                 nextStaff(staffs[currentStaff],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
@@ -636,7 +644,7 @@ void Score::noteEvent(int key, int vel) {
             noteIndex+=chords.values[chordIndex].size();
             chordIndex++;
             int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-                if(note.duration > 1 && //skip graces
+                if(note.duration > 0 && //skip graces
                         !expected.contains(note.key) //skip double notes
                         ) expected.insert(note.key, i);
                 while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {

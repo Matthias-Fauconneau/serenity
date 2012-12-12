@@ -136,7 +136,9 @@ struct Music {
 
     Music() {
         layout << &sheets;// << &keyboard;
-        sampler.open("/Samples/Boesendorfer.sfz"_);
+        //sampler.open("/Samples/Boesendorfer.sfz"_);
+        sampler.open("/Samples/Sonatina/Strings - Celli Sustain.sfz"_);
+
 
         array<string> files = folder.list(Files);
         for(string& file : files) {
