@@ -188,6 +188,7 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
+        openSheet("Skyrim - Secunda"_);
     }
 
     /// Called by score to scroll PDF as needed when playing

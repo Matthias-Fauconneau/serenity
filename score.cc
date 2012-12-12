@@ -3,6 +3,8 @@
 void Score::onPath(const ref<vec2>& p) {
     vec2 min=p[0], max=p[0]; for(vec2 a: p) min=::min(min,a), max=::max(max,a);
     vec2 center = (min+max)/2.f; vec2 span=max-min;
+    if(span.y==0 && span.x>10 && span.x<30) ledgers << center;
+    else if(span.y==0 && span.x>100) staffLines << center.y;
     if(p.size==2) {
         if(p[0].x==p[1].x && abs(p[0].y-p[1].y)>20 && abs(p[0].y-p[1].y)<70) {
             tails << Line(p[0], p[1]);
@@ -181,13 +183,36 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         }
         if(duration<0) return;
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
-        float nearestStaffCut = staffs?6:min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
-        if(nearestStaffCut<6) {
-            nearStaffLimit.insert(pos,Note(index,duration)); //defer staff assignment until all unambiguous notes are assigned
-            /*if(abs(pos.y-staffs[max(int(i)-1,0)])<abs(pos.y-staffs[i])) debug[pos]=str(pos.y-staffs[max(int(i)-1,0)]);
-            else debug[pos]=str(pos.y-staffs[i]);*/
+        if(staffs) {
+            float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
+            //debug[floor(pos)]<<str(nearestStaffCut);
+            if(nearestStaffCut<20) { // Follow ledgers away from staff limit
+                float min=30; vec2 best=pos;
+                for(vec2 ledger: ledgers) {
+                    float d = length(ledger-pos);
+                    if(d>10.5 && d<min) {
+                        min=d, best=ledger;
+                        //debug[best]<<str(min);
+                    }
+                }
+                i=0; for(;i<staffs.size() && best.y>staffs[i];i++) {}
+                if(i>=notes.size()) notes.grow(i+1);
+                float nearestStaffCut = ::min(abs(best.y-staffs[max(int(i)-1,0)]),abs(best.y-staffs[i]));
+                if(nearestStaffCut<20) { // Follow staff lines away from staff limit
+                    float min=30; vec2 best2=best;
+                    for(float y: staffLines) {
+                        float d = abs(y-best.y);
+                        if(abs(y-pos.y)<min || (d<10 && d<min)) {
+                            min=d, best2.y=y;
+                            //debug[best2]<<str(min);
+                        }
+                    }
+                    i=0; for(;i<staffs.size() && best2.y>staffs[i];i++) {}
+                    if(i>=notes.size()) notes.grow(i+1);
+                }
+            }
         }
-        else notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
+        notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
     }
 }
 
@@ -196,6 +221,7 @@ string str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)
 void Score::parse() {
     if(!staffs) return; assert(staffs);
     staffs << (lastClef.y+110); //add a last split at the bottom of the last page
+    /*Disambiguates notes near staff limits
     for(pair<vec2,Note> note: nearStaffLimit) {
         float min=1000; Staff* bestStaff=0;
         for(Staff& staff: notes) { for(int x : staff.keys) for(int y : staff.at(x).keys) {
@@ -205,7 +231,7 @@ void Score::parse() {
         }
         if(!bestStaff) { error("Unable to assign note to staff"); continue; }
         bestStaff->sorted(note.key.x).insertSorted(-note.key.y, note.value);
-    }
+    }*/
     /// Lengthens dotted notes
     for(pair< int,array<vec2> > dots: this->dots) {
         for(vec2 pos: dots.value) for(int x : notes[dots.key].keys) {
@@ -411,9 +437,13 @@ spurious: ;
     }*/
 
     /// Flatten sorted notes
-    for(Staff& staff: notes) for(int x : staff.keys) for(int y : staff.at(x).keys) {
-        staff.at(x).at(y).scoreIndex=indices.size();
-        positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
+    uint i=0; for(Staff& staff: notes) {
+        for(int x : staff.keys) for(int y : staff.at(x).keys) {
+            staff.at(x).at(y).scoreIndex=indices.size();
+            positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
+            debug[positions.last()]<<str(i)+" "_;
+        }
+        i++;
     }
 
     /// Detect and explicit repeats
