@@ -185,26 +185,26 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
         if(staffs) {
             float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
-            debug[floor(pos)]<<str(nearestStaffCut);
+            //debug[floor(pos)]<<str(nearestStaffCut);
             if(nearestStaffCut<20) { // Follow ledgers away from staff limit
-                float min=30; vec2 best=pos;
+                /*float min=30;*/ float max=0; vec2 best=pos;
                 for(vec2 ledger: ledgers) {
                     float d = length(ledger-pos);
-                    if(d>10.5 && d<min) {
-                        min=d, best=ledger;
-                        debug[best]<<str(min);
+                    if((abs(ledger-pos).y>max && d<30)/* || d<min*/) {
+                        /*min=d,*/ max=abs(ledger-pos).y, best=ledger;
+                        //debug[best]<<str(/*min*/max);
                     }
                 }
                 i=0; for(;i<staffs.size() && best.y>staffs[i];i++) {}
                 if(i>=notes.size()) notes.grow(i+1);
-                float nearestStaffCut = ::min(abs(best.y-staffs[max(int(i)-1,0)]),abs(best.y-staffs[i]));
+                float nearestStaffCut = ::min(abs(best.y-staffs[::max(int(i)-1,0)]),abs(best.y-staffs[i]));
                 if(nearestStaffCut<20) { // Follow staff lines away from staff limit
                     float min=30; vec2 best2=best;
                     for(float y: staffLines) {
                         float d = abs(y-best.y);
-                        if(abs(y-pos.y)<min || (d<10 && d<min)) {
+                        if((abs(y-pos.y)<min && abs(y-pos.y)<10) || d<min) {
                             min=d, best2.y=y;
-                            debug[best2]<<str(min);
+                            //debug[best2]<<str(min);
                         }
                     }
                     i=0; for(;i<staffs.size() && best2.y>staffs[i];i++) {}
@@ -441,7 +441,7 @@ spurious: ;
         for(int x : staff.keys) for(int y : staff.at(x).keys) {
             staff.at(x).at(y).scoreIndex=indices.size();
             positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
-            debug[positions.last()]<<str(i)+" "_;
+            //debug[positions.last()]<<str(i)+" "_;
         }
         i++;
     }
@@ -475,7 +475,12 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     /// Synchronize notes to MIDI track
     array<MidiNote> notes; //flatten chords for robust MIDI synchronization
     for(const Chord& chord: MIDI.values) notes<<chord;
-#if 0
+
+    // Removes graces both in MIDI and score (separately as they are not ordered correctly)
+    for(uint i=0; i<notes.size();) if(notes[i].duration==0) notes.removeAt(i); else i++;
+    for(uint i=0; i<durations.size();) if(durations[i]==0)  positions.removeAt(i), indices.removeAt(i), durations.removeAt(i); else i++;
+
+    // Synchronize score with MIDI
     vec2 lastPos=vec2(0,0); int lastKey=0;
     for(uint i=0; i<notes.size() && i<positions.size();) {
         vec2 pos=positions[i]; MidiNote note = notes[i];
@@ -487,24 +492,24 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
             debug[pos]=string("////"_);
             positions.removeAt(i); indices.removeAt(i);
         } else*/
-        /*if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
+        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
             debug[pos]=string("++++"_);
             positions.removeAt(i); indices.removeAt(i);
-        } else*//* if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
+        } /*else if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
             debug[pos]<<str("----"_,lastPos.x-pos.x,lastPos.y-pos.y);
             notes.removeAt(i);
-        } else*/ {
+        }*/ else {
             //debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
             i++;
         }
         lastPos=pos; lastKey=note.key;
     }
-#endif
+
     chords.clear();
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]]<<str(notes[i].key);
+        debug[positions[i]]<<str(notes[i].key)+" "_+str((uint)notes[i].duration);
     }
 }
 

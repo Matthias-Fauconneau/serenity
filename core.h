@@ -152,9 +152,9 @@ template<class A, class B> bool operator >(const A& a, const B& b) { return b<a;
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 
 // Floating-point operations
-inline int floor(float f) { return __builtin_floorf(f); }
-inline int round(float f) { return __builtin_roundf(f); }
-inline int ceil(float f) { return __builtin_ceilf(f); }
+inline float floor(float f) { return __builtin_floorf(f); }
+inline float round(float f) { return __builtin_roundf(f); }
+inline float ceil(float f) { return __builtin_ceilf(f); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 
 inline float pow(float x, float y) { return __builtin_powf(x,y); }

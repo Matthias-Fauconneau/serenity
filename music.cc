@@ -186,7 +186,6 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
-        openSheet("Skyrim - Ancient Stones"_);
     }
 
     /// Called by score to scroll PDF as needed when playing
