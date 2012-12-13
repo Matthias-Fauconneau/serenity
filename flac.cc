@@ -193,7 +193,7 @@ void FLAC::decodeFrame() {
             else if(order==2) predictor[0]=-1, predictor[1]=2;
             else if(order==3) predictor[0]=0, predictor[1]=1, predictor[2]=-3, predictor[3]=3;
             else if(order==4) predictor[0]=-1, predictor[1]=4, predictor[2]=-6, predictor[3]=4;
-        } else error("Unknown type",type,channel,blockSize,index,bsize);
+        } else { error("Unknown type",type,channel,blockSize,index,bsize); return; }
         float* end=signal; signal += order;
 
         //Residual

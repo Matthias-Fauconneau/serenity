@@ -185,14 +185,14 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
         if(staffs) {
             float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
-            //debug[floor(pos)]<<str(nearestStaffCut);
+            debug[floor(pos)]<<str(nearestStaffCut);
             if(nearestStaffCut<20) { // Follow ledgers away from staff limit
                 float min=30; vec2 best=pos;
                 for(vec2 ledger: ledgers) {
                     float d = length(ledger-pos);
                     if(d>10.5 && d<min) {
                         min=d, best=ledger;
-                        //debug[best]<<str(min);
+                        debug[best]<<str(min);
                     }
                 }
                 i=0; for(;i<staffs.size() && best.y>staffs[i];i++) {}
@@ -204,7 +204,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                         float d = abs(y-best.y);
                         if(abs(y-pos.y)<min || (d<10 && d<min)) {
                             min=d, best2.y=y;
-                            //debug[best2]<<str(min);
+                            debug[best2]<<str(min);
                         }
                     }
                     i=0; for(;i<staffs.size() && best2.y>staffs[i];i++) {}

@@ -1,55 +1,4 @@
 #if 0
-#include "window.h"
-#include "display.h"
-#include "gl.h"
-
-inline float log2(float x) { return __builtin_log2f(x); }
-inline float exp2(float x) { return __builtin_exp2f(x); }
-struct Plot : Widget {
-    Window window __(this,int2(0,0),"Plot"_,false);
-
-    Plot(){
-        window.localShortcut(Escape).connect(&exit);
-        window.backgroundCenter=window.backgroundColor=0xFF;
-    }
-
-    void plot(int2 position, int2 size, float* Y, uint N) {
-        float min=0, max=1;
-        for(uint x=0;x<N;x++) {
-            float y = Y[x];
-            min=::min(min,y);
-            max=::max(max,y);
-        }
-        GLBuffer buffer(Line);
-        buffer.allocate(0,2*(N-1),sizeof(vec2));
-        vec2* vertices = (vec2*)buffer.mapVertexBuffer();
-        for(uint x=0;x<N-1;x++) {
-            vertices[2*x+0] = project(vec2(position)+vec2((float)(x)*size.x/(N-1),  size.y-size.y*(Y[x]-min)/(max-min)));
-            vertices[2*x+1] = project(vec2(position)+vec2((float)(x+1)*size.x/(N-1), size.y-size.y*(Y[x+1]-min)/(max-min)));
-        }
-        buffer.unmapVertexBuffer();
-        extern GLShader& fillShader();
-        fillShader().bind();
-        fillShader()["color"] = vec4(1,1,1,1);
-        buffer.bindAttribute(fillShader(),"position",2);
-        buffer.draw();
-    }
-
-    uint t=0;
-    void render(int2 position, int2 size) {
-        const uint N = 48000;
-        const uint Y = 1680-16-16-120;
-        float Nmax = (N/2);
-        float Nmin = 27.5*(N/2)/48000;
-        float f[Y]; for(uint y: range(Y)) f[y] = Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y));
-        f[Y-1] = Nmax;
-        plot(position,size,f,Y);
-        window.render();
-    }
-} test;
-#endif
-
-#if 1
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -121,7 +70,7 @@ struct SFZViewer : Widget {
     Text text;
     Keyboard keyboard;
     VBox layout;
-    Window window __(&layout,int2(0,1050),"SFZ Viewer"_);
+    Window window __(&layout,int2(0,1050+16+16+120+120),"SFZ Viewer"_);
 
     float* buffer;
     float* hann;
@@ -129,16 +78,17 @@ struct SFZViewer : Widget {
     float* spectrum;
     const uint T = 1050;
     uint N = audio.rate; //*8 to get lowest notes
-    const uint Y = 1680-16-16-120;
+    const uint Y = 1050;
     uint t=0;
     float max=0x1p24f;
     Image spectrogram __(T,Y);
 
+    int lastVelocity=0;
+
     SFZViewer() {
         layout << this << &text << &keyboard;
 
-        //sampler.open("/Samples/Boesendorfer.sfz"_);
-        sampler.open("/Samples/Sonatina/Strings - Violin Solo.sfz"_);
+        sampler.open("/Samples/Boesendorfer.sfz"_);
         sampler.frameReady.connect(this,&SFZViewer::viewFrame);
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
@@ -191,11 +141,37 @@ struct SFZViewer : Widget {
         t++; if(t>=T) t=0;
         window.render();
     }
-    int2 sizeHint() { return int2(T,Y); }
-    void render(int2 position, int2) { blit(position,spectrogram); }
+    int2 sizeHint() { return int2(T,Y+120); }
+    void render(int2 position, int2 size) {
+        blit(position,spectrogram);
+        if(lastVelocity) { // Displays volume of all notes for a given velocity layer
+            int margin = (size.x-size.x/88*88)/2;
+            int dx = size.x/88;
+            int y0 = position.y+1050;
+            int y1 = size.y;
+            float level[88]={}; float max=0;
+            for(int key=0;key<88;key++) {
+                for(const Sample& s : sampler.samples) {
+                    if(s.trigger == 0 && s.lokey <= (21+key) && (21+key) <= s.hikey) {
+                        if(s.lovel<=lastVelocity && lastVelocity<=s.hivel) {
+                            if(level[key]!=0) { error("Multiple match"); }
+                            level[key] = s.data.actualLevel(0.25*44100);
+                            max = ::max(max, level[key]);
+                            break;
+                        }
+                    }
+                }
+            }
+            for(int key=0;key<88;key++) {
+                int x0 = position.x + margin + key * dx;
+                fill(x0,y1-level[key]/max*(y1-y0),x0+dx,y1);
+            }
+        }
+    }
 
     void noteEvent(int key, int velocity) {
         if(!velocity) return;
+        lastVelocity=velocity;
         string text;
         for(int last=0;;) {
             int lovel=0xFF; int hivel;
@@ -221,34 +197,39 @@ struct SFZViewer : Widget {
 
 #endif
 
-#if 0
+#if 1
 #include "process.h"
 #include "file.h"
 #include "inflate.h"
 #include "xml.h"
 
+inline float log2(float x) { return __builtin_log2f(x); }
+inline float log10(float x) { return log2(x)/log2(10); }
+
 struct NKI {
     NKI() {
         Element root = parseXML(inflate(readFile("/Samples/Boesendorfer.nki"_).slice(170),true));
-        string sfz;
-        root.xpath("K2_Container/Programs/K2_Program/Zones/K2_Zone"_, [&sfz](const Element& zone){
-            uint lowKey=0, highKey=0, rootKey=0, lowVelocity=0, highVelocity=0;
+        string attack; attack<<"<group> amp_veltrack=73 ampeg_release=1\n"_;
+        string release; release<<"<group> trigger=release\n"_;
+        root.xpath("K2_Container/Programs/K2_Program/Zones/K2_Zone"_, [&attack,&release](const Element& zone){
+            uint lowKey=0, highKey=0, rootKey=0, lowVelocity=0, highVelocity=0; float volume=1;
             zone.xpath("Parameters/V"_, [&](const Element& V){
                 ref<byte> name = V["name"_];
-#define value toInteger(V["value"_]);
-                if(name=="lowKey"_) lowKey=value;
-                if(name=="highKey"_) highKey=value;
-                if(name=="rootKey"_) rootKey=value;
-                if(name=="lowVelocity"_) lowVelocity=value;
-                if(name=="highVelocity"_) highVelocity=value;
+#define value toInteger(V["value"_])
+                /**/  if(name=="lowKey"_) lowKey=value;
+                else if(name=="highKey"_) highKey=value;
+                else if(name=="rootKey"_) rootKey=value;
+                else if(name=="lowVelocity"_) lowVelocity=value;
+                else if(name=="highVelocity"_) highVelocity=value;
+                else if(name=="zoneVolume"_) volume = toDecimal(V["value"_]);
+                //else log(name,V["value"_]); TODO: tune, pan
             });
             if(highKey < 21) return;
             if(zone["groupIdx"_]=="1"_) return; // Hammer noise
             if(zone["groupIdx"_]=="3"_) return; // Sustain
+            string& sfz = zone["groupIdx"_]=="2"_ ? release : attack;
 
             sfz<<"<region> "_;
-            if(zone["groupIdx"_]=="2"_) sfz<<"trigger=release "_;
-
             string path; for(TextData s (zone("Sample"_)("V"_)["value"_]);s;) {
                 if(s.match("@b"_)) {}
                 else if(s.match(" "_)) {}
@@ -258,15 +239,19 @@ struct NKI {
                 else if(s.match("wav"_)) path<<"flac"_;
                 else path << s.next();
             }
-            sfz<<"sample="_+path+" "_;
+            sfz<<"sample="_+section(path,'/',-2,-1)+" "_;
 
-            if(lowKey == highKey) sfz<<"key="_+str(lowKey)+" "_;
+            if(lowKey == highKey) sfz<<"key="_+str(lowKey);
             else sfz<<"lokey="_+str(lowKey)+" hikey="_+str(highKey);
             if(rootKey && (rootKey!=lowKey || rootKey!=highKey)) sfz<<" pitch_keycenter="_+str(rootKey)+" "_;
-            sfz<<"lovel="_+str(lowVelocity)+" hivel="_+str(highVelocity)<<" "_;
-            sfz<<"ampeg_release=1"_;
+            if(lowVelocity!=1 || highVelocity!=127) sfz<<" lovel="_+str(lowVelocity)+" hivel="_+str(highVelocity)<<" "_;
+            if(volume != 1) {
+                assert(volume>=0.1,volume);
+                sfz<<" volume="_+str(20*log10(volume))<<" "_;
+            }
             sfz<<'\n';
         });
+        string sfz = attack+release;
         log(sfz);
         writeFile("/Samples/Boesendorfer.sfz"_,sfz);
     }

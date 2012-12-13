@@ -5,6 +5,7 @@
 #include "resample.h"
 #include "flac.h"
 #include "process.h"
+#include "map.h"
 #include <fftw3.h>
 
 typedef float float4 __attribute((vector_size(16)));
@@ -31,28 +32,21 @@ struct Note : FLAC {
 struct Sample {
     Map map; Note data; array<float> envelope; //Sample data
     int16 trigger=0; int16 lovel=0; int16 hivel=127; int16 lokey=0; int16 hikey=127; //Input controls
-    int16 pitch_keycenter=60; uint16 releaseTime=0; int16 amp_veltrack=100; /*int16 rt_decay=0;*/ int16 volume=1; //Performance parameters
+    int16 pitch_keycenter=60; uint16 releaseTime=0; int16 amp_veltrack=100; float volume=1; //Performance parameters
 };
 
 /// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {
-    ~Sampler();
+    Lock noteReadLock; // Prevent decoder to edit active notes while mixing
+    Lock noteWriteLock; // Prevent input to realloc active notes while decoding
+    struct Layer {
+        float shift;
+        array<Note> notes; // Active notes (currently being sampled) in this layer
+        Resampler resampler; // Resampler to shift pitch
+        Buffer<float> buffer; // Buffer to mix notes before resampling
+    };
+    array<Layer> layers;
 
-    /// Opens a .sfz instrument and maps all its samples
-    void open(const ref<byte>& path); array<Sample> samples;
-
-    /// Receives MIDI note events
-    void noteEvent(int key, int velocity);
-    Lock noteReadLock; // Prevent decoder to edit note arrays while mixing
-    Lock noteWriteLock; // Prevent input to realloc note while decoding
-    array<Note> notes[3]; // Active notes (currently being sampled)
-
-    /// Callback to decode samples
-    void event() override;
-
-    /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
-    bool read(int32* output, uint size);
-    Resampler resampler[2];
     uint64 rate = 0;
     static constexpr uint periodSize = 1024;
     float* buffer; // Interleaved mixing buffer
@@ -74,6 +68,20 @@ struct Sampler : Poll {
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
     uint64 lastTime=0, time=0, recordStart=0;
+
+    ~Sampler();
+
+    /// Opens a .sfz instrument and maps all its samples
+    void open(const ref<byte>& path); array<Sample> samples;
+
+    /// Receives MIDI note events
+    void noteEvent(int key, int velocity);
+
+    /// Callback to decode samples
+    void event() override;
+
+    /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
+    bool read(int32* output, uint size);
 
     /// Records performance to WAV file
     void startRecord(const ref<byte>& path);

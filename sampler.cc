@@ -32,11 +32,33 @@ int noteToMIDI(const ref<byte>& value) {
     return note;
 }
 
+template<int unroll> inline void accumulate(float4 accumulators[unroll], const float4* ptr, const float4* end) {
+    for(;ptr<end;ptr+=unroll) {
+        __builtin_prefetch(ptr+32,0,0);
+        for(uint i: range(unroll)) accumulators[i]+=ptr[i]*ptr[i];
+    }
+}
+float Note::sumOfSquares(uint size) {
+    size =size/2; uint index = readIndex/2, capacity = buffer.capacity/2; //align to float4
+    uint beforeWrap = capacity-index;
+    const float4* buffer = (float4*)this->buffer.data;
+    constexpr uint unroll=4; //4*4*4~64bytes: 1 prefetch/line
+    float4 accumulators[unroll]={}; //breaks dependency chain to pipeline the unrolled loops
+    if(size>beforeWrap) { //wrap
+        accumulate<unroll>(accumulators, buffer+index,buffer+capacity); //accumulate until end of buffer
+        accumulate<unroll>(accumulators, buffer,buffer+(size-beforeWrap)); //accumulate remaining wrapped part
+    } else {
+        accumulate<unroll>(accumulators, buffer+index,buffer+(index+size));
+    }
+    float4 sum={}; for(uint i: range(unroll)) sum+=accumulators[i];
+    return (extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/(1<<24)/(1<<24);
+}
+
 void Sampler::open(const ref<byte>& path) {
     // parse sfz and map samples
     Sample group;
     TextData s = readFile(path);
-    Folder folder = section(path,'/',0,-2);
+    Folder folder = section(path,'.',0,-2); // Samples are implicilty in a subfolder with same name as .sfz files
     Sample* sample=&group;
     for(;;) {
         s.whileAny(" \n\r"_);
@@ -84,7 +106,7 @@ void Sampler::open(const ref<byte>& path) {
             else if(key=="ampeg_release"_) sample->releaseTime=toDecimal(value);
             else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
             else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);
-            else if(key=="volume"_) sample->volume=toInteger(value);
+            else if(key=="volume"_) sample->volume= exp10(toDecimal(value)/20.0);
             else if(key=="tune"_) {} //FIXME
             else if(key=="ampeg_attack"_) {} //FIXME
             else if(key=="ampeg_vel2attack"_) {} //FIXME
@@ -94,16 +116,27 @@ void Sampler::open(const ref<byte>& path) {
         }
     }
 
-    // Generates pitch shifting (resampling) filter banks
-    uint size = max(periodSize*2,1024u);
-    new (&resampler[0]) Resampler(2, size, round(size*exp2((1)/12.0)));
-    new (&resampler[1]) Resampler(2, size, round(size*exp2((-1)/12.0)));
-    for(int i=0;i<3;i++) notes[i].reserve(128);
+    for(Sample& s: samples) {
+        s.data.decode(1<<12); // Predecodes 4K (10ms)
+        s.map.lock(); // Locks compressed samples in memory
 
-    // Predecode 4K (10ms) and lock compressed samples in memory
-    for(Sample& s: samples) s.data.decode(1<<12), s.map.lock();
+        for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
+            float shift = key-s.pitch_keycenter; //TODO: tune
+            Layer* layer=0;
+            for(Layer& l : layers) if(l.shift==shift) layer=&l;
+            if(layer == 0) { // Generates pitch shifting (resampling) filter banks
+                layers.grow(layers.size()+1);
+                layer = &layers.last();
+                layer->shift = shift;
+                if(shift) {
+                    uint size = max(periodSize*2,1024u);
+                    new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)));
+                }
+            }
+        }
+    }
 
-    array<byte> reverbFile = readFile("reverb.flac"_,folder);
+    array<byte> reverbFile = readFile("../reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
     assert(reverbMedia.rate == rate);
     reverbSize = reverbMedia.duration;
@@ -152,27 +185,6 @@ void Sampler::open(const ref<byte>& path) {
 
 /// Input events (realtime thread)
 
-template<int unroll> inline void accumulate(float4 accumulators[unroll], const float4* ptr, const float4* end) {
-    for(;ptr<end;ptr+=unroll) {
-        __builtin_prefetch(ptr+32,0,0);
-        for(uint i: range(unroll)) accumulators[i]+=ptr[i]*ptr[i];
-    }
-}
-float Note::sumOfSquares(uint size) {
-    size =size/2; uint index = readIndex/2, capacity = buffer.capacity/2; //align to float4
-    uint beforeWrap = capacity-index;
-    const float4* buffer = (float4*)this->buffer.data;
-    constexpr uint unroll=4; //4*4*4~64bytes: 1 prefetch/line
-    float4 accumulators[unroll]={}; //breaks dependency chain to pipeline the unrolled loops
-    if(size>beforeWrap) { //wrap
-        accumulate<unroll>(accumulators, buffer+index,buffer+capacity); //accumulate until end of buffer
-        accumulate<unroll>(accumulators, buffer,buffer+(size-beforeWrap)); //accumulate remaining wrapped part
-    } else {
-        accumulate<unroll>(accumulators, buffer+index,buffer+(index+size));
-    }
-    float4 sum={}; for(uint i: range(unroll)) sum+=accumulators[i];
-    return (extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/(1<<24)/(1<<24);
-}
 float Note::actualLevel(uint size) const {
     const int count = size>>8;
     if((position>>8)+count>envelope.size) return 0; //fully decayed
@@ -183,7 +195,7 @@ float Note::actualLevel(uint size) const {
 void Sampler::noteEvent(int key, int velocity) {
     Note* current=0;
     if(velocity==0) {
-        for(int i=0;i<3;i++) for(Note& note: notes[i]) if(note.key==key) {
+        for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
             current=&note; //schedule release sample
             //release fade out current note
             float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(rate*note.releaseTime)));
@@ -199,7 +211,7 @@ void Sampler::noteEvent(int key, int velocity) {
                 level *= extract(current->level,0);
                 if(level>8) level=8;
             } else {
-                level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * exp10(s.volume/20.0);
+                level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * s.volume;
             }
             if(level<0x1p-15) return;
             Note note = s.data;
@@ -210,10 +222,15 @@ void Sampler::noteEvent(int key, int velocity) {
             if(note.sampleSize==16) level*=0x1p8;
             note.level=(float4)__(level,level,level,level);
             {Locker lock(noteReadLock);
-                if(abs(key-s.pitch_keycenter)>1) { log("Unsupported pitch shift",s.pitch_keycenter,"->",key); return; }
-                array<Note>& notes = this->notes[1+key-s.pitch_keycenter];
-                if(notes.size()==notes.capacity()) { log("too many ",notes.capacity(),"active notes"); return;}
-                notes << move(note);
+                float shift = key-s.pitch_keycenter; //TODO: tune
+                Layer* layer=0;
+                for(Layer& l : layers) if(l.shift==shift) layer=&l;
+                if(layer == 0) { error("Layer not instantiated at initialization",key, s.lokey, s.hikey, s.pitch_keycenter, shift); return; }
+                if(layer->notes.size()==layer->notes.capacity()) {
+                    Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use pointer list)
+                    layer->notes.grow(layer->notes.size()+1);
+                }
+                layer->notes << move(note);
             }
             queue(); //queue background decoder in main thread
             return;
@@ -234,15 +251,15 @@ void Note::decode(uint need) {
 }
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
-        for(uint i: range(3)) for(uint j=0; j<notes[i].size(); j++) { Note& note=notes[i][j];
-            if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<0x1p-15) notes[i].removeAt(j); else j++;
+        for(Layer& layer: layers) for(uint j=0; j<layer.notes.size(); j++) { Note& note=layer.notes[j];
+            if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<0x1p-23) layer.notes.removeAt(j); else j++;
         }
         noteReadLock.unlock();
     }
     Locker lock(noteWriteLock);
     for(;;) {
         Note* note=0; uint minBufferSize=-1;
-        for(int i=0;i<3;i++) for(Note& n: notes[i]) { // find least buffered note
+        for(Layer& layer: layers) for(Note& n: layer.notes) { // find least buffered note
             if(n.blockSize && n.writeCount>=n.blockSize && n.buffer.size<minBufferSize) {
                 note=&n;
                 minBufferSize=n.buffer.size;
@@ -278,17 +295,18 @@ void Note::read(float4* out, uint size) {
 bool Sampler::read(int32* output, uint size) { // Audio thread
     {Locker lock(noteReadLock);
         if(size!=periodSize) error(size,periodSize);
-        // Setups mixing buffer
+
         clear(buffer, periodSize*2);
-        // Mixes notes which don't need any resampling
-        for(Note& note: notes[1]) note.read((float4*)buffer, periodSize/2);
-        // Mixes pitch shifting layers
-        for(int i=0;i<2;i++) {
-            uint inSize=align(2,resampler[i].need(periodSize));
-            float4* layer = allocate64<float4>(inSize); clear(layer, inSize/2);
-            for(Note& note: notes[i*2]) note.read(layer, inSize/2);
-            resampler[i].filter<true>((float*)layer, inSize, buffer, periodSize);
-            unallocate(layer,inSize/2);
+        for(Layer& layer: layers) { // Mixes all notes of all layers
+            if(layer.resampler) {
+                uint inSize=align(2,layer.resampler.need(periodSize));
+                if(layer.buffer.capacity<inSize*2) layer.buffer = Buffer<float>(inSize*2);
+                clear(layer.buffer.data, inSize*2);
+                for(Note& note: layer.notes) note.read((float4*)layer.buffer.data, inSize/2);
+                layer.resampler.filter<true>(layer.buffer, inSize, buffer, periodSize);
+            } else {
+                 for(Note& note: layer.notes) note.read((float4*)buffer, periodSize/2);
+            }
         }
 
         if(enableReverb) { // Convolution reverb
