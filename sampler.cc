@@ -128,6 +128,7 @@ void Sampler::open(const ref<byte>& path) {
                 layers.grow(layers.size()+1);
                 layer = &layers.last();
                 layer->shift = shift;
+                layer->notes.reserve(64); //Avoid locking (FIXME: heap pointers array)
                 if(shift) {
                     uint size = max(periodSize*2,1024u);
                     new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)));
@@ -227,8 +228,9 @@ void Sampler::noteEvent(int key, int velocity) {
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
                 if(layer == 0) { error("Layer not instantiated at initialization",key, s.lokey, s.hikey, s.pitch_keycenter, shift); return; }
                 if(layer->notes.size()==layer->notes.capacity()) {
-                    Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use pointer list)
-                    layer->notes.grow(layer->notes.size()+1);
+                    Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use a list of heap pointer instead)
+                    log(layer->notes.size());
+                    layer->notes.reserve(layer->notes.size()*2);
                 }
                 layer->notes << move(note);
             }

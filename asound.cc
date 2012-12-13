@@ -55,7 +55,7 @@ AudioOutput::AudioOutput(function<bool(int32* output, uint size)> read, Thread& 
     hparams.interval(FrameBits) = 32*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
-    if(realtime) hparams.interval(PeriodSize)=1024, hparams.interval(Periods).max=2;
+    if(realtime) hparams.interval(PeriodSize)=512, hparams.interval(Periods).max=2;
     else hparams.interval(PeriodSize).min=4096, hparams.interval(Periods).min=2;
     iowr<HW_PARAMS>(hparams);
     periodSize = hparams.interval(PeriodSize);

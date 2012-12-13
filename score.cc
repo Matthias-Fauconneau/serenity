@@ -15,12 +15,10 @@ void Score::onPath(const ref<vec2>& p) {
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
         if(span.y>2 && span.x<355 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<22) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
-            //debug[center]="V"_+str(span);
             ties+= Line(vec2(min.x,p[0].y),vec2(max.x,p[3].y));
-        } //else debug[center]="!"_+str(span);
+        }
     } else if(p.size==10) {
         if(span.x>36 && span.x<1000 && span.y>10 && (span.y<14 || (span.x>100 && span.y<29))) {
-            //debug[center]="X"_+str(span);
             ties+= Line(vec2(min.x,center.y),vec2(max.x,center.y));
         }
     }
@@ -117,12 +115,11 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==60) duration = 16; //whole
         } else if(find(font,"Opus"_)) {
             if(font=="OpusStd"_) { //FIXME: OCR
-                if(code==7 /*|| code==8*/) {
+                if(code==7) {
                     if(size<30) duration= 0; //grace
                     else duration = 4; //quarter
                 }
-                else if(code==11 /*|| code==9*/) duration = 8; //half
-                //else if(code==16) duration = 16; //whole
+                else if(code==11) duration = 8; //half
             } else if(endsWith(font,"Opus"_)) {
                 if(fontIndex==53) {
                     if(size<30) duration= 0; //grace
@@ -185,14 +182,12 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
         if(staffs) {
             float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[i]));
-            //debug[floor(pos)]<<str(nearestStaffCut);
             if(nearestStaffCut<20) { // Follow ledgers away from staff limit
-                /*float min=30;*/ float max=0; vec2 best=pos;
+                float max=0; vec2 best=pos;
                 for(vec2 ledger: ledgers) {
                     float d = length(ledger-pos);
-                    if((abs(ledger-pos).y>max && d<30)/* || d<min*/) {
-                        /*min=d,*/ max=abs(ledger-pos).y, best=ledger;
-                        //debug[best]<<str(/*min*/max);
+                    if(abs(ledger-pos).y>max && d<30) {
+                        max=abs(ledger-pos).y, best=ledger;
                     }
                 }
                 i=0; for(;i<staffs.size() && best.y>staffs[i];i++) {}
@@ -204,7 +199,6 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                         float d = abs(y-best.y);
                         if((abs(y-pos.y)<min && abs(y-pos.y)<10) || d<min) {
                             min=d, best2.y=y;
-                            //debug[best2]<<str(min);
                         }
                     }
                     i=0; for(;i<staffs.size() && best2.y>staffs[i];i++) {}
@@ -221,17 +215,7 @@ string str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)
 void Score::parse() {
     if(!staffs) return; assert(staffs);
     staffs << (lastClef.y+110); //add a last split at the bottom of the last page
-    /*Disambiguates notes near staff limits
-    for(pair<vec2,Note> note: nearStaffLimit) {
-        float min=1000; Staff* bestStaff=0;
-        for(Staff& staff: notes) { for(int x : staff.keys) for(int y : staff.at(x).keys) {
-                float d = length(note.key-vec2(x,-y));
-                if(d < min) min=d, bestStaff=&staff;
-            }
-        }
-        if(!bestStaff) { error("Unable to assign note to staff"); continue; }
-        bestStaff->sorted(note.key.x).insertSorted(-note.key.y, note.value);
-    }*/
+
     /// Lengthens dotted notes
     for(pair< int,array<vec2> > dots: this->dots) {
         for(vec2 pos: dots.value) for(int x : notes[dots.key].keys) {
@@ -265,7 +249,6 @@ alreadyTied: ;
                 }
                 for(int y : notes[i][x].keys) {
                     int ry = y-t.ly;
-#if 1
                     /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
                     if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
                         debug[vec2(x,-y)]=string("B"_);
@@ -273,15 +256,6 @@ alreadyTied: ;
                         if(abs(x-t.lx)<32) noteBetween++;
                         break;
                     }
-#endif
-#if 0
-                    /// Remove every other note between tied notes (necessary to sync with HTTYD sheets)
-                    if(noteBetween%2 && lx > 0 && rx < -16 && abs(ry) < 2 && l < 200) {
-                        debug[vec2(x,-y)]=string("O"_);
-                        t.ri=i;t.rx=x; t.ry=y; tied<<t; //notes[i][x].remove(y);
-                        noteBetween++;
-                    }
-#endif
                     /// Detect right note of a tie
                     if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>=-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
                         t.ri=i;t.rx=x; t.ry=y;
@@ -358,84 +332,6 @@ trillCancelTie: ;
         }
     }
 
-    /// Detect and explicit tremolos
-#if 0
-    uint begin=0;
-    for(uint i: range(tremolos.size())) {
-        if(i+1>=tremolos.size() || tremolos[i].a.x!=tremolos[i+1].a.x) {
-            int N = i+1-begin;
-            for(Line tail : tails) if(abs(tail.a.x-tremolos[i].a.x)<6 && abs(tail.b.y-tremolos[i].a.y)<60) { log("Spurious"); goto spurious; }
-            {
-                uint staff=0; for(;staff<staffs.size()-1 && tremolos[i].a.y>staffs[staff];staff++) {}
-#if 0
-                // single chord tremolo
-                int X=0; for(int x : notes[staff].keys) if(x>tremolos[i].a.x-10) { X=x; break; }
-                debug[vec2(X,notes[staff][X].keys.first())]=string("T"_);
-                if(X && N==2) {
-                    map<int,Note> chord;
-                    for(pair<int,Note> note: notes[staff].at(X)) {
-                        if(abs(-note.key-tremolos[i].a.y)<75) chord.insert(note.key, note.value);
-                        else if(abs(-note.key-tremolos[i].a.y)<90) debug[vec2(X,-note.key)]="T"_+dec(-note.key-tremolos[i].a.y);
-                    }
-                    int duration = chord.values.first().duration;
-                    int times = duration*(1<<N);
-                    for(int t=1;t<=times;t++) notes[staff].insertMulti(X+t*3, copy(chord));
-                }
-#endif
-#if 0 //alternating tremolo
-                int X1=0,X2=0,Y1=0,Y2=0;
-                for(int x : notes[staff].keys) {
-                    for(int y : notes[staff][x].keys) {
-                        if(abs(-y-tremolos[i].a.y)<70) goto inRange;
-                        else if(abs(-y-tremolos[i].a.y)<120) log(abs(-y-tremolos[i].a.y));
-                    }
-                    continue;
-inRange: ;
-                    if(x<tremolos[i].a.x) { X1=x, Y1=notes[staff].at(X1).keys[0]; }
-                    if(x+10>tremolos[i].b.x) { X2=x; Y2=notes[staff].at(x).keys[0]; break;}
-                }
-                debug[tremolos[i].a]=string("A"_);
-                debug[tremolos[i].b]=string("B"_);
-                debug[vec2(X1,-Y1)]=string("T1"_);
-                debug[vec2(X2,-Y2)]=string("T2"_);
-                log("Tremolo",begin,i,X1,X2,Y1,Y2);
-                if(X1&&X2) {
-                    Note a = notes[staff][X1].take(Y1), b = notes[staff][X2].take(Y2);
-                    int duration = a.duration+b.duration;
-                    int times = duration*(N?4:2)/8;
-                    for(int t=0;t<times;t++) {
-                        notes[staff][X1+(X2-X1)*(2*t+0)/times].insert(Y1, Note(a.index, duration/times));
-                        notes[staff][X1+(X2-X1)*(2*t+1)/times].insert(Y2, Note(a.index, duration/times));
-                    }
-                }
-#endif
-            }
-spurious: ;
-            begin=i;
-        }
-    }
-#endif
-
-    /// Detect and explicit trills
-    /*foreach(QLineF trill, trills) {
-        int i=0; for(;i<staffs.size && trill.y1()>staffs[i];i++) {}
-        foreach(int x, notes[i].keys()) {
-            if(x>trill.x1()-8) {
-                foreach(int y, notes[i][x].keys())
-                    if(abs(-y-trill.y1())<16) {
-                        int duration = notes[i][x][y];
-                        int times = duration*3/4;
-                        for(int t=0;t<times;t++) {
-                            if(t>0) notes[i][trill.x1()+(trill.x2()-trill.x1())*(2*t+0)/(2*times)][y]=duration/times;
-                            if(t<times-1) notes[i][trill.x1()+(trill.x2()-trill.x1())*(2*t+1)/(2*times)][y+8]=duration/times;
-                        }
-                        break;
-                    }
-                break;
-            }
-        }
-    }*/
-
     /// Flatten sorted notes
     uint i=0; for(Staff& staff: notes) {
         for(int x : staff.keys) for(int y : staff.at(x).keys) {
@@ -465,10 +361,7 @@ spurious: ;
         }
     }
 
-    //for(Line l: ties) debug.insertMulti((l.a+l.b)/2.f,string("^"_));
     for(float y: staffs) debug[vec2(0,y-16)]=string("________"_);
-
-    //dots.clear(); notes.clear(); repeats.clear(); ties.clear(); tails.clear(); tremolos.clear(); trills.clear();
 }
 
 void Score::synchronize(const map<uint,Chord>& MIDI) {
@@ -476,6 +369,7 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     array<MidiNote> notes; //flatten chords for robust MIDI synchronization
     for(const Chord& chord: MIDI.values) notes<<chord;
 
+#if 0
     // Removes graces both in MIDI and score (separately as they are not ordered correctly)
     for(uint i=0; i<notes.size();) if(notes[i].duration==0) notes.removeAt(i); else i++;
     for(uint i=0; i<durations.size();) if(durations[i]==0)  positions.removeAt(i), indices.removeAt(i), durations.removeAt(i); else i++;
@@ -484,26 +378,13 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     vec2 lastPos=vec2(0,0); int lastKey=0;
     for(uint i=0; i<notes.size() && i<positions.size();) {
         vec2 pos=positions[i]; MidiNote note = notes[i];
-        /*if(n<notes.size() && notes[n]==note && lastY && y!=lastY && abs(y-lastY)<16) { //double notes in MIDI
-                    debug[vec2(x,-y)]=string("+++"_);
-                    chord<<vec2(x,-y); positions<<vec2(x,-y); indices<<staff[x].at(y).index; staff[x].at(y).scoreIndex=n; n++;
-                }*/
-        /*if(pos.y==lastPos.y && note!=lastNote) { // double notes in score
-            debug[pos]=string("////"_);
-            positions.removeAt(i); indices.removeAt(i);
-        } else*/
         if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
             debug[pos]=string("++++"_);
             positions.removeAt(i); indices.removeAt(i);
-        } /*else if(lastPos && lastKey && lastPos.x<=pos.x-82 && pos.y>=lastPos.y+101 && note.key>lastKey) { // spurious note in MIDI
-            debug[pos]<<str("----"_,lastPos.x-pos.x,lastPos.y-pos.y);
-            notes.removeAt(i);
-        }*/ else {
-            //debug.insertMulti(positions[i]+vec2(12,0),str(notes[i].key));
-            i++;
-        }
+        } else i++;
         lastPos=pos; lastKey=note.key;
     }
+#endif
 
     chords.clear();
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
@@ -669,7 +550,6 @@ void Score::noteEvent(int key, int vel) {
             if(expected.contains(key)) {
                 active.insertMulti(key,expected.at(key));
                 expected.remove(key);
-                //if(expected.size()==1 && chordSize>=4) miss=move(expected);
             } else if(miss.contains(key)) miss.remove(key);
             else return;
         } else if(key) {
