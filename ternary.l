@@ -1,4 +1,4 @@
-initial derivation count : N ← 6
+initial derivation count : N ← 8
 divergence angle 1 : d1 ← 94.74
 divergence angle 2 : d2 ← 132.63
 branching angle : a ← 18.95

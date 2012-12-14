@@ -49,8 +49,11 @@ LSystem::LSystem(string&& name, const ref<byte>& source):name(move(name)){
         if(s.match('#')) continue;
         if(line.contains(':')) s.until(':'); s.skip();
         if(!s) continue;
-        if(find(line,"←"_)) {
-            ref<byte> name = trim(s.until("←"_));
+        if(find(line,"←"_)||find(line,"<-"_)) {
+            ref<byte> name = s.identifier();
+            if(!name) { parseError("Expected constant identifier, got '"_+s.untilEnd()+"'"_); return; }
+            s.skip();
+            if(!s.match("←"_)&&!s.match("<-"_)) { parseError("Expected ←, got '"_+s.untilEnd()+"'"_); return; }
             s.skip();
             unique<Expression> e;
             while(s) {
@@ -60,7 +63,7 @@ LSystem::LSystem(string&& name, const ref<byte>& source):name(move(name)){
             }
             if(!e) { parseError("Expected expression"); return; }
             constants.insert(string(name)) = e->evaluate(*this, ref<float>());
-        } else if(find(line,"→"_)) {
+        } else if(find(line,"→"_)||find(line,"->"_)) {
             ref<byte> symbol = s.identifier();
             if(!symbol) { parseError("Expected rule identifier, got '"_+s.untilEnd()+"'"_); return; }
             Rule rule(symbol);
@@ -91,7 +94,7 @@ LSystem::LSystem(string&& name, const ref<byte>& source):name(move(name)){
                 }
             }
             s.skip();
-            if(!s.match("→"_)) { parseError("Expected →, got '"_+s.untilEnd()+"'"_); return; }
+            if(!s.match("→"_)&&!s.match("->"_)) { parseError("Expected →, got '"_+s.untilEnd()+"'"_); return; }
             s.skip();
             while(s) {
                 s.skip();

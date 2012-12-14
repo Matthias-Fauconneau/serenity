@@ -54,37 +54,54 @@ struct Editor : Widget {
     };
     array<Vertex> vertices;
     array<uint> indices;
+    static constexpr uint G = 16; // Grid resolution (TODO: adapt with vertex count)
+    vec3 gridMin=-1, gridMax=1; // current grid bounds
+    array<uint> grid[G*G*G]; //Space partionning for faster vertex index lookups
+    array<uint>& cell(vec3 p) {
+        assert(p>=gridMin && p<gridMax, gridMin, p, gridMax);
+        vec3 n = float(G)*(p-gridMin)/(gridMax-gridMin);
+        uint i = (uint(n.z)*G+uint(n.y))*G+uint(n.x);
+        assert(i<G*G*G);
+        return grid[i];
+    }
 
     // Creates a new face using existing vertices when possible (normals will be smoothed with adjacent faces)
     template<uint N> void face(const Vertex (&polygon)[N]) {
         static_assert(N>=3,"");
-        struct Match { float distance=1; uint index = -1;};
-        Match matches[N];
-        for(uint index: range(vertices.size())) { //FIXME: generating N vertices is O(N^2) in total (need object & space partition)
-            Vertex& v = vertices[index];
-            for(uint i: range(N)) {
-                const Vertex& o = polygon[i];
+        uint indices[N];
+        for(uint i: range(N)) { // Lookups each vertex
+            const Vertex& o = polygon[i];
+
+            if(!(o.position>=gridMin && o.position<gridMax)) {
+                gridMin=min(gridMin,o.position-vec3(1)); gridMax=max(gridMax,o.position+vec3(1)); //Resizes grid
+                for(array<uint>& cell: grid) cell.clear(); // Clears grid
+                for(uint i: range(vertices.size())) cell(vertices[i].position) << i; // Sorts all vertices
+            }
+
+            float minDistance=1; uint minIndex = -1;
+            for(uint index: cell(o.position)) {
+                Vertex& v = vertices[index];
+
                 if(v.color!=o.color) continue;
                 float distance = sqr(v.position-o.position);
-                if(distance>matches[i].distance) continue;
+                if(distance>minDistance) continue;
                 if(dot(o.normal,v.normal)<0) continue;
-                matches[i].distance = distance;
-                matches[i].index = index;
+                minDistance = distance;
+                minIndex = index;
             }
-        }
-        uint indices[N];
-        for(uint i: range(N)) {
-            const Match& match = matches[i];
-            if(match.index!=uint(-1)) {
-                Vertex& v = vertices[match.index];
-                v.normal += polygon[i].normal;
-                indices[i] = match.index;
+            if(minIndex!=uint(-1)) {
+                Vertex& v = vertices[minIndex];
+                v.normal += o.normal;
+                indices[i] = minIndex;
             } else {
                 if(vertices.size()==vertices.capacity()) vertices.reserve(2*vertices.size());
-                vertices << polygon[i];
-                indices[i] = vertices.size()-1;
+                uint index = vertices.size();
+                vertices << o;
+                cell(o.position) << index;
+                indices[i] = index;
             }
         }
+        // Appends polygon indices
         uint a = indices[0];
         uint b = indices[1];
         for(uint i: range(2,N)) { // Tesselates convex polygons as fans (FIXME: generates bad triangle)
@@ -161,6 +178,7 @@ struct Editor : Widget {
 
         // Clears previous scene
         vertices.clear(); indices.clear(); worldMin=0, worldMax=0, worldCenter=0, worldRadius=0, lightMin=0, lightMax=0;
+        gridMin=-1, gridMax=1; for(array<uint>& cell: grid) cell.clear(); // Clear grid
 
         // Generates new L-system
         if(!level) level=system.constants.at(string("N"_));
