@@ -1,45 +1,3 @@
-/** \file editor.cc
-This is a demonstration of software rasterization as presented by Michael Abrash in "Rasterization on Larrabee".
-
-First, an L-System generates our "scene", i.e a list of branches (position+diameter at both end).
-Then, for each frame, the branches are transformed to view-aligned quads (2 triangles per branch) and submitted to the rasterizer.
-
-This rasterizer is an AVX implementation of a tile-based deferred renderer (cf http://www.drdobbs.com/parallel/rasterization-on-larrabee/217200602) :
-Triangles are not immediatly rendered but first sorted in 16x16 pixels (64x64 samples) bins.
-When all triangles have been setup, each tile is separately rendered.
-Tiles can be processed in parallel (I'm using 4 hyperthreaded cores) and only access their local framebuffer (which should fit L1).
-As presented in Abrash's article, rasterization is done recursively (4x4 blocks of 4x4 pixels of 4x4 samples) using precomputed step grids.
-This architecture allows the rasterizer to leverage 16-wide vector units (on Ivy Bride's 8-wide units, all operations have to be duplicated).
-For each face, the rasterizer outputs pixel masks for each blocks (or sample masks for partial pixels).
-Then, pixels are depth-tested, shaded and blended in the local framebuffer.
-Finally, after all passes have been rendered, the tiles are resolved and copied to the application window buffer.
-
-My goal is to minimize any sampling artifacts:
-- The tiled renderer allows to use 16xMSAA without killing performance (since it is not bandwidth-limited)
-- The branches (actually cones) are not tesselated. They are rendered as view-aligned quads and shaded accordingly.
-- Shadows are raycasted (and not sampled from a shadow map).
-
-For this simple scene, a shadow map would be a better choice, but I wanted to try to leverage the CPU in the shader.
-
-The main advantage of raycasting is that it allows to implement accurate contact-hardening soft shadows for scenes with arbitrary depth complexity.
-Shadow maps only allows to sample the furthest (nearest to light) occluder, while raycasting correctly handle penumbra affected by a closer hidden occluder.
-Thus, given enough samples, raycasting can simulate much wider lights.
-
-The main issue of raycasting is that performance is already so awful while 16 samples is not enough to avoid noisy shadows.
-I guess there is much room for optimization, but actually I originally wanted to study L-Systems (I'm not through "The Algorithmic Beauty of Plants" yet).
-
-I worked on this project to have a more flexible real-time renderer for CG experiments.
-But also because working on improving performance is addictive. As in a game, you get a score (frame time) and you have to make the most out of your abilities to improve the score.
-
-My current results (8 threads on 4-core Ivy Bridge):
-- without shadows: 43-46 fps
-- with 16x raycasted shadows: 13-16 fps
-
-You can find the source code on github.
-Rasterizer code: https://github.com/Matthias-Fauconneau/serenity/blob/master/raster.h
-Setup and shader: https://github.com/Matthias-Fauconneau/serenity/blob/master/lsystem.cc
-This is mostly for reference, since this application use my own framework (Linux only).
-*/
 #include "data.h"
 #include "matrix.h"
 #include "process.h"
@@ -52,6 +10,8 @@ This is mostly for reference, since this application use my own framework (Linux
 #include "lsystem.h"
 #include "gl.h"
 #include "data.h" //cast
+
+constexpr bool UI = true;
 
 /// Generates and renders L-Systems
 struct Editor : Widget {
@@ -77,6 +37,7 @@ struct Editor : Widget {
     GLFrameBuffer sunShadow;
     GLFrameBuffer framebuffer;
     GLBuffer buffer;
+    SHADER(shadow) GLShader& shadow = shadowShader();
     SHADER(shader) GLShader& shader = shaderShader();
     SHADER(resolve) GLShader& resolve = resolveShader();
 
@@ -152,7 +113,8 @@ struct Editor : Widget {
 
      /// Setups the application UI and shortcuts
      Editor() {
-         layout << &systems << this << &editor;
+         if(UI) layout << &systems << this << &editor;
+         else window.widget=this;
          window.localShortcut(Escape).connect(&::exit);
 
          // Scans current folder for L-System definitions (.l files)
@@ -283,22 +245,24 @@ struct Editor : Widget {
                 vec3* V = polygon.vertices.data();
                 uint N = polygon.vertices.size();
                 if(N<3) { userError("N<3"); return; }
-                else if(N==3) {
-                    face<3>((vec3[]){V[0],V[1],V[2]}, polygon.color);
-                    face<3>((vec3[]){V[2],V[1],V[0]}, polygon.color); //Two-sided
-                }
-                else if(N==4) {
-                    face<4>((vec3[]){V[0],V[1],V[2],V[3]}, polygon.color);
-                    face<4>((vec3[]){V[3],V[2],V[1],V[0]}, polygon.color); //Two-sided
-                }
                 else {
-                    vec3 A = polygon.vertices.first();
-                    vec3 B = polygon.vertices[1];
-                    for(vec3 C: polygon.vertices.slice(2)) {
-                        vec3 dn = 0; //0.1f*N/cross(B-A,C-A); // avoid self-shadowing
-                        face((vec3[]){A+dn, B+dn, C+dn}, polygon.color);
-                        face((vec3[]){C-dn, B-dn, A-dn}, polygon.color); //Two-sided
-                        B = C;
+                    vec3 dn = normalize(cross(V[1]-V[0],V[2]-V[0])); // avoid self-shadowing
+                    if(N==3) {
+                        face<3>((vec3[]){V[0]+dn,V[1]+dn,V[2]+dn}, polygon.color);
+                        face<3>((vec3[]){V[2]-dn,V[1]-dn,V[0]-dn}, polygon.color); //Two-sided
+                    }
+                    else if(N==4) {
+                        face<4>((vec3[]){V[0]+dn,V[1]+dn,V[2]+dn,V[3]+dn}, polygon.color);
+                        face<4>((vec3[]){V[3]-dn,V[2]-dn,V[1]-dn,V[0]-dn}, polygon.color); //Two-sided
+                    }
+                    else {
+                        vec3 A = polygon.vertices.first();
+                        vec3 B = polygon.vertices[1];
+                        for(vec3 C: polygon.vertices.slice(2)) {
+                            face((vec3[]){A+dn, B+dn, C+dn}, polygon.color);
+                            face((vec3[]){C-dn, B-dn, A-dn}, polygon.color); //Two-sided
+                            B = C;
+                        }
                     }
                 }
                 polygon = polygonStack.pop();
@@ -392,24 +356,40 @@ struct Editor : Widget {
         vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
         // Render sun shadow map
-        //sunShadow = GLFrameBuffer();
+        if(!sunShadow) sunShadow = GLFrameBuffer(GLTexture(1024,1024,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear));
+        sunShadow.bind(true);
+        glDepthTest(true);
+        glCullFace(true);
+
+        // Normalizes to -1,1
         sun=mat4();
-        sun.scale(lightMax-lightMin);
+        sun.translate(-1);
+        sun.scale(2.f/(lightMax-lightMin));
         sun.translate(-lightMin);
         sun.rotateY(PI/4);
+
+        shadow["modelViewProjectionTransform"] = sun;
+        buffer.bindAttribute(shadow,"position",3,__builtin_offsetof(Vertex,position));
         buffer.draw();
+
+        // Normalizes to xy to 0,1 and z to -1,1
+        sun=mat4();
+        sun.translate(vec3(0,0,0));
+        sun.scale(vec3(1.f/(lightMax.x-lightMin.x),1.f/(lightMax.y-lightMin.y),1.f/(lightMax.z-lightMin.z)));
+        sun.translate(-lightMin);
+        sun.rotateY(PI/4);
 
         if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
         framebuffer.bind(true);
-        glDepthTest(true);
-        glCullFace(true);
         glBlend(false);
 
         shader["modelViewProjectionTransform"] = projection*view;
         shader["normalMatrix"] = normalMatrix;
-        //shader["sunLightTransform"] = sun;
+        shader["sunLightTransform"] = sun;
         shader["sunLightDirection"] = sunLightDirection;
         shader["skyLightDirection"] = skyLightDirection;
+        shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;
+        shader.bindSamplers("shadowMap"); GLTexture::bindSamplers(sunShadow.depthTexture);
         buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
         buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
         buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
@@ -430,7 +410,7 @@ struct Editor : Widget {
         uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
 
         // Overlays errors / profile information (FIXME: software rendered overlay)
-        Text(system.parseErrors ? copy(userErrors) :
+        if(UI) Text(system.parseErrors ? copy(userErrors) :
                                   userErrors ? move(userErrors) :
                                                ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(indices.size()/3)+" faces\n"_)
                 .render(int2(position+int2(16)));

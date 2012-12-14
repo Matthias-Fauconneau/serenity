@@ -107,9 +107,11 @@ struct GLTexture {
 };
 
 struct GLFrameBuffer {
-    move_operator(GLFrameBuffer):id(o.id),depthBuffer(o.depthBuffer),colorBuffer(o.colorBuffer),width(o.width),height(o.height)
-    { o.id=o.depthBuffer=o.colorBuffer=0;}
+    move_operator(GLFrameBuffer):
+        id(o.id),depthBuffer(o.depthBuffer),colorBuffer(o.colorBuffer),width(o.width),height(o.height),depthTexture(move(o.depthTexture))
+    {o.id=o.depthBuffer=o.colorBuffer=0;}
     GLFrameBuffer(){}
+    GLFrameBuffer(GLTexture&& depth);
     GLFrameBuffer(uint width, uint height);
     ~GLFrameBuffer();
 
@@ -120,4 +122,5 @@ struct GLFrameBuffer {
 
     uint id=0, depthBuffer=0, colorBuffer=0;
     uint width=0, height=0;
+    GLTexture depthTexture;
 };

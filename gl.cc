@@ -219,7 +219,8 @@ GLTexture::GLTexture(int width, int height, int format) : width(width), height(h
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
     if((format&3)==sRGB) glTexImage2D(GL_TEXTURE_2D,0,GL_SRGB8,width,height,0,0,GL_UNSIGNED_BYTE,0);
-    if((format&3)==Depth24) glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT32,width,height,0,0,GL_UNSIGNED_INT,0);
+    if((format&3)==Depth24)
+        glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,0);
     if((format&3)==RGB16F) glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,width,height,0,GL_RGB,GL_FLOAT,0);
     if(format&Shadow) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
@@ -244,6 +245,12 @@ void GLTexture::bindSamplers(const GLTexture& tex0) { tex0.bind(0); }
 
 /// Framebuffer
 
+GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.height),depthTexture(move(depth)) {
+    glGenFramebuffers(1,&id);
+    glBindFramebuffer(GL_FRAMEBUFFER,id);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
+}
 GLFrameBuffer::GLFrameBuffer(uint width, uint height):width(width),height(height){
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
@@ -275,6 +282,7 @@ void GLFrameBuffer::bind(bool clear, vec4 color) {
       glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
   }
   glDisable(GL_FRAMEBUFFER_SRGB);
+  glBindTexture(GL_TEXTURE_2D, 0);
 }
 void GLFrameBuffer::bindWindow(int2 position, int2 size, bool clear, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

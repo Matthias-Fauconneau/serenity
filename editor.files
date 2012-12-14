@@ -18,3 +18,5 @@ blit.vert
 blit.frag
 fill.vert
 fill.frag
+shadow.vert
+shadow.frag
