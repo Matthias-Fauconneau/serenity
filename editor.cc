@@ -39,6 +39,7 @@ struct Editor : Widget {
     GLBuffer buffer;
     SHADER(shadow) GLShader& shadow = shadowShader();
     SHADER(shader) GLShader& shader = shaderShader();
+    SHADER(sky) GLShader& sky = skyShader();
     SHADER(resolve) GLShader& resolve = resolveShader();
 
     // Scene
@@ -412,6 +413,10 @@ struct Editor : Widget {
         buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
         buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
         buffer.draw();
+
+        sky["inverseProjectionMatrix"] = projection.inverse();
+        sky["sunLightDirection"] = -sunLightDirection;
+        glDrawRectangle(sky,vec2(-1,-1),vec2(1,1));
 
         GLTexture color(width,height,GLTexture::RGB16F);
         framebuffer.blit(color);

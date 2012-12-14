@@ -20,3 +20,5 @@ fill.vert
 fill.frag
 shadow.vert
 shadow.frag
+sky.frag
+sky.vert

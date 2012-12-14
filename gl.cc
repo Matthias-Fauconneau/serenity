@@ -279,7 +279,7 @@ void GLFrameBuffer::bind(bool clear, vec4 color) {
   glViewport(0,0,width,height);
   if(clear) {
       glClearColor(color.x,color.y,color.z,color.w);
-      glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
+      glClear(GL_DEPTH_BUFFER_BIT);
   }
   glDisable(GL_FRAMEBUFFER_SRGB);
   glBindTexture(GL_TEXTURE_2D, 0);

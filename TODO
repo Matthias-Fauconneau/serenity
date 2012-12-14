@@ -1,11 +1,8 @@
 CG:
- Editor: copy-paste, .XCompose, syntax highlighting
+ Scene: terrain, grass, plants, forest...
  Trees: improve branches using environment modeling (light and space competition)
- Export .obj [release]
  Textures: bark,leafs,twigs
- Scene: sky, terrain, grass, plants, forest...
-
+ Export .obj
+ Editor: copy-paste, .XCompose, syntax highlighting
 IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
 Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
-Standards: deflate, jpeg, mp3, vorbis, truetype, ssl
-Apps: runner, shell, file manager, search, imap, torrent, video, irc

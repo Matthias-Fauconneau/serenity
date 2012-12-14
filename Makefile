@@ -31,7 +31,7 @@ ICONS_player = play pause next
 ICONS_music = music
 
 SHADERS = $(SHADERS_$(TARGET)) fill blit
-SHADERS_editor = shadow shader resolve
+SHADERS_editor = shadow shader sky resolve
 
 SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert) $(SHADERS:%=%.frag)
 SRCS_profile = profile
