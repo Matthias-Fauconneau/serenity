@@ -117,15 +117,7 @@ void Window::create() {
     created = true;
 }
 void Window::destroy() {
-    assert(created);
-#if EGL
-    eglDestroyContext(display, context);
-    eglDestroySurface(display, surface);
-    eglTerminate(display);
-#else
-    //glXDestroyContext(display,context);
-    //XCloseDisplay(display);
-#endif
+    if(!created) return;
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
     created = false;

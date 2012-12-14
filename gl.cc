@@ -112,7 +112,7 @@ void* GLBuffer::mapVertexBuffer() {
 }
 void GLBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ARRAY_BUFFER, 0); }
 
-void GLBuffer::upload(const ref<int>& indices) {
+void GLBuffer::upload(const ref<uint>& indices) {
     if(!indexBuffer) glGenBuffers(1, &indexBuffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
@@ -150,7 +150,7 @@ void GLBuffer::draw() {
     if (indexBuffer) {
         if(primitiveRestart) {
             glEnable(GL_PRIMITIVE_RESTART);
-            glPrimitiveRestartIndex(0xFFFFFFFF);
+            glPrimitiveRestartIndex(-1);
         }
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
         glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);

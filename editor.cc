@@ -53,13 +53,6 @@ This is mostly for reference, since this application use my own framework (Linux
 #include "gl.h"
 #include "data.h" //cast
 
-struct Vertex {
-    vec3 position; // World-space position
-    vec3 color; // BGR albedo (TODO: texture mapping)
-    vec3 normal; // World-space vertex normals
-};
-struct Face { Vertex vertices[3]; };
-
 /// Generates and renders L-Systems
 struct Editor : Widget {
     // L-System
@@ -78,7 +71,7 @@ struct Editor : Widget {
     Bar<Text> systems; // Tab bar to select which L-System to view
     TextInput editor;
     VBox layout;
-    Window window __(&layout, int2(0,0), "L-System Editor"_);
+    Window window __(&layout, int2(0,0), "L-System Editor"_, false);
 
     // Renderer
     GLFrameBuffer sunShadow;
@@ -86,13 +79,76 @@ struct Editor : Widget {
     GLBuffer buffer;
     SHADER(shader) GLShader& shader = shaderShader();
     SHADER(resolve) GLShader& resolve = resolveShader();
-    //Shadow sunShadow; // Holds scene geometry projected in light space bins
 
     // Scene
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
     vec3 worldCenter=0; float worldRadius=0; // Scene bounding sphere in world space
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
-    array<Face> faces; // Generated scene geometry data
+
+    // Generated scene geometry data
+    struct Vertex {
+        vec3 position; // World-space position
+        vec3 color; // BGR albedo (TODO: texture mapping)
+        vec3 normal; // World-space vertex normals
+    };
+    array<Vertex> vertices;
+    array<uint> indices;
+
+    // Creates a new face using existing vertices when possible (normals will be smoothed with adjacent faces)
+    template<uint N> void face(const Vertex (&polygon)[N]) {
+        static_assert(N>=3,"");
+        struct Match { float distance=1; uint index = -1;};
+        Match matches[N];
+        for(uint index: range(vertices.size())) { //FIXME: generating N vertices is O(N^2) in total (need object & space partition)
+            Vertex& v = vertices[index];
+            for(uint i: range(N)) {
+                const Vertex& o = polygon[i];
+                if(v.color!=o.color) continue;
+                float distance = sqr(v.position-o.position);
+                if(distance>matches[i].distance) continue;
+                if(dot(o.normal,v.normal)<0) continue;
+                matches[i].distance = distance;
+                matches[i].index = index;
+            }
+        }
+        uint indices[N];
+        for(uint i: range(N)) {
+            const Match& match = matches[i];
+            if(match.index!=uint(-1)) {
+                Vertex& v = vertices[match.index];
+                v.normal += polygon[i].normal;
+                indices[i] = match.index;
+            } else {
+                if(vertices.size()==vertices.capacity()) vertices.reserve(2*vertices.size());
+                vertices << polygon[i];
+                indices[i] = vertices.size()-1;
+            }
+        }
+        uint a = indices[0];
+        uint b = indices[1];
+        for(uint i: range(2,N)) { // Tesselates convex polygons as fans (FIXME: generates bad triangle)
+            if(this->indices.size()==this->indices.capacity()) this->indices.reserve(2*this->indices.size());
+            uint c = indices[i];
+            this->indices << a << b << c;
+            b = c;
+        }
+    }
+
+    // Creates a new flat face, normals will be smoothed with adjacent faces
+    template<uint N> void face(const vec3 (&polygon)[N], vec3 color) {
+        vec3 a = polygon[0];
+        vec3 b = polygon[1];
+        Vertex vertices[N]={{a,color,0},{b,color,0}};
+        for(uint i: range(2,N)) { // Fan
+            vec3 c = polygon[i];
+            vec3 surface = cross(b-a,c-a);
+            vertices[i-2].normal += surface;
+            vertices[i-1].normal += surface;
+            vertices[i] = __(c,color,surface);
+            b = c;
+        }
+        face(vertices);
+    }
 
      /// Setups the application UI and shortcuts
      Editor() {
@@ -142,7 +198,7 @@ struct Editor : Widget {
         if(system.parseErrors) return;
 
         // Clears previous scene
-        faces.clear(); worldMin=0, worldMax=0, worldCenter=0, worldRadius=0, lightMin=0, lightMax=0;
+        vertices.clear(); indices.clear(); worldMin=0, worldMax=0, worldCenter=0, worldRadius=0, lightMin=0, lightMax=0;
 
         // Generates new L-system
         if(!level) level=system.constants.at(string("N"_));
@@ -183,8 +239,7 @@ struct Editor : Widget {
                 if(symbol=="F"_) {
                     vec3 P = state[3].xyz();
                     if(polygonStack) polygon.vertices << P;
-                    else { // Tesselated branch (TODO: indexing)
-                        array<Face> faces;
+                    else { // Tesselated branch
                         vec3 a = (A*vec3(0,1,0)).xyz() - A[3].xyz(), b = (B*vec3(0,1,0)).xyz() - B[3].xyz();
                         const int Na = max(3,int(length(a))), Nb = max(3,int(length(b)));
                         for(int i=0;i<Na;i++) {
@@ -203,21 +258,8 @@ struct Editor : Widget {
                             float tb0 = 2*PI*bestJ/Nb, tb1 = 2*PI*(bestJ+1)/Nb;
                             vec3 b0 = (B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
                             vec3 b1 = (B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
-                            {vec3 N = normalize(cross(a1-a0,b0-a0)); faces << Face __({{a0,color,N},{a1,color,N},{b0,color,N}}); }
-                            {vec3 N = normalize(cross(b1-a1,b0-a1)); faces << Face __({{a1,color,N},{b1,color,N},{b0,color,N}}); }
+                            face((vec3[]){a0,a1,b1,b0},color);
                         }
-
-                        // Computes smoothed normals (weighted by triangle areas)
-                        for(Face& face: faces) for(uint i: range(3)) {
-                            vec3 N=0; vec3 O = face.vertices[i].position;
-                            for(const Face& face: faces) for(const Vertex& V : ref<Vertex>__(face.vertices, 3)) {
-                                if(length(V.position-O)<1) {
-                                    N += cross(face.vertices[1].position-face.vertices[0].position,face.vertices[2].position-face.vertices[0].position);
-                                }
-                            }
-                            face.vertices[i].normal = normalize(N);
-                        }
-                        this->faces << faces;
                     }
                 }
             } else if(symbol=="."_) {
@@ -235,19 +277,27 @@ struct Editor : Widget {
             } else if(symbol=="%"_) cut=1;
             else if(symbol=="{"_) { // pushes current polygon and starts a new one
                 polygonStack << move(polygon);
+                polygon.vertices.reserve(4);
                 polygon.color = color;
             } else if(symbol=="}"_) { // stores current polygon and pop previous nesting level from stack
-                if(polygon.vertices.size()>=3) {
+                vec3* V = polygon.vertices.data();
+                uint N = polygon.vertices.size();
+                if(N<3) { userError("N<3"); return; }
+                else if(N==3) {
+                    face<3>((vec3[]){V[0],V[1],V[2]}, polygon.color);
+                    face<3>((vec3[]){V[2],V[1],V[0]}, polygon.color); //Two-sided
+                }
+                else if(N==4) {
+                    face<4>((vec3[]){V[0],V[1],V[2],V[3]}, polygon.color);
+                    face<4>((vec3[]){V[3],V[2],V[1],V[0]}, polygon.color); //Two-sided
+                }
+                else {
                     vec3 A = polygon.vertices.first();
                     vec3 B = polygon.vertices[1];
                     for(vec3 C: polygon.vertices.slice(2)) {
-                        vec3 N = cross(B-A,C-A);
-                        float area = length(N);
-                        if(area<0.01) { userError("degenerate"); continue; } //discard degenerate triangles
-                        N /= area;
-                        vec3 dn = 0.1f*N; // avoid self-shadowing
-                        faces << Face __({{A+dn,polygon.color,N},{B+dn,polygon.color,N},{C+dn,polygon.color,N}});
-                        faces << Face __({{C-dn,polygon.color,-N},{B-dn,polygon.color,-N},{A-dn,polygon.color,-N}}); //Two-sided
+                        vec3 dn = 0; //0.1f*N/cross(B-A,C-A); // avoid self-shadowing
+                        face((vec3[]){A+dn, B+dn, C+dn}, polygon.color);
+                        face((vec3[]){C-dn, B-dn, A-dn}, polygon.color); //Two-sided
                         B = C;
                     }
                 }
@@ -275,8 +325,8 @@ struct Editor : Widget {
 
         // Compute scene bounds in light space to fit shadow
         sun=mat4(); sun.rotateY(PI/4);
-        for(const Face& face: faces) for(const Vertex& V : ref<Vertex>__(face.vertices, 3)) {
-            vec3 P = (sun*V.position).xyz();
+        for(Vertex& vertex: vertices) {
+            vec3 P = (sun*vertex.position).xyz();
             lightMin=min(lightMin,P);
             lightMax=max(lightMax,P);
         }
@@ -296,9 +346,7 @@ struct Editor : Widget {
         C -= lightRay*dot(C,vec3(1,0,0))/dotNL;
         D -= lightRay*dot(D,vec3(1,0,0))/dotNL;
         // Add ground plane to scene
-        vec3 N = vec3(1,0,0);
-        faces << Face __ ({{A,vec3(1,1,1),N},{B,vec3(1,1,1),N},{C,vec3(1,1,1),N}});
-        faces << Face __ ({{A,vec3(1,1,1),N},{C,vec3(1,1,1),N},{D,vec3(1,1,1),N}});
+        face((vec3[]){A,B,C,D}, vec3(1,1,1));
         // Update light bounds (Z far)
         { vec3 lightP = (sun*A).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
         { vec3 lightP = (sun*B).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
@@ -306,14 +354,19 @@ struct Editor : Widget {
         { vec3 lightP = (sun*D).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
 
         // Compute scene bounds in world space to fit view
-        for(const Face& face: faces) for(const Vertex& V : ref<Vertex>__(face.vertices, 3)) {
-            worldMin=min(worldMin,V.position);
-            worldMax=max(worldMax,V.position);
+        for(Vertex& vertex: vertices) {
+            worldMin=min(worldMin, vertex.position);
+            worldMax=max(worldMax, vertex.position);
         }
         worldCenter = (worldMax+worldMin)/2.f; worldRadius=length(worldMax.yz()-worldMin.yz())/2.f; //FIXME: compute smallest enclosing sphere
 
-        // Submits geometry (TODO: indexed)
-        buffer.upload<Vertex>(cast<Vertex>(ref<Face>(faces)));
+
+        // Normalizes smoothed normals (weighted by triangle areas)
+        for(Vertex& vertex: vertices) vertex.normal=normalize(vertex.normal);
+
+        // Submits geometry
+        buffer.upload<Vertex>(vertices);
+        buffer.upload(indices);
 
         window.render();
     }
@@ -339,7 +392,7 @@ struct Editor : Widget {
         vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
         // Render sun shadow map
-        sunShadow = GLFrameBuffer()
+        //sunShadow = GLFrameBuffer();
         sun=mat4();
         sun.scale(lightMax-lightMin);
         sun.translate(-lightMin);
@@ -379,7 +432,7 @@ struct Editor : Widget {
         // Overlays errors / profile information (FIXME: software rendered overlay)
         Text(system.parseErrors ? copy(userErrors) :
                                   userErrors ? move(userErrors) :
-                                               ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(faces.size())+" faces\n"_)
+                                               ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(indices.size()/3)+" faces\n"_)
                 .render(int2(position+int2(16)));
 #if 0
         window.render(); //keep updating to get maximum performance profile

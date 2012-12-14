@@ -59,7 +59,7 @@ struct GLBuffer {
     void unmapIndexBuffer();
     void* mapVertexBuffer();
     void unmapVertexBuffer();
-    void upload(const ref<int>& indices);
+    void upload(const ref<uint>& indices);
     void upload(const ref<byte>& vertices);
     template<class T> void upload(const ref<T>& vertices) {
         vertexSize=sizeof(T);

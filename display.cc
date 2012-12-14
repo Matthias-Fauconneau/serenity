@@ -46,7 +46,8 @@ void blit(int2 target, const Image& source, vec4 color) {
     } else {
         glBlend(source.alpha, true);
         blitShader()["color"] = color;
-        blitShader().bindSamplers("sampler"); GLTexture::bindSamplers(source);
+        GLTexture texture = source; //FIXME
+        blitShader().bindSamplers("sampler"); GLTexture::bindSamplers(texture);
         glDrawRectangle(blitShader(), target+Rect(source.size()), true);
     }
 }
