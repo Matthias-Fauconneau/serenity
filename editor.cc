@@ -111,6 +111,7 @@ struct Editor : Widget {
             this->indices << a << b << c;
             b = c;
         }
+        //TODO: triangle strips
     }
 
     // Creates a new flat face, normals will be smoothed with adjacent faces
@@ -306,46 +307,53 @@ struct Editor : Widget {
             } else if(symbol=="|"_) state.rotateZ(PI);
         }
 
-        // Compute scene bounds in light space to fit shadow
+        {// Adds ground plane to scene
+            float size=2000;
+            face((vec3[]){vec3(0,-size,-size),vec3(0,size,-size),vec3(0,size,size),vec3(0,-size,size)}, vec3(1,1,1));
+            //TODO: relief
+        }
+
+        {// Generates grass
+            const int size=64;
+            vertices.reserve(vertices.size()+size*size*8*3);
+
+            Random random;
+            for(int y=0;y<size;y++) for(int x=0;x<size;x++) {
+                float bent = 1./4*(1./2+(random()+1)/2);
+                float angle = random()*PI;
+                float width = (1./2+(random()+1)/2)/8;
+                float height = (1./4+(random()+1)/2)*2;
+                float gravity = 1./4.;
+
+                vec3 position = vec3(x+ (random()+1)/2, y+ (random()+1)/2,0);
+                vec3 velocity = vec3(bent*cos(angle),bent*sin(angle),-1);
+                vec3 tangent = cross(velocity,vec3(0,0,1));
+                vec3 blade[8];
+                blade[0] = 2.f/size*position;
+                for(int i=1;i<8;i++) {
+                    blade[i] = 2.f/size*(position + float(i%2)*width*(7-i)*tangent);
+                    position += height*velocity;
+                    velocity += gravity*vec3(0,0,1);
+                    if(i>=2) face((vec3[]){blade[i-2],blade[i-1],blade[i]},vec3(0,1,0));
+                }
+            }
+        }
+
         sun=mat4(); sun.rotateY(PI/4);
         for(Vertex& vertex: vertices) {
+            // Normalizes smoothed normals (weighted by triangle areas)
+            vertex.normal=normalize(vertex.normal);
+
+            // Compute scene bounds in light space to fit shadow
             vec3 P = (sun*vertex.position).xyz();
             lightMin=min(lightMin,P);
             lightMax=max(lightMax,P);
-        }
 
-        // Fit size to receive all shadows
-        mat4 sunToWorld = sun.inverse();
-        vec3 lightRay = sunToWorld.normalMatrix()*vec3(0,0,1);
-        float xMin=lightMin.x, xMax=lightMax.x, yMin=lightMin.y, yMax=lightMax.y;
-        vec3 A = (sunToWorld*vec3(xMin,yMin,0)).xyz(),
-                B = (sunToWorld*vec3(xMin,yMax,0)).xyz(),
-                C = (sunToWorld*vec3(xMax,yMax,0)).xyz(),
-                D = (sunToWorld*vec3(xMax,yMin,0)).xyz();
-        // Project light view corners on ground plane
-        float dotNL = dot(lightRay,vec3(1,0,0));
-        A -= lightRay*dot(A,vec3(1,0,0))/dotNL;
-        B -= lightRay*dot(B,vec3(1,0,0))/dotNL;
-        C -= lightRay*dot(C,vec3(1,0,0))/dotNL;
-        D -= lightRay*dot(D,vec3(1,0,0))/dotNL;
-        // Add ground plane to scene
-        face((vec3[]){A,B,C,D}, vec3(1,1,1));
-        // Update light bounds (Z far)
-        { vec3 lightP = (sun*A).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
-        { vec3 lightP = (sun*B).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
-        { vec3 lightP = (sun*C).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
-        { vec3 lightP = (sun*D).xyz(); lightMin=min(lightMin,lightP); lightMax=max(lightMax,lightP); }
-
-        // Compute scene bounds in world space to fit view
-        for(Vertex& vertex: vertices) {
+            // Computes scene bounds in world space to fit view
             worldMin=min(worldMin, vertex.position);
             worldMax=max(worldMax, vertex.position);
         }
         worldCenter = (worldMax+worldMin)/2.f; worldRadius=length(worldMax.yz()-worldMin.yz())/2.f; //FIXME: compute smallest enclosing sphere
-
-
-        // Normalizes smoothed normals (weighted by triangle areas)
-        for(Vertex& vertex: vertices) vertex.normal=normalize(vertex.normal);
 
         // Submits geometry
         buffer.upload<Vertex>(vertices);
@@ -375,7 +383,8 @@ struct Editor : Widget {
         vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
 
         // Render sun shadow map
-        if(!sunShadow) sunShadow = GLFrameBuffer(GLTexture(1024,1024,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear));
+        if(!sunShadow)
+            sunShadow = GLFrameBuffer(GLTexture(1024,1024,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear|GLTexture::Clamp));
         sunShadow.bind(true);
         glDepthTest(true);
         glCullFace(true);
@@ -414,6 +423,7 @@ struct Editor : Widget {
         buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
         buffer.draw();
 
+        //TODO: fog
         sky["inverseProjectionMatrix"] = projection.inverse();
         sky["sunLightDirection"] = -sunLightDirection;
         glDrawRectangle(sky,vec2(-1,-1),vec2(1,1));
