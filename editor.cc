@@ -24,7 +24,7 @@ struct Editor : Widget {
     // View
     bool enableShadow=true; // Whether shadows are rendered
     int2 lastPos; // last cursor position to compute relative mouse movements
-    vec2 rotation=vec2(0,PI/4); // current view angles (yaw,pitch)
+    vec2 rotation=vec2(0,-PI/4); // current view angles (yaw,pitch)
     mat4 sun; // sun light transform (TODO: interactive)
 
     // User interface
@@ -46,6 +46,7 @@ struct Editor : Widget {
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
     vec3 worldCenter=0; float worldRadius=0; // Scene bounding sphere in world space
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
+    const float sunPitch = 3*PI/4;
 
     // Generated scene geometry data
     struct Vertex {
@@ -156,7 +157,7 @@ struct Editor : Widget {
          int2 delta = cursor-lastPos; lastPos=cursor;
          if(event==Motion && button==LeftButton) {
              rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
-             rotation.y= clip(float(-PI/2),rotation.y,float(PI/2)); // Keep pitch between [-PI/2,PI/2]
+             rotation.y= clip(float(-PI/2),rotation.y,float(0)); // Keep pitch between [-PI/2,0]
          }
          else if(event == Press) focus = this;
          else return false;
@@ -203,12 +204,12 @@ struct Editor : Widget {
                 mat4 A = stateB; //seamless branch junctions
                 A.scale(wA);
                 // Move forward
-                state.translate(vec3(l,0,0)); //forward axis is +X
-                if(symbol=="F"_) { // Apply tropism
+                state.translate(vec3(0,0,l)); //forward axis is +X
+                if(symbol=="F"_) { //Apply tropism
                     if(system.constants.contains(string("tropism"_))) {
                         float tropism = system.constants.at(string("tropism"_));
-                        vec3 X = state[0].xyz();
-                        vec3 Y = cross(vec3(-1,0,0),X);
+                        vec3 Z = state[2].xyz();
+                        vec3 Y = cross(vec3(0,0,-1),Z);
                         float y = length(Y);
                         if(y>0.01) { //only if X is not colinear with tropism vector
                             assert(Y.x==0);
@@ -226,20 +227,20 @@ struct Editor : Widget {
                         const int Na = max(3,int(length(a))), Nb = max(3,int(length(b)));
                         for(int i=0;i<Na;i++) {
                             float ta0 = 2*PI*i/Na, ta1 = 2*PI*(i+1)/Na;
-                            vec3 a0 = (A * (vec3(0, cos(ta0), sin(ta0)))).xyz();
-                            vec3 a1 = (A * (vec3(0, cos(ta1), sin(ta1)))).xyz();
+                            vec3 a0 = (A * (vec3(cos(ta0), sin(ta0), 0))).xyz();
+                            vec3 a1 = (A * (vec3(cos(ta1), sin(ta1), 0))).xyz();
                             int bestJ=-1; float bestD=__FLT_MAX__;
                             for(int j=0;j<Na;j++) { //FIXME: find out the smarter way to solve this
                                 float tb0 = 2*PI*j/Nb, tb1 = 2*PI*(j+1)/Nb;
-                                vec3 b0 = (B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
-                                vec3 b1 = (B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
+                                vec3 b0 = (B * (vec3(cos(tb0), sin(tb0), 0))).xyz();
+                                vec3 b1 = (B * (vec3(cos(tb1), sin(tb1), 0))).xyz();
                                 vec3 a = A[3].xyz(), b = B[3].xyz();
                                 float d = length((a0-a)-(b0-b))+length((a1-a)-(b1-b));
                                 if(d<bestD) bestJ=j, bestD=d;
                             }
                             float tb0 = 2*PI*bestJ/Nb, tb1 = 2*PI*(bestJ+1)/Nb;
-                            vec3 b0 = (B * (vec3(0, cos(tb0), sin(tb0)))).xyz();
-                            vec3 b1 = (B * (vec3(0, cos(tb1), sin(tb1)))).xyz();
+                            vec3 b0 = (B * (vec3(cos(tb0), sin(tb0), 0))).xyz();
+                            vec3 b1 = (B * (vec3(cos(tb1), sin(tb1), 0))).xyz();
                             face((vec3[]){a0,a1,b1,b0},color);
                         }
                     }
@@ -290,56 +291,64 @@ struct Editor : Widget {
                 if(module.arguments.size()!=3) userError("Expected !(b,g,r)");
                 color = clip(vec3(0.f),vec3(module.arguments[2],module.arguments[1],module.arguments[0]),vec3(1.f));
             } else if(symbol=="$"_) { //set Y horizontal (keeping X), Z=X×Y
-                            vec3 X = state[0].xyz();
-                            vec3 Y = cross(vec3(1,0,0),X);
+                            vec3 Z = state[2].xyz();
+                            vec3 Y = cross(vec3(0,0,1),Z);
                             float y = length(Y);
                             if(y<0.01) continue; //X is colinear to vertical (all possible Y are already horizontal)
                             Y /= y;
                             assert(Y.x==0);
-                            vec3 Z = cross(X,Y);
+                            vec3 X = cross(Z,Y);
+                            state[0] = vec4(X,0.f);
                             state[1] = vec4(Y,0.f);
-                            state[2] = vec4(Z,0.f);
             } else if(symbol=="\\"_||symbol=="/"_||symbol=="&"_||symbol=="^"_||symbol=="-"_ ||symbol=="+"_) {
                 float a = module.arguments ? module.arguments[0]*PI/180 : system.constants.value(string("angle"_),90)*PI/180;
-                if(symbol=="\\"_||symbol=="/"_) state.rotateX(symbol=="\\"_?a:-a);
+                if(symbol=="\\"_||symbol=="/"_) state.rotateZ(symbol=="\\"_?a:-a);
                 else if(symbol=="&"_||symbol=="^"_) state.rotateY(symbol=="&"_?a:-a);
-                else if(symbol=="-"_ ||symbol=="+"_) state.rotateZ(symbol=="+"_?a:-a);
+                else if(symbol=="-"_ ||symbol=="+"_) state.rotateX(symbol=="+"_?a:-a);
             } else if(symbol=="|"_) state.rotateZ(PI);
         }
 
+        const vec3 groundColor(0.5,0.5,0);
+        const vec3 grassColor(0.5,1,0);
+
+        float groundSize=1500;
         {// Adds ground plane to scene
-            float size=2000;
-            face((vec3[]){vec3(0,-size,-size),vec3(0,size,-size),vec3(0,size,size),vec3(0,-size,size)}, vec3(1,1,1));
+            face((vec3[]){vec3(-groundSize,-groundSize,0),vec3(groundSize,-groundSize,0),
+                          vec3(groundSize,groundSize,0),vec3(-groundSize,groundSize,0)}, groundColor);
             //TODO: relief
         }
 
-        {// Generates grass
-            const int size=64;
-            vertices.reserve(vertices.size()+size*size*8*3);
+        {// Generates grass (TODO: parsed definition)
+            const int bladeCountSqrt=128;
+            vertices.reserve(vertices.size()+bladeCountSqrt*bladeCountSqrt*8);
+            indices.reserve(indices.size()+bladeCountSqrt*bladeCountSqrt*8*3);
 
             Random random;
-            for(int y=0;y<size;y++) for(int x=0;x<size;x++) {
+            for(int y=-bladeCountSqrt/2;y<bladeCountSqrt/2;y++) for(int x=-bladeCountSqrt/2;x<bladeCountSqrt/2;x++) {
                 float bent = 1./4*(1./2+(random()+1)/2);
                 float angle = random()*PI;
-                float width = (1./2+(random()+1)/2)/8;
-                float height = (1./4+(random()+1)/2)*2;
-                float gravity = 1./4.;
+                float width = 6*(1./2+(random()+1)/2);
+                float height = 30*(1./4+(random()+1)/2);
+                float gravity = 1./4;
 
-                vec3 position = vec3(x+ (random()+1)/2, y+ (random()+1)/2,0);
-                vec3 velocity = vec3(bent*cos(angle),bent*sin(angle),-1);
-                vec3 tangent = cross(velocity,vec3(0,0,1));
+                vec3 position = 2*groundSize/bladeCountSqrt * vec3(x+ (random()+1)/2, y+ (random()+1)/2,0);
+                vec3 velocity = vec3(bent*cos(angle),bent*sin(angle),1);
+                vec3 tangent = vec3(-sin(angle),cos(angle),0);
                 vec3 blade[8];
-                blade[0] = 2.f/size*position;
+                blade[0] = position - width*tangent;
                 for(int i=1;i<8;i++) {
-                    blade[i] = 2.f/size*(position + float(i%2)*width*(7-i)*tangent);
+                    blade[i] = position + (i%2?1:-1)*width*(7-i)/7.f*tangent;
                     position += height*velocity;
-                    velocity += gravity*vec3(0,0,1);
-                    if(i>=2) face((vec3[]){blade[i-2],blade[i-1],blade[i]},vec3(0,1,0));
+                    velocity.z -= gravity;
+                    if(i>=2) {
+                        face((vec3[]){blade[i-2],blade[i-1],blade[i]}, grassColor);
+                        face((vec3[]){blade[i],blade[i-1],blade[i-2]}, grassColor); // Two sided
+                    }
                 }
             }
         }
 
-        sun=mat4(); sun.rotateY(PI/4);
+        sun=mat4(); sun.rotateX(sunPitch);
         for(Vertex& vertex: vertices) {
             // Normalizes smoothed normals (weighted by triangle areas)
             vertex.normal=normalize(vertex.normal);
@@ -353,7 +362,7 @@ struct Editor : Widget {
             worldMin=min(worldMin, vertex.position);
             worldMax=max(worldMax, vertex.position);
         }
-        worldCenter = (worldMax+worldMin)/2.f; worldRadius=length(worldMax.yz()-worldMin.yz())/2.f; //FIXME: compute smallest enclosing sphere
+        worldCenter = (worldMax+worldMin)/2.f; worldRadius=length(worldMax.xy()-worldMin.xy())/2.f; //FIXME: compute smallest enclosing sphere
 
         // Submits geometry
         buffer.upload<Vertex>(vertices);
@@ -374,13 +383,12 @@ struct Editor : Widget {
         view.scale(1.f/worldRadius); // fit scene (isometric approximation)
         view.translate(vec3(0,0,-2*worldRadius)); // step back
         view.rotateX(rotation.y); // yaw
-        view.rotateY(rotation.x); // pitch
-        view.rotateZ(PI/2); //+X (heading) is up
+        view.rotateZ(rotation.x); // pitch
         view.translate(vec3(-worldCenter.x,0,0)); //view.translate(-worldCenter); //center origin
         // View-space lighting
         mat3 normalMatrix = view.normalMatrix();
         vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
-        vec3 skyLightDirection = normalize(normalMatrix*vec3(1,0,0));
+        vec3 skyLightDirection = normalize(normalMatrix*vec3(0,0,1));
 
         // Render sun shadow map
         if(!sunShadow)
@@ -394,7 +402,7 @@ struct Editor : Widget {
         sun.translate(-1);
         sun.scale(2.f/(lightMax-lightMin));
         sun.translate(-lightMin);
-        sun.rotateY(PI/4);
+        sun.rotateX(sunPitch);
 
         shadow["modelViewProjectionTransform"] = sun;
         buffer.bindAttribute(shadow,"position",3,__builtin_offsetof(Vertex,position));
@@ -405,7 +413,7 @@ struct Editor : Widget {
         sun.translate(vec3(0,0,0));
         sun.scale(vec3(1.f/(lightMax.x-lightMin.x),1.f/(lightMax.y-lightMin.y),1.f/(lightMax.z-lightMin.z)));
         sun.translate(-lightMin);
-        sun.rotateY(PI/4);
+        sun.rotateX(sunPitch);
 
         if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
         framebuffer.bind(true);
