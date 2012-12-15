@@ -1,5 +1,4 @@
 CG:
- Scene: relief, rocks, fog, plants
  Trees: improve branches using environment modeling (light and space competition)
  Textures: bark,leafs,twigs
  Export .obj

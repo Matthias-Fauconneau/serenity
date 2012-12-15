@@ -11,8 +11,6 @@
 #include "gl.h"
 #include "data.h" //cast
 
-constexpr bool UI = true;
-
 /// Generates and renders L-Systems
 struct Editor : Widget {
     // L-System
@@ -24,7 +22,7 @@ struct Editor : Widget {
     // View
     bool enableShadow=true; // Whether shadows are rendered
     int2 lastPos; // last cursor position to compute relative mouse movements
-    vec2 rotation=vec2(0,-PI/4); // current view angles (yaw,pitch)
+    vec2 rotation=vec2(0,-PI/3); // current view angles (yaw,pitch)
     mat4 sun; // sun light transform (TODO: interactive)
 
     // User interface
@@ -60,10 +58,10 @@ struct Editor : Widget {
     vec3 gridMin=-1, gridMax=1; // current grid bounds
     array<uint> grid[G*G*G]; //Space partionning for faster vertex index lookups
     array<uint>& cell(vec3 p) {
-        assert(p>=gridMin && p<gridMax, gridMin, p, gridMax);
+        assert(p>gridMin && p<gridMax, gridMin, p, gridMax);
         vec3 n = float(G)*(p-gridMin)/(gridMax-gridMin);
         uint i = (uint(n.z)*G+uint(n.y))*G+uint(n.x);
-        assert(i<G*G*G);
+        if(i>=G*G*G) i=G*G*G-1; //assert(i<G*G*G);
         return grid[i];
     }
 
@@ -74,7 +72,7 @@ struct Editor : Widget {
         for(uint i: range(N)) { // Lookups each vertex
             const Vertex& o = polygon[i];
 
-            if(!(o.position>=gridMin && o.position<gridMax)) {
+            if(!(o.position>gridMin && o.position<gridMax)) {
                 gridMin=min(gridMin,o.position-vec3(1)); gridMax=max(gridMax,o.position+vec3(1)); //Resizes grid
                 for(array<uint>& cell: grid) cell.clear(); // Clears grid
                 for(uint i: range(vertices.size())) cell(vertices[i].position) << i; // Sorts all vertices
@@ -131,10 +129,35 @@ struct Editor : Widget {
         face(vertices);
     }
 
+    /*vec2 randomNormals[256*256];
+    // Returns a random 2D normal from position
+    vec2 random2D(int2 i) { return randomNormals[(i.y%256)*256+(i.x%256)]; }
+
+    float perlin2D( vec2 p ) {
+      int2 i = int2(p);
+      vec2 f = p-floor(p);
+      float v00 = dot(random2D(i+int2(0,0)), f - vec2(0,0));
+      float v01 = dot(random2D(i+int2(0,1)), f - vec2(0,1));
+      float v10 = dot(random2D(i+int2(1,0)), f - vec2(1,0));
+      float v11 = dot(random2D(i+int2(1,1)), f - vec2(1,1));
+      vec2 w = f*f*f*(f*(6.f*f-vec2(15.f))+vec2(10.f));
+      return mix( mix( v00, v01, w.y ), mix( v10, v11, w.y ), w.x );
+    }*/
+
+    float bilinear(float* image, uint stride, vec2 uv) {
+        uv *= stride;
+        int2 i = int2(uv);
+        vec2 f = uv-floor(uv);
+        return mix(
+                    mix( image[(i.y+0)*(stride+1)+i.x], image[(i.y+0)*(stride+1)+i.x+1], f.x),
+                mix( image[(i.y+1)*(stride+1)+i.x], image[(i.y+1)*(stride+1)+i.x+1], f.x), f.y);
+    };
+
      /// Setups the application UI and shortcuts
      Editor() {
-         if(UI) layout << &systems << this << &editor;
-         else window.widget=this;
+         //Random random; for(vec2& v: randomNormals) v=normalize(vec2(random(),random()));
+
+         layout << &systems << this << &editor;
          window.localShortcut(Escape).connect(&::exit);
 
          // Scans current folder for L-System definitions (.l files)
@@ -183,6 +206,60 @@ struct Editor : Widget {
         vertices.clear(); indices.clear(); worldMin=0, worldMax=0, worldCenter=0, worldRadius=0, lightMin=0, lightMax=0;
         gridMin=-1, gridMax=1; for(array<uint>& cell: grid) cell.clear(); // Clear grid
 
+        const vec3 groundColor(2./8,1./8,0);
+        const vec3 grassColor(2./4,4./4,0);
+
+        float groundSize=4000;
+
+        Random random;
+        const int N=4;
+        float altitude[(N+1)*(N+1)];
+        for(int y=0;y<=N;y++) for(int x=0;x<=N;x++) {
+            altitude[y*(N+1)+x] = 100.f*random();
+        }
+
+        {// Terrain
+            for(int y=0;y<N;y++) for(int x=0;x<N;x++) {
+                vec2 min = vec2((x-N/2)*groundSize/N,(y-N/2)*groundSize/N);
+                vec2 max = vec2((x-N/2+1)*groundSize/N,(y-N/2+1)*groundSize/N);
+                face((vec3[]){ //FIXME: triangular mesh
+                         vec3(min.x,min.y,altitude[(y+0)*(N+1)+(x+0)]),
+                         vec3(max.x,min.y,altitude[(y+0)*(N+1)+(x+1)]),
+                         vec3(max.x,max.y,altitude[(y+1)*(N+1)+(x+1)]),
+                         vec3(min.x,max.y,altitude[(y+1)*(N+1)+(x+0)])}, groundColor);
+            }
+        }
+
+        {// Grass (TODO: speed up generation, parsed definition)
+            const int bladeCountSqrt=256;
+            vertices.reserve(vertices.size()+bladeCountSqrt*bladeCountSqrt*8);
+            indices.reserve(indices.size()+bladeCountSqrt*bladeCountSqrt*8*3);
+
+            for(int y=0;y<bladeCountSqrt;y++) for(int x=0;x<bladeCountSqrt;x++) {
+                float bent = 1./4*(1./2+(random()+1)/2);
+                float angle = random()*PI;
+                float width = 6*(1./2+(random()+1)/2);
+                float height = 30*(1./4+(random()+1)/2);
+                float gravity = 1./4;
+
+                vec2 uv = vec2(x + (random()+1)/2, y + (random()+1)/2)/float(bladeCountSqrt);
+                vec3 position = vec3(groundSize * (uv-vec2(1/2.f)), bilinear(altitude, N, uv));
+                vec3 velocity = vec3(bent*cos(angle),bent*sin(angle),1);
+                vec3 tangent = vec3(-sin(angle),cos(angle),0);
+                vec3 blade[8];
+                blade[0] = position - width*tangent;
+                for(int i=1;i<8;i++) {
+                    blade[i] = position + (i%2?1:-1)*width*(7-i)/7.f*tangent;
+                    position += height*velocity;
+                    velocity.z -= gravity;
+                    if(i>=2) {
+                        face((vec3[]){blade[i-2],blade[i-1],blade[i]}, grassColor);
+                        face((vec3[]){blade[i],blade[i-1],blade[i-2]}, grassColor); // Two sided
+                    }
+                }
+            }
+        }
+
         // Generates new L-system
         if(!level) level=system.constants.at(string("N"_));
         array<Module> modules = system.generate(level);
@@ -194,6 +271,8 @@ struct Editor : Widget {
         struct Polygon { array<vec3> vertices; vec3 color; };
         array<Polygon> polygonStack; Polygon polygon;
         array<vec3> colorStack; vec3 color=vec3(1,1,1);
+        stateB.translate(vec3(0,0,altitude[(N/2)*(N+1)+(N/2)]));
+        state=stateB;
         for(const Module& module : modules) {
             word symbol = module.symbol;
             if(cut) { if(symbol=="["_) cut++; else if(symbol=="]"_) cut--; else continue; }
@@ -211,8 +290,8 @@ struct Editor : Widget {
                         vec3 Z = state[2].xyz();
                         vec3 Y = cross(vec3(0,0,-1),Z);
                         float y = length(Y);
-                        if(y>0.01) { //only if X is not colinear with tropism vector
-                            assert(Y.x==0);
+                        if(y>0.01) { //only if Z is not colinear with tropism vector
+                            assert(Y.z==0);
                             state.rotate(tropism,state.inverse().normalMatrix()*Y);
                         }
                     }
@@ -308,46 +387,6 @@ struct Editor : Widget {
             } else if(symbol=="|"_) state.rotateZ(PI);
         }
 
-        const vec3 groundColor(0.5,0.5,0);
-        const vec3 grassColor(0.5,1,0);
-
-        float groundSize=1500;
-        {// Adds ground plane to scene
-            face((vec3[]){vec3(-groundSize,-groundSize,0),vec3(groundSize,-groundSize,0),
-                          vec3(groundSize,groundSize,0),vec3(-groundSize,groundSize,0)}, groundColor);
-            //TODO: relief
-        }
-
-        {// Generates grass (TODO: parsed definition)
-            const int bladeCountSqrt=128;
-            vertices.reserve(vertices.size()+bladeCountSqrt*bladeCountSqrt*8);
-            indices.reserve(indices.size()+bladeCountSqrt*bladeCountSqrt*8*3);
-
-            Random random;
-            for(int y=-bladeCountSqrt/2;y<bladeCountSqrt/2;y++) for(int x=-bladeCountSqrt/2;x<bladeCountSqrt/2;x++) {
-                float bent = 1./4*(1./2+(random()+1)/2);
-                float angle = random()*PI;
-                float width = 6*(1./2+(random()+1)/2);
-                float height = 30*(1./4+(random()+1)/2);
-                float gravity = 1./4;
-
-                vec3 position = 2*groundSize/bladeCountSqrt * vec3(x+ (random()+1)/2, y+ (random()+1)/2,0);
-                vec3 velocity = vec3(bent*cos(angle),bent*sin(angle),1);
-                vec3 tangent = vec3(-sin(angle),cos(angle),0);
-                vec3 blade[8];
-                blade[0] = position - width*tangent;
-                for(int i=1;i<8;i++) {
-                    blade[i] = position + (i%2?1:-1)*width*(7-i)/7.f*tangent;
-                    position += height*velocity;
-                    velocity.z -= gravity;
-                    if(i>=2) {
-                        face((vec3[]){blade[i-2],blade[i-1],blade[i]}, grassColor);
-                        face((vec3[]){blade[i],blade[i-1],blade[i-2]}, grassColor); // Two sided
-                    }
-                }
-            }
-        }
-
         sun=mat4(); sun.rotateX(sunPitch);
         for(Vertex& vertex: vertices) {
             // Normalizes smoothed normals (weighted by triangle areas)
@@ -362,7 +401,7 @@ struct Editor : Widget {
             worldMin=min(worldMin, vertex.position);
             worldMax=max(worldMax, vertex.position);
         }
-        worldCenter = (worldMax+worldMin)/2.f; worldRadius=length(worldMax.xy()-worldMin.xy())/2.f; //FIXME: compute smallest enclosing sphere
+        worldCenter = (worldMin+worldMax)/2.f; worldRadius=length(worldMax.xy()-worldMin.xy())/2.f; //FIXME: compute smallest enclosing sphere
 
         // Submits geometry
         buffer.upload<Vertex>(vertices);
@@ -377,14 +416,14 @@ struct Editor : Widget {
         uint width=size.x, height = size.y;
         // Computes projection transform
         mat4 projection;
-        projection.perspective(PI/4,width,height,1,4);
+        projection.perspective(PI/4,width,height,1./4,4);
         // Computes view transform
         mat4 view;
         view.scale(1.f/worldRadius); // fit scene (isometric approximation)
-        view.translate(vec3(0,0,-2*worldRadius)); // step back
+        view.translate(vec3(0,0,-1*worldRadius)); // step back
         view.rotateX(rotation.y); // yaw
         view.rotateZ(rotation.x); // pitch
-        view.translate(vec3(-worldCenter.x,0,0)); //view.translate(-worldCenter); //center origin
+        view.translate(vec3(0,0,-worldCenter.z));
         // View-space lighting
         mat3 normalMatrix = view.normalMatrix();
         vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
@@ -392,7 +431,7 @@ struct Editor : Widget {
 
         // Render sun shadow map
         if(!sunShadow)
-            sunShadow = GLFrameBuffer(GLTexture(1024,1024,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear|GLTexture::Clamp));
+            sunShadow = GLFrameBuffer(GLTexture(4096,4096,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear|GLTexture::Clamp));
         sunShadow.bind(true);
         glDepthTest(true);
         glCullFace(true);
@@ -451,7 +490,7 @@ struct Editor : Widget {
         uint frameEnd = cpuTime(); frameTime = ( (frameEnd-this->frameEnd) + (16-1)*frameTime)/16; this->frameEnd=frameEnd;
 
         // Overlays errors / profile information (FIXME: software rendered overlay)
-        if(UI) Text(system.parseErrors ? copy(userErrors) :
+        Text(system.parseErrors ? copy(userErrors) :
                                   userErrors ? move(userErrors) :
                                                ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(indices.size()/3)+" faces\n"_)
                 .render(int2(position+int2(16)));
