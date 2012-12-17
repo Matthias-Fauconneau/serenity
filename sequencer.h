@@ -9,7 +9,7 @@ struct Sequencer : Device, Poll {
     array<uint8> pressed;
     array<uint8> sustained;
     bool sustain=false;
-    signal<int,int> noteEvent;
+    signal<uint,uint> noteEvent;
     struct Event { int16 time; uint8 key; uint8 vel; Event(int16 time, uint8 key, uint8 vel):time(time),key(key),vel(vel){}};
     array<Event> events;
     int lastTick=0;

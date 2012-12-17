@@ -12,8 +12,8 @@
 struct Keyboard : Widget {
     array<int> midi, input;
     signal<> contentChanged;
-    void inputNoteEvent(int key, int vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
-    void midiNoteEvent(int key, int vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
+    void inputNoteEvent(uint key, uint vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
+    void midiNoteEvent(uint key, uint vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
     int2 sizeHint() { return int2(-1,120); }
     void render(int2 position, int2 size) {
         int y0 = position.y;
@@ -61,39 +61,178 @@ inline float sin(float t) { return __builtin_sinf(t); }
 inline float log2(float x) { return __builtin_log2f(x); }
 inline float exp2(float x) { return __builtin_exp2f(x); }
 
+struct Lowpass {
+	float a; // smoothing factor
+	float previous=0;
+    Lowpass(float a):a(a){}
+	float operator()(float in) { float out = a*in + (1-a)*previous; previous = out; return out; }
+};
+
+struct Delay {
+    float* buffer=0;
+	uint index=0, delay=0;
+    Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { clear(buffer,delay); }
+    operator float() { return buffer[index]; }
+    void operator()(float in) { buffer[index]=in; index=(index+1)%delay; }
+    float& operator[](uint offset) { uint i=(index+offset)%delay; return buffer[i]; }
+};
+
+struct Note {
+    uint rate, key, velocity;
+    Note(uint rate, uint key, uint velocity):rate(rate),key(key),velocity(velocity){}
+    float period() { return rate/(440*exp2((int(key)-69)/12.0)); }
+    virtual bool read(float* buffer, uint periodSize)=0;
+
+    enum { Attack, Decay, Sustain, Release } state = Attack;
+    virtual void release() { state=Release; }
+};
+
+struct LinearADSR : Note {
+    float amplitudeStep;
+    float amplitude = 0;
+    LinearADSR(uint rate, uint key, uint velocity):Note(rate, key, velocity),amplitudeStep(1./rate){}
+    bool next() {
+        if(state==Attack) {
+            amplitude += amplitudeStep;
+            if(amplitude >= 1) amplitude=1, state=Decay;
+        }
+        /*else if(state==Decay) {
+        amplitude -= amplitudeStep;
+        if(amplitude <= 1./2) amplitude=1./2, state=Sustain;
+        }*/ else if(state==Release) {
+            amplitude -= amplitudeStep;
+            if(amplitude<=0) return false;
+        }
+        return true;
+    }
+};
+
+struct Square : LinearADSR {
+    float x=0;
+    float step;
+    Square(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(2/Note::period()/*-1 / 1 in one period*/){}
+    bool read(float* buffer, uint periodSize) override {
+        for(uint i : range(periodSize)) {
+            float sample = amplitude*(x > 0);
+            buffer[2*i+0] += sample, buffer[2*i+1] += sample;
+
+            x += step;
+            if(x >= 1) x = -1;
+
+            if(!next()) return false;
+        }
+        return true;
+    }
+};
+
+struct Saw : LinearADSR {
+    float y=0;
+    float step;
+    Saw(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(4/Note::period()/*-1 to 1 to -1 in one period*/){}
+    bool read(float* buffer, uint periodSize) override {
+        for(uint i : range(periodSize)) {
+            float sample = amplitude*y;
+            buffer[2*i+0] += sample, buffer[2*i+1] += sample;
+
+            y += step;
+            if(y >= 1) y = 1, step = -step;
+            if(y <= -1) y = -1, step = -step;
+
+            if(!next()) return false;
+        }
+        return true;
+    }
+};
+
+struct Pure : LinearADSR {
+    float angle=0;
+    float step;
+    Pure(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(2*PI/Note::period()){}
+    bool read(float* buffer, uint periodSize) override {
+        for(uint i : range(periodSize)) {
+            float sample = amplitude*sin(angle);
+            buffer[2*i+0] += sample, buffer[2*i+1] += sample;
+            angle += step;
+            if(!next()) return false;
+        }
+        return true;
+    }
+};
+
+struct Pluck : Note {
+    uint period; // String size in samples
+    Delay delay1,delay2; // Propagating waves
+    Lowpass lowpass; // Low pass filter at the end of the string
+    Pluck(uint rate, uint key, uint velocity):Note(rate, key, velocity),period(Note::period()), delay1(period), delay2(period), lowpass(1./3) {
+        uint pinchPosition = period/3; // position on the string of the maximum of the triangle excitation
+        for(uint x: range(0,pinchPosition)) {
+            delay1[x] = float(x)/pinchPosition;
+            delay2[period-1-x] = -float(x)/pinchPosition;
+        }
+        //FIXME: smooth triangle profile (avoid initial aliasing)
+        for(uint x: range(pinchPosition,period)) {
+            delay1[x] = float(period-x)/(period-pinchPosition);
+            delay2[period-1-x] = -float(period-x)/(period-pinchPosition);
+        }
+    }
+    bool read(float* buffer, uint periodSize) {
+        //if(state==Release) return false; //FIXME: release decayed notes
+        for(uint i : range(periodSize)) {
+            float sample = ( delay1 + delay2 ) / 2;
+            buffer[2*i+0] += sample, buffer[2*i+1] += sample;
+
+            float t = lowpass(-delay2);
+            delay2( -delay1 );
+            delay1( t );
+        }
+        return true;
+    }
+};
+
+struct Synthesizer {
+    const uint rate = 44100;
+    signal<float* /*data*/, uint /*size*/> frameReady;
+
+    typedef Pluck Note; //FIXME: runtime selection combo box
+    array<Note> notes;
+    void noteEvent(uint key, uint velocity) {
+        if(velocity) {
+            notes << Note __(rate, key, velocity);
+        } else {
+            for(Note& note: notes) if(note.key == key) note.release();
+        }
+    }
+
+    bool read(int32* output, uint periodSize) {
+        float buffer[2*periodSize];
+        clear(buffer,2*periodSize);
+
+        // Synthesize all notes
+        for(uint i=0; i<notes.size();) { Note& note=notes[i];
+            if(note.read(buffer,periodSize)) i++;
+            else notes.removeAt(i);
+        }
+
+        //TODO: simulated (i.e not sampled convolution) reverb
+
+        for(uint i: range(2*periodSize)) buffer[i] *= 0x1p28f;
+        frameReady(buffer,periodSize);
+        for(uint i: range(2*periodSize)) output[i] = buffer[i]; // Converts buffer to signed 32bit output
+        return true;
+    }
+};
+
 /// Displays information on the played samples
 struct SynthesizerTest : Widget {
     Thread thread;
     Sequencer input __(thread);
-    struct Synthesizer {
-        uint rate = 44100;
-        signal<float* /*data*/, uint /*size*/> frameReady;
-        struct Note { int key, velocity; uint64 t; };
-        array<Note> notes;
-        bool read(int32* output, uint periodSize) {
-            float buffer[2*periodSize];
-            clear(buffer,2*periodSize);
-
-            for(uint i=0; i<notes.size();) { Note& note=notes[i];
-                if(note.t < rate/2) {
-                    float frequency = exp2((note.key-69)/12.0)*440/rate;
-                    for(uint i : range(periodSize)) buffer[2*i+0]=buffer[2*i+1]= sin(2*PI*frequency*note.t), note.t++;
-                    i++;
-                } else notes.removeAt(i);
-            }
-            frameReady(buffer,periodSize);
-            for(uint i: range(2*periodSize)) buffer[i] *= 0x1p28f;
-            for(uint i: range(2*periodSize)) output[i] = buffer[i]; // Converts buffer to signed 32bit output
-            return true;
-        }
-        void noteEvent(int key, int velocity){ notes << Note __(key,velocity, 0); }
-    } synthesizer;
+    Synthesizer synthesizer;
     AudioOutput audio __({&synthesizer, &Synthesizer::read},thread,true);
 
     Text text;
     Keyboard keyboard;
     VBox layout;
-    Window window __(&layout,int2(0,1050+16+120),"SFZ Viewer"_);
+    Window window __(&layout,int2(0,1050+16+120),"Synthesizer"_);
 
     float* buffer;
     float* hann;
