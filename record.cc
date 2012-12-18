@@ -18,7 +18,7 @@ void Record::start(const ref<byte>& name) {
         videoCodec = videoStream->codec;
         avcodec_get_context_defaults3(videoCodec, codec);
         videoCodec->codec_id = AV_CODEC_ID_H264;
-        videoCodec->bit_rate = 3000000; //FIXME: lossless
+        videoCodec->bit_rate = 3000000;
         videoCodec->width = width;
         videoCodec->height = height;
         videoCodec->time_base.num = 1;
