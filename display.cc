@@ -107,6 +107,9 @@ void disk(vec2 p, float r, vec4 color) {
     for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
         float d = r - sqrt((x-p.x)*(x-p.x)+(y-p.y)*(y-p.y));
         if(d>1) framebuffer(x,y) = color8;
-        else if(d>0) framebuffer(x,y) = byte4(max(int4(0),int4(framebuffer(x,y))-int4(d*negative)));
+        else if(d>0) {
+            byte4& t = framebuffer(x,y);
+            t = byte4(max(0.f,t.b-d*negative.x),max(0.f,t.g-d*negative.y),max(0.f,t.r-d*negative.z),t.a);
+        }
     }
 }

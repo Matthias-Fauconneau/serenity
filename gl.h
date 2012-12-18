@@ -38,12 +38,12 @@ struct GLShader {
 
 #define SHADER(name) \
 GLShader& name ## Shader() { \
-    extern char _binary_## name ##_vert_start[]; \
-    extern char _binary_## name ##_vert_end[]; \
-    extern char _binary_## name ##_frag_start[]; \
-    extern char _binary_## name ##_frag_end[]; \
-    static GLShader shader = GLShader( ref<byte>(_binary_## name ##_vert_start,_binary_## name ##_vert_end), \
-    ref<byte>(_binary_## name ##_frag_start,_binary_## name ##_frag_end)); \
+    extern char _binary_shaders_ ## name ##_vert_start[]; \
+    extern char _binary_shaders_ ## name ##_vert_end[]; \
+    extern char _binary_shaders_ ## name ##_frag_start[]; \
+    extern char _binary_shaders_ ## name ##_frag_end[]; \
+    static GLShader shader = GLShader( ref<byte>(_binary_shaders_## name ##_vert_start,_binary_shaders_## name ##_vert_end), \
+    ref<byte>(_binary_shaders_## name ##_frag_start,_binary_shaders_## name ##_frag_end)); \
     return shader; \
 }
 

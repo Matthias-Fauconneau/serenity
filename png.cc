@@ -151,7 +151,7 @@ array<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
     array<byte> data(w*h*4+h); data.setSize(data.capacity());
     byte* dst = data.data(); const byte* src = (byte*)image.data;
-    for(uint unused y: range(h)) { *dst++ = 0; for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]); dst+=w*4, src+=w*4; }
+    for(uint unused y: range(h)) { *dst++ = 0; for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]); dst+=w*4, src+=image.stride*4; }
     return data;
 }
 

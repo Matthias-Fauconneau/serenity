@@ -60,6 +60,7 @@ struct Timer : Poll {
     Timer();
     ~Timer();
     void setAbsolute(long sec, long nsec=0);
+    void setRelative(long msec);
     signal<> timeout;
     virtual void event() { timeout(); }
 };

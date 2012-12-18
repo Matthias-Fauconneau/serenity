@@ -97,6 +97,8 @@ struct Slider : Progress {
     /// User edited the \a value
     signal<int> valueChanged;
 
+    Slider(int minimum=0, int maximum=0, int value=-1):Progress(minimum,maximum,value){}
+
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 

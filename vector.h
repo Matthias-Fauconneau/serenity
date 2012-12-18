@@ -77,6 +77,7 @@ generic float sqr(const vector& a) { return dot(a,a); }
 generic float length(const vector& a) { return sqrt(dot(a,a)); }
 generic vector normalize(const vector& a){ return a/length(a); }
 
+#define NaN __builtin_nan("")
 inline bool isNaN(float x) { return __builtin_isnan(x); }
 generic bool isNaN(const vector& v){ for(uint i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
 

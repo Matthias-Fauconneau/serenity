@@ -9,7 +9,7 @@ ifeq ($(CC),cc)
    CC := g++ -fabi-version=0
  else ifeq ($(TARGET),test)
    CC := g++ -fabi-version=0
- else ifeq ($(TARGET),mnp)
+ else ifeq ($(TARGET),simulation)
    CC := g++ -fabi-version=0
  else
   CC := clang++ -Wno-lambda-extensions
@@ -33,7 +33,7 @@ ICONS_music = music
 SHADERS = $(SHADERS_$(TARGET)) fill blit
 SHADERS_editor = shadow shader sky resolve
 
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.vert) $(SHADERS:%=%.frag)
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=shaders/%.vert) $(SHADERS:%=shaders/%.frag)
 SRCS_profile = profile
 
 LIBS_time = rt

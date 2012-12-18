@@ -72,7 +72,7 @@ void Record::capture(float* audio, uint audioSize) {
         int gotVideoPacket;
         avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
         av_free(frame->data[0]);
-        av_free(frame);
+        avcodec_free_frame(&frame);
         if(gotVideoPacket) {
             if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
             pkt.stream_index = videoStream->index;
@@ -86,16 +86,21 @@ void Record::capture(float* audio, uint audioSize) {
     {
         AVFrame *frame = avcodec_alloc_frame();
         frame->nb_samples = audioSize;
+        if(audioSize != 1024) error("Bad frame size");
         int16* audio16 = allocate64<int16>(audioSize*2);
-        for(uint i: range(audioSize*2)) audio16[i] = int(audio[i])>>16;
-        avcodec_fill_audio_frame(frame, audioCodec->channels, AV_SAMPLE_FMT_S16, (uint8*)audio16, audioSize * 2 * sizeof(int16), 1);
+        for(uint i: range(audioSize*2)) {
+            float s = audio[i]*0x1p-16;
+            if(s < -(1<<15) || s >= (1<<15) ) error(s);
+            audio16[i] = s;
+        }
+        avcodec_fill_audio_frame(frame, 2, AV_SAMPLE_FMT_S16, (uint8*)audio16, audioSize * 2 * sizeof(int16), 1);
         frame->pts = audioTime;
 
         AVPacket pkt={}; av_init_packet(&pkt);
         int gotAudioPacket;
         avcodec_encode_audio2(audioCodec, &pkt, frame, &gotAudioPacket);
-        avcodec_free_frame(&frame);
         unallocate(audio16,audioSize*2);
+        avcodec_free_frame(&frame);
         if (gotAudioPacket) {
             pkt.stream_index = audioStream->index;
             av_interleaved_write_frame(context, &pkt);

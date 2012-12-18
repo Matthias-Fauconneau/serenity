@@ -1,4 +1,52 @@
-#if 1
+#include "process.h"
+#include "time.h"
+#include "window.h"
+#include "asound.h"
+#include "record.h"
+
+struct RecordTest : Widget {
+    //Thread thread;
+    Window window __(this, int2(0,1050), "RecordTest"_);
+    //Timer displayTimer;
+    AudioOutput audio __({this,&RecordTest::read}, 1024);
+    array< Buffer<float> > audioQueue; Lock audioQueueLock;
+    Record record;
+
+    RecordTest() {
+        window.localShortcut(Escape).connect(&exit);
+        window.backgroundCenter=window.backgroundColor=1;
+        //displayTimer.timeout.connect(&window,&Window::render);
+
+        audio.start();
+        //thread.spawn();
+        window.setSize(int2(1280,720)); record.start("Simulation"_);
+    }
+
+    void render(int2, int2) override {
+        /*if(record && audioQueue) {
+            Locker lock(audioQueueLock);
+            Buffer<float> audio = audioQueue.take(0);
+            record.capture(audio.data,audio.size/2);
+        }
+        displayTimer.setRelative(17);*/
+    }
+
+    bool read(int32* output, uint audioSize) {
+        Buffer<float> audio(2*audioSize,2*audioSize);
+        static int t=0;
+        for(uint i: range(audioSize)) audio[2*i] = audio[2*i+1] = sin(2*3.14*t*440/44100), t++;
+        for(uint i: range(2*audioSize)) audio[i] *= 0x1p30f;
+        for(uint i: range(2*audioSize)) output[i]=audio[i];
+        /*if(record) {
+            Locker lock(audioQueueLock);
+            audioQueue << move(audio);
+        }*/
+        record.capture(audio.data,audio.size/2);
+        return true;
+    }
+} test;
+
+#if 0
 #include "process.h"
 #include "window.h"
 #include "display.h"
