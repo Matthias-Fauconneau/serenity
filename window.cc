@@ -19,7 +19,6 @@ bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
 void glXSwapBuffers(void* dpy, uint drawable);
 }
 #define GLX_RGBA 4
-#define GLX_FRAMEBUFFER_SRGB_CAPABLE 0x20B2
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
@@ -99,8 +98,8 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     if(!softwareRendering) {
         if(!display) display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
         if(!context) {
-            int attributes[] = {GLX_RGBA,GLX_FRAMEBUFFER_SRGB_CAPABLE,0};
-            void* visual = glXChooseVisual(display,0,attributes); assert(visual);
+            int attributes[] = {GLX_RGBA,0};
+            void* visual = glXChooseVisual(display,0,attributes); if(!visual) error("No matching visual");
             context = glXCreateContext(display,visual,0,1); assert(context);
         }
         glXMakeCurrent(display, id, context);

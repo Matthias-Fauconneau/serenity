@@ -1,3 +1,15 @@
+#if 0
+#include "process.h"
+#include "widget.h"
+#include "display.h"
+#include "window.h"
+struct VSyncTest : Widget {
+    Window window __(this,0,"VSync"_,false);
+    VSyncTest(){ window.localShortcut(Escape).connect(&exit); }
+    uint count; void render(int2 position, int2 size) {fill(position+Rect(size),((count++)%2)?black:white); window.render(); if(count>100) exit();}
+} test;
+#endif
+
 #if 1
 #include "process.h"
 #include "window.h"
@@ -15,6 +27,24 @@ inline float sin(float t) { return __builtin_sinf(t); }
 inline float log2(float x) { return __builtin_log2f(x); }
 inline float exp2(float x) { return __builtin_exp2f(x); }
 
+template<class Array> void plot(int2 position, int2 size, const Array& Y) {
+    float min=-1, max=1;
+    for(uint x: range(Y.size())) {
+        float y = Y[x];
+        min=::min(min,y);
+        max=::max(max,y);
+    }
+    vec2 scale = vec2(size.x/(Y.size()-1.), size.y/(max-min));
+    for(uint x: range(Y.size()-1)) {
+        vec2 a = vec2(position)+scale*vec2(x,  (max-min)-(Y[x]-min));
+        vec2 b = vec2(position)+scale*vec2(x+1, (max-min)-(Y[x+1]-min));
+        line(a,b);
+    }
+}
+template<class Array> void subplot(int2 position, int2 size, uint w, uint h, uint i, const Array& Y) {
+    int2 subplot = int2(size.x/w,size.y/h);
+    plot(position+int2(i%w,i/w)*subplot, subplot, Y);
+}
 /// Abstract base class for synthesized notes
 struct Note {
     uint rate, key, velocity;
@@ -26,7 +56,7 @@ struct Note {
     virtual void release() { state=Release; }
 };
 
-// Pure tones
+// Analog synthesis
 
 struct LinearADSR : Note {
     float amplitudeStep;
@@ -102,11 +132,11 @@ struct Sinus : LinearADSR {
 
 // Physical modeling synthesis
 
-// One-Zero filter: G(ω) = √( b₀² + b₁² + 2b₀b₁cos(ωT))
-struct OneZero {
+// Low-pass filter: G(ω) = √( b₀² + b₁² + 2b₀b₁cos(ωT))
+struct LowPass {
 	float b0, b1; // filter coefficients
 	float previous=0;
-    OneZero(float b0, float b1):b0(b0),b1(b1){}
+    LowPass(float b0, float b1):b0(b0),b1(b1){}
 	float operator()(float in) { float out = b0*in + b1*previous; previous = out; return out; }
 };
 
@@ -116,15 +146,17 @@ struct Delay {
     Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { clear(buffer,delay); }
     operator float() { return buffer[index]; }
     void operator()(float in) { buffer[index]=in; index=(index+1)%delay; }
+    float operator[](uint offset) const { uint i=(index+offset)%delay; return buffer[i]; }
     float& operator[](uint offset) { uint i=(index+offset)%delay; return buffer[i]; }
     float* begin() { return buffer; }
     float* end() { return buffer+delay; }
+    uint size() const { return delay; }
 };
 
-struct Pluck : Note {
+struct Pluck : Note, Widget {
     uint L; // String length in samples
     Delay delay1,delay2; // Propagating waves
-    OneZero loss __(1./2, 1./2); // 1st order low pass loss filter G(ω) = cos(ωT/2)
+    LowPass loss __(1./2, 1./2); // 1st order low pass loss filter G(ω) = cos(ωT/2)
     uint pickup; // Pick up position in samples
     float zero;
     Pluck(uint rate, uint key, uint velocity)
@@ -153,7 +185,7 @@ struct Pluck : Note {
             delay1( bridge );
             delay2( nut );
         }
-        if(state==Release) {
+        if(state==Note::Release) {
             float E=0;
             for(float y : delay1) E += y*y;
             for(float y : delay2) E += y*y;
@@ -162,31 +194,39 @@ struct Pluck : Note {
         }
         return true;
     }
+
+// Visualization
+    int2 sizeHint() { return int2(-1,-1); }
+    void render(int2 position, int2 size) {
+        subplot(position,size,1,2,0, delay1);
+        subplot(position,size,1,2,1, delay2);
+    }
 };
 
 /// Manages a synthesized instrument
-struct Synthesizer {
+struct Synthesizer : VList<Pluck> {
     const uint rate = 96000;
     signal<float* /*data*/, uint /*size*/> frameReady;
+    signal<> contentChanged;
 
-    typedef Pluck Note; //FIXME: runtime selection combo box
-    array<Note> notes;
     void noteEvent(uint key, uint velocity) {
         if(velocity) {
-            notes << Note __(rate, key, velocity);
+            clear(); //DEBUG: show only one visualization
+            *this << Pluck __(rate, key, velocity);
         } else {
-            for(Note& note: notes) if(note.key == key) note.release();
+            for(Note& note: *this) if(note.key == key) note.release();
         }
     }
 
+    int2 sizeHint() { return int2(-1,4*256); }
     bool read(int32* output, uint periodSize) {
         float buffer[2*periodSize];
-        clear(buffer,2*periodSize);
+        ::clear(buffer,2*periodSize);
 
         // Synthesize all notes
-        for(uint i=0; i<notes.size();) { Note& note=notes[i];
+        for(uint i=0; i<size();) { Note& note=array<Pluck>::at(i);
             if(note.read(buffer,periodSize)) i++;
-            else notes.removeAt(i);
+            else removeAt(i);
         }
 
         //TODO: simulated (i.e not sampled convolution) reverb
@@ -194,6 +234,7 @@ struct Synthesizer {
         for(uint i: range(2*periodSize)) buffer[i] *= 0x1p28f;
         frameReady(buffer,periodSize);
         for(uint i: range(2*periodSize)) output[i] = buffer[i]; // Converts buffer to signed 32bit output
+        contentChanged(); //FIXME: rate limit
         return true;
     }
 };
@@ -204,7 +245,7 @@ struct Keyboard : Widget {
     signal<> contentChanged;
     void inputNoteEvent(uint key, uint vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
     void midiNoteEvent(uint key, uint vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
-    int2 sizeHint() { return int2(-1,120); }
+    int2 sizeHint() { return int2(-1,102); }
     void render(int2 position, int2 size) {
         int y0 = position.y;
         int y1 = y0+size.y*2/3;
@@ -245,10 +286,9 @@ struct SynthesizerTest : Widget {
     Synthesizer synthesizer;
     AudioOutput audio __({&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024, thread);
 
-    Text text;
     Keyboard keyboard;
     VBox layout;
-    Window window __(&layout,int2(0,1050+16+120),"Synthesizer"_);
+    Window window __(&layout,int2(0,0),"Synthesizer"_);
 
     float* buffer;
     float* hann;
@@ -264,9 +304,10 @@ struct SynthesizerTest : Widget {
     int lastVelocity=0;
 
     SynthesizerTest() {
-        layout << this << &text << &keyboard;
+        layout << &synthesizer << this << &keyboard;
 
         synthesizer.frameReady.connect(this,&SynthesizerTest::viewFrame);
+        synthesizer.contentChanged.connect(&window,&Window::render);
 
         input.noteEvent.connect(&synthesizer,&Synthesizer::noteEvent);
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
@@ -982,18 +1023,6 @@ struct Wing : Widget {
 struct SnapshotTest : TriggerButton {
     Window window __(this,0,"SnapshotTest"_);
     SnapshotTest(){ writeFile("snapshot.png"_,encodePNG(window.snapshot()),home()); exit();}
-} test;
-#endif
-
-#if 0
-#include "process.h"
-#include "widget.h"
-#include "display.h"
-#include "window.h"
-struct VSyncTest : Widget {
-    Window window __(this,0,"VSync"_);
-    VSyncTest(){ window.localShortcut(Escape).connect(&exit); }
-    bool odd; void render(int2 position, int2 size) {fill(position+Rect(size),(odd=!odd)?black:white); window.render();}
 } test;
 #endif
 
