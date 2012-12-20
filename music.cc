@@ -129,7 +129,7 @@ struct Music {
 
     Sampler sampler;
     Thread thread __(-20);
-    AudioOutput audio __({&sampler, &Sampler::read},thread, 512);
+    AudioOutput audio __({&sampler, &Sampler::read},thread, 44100, 512);
     Sequencer input __(thread);
 
     Record record;

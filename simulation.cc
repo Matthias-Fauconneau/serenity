@@ -48,7 +48,7 @@ struct Simulation : Widget {
     Window window __(&layout, int2(0,1050), "Simulation"_);
     Timer displayTimer;
     // Bruit de la simulation
-    AudioOutput audio __({this,&Simulation::read}, 1024, thread);
+    AudioOutput audio __({this,&Simulation::read}, 44100, 1024, thread);
     Resampler resampler __(audio.channels, audio.rate/128, audio.rate, audio.periodSize); // Réduit la vitesse à 44000/128 pas/seconde
     // Enregistrement video+audio
     array< Buffer<float> > audioQueue; Lock audioQueueLock; // Queue des frames audio à enregistrer (par le thread principal)
@@ -98,7 +98,7 @@ struct Simulation : Widget {
             fill(position+Rect(text.textSize),white);
             text.render(position);
 
-            slider.value = Ec/kB/u;
+            slider.value = Ec/kB/u*slider.maximum;
         }
 
         // Enregistrement video+audio

@@ -47,7 +47,7 @@ struct FFmpegMedia : AudioMedia {
             if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
                 audioStream = file->streams[i];
                 audio = audioStream->codec;
-                audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_FLT;
+                audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_S16;
                 AVCodec* codec = avcodec_find_decoder(audio->codec_id);
                 if(codec && avcodec_open2(audio, codec, 0) >= 0 ) {
                     this->rate = audio->sample_rate; this->channels = audio->channels;
@@ -118,7 +118,7 @@ struct Player {
     AudioMedia* media=0;
     FFmpegMedia ffmpeg;
     Resampler resampler;
-    AudioOutput audio __({this,&Player::read});
+    AudioOutput audio __({this,&Player::read}, 44100, 4096);
     bool read(int32* output, uint size) {
         float buffer[2*size];
         uint inputSize = resampler?resampler.need(size):size;

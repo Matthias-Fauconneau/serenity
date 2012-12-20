@@ -15,11 +15,12 @@ typedef float float8 __attribute((vector_size(32),may_alias));
 
 inline float4 load4(const float* p) { return *(float4*)p; }
 inline float4 load4(const float2* p) { return *(float4*)p; }
+inline float4 load4u(const float* p) { return _mm_loadu_ps(p); }
 inline float8 load8(const float* p) { return *(float8*)p; }
 inline float8 load8(const float2* p) { return *(float8*)p; }
 inline float8 load8u(const float* p) { return _mm256_loadu_ps(p); }
 inline float8 load8u(const float2* p) { return _mm256_loadu_ps((float*)p); }
-inline float extract2(float2 v, int i) { return ((float*)&v)[i]; }
+
 #if __clang__
 inline float extract(float4 v, int i) { return v[i]; }
 #else

@@ -1,52 +1,4 @@
-#include "process.h"
-#include "time.h"
-#include "window.h"
-#include "asound.h"
-#include "record.h"
-
-struct RecordTest : Widget {
-    //Thread thread;
-    Window window __(this, int2(0,1050), "RecordTest"_);
-    //Timer displayTimer;
-    AudioOutput audio __({this,&RecordTest::read}, 1024);
-    array< Buffer<float> > audioQueue; Lock audioQueueLock;
-    Record record;
-
-    RecordTest() {
-        window.localShortcut(Escape).connect(&exit);
-        window.backgroundCenter=window.backgroundColor=1;
-        //displayTimer.timeout.connect(&window,&Window::render);
-
-        audio.start();
-        //thread.spawn();
-        window.setSize(int2(1280,720)); record.start("Simulation"_);
-    }
-
-    void render(int2, int2) override {
-        /*if(record && audioQueue) {
-            Locker lock(audioQueueLock);
-            Buffer<float> audio = audioQueue.take(0);
-            record.capture(audio.data,audio.size/2);
-        }
-        displayTimer.setRelative(17);*/
-    }
-
-    bool read(int32* output, uint audioSize) {
-        Buffer<float> audio(2*audioSize,2*audioSize);
-        static int t=0;
-        for(uint i: range(audioSize)) audio[2*i] = audio[2*i+1] = sin(2*3.14*t*440/44100), t++;
-        for(uint i: range(2*audioSize)) audio[i] *= 0x1p30f;
-        for(uint i: range(2*audioSize)) output[i]=audio[i];
-        /*if(record) {
-            Locker lock(audioQueueLock);
-            audioQueue << move(audio);
-        }*/
-        record.capture(audio.data,audio.size/2);
-        return true;
-    }
-} test;
-
-#if 0
+#if 1
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -56,75 +8,14 @@ struct RecordTest : Widget {
 #include "layout.h"
 #include <fftw3.h>
 
-/// Displays active notes on a keyboard representation
-struct Keyboard : Widget {
-    array<int> midi, input;
-    signal<> contentChanged;
-    void inputNoteEvent(uint key, uint vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
-    void midiNoteEvent(uint key, uint vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
-    int2 sizeHint() { return int2(-1,120); }
-    void render(int2 position, int2 size) {
-        int y0 = position.y;
-        int y1 = y0+size.y*2/3;
-        int y2 = y0+size.y;
-        int margin = (size.x-size.x/88*88)/2;
-        for(int key=0; key<88; key++) {
-            vec4 white = midi.contains(key+21)?red:input.contains(key+21)?blue: ::white;
-            int dx = size.x/88;
-            int x0 = position.x + margin + key*dx;
-            int x1 = x0 + dx;
-            line(x0,y0, x0,y1-1, black);
-
-            int notch[12] = { 3, 1, 4, 0, 1, 2, 1, 4, 0, 1, 2, 1 };
-            int l = notch[key%12], r = notch[(key+1)%12];
-            if(key==0) l=0; //A-1 has no left notch
-            if(l==1) { // black key
-                line(x0,y1-1, x1,y1-1, black);
-                fill(x0+1,y0, x1+1,y1-1, midi.contains(key+21)?red:input.contains(key+21)?blue: ::black);
-            } else {
-                fill(x0+1,y0, x1,y2, white); // white key
-                line(x0-l*dx/6,y1-1, x0-l*dx/6, y2, black); //left edge
-                fill(x0+1-l*dx/6,y1, x1,y2, white); //left notch
-                if(key!=87) fill(x1,y1, x1-1+(6-r)*dx/6,y2, white); //right notch
-                //right edge will be next left edge
-            }
-            if(key==87) { //C7 has no right notch
-                line(x1+dx/2,y0,x1+dx/2,y2, black);
-                fill(x1,y0, x1+dx/2,y1-1, white);
-            }
-        }
-    }
-};
-
-struct sRGB {
-    uint8 lookup[256];
-    inline float evaluate(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; }
-    sRGB() { for(uint i=0;i<256;i++) { uint l = round(255*evaluate(i/255.f)); assert(l<256); lookup[i]=l; } }
-    inline uint8 operator [](uint c) { assert(c<256,c); return lookup[c]; }
-} sRGB;
-
+/// Trigonometric builtins
 const double PI = 3.14159265358979323846;
 inline float cos(float t) { return __builtin_cosf(t); }
 inline float sin(float t) { return __builtin_sinf(t); }
 inline float log2(float x) { return __builtin_log2f(x); }
 inline float exp2(float x) { return __builtin_exp2f(x); }
 
-struct Lowpass {
-	float a; // smoothing factor
-	float previous=0;
-    Lowpass(float a):a(a){}
-	float operator()(float in) { float out = a*in + (1-a)*previous; previous = out; return out; }
-};
-
-struct Delay {
-    float* buffer=0;
-	uint index=0, delay=0;
-    Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { clear(buffer,delay); }
-    operator float() { return buffer[index]; }
-    void operator()(float in) { buffer[index]=in; index=(index+1)%delay; }
-    float& operator[](uint offset) { uint i=(index+offset)%delay; return buffer[i]; }
-};
-
+/// Abstract base class for synthesized notes
 struct Note {
     uint rate, key, velocity;
     Note(uint rate, uint key, uint velocity):rate(rate),key(key),velocity(velocity){}
@@ -134,6 +25,8 @@ struct Note {
     enum { Attack, Decay, Sustain, Release } state = Attack;
     virtual void release() { state=Release; }
 };
+
+// Pure tones
 
 struct LinearADSR : Note {
     float amplitudeStep;
@@ -192,10 +85,10 @@ struct Saw : LinearADSR {
     }
 };
 
-struct Pure : LinearADSR {
+struct Sinus : LinearADSR {
     float angle=0;
     float step;
-    Pure(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(2*PI/Note::period()){}
+    Sinus(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(2*PI/Note::period()){}
     bool read(float* buffer, uint periodSize) override {
         for(uint i : range(periodSize)) {
             float sample = amplitude*sin(angle);
@@ -207,38 +100,73 @@ struct Pure : LinearADSR {
     }
 };
 
+// Physical modeling synthesis
+
+// One-Zero filter: G(ω) = √( b₀² + b₁² + 2b₀b₁cos(ωT))
+struct OneZero {
+	float b0, b1; // filter coefficients
+	float previous=0;
+    OneZero(float b0, float b1):b0(b0),b1(b1){}
+	float operator()(float in) { float out = b0*in + b1*previous; previous = out; return out; }
+};
+
+struct Delay {
+    float* buffer=0;
+	uint index=0, delay=0;
+    Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { clear(buffer,delay); }
+    operator float() { return buffer[index]; }
+    void operator()(float in) { buffer[index]=in; index=(index+1)%delay; }
+    float& operator[](uint offset) { uint i=(index+offset)%delay; return buffer[i]; }
+    float* begin() { return buffer; }
+    float* end() { return buffer+delay; }
+};
+
 struct Pluck : Note {
-    uint period; // String size in samples
+    uint L; // String length in samples
     Delay delay1,delay2; // Propagating waves
-    Lowpass lowpass; // Low pass filter at the end of the string
-    Pluck(uint rate, uint key, uint velocity):Note(rate, key, velocity),period(Note::period()), delay1(period), delay2(period), lowpass(1./3) {
-        uint pinchPosition = period/3; // position on the string of the maximum of the triangle excitation
-        for(uint x: range(0,pinchPosition)) {
-            delay1[x] = float(x)/pinchPosition;
-            delay2[period-1-x] = -float(x)/pinchPosition;
+    OneZero loss __(1./2, 1./2); // 1st order low pass loss filter G(ω) = cos(ωT/2)
+    uint pickup; // Pick up position in samples
+    float zero;
+    Pluck(uint rate, uint key, uint velocity)
+        : Note(rate, key, velocity), L(Note::period()/2+1), delay1(L), delay2(L), pickup(L/4) {
+        const uint pluck = L/8; // position on the string of the maximum of the triangle excitation
+        for(uint x: range(0,pluck)) {
+            delay1[x] = float(x)/pluck/2;
+            delay2[L-1-x] = float(x)/pluck/2;
         }
-        //FIXME: smooth triangle profile (avoid initial aliasing)
-        for(uint x: range(pinchPosition,period)) {
-            delay1[x] = float(period-x)/(period-pinchPosition);
-            delay2[period-1-x] = -float(period-x)/(period-pinchPosition);
+        //FIXME: smooth triangle profile (avoid aliasing on attack)
+        for(uint x: range(pluck,L)) {
+            delay1[x] = float(L-x)/(L-1-pluck)/2;
+            delay2[L-1-x] = float(L-x)/(L-1-pluck)/2;
         }
+        zero = delay1[pickup] + delay2[pickup]; //avoid discontinuity at first sample
     }
+    void release() { Note::release(); loss.b0=loss.b1= 1./2 * (1-2.f*L/rate); }
     bool read(float* buffer, uint periodSize) {
-        //if(state==Release) return false; //FIXME: release decayed notes
         for(uint i : range(periodSize)) {
-            float sample = ( delay1 + delay2 ) / 2;
+            zero *= (1-2.f*L/rate); //decay offset to avoid discontinuity at last sample
+            float sample = delay1[pickup] + delay2[pickup] - zero; // Pick-up
             buffer[2*i+0] += sample, buffer[2*i+1] += sample;
 
-            float t = lowpass(-delay2);
-            delay2( -delay1 );
-            delay1( t );
+            float bridge = loss(-delay2);
+            float nut = -delay1;
+            delay1( bridge );
+            delay2( nut );
+        }
+        if(state==Release) {
+            float E=0;
+            for(float y : delay1) E += y*y;
+            for(float y : delay2) E += y*y;
+            E /= L;
+            if(E < 0x1p-24) return false; //release decayed notes
         }
         return true;
     }
 };
 
+/// Manages a synthesized instrument
 struct Synthesizer {
-    const uint rate = 44100;
+    const uint rate = 96000;
     signal<float* /*data*/, uint /*size*/> frameReady;
 
     typedef Pluck Note; //FIXME: runtime selection combo box
@@ -270,12 +198,52 @@ struct Synthesizer {
     }
 };
 
+/// Displays active notes on a keyboard representation
+struct Keyboard : Widget {
+    array<int> midi, input;
+    signal<> contentChanged;
+    void inputNoteEvent(uint key, uint vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
+    void midiNoteEvent(uint key, uint vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
+    int2 sizeHint() { return int2(-1,120); }
+    void render(int2 position, int2 size) {
+        int y0 = position.y;
+        int y1 = y0+size.y*2/3;
+        int y2 = y0+size.y;
+        int margin = (size.x-size.x/88*88)/2;
+        for(int key=0; key<88; key++) {
+            vec4 white = midi.contains(key+21)?red:input.contains(key+21)?blue: ::white;
+            int dx = size.x/88;
+            int x0 = position.x + margin + key*dx;
+            int x1 = x0 + dx;
+            line(x0,y0, x0,y1-1, black);
+
+            int notch[12] = { 3, 1, 4, 0, 1, 2, 1, 4, 0, 1, 2, 1 };
+            int l = notch[key%12], r = notch[(key+1)%12];
+            if(key==0) l=0; //A-1 has no left notch
+            if(l==1) { // black key
+                line(x0,y1-1, x1,y1-1, black);
+                fill(x0+1,y0, x1+1,y1-1, midi.contains(key+21)?red:input.contains(key+21)?blue: ::black);
+            } else {
+                fill(x0+1,y0, x1,y2, white); // white key
+                line(x0-l*dx/6,y1-1, x0-l*dx/6, y2, black); //left edge
+                fill(x0+1-l*dx/6,y1, x1,y2, white); //left notch
+                if(key!=87) fill(x1,y1, x1-1+(6-r)*dx/6,y2, white); //right notch
+                //right edge will be next left edge
+            }
+            if(key==87) { //C7 has no right notch
+                line(x1+dx/2,y0,x1+dx/2,y2, black);
+                fill(x1,y0, x1+dx/2,y1-1, white);
+            }
+        }
+    }
+};
+
 /// Displays information on the played samples
 struct SynthesizerTest : Widget {
     Thread thread;
     Sequencer input __(thread);
     Synthesizer synthesizer;
-    AudioOutput audio __({&synthesizer, &Synthesizer::read},thread,true);
+    AudioOutput audio __({&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024, thread);
 
     Text text;
     Keyboard keyboard;
@@ -336,7 +304,7 @@ struct SynthesizerTest : Widget {
             //FIXME: all bins in a pixel will have same contribution
             float sum=0;
             for(uint n=n0; n<n1; n++) {
-                float a = spectrum[n]; // amplitude
+                float a = sqrt(sqr(spectrum[n]) + sqr(spectrum[N-1-n])); // squared amplitude
                 if(n>N/4) a *= 0x1p8f;
                 sum += a;
             }
@@ -421,7 +389,7 @@ struct SFZViewer : Widget {
     Thread thread;
     Sequencer input __(thread);
     Sampler sampler;
-    AudioOutput audio __({&sampler, &Sampler::read},thread,true);
+    AudioOutput audio __({&sampler, &Sampler::read}, 44100, 512, thread);
 
     Text text;
     Keyboard keyboard;
@@ -653,7 +621,6 @@ struct Plot : Widget {
         /// Loads filter
         array<byte> reverbFile = readFile("/Samples/reverb.flac"_);
         FLAC reverbMedia(reverbFile);
-        assert(reverbMedia.rate == 48000);
         reverbSize = reverbMedia.duration;
         N = reverbSize+periodSize;
         float* stereoFilter = allocate64<float>(2*reverbSize);
@@ -703,7 +670,6 @@ struct Plot : Widget {
         /// Loads signal
         array<byte> signalFile = readFile("/Samples/Salamander/A4v8.flac"_);
         FLAC signalMedia(signalFile);
-        assert(signalMedia.rate == 48000);
         signalSize = min(signalMedia.duration,reverbSize);
         float* stereoSignal = allocate64<float>(2*signalSize); clear(stereoSignal,2*signalSize);
         for(uint i=0;i<24000;) {

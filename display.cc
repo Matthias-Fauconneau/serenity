@@ -5,6 +5,7 @@ bool softwareRendering;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 Image framebuffer;
+SRGB sRGB;
 SHADER(fill);
 SHADER(blit);
 
