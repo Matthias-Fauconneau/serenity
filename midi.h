@@ -4,7 +4,7 @@
 #include "data.h"
 #include "map.h"
 
-struct MidiNote { int key; uint start; float duration; bool operator <(const MidiNote& o)const{return key<o.key;} };
+struct MidiNote { uint key; uint start; float duration; bool operator <(const MidiNote& o)const{return key<o.key;} };
 inline string str(const MidiNote& m) { return str(m.key); }
 typedef array<MidiNote> Chord;
 
@@ -24,7 +24,7 @@ struct MidiFile {
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
     map<int,int> active;
     map<uint,Chord> notes;
-    signal<int, int> noteEvent;
+    signal<uint, uint> noteEvent;
     void open(const ref<byte>& data);
 
     enum State { Seek=0, Play=1, Sort=2 };

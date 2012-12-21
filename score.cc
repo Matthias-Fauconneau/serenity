@@ -523,7 +523,7 @@ void Score::seek(uint unused time) {
     }
 }
 
-void Score::noteEvent(int key, int vel) {
+void Score::noteEvent(uint key, uint vel) {
     if(editMode) {
         if(vel) {
             assert(expected.size()==1 && expected.values[0]==(int)noteIndex);

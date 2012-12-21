@@ -100,17 +100,17 @@ void MidiScore::render(int2 position, int2 size) {
                   current[s].size()>=current[!s].size() && // keep new notes balanced
                   active[s].size()>=active[!s].size() && // keep active (sustain+new) notes balanced
                   (!current[!s] ||
-                   (s==1 && abs(current[!s].first().key-current[s].first().key)<=12) || // keep short span on new notes (left)
-                   (s==0 && abs(current[!s].last().key-current[s].last().key)<=12) ) && // keep short span on new notes (right)
+                   (s==1 && abs(int(current[!s].first().key-current[s].first().key))<=12) || // keep short span on new notes (left)
+                   (s==0 && abs(int(current[!s].last().key-current[s].last().key))<=12) ) && // keep short span on new notes (right)
                   (!sustain[!s] ||
-                   (s==1 && abs(active[!s][0].key-current[s].first().key)<=18) || // keep short span with active notes (left)
-                   (s==0 && abs(active[!s][sustain[!s]-1].key-current[s].last().key)<=18) ) && // keep short span with active notes (right)
+                   (s==1 && abs(int(active[!s][0].key-current[s].first().key))<=18) || // keep short span with active notes (left)
+                   (s==0 && abs(int(active[!s][sustain[!s]-1].key-current[s].last().key))<=18) ) && // keep short span with active notes (right)
                   (
                       active[s].size()>active[!s].size()+1 || // balance active notes
                       current[s].size()>current[!s].size()+1 || // balance load
                       // both new notes and active notes load are balanced
-                      (current[0] && current[1] && s == 0 && abs(current[1].first().key-current[1].last().key)<abs(current[0].first().key-current[0].last().key)) || // minimize left span
-                      (current[0] && current[1] && s == 1 && abs(current[0].first().key-current[0].last().key)<abs(current[1].first().key-current[1].last().key)) || // minimize right span
+                      (current[0] && current[1] && s == 0 && abs(int(current[1].first().key-current[1].last().key))<abs(int(current[0].first().key-current[0].last().key))) || // minimize left span
+                      (current[0] && current[1] && s == 1 && abs(int(current[0].first().key-current[0].last().key))<abs(int(current[1].first().key-current[1].last().key))) || // minimize right span
                       (sustain[s] && sustain[!s] && active[s][sustain[s]-1].start>active[!s][sustain[!s]-1].start) // load least recently used hand
                       )) {
                 if(!s) {

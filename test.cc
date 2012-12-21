@@ -144,6 +144,8 @@ struct Delay {
     float* buffer=0;
 	uint index=0, delay=0;
     Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { clear(buffer,delay); }
+    move_operator(Delay):buffer(o.buffer),index(o.index),delay(o.delay){o.buffer=0;}
+    ~Delay() { if(buffer) unallocate(buffer,delay); }
     operator float() { return buffer[index]; }
     void operator()(float in) { buffer[index]=in; index=(index+1)%delay; }
     float operator[](uint offset) const { uint i=(index+offset)%delay; return buffer[i]; }
@@ -153,14 +155,14 @@ struct Delay {
     uint size() const { return delay; }
 };
 
-struct Pluck : Note, Widget {
+struct String : Note, Widget {
     uint L; // String length in samples
     Delay delay1,delay2; // Propagating waves
     LowPass loss __(1./2, 1./2); // 1st order low pass loss filter G(ω) = cos(ωT/2)
     uint pickup; // Pick up position in samples
     float zero;
-    Pluck(uint rate, uint key, uint velocity)
-        : Note(rate, key, velocity), L(Note::period()/2+1), delay1(L), delay2(L), pickup(L/4) {
+    String(uint rate, uint key, uint velocity) : Note(rate, key, velocity), L(Note::period()/2+1), delay1(L), delay2(L), pickup(L/4) {}
+    void pluck() {
         const uint pluck = L/8; // position on the string of the maximum of the triangle excitation
         for(uint x: range(0,pluck)) {
             delay1[x] = float(x)/pluck/2;
@@ -204,17 +206,20 @@ struct Pluck : Note, Widget {
 };
 
 /// Manages a synthesized instrument
-struct Synthesizer : VList<Pluck> {
+struct Synthesizer : VBox {
     const uint rate = 96000;
     signal<float* /*data*/, uint /*size*/> frameReady;
     signal<> contentChanged;
+    map<uint, String> strings; // one string per key
 
     void noteEvent(uint key, uint velocity) {
         if(velocity) {
-            clear(); //DEBUG: show only one visualization
-            *this << Pluck __(rate, key, velocity);
+            if(!strings.contains(key)) strings.insert(key, String __(rate, key, velocity));
+            strings.at(key).pluck();
+            clear(); //DEBUG: show only last visualization
+            *this << &strings.at(key);
         } else {
-            for(Note& note: *this) if(note.key == key) note.release();
+            strings.at(key).release();
         }
     }
 
@@ -224,9 +229,9 @@ struct Synthesizer : VList<Pluck> {
         ::clear(buffer,2*periodSize);
 
         // Synthesize all notes
-        for(uint i=0; i<size();) { Note& note=array<Pluck>::at(i);
+        for(uint i=0; i<strings.size();) { Note& note=strings.values[i];
             if(note.read(buffer,periodSize)) i++;
-            else removeAt(i);
+            else { strings.keys.removeAt(i); strings.values.removeAt(i); clear(); if(strings) *this << &strings.values.last(); }
         }
 
         //TODO: simulated (i.e not sampled convolution) reverb

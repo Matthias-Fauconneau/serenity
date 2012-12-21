@@ -76,8 +76,8 @@ struct PDFScore : PDF {
 struct Keyboard : Widget {
     array<int> midi, input;
     signal<> contentChanged;
-    void inputNoteEvent(int key, int vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
-    void midiNoteEvent(int key, int vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
+    void inputNoteEvent(uint key, uint vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
+    void midiNoteEvent(uint key, uint vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
     int2 sizeHint() { return int2(-1,120); }
     void render(int2 position, int2 size) {
         int y0 = position.y;
@@ -129,7 +129,7 @@ struct Music {
 
     Sampler sampler;
     Thread thread __(-20);
-    AudioOutput audio __({&sampler, &Sampler::read},thread, 44100, 512);
+    AudioOutput audio __({&sampler, &Sampler::read}, 44100, 512, thread);
     Sequencer input __(thread);
 
     Record record;

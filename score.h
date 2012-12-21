@@ -59,7 +59,7 @@ struct Score {
     void insert();
     void remove();
     void seek(uint time);
-    void noteEvent(int,int);
+    void noteEvent(uint, uint);
     signal<const map<int,vec4>&> activeNotesChanged;
     signal<float,float,float> nextStaff;
     map<vec2, string> debug;

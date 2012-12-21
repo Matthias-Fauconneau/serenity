@@ -193,7 +193,7 @@ float Note::actualLevel(uint size) const {
     return sqrt(sum)/size;
 }
 
-void Sampler::noteEvent(int key, int velocity) {
+void Sampler::noteEvent(uint key, uint velocity) {
     Note* current=0;
     if(velocity==0) {
         for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
@@ -223,7 +223,7 @@ void Sampler::noteEvent(int key, int velocity) {
             if(note.sampleSize==16) level*=0x1p8;
             note.level=(float4)__(level,level,level,level);
             {Locker lock(noteReadLock);
-                float shift = key-s.pitch_keycenter; //TODO: tune
+                float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
                 if(layer == 0) { error("Layer not instantiated at initialization",key, s.lokey, s.hikey, s.pitch_keycenter, shift); return; }
