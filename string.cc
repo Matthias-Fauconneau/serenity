@@ -145,7 +145,7 @@ stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return
 
 /// Number conversions
 
-template<int base> string utoa(uint64 n, int pad) {
+template<uint base> string utoa(uint n, int pad) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
@@ -155,13 +155,13 @@ template<int base> string utoa(uint64 n, int pad) {
     while(64-i<pad) buf[--i] = '0';
     return string(ref<byte>(buf+i,64-i));
 }
-template string utoa<2>(uint64,int);
-template string utoa<16>(uint64,int);
+template string utoa<2>(uint,int);
+template string utoa<16>(uint,int);
 
-template<int base> string itoa(int64 number, int pad) {
+template<uint base> string itoa(int number, int pad) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
-    uint64 n=abs(number);
+    uint n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
@@ -170,8 +170,9 @@ template<int base> string itoa(int64 number, int pad) {
     if(number<0) buf[--i]='-';
     return string(ref<byte>(buf+i,64-i));
 }
-template string itoa<10>(int64,int);
+template string itoa<10>(int,int);
 
+#ifndef __arm
 string ftoa(double n, int precision, int exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
@@ -180,3 +181,4 @@ string ftoa(double n, int precision, int exponent) {
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
     return (n>=0?""_:"-"_)+utoa<10>(abs(n))+(precision?"."_+utoa<10>(uint64(m*abs(n))%m,precision):string())+(e?"e-"_+str(e):string());
 }
+#endif

@@ -1,13 +1,17 @@
 #include "display.h"
+#if GL
 #include "gl.h"
+#endif
 
 bool softwareRendering;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 Image framebuffer;
 SRGB sRGB;
+#if GL
 SHADER(fill);
 SHADER(blit);
+#endif
 
 void fill(Rect rect, vec4 color) {
     rect = rect & currentClip;
@@ -22,9 +26,11 @@ void fill(Rect rect, vec4 color) {
             }
         }
     } else {
+#if GL
         glBlend(color.w!=1, true);
         fillShader()["color"] = color;
         glDrawRectangle(fillShader(), rect);
+#endif
     }
 }
 
@@ -45,11 +51,13 @@ void blit(int2 target, const Image& source, vec4 color) {
             }
         }
     } else {
+#if GL
         glBlend(source.alpha, true);
         blitShader()["color"] = color;
         GLTexture texture = source; //FIXME
         blitShader().bindSamplers("sampler"); GLTexture::bindSamplers(texture);
         glDrawRectangle(blitShader(), target+Rect(source.size()), true);
+#endif
     }
 }
 
@@ -94,9 +102,11 @@ void line(vec2 p1, vec2 p2, vec4 color) {
             intery += gradient;
         }
     } else {
+#if GL
         glBlend(true, false);
         fillShader()["color"] = vec4(vec3(1)-color.xyz(),1.f);
         glDrawLine(fillShader(), p1, p2);
+#endif
     }
 }
 

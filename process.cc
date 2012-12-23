@@ -15,8 +15,8 @@ struct siginfo_t {
         struct { void *si_addr; };
     };
 };
-struct ucontext {
-    long flags; ucontext *link; struct { void* sp; int flags; long size; } stack;
+struct ucontext_t {
+    long flags; void* link; struct { void* sp; int flags; long size; } stack;
 #if __x86_64__
     long r8,r9,r10,r11,r12,r13,r14,r15,rdi,rsi,rbp,rbx,rdx,rax,rcx,rsp,ip,efl,csgsfs,err,trap,oldmask,cr2;
 #elif __arm__
@@ -44,9 +44,11 @@ int gettid() { return syscall(SYS_gettid); }
 #endif
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 
+#if __x86_64
 // Configures floating-point exceptions
 enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
 void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
+#endif
 
 // Log
 void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
@@ -135,12 +137,23 @@ void traceAllThreads() {
 
 // Signal handler
 string trace(int skip, void* ip);
-static void handler(int sig, siginfo_t* info, void* ctx) {
-    string s = trace(1,(void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]);
+static void handler(int sig, siginfo_t* info, ucontext_t* ctx) {
+#if NOLIBC
+    void* ip = (void*)(ctx->pc);
+#else
+#if __x86_64
+    void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
+#else
+    void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.arm_pc;
+#endif
+#endif
+    string s = trace(1,ip);
     if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
+#ifndef __arm
     if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->si_code],")", *(float*)info->si_addr);
+#endif
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
     exit_thread(0);
@@ -162,7 +175,7 @@ void __attribute((constructor(101))) setup_signals() {
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
 #if NOLIBC
     struct {
-        void (*sigaction) (int, struct siginfo*, ucontext*) = &handler;
+        void (*sigaction) (int, siginfo_t*, ucontext_t*) = &handler;
         long flags = SA_SIGINFO|SA_RESTORER|SA_RESTART;
         void (*restorer)() = &restore_rt;
         uint mask[2] = {0,0};
@@ -173,13 +186,15 @@ void __attribute((constructor(101))) setup_signals() {
     check_(sigaction(SIGTERM, &sa, 0, 8));
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 #else
-    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
+    struct sigaction sa; sa.sa_sigaction=typeof(sa.sa_sigaction)&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
     check_(sigaction(SIGFPE, &sa, 0));
     check_(sigaction(SIGABRT, &sa, 0));
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
+#if __x86_64
     //setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);
+#endif
 #endif
 
 }

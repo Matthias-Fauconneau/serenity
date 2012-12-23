@@ -6,9 +6,12 @@
 #include "linux.h"
 #include "time.h"
 #include "png.h"
-#include "gl.h"
 #include "x.h"
 
+#if NOLIBC
+enum {IPC_RMID=0,IPC_CREAT=01000};
+#endif
+#if GL
 extern "C" {
 void* XOpenDisplay(const char*);
 int XCloseDisplay(void*);
@@ -19,6 +22,8 @@ bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
 void glXSwapBuffers(void* dpy, uint drawable);
 }
 #define GLX_RGBA 4
+#include "gl.h"
+#endif
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
@@ -38,7 +43,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), softwareRendering(softwareRendering) {
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
-    if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
+    if(check(connect(Socket::fd,(const void*)&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;
         string authority = getenv("HOME"_)+"/.Xauthority"_;
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
@@ -96,6 +101,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     registerPoll();
 
     if(!softwareRendering) {
+#if GL
         if(!display) display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
         if(!context) {
             int attributes[] = {GLX_RGBA,0};
@@ -103,6 +109,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
             context = glXCreateContext(display,visual,0,1); assert(context);
         }
         glXMakeCurrent(display, id, context);
+#endif
     }
 }
 void Window::create() {
@@ -167,9 +174,11 @@ void Window::event() {
                 }
             }
         } else {
+#if GL
             glXMakeCurrent(display, id, context);
             GLFrameBuffer::bindWindow(0,size,true,vec4(vec3(backgroundColor),backgroundOpacity));
             ::softwareRendering=false;
+#endif
         }
 
         widget->render(0,size);
@@ -190,7 +199,9 @@ void Window::event() {
             r.srcW=size.x; r.srcH=size.y; send(raw(r));
             state=Server;
         } else {
+#if GL
             glXSwapBuffers(display, id);
+#endif
         }
     } else do {
         uint8 type = read<uint8>();

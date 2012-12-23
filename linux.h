@@ -80,7 +80,7 @@ enum class sys {
     gettid=186, futex=202, clock_gettime=228, exit_group=231, tgkill=234, openat=257, mkdirat, unlinkat=263, symlinkat=266, utimensat=280, timerfd_create=283,
     timerfd_settime=286, eventfd2=290
 #else
-    exit=1, fork, read, write, open, close, execve=11, getpid=20, brk=45, ioctl=54, fcntl, setrlimit=75, munmap=91, setpriority=97, socketcall=102, wait4=114,
+    exit=1, fork, read, write, open, close, execve=11, getpid=20, brk=45, ioctl=54, fcntl, lseek=62, setrlimit=75, munmap=91, setpriority=97, socketcall=102, wait4=114,
     ipc = 117, clone=120, mprotect=125, getdents=141, mlock=150, sched_yield=158, poll=168, sigaction=174, mmap=192, fstat=197, madvise=220,
     gettid=224, futex=240, exit_group = 248,
     socket=281, connect=283,
@@ -88,7 +88,7 @@ enum class sys {
     clock_gettime=263, tgkill=268,
     shmat=305,shmdt,shmget,shmctl,
     openat=322, mkdirat, fstatat, unlinkat, symlinkat=331, utimensat=348,
-    timerfd_create=350, timerfd_settime=353, eventfd2=356
+    timerfd_create=350, timerfd_settime=353, eventfd=356
 #elif __i386__
     clock_gettime=265,
     openat=295, mkdirat, fstatat=300, unlinkat, symlinkat=304,
@@ -103,7 +103,7 @@ syscall3(int, open, const char*,name, int,oflag, int,perms)
 syscall1(int, close, int,fd)
 syscall2(int, fstat, int,fd, struct stat*,buf)
 syscall3(int, poll, struct pollfd*,fds, long,nfds, int,timeout)
-//syscall3(int, lseek, int,fd, long,offset, int,whence)
+syscall3(int, lseek, int,fd, long,offset, int,whence)
 syscall6(void*, mmap, void*,addr, long,len, int,prot, int,flags, int,fd, long,offset)
 syscall2(int, munmap, void*,addr, long,len)
 syscall3(int, mprotect, void*,addr, long,len, int,prot)
@@ -121,11 +121,11 @@ syscall1(int, shmdt, const void*,ptr)
 syscall0(int, getpid)
 #if !__i386__
 syscall3(int, socket, int,domain, int,type, int,protocol)
-syscall3(int, connect, int,fd, void*,addr, int,len)
+syscall3(int, connect, int,fd, const void*,addr, int,len)
 #endif
 //syscall5(long, clone, long,flags, void*,stack, void*,ptid, void*,ctid, struct pt_regs*,regs)
 syscall0(int, fork)
-syscall3(int, execve, const char*,path, const char**,argv, const char**,envp)
+syscall3(int, execve, const char*,path, char*const*,argv, char*const*,envp)
 //syscall1(int, exit, int, status)
 syscall4(int, wait4, int,pid, int*,status, int,options, struct rusage*, rusage)
 syscall3(int, fcntl, int,fd, int,cmd, int,param)
@@ -144,7 +144,7 @@ syscall3(int, unlinkat, int,fd, const char*,name, int,flag)
 syscall3(int, symlinkat, const char*,target, int,fd, const char*,name)
 syscall4(int, utimensat, int,fd, const char*,name, const struct timespec*,times, int,flags)
 syscall2(int, timerfd_create, int,clock_id, int,flags)
-syscall4(int, timerfd_settime, int,ufd, int,flags, const struct timespec*,utmr, struct timespec*,otmr)
+syscall4(int, timerfd_settime, int,ufd, int,flags, const void*,utmr, void*,otmr)
 syscall2(int, eventfd, int,val, int,flags)
 
 inline __attribute((noreturn)) void exit_thread(int status) {r(r0,status) r(rN,sys::exit); asm volatile(kernel:: "r"(rN), "r"(r0)); __builtin_unreachable();}
@@ -167,7 +167,7 @@ inline int shmget(int key, long size, int flag) { return ipc(23,key,size,flag,0,
 inline int shmctl(int id, int cmd, struct shmid_ds* buf) { return ipc(24,id,cmd,0,buf,0); }
 syscall2(int, socketcall, int,call, long*,args)
 inline int socket(int domain, int type, int protocol) { long a[]={domain,type,protocol}; return socketcall(1,a); }
-inline int connect(int fd, struct sockaddr* addr, int len) { long a[]={fd,(long)addr,len}; return socketcall(3,a); }
+inline int connect(int fd, const void* addr, int len) { long a[]={fd,(long)addr,len}; return socketcall(3,a); }
 #endif
 
 #undef attribute

@@ -1,3 +1,10 @@
+#if 1
+#include "process.h"
+struct Test {
+    Test(){ log("Hello World"_); }
+} test;
+#endif
+
 #if 0
 #include "process.h"
 #include "widget.h"
@@ -10,7 +17,7 @@ struct VSyncTest : Widget {
 } test;
 #endif
 
-#if 1
+#if 0
 #include "process.h"
 #include "window.h"
 #include "display.h"

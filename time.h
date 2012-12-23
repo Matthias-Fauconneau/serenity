@@ -12,10 +12,12 @@ uint64 cpuTime();
 
 #if __x86_64__
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
+#else
+inline uint64 rdtsc() { return 0; } //STUB
+#endif
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
 struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
-#endif
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

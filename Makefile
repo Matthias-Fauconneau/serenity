@@ -8,7 +8,7 @@ ifeq ($(CC),cc)
  else ifeq ($(TARGET),editor)
    CC := g++ -fabi-version=0
  else ifeq ($(TARGET),test)
-   CC := g++ -fabi-version=0
+   CC := g++
  else ifeq ($(TARGET),simulation)
    CC := g++ -fabi-version=0
  else
@@ -16,13 +16,15 @@ ifeq ($(CC),cc)
  endif
 endif
 
-FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers -Wno-volatile-register-var -pipe -march=native $(FLAGS_$(BUILD))
+FLAGS = -std=c++11 -DNOLIBC -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
+#-Wno-volatile-register-var -pipe -march=native
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
 FLAGS_reverb =  -I/usr/include/libfreeverb3-2/
+FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -45,7 +47,7 @@ LIBS_gl = GL
 LIBS_window = X11
 LIBS_sampler = fftw3f_threads
 LIBS_record = swscale avformat
-LIBS_test = fftw3f_threads
+#LIBS_test = fftw3f_threads
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -75,7 +77,7 @@ endif
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+	$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 $(BUILD)/%.o : %.cc
 	@echo $<
@@ -101,7 +103,8 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@$(CC) $(LFLAGS) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	@#$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	@ld $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png

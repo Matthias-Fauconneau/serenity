@@ -15,20 +15,21 @@ inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) 
 /// Buffer explicit copy
 template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
 
+/// Typed memory allocation (without initialization)
+#if NOLIBC
+/// Stub runtime memory allocation
+byte* allocate_(uint size);
+byte* reallocate_(byte* buffer, uint size, uint need);
+void unallocate_(byte* buffer, uint size);
+template<class T> T* allocate(uint size) { assert(size); return (T*)allocate_(size*sizeof(T)); }
+template<class T> void reallocate(T*& buffer, int size, int need) { buffer=(T*)reallocate_((byte*)buffer, size*sizeof(T), need*sizeof(T)); }
+template<class T> void unallocate(T*& buffer, int size) { assert(buffer); unallocate_((byte*)buffer, size*sizeof(T)); buffer=0; }
+#else
 /// C runtime memory allocation
 extern "C" void* malloc(size_t size);
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
 extern "C" void* realloc(void* buffer, size_t size);
 extern "C" void free(void* buffer);
-
-/// Typed memory allocation (without initialization)
-#if HEAP_TRACE
-extern void heapTrace(int delta);
-template<class T> T* allocate(uint size) { assert(size); heapTrace(size*sizeof(T)); return (T*)malloc(size*sizeof(T)); }
-template<class T> T* allocate16(uint size) { void* buffer; heapTrace(size*sizeof(T)); posix_memalign(&buffer,16,size*sizeof(T)); return (T*)buffer; }
-template<class T> void reallocate(T*& buffer, int unused size, int need) { heapTrace((need-size)*sizeof(T)); buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
-template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); heapTrace(-size*sizeof(T)); free((void*)buffer); buffer=0; }
-#else
 template<class T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
 template<class T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
 template<class T> void reallocate(T*& buffer, int unused size, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
