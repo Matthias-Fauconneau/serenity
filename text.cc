@@ -218,7 +218,7 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
     if(button==MiddleButton) {
         array<uint> selection = toUTF32(getSelection());
         editIndex=index()+selection.size(); array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
-        textSize=0;
+        layout();
         if(textChanged) textChanged(toUTF8(text));
         return true;
     }
@@ -229,9 +229,17 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
     return false;
 }
 
-bool TextInput::keyPress(Key key unused) {
+bool TextInput::keyPress(Key key, Modifiers modifiers) {
     cursor.line=min(cursor.line,textLines.size()-1);
     const TextLine& textLine = textLines[cursor.line];
+
+    if(modifiers&Control && key=='v') {
+        array<uint> selection = toUTF32(getSelection(true));
+        editIndex=index()+selection.size(); array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
+        layout();
+        if(textChanged) textChanged(toUTF8(text));
+        return true;
+    }
 
     if(key==UpArrow) {
         if(cursor.line>0) cursor.line--;
@@ -294,7 +302,7 @@ void TextInput::render(int2 position, int2 size) {
         if(cursor.column<textLine.size()) x= textLine[cursor.column].pos.x;
         else if(textLine) x=textLine.last().pos.x+textLine.last().advance;
         int2 offset = position+max(int2(0),(size-textSize)/2);
-        fill(offset+int2(x,cursor.line*this->size)+Rect(1,this->size), black);
+        fill(offset+int2(x,cursor.line*this->size)+Rect(2,this->size), black);
     }
 }
 

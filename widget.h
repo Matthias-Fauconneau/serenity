@@ -10,6 +10,7 @@ enum Key {
     Delete=0xffff,
     Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19, Power=0x1008ff2a
 };
+enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4, Meta=1<<6 };
 
 /// Abstract component to compose user interfaces
 struct Widget {
@@ -37,7 +38,7 @@ struct Widget {
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted
-    virtual bool keyPress(Key key) { (void)key; return false; }
+    virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
 };
 
 /// Current widget that has the keyboard input focus
@@ -45,8 +46,8 @@ extern Widget* focus;
 /// Current widget that has the drag focus
 extern Widget* drag;
 
-/// Returns last text selection (middle-click paste)
-string getSelection();
+/// Returns last text selection (or if clipboard is true, last copy)
+string getSelection(bool clipboard=false);
 
 /// Cursor icons
 enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };

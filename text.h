@@ -100,6 +100,6 @@ struct TextInput : Text {
     Cursor last;
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-    bool keyPress(Key key) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
     void render(int2 position, int2 size) override;
 };

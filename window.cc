@@ -35,7 +35,7 @@ Lock framebufferLock;
 Widget* focus;
 Widget* drag;
 Window* current;
-string getSelection() { assert(current); return current->getSelection(); }
+string getSelection(bool clipboard) { assert(current); return current->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(current); return current->setCursor(region,cursor); }
 
 // Creates X window
@@ -277,8 +277,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
-            uint key = KeySym(e.key,e.state);
-            if(focus && focus->keyPress((Key)key)) render(); //normal keyPress event
+            uint key = KeySym(e.key, e.state);
+            if(focus && focus->keyPress((Key)key, (Modifiers)e.state)) render(); //normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
                 if(shortcut) (*shortcut)(); //local window shortcut
@@ -303,7 +303,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==ClientMessage) {
             signal<>* shortcut = shortcuts.find(Escape);
             if(shortcut) (*shortcut)(); //local window shortcut
-            else widget->keyPress(Escape);
+            else widget->keyPress(Escape, NoModifiers);
         }
         else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}
@@ -404,9 +404,10 @@ void Window::setIcon(const Image& icon) {
     r.length=2+icon.width*icon.height; r.size+=r.length; send(string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }
 
-string Window::getSelection() {
-    send(raw(GetSelectionOwner())); uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();
-    {ConvertSelection r; r.requestor=id; r.target=Atom("UTF8_STRING"_); send(raw(r));}
+string Window::getSelection(bool clipboard) {
+    {GetSelectionOwner r; if(clipboard) r.selection=Atom("CLIPBOARD"_); send(raw(r)); }
+    uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();
+    {ConvertSelection r; r.requestor=id; if(clipboard) r.selection=Atom("CLIPBOARD"_); r.target=Atom("UTF8_STRING"_); send(raw(r));}
     for(;;) { uint8 type = read<uint8>();
         if((type&0b01111111)==SelectionNotify) { read<XEvent>(); return getProperty<byte>(id,"UTF8_STRING"_); }
         else eventQueue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance

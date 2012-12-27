@@ -76,7 +76,7 @@ struct Window : Socket, Poll {
 
     /// Gets current text selection
     /// \note The selection owner might lock this process if it fails to notify
-    string getSelection();
+    string getSelection(bool clipboard=false);
 
     /// Returns cursor icon for \a cursor
     const Image& cursorIcon(Cursor cursor);
