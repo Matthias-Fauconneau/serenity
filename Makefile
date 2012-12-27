@@ -4,11 +4,11 @@ BUILD ?= release
 
 ifeq ($(CC),cc)
  ifeq ($(TARGET),music)
-  CC := g++ -fabi-version=0
+   CC := g++ -fabi-version=0
  else ifeq ($(TARGET),editor)
    CC := g++ -fabi-version=0
  else ifeq ($(TARGET),test)
-   CC := g++
+   CC := g++ -fabi-version=0
  else ifeq ($(TARGET),simulation)
    CC := g++ -fabi-version=0
  else
@@ -16,15 +16,16 @@ ifeq ($(CC),cc)
  endif
 endif
 
-FLAGS = -std=c++11 -DNOLIBC -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
-#-Wno-volatile-register-var -pipe -march=native
+FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
+#FLAGS += -Wno-volatile-register-var -pipe -march=native
+FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
+
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
 FLAGS_reverb =  -I/usr/include/libfreeverb3-2/
-FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
