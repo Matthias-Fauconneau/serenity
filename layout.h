@@ -123,7 +123,7 @@ struct Selection : virtual Layout {
     signal<uint /*index*/> itemPressed;
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-    bool keyPress(Key key) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
 };
 
 /// Displays a selection using a blue highlight

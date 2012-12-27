@@ -7,15 +7,15 @@
 struct Search : TextInput {
     string browser;
     signal<> triggered;
-    bool keyPress(Key key) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
 };
 
-bool Search::keyPress(Key key) {
+bool Search::keyPress(Key key, Modifiers modifiers) {
     if(key == Return) {
         array<string> args; args<<string("google.com/search?q="_+toUTF8(text)); execute("/usr/bin/chromium-browser"_,args,false);
         setText(string()); triggered(); return true;
     }
-    else return TextInput::keyPress(key);
+    else return TextInput::keyPress(key, modifiers);
 }
 
 /// Executes \a path with \a args when pressed
