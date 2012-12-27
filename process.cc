@@ -15,7 +15,7 @@ struct siginfo_t {
         struct { void *si_addr; };
     };
 };
-struct ucontext_t {
+struct ucontext {
     long flags; void* link; struct { void* sp; int flags; long size; } stack;
 #if __x86_64__
     long r8,r9,r10,r11,r12,r13,r14,r15,rdi,rsi,rbp,rbx,rdx,rax,rcx,rsp,ip,efl,csgsfs,err,trap,oldmask,cr2;
@@ -137,14 +137,16 @@ void traceAllThreads() {
 
 // Signal handler
 string trace(int skip, void* ip);
-static void handler(int sig, siginfo_t* info, ucontext_t* ctx) {
+static void handler(int sig, siginfo_t* info, void* ctx) {
 #if NOLIBC
-    void* ip = (void*)(ctx->pc);
+    void* ip = (void*)(((ucontext*)ctx)->pc);
 #else
 #if __x86_64
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
-#else
+#elif __arm
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.arm_pc;
+#elif __i386
+    void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP];
 #endif
 #endif
     string s = trace(1,ip);
@@ -186,7 +188,7 @@ void __attribute((constructor(101))) setup_signals() {
     check_(sigaction(SIGTERM, &sa, 0, 8));
     check_(sigaction(SIGTRAP, &sa, 0, 8));
 #else
-    struct sigaction sa; sa.sa_sigaction=typeof(sa.sa_sigaction)&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
+    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
     check_(sigaction(SIGFPE, &sa, 0));
     check_(sigaction(SIGABRT, &sa, 0));
     check_(sigaction(SIGSEGV, &sa, 0));

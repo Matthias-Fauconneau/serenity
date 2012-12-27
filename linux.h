@@ -89,7 +89,7 @@ enum class sys {
     shmat=305,shmdt,shmget,shmctl,
     openat=322, mkdirat, fstatat, unlinkat, symlinkat=331, utimensat=348,
     timerfd_create=350, timerfd_settime=353, eventfd=356
-#elif __i386__
+#elif __i386
     clock_gettime=265,
     openat=295, mkdirat, fstatat=300, unlinkat, symlinkat=304,
     timerfd_create=322, timerfd_settime=325

@@ -1,7 +1,5 @@
-CG:
- Trees: improve branches using environment modeling (light and space competition)
- Textures: bark,leafs,twigs
- Export .obj
- Editor: copy-paste, .XCompose, syntax highlighting
-IDE: text editor, parser(inherited attributes, scoped symbols, GLR), syntax highlighting, navigation, completion, git
-Touchbook: hardware scroll, fix touchscreen, accelerometer trigger, portrait, onscreen keyboard, handwriting recognition
+Text Editor: Ctrl+V paste, cut lines, select, delete/cut/copy selection
+IDE: text editor, syntax highlighting, build/run integration, parser(inherited attributes, scoped symbols, GLR), navigation, completion
+Touchbook: fast render, fix touchscreen, rotate screen, accelerometer trigger, onscreen keyboard, handwriting recognition
+Music: Physical modeling synthesis
+CG: Trees: improve branches using environment modeling (light and space competition), Textures: bark,leafs,twigs, Export .obj

@@ -18,14 +18,13 @@ endif
 
 FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 #FLAGS += -Wno-volatile-register-var -pipe -march=native
-FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
+#FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
 
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
-FLAGS_reverb =  -I/usr/include/libfreeverb3-2/
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -104,8 +103,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@#$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
-	@ld $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
+	@$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png

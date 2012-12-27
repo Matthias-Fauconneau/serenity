@@ -43,7 +43,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), softwareRendering(softwareRendering) {
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
-    if(check(connect(Socket::fd,(const void*)&addr,2+path.size()),path)) error("X connection failed");
+    if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
     {ConnectionSetup r;
         string authority = getenv("HOME"_)+"/.Xauthority"_;
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
@@ -243,8 +243,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         /**/ if(type==MotionNotify) {
             cursorPosition = int2(e.x,e.y);
             Cursor lastCursor = cursor; cursor=Cursor::Arrow;
-            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) queue();
-            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) queue();
+            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) render();
+            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
             else if(anchor==Float) {
                 if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; } //to reuse border intersection checks
                 bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
@@ -273,12 +273,12 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonPress) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key)) queue();
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key)) render();
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
             uint key = KeySym(e.key,e.state);
-            if(focus && focus->keyPress((Key)key) ) queue(); //normal keyPress event
+            if(focus && focus->keyPress((Key)key)) render(); //normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
                 if(shortcut) (*shortcut)(); //local window shortcut
@@ -289,15 +289,15 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(type==LeaveNotify && hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
-            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) queue();
+            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
         }
-        else if(type==Expose) { if(!e.expose.count) queue(); }
+        else if(type==Expose) { if(!e.expose.count) render(); }
         else if(type==UnmapNotify) mapped=false;
         else if(type==MapNotify) mapped=true;
         else if(type==ReparentNotify) {}
         else if(type==ConfigureNotify) {
             position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
-            if(this->size!=size) { this->size=size; if(mapped) queue(); }
+            if(this->size!=size) { this->size=size; render(); }
         }
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
@@ -305,7 +305,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(shortcut) (*shortcut)(); //local window shortcut
             else widget->keyPress(Escape);
         }
-        else if(type==Shm::event+Shm::Completion) { if(state==Wait && mapped) queue(); state=Idle; }
+        else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }

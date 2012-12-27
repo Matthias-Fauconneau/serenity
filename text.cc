@@ -252,7 +252,7 @@ bool TextInput::keyPress(Key key unused) {
         else if(key==End) cursor.column=textLine.size();
         else if(key==Delete) {
             if(cursor.column<textLine.size() || cursor.line<textLines.size()-1) {
-                text.removeAt(editIndex=index()); textSize=0; if(textChanged) textChanged(toUTF8(text));
+                text.removeAt(editIndex=index()); layout(); if(textChanged) textChanged(toUTF8(text));
             }
         }
         else if(key==BackSpace) { //LeftArrow+Delete
@@ -260,13 +260,13 @@ bool TextInput::keyPress(Key key unused) {
             else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size();
             else return false;
             if(index()<text.size()) {
-                text.removeAt(editIndex=index()); textSize=0; if(textChanged) textChanged(toUTF8(text));
+                text.removeAt(editIndex=index()); layout(); if(textChanged) textChanged(toUTF8(text));
             }
         }
         else if(key==Return) {
             if(textEntered) textEntered(toUTF8(text));
             else {
-                editIndex=index()+1; text.insertAt(index(),'\n'); textSize=0; if(textChanged) textChanged(toUTF8(text));
+                editIndex=index()+1; text.insertAt(index(),'\n'); layout(); if(textChanged) textChanged(toUTF8(text));
             }
         }
         else {
@@ -279,7 +279,7 @@ bool TextInput::keyPress(Key key unused) {
             else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';
             else if(key==KP_Multiply) c='*'; else if(key==KP_Add) c='+'; else if(key==KP_Sub) c='-'; else if(key==KP_Divide) c='/';
             else return false;
-            editIndex=index()+1; if(text) text.insertAt(index(), c); else text<<c; textSize=0; if(textChanged) textChanged(toUTF8(text));
+            editIndex=index()+1; if(text) text.insertAt(index(), c); else text<<c; layout(); if(textChanged) textChanged(toUTF8(text));
         }
     }
     return true;

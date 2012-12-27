@@ -170,9 +170,9 @@ Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){registerPoll();}
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(long sec, long nsec) {
     timespec time[2]={{0,0},{sec,nsec}};
-    timerfd_settime(fd,1,(const void*)time,0);
+    timerfd_settime(fd,1,(const itimerspec*)time,0);
 }
 void Timer::setRelative(long msec) {
     timespec time[2]={{0,0},{msec/1000,(msec%1000)*1000000}};
-    timerfd_settime(fd,0,(const void*)time,0);
+    timerfd_settime(fd,0,(const itimerspec*)time,0);
 }

@@ -1,7 +1,20 @@
-#if 1
+#if 0
 #include "process.h"
 struct Test {
     Test(){ log("Hello World"_); }
+} test;
+#endif
+
+#if 1
+#include "window.h"
+#include "text.h"
+struct TextInputTest {
+    TextInput input __(readFile("TODO"_,cwd()));
+    Window window __(&input,int2(1024,525),"TextInput"_);
+
+    TextInputTest() {
+        window.localShortcut(Escape).connect(&exit);
+    }
 } test;
 #endif
 
@@ -13,7 +26,7 @@ struct Test {
 struct VSyncTest : Widget {
     Window window __(this,0,"VSync"_,false);
     VSyncTest(){ window.localShortcut(Escape).connect(&exit); }
-    uint count; void render(int2 position, int2 size) {fill(position+Rect(size),((count++)%2)?black:white); window.render(); if(count>100) exit();}
+    uint count=0; void render(int2 position, int2 size) {fill(position+Rect(size),((count++)%2)?black:white); window.render(); if(count>100) exit();}
 } test;
 #endif
 
@@ -820,19 +833,6 @@ struct Plot : Widget {
     }
 } test;
 
-#endif
-
-#if 0
-#include "window.h"
-#include "text.h"
-struct TextInputTest {
-    TextInput input __(readFile("ternary.l"_,cwd()));
-    Window window __(&input,int2(525,525),"TextInput"_);
-
-    TextInputTest() {
-        window.localShortcut(Escape).connect(&exit);
-    }
-} test;
 #endif
 
 #if 0
