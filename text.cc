@@ -179,8 +179,8 @@ void Text::render(int2 position, int2 size) {
     for(const Line& l: lines) fill(offset+Rect(l.min,l.max), black);
 }
 
-bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
-    if(event!=Press) return false;
+bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
+    if(!button) return false;
     position -= max(int2(0),(size-textSize)/2);
     if(!Rect(textSize).contains(position)) return false;
     for(uint line: range(textLines.size())) {
@@ -200,33 +200,29 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button) {
         const Character& last = textLine.last();
         if(position.x >= last.center) { cursor = Cursor __(line,textLine.size()); goto break_; }
     }
-    if(textClicked) { textClicked(); return true; }
-    return false;
+    if(event == Press && textClicked) { textClicked(); return true; }
     break_:;
-    for(const Link& link: links) if(cursor>link.begin && link.end>cursor) { linkActivated(link.identifier); return true; }
-    if(textClicked) { textClicked(); return true; }
-    return false;
+    if(event == Press) for(const Link& link: links) if(cursor>link.begin && link.end>cursor) { linkActivated(link.identifier); return true; }
+    if(event == Press && textClicked) { textClicked(); return true; }
+    return true;
 }
 
 /// TextInput
 
 bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button) {
     setCursor(position+Rect(size),::Cursor::Text);
-    if(Text::mouseEvent(position,size,event,button)) return true;
-    if(event!=Press) return false;
     focus=this;
-    if(button==MiddleButton) {
+    if(event==Press && button==MiddleButton) {
+        Text::mouseEvent(position,size,event,button);
         array<uint> selection = toUTF32(getSelection());
         editIndex=index()+selection.size(); array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
         layout();
         if(textChanged) textChanged(toUTF8(text));
         return true;
     }
-    if(cursor.line!=last.line || cursor.column!=last.column) {
-        last=cursor;
-        return true;
-    }
-    return false;
+    bool contentChanged = Text::mouseEvent(position,size,event,button);
+    if(event==Press && button==LeftButton) selectionStart = cursor;
+    return contentChanged;
 }
 
 bool TextInput::keyPress(Key key, Modifiers modifiers) {
@@ -290,6 +286,7 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
             editIndex=index()+1; if(text) text.insertAt(index(), c); else text<<c; layout(); if(textChanged) textChanged(toUTF8(text));
         }
     }
+    if(!(modifiers&Shift)) selectionStart=cursor;
     return true;
 }
 

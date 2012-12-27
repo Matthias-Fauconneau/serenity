@@ -96,8 +96,8 @@ struct TextInput : Text {
     signal<const ref<byte>&> textChanged;
     /// User pressed enter
     signal<const ref<byte>&> textEntered;
-    /// Last cursor position
-    Cursor last;
+    /// Cursor start position for selections
+    Cursor selectionStart;
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
