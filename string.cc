@@ -37,7 +37,7 @@ ref<byte> section(const ref<byte>& s, byte separator, int begin, int end) {
     else { b=s.size; if(begin!=-1) { b--; for(uint i=0;b>0;b--) if(s[b]==separator) { i++; if(i>=uint(-begin-1)) { b++; break; } } } }
     if(end>=0) { e=0; for(uint i=0;e<s.size;e++) if(s[e]==separator) { i++; if(i>=(uint)end) break; } }
     else { e=s.size; if(end!=-1) { e--; for(uint i=0;e>0;e--) { if(s[e]==separator) { i++; if(i>=uint(-end-1)) break; } } } }
-    assert(e>=b);
+    assert(e>=b,s,separator,begin,end);
     return ref<byte>(s.data+b,e-b);
 }
 

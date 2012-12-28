@@ -25,9 +25,9 @@ void HTML::load(const URL& url, Map&& document) {
     Element html = parseHTML(document);
 
     if(!paragraphElement)
-        paragraphElement = split("p br div"_);
+        paragraphElement = split("p br div center"_);
     if(!textElement)
-        textElement = split("span a blockquote center u hr ul li i strike cite em ol dt dl dd h1 h2 h3 h4 h5 code article small abbr aside th pre"_);
+        textElement = split("span a blockquote u hr ul li i strike cite em ol dt dl dd h1 h2 h3 h4 h5 code article small abbr aside th pre"_);
     if(!boldElement)
         boldElement = split("b strong h1 h2 h3 h4 h5 h6"_);
     if(!ignoreElement)
@@ -40,8 +40,8 @@ void HTML::load(const URL& url, Map&& document) {
         int score = 0;
         if(find(e["class"_],"comment"_)||find(e["class"_],"menu"_)) return true;
         if(find(e["id"_],"comment"_)||find(e["id"_],"menu"_)) return true;
-        if(e["class"_]=="content"_||e["id"_]=="content"_) score += 600;
-        else if(e["class"_]=="comic"_||e["id"_]=="comic"_) score += 16400;
+        if(e["class"_]=="content"_||e["id"_]=="content"_||e["id"_]=="main"_) score += 600;
+        else if(e["class"_]=="comic"_||e["id"_]=="comic"_||e["id"_]=="page"_) score += 16400;
         else if(startsWith(e["style"_],"background-image:url("_)) score += 4000;
         if(e.name=="img"_ && e["src"_]) {
             URL src = url.relative(e["src"_]);
@@ -50,7 +50,7 @@ void HTML::load(const URL& url, Map&& document) {
                      find(src.path,"page"_)||find(src.path,"chapter"_)||find(src.path,"issue"_)||find(src.path,"art/"_))) {
                 int size=0;
                 if(isInteger(e["width"_])&&isInteger(e["height"_])) size = toInteger(e["width"_])*toInteger(e["height"_]);
-                score += size?: find(e["alt"_],"Comic"_) ? 16200 : find(e["alt"_],"Page"_)||find(e["alt"_],"Chapter"_)? 16800: 0;
+                score += size?: find(e["alt"_],"Comic"_)||find(src.path,"chapter"_) ? 16200 : find(e["alt"_],"Page"_)||find(e["alt"_],"Chapter"_)? 16800: 0;
             }
         } else if(!e.children) return false;
         e.mayVisit([&score](const Element& e)->bool{
@@ -78,7 +78,9 @@ void HTML::parse(const URL& url, const Element &e) {
     if(!e.name) {
         if(text || trim(e.content)) { flushImages(); text << e.content; }
     }
-    else if(find(e["class"_],"comment"_) || e["class"_]=="editsection"_) return;
+    else if(find(e["class"_],"comment"_) || e["class"_]=="editsection"_) {
+        return;
+    }
     else if(e.name=="img"_) {
         if(endsWith(e["src"_],".gif"_)) return;
         flushText();
@@ -93,9 +95,12 @@ void HTML::parse(const URL& url, const Element &e) {
         bool inlineText=true;
         e.visit([&inlineText](const Element& e){if(e.name&&!textElement.contains(e.name)) inlineText=false;});
         if(inlineText) flushImages();
-        if(inlineText && !e["href"_].contains(' ')) text << format(Underline|Link) << e["href"_] << " "_;
+        linkStack << string(e["href"_]);
+        if(inlineText && !linkStack.last().contains(' ')) text << format(Underline|Link) << linkStack.last() << " "_;
         for(const Element& c: e.children) parse(url, c);
-        if(inlineText && !e["href"_].contains(' ')) text << format(Regular);
+        if(inlineText && !linkStack.last().contains(' ')) text << format(Regular);
+        flushImages();
+        linkStack.pop();
     }
     else if(paragraphElement.contains(e.name)) { //Paragraph
         for(const Element& c: e.children) parse(url, c);
@@ -125,9 +130,16 @@ void HTML::flushText() {
 }
 void HTML::flushImages() {
     if(!images) return;
-    UniformGrid<ImageView>& grid = heap<UniformGrid<ImageView> >();
+    UniformGrid<ImageLink>& grid = heap<UniformGrid<ImageLink> >();
     grid.reserve(images.size());
-    for(URL& image: images) { grid<<ImageView(); heap<ImageLoader>(move(image), &grid.last().image, contentChanged); }
+    for(URL& image: images) {
+        grid<<ImageLink();
+        heap<ImageLoader>(move(image), &grid.last().image, contentChanged);
+        if(linkStack) {
+            grid.last().link = copy(linkStack.last());
+            grid.last().linkActivated.connect(this, &HTML::go);
+        }
+    }
     VBox::operator<<(&grid);
     images.clear();
 }

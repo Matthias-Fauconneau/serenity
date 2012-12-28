@@ -36,4 +36,5 @@ struct HTML : VBox {
     string text;
     array<URL> images;
     int paragraphCount;
+    array<string> linkStack;
 };

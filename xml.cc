@@ -21,7 +21,7 @@ Element parseXML(const ref<byte>& document) { return parse(document,false); }
 Element parseHTML(const ref<byte>& document) { return parse(document,true); }
 
 Element::Element(TextData& s, bool html) {
-    uint begin = s.index;
+    //uint begin = s.index;
     if(s.match("!DOCTYPE"_)||s.match("!doctype"_)) { s.until('>'); return; }
     else if(s.match("?xml"_)) { s.until("?>"_); return; }
     else if(s.match("!--"_)) { s.until("-->"_); return; }
@@ -35,7 +35,7 @@ Element::Element(TextData& s, bool html) {
         else if(s.match('/')) s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
         string key = string(s.identifier("_-:"_));/*TODO:reference*/ s.skip();
-        if(!key) { log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>')); break; }
+        if(!key) { /*log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>'));*/ s.until('>'); break; }
         if(html) key=toLower(key);
         string value;
         if(s.match('=')) {
@@ -126,17 +126,18 @@ string Element::text(const ref<byte>& path) const {
     return text;
 }
 
-string Element::str(const ref<byte>& prefix) const {
-    assert(name||content||children||attributes);
-    string line; line<< prefix;
-    if(name||attributes) line << "<"_+name;
+string Element::str(uint depth) const {
+    //assert(name||content, attributes, children);
+    string line;
+    string indent; for(uint unused i: range(depth)) indent<<' ';
+    if(name) line << indent<<"<"_+name;
     for(auto attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
-    if(content||children) {
-        if(name||attributes) line << ">\n"_;
-        if(trim(content)) { assert(!children); line<< "'"_+content+"'"_; }
-        if(children) for(const Element& e: children) line << e.str(string(prefix+" "_));
-        if(name||attributes) line << prefix+"</"_+name+">\n"_;
-    } else if(name||attributes) line << "/>\n"_;
+    if(trim(content)||children) {
+        if(name) line << ">\n"_;
+        if(trim(content)) line<<indent<<replace(simplify(string(trim(content))),"\n"_,string("\n"_+indent))<<"\n"_;
+        if(children) for(const Element& e: children) line << e.str(depth+1);
+        if(name) line << indent+"</"_+name+">\n"_;
+    } else if(name) line << " />\n"_;
     return line;
 }
 string str(const Element& e) { return e.str(); }

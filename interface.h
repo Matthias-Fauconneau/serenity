@@ -34,7 +34,7 @@ template<class T> struct Scroll : ScrollArea, T {
     Widget& area() { return (ScrollArea&)*this; }
 };
 
-/// Displays a static image
+/// Displays an image
 struct ImageView : Widget {
     /// Displayed image
     Image image;
@@ -50,14 +50,22 @@ struct ImageView : Widget {
 /// Displays an icon
 typedef ImageView Icon;
 
-/// Clickable Icon
-struct TriggerButton : Icon {
-    TriggerButton(){}
-    TriggerButton(Image&& image):Icon(move(image)){}
-    /// User clicked on the button
+/// Clickable image
+struct ImageLink : ImageView {
+    /// Argument given to triggered
+    string link;
+    /// User clicked on the image
     signal<> triggered;
+    /// User clicked on the image
+    signal<const ref<byte>&> linkActivated;
+
+    ImageLink(){}
+    ImageLink(Image&& image):Icon(move(image)){}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
+/// \typedef ImageLink TriggerButton
+/// Displays a clickable button with an icon
+typedef ImageLink TriggerButton;
 
 /// Togglable Icon
 struct ToggleButton : Widget {

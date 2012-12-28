@@ -1,7 +1,6 @@
 /// \file player.cc Music player
 #include "process.h"
 #include "file.h"
-#include "flac.h"
 #include "resample.h"
 #include "asound.h"
 #include "interface.h"
