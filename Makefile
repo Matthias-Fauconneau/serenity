@@ -16,8 +16,9 @@ ifeq ($(CC),cc)
  endif
 endif
 
-FLAGS = -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
-#FLAGS += -Wno-volatile-register-var -pipe -march=native
+FLAGS = -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
+#FLAGS += -Wno-volatile-register-var
+FLAGS += -march=native
 #FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
 
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
@@ -31,6 +32,7 @@ ICONS_taskbar = button
 ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next
 ICONS_music = music
+ICONS_test = feeds network
 
 SHADERS = $(SHADERS_$(TARGET)) fill blit
 SHADERS_editor = shadow shader sky resolve
@@ -77,7 +79,7 @@ endif
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+	@$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 $(BUILD)/%.o : %.cc
 	@echo $<

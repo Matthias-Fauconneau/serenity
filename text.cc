@@ -204,7 +204,7 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
     break_:;
     if(event == Press) for(const Link& link: links) if(cursor>link.begin && link.end>cursor) { linkActivated(link.identifier); return true; }
     if(event == Press && textClicked) { textClicked(); return true; }
-    return true;
+    return false;
 }
 
 /// TextInput

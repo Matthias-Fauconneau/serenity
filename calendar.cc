@@ -4,7 +4,7 @@
 
 array<Event> getEvents(Date query) {
     array<Event> events;
-    if(!existsFile("events"_,config())) {warn("No events settings [$HOME/.config/events]"); return events; }
+    if(!existsFile("events"_,config())) {log("No events settings [$HOME/.config/events]"); return events; }
     string file = readFile("events"_,config());
 
     map<string, array<Date>> exceptions; //Exceptions for recurring events

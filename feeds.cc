@@ -50,7 +50,10 @@ void Favicon::update() {
 
 void Feeds::loadFeed(const URL& url, Map&& document) {
     Element feed = parseXML(document);
-    URL channel = URL(feed.text("rss/channel/link"_) ?: string(feed("feed"_)("link"_)["href"_]) ?: (error(url),string()) ); //RSS ?: Atom
+    string link = feed.text("rss/channel/link"_);
+    if(!link) link=string(feed("feed"_)("link"_)["href"_]);
+    assert(link,url);
+    URL channel = URL(link); //RSS ?: Atom
     assert(channel.host);
     Favicon* favicon=0;
     for(Favicon* f: favicons) if(f->host==channel.host) { favicon=f; break; }

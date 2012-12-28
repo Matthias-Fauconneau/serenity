@@ -48,7 +48,7 @@ struct Taskbar : Socket, Poll {
         panel<<&button<<&tasks<<&clock;
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
-        check_(connect(Socket::fd,(const void*)&addr,2+path.size()),path);
+        check_(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path);
         {ConnectionSetup r;
             string authority = getenv("HOME"_)+"/.Xauthority"_;
             if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));

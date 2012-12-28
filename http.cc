@@ -21,7 +21,7 @@ struct UDPSocket : Socket {
 };
 // TCPSocket
 TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|O_NONBLOCK) {
-    assert(host!=uint(-1));
+    if(host==uint(-1)) { if(fd>0) close(fd); fd=0; return; }
     sockaddress addr = {PF_INET,big16(port),host}; connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
     fcntl(Socket::fd,F_SETFL,0);
 }
@@ -39,7 +39,6 @@ extern "C" {
  int SSL_write(SSL*,const void *buf,int num);
 }
 SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port) {
-    assert(host!=uint(-1));
     if(secure && fd) {
         static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
         ssl = SSL_new(ctx);
@@ -80,7 +79,7 @@ uint resolve(const ref<byte>& host) {
         }
         query << 0 << 0 << 1 << 0 << 1;
         dns.write(query);
-        if(!dns.poll(1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!dns.poll(1000)){log("giving up"); return false; }}
+        if(!dns.poll(1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!dns.poll(1000)){log("giving up"); return -1; }}
         BinaryData s(dns.readUpTo(4096), true);
         header = s.read<Header>();
         for(int i=0;i<big16(header.qd);i++) { for(uint8 n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
@@ -158,7 +157,10 @@ string cacheFile(const URL& url) {
 }
 HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
-      url(move(url)), headers(move(headers)), method(method), handler(handler) { registerPoll(); }
+      url(move(url)), headers(move(headers)), method(method), handler(handler) {
+    if(!Socket::fd) { log("Unknown host",url.host); state=Done; free(this); return; }
+    registerPoll();
+}
 void HTTP::request() {
     string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
     for(const string& header: headers) request << header+"\r\n"_;

@@ -56,11 +56,12 @@ struct Desktop {
     Window window __(&applets,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
     Window browser __(0,0,"Browser"_);
     Desktop() {
-        if(!existsFile("launcher"_,config())) warn("No launcher settings [.config/launcher]");
+        if(!existsFile("launcher"_,config())) log("No launcher settings [.config/launcher]");
         else {
             auto apps = readFile("launcher"_,config());
-            for(const ref<byte>& desktop: split(apps,'\n')) {
-                if(startsWith(desktop,"#"_)) continue;
+            for(const ref<byte>& line: split(apps,'\n')) {
+                const ref<byte> desktop=trim(line);
+                if(!desktop || startsWith(desktop,"#"_)) continue;
                 if(!existsFile(desktop)) { warn("Missing settings","'"_+desktop+"'"_); continue; }
                 string file = readFile(desktop);
                 map<ref<byte>,ref<byte> > entries = readSettings(file);
