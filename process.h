@@ -26,7 +26,7 @@ int pthread_cond_signal(pthread_cond* cond);
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock {
-    thread( pthread_mutex mutex; )
+    pthread( pthread_mutex mutex; )
     Lock(){ pthread( pthread_mutex_init(&mutex,0); ) }
     /// Locks the mutex.
     inline void lock() { pthread( pthread_mutex_lock(&mutex); ) }
@@ -109,7 +109,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
 
     Thread(int priority=0);
     /// Spawns a thread running an event loop with the given \a priority
-    thread( void spawn(); )
+    pthread( void spawn(); )
     /// Processes all events on \a polls and tasks on \a queue until #terminate is set
     void run();
     /// Processes all events on \a polls and tasks on \a queue
