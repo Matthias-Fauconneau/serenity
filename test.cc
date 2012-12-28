@@ -1,4 +1,4 @@
-#if 0
+#if 1
 #include "process.h"
 struct LogTest {
     LogTest(){ log("Hello World"_); }
@@ -18,6 +18,7 @@ struct TextInputTest {
 } test;
 #endif
 
+#if 0
 #include "process.h"
 #include "window.h"
 #include "feeds.h"
@@ -45,6 +46,7 @@ struct FeedsTest {
         browser.widget=&page.area(); browser.show();
     }
 } application;
+#endif
 
 #if 0
 #include "process.h"

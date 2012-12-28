@@ -26,9 +26,7 @@ import string
 import os.path
 import re
 
-HELP_USAGE = """
-Usage: dep.py <link-target> <link-file> <build-dir> <root-dep-file> <include-dir> ...
-"""
+HELP_USAGE = "Usage: dep.py <link-target> <link-file> <build-dir> <root-dep-file> <include-dir> ..."
 
 regSuffix = re.compile(r"\.[^.]*$")
 regSrc = re.compile(r"^.*\.(c|cc|cpp)$")
@@ -94,7 +92,6 @@ def main(argv):
 
 	# check command line parameters
 	if len(sys.argv) < 5:
-		print HELP_USAGE
 		return
 	
 	args = sys.argv
@@ -145,22 +142,22 @@ def main(argv):
 	# all includes of dependency files
 	for i in linkFiles:
 		i = regSuffix.sub(".d", i)
-		print "-include " + buildDir + "/" + i
-	print
+		print("-include " + buildDir + "/" + i)
+	print()
 
 	# dependencies for link file
-	print linkFile + ": \\"
+	print(linkFile + ": \\")
 	for i in linkFiles:
 		i = regSuffix.sub(".d", i)
-		print "\t" + buildDir + "/" + i + " \\"
-	print
+		print("\t" + buildDir + "/" + i + " \\")
+	print()
 
 	# print out all files we need to link against
-	print ruleTarget + ": " + linkFile + " \\"
+	print(ruleTarget + ": " + linkFile + " \\")
 	for i in linkFiles:
 		i = regSuffix.sub(".o", i)
-		print "\t" + buildDir + "/" + i + " \\"
-	print
+		print("\t" + buildDir + "/" + i + " \\")
+	print()
 
 
 if __name__ == "__main__":

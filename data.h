@@ -47,7 +47,9 @@ struct Data {
 };
 
 #define big32 __builtin_bswap32
+#ifndef __clang__
 inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
+#endif
 #define big16 __builtin_bswap16
 
 /// Provides a convenient interface to parse binary inputs

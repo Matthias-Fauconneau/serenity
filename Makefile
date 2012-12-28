@@ -1,25 +1,16 @@
 PREFIX ?= /usr
 TARGET ?= test
-BUILD ?= release
+BUILD ?= fast
 
 ifeq ($(CC),cc)
- ifeq ($(TARGET),music)
-   CC := g++ -fabi-version=0
- else ifeq ($(TARGET),editor)
-   CC := g++ -fabi-version=0
- else ifeq ($(TARGET),test)
-   CC := g++ -fabi-version=0
- else ifeq ($(TARGET),simulation)
-   CC := g++ -fabi-version=0
- else
-  CC := clang++ -Wno-lambda-extensions
- endif
+ #CC := g++ -fabi-version=0
+ CC := clang++ -static -Wno-lambda-extensions
 endif
 
-FLAGS = -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
-#FLAGS += -Wno-volatile-register-var
-FLAGS += -march=native
-#FLAGS += -march=armv7-a -mtune=cortex-a8 -mfpu=neon
+CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
+#CC += -Wno-volatile-register-var
+#CC += -march=native
+CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
@@ -79,12 +70,12 @@ endif
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+	@$(CC) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 $(BUILD)/%.o : %.cc
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
+	@$(CC) $(FLAGS_$*) -c -o $@ $<
 
 $(BUILD)/%.o: %.png
 	@echo $<

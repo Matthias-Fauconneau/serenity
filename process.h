@@ -3,10 +3,12 @@
 #include "array.h"
 #include "file.h"
 #include "function.h"
-typedef unsigned long int pthread;
+
+#if THREAD
+extern "C" {
+typedef unsigned long int pthread_t;
 struct pthread_mutex { int lock; uint count; int owner; uint nusers; int kind, spins; void* prev,*next; };
 struct pthread_cond { int lock; uint futex; uint64 total_seq, wakeup_seq, woken_seq; void* mutex; uint nwaiters; uint broadcast_seq; };
-extern "C" {
 int pthread_create(pthread* thread, void* attr, void *(*start_routine)(void*), void* arg);
 int pthread_join(pthread thread, void **status);
 int pthread_mutex_init(pthread_mutex* mutex, const void* attr);
@@ -17,34 +19,21 @@ int pthread_cond_init(pthread_cond* cond, const void* attr);
 int pthread_cond_wait(pthread_cond* cond, pthread_mutex* mutex);
 int pthread_cond_signal(pthread_cond* cond);
 }
-
-/// A semaphore using POSIX mutex, POSIX condition variable, and a counter
-struct Semaphore {
-    pthread_mutex mutex;
-    pthread_cond condition;
-    long counter;
-    /// Creates a semaphore with \a count initial ressources
-    Semaphore(int count=0):counter(count){pthread_mutex_init(&mutex,0); pthread_cond_init(&condition,0);}
-    /// Acquires \a count ressources
-    inline void acquire(int count) {pthread_mutex_lock(&mutex); while(counter<count) pthread_cond_wait(&condition,&mutex); counter-=count; pthread_mutex_unlock(&mutex);}
-    /// Atomically tries to acquires \a count ressources only if available
-    inline bool tryAcquire(int count) {pthread_mutex_lock(&mutex); if(counter<count) { pthread_mutex_unlock(&mutex); return false; } counter-=count; pthread_mutex_unlock(&mutex); return true; }
-    /// Releases \a count ressources
-    inline void release(int count) {pthread_mutex_lock(&mutex); counter+=count; pthread_cond_signal(&condition); pthread_mutex_unlock(&mutex);}
-    /// Returns available ressources \a count
-    operator int() { return counter; }
-};
+#define pthread(statements...) statements
+#else
+#define pthread(statements...)
+#endif
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock {
-    pthread_mutex mutex;
-    Lock(){pthread_mutex_init(&mutex,0);}
+    thread( pthread_mutex mutex; )
+    Lock(){ pthread( pthread_mutex_init(&mutex,0); ) }
     /// Locks the mutex.
-    inline void lock() {pthread_mutex_lock(&mutex);}
+    inline void lock() { pthread( pthread_mutex_lock(&mutex); ) }
     /// Atomically lock the mutex only if unlocked.
-    inline bool tryLock() { return !pthread_mutex_trylock(&mutex); }
+    pthread( inline bool tryLock() { return !pthread_mutex_trylock(&mutex); } )
     /// Unlocks the mutex.
-    inline void unlock() {pthread_mutex_unlock(&mutex);}
+    inline void unlock() { pthread( pthread_mutex_unlock(&mutex); ) }
 };
 
 /// Convenience class to automatically unlock a mutex
@@ -52,6 +41,32 @@ struct Locker {
     Lock& lock;
     Locker(Lock& lock):lock(lock){lock.lock();}
     ~Locker(){lock.unlock();}
+};
+
+/// A semaphore using POSIX mutex, POSIX condition variable, and a counter
+struct Semaphore {
+    Lock mutex;
+    pthread( pthread_cond condition; )
+    long counter;
+    /// Creates a semaphore with \a count initial ressources
+    Semaphore(int count=0) : counter(count) { pthread( pthread_cond_init(&condition,0); ) }
+    /// Acquires \a count ressources
+    inline void acquire(int count) {
+        pthread( while(counter<count) pthread_cond_wait(&condition,&mutex); )
+        counter-=count; assert(counter>=0);
+    }
+    /// Atomically tries to acquires \a count ressources only if available
+    inline bool tryAcquire(int count) {	
+        if(counter<count) return false; counter-=count; return true;
+    }
+    /// Releases \a count ressources
+    inline void release(int count) {
+        Locker lock(mutex);
+        counter+=count; 
+        pthread( pthread_cond_signal(&condition); )
+    }
+    /// Returns available ressources \a count
+    operator int() { return counter; }
 };
 
 /// Returns original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
@@ -83,16 +98,18 @@ struct EventFD : Stream {
 
 /// Concurrently runs an event loop
 struct Thread : array<Poll*>, EventFD, Poll {
-    pthread thread;
-    int tid=0,priority=0;
     bool terminate=0; // Flag to cleanly terminate a thread
     array<Poll*> queue; // Poll objects queued on this thread
     array<Poll*> unregistered; // Poll objects removed while in event loop
+    int priority=0; // Thread system priority
+    int tid=0; // Thread system identifier
+    pthread( pthread_t thread; )
     Lock lock;
     Map stack;
+
     Thread(int priority=0);
     /// Spawns a thread running an event loop with the given \a priority
-    void spawn();
+    thread( void spawn(); )
     /// Processes all events on \a polls and tasks on \a queue until #terminate is set
     void run();
     /// Processes all events on \a polls and tasks on \a queue
@@ -101,6 +118,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void event();
 };
 
+#if THREAD
 /// Runs a loop in parallel
 template<int N=8> struct parallel {
     uint iterationCount;
@@ -120,6 +138,7 @@ template<int N=8> struct parallel {
         for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
     }
 };
+#endif
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all file-scope objects and exits process.
 void exit();
