@@ -109,9 +109,9 @@ void ImageView::render(int2 position, int2 size) {
     blit(pos, image);
 }
 
-// TriggerButton
-bool TriggerButton::mouseEvent(int2, int2, Event event, Button) {
-    if(event==Press) { triggered(); return true; }
+// ImageLink
+bool ImageLink::mouseEvent(int2, int2, Event event, Button) {
+    if(event==Press) { triggered(); linkActivated(link); return true; }
     return false;
 }
 

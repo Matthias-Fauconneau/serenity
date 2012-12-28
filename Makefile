@@ -2,19 +2,8 @@ PREFIX ?= /usr
 TARGET ?= test
 BUILD ?= release
 
-ifeq ($(CC),cc)
- ifeq ($(TARGET),music)
-   CC := g++ -fabi-version=0
- else ifeq ($(TARGET),editor)
-   CC := g++ -fabi-version=0
- else ifeq ($(TARGET),test)
-   CC := g++ -fabi-version=0
- else ifeq ($(TARGET),simulation)
-   CC := g++ -fabi-version=0
- else
-  CC := clang++ -Wno-lambda-extensions
- endif
-endif
+CC := g++ -fabi-version=0
+#CC := clang++ -Wno-lambda-extensions
 
 FLAGS = -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 #FLAGS += -Wno-volatile-register-var

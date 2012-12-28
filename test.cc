@@ -18,6 +18,22 @@ struct TextInputTest {
 } test;
 #endif
 
+#if 0
+#include "window.h"
+#include "html.h"
+struct HTMLTest {
+    Scroll<HTML> page;
+    Window window __(&page.area(),0,"HTML"_);
+
+    HTMLTest() {
+        window.localShortcut(Escape).connect(&exit);
+        page.contentChanged.connect(&window, &Window::render);
+        page.go(""_);
+    }
+} test;
+#endif
+
+#if 1
 #include "process.h"
 #include "window.h"
 #include "feeds.h"
@@ -28,6 +44,7 @@ struct FeedsTest {
     Window window __(&feeds,0,"Feeds"_);
     Window browser __(0,0,"Browser"_);
     FeedsTest() {
+        window.localShortcut(Escape).connect(&exit);
         feeds.listChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&FeedsTest::showPage);
         browser.localShortcut(Escape).connect(&browser, &Window::destroy);
@@ -45,6 +62,7 @@ struct FeedsTest {
         browser.widget=&page.area(); browser.show();
     }
 } application;
+#endif
 
 #if 0
 #include "process.h"
@@ -634,21 +652,6 @@ struct Book {
     void next() { pdf.delta.y -= window.size.y/2; window.render(); save(); }
     void save() { writeFile("Books/.last"_,string(file+"\0"_+dec(pdf.delta.y))); }
 } application;
-#endif
-
-#if 0
-#include "window.h"
-#include "html.h"
-struct HTMLTest {
-    Scroll<HTML> page;
-    Window window __(&page.area(),0,"HTML"_);
-
-    HTMLTest() {
-        window.localShortcut(Escape).connect(&exit);
-        page.contentChanged.connect(&window, &Window::render);
-        page.go("http://feedproxy.google.com/~r/Phoronix/~3/LdcmrpZu6FA/vr.php"_);
-    }
-} test;
 #endif
 
 #if 0

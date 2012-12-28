@@ -36,7 +36,7 @@ struct Element {
     /// Collects text content of descendants matching path
     string text(const ref<byte>& path) const;
     /// Returns element as parseable string
-    string str(const ref<byte>& prefix=""_) const;
+    string str(uint depth=0) const;
 };
 string str(const Element& e);
 

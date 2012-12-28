@@ -128,6 +128,7 @@ URL::URL(const ref<byte>& url) {
     fragment = string(s.untilEnd());
 }
 URL URL::relative(URL&& url) const {
+    if(!url.scheme && !url.host && !startsWith(url.path,"/"_) && path.contains('/')) url.path = section(path,'/',0,-2)+"/"_+url.path;
     if(!url.scheme) url.scheme=copy(scheme);
     if(!url.host) url.host=copy(host);
     if(startsWith(url.path,"."_)) url.path.removeAt(0);
@@ -142,7 +143,7 @@ string str(const URL& url) {
 template<class T> uint DataStream<T>::available(uint need) {
     while(need>Data::available(need) && T::poll()) {
         array<byte> chunk = T::readUpTo(max(4096u,need-Data::available(need)));
-        if(!chunk) { error("Empty chunk",Data::available(need),need); break; }
+        if(!chunk) { log("Empty chunk",Data::available(need),need); break; }
         buffer << chunk;
     }
     return Data::available(need);
@@ -183,8 +184,9 @@ void HTTP::header() {
     else if(status==400) log("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
     else if(status==404) log("Not Found"_,url);
     else if(status==408) log("Request timeout"_);
+    else if(status==502) log("Bad gateway"_);
     else if(status==504) log("Gateway timeout"_);
-    else { warn("Unhandled status",status,"from",url); state=Done; free(this); return; }
+    else { log("Unhandled status",status,"from",url); state=Done; free(this); return; }
 
     // Headers
     while(!match("\r\n"_)) {
@@ -218,10 +220,9 @@ void HTTP::event() {
         }
         else if(chunked) {
             do {
-                if(!chunkSize) { chunkSize = hexadecimal(); match("\r\n"_); } //else already parsed
+                if(chunkSize<=0) { chunkSize = hexadecimal(); match("\r\n"_); } //else already parsed
                 if(chunkSize==0) { state=Cache; break; }
-                assert(chunkSize>0,chunkSize,buffer);
-                if(available(chunkSize+2)<uint(chunkSize+2)) return;
+                if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return;
                 content << Data::read(chunkSize); match("\r\n"_);
                 chunkSize=0;
             } while(Data::available(3)>=3);
@@ -252,6 +253,7 @@ void getURL(URL&& url, Handler handler, int maximumAge) {
     if(existsFile(file,cache())) {
         long modified = modifiedTime(file,cache());
         if(currentTime()-modified < maximumAge*60) {
+            log("Cached", url);
             handler(url,Map(file,cache()));
             return;
         }
