@@ -36,8 +36,7 @@ LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_player = avformat avcodec
-LIBS_gl = GL
-LIBS_window = X11
+LIBS_gl = X11 GL
 LIBS_sampler = fftw3f_threads
 LIBS_record = swscale avformat
 #LIBS_test = fftw3f_threads
@@ -96,7 +95,8 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	@#$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	$(CC) $(LIBS:%=/usr/lib/lib%.a) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
