@@ -1,7 +1,7 @@
 xkbcomp ~/.xkm $DISPLAY
-desktop &
+taskbar &
 for ((;;)) ; do
-	taskbar
-	pidof desktop || desktop &
+	desktop
+	pidof taskbar || taskbar &
 	sleep 1
 done

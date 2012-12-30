@@ -172,8 +172,7 @@ template<uint base> string itoa(int number, int pad) {
 }
 template string itoa<10>(int,int);
 
-#ifndef __arm
-string ftoa(double n, int precision, int exponent) {
+string ftoa(float n, int precision, int exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
@@ -181,4 +180,3 @@ string ftoa(double n, int precision, int exponent) {
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
     return (n>=0?""_:"-"_)+utoa<10>(abs(n))+(precision?"."_+utoa<10>(uint64(m*abs(n))%m,precision):string())+(e?"e-"_+str(e):string());
 }
-#endif

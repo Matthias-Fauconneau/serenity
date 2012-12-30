@@ -86,7 +86,7 @@ Date::Date(long time) {
     }
 
     debug(invariant();)
-    assert(long(*this)==time, long(*this)/60.0, time/60.0, seconds, time%60);
+    assert(long(*this)==time);
 }
 Date::operator long() const {
     debug(invariant();)

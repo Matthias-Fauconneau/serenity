@@ -70,12 +70,9 @@ inline string str(const long& n) { return dec(n); }
 inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
 template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 
-#ifndef __arm
 /// Converts floating-point numbers
-string ftoa(double number, int precision=2, int exponent=10);
+string ftoa(float number, int precision=2, int exponent=10);
 inline string str(const float& n) { return ftoa(n); }
-inline string str(const double& n) { return ftoa(n); }
-#endif
 
 /// Converts references
 template<class T> string str(const unique<T>& t) { return str(*t.pointer); }

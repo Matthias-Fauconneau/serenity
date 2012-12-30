@@ -162,7 +162,7 @@ void Text::layout() {
             if(layoutLine.begin.column<textLine.size()) {
                 TextLayout::Character first = (line==layoutLine.begin.line) ? textLine[layoutLine.begin.column] : textLine.first();
                 TextLayout::Character last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size()) ? textLine[layoutLine.end.column] : textLine.last();
-                assert(first.pos.y == last.pos.y, first.pos, last.pos, textLine.size(), textLine[1].pos);
+                assert(first.pos.y == last.pos.y);
                 lines << Line __( int2(first.pos+vec2(0,1)), int2(last.pos+vec2(last.font?last.font->advance(last.index):0,2)));
             }
         }

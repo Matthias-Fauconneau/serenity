@@ -3,8 +3,8 @@ TARGET ?= test
 BUILD ?= fast
 
 ifeq ($(CC),cc)
- CC := g++ -fabi-version=0
- #CC := clang++ -Wno-lambda-extensions
+ #CC := g++ -fabi-version=0
+ CC := clang++ -Wno-lambda-extensions
 endif
 
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
@@ -15,8 +15,8 @@ FLAGS_font = -I/usr/include/freetype2
 
 CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 #CC += -Wno-volatile-register-var
-CC += -march=native
-#CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
+#CC += -march=native
+CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -95,7 +95,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	@g++ $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png

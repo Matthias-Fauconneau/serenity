@@ -280,8 +280,6 @@ struct Synthesizer : VBox {
     const float g = (1/(2*r)) / (1/d); //dissipation along indirect path (relative to direct path)
     Delay echo __(M);
 
-    Synthesizer() { log(M,g); }
-
     void noteEvent(uint key, uint velocity) {
         if(velocity) {
             if(!strings.contains(key)) strings.insert(key, String __(rate, key, velocity));
