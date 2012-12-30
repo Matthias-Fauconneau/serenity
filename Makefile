@@ -7,16 +7,16 @@ ifeq ($(CC),cc)
  #CC := clang++ -Wno-lambda-extensions
 endif
 
-CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
-#CC += -Wno-volatile-register-var
-CC += -march=native
-#CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
-
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 FLAGS_font = -I/usr/include/freetype2
+
+CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
+#CC += -Wno-volatile-register-var
+CC += -march=native
+#CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -105,4 +105,4 @@ install_%.desktop: %.desktop
 	@cp $< $(PREFIX)/share/applications/
 
 install: all $(INSTALL:%=install_%)
-	@mv $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)
+	@mv $(BUILD)/$(TARGET) $(PREFIX)/local/bin/$(TARGET)

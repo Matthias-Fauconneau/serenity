@@ -39,6 +39,7 @@ struct Widget {
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted
     virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
+    virtual bool keyRelease(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
 };
 
 /// Current widget that has the keyboard input focus

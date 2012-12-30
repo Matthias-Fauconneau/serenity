@@ -4,13 +4,14 @@
 #include "file.h"
 #include "function.h"
 
+#define THREAD 1
 #if THREAD
 extern "C" {
 typedef unsigned long int pthread_t;
 struct pthread_mutex { int lock; uint count; int owner; uint nusers; int kind, spins; void* prev,*next; };
 struct pthread_cond { int lock; uint futex; uint64 total_seq, wakeup_seq, woken_seq; void* mutex; uint nwaiters; uint broadcast_seq; };
-int pthread_create(pthread* thread, void* attr, void *(*start_routine)(void*), void* arg);
-int pthread_join(pthread thread, void **status);
+int pthread_create(pthread_t* thread, void* attr, void *(*start_routine)(void*), void* arg);
+int pthread_join(pthread_t thread, void **status);
 int pthread_mutex_init(pthread_mutex* mutex, const void* attr);
 int pthread_mutex_trylock(pthread_mutex* mutex);
 int pthread_mutex_lock(pthread_mutex* mutex);
@@ -52,7 +53,7 @@ struct Semaphore {
     Semaphore(int count=0) : counter(count) { pthread( pthread_cond_init(&condition,0); ) }
     /// Acquires \a count ressources
     inline void acquire(int count) {
-        pthread( while(counter<count) pthread_cond_wait(&condition,&mutex); )
+        pthread( while(counter<count) pthread_cond_wait(&condition,&mutex.mutex); )
         counter-=count; assert(counter>=0);
     }
     /// Atomically tries to acquires \a count ressources only if available
@@ -132,7 +133,7 @@ template<int N=8> struct parallel {
         return 0;
     }
     template<class F> parallel(uint iterationCount, F f) : iterationCount(iterationCount), delegate(f) {
-        pthread threads[N-1];
+        pthread_t threads[N-1];
         for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,(void*(*)(void*))start_routine,this);
         start_routine(this);
         for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }

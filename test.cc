@@ -33,7 +33,7 @@ struct HTMLTest {
 } test;
 #endif
 
-#if 1
+#if 0
 #include "process.h"
 #include "window.h"
 #include "feeds.h"
@@ -64,7 +64,7 @@ struct FeedsTest {
 } application;
 #endif
 
-#if 0
+#if 1
 #include "process.h"
 #include "window.h"
 #include "display.h"
@@ -72,7 +72,9 @@ struct FeedsTest {
 #include "asound.h"
 #include "text.h"
 #include "layout.h"
+#if FFTW
 #include <fftw3.h>
+#endif
 
 /// Trigonometric builtins
 const double PI = 3.14159265358979323846;
@@ -197,7 +199,7 @@ struct LowPass {
 struct Delay {
     float* buffer=0;
 	uint index=0, delay=0;
-    Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { clear(buffer,delay); }
+    Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { assert(delay>0 && delay<=65536); clear(buffer,delay); }
     move_operator(Delay):buffer(o.buffer),index(o.index),delay(o.delay){o.buffer=0;}
     ~Delay() { if(buffer) unallocate(buffer,delay); }
     operator float() { return buffer[index]; }
@@ -261,10 +263,24 @@ struct String : Note, Widget {
 
 /// Manages a synthesized instrument
 struct Synthesizer : VBox {
-    const uint rate = 96000;
-    signal<float* /*data*/, uint /*size*/> frameReady;
+    // Display strings
     signal<> contentChanged;
+    int2 sizeHint() { return int2(-1,4*256); }
+
+    static constexpr uint rate = 48000; //96000
+    signal<float* /*data*/, uint /*size*/> frameReady;
     map<uint, String> strings; // one string per key
+
+    const float h = 50; //m distance from floor/wall/ceiling (TODO: compute from geometry + source + target)
+    const float d = 50; //m distance from source
+    const float r = sqrt(sqr(h) + sqrt(d/2)); //m half indirect distance
+    const float c = 340; //m/s speed of sound
+    const float T = 1./rate; //s sampling interval
+    const uint M = (2*r - d) / (c*T); //sample count in delay line
+    const float g = (1/(2*r)) / (1/d); //dissipation along indirect path (relative to direct path)
+    Delay echo __(M);
+
+    Synthesizer() { log(M,g); }
 
     void noteEvent(uint key, uint velocity) {
         if(velocity) {
@@ -277,8 +293,7 @@ struct Synthesizer : VBox {
         }
     }
 
-    int2 sizeHint() { return int2(-1,4*256); }
-    bool read(int32* output, uint periodSize) {
+    bool read(int16/*int32*/* output, uint periodSize) {
         float buffer[2*periodSize];
         ::clear(buffer,2*periodSize);
 
@@ -288,10 +303,19 @@ struct Synthesizer : VBox {
             else { strings.keys.removeAt(i); strings.values.removeAt(i); clear(); if(strings) *this << &strings.values.last(); }
         }
 
-        //TODO: simulated (i.e not sampled convolution) reverb
+        // Echo
+        for(uint i: range(periodSize)) {
+            float direct = buffer[2*i];
+            float indirect = g*echo;
+            echo(direct);
+            buffer[2*i+1]=buffer[2*i] = direct + indirect;
+        }
 
-        for(uint i: range(2*periodSize)) buffer[i] *= 0x1p28f;
+        //TODO: reverb
+
+        for(uint i: range(2*periodSize)) buffer[i] *= 0x1p28f; //32bit
         frameReady(buffer,periodSize);
+        for(uint i: range(2*periodSize)) buffer[i] /= 0x1p16f; //16bit
         for(uint i: range(2*periodSize)) output[i] = buffer[i]; // Converts buffer to signed 32bit output
         contentChanged(); //FIXME: rate limit
         return true;
@@ -338,53 +362,28 @@ struct Keyboard : Widget {
     }
 };
 
-/// Displays information on the played samples
-struct SynthesizerTest : Widget {
-    Thread thread;
-    Sequencer input __(thread);
-    Synthesizer synthesizer;
-    AudioOutput audio __({&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024, thread);
-
-    Keyboard keyboard;
-    VBox layout;
-    Window window __(&layout,int2(0,0),"Synthesizer"_);
-
+#if FFTW
+struct Spectrogram : Widget {
     float* buffer;
     float* hann;
     float* windowed;
     float* spectrum;
     const uint T = 1050;
-    uint N = audio.rate; //*8 to get lowest notes
+    uint N = audio.rate;
     const uint Y = 1050;
     uint t=0;
     float max=0x1p24f;
     Image spectrogram __(T,Y);
 
-    int lastVelocity=0;
-
-    SynthesizerTest() {
-        layout << &synthesizer << this << &keyboard;
-
-        synthesizer.frameReady.connect(this,&SynthesizerTest::viewFrame);
-        synthesizer.contentChanged.connect(&window,&Window::render);
-
-        input.noteEvent.connect(&synthesizer,&Synthesizer::noteEvent);
-        input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
-        keyboard.contentChanged.connect(&window,&Window::render);
-
-        window.backgroundCenter=window.backgroundColor=1;
-        window.localShortcut(Escape).connect(&exit);
-
+    Spectrogram() {
         fftwf_init_threads();
         fftwf_plan_with_nthreads(4);
         buffer = allocate64<float>(N); clear(buffer,N);
         hann = allocate64<float>(N); for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2;
         windowed = allocate64<float>(N);
         spectrum = allocate64<float>(N);
-
-        audio.start();
-        thread.spawn();
     }
+
     void viewFrame(float* data, uint size) {
         for(uint i: range(N-size)) buffer[i] = buffer[i+size]; // Shifts buffer
         for(uint i: range(size)) buffer[N-size+i] = data[i*2+0]+data[i*2+1]; // Appends latest frame
@@ -418,6 +417,65 @@ struct SynthesizerTest : Widget {
     }
     int2 sizeHint() { return int2(T,Y); }
     void render(int2 position, int2) { blit(position,spectrogram); }
+};
+#endif
+
+/// Dummy input for testing without a MIDI keyboard
+struct KeyboardInput : Widget {
+    signal<uint,uint> noteEvent;
+    bool keyPress(Key key, Modifiers) override {
+        int i = "awsedftgyhujkolp;']\\"_.indexOf(key);
+        if(i>=0) noteEvent(60+i,100);
+        return false;
+    }
+    bool keyRelease(Key key, Modifiers) override {
+        int i = "awsedftgyhujkolp;']\\"_.indexOf(key);
+        if(i>=0) noteEvent(60+i,0);
+        return false;
+    }
+    void render(int2, int2){};
+};
+
+/// Displays information on the played samples
+struct SynthesizerTest {
+    //Thread thread;
+    //Sequencer input; //__(thread);
+    KeyboardInput input;
+    Synthesizer synthesizer;
+    AudioOutput audio __({&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024);
+
+    VBox layout;
+    Window window __(&layout,int2(0,/*0*/512),"Synthesizer"_);
+
+#if FFTW
+    Spectrogram spectrogram;
+#endif
+    Keyboard keyboard;
+
+    SynthesizerTest() {
+        window.backgroundCenter=window.backgroundColor=1;
+        window.localShortcut(Escape).connect(&exit);
+        focus=&input;
+
+        // Synthesizer
+        layout << &synthesizer;
+        synthesizer.contentChanged.connect(&window,&Window::render);
+        input.noteEvent.connect(&synthesizer,&Synthesizer::noteEvent);
+
+        // Spectrogram
+#if FFTW
+        synthesizer.frameReady.connect(&spectrogram,&Spectrogram::viewFrame);
+        layout << this;
+#endif
+
+        // Keyboard
+        input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+        keyboard.contentChanged.connect(&window,&Window::render);
+        layout << &keyboard;
+
+        audio.start();
+        //thread.spawn();
+    }
 } test;
 
 #endif
