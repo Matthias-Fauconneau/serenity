@@ -83,19 +83,20 @@ struct FFmpegMedia : AudioMedia {
                 if(audio->sample_fmt == AV_SAMPLE_FMT_FLT) {
                     float2* input = (float2*)frame.data[0];
                     uint size = min(inputSize,outputSize);
-                    for(uint i: range(size)) output[i] = input[i]*(float2){0x1p31,0x1p31};
+                    for(uint i: range(size)) output[i] = input[i];
                     if(inputSize > outputSize) {
-                        for(uint i: range(inputSize-outputSize)) buffer[i] = input[outputSize+i]*(float2){0x1p31,0x1p31};
+                        for(uint i: range(inputSize-outputSize)) buffer[i] = input[outputSize+i];
                         buffer.size += inputSize-outputSize;
                     }
                     outputSize -= size; output+=size;
                 } else {
                     int16* input = (int16*)frame.data[0];
                     uint size = min(inputSize,outputSize);
-                    for(uint i: range(size)) output[i] = (float2){0x1p16f*input[2*i+0], 0x1p16f*input[2*i+1]};
+		    const float scale = 0x1p-15f;
+                    for(uint i: range(size)) output[i] = (float2){scale*input[2*i+0], scale*input[2*i+1]};
                     if(inputSize > outputSize) {
                         for(uint i: range(inputSize-outputSize))
-                            buffer[i] = (float2){0x1p16f*input[2*(outputSize+i)+0], 0x1p16f*input[2*(outputSize+i)+1]};
+                            buffer[i] = (float2){scale*input[2*(outputSize+i)+0], scale*input[2*(outputSize+i)+1]};
                         buffer.size += inputSize-outputSize;
                     }
                     outputSize -= size; output+=size;
@@ -117,8 +118,8 @@ struct Player {
     AudioMedia* media=0;
     FFmpegMedia ffmpeg;
     Resampler resampler;
-    AudioOutput audio __({this,&Player::read}, 44100, 4096);
-    bool read(int32* output, uint size) {
+    AudioOutput audio __({this,&Player::read}, 48000, 4096);
+    bool read(AudioOutput::sample* output, uint size) {
         float buffer[2*size];
         uint inputSize = resampler?resampler.need(size):size;
         {int size=inputSize; for(float2* input=(float2*)buffer;;) {
@@ -131,7 +132,7 @@ struct Player {
         }}
         if(resampler) resampler.filter<false>(buffer,inputSize,buffer,size);
         assert(size%4==0);
-        for(uint i: range(size*2)) output[i] = buffer[i];
+        for(uint i: range(size*2)) output[i] = AudioOutput::sampleRange * buffer[i];
         update(media->position(),media->duration());
         return true;
     }

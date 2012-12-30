@@ -48,7 +48,7 @@ void Favicon::update() {
     imageChanged();
 }
 
-void Feeds::loadFeed(const URL& url, Map&& document) {
+void Feeds::loadFeed(const URL& url unused, Map&& document) {
     Element feed = parseXML(document);
     string link = feed.text("rss/channel/link"_);
     if(!link) link=string(feed("feed"_)("link"_)["href"_]);

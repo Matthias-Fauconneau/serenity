@@ -1,5 +1,6 @@
-Text Editor: mouse select, shift select, delete selection, X11 cut/copy
-IDE: text editor, syntax highlighting, build/run integration, parser(inherited attributes, scoped symbols, GLR), navigation, completion
-Touchbook: fast render, fix touchscreen, rotate screen, accelerometer trigger, onscreen keyboard, handwriting recognition
+update PDF viewer
 Music: Physical modeling synthesis
 CG: Trees: improve branches using environment modeling (light and space competition), Textures: bark,leafs,twigs, Export .obj
+Touchbook: fast render, fix touchscreen, rotate screen, accelerometer trigger, onscreen keyboard, handwriting recognition
+Text Editor: mouse select, shift select, delete selection, X11 cut/copy
+IDE: text editor, syntax highlighting, build/run integration, parser(inherited attributes, scoped symbols, GLR), navigation, completion

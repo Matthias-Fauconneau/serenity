@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
-# Copyright (C) 2009 Alexander Kl"aser
+# Copyright (C) 2009 Alexander Klaser
 # 
 # This piece is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

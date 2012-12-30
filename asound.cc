@@ -45,23 +45,23 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-AudioOutput::AudioOutput(function<bool(int32* output, uint size)> read, uint rate, uint periodSize, Thread& thread)
+AudioOutput::AudioOutput(function<bool(AudioOutput::sample* output, uint size)> read, uint rate, uint periodSize, Thread& thread)
     : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
-    hparams.mask(Format).set(S32_LE);
+    hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
     hparams.mask(SubFormat).set(Standard);
-    hparams.interval(SampleBits) = 32;
-    hparams.interval(FrameBits) = 32*channels;
+    hparams.interval(SampleBits) = sampleBits;
+    hparams.interval(FrameBits) = sampleBits*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
     hparams.interval(Periods) = 2;
-    hparams.interval(PeriodSize)=periodSize,
+    hparams.interval(PeriodSize) = periodSize,
     iowr<HW_PARAMS>(hparams);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * this->periodSize;
-    buffer= (int32*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * sizeof(int32), Map::Write)).data);
+    buffer= (sample*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * sizeof(sample), Map::Write)).data);
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Read|Map::Write)).data);
 }

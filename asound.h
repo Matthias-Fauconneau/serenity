@@ -5,10 +5,16 @@
 
 /// Audio output through ALSA PCM interface
 struct AudioOutput : Device, Poll {
+    typedef int16 sample;
+    static constexpr uint sampleBits = sizeof(sample)*8;
+    static constexpr int sampleRange = 1<<(sizeof(sample)*8-1);
+    uint channels = 2, rate;
+    uint periodSize, bufferSize;
+
     /// Configures PCM output
     /// \note read will be called back periodically to fill \a output with \a size samples
     /// \note if \a realtime is set, \a read will be called from a separate thread
-    AudioOutput(function<bool(int32* output, uint size)> read, uint rate=44100, uint periodSize=4096, Thread& thread=mainThread());
+    AudioOutput(function<bool(AudioOutput::sample* output, uint size)> read, uint rate=44100, uint periodSize=4096, Thread& thread=mainThread());
     /// Starts audio output, will require data periodically from \a read callback
     void start();
     /// Drains audio output and stop requiring data from \a read callback
@@ -16,12 +22,10 @@ struct AudioOutput : Device, Poll {
     /// Callback for poll events
     void event();
 
-    uint channels = 2, rate;
-    uint periodSize, bufferSize;
 private:
     Map maps[3];
-    int32* buffer = 0;
+    sample* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
-    function<bool(int32* output, uint size)> read;
+    function<bool(sample* output, uint size)> read;
 };

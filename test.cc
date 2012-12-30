@@ -1,4 +1,4 @@
-#if 1
+#if 0
 #include "process.h"
 struct LogTest {
     LogTest(){ log("Hello World"_); }

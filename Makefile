@@ -4,13 +4,13 @@ BUILD ?= fast
 
 ifeq ($(CC),cc)
  #CC := g++ -fabi-version=0
- CC := clang++ -static -Wno-lambda-extensions
+ CC := clang++ -Wno-lambda-extensions
 endif
 
 CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 #CC += -Wno-volatile-register-var
-#CC += -march=native
-CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
+CC += -march=native
+#CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
@@ -62,7 +62,7 @@ prepare:
 	@ln -sf $(TARGET).files serenity.files
 
 %.l: %.d
-	@python dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
+	@python3 dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(BUILD)/$(TARGET).l
