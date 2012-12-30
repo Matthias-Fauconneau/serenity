@@ -45,8 +45,8 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-AudioOutput::AudioOutput(function<bool(AudioOutput::sample* output, uint size)> read, uint rate, uint periodSize, Thread& thread)
-    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread), read(read) {
+AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
+    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
@@ -58,20 +58,22 @@ AudioOutput::AudioOutput(function<bool(AudioOutput::sample* output, uint size)> 
     hparams.interval(Periods) = 2;
     hparams.interval(PeriodSize) = periodSize,
     iowr<HW_PARAMS>(hparams);
+    this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * this->periodSize;
-    buffer= (sample*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * sizeof(sample), Map::Write)).data);
+    buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Write)).data);
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Read|Map::Write)).data);
 }
-void AudioOutput::start() { if(status->state != Prepared) io<PREPARE>(); registerPoll(); }
+void AudioOutput::start() { if(status->state != Prepared && status->state != Running) io<PREPARE>(); registerPoll(); }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
     if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
-        if(!read(buffer+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
+        if(sampleBits==16 && !read16(((int16*)buffer)+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
+        if(sampleBits==32 && !read32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
         control->swPointer += periodSize;
     }
     if(status->state == Prepared) { io<START>(); }

@@ -3,8 +3,8 @@ TARGET ?= test
 BUILD ?= fast
 
 ifeq ($(CC),cc)
- #CC := g++ -fabi-version=0
- CC := clang++ -Wno-lambda-extensions
+ CC := g++ -fabi-version=0
+ #CC := clang++ -Wno-lambda-extensions
 endif
 
 CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
@@ -100,10 +100,10 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
-	cp $< $(PREFIX)/share/icons/hicolor/32x32/apps
+	@cp $< $(PREFIX)/share/icons/hicolor/32x32/apps
 
 install_%.desktop: %.desktop
-	cp $< $(PREFIX)/share/applications/
+	@cp $< $(PREFIX)/share/applications/
 
 install: all $(INSTALL:%=install_%)
-	mv $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)
+	@mv $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)

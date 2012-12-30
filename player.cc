@@ -92,11 +92,10 @@ struct FFmpegMedia : AudioMedia {
                 } else {
                     int16* input = (int16*)frame.data[0];
                     uint size = min(inputSize,outputSize);
-		    const float scale = 0x1p-15f;
-                    for(uint i: range(size)) output[i] = (float2){scale*input[2*i+0], scale*input[2*i+1]};
+                    for(uint i: range(size)) output[i] = (float2){ (float)input[2*i+0], (float)input[2*i+1] };
                     if(inputSize > outputSize) {
                         for(uint i: range(inputSize-outputSize))
-                            buffer[i] = (float2){scale*input[2*(outputSize+i)+0], scale*input[2*(outputSize+i)+1]};
+                            buffer[i] = (float2){ (float)input[2*(outputSize+i)+0], (float)input[2*(outputSize+i)+1] };
                         buffer.size += inputSize-outputSize;
                     }
                     outputSize -= size; output+=size;
@@ -119,7 +118,7 @@ struct Player {
     FFmpegMedia ffmpeg;
     Resampler resampler;
     AudioOutput audio __({this,&Player::read}, 48000, 4096);
-    bool read(AudioOutput::sample* output, uint size) {
+    bool read(int16* output, uint size) {
         float buffer[2*size];
         uint inputSize = resampler?resampler.need(size):size;
         {int size=inputSize; for(float2* input=(float2*)buffer;;) {
@@ -132,7 +131,7 @@ struct Player {
         }}
         if(resampler) resampler.filter<false>(buffer,inputSize,buffer,size);
         assert(size%4==0);
-        for(uint i: range(size*2)) output[i] = AudioOutput::sampleRange * buffer[i];
+        for(uint i: range(size*2)) output[i] = buffer[i];
         update(media->position(),media->duration());
         return true;
     }
@@ -232,7 +231,6 @@ struct Player {
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        if(playButton.enabled==play) return;
         if(play) { audio.start(); window.setIcon(playIcon()); }
         else { audio.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play; window.render();

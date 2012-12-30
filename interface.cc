@@ -33,10 +33,10 @@ int2 Progress::sizeHint() { return int2(-height,height); }
 void Progress::render(int2 position, int2 size) {
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = size.x*uint(value-minimum)/uint(maximum-minimum);
-        fill(position+Rect(int2(0,1), int2(x,size.y-2)), lighten);
-        fill(position+Rect(int2(x,1), int2(size.x,size.y-2)), darken);
+        fill(position+Rect(int2(0,1), int2(x,size.y-2)), highlight);
+        fill(position+Rect(int2(x,1), int2(size.x,size.y-2)), darkGray);
     } else {
-        fill(position+Rect(0, size), darken);
+        fill(position+Rect(0, size), darkGray);
     }
 }
 

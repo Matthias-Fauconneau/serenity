@@ -20,8 +20,6 @@ constexpr vec4 black __(0, 0, 0, 1);
 constexpr vec4 darkGray __(13./16, 13./16, 13./16, 1);
 constexpr vec4 lightGray __(15./16, 15./16, 15./16, 1);
 constexpr vec4 white __(1, 1, 1, 1);
-constexpr vec4 darken __(0, 0, 0, 0);
-constexpr vec4 lighten __(1, 1, 1, 1./4);
 constexpr vec4 highlight __(8./16, 12./16, 14./16, 1);
 constexpr vec4 blue __(0, 0, 1, 1);
 constexpr vec4 cyan __(0, 1, 1, 1);

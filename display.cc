@@ -16,7 +16,7 @@ SHADER(blit);
 void fill(Rect rect, vec4 color) {
     rect = rect & currentClip;
     if(softwareRendering) {
-        int4 color8 = int4(color.z*255,color.y*255,color.x*255,color.w*255);
+        int4 color8 = int4(color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
         if(color8.a == 0xFF) {
             for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = byte4(color8);
         } else {
@@ -37,7 +37,7 @@ void fill(Rect rect, vec4 color) {
 void blit(int2 target, const Image& source, vec4 color) {
     Rect rect = (target+Rect(source.size())) & currentClip;
     if(softwareRendering) {
-        int4 color8 = int4(color.z*255,color.y*255,color.x*255,color.w*255);
+        int4 color8 = int4(color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
         if(source.alpha) {
             for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
                 byte4 s = source(x-target.x,y-target.y); int a=color8.a*int(s.a)/0xFF;

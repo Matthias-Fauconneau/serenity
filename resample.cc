@@ -38,7 +38,7 @@ inline float product(const float* kernel, const float* signal, int len) {
 #else
     sum += _mm_movehl_ps(sum,sum);
     sum += _mm_shuffle_ps(sum, sum, 0x55);
-    return extract(sum, 0);
+    return _mm_cvtss_f32(sum);
 #endif
 }
 
