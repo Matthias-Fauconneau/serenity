@@ -61,8 +61,8 @@ void HTML::load(const URL& url, Map&& document) {
                 else if(!e.name.contains(':')) log("Unknown HTML tag",e.name);
                 return false;
         });
-        if(score>max) best=&e, second=max, max=score;
-        else if(score>second) second=score;
+        if(score>=max) best=&e, second=max, max=score;
+        else if(score>=second) second=score;
         return true;
     });
     while(best->name=="a"_ && best->children.size()==1) best=&best->children.first();

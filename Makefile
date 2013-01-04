@@ -1,6 +1,6 @@
 PREFIX ?= /usr
 TARGET ?= test
-BUILD ?= fast
+BUILD ?= release
 
 ifeq ($(CC),cc)
  #CC := g++ -fabi-version=0
@@ -15,8 +15,8 @@ FLAGS_font = -I/usr/include/freetype2
 
 CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 #CC += -Wno-volatile-register-var
-#CC += -march=native
-CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
+CC += -march=native
+#CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -105,4 +105,4 @@ install_%.desktop: %.desktop
 	@cp $< $(PREFIX)/share/applications/
 
 install: all $(INSTALL:%=install_%)
-	@mv $(BUILD)/$(TARGET) $(PREFIX)/local/bin/$(TARGET)
+	@mv $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)

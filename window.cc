@@ -137,7 +137,7 @@ void Window::event() {
             int2 hint = widget->sizeHint();
             if(hint != size) { setSize(hint); return; }
         }
-        assert(mapped); assert(size);
+        assert(size);
         currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
@@ -276,14 +276,17 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key)) render();
         }
         else if(type==ButtonRelease) drag=0;
-        else if(type==KeyPress || type==KeyRelease) {
+        else if(type==KeyPress) {
             uint key = KeySym(e.key, e.state);
-            if(focus && ((type==KeyPress && focus->keyPress((Key)key, (Modifiers)e.state)) ||
-                         (type==KeyRelease && focus->keyRelease((Key)key, (Modifiers)e.state))) ) render(); //normal keyPress event
+            if(focus && focus->keyPress((Key)key, (Modifiers)e.state)) render(); //normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
                 if(shortcut) (*shortcut)(); //local window shortcut
             }
+        }
+        else if(type==KeyRelease) {
+            uint key = KeySym(e.key, e.state);
+            if(focus && focus->keyRelease((Key)key, (Modifiers)e.state)) render();
         }
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();

@@ -83,6 +83,7 @@ inline float sin(float t) { return __builtin_sinf(t); }
 inline float log2(float x) { return __builtin_log2f(x); }
 inline float exp2(float x) { return __builtin_exp2f(x); }
 
+/// Displays a plot of Y
 template<class Array> void plot(int2 position, int2 size, const Array& Y) {
     float min=-1, max=1;
     for(uint x: range(Y.size())) {
@@ -101,6 +102,7 @@ template<class Array> void subplot(int2 position, int2 size, uint w, uint h, uin
     int2 subplot = int2(size.x/w,size.y/h);
     plot(position+int2(i%w,i/w)*subplot, subplot, Y);
 }
+
 /// Abstract base class for synthesized notes
 struct Note {
     uint rate, key, velocity;
@@ -110,80 +112,6 @@ struct Note {
 
     enum { Attack, Decay, Sustain, Release } state = Attack;
     virtual void release() { state=Release; }
-};
-
-// Analog synthesis
-
-struct LinearADSR : Note {
-    float amplitudeStep;
-    float amplitude = 0;
-    LinearADSR(uint rate, uint key, uint velocity):Note(rate, key, velocity),amplitudeStep(1./rate){}
-    bool next() {
-        if(state==Attack) {
-            amplitude += amplitudeStep;
-            if(amplitude >= 1) amplitude=1, state=Decay;
-        }
-        /*else if(state==Decay) {
-        amplitude -= amplitudeStep;
-        if(amplitude <= 1./2) amplitude=1./2, state=Sustain;
-        }*/ else if(state==Release) {
-            amplitude -= amplitudeStep;
-            if(amplitude<=0) return false;
-        }
-        return true;
-    }
-};
-
-struct Square : LinearADSR {
-    float x=0;
-    float step;
-    Square(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(2/Note::period()/*-1 / 1 in one period*/){}
-    bool read(float* buffer, uint periodSize) override {
-        for(uint i : range(periodSize)) {
-            float sample = amplitude*(x > 0);
-            buffer[2*i+0] += sample, buffer[2*i+1] += sample;
-
-            x += step;
-            if(x >= 1) x = -1;
-
-            if(!next()) return false;
-        }
-        return true;
-    }
-};
-
-struct Saw : LinearADSR {
-    float y=0;
-    float step;
-    Saw(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(4/Note::period()/*-1 to 1 to -1 in one period*/){}
-    bool read(float* buffer, uint periodSize) override {
-        for(uint i : range(periodSize)) {
-            float sample = amplitude*y;
-            buffer[2*i+0] += sample, buffer[2*i+1] += sample;
-
-            y += step;
-            if(y >= 1) y = 1, step = -step;
-            if(y <= -1) y = -1, step = -step;
-
-            if(!next()) return false;
-        }
-        return true;
-    }
-};
-
-struct Sinus : LinearADSR {
-    float angle=0;
-    float step;
-    Sinus(uint rate, uint key, uint velocity) : LinearADSR(rate, key, velocity), step(2*PI/Note::period()){}
-    bool read(float* buffer, uint periodSize) override {
-        for(uint i : range(periodSize)) {
-            float sample = amplitude*sin(angle);
-            buffer[2*i+0] += sample, buffer[2*i+1] += sample;
-            angle += step;
-            if(!next()) return false;
-        }
-        return true;
-    }
 };
 
 // Physical modeling synthesis
@@ -219,17 +147,18 @@ struct String : Note, Widget {
     float zero;
     String(uint rate, uint key, uint velocity) : Note(rate, key, velocity), L(Note::period()/2+1), delay1(L), delay2(L), pickup(L/4) {}
     void pluck() {
+        zero -= delay1[pickup] + delay2[pickup]; // avoid discontinuity (FIXME)
         const uint pluck = L/8; // position on the string of the maximum of the triangle excitation
         for(uint x: range(0,pluck)) {
-            delay1[x] = float(x)/pluck/2;
-            delay2[L-1-x] = float(x)/pluck/2;
+            float e = float(x)/pluck/2;
+            delay1[x] += e, delay2[L-1-x] += e;
         }
-        //FIXME: smooth triangle profile (avoid aliasing on attack)
+        //FIXME: low pass pluck profile to avoid aliasing on attack | propagate acceleration/curvature impulse
         for(uint x: range(pluck,L)) {
-            delay1[x] = float(L-x)/(L-1-pluck)/2;
-            delay2[L-1-x] = float(L-x)/(L-1-pluck)/2;
+            float e = float(L-x)/(L-1-pluck)/2;
+            delay1[x] += e, delay2[L-1-x] += e;
         }
-        zero = delay1[pickup] + delay2[pickup]; //avoid discontinuity at first sample
+        zero += delay1[pickup] + delay2[pickup]; //avoid discontinuity (FIXME)
     }
     void release() { Note::release(); loss.b0=loss.b1= 1./2 * (1-2.f*L/rate); }
     bool read(float* buffer, uint periodSize) {

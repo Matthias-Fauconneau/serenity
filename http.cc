@@ -116,7 +116,7 @@ string base64(const ref<byte>& input) {
     return output;
 }
 URL::URL(const ref<byte>& url) {
-    if(!url) { warn("Empty URL"); return; }
+    if(!url) { log("Empty URL"); return; }
     TextData s(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path

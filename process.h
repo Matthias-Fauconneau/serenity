@@ -109,6 +109,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     Map stack;
 
     Thread(int priority=0);
+    ~Thread(){Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/}
     /// Spawns a thread running an event loop with the given \a priority
     pthread( void spawn(); )
     /// Processes all events on \a polls and tasks on \a queue until #terminate is set
