@@ -7,7 +7,6 @@
 #include "layout.h"
 #include "window.h"
 #include "text.h"
-#include "simd.h"
 
 /// Virtual audio decoder interface
 struct AudioMedia {

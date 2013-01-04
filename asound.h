@@ -17,6 +17,7 @@ struct AudioOutput : Device, Poll {
     /// \note read will be called back periodically to fill \a output with \a size samples
     AudioOutput(function<bool(int32* output, uint size)> read, uint rate=44100, uint periodSize=4096, Thread& thread=mainThread()):
 	AudioOutput(32,rate,periodSize,thread) { read32=read; }
+    ~AudioOutput();
     /// Starts audio output, will require data periodically from \a read callback
     void start();
     /// Drains audio output and stop requiring data from \a read callback
@@ -25,11 +26,13 @@ struct AudioOutput : Device, Poll {
     void event();
 
 private:
-
     Map maps[3];
     void* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
     function<bool(int16* output, uint size)> read16 = [](int16*,uint){return false;};
     function<bool(int32* output, uint size)> read32 = [](int32*,uint){return false;};
+#ifndef MMAP
+    struct SyncPtr* syncPtr = 0;
+#endif
 };

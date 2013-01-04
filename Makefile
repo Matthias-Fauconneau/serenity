@@ -15,8 +15,8 @@ FLAGS_font = -I/usr/include/freetype2
 
 CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
 #CC += -Wno-volatile-register-var
-CC += -march=native
-#CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
+#CC += -march=native
+CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button

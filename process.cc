@@ -73,9 +73,11 @@ Thread& mainThread() { static Thread mainThread(20); return mainThread; }
 void yield() { sched_yield(); }
 int main() {
     mainThread().run();
+#if THREAD
     while(threads().size()) yield(); // Lets all threads return to event loop
     Locker lock(threadsLock());
     for(Thread* thread: threads()) if(thread!=&mainThread()) tgkill(getpid(),thread->tid,SIGKILL); // Kills any remaining thread
+#endif
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 

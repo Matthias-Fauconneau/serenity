@@ -45,6 +45,15 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
+// No direct memory access support on OMAP
+enum { HWSYNC=1<<0, APPL=1<<1, AVAIL_MIN=1<<2 };
+struct SyncPtr {
+    uint flags;
+    union { Status status; byte pad1[64]; };
+    union { Control control; byte pad2[64]; };
+};
+typedef IOWR<'A', 0x23,SyncPtr> SYNC_PTR;
+
 AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
     : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread) {
     HWParams hparams;
@@ -57,24 +66,43 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     hparams.interval(Rate) = rate;
     hparams.interval(Periods) = 2;
     hparams.interval(PeriodSize) = periodSize,
-    iowr<HW_PARAMS>(hparams);
+    log("HW_PARAMS"); iowr<HW_PARAMS>(hparams);
     this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Write)).data);
+#if MMAP
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Read|Map::Write)).data);
+#else
+    syncPtr = &heap<SyncPtr>();
+    status = &syncPtr->status, control = &syncPtr->control;
+#endif
 }
-void AudioOutput::start() { if(status->state != Prepared && status->state != Running) io<PREPARE>(); registerPoll(); }
-void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
+AudioOutput::~AudioOutput() {
+#ifndef MMAP
+    free(syncPtr);
+#define sync ({ syncPtr->flags=APPL|AVAIL_MIN; iowr<SYNC_PTR>(*syncPtr); })
+#else
+#define sync ({})
+#endif
+}
+void AudioOutput::start() { sync; if(status->state != Prepared && status->state != Running) log("PREPARE"), io<PREPARE>(); registerPoll(); }
+void AudioOutput::stop() { sync; if(status->state == Running) log("DRAIN"), io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
+    sync;
     if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         if(sampleBits==16 && !read16(((int16*)buffer)+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
         if(sampleBits==32 && !read32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
         control->swPointer += periodSize;
+#ifndef MMAP
+        //log("sync",status->hwPointer,control->swPointer,status->state);
+        //syncPtr->flags=HWSYNC; iowr<SYNC_PTR>(*syncPtr);
+        sync;
+#endif
     }
-    if(status->state == Prepared) { io<START>(); }
+    if(status->state == Prepared) { log("start"); io<START>(); }
 }
