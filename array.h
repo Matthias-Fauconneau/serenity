@@ -32,6 +32,8 @@ template<class T> struct array {
     explicit array(uint capacity){reserve(capacity); }
     /// Copies elements from a reference
     explicit array(const ref<T>& ref){reserve(ref.size); setSize(ref.size); for(uint i: range(ref.size)) new (&at(i)) T(ref[i]);}
+    /// Copies elements from a static array
+    template<size_t N> array(const T (&a)[N]):array(ref<T>(a,N)){}
     /// References \a size elements from read-only \a data pointer
     array(const T* data, uint size) : tag(-1) { buffer=__(data, size, 0); }
 
@@ -102,11 +104,17 @@ template<class T> struct array {
     array& operator <<(const ref<T>& a) { int old=size(); reserve(old+a.size); setSize(old+a.size); for(uint i: range(a.size)) new (&at(old+i)) T(copy(a[i])); return *this; }
     /// \}
 
-    /// \name Appends once (if not already contained) operators
+    /*/// \name Appends once (if not already contained) operators
     array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
     array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
     array& operator +=(const T& v) { if(!contains(v)) *this<< copy(v); return *this; }
     array& operator +=(const ref<T>& o) { for(const T& v: o) *this+= copy(v); return *this; }
+    /// \}*/
+    /// \name Appends once (if not already contained) operators
+    array& appendOnce(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
+    array& appendOnce(array&& b) { for(T& v: b) appendOnce(move(v)); return *this; }
+    array& appendOnce(const T& v) { if(!contains(v)) appendOnce(copy(v)); return *this; }
+    array& appendOnce(const ref<T>& o) { for(const T& v: o) appendOnce(copy(v)); return *this; }
     /// \}
 
     /// Inserts an element at \a index

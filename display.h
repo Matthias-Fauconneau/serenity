@@ -31,7 +31,7 @@ constexpr vec4 magenta __(1, 0, 1, 1);
 // Gamma correction
 struct SRGB {
     uint8 lookup[256];
-    inline float evaluate(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; }
+    inline float evaluate(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4f)-0.055; else return 12.92*c; }
     SRGB() { for(uint i=0;i<256;i++) { uint l = round(255*evaluate(i/255.f)); assert(l<256); lookup[i]=l; } }
     inline uint8 operator [](uint c) { assert(c<256,c); return lookup[c]; }
 };

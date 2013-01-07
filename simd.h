@@ -10,6 +10,16 @@ typedef float float4 __attribute((vector_size(16)));
 inline float4 load4(const float* p) { return *(float4*)p; }
 inline float4 load4u(const float* p) { return _mm_loadu_ps(p); }
 
+#if __clang__
+inline float extract(float4 v, int i) { return v[i]; }
+#else
+#if DEBUG
+#define extract(v,i) __builtin_ia32_vec_ext_v4sf(v,i)
+#else
+inline float extract(float4 v, int i) { return __builtin_ia32_vec_ext_v4sf(v,i); }
+#endif
+#endif
+
 // AVX intrinsics
 #if __AVX__
 #include "immintrin.h"

@@ -47,7 +47,7 @@ struct Sampler : Poll {
     };
     array<Layer> layers;
 
-    uint64 rate = 0;
+    uint rate = 0;
     static constexpr uint periodSize = 512;
     float* buffer; // Interleaved mixing buffer
 

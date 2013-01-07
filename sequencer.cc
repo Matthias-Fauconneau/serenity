@@ -17,7 +17,7 @@ void Sequencer::event() {
         if(value == 0 ) {
             if(!pressed.contains(key)) return; //pressed even before the device was opened
             pressed.removeAll(key);
-            if(sustain) sustained+= key;
+            if(sustain) sustained.appendOnce(key);
             else {
                 noteEvent(key,0);
                 if(record) {

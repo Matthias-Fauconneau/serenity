@@ -98,7 +98,7 @@ struct range {
     uint start,stop;
     range(uint start, uint stop):start(start),stop(stop){}
     range(uint size):range(0,size){}
-    struct iterator { uint i; uint operator*() {return i;} uint operator++(){return i++;} bool operator !=(const iterator& o) const{return i!=o.i;}};
+    struct iterator { uint i; uint operator*() {return i;} uint operator++(){return i++;} bool operator !=(const iterator& o) const{return i<o.i;}};
     iterator begin(){ return __(start); }
     iterator end(){ return __(stop); }
 };
@@ -113,6 +113,8 @@ template<class T> struct initializer_list {
     constexpr initializer_list(const T* data, uint size) : data(data), size(size) {}
     /// References elements sliced from \a begin to \a end
     constexpr initializer_list(const T* begin,const T* end) : data(begin), size(uint(end-begin)) {}
+    /// References elements from a static array
+    template<size_t N> initializer_list(const T (&a)[N]):ref<T>(a,N){}
     constexpr const T* begin() const { return data; }
     constexpr const T* end() const { return data+size; }
     const T& operator [](uint i) const { assert(i<size); return data[i]; }

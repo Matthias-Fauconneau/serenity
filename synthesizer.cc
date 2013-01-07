@@ -296,7 +296,7 @@ struct KeyboardInput : Widget {
     void render(int2, int2){};
 };
 
-struct Synthesizer {
+struct SynthesizerApp {
     //Thread thread;
     //Sequencer input; //__(thread);
     KeyboardInput input;
@@ -311,7 +311,7 @@ struct Synthesizer {
 #endif
     Keyboard keyboard;
 
-    Synthesizer() {
+    SynthesizerApp() {
         window.backgroundCenter=window.backgroundColor=1;
         window.localShortcut(Escape).connect(&exit);
         focus=&input;

@@ -17,13 +17,13 @@ struct Variant { //TODO: union
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
     Variant(map<ref<byte>,Variant>&& dict) : type(Dict), dict(move(dict)) {}
     operator bool() const { return type!=Empty; }
-    int integer() const { assert(type==Integer, number); return number; }
+    int integer() const { assert(type==Integer, float(number)); return number; }
     double real() const { assert(type==Real||type==Integer); return number; }
 };
 string str(const Variant& o) {
     if(o.type==Variant::Boolean) return string(o.number?"true"_:"false"_);
     if(o.type==Variant::Integer) return str(int(o.number));
-    if(o.type==Variant::Real) return str(o.number);
+    if(o.type==Variant::Real) return str(float(o.number));
     if(o.type==Variant::Data) return copy(o.data);
     if(o.type==Variant::List) return str(o.list);
     if(o.type==Variant::Dict) return str(o.dict);

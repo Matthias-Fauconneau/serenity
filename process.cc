@@ -55,9 +55,9 @@ void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
 // Poll
-void Poll::registerPoll() { thread+=this; thread.post(); }
+void Poll::registerPoll() { thread.appendOnce(this); thread.post(); }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
-void Poll::queue() {Locker lock(thread.lock); thread.queue+= this; thread.post();}
+void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thread.post();}
 
 // EventFD
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}

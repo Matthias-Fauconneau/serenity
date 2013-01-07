@@ -15,11 +15,11 @@ void Score::onPath(const ref<vec2>& p) {
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
         if(span.y>2 && span.x<355 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<22) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30))) {
-            ties+= Line(vec2(min.x,p[0].y),vec2(max.x,p[3].y));
+            ties.appendOnce( Line(vec2(min.x,p[0].y),vec2(max.x,p[3].y)) );
         }
     } else if(p.size==10) {
         if(span.x>36 && span.x<1000 && span.y>10 && (span.y<14 || (span.x>100 && span.y<29))) {
-            ties+= Line(vec2(min.x,center.y),vec2(max.x,center.y));
+            ties.appendOnce( Line(vec2(min.x,center.y),vec2(max.x,center.y)) );
         }
     }
 }

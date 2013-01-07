@@ -20,7 +20,7 @@ map<uint, Chord> parseAnnotations(string&& annotations) {
     uint t=0,i=0;
     for(TextData s(annotations);s;) {
         while(!s.match('\n')) {
-            int key = s.integer(); s.match(' ');
+            uint key = s.integer(); s.match(' ');
             chords[t] << MidiNote __(key,t,1);
             i++;
         }

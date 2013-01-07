@@ -32,6 +32,7 @@ private:
     struct Control* control = 0;
     function<bool(int16* output, uint size)> read16 = [](int16*,uint){return false;};
     function<bool(int32* output, uint size)> read32 = [](int32*,uint){return false;};
+#define MMAP
 #ifndef MMAP
     struct SyncPtr* syncPtr = 0;
 #endif
