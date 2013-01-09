@@ -8,7 +8,7 @@ struct WeekViewPrint : Widget {
         inline uint floor(uint width, uint value) { return value/width*width; }
         inline uint ceil(uint width, uint value) { return (value+width-1)/width*width; }
         void render(int2 position, int2 size) {
-            const int workWeek=4;
+            const int workWeek=5;
             int w = size.x/workWeek, y=0;
             for(int i=0;i<workWeek;i++) {
                 constexpr ref<byte> days[5]={"Lundi"_,"Mardi"_,"Mercredi"_,"Jeudi"_,"Vendredi"_};
@@ -35,12 +35,12 @@ struct WeekViewPrint : Widget {
         }
     };
 
-    Window window __(this,0,"WeekView"_);
+    Window window __(this,int2(0,0),"WeekView"_);
     Image page __(2480,3508);
     WeekViewPrint(){
         renderPage();
         writeFile("week.png"_,encodePNG(page),home());
-        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=0xFF;
+        window.localShortcut(Escape).connect(&exit); window.backgroundCenter=window.backgroundColor=1;
     }
     void renderPage() {
         framebuffer=share(page); currentClip = Rect(page.size());
@@ -48,5 +48,5 @@ struct WeekViewPrint : Widget {
         WeekView().render(int2(16,16),int2(framebuffer.size().x-32,framebuffer.size().y/2-32));
         WeekView().render(int2(16,framebuffer.size().y/2+16),int2(framebuffer.size().x-32,framebuffer.size().y/2-32));
     }
-    void render(int2 position, int2 unused size) { blit(position,resize(page,page.width/2,page.height/2)); }
+    void render(int2 position, int2 size) { blit(position,resize(page,size.x,page.height*size.x/page.width)); }
 } application;

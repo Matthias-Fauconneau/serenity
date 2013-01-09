@@ -8,7 +8,7 @@
 ICON(network) ICON(feeds)
 
 Feeds::Feeds() : readConfig("read"_,config(),ReadWrite|Create|Append), readMap(readConfig) {
-    array::reserve(36);
+    array::reserve(64);
     List<Entry>::activeChanged.connect(this,&Feeds::setRead);
     List<Entry>::itemPressed.connect(this,&Feeds::readEntry);
     load();

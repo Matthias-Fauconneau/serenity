@@ -3,7 +3,7 @@
 #include "gl.h"
 #endif
 
-bool softwareRendering;
+bool softwareRendering = true;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 Image framebuffer;

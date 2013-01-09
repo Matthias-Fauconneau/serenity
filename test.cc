@@ -85,6 +85,11 @@ vec operator-(const vec& A, const vec& B) {
     for(uint i: range(N)) R[i]=A[i]-B[i];
     return R;
 }
+vec operator*(float A, const vec& B) {
+    uint N=B.size(); vec R(N); R.setSize(N);
+    for(uint i: range(N)) R[i]=A*B[i];
+    return R;
+}
 vec operator*(const vec& A, float B) {
     uint N=A.size(); vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[i]*B;
@@ -100,6 +105,12 @@ vec& operator+=(vec& A, const vec& B) {
     uint N=A.size(); assert(B.size()==N);
     for(uint i: range(N)) A[i]+=B[i];
     return A;
+}
+
+vec flip(const vec& A) {
+    uint N=A.size(); vec R(N); R.setSize(N);
+    for(uint i: range(N)) R[i]=A[N-1-i];
+    return R;
 }
 
 vec dB(const vec& A) {
@@ -184,25 +195,25 @@ struct PassiveReflectancePlot : Widget {
             float b = s.decimal() / fs; // bandwidth
             s.whileAny(" \t;\n"_);
 
-            float radius = exp(-PI*b); // pole modulus
-            float angle = 2*PI*f; // pole argument
+            float radius = exp(-PI*b);
+            float angle = 2*PI*f;
             A1 << -2*radius*cos(angle); // 2nd-order section coeff
             A2 << radius*radius; // 2nd-order section coeff
         }
         const uint N = A1.size();
         vec A; A << 1 << zeros(2*N);
-        for(uint i: range(N)) { // polynomial multiplication = feedforward filter
-            float denominator[] = {1,A1[i],A2[i]};
-            A = filter(denominator,A);
+        for(uint i: range(N)) { // A=Π[i](1/(1+a1[i]z[-1]+a2[i]z[-2]) (polynomial multiplication = feedforward filter)
+            float denominator[] = {1, A1[i], A2[i]};
+            A = filter(denominator, A);
         }
         // Now A contains the (stable) denominator of the desired bridge admittance.
-#if 0 //Constructs a numerator which gives a positive-real result by first creating a passive reflectance and then computing the corresponding PR admittance.
-        g = 0.9;         // Uniform loss factor
-        B = g*fliplr(A); // Flip(A)/A = desired allpass
+#if 1 //Constructs a numerator which gives a positive-real result by first creating a passive reflectance and then computing the corresponding PR admittance.
+        const float g = 0.9;         // Uniform loss factor
+        vec B = g*flip(A); // Flip(A)/A = desired allpass
 #else //Construct a resonator as a sum of arbitrary modes with unit residues, adding a near-zero at dc ==
         vec B = zeros(2*N+1);
         vec impulse; impulse << 1 << zeros(2*N);
-        for(uint i: range(N)) { // polynomial division = feedback filter
+        for(uint i: range(N)) { // B=Γ[0]·(1-z[-1])·Σ[i](1/(1+a1[i]z[-1]+a2[i]z[-2]) polynomial division = feedback filter
             float denominator[] = {1,A1[i],A2[i]};
             B += filter(A,denominator,impulse);
         }
@@ -218,7 +229,7 @@ struct PassiveReflectancePlot : Widget {
         //assert(Aadm[0]);
         Badm = Badm/Aadm[0], Aadm = Aadm/Aadm[0]; // Renormalize
 
-        const uint fc = 300; // Plot every Hz up to 300Hz
+        const uint fc = fs;//300; // Plot every Hz up to 300Hz
         vecc H = freqz(Badm, Aadm, fc, float(fc)/fs);
         plots << Plot(dB(norm(H)),"Admittance"_,"Frequency (Hz)"_,"Magnitude (dB)"_);
         plots << Plot(angle(H),"Admittance"_,"Frequency (Hz)"_,"Phase (radians)"_);
