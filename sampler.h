@@ -48,11 +48,11 @@ struct Sampler : Poll {
     array<Layer> layers;
 
     uint rate = 0;
-    static constexpr uint periodSize = 512;
+    static constexpr uint periodSize = 256;
     float* buffer; // Interleaved mixing buffer
 
     /// Convolution reverb
-    bool enableReverb=true;
+    bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
     uint reverbSize=0; // Reverb filter size
     uint N=0; // reverbSize+periodSize
     float* reverbFilter[2]={}; // Convolution reverb filter in frequency-domain

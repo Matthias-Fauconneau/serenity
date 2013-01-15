@@ -49,10 +49,10 @@ struct Score {
     uint chordIndex=-1, noteIndex=0, currentStaff=0;
     int chordSize=0;
     map<int,int> active;
-    map<int,int> miss;
     map<int,int> expected;
     bool editMode=false;
-    bool showActive=false; // Toggles between active or expected notes highlighting
+    bool showActive=false; // Toggles whether active notes are highlighted
+    bool showExpected=false; // Toggles whether expected notes are highlighted (set on errors, cleared on sucess)
     void toggleEdit();
     void previous();
     void next();
@@ -66,5 +66,9 @@ struct Score {
     int pass=-1;
     int msScore=0;
 
-    void clear() { staffs.clear(); lastClef=lastPos=0; repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear(); notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0; active.clear(); miss.clear(); expected.clear(); debug.clear(); pass=-1; }
+    void clear() {
+        staffs.clear(); lastClef=lastPos=0; repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear();
+        notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0;
+        active.clear(); expected.clear(); debug.clear(); pass=-1;
+    }
 };

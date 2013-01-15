@@ -15,12 +15,12 @@ struct SoundTest {
     SoundTest() { audio.start(); }
     float step=2*PI*440/48000;
     float amplitude=0x1p12;
-    float angle=0;
+    float phase=0;
     bool read(int16* output, uint periodSize) {
         for(uint i : range(periodSize)) {
-            float sample = amplitude*sin(angle);
+            float sample = amplitude*sin(phase);
             output[2*i+0] = sample, output[2*i+1] = sample;
-            angle += step;
+            phase += step;
         }
         return true;
     }
@@ -42,39 +42,63 @@ struct HTMLTest {
 } test;
 #endif
 
+#if 1
+#include "asound.h"
+#include "spectrogram.h"
+
+struct MusicAnalyzer {
+    AudioOutput audio __({this, &MusicAnalyzer::read}, 44100 FIXME: change according to file , 4096);
+    Spectrogram spectrogram;
+    Window window __(&spectrogram,int2(0,1680/2),"Music Analyzer"_);
+
+    MusicAnalyzer() {
+        window.backgroundCenter=window.backgroundColor=1;
+        window.localShortcut(Escape).connect(&exit);
+        audio.start();
+    }
+    bool read(int16* output, uint size) {
+        TODO: factor FFmpeg media
+    }
+} application;
+} test;
+#endif
+
+#if 0
 #include "data.h"
 #include "window.h"
 #include "display.h"
 #include "text.h"
 
+/// \name Real functions
 typedef float real;
 const float PI = 3.14159265358979323846;
 inline float exp(float x) { return __builtin_expf(x); }
 inline float cos(float t) { return __builtin_cosf(t); }
 inline float sin(float t) { return __builtin_sinf(t); }
 inline float log10(float x) { return __builtin_log10f(x); }
-//inline float log10(float x) { return log2(x)/log2(10); }
 inline float dB(float x) { return 10*log10(x); }
+/// \}
 
+/// \name Complex operations
 struct complex { real re, im; complex(real re, real im):re(re),im(im){} };
-//string str(complex z) { return "(r="_+ftoa(norm(z),2,0)+" θ="_+ftoa(arg(z),2,0)+")"_; }
 float norm(complex z) { return sqrt(z.re*z.re+z.im*z.im); }
-float angle(complex z) { return __builtin_atan2f(z.im, z.re); }
+float phase(complex z) { return __builtin_atan2f(z.im, z.re); }
 complex polar(real r, real a) { return complex(r*cos(a),r*sin(a)); }
-
 complex operator+(complex a, complex b) { return complex(a.re+b.re, a.im+b.im); }
 complex operator-(complex a, complex b) { return complex(a.re-b.re, a.im-b.im); }
 complex operator*(complex a, complex b) { return complex(a.re*b.re-a.im*b.im, a.re*b.im + a.im*b.re); }
 complex operator/(complex a, float b) { return complex(a.re/b, a.im/b); }
 complex operator/(complex a, complex b) { return complex(a.re*b.re+a.im*b.im, a.re*b.im - a.im*b.re) / (b.re*b.re + b.im*b.im); }
-
 complex& operator+=(complex& a, complex b) { a.re+=b.re, a.im+=b.im; return a;}
+/// \}
 
-// Vector operations on dynamic arrays
+/// Dynamically allocated vector of reals
 typedef array<real> vec;
 
+/// Initializes a vector of N values to zero
 vec zeros(uint N) { vec r(N); r.setSize(N); for(uint i: range(N)) r[i] = 0; return r; }
 
+/// \name Vector operations
 vec operator+(const vec& A, const vec& B) {
     uint N=A.size(); assert(B.size()==N); vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[i]+B[i];
@@ -100,19 +124,21 @@ vec operator/(const vec& A, float B) {
     for(uint i: range(N)) R[i]=A[i]/B;
     return R;
 }
-
 vec& operator+=(vec& A, const vec& B) {
     uint N=A.size(); assert(B.size()==N);
     for(uint i: range(N)) A[i]+=B[i];
     return A;
 }
+/// \}
 
+/// Flips a vector
 vec flip(const vec& A) {
     uint N=A.size(); vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[N-1-i];
     return R;
 }
 
+/// Applies \a dB to all elements
 vec dB(const vec& A) {
     uint N=A.size(); vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=dB(A[i]);
@@ -132,18 +158,22 @@ vec filter(const vec& b, const vec& a, const vec& x) {
 }
 vec filter(const vec& b, const vec& x) { return filter(b,(float[]){1},x); }
 
+/// \name Vector operations on dynamic arrays of complex numbers
 typedef array<complex> vecc;
 
+/// Applies norm to all elements
 vec norm(const vecc& A) {
     uint N=A.size(); vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=norm(A[i]);
     return R;
 }
-vec angle(const vecc& A) {
+/// Applies phase to all elements
+vec phase(const vecc& A) {
     uint N=A.size(); vec R(N); R.setSize(N);
-    for(uint i: range(N)) R[i]=angle(A[i]);
+    for(uint i: range(N)) R[i]=phase(A[i]);
     return R;
 }
+/// \}
 
 /// Samples frequency response of digital filter b/a on n points from [0, 2π fc]
 vecc freqz(const vec& b, const vec& a, uint N, float fc = 1) {
@@ -176,6 +206,7 @@ template<class Array> void plot(int2 position, int2 size, const Array& Y) {
     line(position+int2(0,size.y/2),position+int2(size.x,size.y/2), darkGray);
 }
 
+/// Computes a passive reflectance filter from resonances data and plots its frequency response
 struct PassiveReflectancePlot : Widget {
     struct Plot {
         vec data; string title, xlabel, ylabel;
@@ -232,7 +263,7 @@ struct PassiveReflectancePlot : Widget {
         const uint fc = fs;//300; // Plot every Hz up to 300Hz
         vecc H = freqz(Badm, Aadm, fc, float(fc)/fs);
         plots << Plot(dB(norm(H)),"Admittance"_,"Frequency (Hz)"_,"Magnitude (dB)"_);
-        plots << Plot(angle(H),"Admittance"_,"Frequency (Hz)"_,"Phase (radians)"_);
+        plots << Plot(phase(H),"Admittance"_,"Frequency (Hz)"_,"Phase (radians)"_);
 
         window.backgroundCenter=window.backgroundColor=1;
         window.localShortcut(Escape).connect(&exit);
@@ -251,3 +282,4 @@ struct PassiveReflectancePlot : Widget {
         }
     }
 } test;
+#endif

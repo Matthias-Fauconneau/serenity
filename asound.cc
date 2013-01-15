@@ -67,8 +67,8 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate;
     hparams.interval(Periods) = 2;
-    hparams.interval(PeriodSize) = periodSize,
-    log("HW_PARAMS"); iowr<HW_PARAMS>(hparams);
+    hparams.interval(PeriodSize) = periodSize;
+    iowr<HW_PARAMS>(hparams);
     this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);

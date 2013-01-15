@@ -129,7 +129,7 @@ struct Music {
 
     Sampler sampler;
     Thread thread __(-20);
-    AudioOutput audio __({&sampler, &Sampler::read}, 44100, 512, thread);
+    AudioOutput audio __({&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread);
     Sequencer input __(thread);
 
     Record record;
@@ -182,11 +182,14 @@ struct Music {
         window.localShortcut(Insert).connect(&score,&Score::insert);
         window.localShortcut(Delete).connect(&score,&Score::remove);
         window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
+        window.localShortcut(Key('r')).connect(this,&Music::toggleReverb);
 
         showSheetList();
         audio.start();
         thread.spawn();
     }
+
+    void toggleReverb() { sampler.enableReverb=!sampler.enableReverb; }
 
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float unused previous, float current, float unused next) {
@@ -197,7 +200,9 @@ struct Music {
                                     max(scale*previous, //scroll to see at least previous
                                         scale*next-pdfScore.ScrollArea::size.y) //and at least next
                                     );*/
-            pdfScore.center(int2(0,scale*current));
+            //pdfScore.center(int2(0,scale*current));
+            // Current staff  is always second staff from bottom edge (allows to repeat page, track scrolling, see keyboard in peripheral vision)
+            pdfScore.delta.y = -(scale*next-pdfScore.ScrollArea::size.y);
         }
         //midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
         midiScore.center(int2(0,current));

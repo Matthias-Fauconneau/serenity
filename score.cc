@@ -504,6 +504,7 @@ void Score::seek(uint unused time) {
         expected.insert(0,noteIndex=0);
     } else if(chords) {
         chordIndex=0, noteIndex=0; currentStaff=0; expected.clear(); active.clear();
+        nextStaff(0,0,0);
         int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
             if(note.duration > 0 && //skip graces
                     !expected.contains(note.key) //skip double notes
@@ -524,6 +525,7 @@ void Score::seek(uint unused time) {
 }
 
 void Score::noteEvent(uint key, uint vel) {
+    map<int,vec4> activeNotes;
     if(editMode) {
         if(vel) {
             assert(expected.size()==1 && expected.values[0]==(int)noteIndex);
@@ -550,18 +552,21 @@ void Score::noteEvent(uint key, uint vel) {
             if(expected.contains(key)) {
                 active.insertMulti(key,expected.at(key));
                 expected.remove(key);
-            } else if(miss.contains(key)) miss.remove(key);
-            else return;
+            }
+            else if(!showExpected) showExpected = true; // Only shows expected notes on errors
+            else return; // no changes
         } else if(key) {
             if(active.contains(key)) active.remove(key);
+            else return;
         }
         while(!expected && chordIndex<chords.size()-1) {
             noteIndex+=chords.values[chordIndex].size();
             chordIndex++;
             int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-                if(note.duration > 0 && //skip graces
-                        !expected.contains(note.key) //skip double notes
-                        ) expected.insert(note.key, i);
+                if(note.duration > 0  /*skip graces*/ && !expected.contains(note.key) /*skip double notes*/ ) {
+                    expected.insert(note.key, i);
+                    showExpected = false; // Hide highlighting while succeeding (otherwise the distraction limits eye-hand span)
+                }
                 while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
                     assert(currentStaff<staffs.size());
                     if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
@@ -572,12 +577,7 @@ void Score::noteEvent(uint key, uint vel) {
             chordSize = expected.size();
         }
     }
-    map<int,vec4> activeNotes;
-    if(showActive) {
-        for(int i: active.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,red);
-    } else { // show expected notes
-        for(int i: expected.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
-        for(int i: miss.values) activeNotes.insertMulti(indices?indices[i]:i,blue);
-    }
+    if(showActive) for(int i: active.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,red);
+    if(showExpected) for(int i: expected.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insertMulti(indices?indices[i]:i,blue);
     activeNotesChanged(activeNotes);
 }

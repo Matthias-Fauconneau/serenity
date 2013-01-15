@@ -7,6 +7,7 @@
 #include "layout.h"
 #include "window.h"
 #include "text.h"
+#include "simd.h"
 
 /// Virtual audio decoder interface
 struct AudioMedia {
@@ -116,7 +117,7 @@ struct Player {
     AudioMedia* media=0;
     FFmpegMedia ffmpeg;
     Resampler resampler;
-    AudioOutput audio __({this,&Player::read}, 48000, 4096);
+    AudioOutput audio __({this,&Player::read}, 44100, 4096); //FIXME: avoid resampling (use 48000Hz output on relevant files)
     bool read(int16* output, uint size) {
         float buffer[2*size];
         uint inputSize = resampler?resampler.need(size):size;
@@ -146,7 +147,7 @@ struct Player {
     Scroll< List<Text> > titles;
     HBox main;// __( &albums.area(), &titles.area() );
     VBox layout;// __( &toolbar, &main );
-    Window window __(&layout, int2(-512,-512), "Player"_, pauseIcon());
+    Window window __(&layout, int2(-1680/2,-1050/2), "Player"_, pauseIcon());
 
 // Content
     array<string> folders;

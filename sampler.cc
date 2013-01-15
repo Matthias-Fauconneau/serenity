@@ -168,7 +168,7 @@ void Sampler::open(const ref<byte>& path) {
         fftwf_execute(p);
         fftwf_destroy_plan(p);
         unallocate(filter[c],N); // Releases time domain filter
-        for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; //Cuts frequencies higher than nyquist (FIXME: is this smart?)
+        for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; //Cuts frequencies higher than nyquist
     }
 
     // Allocates reverb buffer and temporary buffers
