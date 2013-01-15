@@ -97,12 +97,15 @@ void AudioOutput::event() {
     if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
-        if(sampleBits==16 && !read16(((int16*)buffer)+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
-        if(sampleBits==32 && !read32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize)) {stop(); return;}
-        control->swPointer += periodSize;
+        uint readSize;
+        if(sampleBits==16) readSize=read16(((int16*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
+        if(sampleBits==32) readSize=read32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
+        assert(readSize<=periodSize);
+        control->swPointer += readSize;
 #ifndef MMAP
         sync;
 #endif
+        if(readSize<periodSize) { stop(); return; }
     }
     if(status->state == Prepared) io<START>();
 }

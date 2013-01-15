@@ -1,139 +1,33 @@
 /// \file player.cc Music player
 #include "process.h"
 #include "file.h"
-#include "resample.h"
 #include "asound.h"
 #include "interface.h"
 #include "layout.h"
 #include "window.h"
 #include "text.h"
-#include "simd.h"
-
-/// Virtual audio decoder interface
-struct AudioMedia {
-    uint rate=0,channels=0;
-    /// Returns elapsed time in seconds
-    virtual uint position()=0;
-    /// Returns media duration in seconds
-    virtual uint duration()=0;
-    /// Seeks media to \a position (in seconds)
-    virtual void seek(uint position)=0;
-    /// Reads \a size frames into \a output
-    virtual int read(float2* output, uint size)=0;
-    virtual ~AudioMedia(){}
-};
-
-/// Generic audio decoder (using ffmpeg)
-extern "C" {
-#define __STDC_CONSTANT_MACROS
-#include <stdint.h>
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-}
-struct FFmpegMedia : AudioMedia {
-    AVFormatContext* file=0;
-    AVStream* audioStream=0;
-    AVCodecContext* audio=0;
-    int audioPTS=0;
-
-    FFmpegMedia(){}
-    FFmpegMedia(const ref<byte>& path){
-        static int unused once=(av_register_all(), 0);
-        if(avformat_open_input(&file, strz(path), 0, 0)) { file=0; return; }
-        avformat_find_stream_info(file, 0);
-        if(file->duration <= 0) return;
-        for(uint i=0; i<file->nb_streams; i++) {
-            if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
-                audioStream = file->streams[i];
-                audio = audioStream->codec;
-                audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_S16;
-                AVCodec* codec = avcodec_find_decoder(audio->codec_id);
-                if(codec && avcodec_open2(audio, codec, 0) >= 0 ) {
-                    this->rate = audio->sample_rate; this->channels = audio->channels;
-                    break;
-                }
-            }
-        }
-        assert(audio, path);
-        assert(audio->sample_fmt == AV_SAMPLE_FMT_FLT || audio->sample_fmt == AV_SAMPLE_FMT_S16);
-        assert(this->rate);
-        assert(this->channels == 2);
-    }
-    uint position() { return audioPTS/1000;  }
-    uint duration() { return file->duration/1000/1000; }
-    void seek(uint unused position) { av_seek_frame(file,-1,position*1000*1000,0); }
-    Buffer<float2> buffer __(8192);
-    int read(float2* output, uint outputSize) {
-        uint readSize = outputSize;
-
-        uint size = min(outputSize,buffer.size);
-        for(uint i: range(size)) output[i] = buffer[i];
-        for(uint i: range(buffer.size-size)) buffer[i] = buffer[size+i]; //FIXME: ring buffer
-        buffer.size -= size, outputSize -= size; output+=size;
-
-        while(outputSize) {
-            AVPacket packet;
-            if(av_read_frame(file, &packet) < 0) return 0;
-            if(file->streams[packet.stream_index]==audioStream) {
-                AVFrame frame; avcodec_get_frame_defaults(&frame); int gotFrame=0;
-                int used = avcodec_decode_audio4(audio, &frame, &gotFrame, &packet);
-                if(used < 0 || !gotFrame) continue;
-                uint inputSize = frame.nb_samples;
-                assert(int(inputSize-outputSize)<int(buffer.capacity));
-                if(audio->sample_fmt == AV_SAMPLE_FMT_FLT) {
-                    float2* input = (float2*)frame.data[0];
-                    uint size = min(inputSize,outputSize);
-                    for(uint i: range(size)) output[i] = input[i];
-                    if(inputSize > outputSize) {
-                        for(uint i: range(inputSize-outputSize)) buffer[i] = input[outputSize+i];
-                        buffer.size += inputSize-outputSize;
-                    }
-                    outputSize -= size; output+=size;
-                } else {
-                    int16* input = (int16*)frame.data[0];
-                    uint size = min(inputSize,outputSize);
-                    for(uint i: range(size)) output[i] = (float2){ (float)input[2*i+0], (float)input[2*i+1] };
-                    if(inputSize > outputSize) {
-                        for(uint i: range(inputSize-outputSize))
-                            buffer[i] = (float2){ (float)input[2*(outputSize+i)+0], (float)input[2*(outputSize+i)+1] };
-                        buffer.size += inputSize-outputSize;
-                    }
-                    outputSize -= size; output+=size;
-
-                }
-                audioPTS = packet.dts*audioStream->time_base.num*1000/audioStream->time_base.den;
-            }
-            av_free_packet(&packet);
-        }
-        return readSize;
-    }
-    ~FFmpegMedia() { avformat_close_input(&file); }
-};
+#include "ffmpeg.h"
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
-// Pipeline: File -> AudioMedia -> [Resampler] -> AudioOutput
-    static constexpr int channels=2;
-    AudioMedia* media=0;
-    FFmpegMedia ffmpeg;
-    Resampler resampler;
-    AudioOutput audio __({this,&Player::read}, 44100, 4096); //FIXME: avoid resampling (use 48000Hz output on relevant files)
-    bool read(int16* output, uint size) {
-        float buffer[2*size];
-        uint inputSize = resampler?resampler.need(size):size;
-        {int size=inputSize; for(float2* input=(float2*)buffer;;) {
-            if(!media) return false;
-            int read=media->read(input,size);
-            if(read==size) break;
-            assert(read<size);
-            if(read>0) input+=read, size-=read;
+// Gapless playback
+    static constexpr uint channels = 2;
+    AudioFile file;
+    AudioOutput output __({this,&Player::read}, 44100, 4096);
+    uint read(int16* output, uint outputSize) {
+        uint readSize = 0;
+        for(;;) {
+            if(!file) return readSize;
+            uint need = outputSize-readSize;
+            uint read = file.read(output, need);
+            assert(read<=need);
+            output += read*channels; readSize += read;
+            if(readSize == outputSize) {
+                update(file.position(),file.duration());
+                return readSize;
+            }
             next();
-        }}
-        if(resampler) resampler.filter<false>(buffer,inputSize,buffer,size);
-        assert(size%4==0);
-        for(uint i: range(size*2)) output[i] = buffer[i];
-        update(media->position(),media->duration());
-        return true;
+        }
     }
 
 // Interface
@@ -147,7 +41,7 @@ struct Player {
     Scroll< List<Text> > titles;
     HBox main;// __( &albums.area(), &titles.area() );
     VBox layout;// __( &toolbar, &main );
-    Window window __(&layout, int2(-1680/2,-1050/2), "Player"_, pauseIcon());
+    Window window __(&layout, int2(-1050/2,-1680/2), "Player"_, pauseIcon());
 
 // Content
     array<string> folders;
@@ -190,7 +84,6 @@ struct Player {
                 }
             }
         }
-        window.setSize(int2(-512,-512));
         mainThread().priority=-19;
     }
     void queueFile(const ref<byte>& file, const ref<byte>& folder) {
@@ -216,10 +109,13 @@ struct Player {
     void playTitle(uint index) {
         window.setTitle(toUTF8(titles[index].text));
         ref<byte> path = files[index];
-        if(media) media->~AudioMedia(), media=0;
-        media = new (&ffmpeg) FFmpegMedia(string("/Music/"_+path));
-        assert(audio.channels==media->channels);
-        if(audio.rate!=media->rate) new (&resampler) Resampler(audio.channels, media->rate, audio.rate, audio.periodSize);
+        file.open(string("/Music/"_+path));
+        assert(output.channels==file.channels);
+        if(output.rate!=file.rate) {
+            output.~AudioOutput();
+            new (&output) AudioOutput({this,&Player::read}, file.rate, 4096);
+            output.start();
+        }
         setPlaying(true);
     }
     void next() {
@@ -227,23 +123,22 @@ struct Player {
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else if(albums.count()) playAlbum(albums.index=0);
         else { window.setTitle("Player"_); stop(); return; }
-        //titles.ensureVisible(titles.active());
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        if(play) { audio.start(); window.setIcon(playIcon()); }
-        else { audio.stop(); window.setIcon(pauseIcon()); }
+        if(play) { output.start(); window.setIcon(playIcon()); }
+        else { output.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play; window.render();
     }
     void stop() {
         setPlaying(false);
-        if(media) media->~AudioMedia(), media=0;
+        file.close();
         elapsed.setText(string("00:00"_));
         slider.value = -1;
         remaining.setText(string("00:00"_));
         titles.index=-1;
     }
-    void seek(int position) { if(media) { media->seek(position); update(media->position(),media->duration()); } }
+    void seek(int position) { if(file) { file.seek(position); update(file.position(),file.duration()); } }
     void update(int position, int duration) {
         if(slider.value == position) return;
         writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));

@@ -34,3 +34,5 @@ resample.cc
 resample.h
 player.cc
 mpg123.h
+ffmpeg.h
+ffmpeg.cc
