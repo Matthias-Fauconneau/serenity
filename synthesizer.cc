@@ -5,16 +5,7 @@
 #include "asound.h"
 #include "text.h"
 #include "layout.h"
-#if FFTW
 #include "spectrogram.h"
-#endif
-
-/// Trigonometric builtins
-const float PI = 3.14159265358979323846;
-inline float cos(float t) { return __builtin_cosf(t); }
-inline float sin(float t) { return __builtin_sinf(t); }
-inline float log2(float x) { return __builtin_log2f(x); }
-inline float exp2(float x) { return __builtin_exp2f(x); }
 
 /// Displays a plot of Y
 template<class Array> void plot(int2 position, int2 size, const Array& Y) {
@@ -40,7 +31,7 @@ template<class Array> void subplot(int2 position, int2 size, uint w, uint h, uin
 struct Note {
     uint rate, key, velocity;
     Note(uint rate, uint key, uint velocity):rate(rate),key(key),velocity(velocity){}
-    float period() { return rate/(440*exp2((int(key)-69)/12.0)); }
+    float period() { return rate/pitch(key); }
     virtual bool read(float* buffer, uint periodSize)=0;
 
     enum { Attack, Decay, Sustain, Release } state = Attack;
@@ -129,10 +120,11 @@ struct Synthesizer : VBox {
     signal<> contentChanged;
     int2 sizeHint() { return int2(-1,4*256); }
 
-    static constexpr uint rate = 48000; //96000
+    static constexpr uint rate = 48000;
     signal<float* /*data*/, uint /*size*/> frameReady;
     map<uint, String> strings; // one string per key
 
+#if ECHO
     const float h = 50; //m distance from floor/wall/ceiling (TODO: compute from geometry + source + target)
     const float d = 50; //m distance from source
     const float r = sqrt(sqr(h) + sqrt(d/2)); //m half indirect distance
@@ -141,6 +133,7 @@ struct Synthesizer : VBox {
     const uint M = (2*r - d) / (c*T); //sample count in delay line
     const float g = (1/(2*r)) / (1/d); //dissipation along indirect path (relative to direct path)
     Delay echo __(M);
+#endif
 
     void noteEvent(uint key, uint velocity) {
         if(velocity) {
@@ -148,12 +141,12 @@ struct Synthesizer : VBox {
             strings.at(key).pluck();
             clear(); //DEBUG: show only last visualization
             *this << &strings.at(key);
-        } else {
+        } else if(strings.contains(key)) {
             strings.at(key).release();
         }
     }
 
-    bool read(int16/*int32*/* output, uint periodSize) {
+    uint read(int32* output, uint periodSize) {
         float buffer[2*periodSize];
         ::clear(buffer,2*periodSize);
 
@@ -163,122 +156,56 @@ struct Synthesizer : VBox {
             else { strings.keys.removeAt(i); strings.values.removeAt(i); clear(); if(strings) *this << &strings.values.last(); }
         }
 
-        // Echo
+#if ECHO
         for(uint i: range(periodSize)) {
             float direct = buffer[2*i];
             float indirect = g*echo;
             echo(direct);
             buffer[2*i+1]=buffer[2*i] = direct + indirect;
         }
+#endif
 
         //TODO: reverb
 
         for(uint i: range(2*periodSize)) buffer[i] *= 0x1p28f; //32bit
         frameReady(buffer,periodSize);
-        for(uint i: range(2*periodSize)) buffer[i] /= 0x1p16f; //16bit
         for(uint i: range(2*periodSize)) output[i] = buffer[i]; // Converts buffer to signed 32bit output
         contentChanged(); //FIXME: rate limit
-        return true;
+        return periodSize;
     }
-};
-
-/// Displays active notes on a keyboard representation
-struct Keyboard : Widget {
-    array<int> midi, input;
-    signal<> contentChanged;
-    void inputNoteEvent(uint key, uint vel) { if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged(); }
-    void midiNoteEvent(uint key, uint vel) { if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged(); }
-    int2 sizeHint() { return int2(-1,102); }
-    void render(int2 position, int2 size) {
-        int y0 = position.y;
-        int y1 = y0+size.y*2/3;
-        int y2 = y0+size.y;
-        int margin = (size.x-size.x/88*88)/2;
-        for(int key=0; key<88; key++) {
-            vec4 white = midi.contains(key+21)?red:input.contains(key+21)?blue: ::white;
-            int dx = size.x/88;
-            int x0 = position.x + margin + key*dx;
-            int x1 = x0 + dx;
-            line(x0,y0, x0,y1-1, black);
-
-            int notch[12] = { 3, 1, 4, 0, 1, 2, 1, 4, 0, 1, 2, 1 };
-            int l = notch[key%12], r = notch[(key+1)%12];
-            if(key==0) l=0; //A-1 has no left notch
-            if(l==1) { // black key
-                line(x0,y1-1, x1,y1-1, black);
-                fill(x0+1,y0, x1+1,y1-1, midi.contains(key+21)?red:input.contains(key+21)?blue: ::black);
-            } else {
-                fill(x0+1,y0, x1,y2, white); // white key
-                line(x0-l*dx/6,y1-1, x0-l*dx/6, y2, black); //left edge
-                fill(x0+1-l*dx/6,y1, x1,y2, white); //left notch
-                if(key!=87) fill(x1,y1, x1-1+(6-r)*dx/6,y2, white); //right notch
-                //right edge will be next left edge
-            }
-            if(key==87) { //C7 has no right notch
-                line(x1+dx/2,y0,x1+dx/2,y2, black);
-                fill(x1,y0, x1+dx/2,y1-1, white);
-            }
-        }
-    }
-};
-
-#if FFTW
-#include "spectrogram.h"
-#endif
-
-/// Dummy input for testing without a MIDI keyboard
-struct KeyboardInput : Widget {
-    signal<uint,uint> noteEvent;
-    bool keyPress(Key key, Modifiers) override {
-        int i = "awsedftgyhujkolp;']\\"_.indexOf(key);
-        if(i>=0) noteEvent(60+i,100);
-        return false;
-    }
-    bool keyRelease(Key key, Modifiers) override {
-        int i = "awsedftgyhujkolp;']\\"_.indexOf(key);
-        if(i>=0) noteEvent(60+i,0);
-        return false;
-    }
-    void render(int2, int2){};
 };
 
 struct SynthesizerApp {
-    //Thread thread;
-    //Sequencer input; //__(thread);
-    KeyboardInput input;
+    Sequencer input;
+    //KeyboardInput input;
     Synthesizer synthesizer;
-    AudioOutput audio __({&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024);
+    AudioOutput output __({&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024);
+
+    Spectrogram spectrogram __(16384, output.rate, 32); //~synthesizer.rate/(pitch(22)-pitch(21))
+    Keyboard keyboard;
 
     VBox layout;
-    Window window __(&layout,int2(0,/*0*/512),"Synthesizer"_);
+    Window window __(&layout,int2(0,spectrogram.sizeHint().y),"Synthesizer"_);
 
-#if FFTW
-    Spectrogram spectrogram;
-#endif
-    Keyboard keyboard;
 
     SynthesizerApp() {
         window.backgroundCenter=window.backgroundColor=1;
         window.localShortcut(Escape).connect(&exit);
-        focus=&input;
 
         // Synthesizer
-        layout << &synthesizer;
+        //layout << &synthesizer;
         synthesizer.contentChanged.connect(&window,&Window::render);
         input.noteEvent.connect(&synthesizer,&Synthesizer::noteEvent);
 
         // Spectrogram
-#if FFTW
-        synthesizer.frameReady.connect(&spectrogram,&Spectrogram::viewFrame);
-        layout << this;
-#endif
+        synthesizer.frameReady.connect(&spectrogram,&Spectrogram::write);
+        layout << &spectrogram;
 
         // Keyboard
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
         keyboard.contentChanged.connect(&window,&Window::render);
-        layout << &keyboard;
+        //layout << &keyboard;
 
-        audio.start();
-        //thread.spawn();
+        output.start();
     }
 } application;

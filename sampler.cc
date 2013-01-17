@@ -97,11 +97,7 @@ void Sampler::open(const ref<byte>& path) {
             else if(key=="hivel"_) sample->hivel=toInteger(value);
             else if(key=="lokey"_) sample->lokey=isInteger(value)?toInteger(value):noteToMIDI(value);
             else if(key=="hikey"_) sample->hikey=isInteger(value)?toInteger(value):noteToMIDI(value);
-            else if(key=="pitch_keycenter"_) {
-                sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
-                assert(sample->pitch_keycenter>=sample->lokey,sample->pitch_keycenter,value);
-                assert(sample->pitch_keycenter<=sample->hikey,sample->pitch_keycenter,value);
-            }
+            else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
             else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
             else if(key=="ampeg_release"_) sample->releaseTime=toDecimal(value);
             else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
@@ -128,15 +124,16 @@ void Sampler::open(const ref<byte>& path) {
                 layers.grow(layers.size()+1);
                 layer = &layers.last();
                 layer->shift = shift;
-                layer->notes.reserve(64); //Avoid locking (FIXME: heap pointers array)
+                layer->notes.reserve(64); // Avoid locking (FIXME: heap pointers array)
                 if(shift) {
-                    uint size = max(periodSize*2,1024u);
+                    const uint size = 2048; //1024; // Accurate frequency resolution while keeping reasonnable filter bank size
                     new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)));
                 }
             }
         }
     }
 
+#if REVERB
     array<byte> reverbFile = readFile("../reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
     assert(reverbMedia.rate == rate);
@@ -150,7 +147,7 @@ void Sampler::open(const ref<byte>& path) {
 
     // Computes normalization
     float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
-    const float scale = 0x1p6f/sqrt(sum); // Normalizes and scales 24->32bit (-3bit head room)
+    const float scale = 0x1p6f/sqrt(sum); // Normalizes and scales 24->32bit (-2bit head room)
 
     // Reverses, scales and deinterleaves filter
     float* filter[2];
@@ -159,7 +156,6 @@ void Sampler::open(const ref<byte>& path) {
 
     fftwf_init_threads();
     fftwf_plan_with_nthreads(4);
-    //fftwf_import_wisdom_from_filename("/Samples/wisdom");
 
     // Transforms reverb filter to frequency domain
     for(int c=0;c<2;c++) {
@@ -172,7 +168,6 @@ void Sampler::open(const ref<byte>& path) {
     }
 
     // Allocates reverb buffer and temporary buffers
-    buffer = allocate64<float>(periodSize*2);
     input = allocate64<float>(N);
     for(int c=0;c<2;c++) {
         reverbBuffer[c] = allocate64<float>(N), clear(reverbBuffer[c],N);
@@ -180,8 +175,7 @@ void Sampler::open(const ref<byte>& path) {
     }
     product = allocate64<float>(N);
     backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, FFTW_ESTIMATE);
-
-    //fftwf_export_wisdom_to_filename("/Samples/wisdom");
+#endif
 }
 
 /// Input events (realtime thread)
@@ -294,24 +288,27 @@ void Note::read(float4* out, uint size) {
     buffer.size-=size*2; writeCount.release(size*2); //allow decoder to continue
     position+=size*2; //keep track of position for release sample level matching
 }
-bool Sampler::read(int32* output, uint size) { // Audio thread
-    {Locker lock(noteReadLock);
-        if(size!=periodSize) error(size,periodSize);
+uint Sampler::read(int32* output, uint size) { // Audio thread
+    float8 buffer64[size*2/8]; // Force alignment
+    float* buffer = (float*)buffer64;
+    clear(buffer, size*2);
 
-        clear(buffer, periodSize*2);
+    {Locker lock(noteReadLock);
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
-                uint inSize=align(2,layer.resampler.need(periodSize));
+                uint inSize=align(2,layer.resampler.need(size));
                 if(layer.buffer.capacity<inSize*2) layer.buffer = Buffer<float>(inSize*2);
                 clear(layer.buffer.data, inSize*2);
                 for(Note& note: layer.notes) note.read((float4*)layer.buffer.data, inSize/2);
-                layer.resampler.filter<true>(layer.buffer, inSize, buffer, periodSize);
+                layer.resampler.filter<true>(layer.buffer, inSize, buffer, size);
             } else {
-                 for(Note& note: layer.notes) note.read((float4*)buffer, periodSize/2);
+                 for(Note& note: layer.notes) note.read((float4*)buffer, size/2);
             }
         }
 
+#if REVERB
         if(enableReverb) { // Convolution reverb
+            if(size!=periodSize) error("Expected period size ",periodSize,"got",size);
             // Deinterleaves mixed signal into reverb buffer
             for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = buffer[2*i+c];
 
@@ -342,17 +339,20 @@ bool Sampler::read(int32* output, uint size) { // Audio thread
                     buffer[2*i+c] = (1.f/N)*input[reverbSize+i];
                 }
             }
-        } else {
-            for(uint i: range(2*periodSize)) buffer[i] *= 0x1p6f;
+        } else
+#endif
+        {
+            for(uint i: range(2*size)) buffer[i] *= 0x1p6f; // 24bit samples to 32bit output with 2bit head room to add multiple notes
         }
         // Converts mixing buffer to signed 32bit output
-        for(uint i: range(periodSize/4)) ((word8*)output)[i] = cvtps(((float8*)buffer)[i]);
+        for(uint i: range(size/4)) ((word8*)output)[i] = cvtps(((float8*)buffer)[i]);
     }
-    time+=periodSize;
+
+    time+=size;
     queue(); //queue background decoder in main thread
-    if(record) record.write(ref<byte>((byte*)output,2*periodSize*sizeof(int32)));
-    frameReady(buffer, periodSize);
-    return true;
+    if(record) record.write(ref<byte>((byte*)output,2*size*sizeof(int32)));
+    frameReady(buffer, size);
+    return size;
 }
 
 void Sampler::startRecord(const ref<byte>& name) {
@@ -370,6 +370,7 @@ void Sampler::stopRecord() {
 
 Sampler::~Sampler() {
     stopRecord();
+#if REVERB
     for(uint c=0;c<2;c++) {
         if(reverbFilter[c]) unallocate(reverbFilter[c],N);
         if(reverbBuffer[c]) unallocate(reverbBuffer[c],N);
@@ -379,5 +380,6 @@ Sampler::~Sampler() {
     unallocate(input,N);
     unallocate(product,N);
     unallocate(buffer,periodSize*2);
+#endif
 }
 constexpr uint Sampler::periodSize;

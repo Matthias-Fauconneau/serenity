@@ -36,3 +36,7 @@ player.cc
 mpg123.h
 spectrogram.h
 spectrogram.cc
+keyboard.h
+keyboard.cc
+reflectance.cc
+analyzer.cc

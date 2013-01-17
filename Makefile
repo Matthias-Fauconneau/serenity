@@ -35,11 +35,12 @@ LIBS_time = rt
 LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
-LIBS_player = avformat avcodec
 LIBS_gl = X11 GL
+LIBS_ffmpeg = avformat avcodec
+LIBS_record = swscale avformat avcodec
 LIBS_sampler = fftw3f_threads
-LIBS_record = swscale avformat
-#LIBS_test = fftw3f_threads
+LIBS_spectrogram = fftw3f_threads
+LIBS_stretch = rubberband
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

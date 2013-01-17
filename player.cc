@@ -13,7 +13,7 @@ struct Player {
 // Gapless playback
     static constexpr uint channels = 2;
     AudioFile file;
-    AudioOutput output __({this,&Player::read}, 44100, 4096);
+    AudioOutput output __({this,&Player::read}, 44100, 8192);
     uint read(int16* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {
@@ -113,7 +113,7 @@ struct Player {
         assert(output.channels==file.channels);
         if(output.rate!=file.rate) {
             output.~AudioOutput();
-            new (&output) AudioOutput({this,&Player::read}, file.rate, 4096);
+            new (&output) AudioOutput({this,&Player::read}, file.rate, 8192);
             output.start();
         }
         setPlaying(true);

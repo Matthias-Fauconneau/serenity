@@ -48,9 +48,9 @@ struct Sampler : Poll {
     array<Layer> layers;
 
     uint rate = 0;
-    static constexpr uint periodSize = 256;
-    float* buffer; // Interleaved mixing buffer
+    static constexpr uint periodSize = 128; // same as resampler latency and 1m wave propagation time
 
+#if REVERB
     /// Convolution reverb
     bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
     uint reverbSize=0; // Reverb filter size
@@ -64,6 +64,7 @@ struct Sampler : Poll {
 
     fftwf_plan forward[2]; // FFTW plan to forward transform reverb buffer
     fftwf_plan backward; // FFTW plan to backward transform product*/
+#endif
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
@@ -81,7 +82,7 @@ struct Sampler : Poll {
     void event() override;
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
-    bool read(int32* output, uint size);
+    uint read(int32* output, uint size);
 
     /// Records performance to WAV file
     void startRecord(const ref<byte>& path);

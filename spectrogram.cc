@@ -1,43 +1,68 @@
 #include "spectrogram.h"
+#include "display.h"
 #include <fftw3.h>
 
-Spectrogram::Spectrogram() {
-    fftwf_init_threads();
-    fftwf_plan_with_nthreads(4);
+const float PI = 3.14159265358979323846;
+inline float cos(float t) { return __builtin_cosf(t); }
+inline float log2(float x) { return __builtin_log2f(x); }
+
+Spectrogram::Spectrogram(uint N, uint rate, uint bitDepth) : ImageView(Image(F,T)), N(N), rate(rate), bitDepth(bitDepth) {
     buffer = allocate64<float>(N); clear(buffer,N);
     hann = allocate64<float>(N); for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2;
     windowed = allocate64<float>(N);
     spectrum = allocate64<float>(N);
+    fftwf_init_threads();
+    fftwf_plan_with_nthreads(4);
+    plan = fftwf_plan_r2r_1d(N, windowed, spectrum, FFTW_R2HC, FFTW_ESTIMATE);
+}
+Spectrogram::~Spectrogram() {
+    unallocate(buffer,N);
+    unallocate(hann,N);
+    unallocate(windowed,N);
+    unallocate(spectrum,N);
+    fftwf_destroy_plan(plan);
 }
 
-void viewFrame(float* data, uint size) {
+void Spectrogram::write(int16* data, uint size) {
     for(uint i: range(N-size)) buffer[i] = buffer[i+size]; // Shifts buffer
     for(uint i: range(size)) buffer[N-size+i] = data[i*2+0]+data[i*2+1]; // Appends latest frame
+    update();
+}
+
+void Spectrogram::write(int32* data, uint size) {
+    for(uint i: range(N-size)) buffer[i] = buffer[i+size]; // Shifts buffer
+    for(uint i: range(size)) buffer[N-size+i] = data[i*2+0]+data[i*2+1]; // Appends latest frame
+    update();
+}
+
+void Spectrogram::write(float* data, uint size) {
+    for(uint i: range(N-size)) buffer[i] = buffer[i+size]; // Shifts buffer
+    for(uint i: range(size)) buffer[N-size+i] = data[i*2+0]+data[i*2+1]; // Appends latest frame
+    update();
+}
+
+void Spectrogram::update() {
+    // Shifts image down
+    for(uint y=image.height-1; y>0; y--)
+         for(uint x: range(image.width))
+             image(x,y) = image(x,y-1);
+
     for(uint i: range(N)) windowed[i] = hann[i]*buffer[i]; // Multiplies window
-    // Transforms
-    fftwf_plan p = fftwf_plan_r2r_1d(N, windowed, spectrum, FFTW_R2HC, FFTW_ESTIMATE);
-    fftwf_execute(p);
-    fftwf_destroy_plan(p);
+    fftwf_execute(plan); // Transforms
     for(int i: range(N)) spectrum[i] /= N; // Normalizes
 
-    float Nmax = N/2; //only real part
-    float Nmin = 27.0*(N/2)/synthesizer.rate;
-
     // Updates spectrogram
-    for(uint y: range(Y)) {
-        uint n0 = floor(Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y))), n1=ceil(Nmin+exp2(log2(Nmax-Nmin)*(float(y)/Y)));
-        //FIXME: all bins in a pixel will have same contribution
+    for(uint f: range(F)) {
+        uint n0 = floor(pitch(21+(f-6)/12.0)/rate*N);
+        uint n1 = ceil(pitch(21+(f-6+1)/12.0)/rate*N);
         float sum=0;
-        for(uint n=n0; n<n1; n++) {
+        for(uint n=n0; n<n1; n++) { //FIXME: weight n0 and n1 with overlap
             float a = sqrt(sqr(spectrum[n]) + sqr(spectrum[N-1-n])); // squared amplitude
-            if(n>N/4) a *= 0x1p8f;
             sum += a;
         }
         sum /= n1-n0;
-        int v = sRGB[clip(0,int(255*((log2(sum)-16)/8)),255)]; // Logarithmic scale from 16-24bit
-        spectrogram(t,Y-1-y) = byte4(v,v,v,1);
+        int v = sRGB[clip(0,int(255*((log2(sum)-(bitDepth-8))/8)),255)]; // Logarithmic scale on [-8bit 0]
+        image(f,0) = byte4(v,v,v,255);
     }
-
-    t++; if(t>=T) t=0;
-    window.render();
 }
+

@@ -13,15 +13,17 @@ struct AudioFile {
     int16* buffer=0;
     uint bufferSize=0;
 
-    bool open(const ref<byte>& path);
-    uint read(int16* output, uint outputSize);
+    AudioFile(){}
+    AudioFile(const ref<byte>& path){ open(path); }
+    ~AudioFile() { close(); }
 
+    operator bool() { return file; }
+
+    bool open(const ref<byte>& path);
+    void close();
+
+    uint read(int16* output, uint outputSize);
     uint position() { return audioPTS/1000;  }
     uint duration();
     void seek(uint position);
-
-    void close();
-    ~AudioFile() { close(); }
-    operator bool() { return file; }
-
 };
