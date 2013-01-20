@@ -4,7 +4,6 @@
 #include "matrix.h"
 #include "map.h"
 #include "image.h"
-#include "window.h"
 
 void glCullFace(bool enable);
 void glDepthTest(bool enable);

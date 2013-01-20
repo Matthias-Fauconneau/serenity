@@ -1,7 +1,16 @@
 #pragma once
 // Blender 2.56 SDNA
 
-typedef uint64 uint64_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+
+struct BlockHeader {
+    char identifier[4];
+    uint32_t size; // Total length of the data after the block header
+    uint64_t address; // Base memory address used by pointers pointing in this block
+    uint32_t type; // Type of the stored structure (as an index in SDNA types)
+    uint32_t count; // Number of structures located in this block
+};
 
 struct ID {
  ID* next;
@@ -51,11 +60,92 @@ struct bAnimVizSettings {
  int path_ac;
 };
 
+struct CustomData {
+ struct CustomDataLayer* layers;
+ int typemap[34];
+ int totlayer;
+ int maxlayer;
+ int totsize;
+ int pad2;
+ void* pool;
+ struct CustomDataExternal* external;
+};
+
+struct MPoly {
+ int loopstart;
+ int totloop;
+ short mat_nr;
+ char flag;
+ char pad;
+};
+
+struct MLoop {
+ int v;
+ int e;
+};
+
+struct MVert {
+ float co[3];
+ short no[3];
+ char flag;
+ char bweight;
+};
+
+struct Mesh {
+ ID id;
+ struct AnimData* adt;
+ struct BoundBox* bb;
+ struct Ipo* ipo;
+ struct Key* key;
+ struct Material* mat;
+ MPoly* mpoly;
+ struct MTexPoly* mtpoly;
+ MLoop* mloop;
+ struct MLoopUV* mloopuv;
+ struct MLoopCol* mloopcol;
+ struct MFace* mface;
+ struct MTFace* mtface;
+ struct TFace* tface;
+ MVert* mvert;
+ struct MEdge* medge;
+ struct MDeformVert* dvert;
+ struct MCol* mcol;
+ struct MSticky* msticky;
+ struct Mesh* texcomesh;
+ struct MSelect* mselect;
+ struct BMEditMesh* edit_btmesh;
+ CustomData vdata;
+ CustomData edata;
+ CustomData fdata;
+ CustomData pdata;
+ CustomData ldata;
+ int totvert;
+ int totedge;
+ int totface;
+ int totselect;
+ int totpoly;
+ int totloop;
+ int act_face;
+ float loc[3];
+ float size[3];
+ float rot[3];
+ short texflag;
+ short drawflag;
+ short smoothresh;
+ short flag;
+ short subdiv;
+ short subdivr;
+ char subsurftype;
+ char editflag;
+ short totcol;
+ struct Multires* mr;
+};
+
 struct Object {
  ID id;
  struct AnimData* adt;
  struct SculptSession* sculpt;
- short type;
+ enum { Empty, Mesh, Curve, Surf, Font, MBall, Lamp=10, Camera }; short type;
  short partype;
  int par1;
  int par2;
@@ -71,7 +161,7 @@ struct Object {
  struct bAction* action;
  struct bAction* poselib;
  struct bPose* pose;
- void* data;
+ struct Mesh* data;
  struct bGPdata* gpd;
  struct bAnimVizSettings avs;
  struct bMotionPath* mpath;

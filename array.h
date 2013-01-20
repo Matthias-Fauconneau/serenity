@@ -157,7 +157,7 @@ template<class T> struct array {
     /// Returns whether this array contains any elements matching \a value
     bool contains(const T& key) const { return ref<T>(*this).contains(key); }
     /// Returns index of the first element less than \a value using binary search (assuming a sorted array)
-    int binarySearch(const T& key) {
+    int binarySearch(const T& key) const {
         uint min=0, max=size();
         while(min<max) {
             uint mid = (min+max)/2;
@@ -177,6 +177,30 @@ template<class T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; ret
 template<class T> array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
+
+// Quicksort
+template<class T> uint partition(array<T>& at, uint left, uint right, uint pivotIndex) {
+    swap(at[pivotIndex], at[right]);
+    const T& pivot = at[right];
+    uint storeIndex = left;
+    for(uint i: range(left,right)) {
+        if(at[i] < pivot) {
+            swap(at[i], at[storeIndex]);
+            storeIndex++;
+        }
+    }
+    swap(at[storeIndex], at[right]);
+    return storeIndex;
+}
+template<class T> void quicksort(array<T>& at, uint left, uint right) {
+    if(left < right) { // If the list has 2 or more items
+        uint pivotIndex = partition(at, left, right, (left + right)/2);
+        quicksort(at, left, pivotIndex-1);
+        quicksort(at, pivotIndex+1, right);
+    }
+}
+/// Quicksorts the array in-place
+template<class T> void quicksort(array<T>& at) { return quicksort(at, 0, at.size()-1); }
 
 /// string is an array of bytes
 typedef array<byte> string;
