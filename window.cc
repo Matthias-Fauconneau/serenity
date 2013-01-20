@@ -203,14 +203,15 @@ void Window::event() {
             glXSwapBuffers(glDisplay, id);
 #endif
         }
-    } else do {
+    } else for(;;) {
         readLock.lock();
+        if(!poll()) { readLock.unlock(); break; }
         uint8 type = read<uint8>();
         XEvent e = read<XEvent>();
         readLock.unlock();
         processEvent(type, e);
-        while(eventQueue) { QEvent e=eventQueue.take(0); processEvent(e.type, e.event); }
-    } while(poll());
+        while(eventQueue) { readLock.lock(); QEvent e=eventQueue.take(0); readLock.unlock(); processEvent(e.type, e.event); }
+    };
     current=0;
 }
 

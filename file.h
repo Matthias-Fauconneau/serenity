@@ -112,13 +112,16 @@ struct Device : File {
 
 /// Managed memory mapping
 struct Map : ref<byte> {
+    enum {Read=1, Write=2};
+    enum {Shared=1, Private=2, Anonymous=32};
+
     Map(){}
-    Map(const File& file);
-    Map(const ref<byte>& file, const Folder& at=root()):Map(File(file,at)){}
-    enum {Read=1, Write=2}; enum {Shared=1, Private=2, Anonymous=32};
+    Map(const File& file, uint prot=Read);
+    Map(const ref<byte>& file, const Folder& at=root(), uint prot=Read):Map(File(file,at),prot){}
     Map(uint fd, uint offset, uint size, uint prot, uint flags=Shared);
     move_operator(Map):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
     ~Map();
+
     /// Locks memory map in RAM
     void lock(uint size=-1) const;
 };

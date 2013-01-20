@@ -46,6 +46,7 @@ struct Data {
     uint index=0;
 };
 
+#define big64 __builtin_bswap64
 #define big32 __builtin_bswap32
 #ifndef __clang__
 inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
@@ -66,18 +67,24 @@ struct BinaryData : virtual Data {
     void seek(uint index) { assert(index<buffer.size()); this->index=index; }
     /// Seeks last match for \a key.
     bool seekLast(const ref<byte>& key);
+    /// Seeks to next aligned position
+    void align(uint width) { index=::align(width,index); }
 
     /// Reads until next null byte
     ref<byte> untilNull();
 
     /// Reads one raw \a T element
     template<class T> const T& read() { const T& t = raw<T>(Data::read(sizeof(T))); return t; }
+    int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
     int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
     int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
 
     /// Provides template overloaded specialization (for swap) and return type overloading through cast operators.
     struct ReadOperator {
         BinaryData * s;
+        /// Reads an int64 and if necessary, swaps to host byte order
+        operator uint64() { return s->read64(); }
+        operator int64() { return s->read64(); }
         /// Reads an int32 and if necessary, swaps to host byte order
         operator uint32() { return s->read32(); }
         operator int32() { return s->read32(); }

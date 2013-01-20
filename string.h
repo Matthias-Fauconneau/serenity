@@ -55,8 +55,8 @@ stringz strz(const ref<byte>& s);
 /// Forwards string
 inline const string& str(const string& s) { return s; }
 /// Converts integers
-template<uint base=10> string utoa(uint number, int pad=0);
-template<uint base=10> string itoa(int number, int pad=0);
+template<uint base=10> string utoa(uint64 number, int pad=0);
+template<uint base=10> string itoa(int64 number, int pad=0);
 inline string bin(uint n, int pad=0) { return utoa<2>(n,pad); }
 inline string dec(int n, int pad=0) { return itoa<10>(n,pad); }
 inline string str(const uint8& n) { return dec(n); }
@@ -65,9 +65,9 @@ inline string str(const uint16& n) { return dec(n); }
 inline string str(const int16& n) { return dec(n); }
 inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
-inline string str(const unsigned long& n) { return dec(n); }
-inline string str(const long& n) { return dec(n); }
-inline string hex(uint n, int pad=0) { return utoa<16>(n,pad); }
+inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
+inline string str(const uint64& n) { return hex(n); }
+inline string str(const int64& n) { return hex(n); }
 template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 
 /// Converts floating-point numbers

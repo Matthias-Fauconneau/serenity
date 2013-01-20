@@ -40,3 +40,4 @@ keyboard.h
 keyboard.cc
 reflectance.cc
 analyzer.cc
+blender.h

@@ -165,7 +165,7 @@ template<class T> struct array {
             if(at(mid) < key) min = mid+1;
             else max = mid;
         }
-        //if(min == max && at(min) == key) return min;
+        assert(min == max /*&& at(min) == key*/);
         return min;
     }
 };

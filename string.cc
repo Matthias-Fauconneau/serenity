@@ -145,7 +145,7 @@ stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return
 
 /// Number conversions
 
-template<uint base> string utoa(uint n, int pad) {
+template<uint base> string utoa(uint64 n, int pad) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
@@ -155,13 +155,13 @@ template<uint base> string utoa(uint n, int pad) {
     while(64-i<pad) buf[--i] = '0';
     return string(ref<byte>(buf+i,64-i));
 }
-template string utoa<2>(uint,int);
-template string utoa<16>(uint,int);
+template string utoa<2>(uint64,int);
+template string utoa<16>(uint64,int);
 
-template<uint base> string itoa(int number, int pad) {
+template<uint base> string itoa(int64 number, int pad) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
-    uint n=abs(number);
+    uint64 n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
@@ -170,7 +170,7 @@ template<uint base> string itoa(int number, int pad) {
     if(number<0) buf[--i]='-';
     return string(ref<byte>(buf+i,64-i));
 }
-template string itoa<10>(int,int);
+template string itoa<10>(int64,int);
 
 string ftoa(float n, int precision, int exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);

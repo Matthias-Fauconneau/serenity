@@ -41,8 +41,7 @@ uint AudioFile::read(int16* output, uint outputSize) {
             AVPacket packet;
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
-                if(frame) avcodec_free_frame(&frame);
-                frame = avcodec_alloc_frame(); int gotFrame=0;
+                if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
                 if(used < 0 || !gotFrame) continue;
                 buffer = (int16*)frame->data[0];
