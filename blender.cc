@@ -3,6 +3,7 @@
 #include "string.h"
 #include "data.h"
 #include "gl.h"
+#include "window.h"
 
 /// Used to fix pointers in .blend file-block sections
 struct Block {
@@ -29,22 +30,43 @@ string str(const Struct::Field& f) { return " "_+f.typeName+(f.reference?"* "_:"
 string str(const Struct& s) { return "struct "_+s.name+" {\n"_+str(s.fields,'\n')+"\n};"_; }
 
 /// Parses a .blend file
-struct Blender {
+struct BlendView : Widget {
+    // View
+    int2 lastPos; // last cursor position to compute relative mouse movements
+    vec2 rotation=vec2(0,-PI/3); // current view angles (yaw,pitch)
+    Window window __(this, int2(1050,1050), "BlendView"_, Window::OpenGL);
+
+    // Renderer
+    GLFrameBuffer framebuffer;
+    //SHADER(shadow) GLShader& shadow = shadowShader();
+    SHADER(shader) GLShader& shader = shaderShader();
+    SHADER(sky) GLShader& sky = skyShader();
+    SHADER(resolve) GLShader& resolve = resolveShader();
+
+    // File
     Map map; // Keep file mmaped
     const Scene* scene=0; // Blender scene (root handle to access all data)
 
+    // Scene
+    vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
+    vec3 worldCenter=0; float worldRadius=0; // Scene bounding sphere in world space
+    /*vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
+    const float sunPitch = 3*PI/4;*/
+
+    // Geometry
     struct Vertex {
         vec3 position; // World-space position
         vec3 color; // BGR albedo (TODO: texture mapping)
         vec3 normal; // World-space vertex normals
     };
-
     array<GLBuffer> buffers;
 
-    Blender()
+    BlendView()
         : map("Island/Island.blend", home(), Map::Read|Map::Write) { // with write access to fix pointers (TODO: write back fixes for faster loads)
         load();
         parse();
+
+        window.localShortcut(Escape).connect(&::exit);
     }
 
     /// Recursively fix all pointers in an SDNA structure
@@ -165,6 +187,8 @@ struct Blender {
 
     /// Extracts relevant data from Blender structures
     void parse() {
+        //sun=mat4(); sun.rotateX(sunPitch);
+
         for(const Base& base: scene->base) {
             if(base.object->type==Object::Mesh) {
                 const Mesh* mesh = base.object->data;
@@ -172,7 +196,20 @@ struct Blender {
                 ref<MVert> verts (mesh->mvert, mesh->totvert);
                 array<Vertex> vertices;
                 for(const MVert& vert: verts) {
-                    vertices << Vertex __(vec3(vert.co), normalize(vec3(vert.no[0],vert.no[1],vert.no[2])), vec3(1,1,1)); //TODO: MCol
+                    vec3 position = vec3(vert.co);
+                    vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
+                    vec3 color = vec3(1,1,1); //TODO: MCol
+
+                    /*// Compute scene bounds in light space to fit shadow
+                    vec3 P = (sun*vertex.position).xyz();
+                    lightMin=min(lightMin,P);
+                    lightMax=max(lightMax,P);*/
+
+                    // Computes scene bounds in world space to fit view
+                    worldMin=min(worldMin, position);
+                    worldMax=max(worldMax, position);
+
+                    vertices << Vertex __(position, normal, color);
                 }
 
                 ref<MPoly> polys (mesh->mpoly, mesh->totpoly);
@@ -188,14 +225,109 @@ struct Blender {
                     }
                 }
 
-                /*// Submits geometry
+                // Submits geometry
                 GLBuffer buffer;
                 buffer.upload<Vertex>(vertices);
                 buffer.upload(indices);
-                buffers << move(buffer);*/
+                buffers << move(buffer);
 
-                log(base.object->id.name, mesh->id.name, vertices.size(), indices.size());
+                //log(base.object->id.name, mesh->id.name, vertices.size(), indices.size());
             }
         }
+
+        //FIXME: compute smallest enclosing sphere
+        worldCenter = (worldMin+worldMax)/2.f; worldRadius=length(worldMax.xy()-worldMin.xy())/2.f;
     }
+
+    // Orbital view control
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override {
+        int2 delta = cursor-lastPos; lastPos=cursor;
+        if(event==Motion && button==LeftButton) {
+            rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
+            rotation.y= clip(float(-PI/2),rotation.y,float(0)); // Keep pitch between [-PI/2,0]
+        }
+        else if(event == Press) focus = this;
+        else return false;
+        return true;
+    }
+
+    void render(int2 unused position, int2 unused size) override {
+        uint width=size.x, height = size.y;
+        // Computes projection transform
+        mat4 projection;
+        projection.perspective(PI/4,width,height,1./4,4);
+        // Computes view transform
+        mat4 view;
+        view.scale(1.f/worldRadius); // fit scene (isometric approximation)
+        view.translate(vec3(0,0,-1*worldRadius)); // step back
+        view.rotateX(rotation.y); // yaw
+        view.rotateZ(rotation.x); // pitch
+        view.translate(vec3(0,0,-worldCenter.z));
+        // View-space lighting
+        mat3 normalMatrix = view.normalMatrix();
+        /*vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
+        vec3 skyLightDirection = normalize(normalMatrix*vec3(0,0,1));
+
+        // Render sun shadow map
+        if(!sunShadow)
+            sunShadow = GLFrameBuffer(GLTexture(4096,4096,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear|GLTexture::Clamp));
+        sunShadow.bind(true);*/
+        glDepthTest(true);
+        glCullFace(true);
+
+        // Normalizes to -1,1
+        /*sun=mat4();
+        sun.translate(-1);
+        sun.scale(2.f/(lightMax-lightMin));
+        sun.translate(-lightMin);
+        sun.rotateX(sunPitch);
+
+        shadow["modelViewProjectionTransform"] = sun;
+        buffer.bindAttribute(shadow,"position",3,__builtin_offsetof(Vertex,position));
+        buffer.draw();
+
+        // Normalizes to xy to 0,1 and z to -1,1
+        sun=mat4();
+        sun.translate(vec3(0,0,0));
+        sun.scale(vec3(1.f/(lightMax.x-lightMin.x),1.f/(lightMax.y-lightMin.y),1.f/(lightMax.z-lightMin.z)));
+        sun.translate(-lightMin);
+        sun.rotateX(sunPitch);*/
+
+        if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
+        framebuffer.bind(true);
+        glBlend(false);
+
+        shader.bind();
+        shader["modelViewProjectionTransform"] = projection*view;
+        shader["normalMatrix"] = normalMatrix;
+        /*shader["sunLightTransform"] = sun;
+        shader["sunLightDirection"] = sunLightDirection;
+        shader["skyLightDirection"] = skyLightDirection;
+        shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;
+        shader.bindSamplers("shadowMap"); GLTexture::bindSamplers(sunShadow.depthTexture);*/
+        for(GLBuffer& buffer: buffers) {
+            buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
+            buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
+            buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
+            buffer.draw();
+        }
+
+        //TODO: fog
+        sky["inverseProjectionMatrix"] = projection.inverse();
+        //sky["sunLightDirection"] = -sunLightDirection;
+        glDrawRectangle(sky,vec2(-1,-1),vec2(1,1));
+
+        GLTexture color(width,height,GLTexture::RGB16F);
+        framebuffer.blit(color);
+
+        GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
+        glDepthTest(false);
+        glCullFace(false);
+
+        resolve.bindSamplers("framebuffer"); GLTexture::bindSamplers(color);
+        glDrawRectangle(resolve,vec2(-1,-1),vec2(1,1));
+
+        GLFrameBuffer::bindWindow(0, window.size);
+    }
+
 } application;

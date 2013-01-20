@@ -96,7 +96,7 @@ struct Mesh {
  struct AnimData* adt;
  struct BoundBox* bb;
  struct Ipo* ipo;
- struct Key* key;
+ struct Key {} * key;
  struct Material* mat;
  MPoly* mpoly;
  struct MTexPoly* mtpoly;

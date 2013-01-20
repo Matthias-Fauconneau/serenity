@@ -42,8 +42,8 @@ string getSelection(bool clipboard) { assert(current); return current->getSelect
 void setCursor(Rect region, Cursor cursor) { assert(current); return current->setCursor(region,cursor); }
 
 // Creates X window
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, bool softwareRendering)
-    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), softwareRendering(softwareRendering) {
+Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, Renderer renderer)
+    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
@@ -102,7 +102,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     if(widget) show(); //asynchronous window are shown by default to avoid race conditions
     registerPoll();
 
-    if(!softwareRendering) {
+    if(renderer == OpenGL) {
 #if GL
         if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
         if(!glContext) {
@@ -111,6 +111,8 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
             glContext = glXCreateContext(glDisplay,visual,0,1); assert(glContext);
         }
         glXMakeCurrent(glDisplay, id, glContext);
+#else
+        error("OpenGL unsupported");
 #endif
     }
 }
@@ -144,7 +146,7 @@ void Window::event() {
 
         if(state!=Idle) { state=Wait; return; }
 
-        if(softwareRendering) {
+        if(renderer == Raster) {
             if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
                 if(shm) {
                     {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
@@ -186,7 +188,7 @@ void Window::event() {
 
         frameReady();
 
-        if(softwareRendering) {
+        if(renderer == Raster) {
             if(featherBorder) { //feather borders
                 const bool corner = 1;
                 if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;

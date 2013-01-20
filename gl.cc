@@ -48,7 +48,7 @@ void GLShader::compile(uint type, const ref<byte>& source) {
     uint shader=glCreateShader(type);
     glShaderSource(shader, 1, &source.data, &(int&)source.size);
     glCompileShader(shader);
-    int length;
+    int length=0;
     glGetShaderiv(shader , GL_INFO_LOG_LENGTH , &length);
     if(length>1) {
         string buffer(length); buffer.setSize(length-1);
@@ -65,7 +65,7 @@ GLShader::GLShader(const ref<byte> &vertex, const ref<byte> &fragment) {
     compile(GL_VERTEX_SHADER, vertex);
     compile(GL_FRAGMENT_SHADER, fragment);
     glLinkProgram(id);
-    int length;
+    int length=0;
     glGetProgramiv(id , GL_INFO_LOG_LENGTH , &length);
     if(length>1) {
         string buffer(length); buffer.setSize(length-1);

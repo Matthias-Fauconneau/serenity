@@ -11,9 +11,13 @@ FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
+
+FLAGS_editor = -DGL
+FLAGS_blender = -DGL
+
 FLAGS_font = -I/usr/include/freetype2
 
-CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD))
+CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD)) $(FLAGS_$(TARGET))
 #CC += -Wno-volatile-register-var
 CC += -march=native
 #CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
@@ -28,6 +32,7 @@ ICONS_test = feeds network
 
 SHADERS = $(SHADERS_$(TARGET)) fill blit
 SHADERS_editor = shadow shader sky resolve
+SHADERS_blender = shader sky resolve
 
 SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=shaders/%.vert) $(SHADERS:%=shaders/%.frag)
 SRCS_profile = profile

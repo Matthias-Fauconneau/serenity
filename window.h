@@ -16,15 +16,15 @@ enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom
 /// Interfaces \a widget as a window on an X11 display server
 struct Window : Socket, Poll {
     no_copy(Window);
-
+    enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
-           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread(), bool softwareRendering=true);
+           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread(), Renderer renderer=Raster);
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size, const ref<byte>& name, bool softwareRendering) :
-        Window(widget, size, name, Image(),"_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread(), softwareRendering){}
+    Window(Widget* widget, int2 size, const ref<byte>& name, Renderer renderer) :
+        Window(widget, size, name, Image(),"_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread(), renderer){}
     ~Window() { destroy(); }
 
     /// Event handler
@@ -126,8 +126,8 @@ struct Window : Socket, Poll {
     /// Associated window resource (relative to \a id)
     enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment };
 
-    /// Whether to use software rendering
-    bool softwareRendering = true;
+    /// Selects between software or OpenGL rendering
+    Renderer renderer;
     /// System V shared memory
     int shm = 0;
     /// Shared window back buffer
