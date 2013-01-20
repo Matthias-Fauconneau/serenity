@@ -28,7 +28,7 @@ struct Favicon {
     void update();
 };
 
-/// List of entries fetched from RSS/Atom feeds
+/// List of entries fetched from feeds
 /// \note .config/feeds contains the list of feeds to fetch, .config/read contains the list of read articles
 struct Feeds : List<Entry> {
     File readConfig;
@@ -44,7 +44,7 @@ struct Feeds : List<Entry> {
     bool isRead(const ref<byte>& title, const ref<byte>& link);
     /// Returns whether \a entry is read (according to config/read)
     bool isRead(const Entry& entry);
-    /// Loads an RSS/Atom feed
+    /// Loads one feed
     void loadFeed(const URL&, Map&& document);
     /// If unread, appends entry at \a index to ~/.config/read
     void setRead(uint index);

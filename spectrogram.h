@@ -18,6 +18,8 @@ struct Spectrogram : ImageView {
 
     static constexpr uint F = 1056; // Size of the frequency plot in pixels (88x12)
     static constexpr uint T = 1056; // Number of updates in one image (one pixel per update)
+    uint t = 0;
+    Lock imageLock;
 
     /// Initializes a running spectrogram with \a N bins
     Spectrogram(uint N, uint rate=44100, uint bitDepth=16);
@@ -31,4 +33,6 @@ struct Spectrogram : ImageView {
     void write(float* data, uint size);
     /// Updates spectrogram using written data
     void update();
+    /// Renders spectrogram image
+    void render(int2 position, int2 size) override;
 };

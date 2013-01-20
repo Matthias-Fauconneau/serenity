@@ -22,6 +22,7 @@ ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET
 ICONS_taskbar = button
 ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next
+ICONS_analyzer = play pause
 ICONS_music = music
 ICONS_test = feeds network
 

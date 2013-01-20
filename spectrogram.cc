@@ -43,9 +43,10 @@ void Spectrogram::write(float* data, uint size) {
 
 void Spectrogram::update() {
     // Shifts image down
-    for(uint y=image.height-1; y>0; y--)
-         for(uint x: range(image.width))
-             image(x,y) = image(x,y-1);
+    Locker lock(imageLock);
+    for(uint y=image.height-1; y>=1; y--)
+        for(uint x: range(image.width))
+            image(x,y) = image(x,y-1);
 
     for(uint i: range(N)) windowed[i] = hann[i]*buffer[i]; // Multiplies window
     fftwf_execute(plan); // Transforms
@@ -62,7 +63,24 @@ void Spectrogram::update() {
         }
         sum /= n1-n0;
         int v = sRGB[clip(0,int(255*((log2(sum)-(bitDepth-8))/8)),255)]; // Logarithmic scale on [-8bit 0]
-        image(f,0) = byte4(v,v,v,255);
+        image(f,/*t*/0) = byte4(v,v,v,255);
     }
+    //t++;
 }
 
+void Spectrogram::render(int2 position, int2 size) {
+    Locker lock(imageLock);
+    /*if(t > 0) {
+        // Shifts image down
+        for(uint y=image.height-1; y>=t; y--)
+            for(uint x: range(image.width))
+                image(x,y) = image(x,y-t);
+        t = 0;
+    }*/
+
+    int2 pos = position+(size-image.size())/2;
+    blit(pos, image);
+
+    fill(0,T/2,F,T/2+1,red); // mark current audio output
+    for(uint x: range(1,88)) fill(x*12,0,x*12+1,T,blue); // mark current audio output
+}

@@ -33,8 +33,6 @@ struct Window : Socket, Poll {
     void processEvent(uint8 type, const XEvent& e);
     /// Returns Atom for \a name
     uint Atom(const ref<byte>& name);
-    /// Returns name for \a atom
-    string AtomName(uint atom);
     /// Returns KeySym for key \a code and modifier \a state
     uint KeySym(uint8 code, uint8 state);
     /// Returns KeyCode for \a sym
@@ -117,8 +115,8 @@ struct Window : Socket, Poll {
     /// This window base resource id
     uint id = 0;
 
-    static void* display;
-    static void* context;
+    /// Synchronize reading from event and readReply
+    Lock readLock;
 
     /// Shortcuts triggered when a key is pressed
     map<uint16, signal<> > shortcuts;
@@ -146,7 +144,7 @@ struct Window : Socket, Poll {
     struct QEvent { uint8 type; XEvent event; } _packed;
     array<QEvent> eventQueue;
     /// Reads an X reply (checks for errors and queue events)
-    template<class T> T readReply();
+    template<class T> T readReply(const ref<byte>& request);
 
     /// Current cursor
     Cursor cursor = Cursor::Arrow;

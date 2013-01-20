@@ -11,9 +11,10 @@
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
 // Gapless playback
+    Thread audioThread;
     static constexpr uint channels = 2;
     AudioFile file;
-    AudioOutput output __({this,&Player::read}, 44100, 8192);
+    AudioOutput output __({this,&Player::read}, 44100, 8192, audioThread);
     uint read(int16* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {
@@ -84,7 +85,8 @@ struct Player {
                 }
             }
         }
-        mainThread().priority=-19;
+        audioThread.priority=-20;
+        audioThread.spawn();
     }
     void queueFile(const ref<byte>& file, const ref<byte>& folder) {
         string title = string(section(section(file,'/',-2,-1),'.',0,-2));
@@ -138,7 +140,9 @@ struct Player {
         remaining.setText(string("00:00"_));
         titles.index=-1;
     }
-    void seek(int position) { if(file) { file.seek(position); update(file.position(),file.duration()); } }
+    void seek(int position) {
+        if(file) { file.seek(position); update(file.position(),file.duration()); }
+    }
     void update(int position, int duration) {
         if(slider.value == position) return;
         writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));

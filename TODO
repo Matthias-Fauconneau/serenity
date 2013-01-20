@@ -1,4 +1,29 @@
-Music: Physical modeling synthesis
+Analyzer:
+ - Set speed, Loop on selection, fix seek
+ - Display piano mask on spectrogram (to better match notes)
+ - Better visualisation (to better filter harmonics)
+
+ - Tempo estimation, Discrete note detection, Full rhythm tracking
+ - Harmonic estimation, Chord detection, Full melody tracking
+ - Timbre estimation, Track detection, Full intrument tracking
+
+ - User-assisted music sheet transcription
+ - Extract instruments for sampling (or modeling)
+
+Passive Reflectance Synthesis:
+ - show expected poles on frequency response plot
+
+Piano:
+ Realistic mode:
+  Compute running average of velocities, limit offset from average to 2x (but contribute fully to average computation) ?
+  Continuous scroll (~4-60px/s) ?
+ Practice mode:
+  Allow up to twice too slow
+  Repeat from previous bar/line/mark if too many note/beat errors
+ Record mode:
+  Stitch best lines
+  Sync webcam
+
 CG: Trees: improve branches using environment modeling (light and space competition), Textures: bark,leafs,twigs, Export .obj
 Touchbook: fast render, fix touchscreen, rotate screen, accelerometer trigger, onscreen keyboard, handwriting recognition
 Text Editor: mouse select, shift select, delete selection, X11 cut/copy

@@ -58,8 +58,6 @@ struct QueryTree { int8 req=15, pad=0; uint16 size=2; uint id; };
 struct QueryTreeReply { byte pad; uint16 seq; uint length; uint root,parent; uint16 count; byte pad2[14]; } fixed(QueryTreeReply);
 struct InternAtom { int8 req=16,exists=0; uint16 size=2; int16 length, pad=0; };
 struct InternAtomReply { byte pad; uint16 seq; uint length,atom; byte pad2[20]; } fixed(InternAtomReply);
-struct GetAtomName { int8 req=17,pad=0; uint16 size=2; uint atom; };
-struct GetAtomNameReply { byte pad; uint16 seq; uint length; uint16 size; byte pad2[22]; } fixed(GetAtomNameReply);
 struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint window,property,type; uint8 format,pad[3]={}; uint length; };
 struct GetProperty { int8 req=20,remove=0; uint16 size=6; uint window,property,type=0; uint offset=0,length=-1; };
 struct GetPropertyReply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length,pad[3]; } fixed(GetPropertyReply);

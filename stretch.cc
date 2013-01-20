@@ -4,7 +4,9 @@
 AudioStretch::AudioStretch(uint rate) {
     rubberband = new RubberBand::RubberBandStretcher(rate, 2, RubberBand::RubberBandStretcher::OptionProcessRealTime, 2);
 }
-
+void AudioStretch::setTimeRatio(float ratio) {
+    rubberband->setTimeRatio(ratio);
+}
 uint AudioStretch::read(int16* output, uint size) {
     while((uint)rubberband->available()<size) {
         uint need = rubberband->getSamplesRequired();

@@ -53,7 +53,7 @@ void Feeds::loadFeed(const URL& url unused, Map&& document) {
     string link = feed.text("rss/channel/link"_);
     if(!link) link=string(feed("feed"_)("link"_)["href"_]);
     assert(link,url);
-    URL channel = URL(link); //RSS ?: Atom
+    URL channel = URL(link);
     assert(channel.host);
     Favicon* favicon=0;
     for(Favicon* f: favicons) if(f->host==channel.host) { favicon=f; break; }
@@ -68,15 +68,15 @@ void Feeds::loadFeed(const URL& url unused, Map&& document) {
     auto addEntry = [this,&favicon,&count,&entries](const Element& e)->void{
         if(count>=16) return; //limit history
         if(array::size()+entries.size()>=array::capacity()) return; //limit total entry count
-        string title = e("title"_).text(); //RSS&Atom
-        string guid = e("guid"_).text(); if(!guid) guid=e("pubDate"_).text(); //RSS
-        string link = string(e("link"_)["href"_]); if(!link) link=e("link"_).text(); //Atom ?: RSS
+        string title = e("title"_).text();
+        string guid = e("guid"_).text(); if(!guid) guid=e("pubDate"_).text();
+        string link = string(e("link"_)["href"_]); if(!link) link=e("link"_).text();
         if(!isRead(guid, link)) entries<< Entry(move(guid),move(link),share(favicon->image),move(title)); //display all unread entries
         else if(count==0) entries<< Entry(move(guid),move(link),share(favicon->image),move(title),12); //display last read entry
         count++;
     };
-    feed.xpath("feed/entry"_,addEntry); //Atom
-    feed.xpath("rss/channel/item"_,addEntry); //RSS
+    feed.xpath("feed/entry"_,addEntry);
+    feed.xpath("rss/channel/item"_,addEntry);
     for(int i=entries.size()-1;i>=0;i--) *this<< move(entries[i]); //oldest first
     listChanged();
 }

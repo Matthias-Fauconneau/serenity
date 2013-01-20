@@ -5,7 +5,6 @@
 #include "process.h"
 
 extern bool softwareRendering;
-extern Lock framebufferLock;
 /// Current window framebuffer (X11 shared memory mapped by Window::render)
 extern Image framebuffer;
 

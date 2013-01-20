@@ -63,9 +63,8 @@ void Record::capture(float* audio, uint audioSize) {
         int stride = image.stride*4;
         AVFrame* frame = avcodec_alloc_frame();
         avpicture_alloc((AVPicture*)frame, PIX_FMT_YUV420P, videoCodec->width, videoCodec->height);
-        //{Locker framebufferLocker(framebufferLock); //FIXME: encode in main thread
-            sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, width, frame->data, frame->linesize);
-        //}
+        //FIXME: encode in main thread
+        sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, width, frame->data, frame->linesize);
         frame->pts = videoTime;
 
         AVPacket pkt = {}; av_init_packet(&pkt);

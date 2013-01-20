@@ -67,6 +67,7 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size);
 #define __( args... ) { args }
 #define ___ ...
 #define ____( ignore... ) ignore
+#define __thread
 #endif
 
 #ifdef DEBUG

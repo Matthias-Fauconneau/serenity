@@ -25,16 +25,19 @@ void glXSwapBuffers(void* dpy, uint drawable);
 #include "gl.h"
 #endif
 
-// Globals
-namespace Shm { int EXT, event, errorBase; } using namespace Shm;
-namespace Render { int EXT, event, errorBase; } using namespace Render;
-void* Window::display=0;
-void* Window::context=0;
+// Public globals
 int2 displaySize;
-Lock framebufferLock;
 Widget* focus;
 Widget* drag;
-Window* current;
+
+namespace Shm { int EXT, event, errorBase; } using namespace Shm;
+namespace Render { int EXT, event, errorBase; } using namespace Render;
+#if GL
+static void* glDisplay=0;
+static void* glContext=0;
+#endif
+
+static __thread Window* current; // Window being rendered in this thread
 string getSelection(bool clipboard) { assert(current); return current->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(current); return current->setCursor(region,cursor); }
 
@@ -63,14 +66,13 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     }
     assert(visual);
 
-    {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; send(string(raw(r)+"MIT-SHM"_+pad(4,r.length)));}
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; string(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
+        Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
 
-    {QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; send(string(raw(r)+"RENDER"_+pad(4,r.length)));}
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(); Render::EXT=r.major; Render::event=r.firstEvent; Render::errorBase=r.firstError; }
-    {Render::QueryVersion r; send(raw(r)); readReply<Render::QueryVersionReply>();}
-    {QueryPictFormats r; send(raw(r));}
-    {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>();
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; string(raw(r)+"RENDER"_+pad(4,r.length));}));
+        Render::EXT=r.major; Render::event=r.firstEvent; Render::errorBase=r.firstError; }
+    //readReply<Render::QueryVersionReply>(raw(Render::QueryVersion()));
+    {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>(raw(QueryPictFormats()));
         array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
         for(uint unused i: range(r.numScreens)) { PictScreen screen = read<PictScreen>();
             for(uint unused i: range(screen.numDepths)) { PictDepth depth = read<PictDepth>();
@@ -102,13 +104,13 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
 
     if(!softwareRendering) {
 #if GL
-        if(!display) display = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(display);
-        if(!context) {
+        if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
+        if(!glContext) {
             int attributes[] = {GLX_RGBA,0};
-            void* visual = glXChooseVisual(display,0,attributes); if(!visual) error("No matching visual");
-            context = glXCreateContext(display,visual,0,1); assert(context);
+            void* visual = glXChooseVisual(glDisplay,0,attributes); if(!visual) error("No matching visual");
+            glContext = glXCreateContext(glDisplay,visual,0,1); assert(glContext);
         }
-        glXMakeCurrent(display, id, context);
+        glXMakeCurrent(glDisplay, id, glContext);
 #endif
     }
 }
@@ -142,8 +144,6 @@ void Window::event() {
 
         if(state!=Idle) { state=Wait; return; }
 
-        Locker framebufferLocker(framebufferLock);
-
         if(softwareRendering) {
             if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
                 if(shm) {
@@ -175,7 +175,7 @@ void Window::event() {
             }
         } else {
 #if GL
-            glXMakeCurrent(display, id, context);
+            glXMakeCurrent(glDisplay, id, glContext);
             GLFrameBuffer::bindWindow(0,size,true,vec4(vec3(backgroundColor),backgroundOpacity));
             ::softwareRendering=false;
 #endif
@@ -200,12 +200,15 @@ void Window::event() {
             state=Server;
         } else {
 #if GL
-            glXSwapBuffers(display, id);
+            glXSwapBuffers(glDisplay, id);
 #endif
         }
     } else do {
+        readLock.lock();
         uint8 type = read<uint8>();
-        processEvent(type, read<XEvent>());
+        XEvent e = read<XEvent>();
+        readLock.unlock();
+        processEvent(type, e);
         while(eventQueue) { QEvent e=eventQueue.take(0); processEvent(e.type, e.event); }
     } while(poll());
     current=0;
@@ -314,7 +317,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     }
 }
 void Window::send(const ref<byte>& request) { write(request); sequence++; }
-template<class T> T Window::readReply() {
+template<class T> T Window::readReply(const ref<byte>& request) {
+    Locker lock(readLock);
+    send(request);
     for(;;) { uint8 type = read<uint8>();
         if(type==0){XError e=read<XError>(); processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
         else if(type==1) return read<T>();
@@ -356,13 +361,11 @@ void Window::render() { if(mapped) queue(); }
 
 // Keyboard
 uint Window::KeySym(uint8 code, uint8 state) {
-    {GetKeyboardMapping r; r.keycode=code; send(raw(r));}
-    {GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>();
-        array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
-        if(!keysyms) return 0;
-        if(keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
-        return keysyms[state&1];
-    }
+    GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({GetKeyboardMapping r; r.keycode=code; raw(r);}));
+    array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
+    if(!keysyms) return 0;
+    if(keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
+    return keysyms[state&1];
 }
 uint Window::KeyCode(Key sym) {
     uint keycode=0;
@@ -379,17 +382,11 @@ signal<>& Window::globalShortcut(Key key) {
 
 // Properties
 uint Window::Atom(const ref<byte>& name) {
-    {InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; send(string(raw(r)+name+pad(4,r.length)));}
-    {InternAtomReply r=readReply<InternAtomReply>(); return r.atom; }
-}
-string Window::AtomName(uint atom) {
-    {GetAtomName r; r.atom=atom; send(raw(r));}
-    {GetAtomNameReply r=readReply<GetAtomNameReply>(); string name=read(r.size); read(align(4,r.size)-r.size); return name;}
+    InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; return readReply<InternAtomReply>(string(raw(r)+name+pad(4,r.length))).atom;
 }
 template<class T> array<T> Window::getProperty(uint window, const ref<byte>& name, uint size) {
-    {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
-    {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
-        array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
+    GetPropertyReply r=readReply<GetPropertyReply>(({ GetProperty r; r.window=window; r.property=Atom(name); r.length=size; raw(r); }));
+    { uint size=r.length*r.format/8; array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
 }
 template array<uint> Window::getProperty(uint window, const ref<byte>& name, uint size);
 template array<byte> Window::getProperty(uint window, const ref<byte>& name, uint size);
@@ -408,12 +405,15 @@ void Window::setIcon(const Image& icon) {
 }
 
 string Window::getSelection(bool clipboard) {
-    {GetSelectionOwner r; if(clipboard) r.selection=Atom("CLIPBOARD"_); send(raw(r)); }
-    uint owner = readReply<GetSelectionOwnerReply>().owner; if(!owner) return string();
+    uint owner = readReply<GetSelectionOwnerReply>(({GetSelectionOwner r; if(clipboard) r.selection=Atom("CLIPBOARD"_); raw(r); })).owner;
+    if(!owner) return string();
     {ConvertSelection r; r.requestor=id; if(clipboard) r.selection=Atom("CLIPBOARD"_); r.target=Atom("UTF8_STRING"_); send(raw(r));}
-    for(;;) { uint8 type = read<uint8>();
-        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); return getProperty<byte>(id,"UTF8_STRING"_); }
+    for(;;) {
+        readLock.lock();
+        uint8 type = read<uint8>();
+        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); readLock.unlock(); return getProperty<byte>(id,"UTF8_STRING"_); }
         else eventQueue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
+        readLock.unlock();
     }
 }
 
@@ -452,8 +452,7 @@ Image Window::getSnapshot() {
     int shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
     buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
     {Shm::Attach r; r.seg=id+SnapshotSegment; r.shm=shm; send(raw(r));}
-    {Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment; send(raw(r));}
-    readReply<Shm::GetImageReply>();
+    readReply<Shm::GetImageReply>(({Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment; raw(r); }));
     {Shm::Detach r; r.seg=id+SnapshotSegment; send(raw(r));}
     Image image = copy(buffer);
     for(uint y: range(image.height)) for(uint x: range(image.width)) {byte4& p=image(x,y); p.a=0xFF;}
