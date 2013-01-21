@@ -40,59 +40,35 @@ void GLUniform::operator=(mat4 m) { glUseProgram(program); glUniformMatrix4fv(lo
 #endif
 GLUniform GLShader::operator[](const char* name) {
     int location = uniformLocations.value(name,-1);
-    if(location<0) uniformLocations.insert(name,location=glGetUniformLocation(id,name));
-    if(location<0) error("Unknown uniform"_,name);
+    if(location<0) {
+        location=glGetUniformLocation(id,name);
+        if(location<0) error("Unknown uniform"_,name);
+        uniformLocations.insert(name,location);
+    }
     return GLUniform(id,location);
 }
 
 GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
     id = glCreateProgram();
+    string shaders;
     for(uint type: (uint[]){GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {
         array< ref<byte> > tags_;
         tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
         string global, main;
-        /*const char* s = source.data, *e=source.data+source.size; //TODO: use TextData (or Parser)
-        array<int> scope;
-        for(uint nest=0;s<e;) { //for each line
-            const char* l=s;
-            { //[a-z]+ {
-                const char* t=s; while(*t==' '||*t=='\t') t++; const char* b=t; while(*t>='a'&&*t<='z') t++;
-                const ref<byte> tag(b,t);
-                if(t>b && *t++==' ' && *t++=='{' && *t++=='\n') { //scope
-                    bool skip=true;
-                    for(const auto& e : tags_) if(tag==e) { skip=false; break; }
-                    s=t;
-                    if(skip) {
-                        for(int nest=1;nest;s++) { if(!*s) error("Unmatched {"_); if(*s=='{') nest++; if(*s=='}') nest--; }
-                        if(*s!='\n') error(""); s++;
-                    } else { scope<<nest; nest++; } //remember to remove scope end bracket
-                    continue;
-                }
-            }
-            bool declaration=false;
-            { //(uniform|attribute|varying|in|out )|(float|vec[1234]|mat[234]) [a-zA-Z0-9]+\(
-                const char* t=s; while(*t==' '||*t=='\t') t++; const char* b=t; while(*t>='a'&&*t<='z') t++;
-                const ref<byte> qualifier(b,t);
-                if(t>b && *t++==' ') {
-                    for(const auto& e : (ref<byte>[]){"uniform"_,"attribute"_,"varying"_,"in"_,"out"_}) if(qualifier==e) { declaration=true; break; }
-                }
-            }
-            for(;s<e && *s!='\n';s++) { if(*s=='{') nest++; if(*s=='}') nest--; } s++;
-            if(scope.size() && nest==scope.last()) { scope.pop(); continue; }
-            (declaration ? global : main) << ref<byte>(l,s);
-        }*/
         TextData s (source);
         array<uint> scope;
         for(uint nest=0;s;) { //for each line
-            static array< ref<byte> > qualifiers = split("uniform attribute varying in out"_);
+            static array< ref<byte> > qualifiers = split("const uniform attribute varying out"_);
+            static array< ref<byte> > types = split("float vec2 vec3 vec4"_);
             uint lineStart = s.index;
             s.whileAny(" \t"_);
-            ref<byte> word = s.until(' ');
-            if(word && s.match(" {\n"_)) { //scope: "[a-z]+ {"
+            ref<byte> word = s.word();
+            s.whileAny(" \t"_);
+            if(word && s.match("{\n"_)) { //scope: "[a-z]+ {"
                 if(tags_.contains(word)) { scope<<nest; nest++; } // Remember nesting level to remove matching scope closing bracket
                 else { // Skip scope
                     for(uint nest=1; nest;) {
-                        if(!s) error("Unmatched {"_);
+                        if(!s) error(source, "Unmatched {"_);
                         if(s.match('{')) nest++;
                         else if(s.match('}')) nest--;
                         else s.advance(1);
@@ -101,13 +77,16 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
                 }
                 continue;
             }
+            bool function = false;
+            if(types.contains(word) && s.word() && s.match('(')) function=true;
             while(s && !s.match('\n')) {
                 if(s.match('{')) nest++;
                 else if(s.match('}')) nest--;
                 else s.advance(1);
             }
             if(scope && nest==scope.last()) { scope.pop(); continue; } // Remove matching scope closing bracket
-            (qualifiers.contains(word) ? global : main) << s.slice(lineStart, s.index);
+            ref<byte> line = s.slice(lineStart, s.index-lineStart);
+            if(trim(line)) (function || qualifiers.contains(word) ? global : main) << line;
         }
         string glsl = global+"\nvoid main() {\n"_+main+"\n}\n"_;
         uint shader = glCreateShader(type);
@@ -120,7 +99,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
         if(!status || length>1) {
             string buffer(length); buffer.setSize(length-1);
             glGetShaderInfoLog(shader, length, 0, buffer.data());
-            if(buffer) error("Shader failed\n",buffer);
+            error(glsl,"Shader failed\n",buffer);
         }
         glAttachShader(id, shader);
     }
@@ -131,7 +110,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
     if(!status || length>1) {
         string buffer(length); buffer.setSize(length-1);
         glGetProgramInfoLog(id, length, 0, buffer.data());
-        if(buffer) error("Program failed\n",buffer);
+        error(tags, "Program failed\n",buffer);
     }
 }
 void GLShader::bind() { glUseProgram(id); }

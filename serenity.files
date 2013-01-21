@@ -1,13 +1,115 @@
-analyzer.cc   data.h        file.h         ico.cc        layout.h      music.cc    reflectance.cc  stretch.cc      utf8.cc
-array.h       desktop.cc    filewatcher.h  ico.h         linux.h       pdf.cc      resample.cc     stretch.h       utf8.h
-asound.cc     disasm.cc     flac.cc        image.cc      lsystem.cc    pdf.h       resample.h      string.cc       vec16.h
-asound.h      disasm.h      flac.h         image.h       lsystem.h     player.cc   sampler.cc      string.h        vector.h
-blender.cc    display.cc    font.cc        inflate.cc    map.h         png.cc      sampler.h       synthesizer.cc  weekview.cc
-blender.glsl  display.glsl  font.h         inflate.h     matrix.h      png.h       score.cc        taskbar.cc      widget.h
-blender.h     display.h     function.h     interface.cc  memory.cc     process.cc  score.h         test.cc         window.cc
-book.cc       editor.cc     gl.cc          interface.h   memory.h      process.h   sequencer.cc    text.cc         window.h
-calendar.cc   feeds.cc      gl.h           jpeg.cc       midi.cc       profile.cc  sequencer.h     text.h          x.h
-calendar.h    feeds.h       html.cc        jpeg.h        midi.h        raster.cc   sfzviewer.cc    time.cc         xml.cc
-core.cc       ffmpeg.cc     html.h         keyboard.cc   midiscore.cc  raster.h    simd.h          time.h          xml.h
-core.h        ffmpeg.h      http.cc        keyboard.h    midiscore.h   record.cc   spectrogram.cc  trace.cc
-data.cc       file.cc       http.h         layout.cc     monitor.cc    record.h    spectrogram.h   trace.h
+analyzer.cc
+data.h
+file.h
+ico.cc
+layout.h
+music.cc
+reflectance.cc
+stretch.cc
+utf8.cc
+array.h
+desktop.cc
+filewatcher.h
+ico.h
+linux.h
+pdf.cc
+resample.cc
+stretch.h
+utf8.h
+asound.cc
+disasm.cc
+flac.cc
+image.cc
+lsystem.cc
+pdf.h
+resample.h
+string.cc
+vec16.h
+asound.h
+disasm.h
+flac.h
+image.h
+lsystem.h
+player.cc
+sampler.cc
+string.h
+vector.h
+blender.cc
+display.cc
+font.cc
+inflate.cc
+map.h
+png.cc
+sampler.h
+synthesizer.cc
+weekview.cc
+blender.glsl
+display.glsl
+font.h
+inflate.h
+matrix.h
+png.h
+score.cc
+taskbar.cc
+widget.h
+blender.h
+display.h
+function.h
+interface.cc
+memory.cc
+process.cc
+score.h
+test.cc
+window.cc
+book.cc
+editor.cc
+gl.cc
+interface.h
+memory.h
+process.h
+sequencer.cc
+text.cc
+window.h
+calendar.cc
+feeds.cc
+gl.h
+jpeg.cc
+midi.cc
+profile.cc
+sequencer.h
+text.h
+x.h
+calendar.h
+feeds.h
+html.cc
+jpeg.h
+midi.h
+raster.cc
+sfzviewer.cc
+time.cc
+xml.cc
+core.cc
+ffmpeg.cc
+html.h
+keyboard.cc
+midiscore.cc
+raster.h
+simd.h
+time.h
+xml.h
+core.h
+ffmpeg.h
+http.cc
+keyboard.h
+midiscore.h
+record.cc
+spectrogram.cc
+trace.cc
+data.cc
+file.cc
+http.h
+layout.cc
+monitor.cc
+record.h
+spectrogram.h
+trace.h

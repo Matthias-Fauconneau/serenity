@@ -61,6 +61,7 @@ struct BlendView : Widget {
 
     // Shaders
     map<string, GLShader> shaders;
+    GLShader shader __(blender, "transform normal diffuse shadow sun sky"_);
 
     // Geometry
     struct Vertex {
@@ -226,6 +227,7 @@ struct BlendView : Widget {
     void parse() {
         sun=mat4(); sun.rotateX(sunPitch); sun.rotateZ(sunYaw);
 
+        shaders.reserve(16); // Reallocation would dangle Object::shader references
         for(const Base& base: scene->base) {
             if(base.object->type==::Object::Mesh) {
                 const Mesh* mesh = base.object->data;
@@ -272,21 +274,15 @@ struct BlendView : Widget {
                 buffer.upload<Vertex>(vertices);
                 buffer.upload(indices);
 
-                // Compiles shader
-                static Folder shaderFolder("shaders",cwd());
-
-                ref<byte> vert="default"_, frag="default"_;
+                /*// Compiles shader
+                string tags = string("transform normal diffuse shadow sun sky"_);
                 if(base.object->data->totcol>=1 && base.object->data->mat[0]) {
-                    string name =  toLower(str((const char*)base.object->data->mat[0]->id.name+2));
-                    if(existsFile(string(name+".vert"_),shaderFolder)) vert=name;
-                    if(existsFile(string(name+".frag"_),shaderFolder)) frag=name;
-                    log(name, vert, frag);
+                    string name = replace(simplify(toLower(str((const char*)base.object->data->mat[0]->id.name+2)))," "_,"_");
+                    tags <<' '<<name;
                 }
-                if(!shaders.contains(vert+frag))
-                    shaders.insert(vert+frag, GLShader(
-                                       readFile(string(vert+".vert"_),shaderFolder),
-                                       readFile(string(frag+".frag"_),shaderFolder)) );
-                objects << Object __(move(buffer), shaders.at(vert+frag));
+                if(!shaders.contains(tags)) shaders.insert(tags, GLShader(blender, tags));
+                objects << Object __(move(buffer), shaders.at(tags));*/
+                objects << Object __(move(buffer), shader);
 
                 //log(base.object->id.name, mesh->id.name, vertices.size(), indices.size());
             }
@@ -364,7 +360,7 @@ struct BlendView : Widget {
             shader.bind();
             shader["modelViewProjectionTransform"] = projection*view;
             shader["normalMatrix"] = normalMatrix;
-            shader["sunLightTransform"] = sun;
+            shader["shadowTransform"] = sun;
             shader["sunLightDirection"] = sunLightDirection;
             shader["skyLightDirection"] = skyLightDirection;
             shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;

@@ -29,7 +29,7 @@ diffuse {
   diffuseColor = color;
  }
  fragment {
-  vec3 diffuseLight = 0;
+  vec3 diffuseLight = vec3(0,0,0);
  }
 }
 
@@ -46,13 +46,14 @@ shadow {
   for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
    PCF += shadow2DProj(shadowMap, vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.zw)).r;
   float shadowLight = 1.0-PCF/4.0;
+ }
 }
 
 sun {
  fragment {
   const vec3 sunColor = vec3(0.875, 0.75, 0.5); //(0.75, 0.5, 0.25);
   uniform vec3 sunLightDirection;
-  diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor
+  diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor;
  }
 }
 
@@ -69,7 +70,7 @@ screen {
  vertex {
   attribute vec2 position;
   gl_Position = vec4(position,0,1);
-  texCoord = (position+1)/2;
+  texCoord = (position+1.0)/2.0;
  }
 }
 
@@ -93,6 +94,8 @@ atmosphere {
   const float Kr=0.0025, Km=0.0001, g=-0.990;
   float cos = dot(sunLightDirection, normalize(viewRay));
   float miePhase = ((1.0 - g*g) / (2.0 + g*g)) * (1.0 + cos*cos) / pow(1.0 + g*g - 2.0*g*cos, 1.5);
+  const vec3 skyColor = vec3(0.125, 0.25, 0.5); //(0.25, 0.5, 0.75)
+  const vec3 sunColor = vec3(0.875, 0.75, 0.5); //(0.75, 0.5, 0.25);
   gl_FragColor.rgb = skyColor + sunColor*20.0*Km*miePhase;
  }
 }
