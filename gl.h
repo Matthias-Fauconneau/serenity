@@ -22,7 +22,7 @@ struct GLUniform {
 };
 
 struct GLShader {
-    GLShader(const ref<byte>& vertex, const ref<byte>& fragment);
+    GLShader(const ref<byte>& source, const ref<byte>& tags=""_);
     void compile(uint type, const ref<byte>& source);
     void bind();
     uint attribLocation(const char*);
@@ -35,16 +35,10 @@ struct GLShader {
     map<const char*,int> uniformLocations;
 };
 
-#define SHADER(name) \
-GLShader& name ## Shader() { \
-    extern char _binary_shaders_ ## name ##_vert_start[]; \
-    extern char _binary_shaders_ ## name ##_vert_end[]; \
-    extern char _binary_shaders_ ## name ##_frag_start[]; \
-    extern char _binary_shaders_ ## name ##_frag_end[]; \
-    static GLShader shader = GLShader( ref<byte>(_binary_shaders_## name ##_vert_start,_binary_shaders_## name ##_vert_end), \
-    ref<byte>(_binary_shaders_## name ##_frag_start,_binary_shaders_## name ##_frag_end)); \
-    return shader; \
-}
+#define SHADER( name ) \
+extern char _binary_ ## name ##_glsl_start[]; \
+extern char _binary_ ## name ##_glsl_end[]; \
+static ref<byte> name (_binary_ ## name ##_glsl_start,_binary_ ## name ##_glsl_end);
 
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
 struct GLBuffer {
@@ -81,7 +75,7 @@ struct GLBuffer {
 };
 
 vec2 project(vec2 p);
-void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord=false);
+void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1), bool texCoord=false);
 void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord=false);
 void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);
 

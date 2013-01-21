@@ -47,6 +47,8 @@ string replace(const ref<byte>& s, const ref<byte>& before, const ref<byte>& aft
 string toLower(const ref<byte>& s);
 /// Removes duplicate whitespace
 string simplify(string&& s);
+/// Repeats a character
+string repeat(char c, uint times);
 
 struct stringz : string { operator char*(){return (char*)data();}};
 /// Copies the reference and appends a null byte
@@ -65,10 +67,14 @@ inline string str(const uint16& n) { return dec(n); }
 inline string str(const int16& n) { return dec(n); }
 inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
+inline string str(const unsigned long& n) { return dec(n); }
+inline string str(const long& n) { return dec(n); }
 inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 inline string str(const uint64& n) { return hex(n); }
 inline string str(const int64& n) { return hex(n); }
 template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
+/*inline string str(void* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
+template<class T> inline string str(T* const& p) { return str(*p); }*/
 
 /// Converts floating-point numbers
 string ftoa(float number, int precision=2, int exponent=10);

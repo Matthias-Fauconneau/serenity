@@ -129,7 +129,7 @@ string Element::text(const ref<byte>& path) const {
 string Element::str(uint depth) const {
     //assert(name||content, attributes, children);
     string line;
-    string indent; for(uint unused i: range(depth)) indent<<' ';
+    string indent = repeat(' ',depth);
     if(name) line << indent<<"<"_+name;
     for(auto attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
     if(trim(content)||children) {

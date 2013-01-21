@@ -141,6 +141,10 @@ string simplify(string&& s) {
     return move(s);
 }
 
+string repeat(char c, uint times) {
+    string s; for(uint unused i: range(times)) s<<c; return s;
+}
+
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return r; }
 
 /// Number conversions

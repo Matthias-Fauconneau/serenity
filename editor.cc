@@ -421,8 +421,8 @@ struct Editor : Widget {
         mat4 view;
         view.scale(1.f/worldRadius); // fit scene (isometric approximation)
         view.translate(vec3(0,0,-1*worldRadius)); // step back
-        view.rotateX(rotation.y); // yaw
-        view.rotateZ(rotation.x); // pitch
+        view.rotateX(rotation.y); // pitch
+        view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
         // View-space lighting
         mat3 normalMatrix = view.normalMatrix();

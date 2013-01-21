@@ -4,6 +4,7 @@
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 
+// Header for a file-block (BHead in blender)
 struct BlockHeader {
     char identifier[4];
     uint32_t size; // Total length of the data after the block header
@@ -60,15 +61,162 @@ struct bAnimVizSettings {
  int path_ac;
 };
 
-struct CustomData {
- struct CustomDataLayer* layers;
- int typemap[34];
- int totlayer;
- int maxlayer;
- int totsize;
- int pad2;
- void* pool;
- struct CustomDataExternal* external;
+
+struct VolumeSettings {
+ float density;
+ float emission;
+ float scattering;
+ float reflection;
+ float emission_col[3];
+ float transmission_col[3];
+ float reflection_col[3];
+ float density_scale;
+ float depth_cutoff;
+ float asymmetry;
+ short stepsize_type;
+ short shadeflag;
+ short shade_type;
+ short precache_resolution;
+ float stepsize;
+ float ms_diff;
+ float ms_intensity;
+ float ms_spread;
+};
+
+struct GameSettings {
+ int flag;
+ int alpha_blend;
+ int face_orientation;
+ int pad1;
+};
+
+struct Material {
+ ID id;
+ struct AnimData* adt;
+ short material_type;
+ short flag;
+ float r;
+ float g;
+ float b;
+ float specr;
+ float specg;
+ float specb;
+ float mirr;
+ float mirg;
+ float mirb;
+ float ambr;
+ float ambb;
+ float ambg;
+ float amb;
+ float emit;
+ float ang;
+ float spectra;
+ float ray_mirror;
+ float alpha;
+ float ref;
+ float spec;
+ float zoffs;
+ float add;
+ float translucency;
+ VolumeSettings vol;
+ GameSettings game;
+ float fresnel_mir;
+ float fresnel_mir_i;
+ float fresnel_tra;
+ float fresnel_tra_i;
+ float filter;
+ float tx_limit;
+ float tx_falloff;
+ short ray_depth;
+ short ray_depth_tra;
+ short har;
+ char seed1;
+ char seed2;
+ float gloss_mir;
+ float gloss_tra;
+ short samp_gloss_mir;
+ short samp_gloss_tra;
+ float adapt_thresh_mir;
+ float adapt_thresh_tra;
+ float aniso_gloss_mir;
+ float dist_mir;
+ short fadeto_mir;
+ short shade_flag;
+ int mode;
+ int mode_l;
+ short flarec;
+ short starc;
+ short linec;
+ short ringc;
+ float hasize;
+ float flaresize;
+ float subsize;
+ float flareboost;
+ float strand_sta;
+ float strand_end;
+ float strand_ease;
+ float strand_surfnor;
+ float strand_min;
+ float strand_widthfade;
+ char strand_uvname[64];
+ float sbias;
+ float lbias;
+ float shad_alpha;
+ int septex;
+ char rgbsel;
+ char texact;
+ char pr_type;
+ char use_nodes;
+ short pr_back;
+ short pr_lamp;
+ short pr_texture;
+ short ml_flag;
+ short diff_shader;
+ short spec_shader;
+ float roughness;
+ float refrac;
+ float param[4];
+ float rms;
+ float darkness;
+ short texco;
+ short mapto;
+ struct ColorBand* ramp_col;
+ struct ColorBand* ramp_spec;
+ char rampin_col;
+ char rampin_spec;
+ char rampblend_col;
+ char rampblend_spec;
+ short ramp_show;
+ short pad3;
+ float rampfac_col;
+ float rampfac_spec;
+ struct MTex* mtex[18];
+ struct bNodeTree* nodetree;
+ struct Ipo* ipo;
+ struct Group* group;
+ struct PreviewImage* preview;
+ float friction;
+ float fh;
+ float reflect;
+ float fhdist;
+ float xyfrict;
+ short dynamode;
+ short pad2;
+ float sss_radius[3];
+ float sss_col[3];
+ float sss_error;
+ float sss_scale;
+ float sss_ior;
+ float sss_colfac;
+ float sss_texfac;
+ float sss_front;
+ float sss_back;
+ short sss_flag;
+ short sss_preset;
+ int mapto_textured;
+ short shadowonly_flag;
+ short index;
+ ListBase<> gpumaterial;
 };
 
 struct MPoly {
@@ -91,13 +239,24 @@ struct MVert {
  char bweight;
 };
 
+struct CustomData {
+ struct CustomDataLayer* layers;
+ int typemap[34];
+ int totlayer;
+ int maxlayer;
+ int totsize;
+ int pad2;
+ void* pool;
+ struct CustomDataExternal* external;
+};
+
 struct Mesh {
  ID id;
  struct AnimData* adt;
  struct BoundBox* bb;
  struct Ipo* ipo;
  struct Key {} * key;
- struct Material* mat;
+ Material** mat;
  MPoly* mpoly;
  struct MTexPoly* mtpoly;
  MLoop* mloop;
@@ -172,7 +331,7 @@ struct Object {
  ListBase<> modifiers;
  int mode;
  int restore_mode;
- struct Material* mat;
+ Material** mat;
  char* matbits;
  int totcol;
  int actcol;

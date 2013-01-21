@@ -30,11 +30,11 @@ ICONS_analyzer = play pause
 ICONS_music = music
 ICONS_test = feeds network
 
-SHADERS = $(SHADERS_$(TARGET)) fill blit
-SHADERS_editor = shadow shader sky resolve
-SHADERS_blender = shader sky resolve
+SHADERS = $(SHADERS_$(TARGET))
+SHADERS_editor = display editor
+SHADERS_blender = display blender
 
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=shaders/%.vert) $(SHADERS:%=shaders/%.frag)
+SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
 SRCS_profile = profile
 
 LIBS_time = rt
@@ -54,7 +54,7 @@ INSTALL_feeds = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_music = icons/$(TARGET).png $(TARGET).desktop
 INSTALL_monitor = $(TARGET).desktop
 
-all: prepare $(BUILD)/$(TARGET)
+all: $(BUILD)/$(TARGET)
 
 clean:
 	@rm -f $(BUILD)/*.l
@@ -63,9 +63,6 @@ clean:
 	@rm -f $(BUILD)/$(TARGET)
 	@rm -fR $(BUILD)/icons
 	@rmdir $(BUILD)
-
-prepare:
-	@ln -sf $(TARGET).files serenity.files
 
 %.l: %.d
 	@python3 dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
@@ -88,12 +85,7 @@ $(BUILD)/%.o: %.png
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<
 
-$(BUILD)/%.vert.o: %.vert
-	@echo $<
-	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@ld -r -b binary -o $@ $<
-
-$(BUILD)/%.frag.o: %.frag
+$(BUILD)/%.glsl.o: %.glsl
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<

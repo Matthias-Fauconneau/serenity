@@ -1,4 +1,5 @@
 #include "gl.h"
+#include "data.h"
 
 #define GL_GLEXT_PROTOTYPES
 #include  <GL/gl.h>
@@ -44,37 +45,94 @@ GLUniform GLShader::operator[](const char* name) {
     return GLUniform(id,location);
 }
 
-void GLShader::compile(uint type, const ref<byte>& source) {
-    uint shader=glCreateShader(type);
-    glShaderSource(shader, 1, &source.data, &(int&)source.size);
-    glCompileShader(shader);
-    int length=0;
-    glGetShaderiv(shader , GL_INFO_LOG_LENGTH , &length);
-    if(length>1) {
-        string buffer(length); buffer.setSize(length-1);
-        glGetShaderInfoLog(shader, length, 0, buffer.data());
-        if(buffer) log(buffer);
-    }
-    int success=0;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if(!success) error("Compile failed");
-    glAttachShader(id, shader);
-}
-GLShader::GLShader(const ref<byte> &vertex, const ref<byte> &fragment) {
+GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
     id = glCreateProgram();
-    compile(GL_VERTEX_SHADER, vertex);
-    compile(GL_FRAGMENT_SHADER, fragment);
+    for(uint type: (uint[]){GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {
+        array< ref<byte> > tags_;
+        tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
+        string global, main;
+        /*const char* s = source.data, *e=source.data+source.size; //TODO: use TextData (or Parser)
+        array<int> scope;
+        for(uint nest=0;s<e;) { //for each line
+            const char* l=s;
+            { //[a-z]+ {
+                const char* t=s; while(*t==' '||*t=='\t') t++; const char* b=t; while(*t>='a'&&*t<='z') t++;
+                const ref<byte> tag(b,t);
+                if(t>b && *t++==' ' && *t++=='{' && *t++=='\n') { //scope
+                    bool skip=true;
+                    for(const auto& e : tags_) if(tag==e) { skip=false; break; }
+                    s=t;
+                    if(skip) {
+                        for(int nest=1;nest;s++) { if(!*s) error("Unmatched {"_); if(*s=='{') nest++; if(*s=='}') nest--; }
+                        if(*s!='\n') error(""); s++;
+                    } else { scope<<nest; nest++; } //remember to remove scope end bracket
+                    continue;
+                }
+            }
+            bool declaration=false;
+            { //(uniform|attribute|varying|in|out )|(float|vec[1234]|mat[234]) [a-zA-Z0-9]+\(
+                const char* t=s; while(*t==' '||*t=='\t') t++; const char* b=t; while(*t>='a'&&*t<='z') t++;
+                const ref<byte> qualifier(b,t);
+                if(t>b && *t++==' ') {
+                    for(const auto& e : (ref<byte>[]){"uniform"_,"attribute"_,"varying"_,"in"_,"out"_}) if(qualifier==e) { declaration=true; break; }
+                }
+            }
+            for(;s<e && *s!='\n';s++) { if(*s=='{') nest++; if(*s=='}') nest--; } s++;
+            if(scope.size() && nest==scope.last()) { scope.pop(); continue; }
+            (declaration ? global : main) << ref<byte>(l,s);
+        }*/
+        TextData s (source);
+        array<uint> scope;
+        for(uint nest=0;s;) { //for each line
+            static array< ref<byte> > qualifiers = split("uniform attribute varying in out"_);
+            uint lineStart = s.index;
+            s.whileAny(" \t"_);
+            ref<byte> word = s.until(' ');
+            if(word && s.match(" {\n"_)) { //scope: "[a-z]+ {"
+                if(tags_.contains(word)) { scope<<nest; nest++; } // Remember nesting level to remove matching scope closing bracket
+                else { // Skip scope
+                    for(uint nest=1; nest;) {
+                        if(!s) error("Unmatched {"_);
+                        if(s.match('{')) nest++;
+                        else if(s.match('}')) nest--;
+                        else s.advance(1);
+                    }
+                    if(!s.match('\n')) error("Expecting newline after scope");
+                }
+                continue;
+            }
+            while(s && !s.match('\n')) {
+                if(s.match('{')) nest++;
+                else if(s.match('}')) nest--;
+                else s.advance(1);
+            }
+            if(scope && nest==scope.last()) { scope.pop(); continue; } // Remove matching scope closing bracket
+            (qualifiers.contains(word) ? global : main) << s.slice(lineStart, s.index);
+        }
+        string glsl = global+"\nvoid main() {\n"_+main+"\n}\n"_;
+        uint shader = glCreateShader(type);
+        const char* data = glsl.data(); int size = glsl.size();
+        glShaderSource(shader, 1, &data,&size);
+        glCompileShader(shader);
+
+        int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
+        int length=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&length);
+        if(!status || length>1) {
+            string buffer(length); buffer.setSize(length-1);
+            glGetShaderInfoLog(shader, length, 0, buffer.data());
+            if(buffer) error("Shader failed\n",buffer);
+        }
+        glAttachShader(id, shader);
+    }
     glLinkProgram(id);
-    int length=0;
-    glGetProgramiv(id , GL_INFO_LOG_LENGTH , &length);
-    if(length>1) {
+
+    int status=0; glGetProgramiv(id, GL_LINK_STATUS, &status);
+    int length=0; glGetProgramiv(id , GL_INFO_LOG_LENGTH , &length);
+    if(!status || length>1) {
         string buffer(length); buffer.setSize(length-1);
         glGetProgramInfoLog(id, length, 0, buffer.data());
-        if(buffer) log(buffer);
+        if(buffer) error("Program failed\n",buffer);
     }
-    int success=0;
-    glGetProgramiv(id, GL_LINK_STATUS, &success);
-    if(!success) error("Link failed");
 }
 void GLShader::bind() { glUseProgram(id); }
 uint GLShader::attribLocation(const char* name) {

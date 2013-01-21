@@ -1,6 +1,5 @@
 .blend decoder:
- parse mesh data
- render flat mesh data
+ parse & render shaders, load & sample textures | use custom shaders
  apply object transforms
- parse & render shaders
- load & sample textures
+ instantiate (with automatic impostors)
+ parse lights, cameras, background
