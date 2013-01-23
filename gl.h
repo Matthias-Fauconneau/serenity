@@ -11,6 +11,7 @@ void glBlend(bool enable, bool add=true);
 
 struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
+    explicit operator bool() { return location>=0; }
     void operator=(int);
     void operator=(float);
     void operator=(vec2);
@@ -23,16 +24,17 @@ struct GLUniform {
 
 struct GLShader {
     GLShader(const ref<byte>& source, const ref<byte>& tags=""_);
+    move_operator(GLShader): id(o.id) { o.id=0; }
     void compile(uint type, const ref<byte>& source);
     void bind();
-    uint attribLocation(const char*);
-    GLUniform operator[](const char*);
-    void bindSamplers(const char* tex0);
+    uint attribLocation(const ref<byte>&);
+    GLUniform operator[](const ref<byte>&);
 
     uint id=0;
     //using pointer comparison (only works with string literals)
-    map<const char*,int> attribLocations;
-    map<const char*,int> uniformLocations;
+    map<string, int> attribLocations;
+    map<string, int> uniformLocations;
+    array<string> sampler2D; // names of declared sampler2D
 };
 
 #define SHADER( name ) \
@@ -59,7 +61,7 @@ struct GLBuffer {
         upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T)));
     }
     void bind();
-    void bindAttribute(GLShader& program, const char* name, int elementSize, uint64 offset = 0);
+    void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0);
     void draw();
     ~GLBuffer();
 
@@ -82,18 +84,17 @@ void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);
 struct GLTexture {
     uint id=0;
     uint width=0, height=0;
-    bool alpha=false;
+    uint format;
     GLTexture(){}
     enum Format {
-        sRGB=0,Depth24=1,RGB16F=2,
+        sRGB=0,sRGBA=1,Depth24=2,RGB16F=3,
         Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
-    GLTexture(int width,int height,int format=sRGB);
-    GLTexture(const Image& image);
+    GLTexture(int width, int height, uint format=sRGB, const void* data=0);
+    GLTexture(const Image& image, uint format=sRGB);
     move_operator(GLTexture):id(o.id),width(o.width),height(o.height){o.id=0;}
     ~GLTexture();
 
     void bind(uint sampler=0) const;
-    static void bindSamplers(const GLTexture& tex0);
 
     operator bool() const { return id; }
     int2 size() const { return int2(width,height); }

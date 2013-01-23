@@ -195,12 +195,12 @@ template<class T> uint partition(array<T>& at, uint left, uint right, uint pivot
 template<class T> void quicksort(array<T>& at, uint left, uint right) {
     if(left < right) { // If the list has 2 or more items
         uint pivotIndex = partition(at, left, right, (left + right)/2);
-        quicksort(at, left, pivotIndex-1);
+        if(pivotIndex) quicksort(at, left, pivotIndex-1);
         quicksort(at, pivotIndex+1, right);
     }
 }
 /// Quicksorts the array in-place
-template<class T> void quicksort(array<T>& at) { return quicksort(at, 0, at.size()-1); }
+template<class T> void quicksort(array<T>& at) { quicksort(at, 0, at.size()-1); }
 
 /// string is an array of bytes
 typedef array<byte> string;

@@ -2,9 +2,10 @@
 #include "process.h"
 #include "string.h"
 #include "data.h"
-#include "gl.h"
-#include "window.h"
 #include "map.h"
+#include "jpeg.h"
+#include "window.h"
+#include "gl.h"
 SHADER(blender)
 
 /// Used to fix pointers in .blend file-block sections
@@ -45,8 +46,10 @@ struct BlendView : Widget {
     GLShader resolve = GLShader(blender,"screen resolve"_);
 
     // File
+    Folder folder;
     Map mmap; // Keep file mmaped
     const Scene* scene=0; // Blender scene (root handle to access all data)
+    string shaderSource; // Custom GLSL shader
 
     // Scene
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
@@ -55,13 +58,9 @@ struct BlendView : Widget {
     // Light
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
     const float sunYaw = PI/3;
-    const float sunPitch = 3*PI/4;
+    const float sunPitch = 2*PI/3;
     mat4 sun; // sun light transform
     GLFrameBuffer sunShadow;
-
-    // Shaders
-    map<string, GLShader> shaders;
-    GLShader shader __(blender, "transform normal diffuse shadow sun sky"_);
 
     // Geometry
     struct Vertex {
@@ -70,15 +69,17 @@ struct BlendView : Widget {
         vec3 color; // BGR albedo (TODO: texture mapping)
     };
     struct Object {
+        vec3 objectMin, objectMax;
         GLBuffer buffer;
-        GLShader& shader;
+        GLShader shader;
+        array<GLTexture> textures;
     };
     array<Object> objects;
     //TODO: instances = {object, mat4[]}
 
-    BlendView()
-        : mmap("Island/Island.blend", home(), Map::Read|Map::Write) { // with write access to fix pointers
+    BlendView() : folder("Island"_,home()), mmap("Island.blend.orig", folder, Map::Read|Map::Write) { // with write access to fix pointers
         load();
+        shaderSource << readFile("gpu_shader_material.glsl"_, folder) << readFile("Island.glsl", folder);
         parse();
 
         window.localShortcut(Escape).connect(&::exit);
@@ -227,65 +228,73 @@ struct BlendView : Widget {
     void parse() {
         sun=mat4(); sun.rotateX(sunPitch); sun.rotateZ(sunYaw);
 
-        shaders.reserve(16); // Reallocation would dangle Object::shader references
         for(const Base& base: scene->base) {
-            if(base.object->type==::Object::Mesh) {
-                const Mesh* mesh = base.object->data;
+            if(base.object->type !=::Object::Mesh) continue;
+            const Mesh* mesh = base.object->data;
+            if(!mesh->mvert) continue;
 
-                array<Vertex> vertices;
-                for(const MVert& vert: ref<MVert>(mesh->mvert, mesh->totvert)) {
-                    vec3 position = vec3(vert.co);
-                    vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
-                    vec3 color = vec3(1,1,1); //TODO: MCol
+            array<Vertex> vertices;
+            for(const MVert& vert: ref<MVert>(mesh->mvert, mesh->totvert)) {
+                vec3 position = vec3(vert.co);
+                vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
+                vec3 color = vec3(1,1,1); //TODO: MCol
 
-                    vertices << Vertex __(position, normal, color);
-                }
-
-                ref<MLoop> loops(mesh->mloop, mesh->totloop);
-                array<uint> indices;
-                uint materialCount=1;
-                for(const MPoly& poly: ref<MPoly>(mesh->mpoly, mesh->totpoly)) {
-                    materialCount = max(materialCount, uint(poly.mat_nr+1));
-                    assert(poly.totloop==3 || poly.totloop==4);
-                    uint a=loops[poly.loopstart].v, b=loops[poly.loopstart+1].v;
-                    for(uint i: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
-                        uint c = loops[i].v;
-                        indices << a << b << c;
-                        b = c;
-                    }
-                }
-
-                for(Vertex& vertex: vertices) {
-                    // Normalizes smoothed normals (weighted by triangle areas)
-                    vertex.normal=normalize(vertex.normal);
-
-                    // Computes scene bounds in world space to fit view
-                    worldMin=min(worldMin, vertex.position);
-                    worldMax=max(worldMax, vertex.position);
-
-                    // Compute scene bounds in light space to fit shadow
-                    vec3 P = (sun*vertex.position).xyz();
-                    lightMin=min(lightMin,P);
-                    lightMax=max(lightMax,P);
-                }
-
-                // Submits geometry
-                GLBuffer buffer;
-                buffer.upload<Vertex>(vertices);
-                buffer.upload(indices);
-
-                /*// Compiles shader
-                string tags = string("transform normal diffuse shadow sun sky"_);
-                if(base.object->data->totcol>=1 && base.object->data->mat[0]) {
-                    string name = replace(simplify(toLower(str((const char*)base.object->data->mat[0]->id.name+2)))," "_,"_");
-                    tags <<' '<<name;
-                }
-                if(!shaders.contains(tags)) shaders.insert(tags, GLShader(blender, tags));
-                objects << Object __(move(buffer), shaders.at(tags));*/
-                objects << Object __(move(buffer), shader);
-
-                //log(base.object->id.name, mesh->id.name, vertices.size(), indices.size());
+                vertices << Vertex __(position, normal, color);
             }
+
+            ref<MLoop> loops(mesh->mloop, mesh->totloop);
+            array<uint> indices;
+            uint materialCount=1;
+            for(const MPoly& poly: ref<MPoly>(mesh->mpoly, mesh->totpoly)) {
+                materialCount = max(materialCount, uint(poly.mat_nr+1));
+                assert(poly.totloop==3 || poly.totloop==4);
+                uint a=loops[poly.loopstart].v, b=loops[poly.loopstart+1].v;
+                for(uint i: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
+                    uint c = loops[i].v;
+                    indices << a << b << c;
+                    b = c;
+                }
+            }
+
+            vec3 objectMin=0, objectMax=0;
+            for(Vertex& vertex: vertices) {
+                // Normalizes smoothed normals (weighted by triangle areas)
+                vertex.normal=normalize(vertex.normal);
+
+                // Computes object bounds
+                objectMin=min(objectMin, vertex.position);
+                objectMax=max(objectMax, vertex.position);
+
+                // Computes scene bounds in world space to fit view
+                worldMin=min(worldMin, vertex.position);
+                worldMax=max(worldMax, vertex.position);
+
+                // Compute scene bounds in light space to fit shadow
+                vec3 P = (sun*vertex.position).xyz();
+                lightMin=min(lightMin,P);
+                lightMax=max(lightMax,P);
+            }
+
+            // Submits geometry
+            GLBuffer buffer;
+            buffer.upload<Vertex>(vertices);
+            buffer.upload(indices);
+
+            // Compiles shader
+            string tags = string("transform normal color diffuse shadow sun sky"_);
+            if(base.object->data->totcol>=1 && base.object->data->mat[0]) {
+                string name = replace(simplify(toLower(str((const char*)base.object->data->mat[0]->id.name+2)))," "_,"_");
+                tags <<' '<<name;
+            }
+
+            GLShader shader(string(blender+shaderSource), tags);
+            array<GLTexture> textures;
+            int i=1; for(const string& name: shader.sampler2D) {
+                shader[name] = i++;
+                textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)),
+                                    GLTexture::Mipmap|GLTexture::Bilinear|GLTexture::Anisotropic);
+            }
+            objects << Object __(objectMin, objectMax, move(buffer), move(shader), move(textures));
         }
 
         //FIXME: compute smallest enclosing sphere
@@ -364,7 +373,10 @@ struct BlendView : Widget {
             shader["sunLightDirection"] = sunLightDirection;
             shader["skyLightDirection"] = skyLightDirection;
             shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;
-            shader.bindSamplers("shadowMap"); GLTexture::bindSamplers(sunShadow.depthTexture);
+            if(shader["objectMin"]) shader["objectMin"] = object.objectMin, shader["objectMax"] = object.objectMax;
+            shader["shadowMap"] = 0; sunShadow.depthTexture.bind(0);
+            {int i=1; for(const string& name: shader.sampler2D) shader[name] = i++; }
+            {int i=1; for(const GLTexture& texture : object.textures) texture.bind(i++); }
             object.buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
             object.buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
             object.buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
@@ -383,7 +395,7 @@ struct BlendView : Widget {
         glDepthTest(false);
         glCullFace(false);
 
-        resolve.bindSamplers("framebuffer"); GLTexture::bindSamplers(color);
+        resolve["framebuffer"]=0; color.bind(0);
         glDrawRectangle(resolve);
 
         GLFrameBuffer::bindWindow(0, window.size);

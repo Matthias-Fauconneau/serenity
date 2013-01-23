@@ -22,14 +22,18 @@ normal {
  }
 }
 
-diffuse {
- varying vec3 diffuseColor;
+color {
+ varying vec3 _color;
  vertex {
   attribute vec3 color;
-  diffuseColor = color;
+  _color = color;
  }
+}
+
+diffuse {
  fragment {
   vec3 diffuseLight = vec3(0,0,0);
+  vec3 diffuseColor = _color;
  }
 }
 
@@ -51,7 +55,7 @@ shadow {
 
 sun {
  fragment {
-  const vec3 sunColor = vec3(0.875, 0.75, 0.5); //(0.75, 0.5, 0.25);
+  const vec3 sunColor = vec3(0.75, 0.5, 0.25); //(0.875, 0.75, 0.5);
   uniform vec3 sunLightDirection;
   diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor;
  }
@@ -59,7 +63,7 @@ sun {
 
 sky {
  fragment {
-  const vec3 skyColor = vec3(0.125, 0.25, 0.5); //(0.25, 0.5, 0.75)
+  const vec3 skyColor = vec3(0.25, 0.5, 0.75); //(0.125, 0.25, 0.5)
   uniform vec3 skyLightDirection;
   diffuseLight += (1.f+dot(skyLightDirection, normal))/2.f * skyColor;
  }
@@ -71,12 +75,6 @@ screen {
   attribute vec2 position;
   gl_Position = vec4(position,0,1);
   texCoord = (position+1.0)/2.0;
- }
-}
-
-diffuse {
- fragment {
-  gl_FragColor.rgb += diffuseColor*diffuseLight;
  }
 }
 

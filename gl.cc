@@ -30,20 +30,20 @@ void GLUniform::operator=(vec2 v) { glProgramUniform2f(program,location,v.x,v.y)
 void GLUniform::operator=(vec4 v) { glProgramUniform4f(program,location,v.x,v.y,v.z,v.w); }
 void GLUniform::operator=(mat4 m) { glProgramUniformMatrix4fv(program,location,1,0,m.data); }
 #else
-void GLUniform::operator=(int v) { glUseProgram(program); glUniform1i(location,v); }
-void GLUniform::operator=(float v) { glUseProgram(program); glUniform1f(location,v); }
-void GLUniform::operator=(vec2 v) { glUseProgram(program); glUniform2f(location,v.x,v.y); }
-void GLUniform::operator=(vec3 v) { glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
-void GLUniform::operator=(vec4 v) { glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
-void GLUniform::operator=(mat3 m) { glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
-void GLUniform::operator=(mat4 m) { glUseProgram(program); glUniformMatrix4fv(location,1,0,m.data); }
+void GLUniform::operator=(int v) { assert(location>=0); glUseProgram(program); glUniform1i(location,v); }
+void GLUniform::operator=(float v) { assert(location>=0); glUseProgram(program); glUniform1f(location,v); }
+void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
+void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
+void GLUniform::operator=(vec4 v) { assert(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
+void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
+void GLUniform::operator=(mat4 m) { assert(location>=0); glUseProgram(program); glUniformMatrix4fv(location,1,0,m.data); }
 #endif
-GLUniform GLShader::operator[](const char* name) {
-    int location = uniformLocations.value(name,-1);
+GLUniform GLShader::operator[](const ref<byte>& name) {
+    int location = uniformLocations.value(string(name),-1);
     if(location<0) {
-        location=glGetUniformLocation(id,name);
-        if(location<0) error("Unknown uniform"_,name);
-        uniformLocations.insert(name,location);
+        location=glGetUniformLocation(id,strz(name));
+        if(location<0) return GLUniform(id,location); //error("Unknown uniform"_,name);
+        uniformLocations.insert(string(name),location);
     }
     return GLUniform(id,location);
 }
@@ -59,13 +59,13 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
         array<uint> scope;
         for(uint nest=0;s;) { //for each line
             static array< ref<byte> > qualifiers = split("const uniform attribute varying out"_);
-            static array< ref<byte> > types = split("float vec2 vec3 vec4"_);
+            static array< ref<byte> > types = split("void float vec2 vec3 vec4"_);
             uint lineStart = s.index;
             s.whileAny(" \t"_);
-            ref<byte> word = s.word();
+            ref<byte> identifier = s.identifier();
             s.whileAny(" \t"_);
-            if(word && s.match("{\n"_)) { //scope: "[a-z]+ {"
-                if(tags_.contains(word)) { scope<<nest; nest++; } // Remember nesting level to remove matching scope closing bracket
+            if(identifier && s.match("{\n"_)) { //scope: "[a-z]+ {"
+                if(tags_.contains(identifier)) { scope<<nest; nest++; } // Remember nesting level to remove matching scope closing bracket
                 else { // Skip scope
                     for(uint nest=1; nest;) {
                         if(!s) error(source, "Unmatched {"_);
@@ -78,7 +78,17 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
                 continue;
             }
             bool function = false;
-            if(types.contains(word) && s.word() && s.match('(')) function=true;
+            if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
+                function = true;
+                s.until('{');
+                for(uint n=nest+1;s && n>nest;) {
+                    if(s.match('{')) n++;
+                    else if(s.match('}')) n--;
+                    else s.advance(1);
+                }
+            }
+            bool declaration = qualifiers.contains(identifier);
+            if(declaration && identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << string(s.word());
             while(s && !s.match('\n')) {
                 if(s.match('{')) nest++;
                 else if(s.match('}')) nest--;
@@ -86,7 +96,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
             }
             if(scope && nest==scope.last()) { scope.pop(); continue; } // Remove matching scope closing bracket
             ref<byte> line = s.slice(lineStart, s.index-lineStart);
-            if(trim(line)) (function || qualifiers.contains(word) ? global : main) << line;
+            if(trim(line)) ((function || declaration) ? global : main) << line;
         }
         string glsl = global+"\nvoid main() {\n"_+main+"\n}\n"_;
         uint shader = glCreateShader(type);
@@ -114,13 +124,12 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
     }
 }
 void GLShader::bind() { glUseProgram(id); }
-uint GLShader::attribLocation(const char* name) {
-    int location = attribLocations.value(name,-1);
-    if(location<0) attribLocations.insert(name,location=glGetAttribLocation(id,name));
+uint GLShader::attribLocation(const ref<byte>& name) {
+    int location = attribLocations.value(string(name),-1);
+    if(location<0) attribLocations.insert(string(name), location=glGetAttribLocation(id,strz(name)));
     if(location<0) error("Unknown attribute"_,name);
     return (uint)location;
 }
-void GLShader::bindSamplers(const char* tex0) { operator[](tex0) = 0; }
 
 /// Buffer
 
@@ -162,9 +171,9 @@ void GLBuffer::upload(const ref<byte> &vertices) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertexCount = vertices.size/vertexSize;
 }
-void GLBuffer::bindAttribute(GLShader& program, const char* name, int elementSize, uint64 offset) {
+void GLBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset) {
     assert(vertexBuffer);
-    int location = program.attribLocation(name);
+    int location = program.attribLocation(strz(name));
     assert(location>=0,"unused attribute"_,name);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glVertexAttribPointer(location, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
@@ -243,22 +252,17 @@ void glDrawLine(GLShader& shader, vec2 p1, vec2 p2) {
 }
 
 /// Texture
-
-GLTexture::GLTexture(const Image& image) : width(image.width), height(image.height), alpha(image.alpha) {
+GLTexture::GLTexture(int width, int height, uint format, const void* data) : width(width), height(height), format(format) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    assert(width==image.stride);
-    glTexImage2D(GL_TEXTURE_2D,0,alpha?GL_RGBA:GL_RGB,width,height,0,GL_BGRA,GL_UNSIGNED_BYTE,image.data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-}
-GLTexture::GLTexture(int width, int height, int format) : width(width), height(height) {
-    glGenTextures(1, &id);
-    glBindTexture(GL_TEXTURE_2D, id);
-    if((format&3)==sRGB) glTexImage2D(GL_TEXTURE_2D,0,GL_SRGB8,width,height,0,0,GL_UNSIGNED_BYTE,0);
+    if((format&3)==sRGB)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+    if((format&3)==sRGBA)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     if((format&3)==Depth24)
-        glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,0);
-    if((format&3)==RGB16F) glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,width,height,0,GL_RGB,GL_FLOAT,0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
+    if((format&3)==RGB16F)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
     if(format&Shadow) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_GEQUAL );
@@ -270,15 +274,19 @@ GLTexture::GLTexture(int width, int height, int format) : width(width), height(h
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_NEAREST_MIPMAP_NEAREST:GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
-    if(format&Anisotropic) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 2.0);
+    if(format&Anisotropic) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
     if(format&Clamp) {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
+    if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_2D);
+}
+GLTexture::GLTexture(const Image& image, uint format)
+    : GLTexture(image.width, image.height, (image.alpha?sRGBA:sRGB)|format, image.data) {
+    assert(width==image.stride);
 }
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
 void GLTexture::bind(uint sampler) const { assert(id); glActiveTexture(GL_TEXTURE0+sampler); glBindTexture(GL_TEXTURE_2D, id); }
-void GLTexture::bindSamplers(const GLTexture& tex0) { tex0.bind(0); }
 
 /// Framebuffer
 
