@@ -62,7 +62,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
             static array< ref<byte> > types = split("void float vec2 vec3 vec4"_);
             uint lineStart = s.index;
             s.whileAny(" \t"_);
-            ref<byte> identifier = s.identifier();
+            ref<byte> identifier = s.identifier("_"_);
             s.whileAny(" \t"_);
             if(identifier && s.match("{\n"_)) { //scope: "[a-z]+ {"
                 if(tags_.contains(identifier)) { scope<<nest; nest++; } // Remember nesting level to remove matching scope closing bracket
@@ -88,7 +88,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
                 }
             }
             bool declaration = qualifiers.contains(identifier);
-            if(declaration && identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << string(s.word());
+            if(declaration && identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << string(s.identifier("_"_));
             while(s && !s.match('\n')) {
                 if(s.match('{')) nest++;
                 else if(s.match('}')) nest--;

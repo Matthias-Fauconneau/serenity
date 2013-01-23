@@ -55,7 +55,7 @@ shadow {
 
 sun {
  fragment {
-  const vec3 sunColor = vec3(0.75, 0.5, 0.25); //(0.875, 0.75, 0.5);
+  const vec3 sunColor = vec3(0.75, 0.5, 0.25);
   uniform vec3 sunLightDirection;
   diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor;
  }
@@ -63,7 +63,7 @@ sun {
 
 sky {
  fragment {
-  const vec3 skyColor = vec3(0.25, 0.5, 0.75); //(0.125, 0.25, 0.5)
+  const vec3 skyColor = vec3(0.25, 0.5, 0.75);
   uniform vec3 skyLightDirection;
   diffuseLight += (1.f+dot(skyLightDirection, normal))/2.f * skyColor;
  }
@@ -78,23 +78,21 @@ screen {
  }
 }
 
-atmosphere {
+skymap {
  varying vec3 viewRay;
  vertex {
   attribute vec2 position;
   gl_Position = vec4(position,0.999,1);
-  uniform mat4 inverseProjectionMatrix;
-  vec4 viewPos = (inverseProjectionMatrix * vec4(position.xy,1,1));
+  uniform mat4 inverseViewProjectionMatrix;
+  vec4 viewPos = (inverseViewProjectionMatrix * vec4(position.xy,1,1));
   viewRay = viewPos.xyz/viewPos.w;
  }
  fragment {
-  uniform vec3 sunLightDirection;
-  const float Kr=0.0025, Km=0.0001, g=-0.990;
-  float cos = dot(sunLightDirection, normalize(viewRay));
-  float miePhase = ((1.0 - g*g) / (2.0 + g*g)) * (1.0 + cos*cos) / pow(1.0 + g*g - 2.0*g*cos, 1.5);
-  const vec3 skyColor = vec3(0.125, 0.25, 0.5); //(0.25, 0.5, 0.75)
-  const vec3 sunColor = vec3(0.875, 0.75, 0.5); //(0.75, 0.5, 0.25);
-  gl_FragColor.rgb = skyColor + sunColor*20.0*Km*miePhase;
+  uniform sampler2D Skymap_offworld_gen2;
+  const float PI = 3.14159265358979323846;
+  vec2 equirectangular = vec2(atan(viewRay.y,viewRay.x)/(2.0*PI), acos(normalize(viewRay).z)/PI);
+  equirectangular.x = 0.5-equirectangular.x; // flip x
+  gl_FragColor.rgb = texture2D(Skymap_offworld_gen2, equirectangular).rgb;
  }
 }
 

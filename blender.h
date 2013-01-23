@@ -349,11 +349,11 @@ struct Object {
  float drotAxis[3];
  float rotAngle;
  float drotAngle;
- float obmat[4];
- float parentinv[4];
- float constinv[4];
- float imat[4];
- float imat_ren[4];
+ float obmat[16];
+ float parentinv[16];
+ float constinv[16];
+ float imat[16];
+ float imat_ren[16];
  int lay;
  int pad6;
  short flag;

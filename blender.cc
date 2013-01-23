@@ -37,12 +37,11 @@ struct BlendView : Widget {
     // View
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(PI/3,-PI/3); // current view angles (yaw,pitch)
-    Window window __(this, int2(1050,1050), "BlendView"_, Window::OpenGL);
+    Window window __(this, int2(1050,590), "BlendView"_, Window::OpenGL);
 
     // Renderer
     GLFrameBuffer framebuffer;
     GLShader shadow = GLShader(blender,"transform"_);
-    GLShader atmosphere = GLShader(blender,"atmosphere"_);
     GLShader resolve = GLShader(blender,"screen resolve"_);
 
     // File
@@ -57,10 +56,14 @@ struct BlendView : Widget {
 
     // Light
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
-    const float sunYaw = PI/3;
+    const float sunYaw = 4*PI/3;
     const float sunPitch = 2*PI/3;
     mat4 sun; // sun light transform
     GLFrameBuffer sunShadow;
+
+    // Sky
+    GLShader sky = GLShader(blender,"skymap"_);
+    GLTexture skymap;
 
     // Geometry
     struct Vertex {
@@ -69,10 +72,11 @@ struct BlendView : Widget {
         vec3 color; // BGR albedo (TODO: texture mapping)
     };
     struct Object {
+        mat4 transform;
         vec3 objectMin, objectMax;
-        GLBuffer buffer;
         GLShader shader;
         array<GLTexture> textures;
+        GLBuffer buffer;
     };
     array<Object> objects;
     //TODO: instances = {object, mat4[]}
@@ -81,6 +85,9 @@ struct BlendView : Widget {
         load();
         shaderSource << readFile("gpu_shader_material.glsl"_, folder) << readFile("Island.glsl", folder);
         parse();
+
+        skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)),
+                           GLTexture::Mipmap|GLTexture::Bilinear);
 
         window.localShortcut(Escape).connect(&::exit);
     }
@@ -179,7 +186,7 @@ struct BlendView : Widget {
                             }
                         }
                         s.whileNot('['); if(s.match('[')) { //parse static arrays
-                            name.size = s.index;
+                            name.size = s.index-1;
                             count = s.integer();
                             s.match(']');
                             while(s.match('[')) { // Flatten multiple indices
@@ -210,13 +217,11 @@ struct BlendView : Widget {
             ref<byte> identifier(header.identifier,4);
             BinaryData data (file.Data::read(header.size));
 
-            //if(identifier == "DATA"_) continue; // dynamic arrays, pointer arrays are fixed when parsing the reference
             if(identifier == "SC\0\0"_) scene = (Scene*)data.buffer.buffer.data;
             if(identifier == "DNA1"_) continue;
             if(identifier == "ENDB"_) break;
 
             const Struct& type = structs[header.type];
-            //assert(header.size >= header.count*type.size);
             if(header.size >= header.count*type.size)
                 if(type.fields) for(uint unused i: range(header.count)) fix(blocks, type, data.Data::read(type.size));
         }
@@ -232,6 +237,12 @@ struct BlendView : Widget {
             if(base.object->type !=::Object::Mesh) continue;
             const Mesh* mesh = base.object->data;
             if(!mesh->mvert) continue;
+
+            mat4 transform;
+            for(uint i: range(4)) for(uint j: range(4)) transform(i,j) = base.object->obmat[j*4+i];
+            float scale = length(vec3(transform(0,0),transform(1,1),transform(2,2)));
+
+            if(scale>10) continue; // Currently ignoring water plane, TODO: water reflection
 
             array<Vertex> vertices;
             for(const MVert& vert: ref<MVert>(mesh->mvert, mesh->totvert)) {
@@ -265,14 +276,17 @@ struct BlendView : Widget {
                 objectMin=min(objectMin, vertex.position);
                 objectMax=max(objectMax, vertex.position);
 
-                // Computes scene bounds in world space to fit view
-                worldMin=min(worldMin, vertex.position);
-                worldMax=max(worldMax, vertex.position);
+                if(scale<10) { // Ignore water plane
+                    // Computes scene bounds in world space to fit view
+                    vec3 position = (transform*vertex.position).xyz();
+                    worldMin=min(worldMin, position);
+                    worldMax=max(worldMax, position);
 
-                // Compute scene bounds in light space to fit shadow
-                vec3 P = (sun*vertex.position).xyz();
-                lightMin=min(lightMin,P);
-                lightMax=max(lightMax,P);
+                    // Compute scene bounds in light space to fit shadow
+                    vec3 P = (sun*position).xyz();
+                    lightMin=min(lightMin,P);
+                    lightMax=max(lightMax,P);
+                }
             }
 
             // Submits geometry
@@ -283,7 +297,7 @@ struct BlendView : Widget {
             // Compiles shader
             string tags = string("transform normal color diffuse shadow sun sky"_);
             if(base.object->data->totcol>=1 && base.object->data->mat[0]) {
-                string name = replace(simplify(toLower(str((const char*)base.object->data->mat[0]->id.name+2)))," "_,"_");
+                string name = replace(replace(simplify(toLower(str((const char*)base.object->data->mat[0]->id.name+2)))," "_,"_"),"."_,"_"_);
                 tags <<' '<<name;
             }
 
@@ -294,7 +308,8 @@ struct BlendView : Widget {
                 textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)),
                                     GLTexture::Mipmap|GLTexture::Bilinear|GLTexture::Anisotropic);
             }
-            objects << Object __(objectMin, objectMax, move(buffer), move(shader), move(textures));
+
+            objects << Object __(transform, objectMin, objectMax, move(shader), move(textures), move(buffer));
         }
 
         //FIXME: compute smallest enclosing sphere
@@ -321,7 +336,7 @@ struct BlendView : Widget {
         // Computes view transform
         mat4 view;
         view.scale(1.f/worldRadius); // fit scene (isometric approximation)
-        view.translate(vec3(0,0,-2*worldRadius)); // step back
+        view.translate(vec3(0,0,-worldRadius)); // step back
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
@@ -346,16 +361,15 @@ struct BlendView : Widget {
         sun.rotateZ(sunYaw);
 
         shadow.bind();
-        shadow["modelViewProjectionTransform"] = sun;
         for(Object& object: objects) {
+            shadow["modelViewProjectionTransform"] = sun*object.transform;
             object.buffer.bindAttribute(shadow, "position", 3, __builtin_offsetof(Vertex,position));
             object.buffer.draw();
         }
 
         // Normalizes to xy to 0,1 and z to -1,1
         sun=mat4();
-        sun.translate(vec3(0,0,0));
-        sun.scale(vec3(1.f/(lightMax.x-lightMin.x),1.f/(lightMax.y-lightMin.y),1.f/(lightMax.z-lightMin.z)));
+        sun.scale(1.f/(lightMax-lightMin));
         sun.translate(-lightMin);
         sun.rotateX(sunPitch);
         sun.rotateZ(sunYaw);
@@ -367,9 +381,9 @@ struct BlendView : Widget {
         for(Object& object: objects) {
             GLShader& shader = object.shader;
             shader.bind();
-            shader["modelViewProjectionTransform"] = projection*view;
-            shader["normalMatrix"] = normalMatrix;
-            shader["shadowTransform"] = sun;
+            shader["modelViewProjectionTransform"] = projection*view*object.transform;
+            shader["normalMatrix"] = normalMatrix*object.transform.normalMatrix();
+            shader["shadowTransform"] = sun*object.transform;
             shader["sunLightDirection"] = sunLightDirection;
             shader["skyLightDirection"] = skyLightDirection;
             shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;
@@ -384,9 +398,9 @@ struct BlendView : Widget {
         }
 
         //TODO: fog
-        atmosphere["inverseProjectionMatrix"] = projection.inverse();
-        atmosphere["sunLightDirection"] = -sunLightDirection;
-        glDrawRectangle(atmosphere);
+        sky["inverseViewProjectionMatrix"] = (projection*view).inverse();
+        sky[sky.sampler2D.first()] = 0; skymap.bind(0);
+        glDrawRectangle(sky);
 
         GLTexture color(width,height,GLTexture::RGB16F);
         framebuffer.blit(color);
