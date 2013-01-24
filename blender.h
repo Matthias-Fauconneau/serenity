@@ -39,7 +39,7 @@ template<class T=void> struct ListBase {
  const ID* first;
  const ID* last;
  const ID_iterator<T> begin() const { return first; }
- const ID_iterator<T> end() const { return last; }
+ const ID_iterator<T> end() const { return 0; }
 };
 
 struct bAnimVizSettings {
@@ -88,6 +88,14 @@ struct GameSettings {
  int alpha_blend;
  int face_orientation;
  int pad1;
+};
+
+struct Object;
+struct Group {
+ ID id;
+ ListBase<Object> gobject;
+ int layer;
+ float dupli_ofs[3];
 };
 
 struct Material {
@@ -193,7 +201,7 @@ struct Material {
  struct MTex* mtex[18];
  struct bNodeTree* nodetree;
  struct Ipo* ipo;
- struct Group* group;
+ Group* group;
  struct PreviewImage* preview;
  float friction;
  float fh;
@@ -250,6 +258,17 @@ struct CustomData {
  struct CustomDataExternal* external;
 };
 
+struct MDeformWeight {
+ int def_nr;
+ float weight;
+};
+
+struct MDeformVert {
+ MDeformWeight* dw;
+ int totweight;
+ int flag;
+};
+
 struct Mesh {
  ID id;
  struct AnimData* adt;
@@ -267,7 +286,7 @@ struct Mesh {
  struct TFace* tface;
  MVert* mvert;
  struct MEdge* medge;
- struct MDeformVert* dvert;
+ MDeformVert* dvert;
  struct MCol* mcol;
  struct MSticky* msticky;
  struct Mesh* texcomesh;
@@ -298,6 +317,202 @@ struct Mesh {
  char editflag;
  short totcol;
  struct Multires* mr;
+};
+
+struct ParticleDupliWeight {
+ ParticleDupliWeight* next;
+ ParticleDupliWeight* prev;
+ Object* ob;
+ short count;
+ short flag;
+ short index;
+ short rt;
+};
+
+struct ParticleSettings {
+    ID id;
+    struct AnimData* adt;
+    struct BoidSettings* boids;
+    struct SPHFluidSettings* fluid;
+    struct EffectorWeights* effector_weights;
+    int flag;
+    int rt;
+    short type;
+    short from;
+    short distr;
+    short texact;
+    enum { PART_PHYS_NEWTON=1 }; short phystype;
+    short rotmode;
+    short avemode;
+    short reactevent;
+    enum { PART_DRAW_EMITTER=8 }; short draw;
+    short draw_as;
+    short draw_size;
+    short childtype;
+    short ren_as;
+    short subframes;
+    short draw_col;
+    short draw_step;
+    short ren_step;
+    short hair_step;
+    short keys_step;
+    short adapt_angle;
+    short adapt_pix;
+    short disp;
+    short omat;
+    short interpolation;
+    short rotfrom;
+    short integrator;
+    short kink;
+    short kink_axis;
+    short bb_align;
+    short bb_uv_split;
+    short bb_anim;
+    short bb_split_offset;
+    float bb_tilt;
+    float bb_rand_tilt;
+    float bb_offset[2];
+    float bb_size[2];
+    float bb_vel_head;
+    float bb_vel_tail;
+    float color_vec_max;
+    short simplify_flag;
+    short simplify_refsize;
+    float simplify_rate;
+    float simplify_transition;
+    float simplify_viewport;
+    float sta;
+    float end;
+    float lifetime;
+    float randlife;
+    float timetweak;
+    float courant_target;
+    float jitfac;
+    float eff_hair;
+    float grid_rand;
+    float ps_offset;
+    int totpart;
+    int userjit;
+    int grid_res;
+    int effector_amount;
+    short time_flag;
+    short time_pad[3];
+    float normfac;
+    float obfac;
+    float randfac;
+    float partfac;
+    float tanfac;
+    float tanphase;
+    float reactfac;
+    float ob_vel[3];
+    float avefac;
+    float phasefac;
+    float randrotfac;
+    float randphasefac;
+    float mass;
+    float size;
+    float randsize;
+    float acc[3];
+    float dragfac;
+    float brownfac;
+    float dampfac;
+    float randlength;
+    int child_nbr;
+    int ren_child_nbr;
+    float parents;
+    float childsize;
+    float childrandsize;
+    float childrad;
+    float childflat;
+    float clumpfac;
+    float clumppow;
+    float kink_amp;
+    float kink_freq;
+    float kink_shape;
+    float kink_flat;
+    float kink_amp_clump;
+    float rough1;
+    float rough1_size;
+    float rough2;
+    float rough2_size;
+    float rough2_thres;
+    float rough_end;
+    float rough_end_shape;
+    float clength;
+    float clength_thres;
+    float parting_fac;
+    float parting_min;
+    float parting_max;
+    float branch_thres;
+    float draw_line[2];
+    float path_start;
+    float path_end;
+    int trail_count;
+    int keyed_loops;
+    struct MTex* mtex[18];
+    Group* dup_group;
+    ListBase<ParticleDupliWeight> dupliweights;
+    Group* eff_group;
+    Object* dup_ob;
+    Object* bb_ob;
+    struct Ipo* ipo;
+    struct PartDeflect* pd;
+    struct PartDeflect* pd2;
+};
+
+struct ParticleSystem {
+    ParticleSystem* next;
+    ParticleSystem* prev;
+    ParticleSettings* part;
+    struct ParticleData* particles;
+    struct ChildParticle* child;
+    struct PTCacheEdit* edit;
+    void* free_edit;
+    struct ParticleCacheKey** pathcache;
+    struct ParticleCacheKey** childcache;
+    ListBase<> pathcachebufs;
+    ListBase<> childcachebufs;
+    struct ClothModifierData* clmd;
+    struct DerivedMesh* hair_in_dm;
+    struct DerivedMesh* hair_out_dm;
+    Object* target_ob;
+    Object* lattice;
+    Object* parent;
+    ListBase<> targets;
+    char name[64];
+    float imat[16];
+    float cfra;
+    float tree_frame;
+    float bvhtree_frame;
+    int seed;
+    int child_seed;
+    int flag;
+    int totpart;
+    int totunexist;
+    int totchild;
+    int totcached;
+    int totchildcache;
+    short recalc;
+    short target_psys;
+    short totkeyed;
+    short bakespace;
+    char bb_uvname[192];
+    enum { PSYS_VG_DENSITY=0 }; short vgroup[12];
+    short vg_neg;
+    short rt3;
+    void* renderdata;
+    struct PointCache* pointcache;
+    ListBase<> ptcaches;
+    ListBase<>* effectors;
+    struct ParticleSpring* fluid_springs;
+    int tot_fluidsprings;
+    int alloc_fluidsprings;
+    struct KDTree* tree;
+    struct BVHTree* bvhtree;
+    struct ParticleDrawData* pdd;
+    float* frand;
+    float dt_frac;
+    float _pad;
 };
 
 struct Object {
@@ -410,10 +625,10 @@ struct Object {
  ListBase<> constraints;
  ListBase<> nlastrips;
  ListBase<> hooks;
- ListBase<> particlesystem;
+ ListBase<ParticleSystem> particlesystem;
  struct PartDeflect* pd;
  struct SoftBody* soft;
- struct Group* dup_group;
+ Group* dup_group;
  char body_type;
  char shapeflag;
  short shapenr;
@@ -721,21 +936,21 @@ struct PhysicsSettings {
 struct Scene {
  ID id;
  struct AnimData* adt;
- struct Object* camera;
+ Object* camera;
  struct World* world;
  Scene* set;
  ListBase<Base> base;
- struct Base* basact;
- struct Object* obedit;
- float* cursor[3];
- float* twcent[3];
- float* twmin[3];
- float* twmax[3];
- int* lay;
- int* layact;
- int* lay_updated;
- short* flag;
- short* use_nodes;
+ Base* basact;
+ Object* obedit;
+ float cursor[3];
+ float twcent[3];
+ float twmin[3];
+ float twmax[3];
+ int lay;
+ int layact;
+ int lay_updated;
+ short flag;
+ short use_nodes;
  struct bNodeTree* nodetree;
  struct Editing* ed;
  struct ToolSettings* toolsettings;
@@ -750,13 +965,13 @@ struct Scene {
  void* speaker_handles;
  void* fps_info;
  struct DagForest* theDag;
- short* dagisvalid;
- short* dagflags;
- short* recalc;
- short* pad6;
- int* pad5;
- int* active_keyingset;
- ListBase<>* keyingsets;
+ short dagisvalid;
+ short dagflags;
+ short recalc;
+ short pad6;
+ int pad5;
+ int active_keyingset;
+ ListBase<> keyingsets;
  GameFraming framing;
  GameData gm;
  UnitSettings unit;

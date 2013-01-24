@@ -72,22 +72,23 @@ struct BlendView : Widget {
         vec3 color; // BGR albedo (TODO: texture mapping)
     };
     struct Object {
-        mat4 transform;
-        vec3 objectMin, objectMax;
+        array<Vertex> vertices;
+        array<uint> indices;
+
         GLShader shader;
         array<GLTexture> textures;
         GLBuffer buffer;
+
+        array<mat4> instances;
     };
     array<Object> objects;
-    //TODO: instances = {object, mat4[]}
 
     BlendView() : folder("Island"_,home()), mmap("Island.blend.orig", folder, Map::Read|Map::Write) { // with write access to fix pointers
         load();
         shaderSource << readFile("gpu_shader_material.glsl"_, folder) << readFile("Island.glsl", folder);
         parse();
 
-        skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)),
-                           GLTexture::Mipmap|GLTexture::Bilinear);
+        skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)), GLTexture::Bilinear);
 
         window.localShortcut(Escape).connect(&::exit);
     }
@@ -178,7 +179,7 @@ struct BlendView : Widget {
                         TextData s (name);
                         if(s.match("(*"_)) { //parse function pointers
                             name.data+=2; name.size-=2+3;
-                            type = "function"_; reference++;
+                            type = "void"_; reference++;
                         } else {
                             while(s.match('*')) { //parse references
                                 name.data++; name.size--;
@@ -186,7 +187,7 @@ struct BlendView : Widget {
                             }
                         }
                         s.whileNot('['); if(s.match('[')) { //parse static arrays
-                            name.size = s.index-1;
+                            name.size -= 1+(s.buffer.size()-s.index);
                             count = s.integer();
                             s.match(']');
                             while(s.match('[')) { // Flatten multiple indices
@@ -226,31 +227,36 @@ struct BlendView : Widget {
                 if(type.fields) for(uint unused i: range(header.count)) fix(blocks, type, data.Data::read(type.size));
         }
 
-        //for(const Struct& match: structs) if(match.name == "Object"_) log(match);
+        for(const Struct& match: structs) if(match.name == ""_) log(match);
     }
 
     /// Extracts relevant data from Blender structures
     void parse() {
         sun=mat4(); sun.rotateX(sunPitch); sun.rotateZ(sunYaw);
 
+        // Parses meshes
         for(const Base& base: scene->base) {
-            if(base.object->type !=::Object::Mesh) continue;
-            const Mesh* mesh = base.object->data;
+            const ::Object& object = *base.object;
+            if(!(scene->lay&object.lay)) continue;
+            if(object.type !=::Object::Mesh) continue;
+            const Mesh* mesh = object.data;
             if(!mesh->mvert) continue;
 
             mat4 transform;
-            for(uint i: range(4)) for(uint j: range(4)) transform(i,j) = base.object->obmat[j*4+i];
+            for(uint i: range(4)) for(uint j: range(4)) transform(i,j) = object.obmat[j*4+i];
             float scale = length(vec3(transform(0,0),transform(1,1),transform(2,2)));
 
             if(scale>10) continue; // Currently ignoring water plane, TODO: water reflection
-
+            ref<MVert> verts(mesh->mvert, mesh->totvert);
             array<Vertex> vertices;
-            for(const MVert& vert: ref<MVert>(mesh->mvert, mesh->totvert)) {
+            for(uint i: range(verts.size)) {
+                const MVert& vert = verts[i];
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
-                vec3 color = vec3(1,1,1); //TODO: MCol
+                vec3 color = mesh->dvert?vec3(mesh->dvert[i].dw[0].weight):vec3(1,1,1);
 
                 vertices << Vertex __(position, normal, color);
+                i++;
             }
 
             ref<MLoop> loops(mesh->mloop, mesh->totloop);
@@ -288,6 +294,20 @@ struct BlendView : Widget {
                     lightMax=max(lightMax,P);
                 }
             }
+            // scale positions and transforms to keep unit bounding box in object space
+            for(Vertex& vertex: vertices) {
+                vertex.position = (vertex.position-objectMin)/(objectMax-objectMin);
+            }
+            transform.translate(objectMin);
+            transform.scale(objectMax-objectMin);
+
+            // Parses particle systems
+            bool renderEmitter=true;
+            for(const ParticleSystem& particle: object.particlesystem) {
+                const ParticleSettings& p = *particle.part;
+                if(!(p.draw&p.PART_DRAW_EMITTER)) renderEmitter=false;
+            }
+            if(!renderEmitter) continue;
 
             // Submits geometry
             GLBuffer buffer;
@@ -296,12 +316,13 @@ struct BlendView : Widget {
 
             // Compiles shader
             string tags = string("transform normal color diffuse shadow sun sky"_);
-            if(base.object->data->totcol>=1 && base.object->data->mat[0]) {
-                string name = replace(replace(simplify(toLower(str((const char*)base.object->data->mat[0]->id.name+2)))," "_,"_"),"."_,"_"_);
+            if(object.data->totcol>=1 && object.data->mat[0]) {
+                string name = replace(replace(simplify(toLower(str((const char*)object.data->mat[0]->id.name+2)))," "_,"_"),"."_,"_"_);
                 tags <<' '<<name;
             }
-
             GLShader shader(string(blender+shaderSource), tags);
+
+            // Loads textures
             array<GLTexture> textures;
             int i=1; for(const string& name: shader.sampler2D) {
                 shader[name] = i++;
@@ -309,7 +330,26 @@ struct BlendView : Widget {
                                     GLTexture::Mipmap|GLTexture::Bilinear|GLTexture::Anisotropic);
             }
 
-            objects << Object __(transform, objectMin, objectMax, move(shader), move(textures), move(buffer));
+            objects << Object __(
+                           move(vertices), move(indices),
+                           move(shader), move(textures), move(buffer),
+                           move(array<mat4>()<<transform) );
+        }
+
+        // Parses particle systems
+        for(const Base& base: scene->base) {
+            const ::Object& object = *base.object;
+            for(const ParticleSystem& particle: object.particlesystem) {
+                const ParticleSettings& p = *particle.part;
+                log("count",particle.totpart*(p.childtype?p.ren_child_nbr:1),"size",p.size,"randomSize",p.randsize,
+                    "phys",p.phystype&p.PART_PHYS_NEWTON,p.brownfac);
+                if(p.dup_ob) log(p.dup_ob->id.name);
+                for(const ParticleDupliWeight& p: p.dupliweights) log(p.ob->id.name, p.count);
+                // Selects N random faces (if vg[PSYS_VG_DENSITY], discard if mesh->dvert[i].dw[vg[PSYS_VG_DENSITY]] < 1)
+
+                //TODO compute random location on face
+                //TODO instantiate object (dup_ob or random from dupliweights)
+            }
         }
 
         //FIXME: compute smallest enclosing sphere
@@ -362,9 +402,11 @@ struct BlendView : Widget {
 
         shadow.bind();
         for(Object& object: objects) {
-            shadow["modelViewProjectionTransform"] = sun*object.transform;
             object.buffer.bindAttribute(shadow, "position", 3, __builtin_offsetof(Vertex,position));
-            object.buffer.draw();
+            for(const mat4& transform: object.instances) {
+                shadow["modelViewProjectionTransform"] = sun*transform;
+                object.buffer.draw();
+            }
         }
 
         // Normalizes to xy to 0,1 and z to -1,1
@@ -381,21 +423,27 @@ struct BlendView : Widget {
         for(Object& object: objects) {
             GLShader& shader = object.shader;
             shader.bind();
-            shader["modelViewProjectionTransform"] = projection*view*object.transform;
-            shader["normalMatrix"] = normalMatrix*object.transform.normalMatrix();
-            shader["shadowTransform"] = sun*object.transform;
             shader["sunLightDirection"] = sunLightDirection;
             shader["skyLightDirection"] = skyLightDirection;
             shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;
-            if(shader["objectMin"]) shader["objectMin"] = object.objectMin, shader["objectMax"] = object.objectMax;
             shader["shadowMap"] = 0; sunShadow.depthTexture.bind(0);
+
             {int i=1; for(const string& name: shader.sampler2D) shader[name] = i++; }
             {int i=1; for(const GLTexture& texture : object.textures) texture.bind(i++); }
+
             object.buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
             object.buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
             object.buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
-            object.buffer.draw();
+
+            for(const mat4& transform: object.instances) {
+                shader["modelViewProjectionTransform"] = projection*view*transform;
+                shader["normalMatrix"] = normalMatrix*transform.normalMatrix();
+                shader["shadowTransform"] = sun*transform;
+                if(shader["modelTransform"]) shader["modelTransform"] = transform;
+                object.buffer.draw();
+            }
         }
+        //TODO: render Instances
 
         //TODO: fog
         sky["inverseViewProjectionMatrix"] = (projection*view).inverse();
