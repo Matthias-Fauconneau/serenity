@@ -22,18 +22,18 @@ normal {
  }
 }
 
-color {
- varying vec3 _color;
+texCoord {
+ varying vec2 _texCoord;
  vertex {
-  attribute vec3 color;
-  _color = color;
+  attribute vec2 texCoord;
+  _texCoord = texCoord;
  }
 }
 
 diffuse {
  fragment {
   vec3 diffuseLight = vec3(0,0,0);
-  vec3 diffuseColor = _color;
+  vec3 diffuseColor;
  }
 }
 

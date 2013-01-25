@@ -240,6 +240,11 @@ struct MLoop {
  int e;
 };
 
+struct MLoopUV {
+ float uv[2];
+ int flag;
+};
+
 struct MVert {
  float co[3];
  short no[3];
@@ -279,7 +284,7 @@ struct Mesh {
  MPoly* mpoly;
  struct MTexPoly* mtpoly;
  MLoop* mloop;
- struct MLoopUV* mloopuv;
+ MLoopUV* mloopuv;
  struct MLoopCol* mloopcol;
  struct MFace* mface;
  struct MTFace* mtface;

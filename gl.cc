@@ -50,7 +50,7 @@ GLUniform GLShader::operator[](const ref<byte>& name) {
 
 GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
     id = glCreateProgram();
-    string shaders;
+    array< ref<byte> > knownTags;
     for(uint type: (uint[]){GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {
         array< ref<byte> > tags_;
         tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
@@ -65,8 +65,10 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
             ref<byte> identifier = s.identifier("_"_);
             s.whileAny(" \t"_);
             if(identifier && s.match("{\n"_)) { //scope: "[a-z]+ {"
-                if(tags_.contains(identifier)) { scope<<nest; nest++; } // Remember nesting level to remove matching scope closing bracket
-                else { // Skip scope
+                if(tags_.contains(identifier)) {
+                    knownTags.appendOnce(identifier);
+                    scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
+                } else { // Skip scope
                     for(uint nest=1; nest;) {
                         if(!s) error(source, "Unmatched {"_);
                         if(s.match('{')) nest++;
@@ -122,6 +124,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
         glGetProgramInfoLog(id, length, 0, buffer.data());
         error(tags, "Program failed\n",buffer);
     }
+    for(ref<byte>& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag);
 }
 void GLShader::bind() { glUseProgram(id); }
 uint GLShader::attribLocation(const ref<byte>& name) {

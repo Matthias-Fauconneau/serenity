@@ -16,6 +16,7 @@ struct Block {
     int64 delta; // Target memory address where the block was loaded - begin
 };
 bool operator<(const Block& a, const Block& b) { return a.begin<b.begin; }
+string str(const Block& b) { return str(b.begin)+str("-")+str(b.end); }
 
 /// SDNA type definitions
 struct Struct {
@@ -70,7 +71,7 @@ struct BlendView : Widget {
     struct Vertex {
         vec3 position; // World-space position
         vec3 normal; // World-space vertex normals
-        vec3 color; // BGR albedo (TODO: texture mapping)
+        vec2 texCoord; // Texture coordinates
     };
     struct Surface {
         mat4 transform;
@@ -132,7 +133,16 @@ struct BlendView : Widget {
                         goto found;
                     }
                 }
-                pointer = 0;
+                /*assert(field.type || field.typeName=="void"_ ||
+                       field.typeName=="wmTimer"_ || field.typeName=="wmEvent"_ ||
+                       field.typeName=="SpaceType"_ || field.typeName=="ARegionType"_ || field.typeName=="PanelType"_ ||
+                       field.typeName=="SceneStats"_ || field.typeName=="DagForest"_ ||
+                       field.typeName=="bNodeType"_ || field.typeName=="DerivedMesh"_ || field.typeName=="ParticleCacheKey"_, field.typeName);
+                if(field.type && field.typeName!="wmKeyConfig"_ && field.name!="tab_offset"_ &&
+                        field.typeName!="bNode"_ && field.typeName!="bNodePreview"_ && field.typeName!="bNodeSocket"_ &&
+                        field.typeName!="CurveMapPoint"_ && field.typeName!="BoundBox"_ &&
+                        field.name!="newid"_ && field.name!="undo_buf"_ && field.name!="format"_ && field.name!="frand"_ && field.name!="cached_frames"_) error("not found", type.name, type, field, pointer); //blocks*/
+                pointer = -1;
                 found:;
             }
         }
@@ -221,17 +231,19 @@ struct BlendView : Widget {
             const BlockHeader& header = file.read<BlockHeader>();
             ref<byte> identifier(header.identifier,4);
             BinaryData data (file.Data::read(header.size));
+            const Struct& type = structs[header.type];
 
             if(identifier == "SC\0\0"_) scene = (Scene*)data.buffer.buffer.data;
-            if(identifier == "DNA1"_) continue;
-            if(identifier == "ENDB"_) break;
+            else if(identifier == "DNA1"_ ) continue;
+            else if(identifier == "ENDB"_) break;
 
-            const Struct& type = structs[header.type];
-            if(header.size >= header.count*type.size)
-                if(type.fields) for(uint unused i: range(header.count)) fix(blocks, type, data.Data::read(type.size));
+            if(header.size >= header.count*type.size && type.fields && header.type != 0) {
+                if(header.size != header.count*type.size) log(identifier, header.size,header.count, type.name, type.size);
+                for(uint unused i: range(header.count)) fix(blocks, type, data.Data::read(type.size));
+            }
         }
 
-        for(const Struct& match: structs) if(match.name == ""_) log(match);
+        //for(const Struct& match: structs) if(match.name == ""_) log(match);
     }
 
     /// Extracts relevant data from Blender structures
@@ -258,9 +270,8 @@ struct BlendView : Widget {
                 const MVert& vert = verts[i];
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
-                vec3 color = vec3(1,1,1); //mesh.dvert?vec3(mesh.dvert[i].dw[0].weight):vec3(1,1,1);
 
-                surface.vertices << Vertex __(position, normal, color);
+                surface.vertices << Vertex __(position, normal, vec2(0,0));
                 i++;
             }
 
@@ -274,6 +285,15 @@ struct BlendView : Widget {
                     uint c = loops[i].v;
                     surface.indices << a << b << c;
                     b = c;
+                }
+            }
+
+            if(mesh.mloopuv) { // Assign UV coordinates to vertices, TODO: duplicates vertices as needed
+                ref<MLoopUV> texCoord(mesh.mloopuv, mesh.totloop);
+                for(uint index: surface.indices) {
+                    if(surface.vertices[index].texCoord && surface.vertices[index].texCoord != vec2(texCoord[index].uv))
+                        error("TODO: duplicate vertex");
+                    surface.vertices[index].texCoord = vec2(texCoord[index].uv);
                 }
             }
 
@@ -319,10 +339,11 @@ struct BlendView : Widget {
                 surface.buffer.upload(surface.indices);
 
                 // Compiles shader
-                string tags = string("transform normal color diffuse shadow sun sky"_);
-                if(mesh.totcol>=1 && mesh.mat[0]) {
+                string tags = string("transform normal texCoord diffuse shadow sun sky"_);
+                if(mesh.totcol>=1) {
                     string name = replace(replace(simplify(toLower(str((const char*)mesh.mat[0]->id.name+2)))," "_,"_"),"."_,"_"_);
                     tags <<' '<<name;
+                    //log(name);
                 }
                 surface.shader = GLShader(string(blender+shaderSource), tags);
 
@@ -487,8 +508,8 @@ struct BlendView : Widget {
             {int i=1; for(const GLTexture& texture : surface.textures) texture.bind(i++); }
 
             surface.buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
-            surface.buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
             surface.buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
+            surface.buffer.bindAttribute(shader,"texCoord",3,__builtin_offsetof(Vertex,texCoord));
 
             //log(surface.instances.size(),'\t',surface.shader.sampler2D);
             for(const mat4& transform: surface.instances) {
