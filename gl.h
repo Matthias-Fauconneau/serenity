@@ -23,8 +23,9 @@ struct GLUniform {
 };
 
 struct GLShader {
+    GLShader(){}
     GLShader(const ref<byte>& source, const ref<byte>& tags=""_);
-    move_operator(GLShader): id(o.id) { o.id=0; }
+    move_operator(GLShader): id(o.id), sampler2D(move(o.sampler2D)) { o.id=0; }
     void compile(uint type, const ref<byte>& source);
     void bind();
     uint attribLocation(const ref<byte>&);

@@ -77,7 +77,7 @@ template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p
 template<class T> inline string str(T* const& p) { return str(*p); }*/
 
 /// Converts floating-point numbers
-string ftoa(float number, int precision=2, int exponent=10);
+string ftoa(float number, int precision=3, int exponent=0);
 inline string str(const float& n) { return ftoa(n); }
 
 /// Converts references

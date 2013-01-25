@@ -10,6 +10,7 @@ inline float cos(float t) { return __builtin_cosf(t); }
 inline float sin(float t) { return __builtin_sinf(t); }
 inline float acos(float t) { return __builtin_acosf(t); }
 inline float asin(float t) { return __builtin_asinf(t); }
+inline float atan(float t) { return __builtin_atanf(t); }
 
 struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
@@ -17,7 +18,7 @@ struct mat3 {
     float data[3*3];
     mat3(float d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d; }
     mat3(float dx, float dy) : mat3(vec3(1,0,0),vec3(0,1,0),vec3(dx,dy,1)){}
-    mat3(vec3 c0, vec3 c1, vec3 c2){for(int i=0;i<3;i++) M(i,0)=c0[i], M(i,1)=c1[i], M(i,2)=c2[i]; }
+    mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
     float M(int i, int j) const { return data[j*3+i]; }
     float& M(int i, int j) { return data[j*3+i]; }
@@ -60,6 +61,7 @@ struct mat4; inline mat4 operator*(float s, mat4 M);
 struct mat4 {
     float data[4*4];
     mat4(int d=1) { for(int i=0;i<4*4;i++) data[i]=0; for(int i=0;i<4;i++) M(i,i)=d; }
+    mat4(vec3 e0, vec3 e1, vec3 e2):mat4(1){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
     float M(int i, int j) const { return data[j*4+i]; }
     float& M(int i, int j) { return data[j*4+i]; }

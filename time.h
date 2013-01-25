@@ -79,5 +79,6 @@ struct Random {
         w = 18000 * (w & 0xFFFF) + (w >> 16);
         return (z << 16) + w;
     }
-    float operator()() { float f = float(next()&((1<<24)-1))*0x1p-23f - 1; assert(f>=-1 && f<=1); return f; }
+    operator uint64() { return next(); }
+    float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };

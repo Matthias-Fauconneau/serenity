@@ -155,7 +155,7 @@ struct Editor : Widget {
 
      /// Setups the application UI and shortcuts
      Editor() {
-         //Random random; for(vec2& v: randomNormals) v=normalize(vec2(random(),random()));
+         //Random random; for(vec2& v: randomNormals) v=normalize(vec2(random()*2-1,random()*2-1));
 
          layout << &systems << this << &editor;
          window.localShortcut(Escape).connect(&::exit);
@@ -215,7 +215,7 @@ struct Editor : Widget {
         const int N=4;
         float altitude[(N+1)*(N+1)];
         for(int y=0;y<=N;y++) for(int x=0;x<=N;x++) {
-            altitude[y*(N+1)+x] = 100.f*random();
+            altitude[y*(N+1)+x] = 100.f*(random()*2-1);
         }
 
         {// Terrain
@@ -236,13 +236,13 @@ struct Editor : Widget {
             indices.reserve(indices.size()+bladeCountSqrt*bladeCountSqrt*8*3);
 
             for(int y=0;y<bladeCountSqrt;y++) for(int x=0;x<bladeCountSqrt;x++) {
-                float bent = 1./4*(1./2+(random()+1)/2);
+                float bent = 1./4*(1./2+random());
                 float angle = random()*PI;
-                float width = 6*(1./2+(random()+1)/2);
-                float height = 30*(1./4+(random()+1)/2);
+                float width = 6*(1./2+random());
+                float height = 30*(1./4+random());
                 float gravity = 1./4;
 
-                vec2 uv = vec2(x + (random()+1)/2, y + (random()+1)/2)/float(bladeCountSqrt);
+                vec2 uv = vec2(x + random(), y + random())/float(bladeCountSqrt);
                 vec3 position = vec3(groundSize * (uv-vec2(1/2.f)), bilinear(altitude, N, uv));
                 vec3 velocity = vec3(bent*cos(angle),bent*sin(angle),1);
                 vec3 tangent = vec3(-sin(angle),cos(angle),0);

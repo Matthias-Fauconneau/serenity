@@ -3,6 +3,7 @@
 #include "string.h"
 #include "data.h"
 #include "map.h"
+#include "time.h"
 #include "jpeg.h"
 #include "window.h"
 #include "gl.h"
@@ -71,7 +72,8 @@ struct BlendView : Widget {
         vec3 normal; // World-space vertex normals
         vec3 color; // BGR albedo (TODO: texture mapping)
     };
-    struct Object {
+    struct Surface {
+        mat4 transform;
         array<Vertex> vertices;
         array<uint> indices;
 
@@ -80,8 +82,10 @@ struct BlendView : Widget {
         GLBuffer buffer;
 
         array<mat4> instances;
+        // Rendering order (cheap to expensive, front to back)
+        bool operator <(const Surface& o) const { return instances.size()<o.instances.size(); }
     };
-    array<Object> objects;
+    array<Surface> surfaces;
 
     BlendView() : folder("Island"_,home()), mmap("Island.blend.orig", folder, Map::Read|Map::Write) { // with write access to fix pointers
         load();
@@ -234,47 +238,47 @@ struct BlendView : Widget {
     void parse() {
         sun=mat4(); sun.rotateX(sunPitch); sun.rotateZ(sunYaw);
 
-        // Parses meshes
+        // Parses objects
+        map<const Object*, uint> surfaceIndex;
         for(const Base& base: scene->base) {
-            const ::Object& object = *base.object;
-            if(!(scene->lay&object.lay)) continue;
-            if(object.type !=::Object::Mesh) continue;
-            const Mesh* mesh = object.data;
-            if(!mesh->mvert) continue;
+            const Object& object = *base.object;
+            Surface surface;
+
+            if(object.type !=Object::Mesh) continue;
+            const Mesh& mesh = *object.data;
+            if(!mesh.mvert) continue;
 
             mat4 transform;
             for(uint i: range(4)) for(uint j: range(4)) transform(i,j) = object.obmat[j*4+i];
             float scale = length(vec3(transform(0,0),transform(1,1),transform(2,2)));
 
             if(scale>10) continue; // Currently ignoring water plane, TODO: water reflection
-            ref<MVert> verts(mesh->mvert, mesh->totvert);
-            array<Vertex> vertices;
+            ref<MVert> verts(mesh.mvert, mesh.totvert);
             for(uint i: range(verts.size)) {
                 const MVert& vert = verts[i];
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
-                vec3 color = mesh->dvert?vec3(mesh->dvert[i].dw[0].weight):vec3(1,1,1);
+                vec3 color = vec3(1,1,1); //mesh.dvert?vec3(mesh.dvert[i].dw[0].weight):vec3(1,1,1);
 
-                vertices << Vertex __(position, normal, color);
+                surface.vertices << Vertex __(position, normal, color);
                 i++;
             }
 
-            ref<MLoop> loops(mesh->mloop, mesh->totloop);
-            array<uint> indices;
+            ref<MLoop> loops(mesh.mloop, mesh.totloop);
             uint materialCount=1;
-            for(const MPoly& poly: ref<MPoly>(mesh->mpoly, mesh->totpoly)) {
+            for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
                 materialCount = max(materialCount, uint(poly.mat_nr+1));
                 assert(poly.totloop==3 || poly.totloop==4);
                 uint a=loops[poly.loopstart].v, b=loops[poly.loopstart+1].v;
                 for(uint i: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
                     uint c = loops[i].v;
-                    indices << a << b << c;
+                    surface.indices << a << b << c;
                     b = c;
                 }
             }
 
             vec3 objectMin=0, objectMax=0;
-            for(Vertex& vertex: vertices) {
+            for(Vertex& vertex: surface.vertices) {
                 // Normalizes smoothed normals (weighted by triangle areas)
                 vertex.normal=normalize(vertex.normal);
 
@@ -295,62 +299,108 @@ struct BlendView : Widget {
                 }
             }
             // scale positions and transforms to keep unit bounding box in object space
-            for(Vertex& vertex: vertices) {
+            for(Vertex& vertex: surface.vertices) {
                 vertex.position = (vertex.position-objectMin)/(objectMax-objectMin);
             }
             transform.translate(objectMin);
             transform.scale(objectMax-objectMin);
+            surface.transform = transform; //for emitter and particles
 
             // Parses particle systems
-            bool renderEmitter=true;
+            bool render = true;
             for(const ParticleSystem& particle: object.particlesystem) {
                 const ParticleSettings& p = *particle.part;
-                if(!(p.draw&p.PART_DRAW_EMITTER)) renderEmitter=false;
-            }
-            if(!renderEmitter) continue;
-
-            // Submits geometry
-            GLBuffer buffer;
-            buffer.upload<Vertex>(vertices);
-            buffer.upload(indices);
-
-            // Compiles shader
-            string tags = string("transform normal color diffuse shadow sun sky"_);
-            if(object.data->totcol>=1 && object.data->mat[0]) {
-                string name = replace(replace(simplify(toLower(str((const char*)object.data->mat[0]->id.name+2)))," "_,"_"),"."_,"_"_);
-                tags <<' '<<name;
-            }
-            GLShader shader(string(blender+shaderSource), tags);
-
-            // Loads textures
-            array<GLTexture> textures;
-            int i=1; for(const string& name: shader.sampler2D) {
-                shader[name] = i++;
-                textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)),
-                                    GLTexture::Mipmap|GLTexture::Bilinear|GLTexture::Anisotropic);
+                if(!(p.draw&p.PART_DRAW_EMITTER)) render=false;
             }
 
-            objects << Object __(
-                           move(vertices), move(indices),
-                           move(shader), move(textures), move(buffer),
-                           move(array<mat4>()<<transform) );
+            if(render) {
+                // Submits geometry
+                surface.buffer.upload<Vertex>(surface.vertices);
+                surface.buffer.upload(surface.indices);
+
+                // Compiles shader
+                string tags = string("transform normal color diffuse shadow sun sky"_);
+                if(mesh.totcol>=1 && mesh.mat[0]) {
+                    string name = replace(replace(simplify(toLower(str((const char*)mesh.mat[0]->id.name+2)))," "_,"_"),"."_,"_"_);
+                    tags <<' '<<name;
+                }
+                surface.shader = GLShader(string(blender+shaderSource), tags);
+
+                // Loads textures
+                int i=1; for(const string& name: surface.shader.sampler2D) {
+                    surface.shader[name] = i++;
+                    surface.textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)),
+                                               GLTexture::Mipmap|GLTexture::Bilinear|GLTexture::Anisotropic);
+                }
+
+                // Appends an instance
+                if(scene->lay&object.lay) surface.instances << transform;
+            }
+
+            surfaceIndex.insert(&object, surfaces.size()); // Keep track of Object <-> Surface mapping (e.g to instanciate particles)
+            surfaces << move(surface);
         }
 
         // Parses particle systems
         for(const Base& base: scene->base) {
-            const ::Object& object = *base.object;
-            for(const ParticleSystem& particle: object.particlesystem) {
+            for(const ParticleSystem& particle: base.object->particlesystem) {
+                const Surface& surface = surfaces[surfaceIndex.at(base.object)];
                 const ParticleSettings& p = *particle.part;
-                log("count",particle.totpart*(p.childtype?p.ren_child_nbr:1),"size",p.size,"randomSize",p.randsize,
-                    "phys",p.phystype&p.PART_PHYS_NEWTON,p.brownfac);
-                if(p.dup_ob) log(p.dup_ob->id.name);
-                for(const ParticleDupliWeight& p: p.dupliweights) log(p.ob->id.name, p.count);
-                // Selects N random faces (if vg[PSYS_VG_DENSITY], discard if mesh->dvert[i].dw[vg[PSYS_VG_DENSITY]] < 1)
+                if(p.brownfac>10) continue; // FIXME: render birds with brownian dispersion
+                //log("count",particle.totpart*(p.childtype?p.ren_child_nbr:1));
 
-                //TODO compute random location on face
-                //TODO instantiate object (dup_ob or random from dupliweights)
+                // Selects N random faces
+                Random random;
+                for(int n=0; n</*particle.totpart/200*/64;) {
+                    uint index = random % (surface.indices.size()/3) * 3;
+                    uint a=surface.indices[index], b=surface.indices[index+1], c=surface.indices[index+2];
+                    uint densityVG = particle.vgroup[ParticleSystem::PSYS_VG_DENSITY];
+                    if(densityVG) {
+                        if(base.object->data->dvert[a].dw[densityVG-1].weight < 0.5) continue;
+                        if(base.object->data->dvert[b].dw[densityVG-1].weight < 0.5) continue;
+                        if(base.object->data->dvert[c].dw[densityVG-1].weight < 0.5) continue;
+                    }
+
+                    mat4 transform;
+                    // Translates
+                    vec3 A = (surface.transform*surface.vertices[a].position).xyz(),
+                            B = (surface.transform*surface.vertices[b].position).xyz(),
+                            C = (surface.transform*surface.vertices[c].position).xyz();
+                    float wA = random(), wB = random(), wC = 3-wA-wB;
+                    vec3 position = (wA*A+wB*B+wC*C)/3.f;
+                    transform.translate(position);
+                    // Scales
+                    transform.scale(p.size);
+                    transform.scale( 1 - p.randsize*random() ); //p.size is maximum not average
+                    transform.scale(10); // HACK FIXME
+                    // Orient X axis along normal
+                    vec3 e2 = normalize(B-A), e1 = normalize(cross(e2,C-A)), e3 = cross(e1,e2);
+                    mat4 align(e1,e2,e3);
+                    transform = transform * align;
+                    // Random rotation around X axis
+                    transform.rotateX(2*PI*random());
+
+                    Object* object=0;
+                    if(p.dup_ob) object = p.dup_ob;
+                    else {
+                        uint total = 0;
+                        for(const ParticleDupliWeight& p: p.dupliweights) total += p.count;
+                        uint index = random % total;
+                        uint i = 0;
+                        for(const ParticleDupliWeight& p: p.dupliweights) {
+                            if(index >= i && index<i+p.count) { object = p.ob; break; }
+                            i+=p.count;
+                        }
+                    }
+                    assert(object);
+
+                    Surface& dupli = surfaces.at(surfaceIndex.at(object));
+                    dupli.instances << transform*dupli.transform;
+                    n++;
+                }
             }
         }
+        quicksort(surfaces); //Render particles (most instances last)
 
         //FIXME: compute smallest enclosing sphere
         worldCenter = (worldMin+worldMax)/2.f; worldRadius=length(worldMax.xy()-worldMin.xy())/2.f;
@@ -372,7 +422,8 @@ struct BlendView : Widget {
         uint width=size.x, height = size.y;
         // Computes projection transform
         mat4 projection;
-        projection.perspective(PI/4,width,height,1./4,4);
+        //projection.perspective(2*atan(36/(2*40.0)),width,height,0.1,4);
+        projection.perspective(PI/8/*4*/,width,height,1./4,4);
         // Computes view transform
         mat4 view;
         view.scale(1.f/worldRadius); // fit scene (isometric approximation)
@@ -401,11 +452,13 @@ struct BlendView : Widget {
         sun.rotateZ(sunYaw);
 
         shadow.bind();
-        for(Object& object: objects) {
-            object.buffer.bindAttribute(shadow, "position", 3, __builtin_offsetof(Vertex,position));
-            for(const mat4& transform: object.instances) {
+        for(Surface& surface: surfaces) {
+            if(!surface.instances) continue;
+
+            surface.buffer.bindAttribute(shadow, "position", 3, __builtin_offsetof(Vertex,position));
+            for(const mat4& transform: surface.instances) {
                 shadow["modelViewProjectionTransform"] = sun*transform;
-                object.buffer.draw();
+                surface.buffer.draw();
             }
         }
 
@@ -420,8 +473,10 @@ struct BlendView : Widget {
         framebuffer.bind(true);
         glBlend(false);
 
-        for(Object& object: objects) {
-            GLShader& shader = object.shader;
+        for(Surface& surface: surfaces) {
+            if(!surface.instances) continue;
+
+            GLShader& shader = surface.shader;
             shader.bind();
             shader["sunLightDirection"] = sunLightDirection;
             shader["skyLightDirection"] = skyLightDirection;
@@ -429,21 +484,22 @@ struct BlendView : Widget {
             shader["shadowMap"] = 0; sunShadow.depthTexture.bind(0);
 
             {int i=1; for(const string& name: shader.sampler2D) shader[name] = i++; }
-            {int i=1; for(const GLTexture& texture : object.textures) texture.bind(i++); }
+            {int i=1; for(const GLTexture& texture : surface.textures) texture.bind(i++); }
 
-            object.buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
-            object.buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
-            object.buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
+            surface.buffer.bindAttribute(shader,"position",3,__builtin_offsetof(Vertex,position));
+            surface.buffer.bindAttribute(shader,"color",3,__builtin_offsetof(Vertex,color));
+            surface.buffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Vertex,normal));
 
-            for(const mat4& transform: object.instances) {
+            //log(surface.instances.size(),'\t',surface.shader.sampler2D);
+            for(const mat4& transform: surface.instances) {
                 shader["modelViewProjectionTransform"] = projection*view*transform;
                 shader["normalMatrix"] = normalMatrix*transform.normalMatrix();
                 shader["shadowTransform"] = sun*transform;
                 if(shader["modelTransform"]) shader["modelTransform"] = transform;
-                object.buffer.draw();
+                surface.buffer.draw();
             }
         }
-        //TODO: render Instances
+        //log("---");
 
         //TODO: fog
         sky["inverseViewProjectionMatrix"] = (projection*view).inverse();
