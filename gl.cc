@@ -134,47 +134,29 @@ uint GLShader::attribLocation(const ref<byte>& name) {
     return (uint)location;
 }
 
-/// Buffer
+/// Vertex Buffer
 
-GLBuffer::~GLBuffer() { if(vertexBuffer) glDeleteBuffers(1,&vertexBuffer); if(indexBuffer) glDeleteBuffers(1,&indexBuffer); }
-void GLBuffer::allocate(int indexCount, int vertexCount, int vertexSize) {
+GLVertexBuffer::~GLVertexBuffer() { if(vertexBuffer) glDeleteBuffers(1,&vertexBuffer); }
+void GLVertexBuffer::allocate(int vertexCount, int vertexSize) {
     this->vertexCount = vertexCount;
     this->vertexSize = vertexSize;
     if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, vertexCount*vertexSize, 0, GL_STATIC_DRAW);
-    this->indexCount = indexCount;
-    if(indexCount) {
-        if(!indexBuffer) glGenBuffers(1, &indexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount*sizeof(uint), 0, GL_STATIC_DRAW );
-    }
 }
-uint* GLBuffer::mapIndexBuffer() {
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    return (uint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
-}
-void GLBuffer::unmapIndexBuffer() { glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
-void* GLBuffer::mapVertexBuffer() {
+void* GLVertexBuffer::mapVertexBuffer() {
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
 }
-void GLBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ARRAY_BUFFER, 0); }
-
-void GLBuffer::upload(const ref<uint>& indices) {
-    if(!indexBuffer) glGenBuffers(1, &indexBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
-    indexCount = indices.size;
-}
-void GLBuffer::upload(const ref<byte> &vertices) {
+void GLVertexBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ARRAY_BUFFER, 0); }
+void GLVertexBuffer::upload(const ref<byte> &vertices) {
     if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, vertices.size, vertices.data, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertexCount = vertices.size/vertexSize;
 }
-void GLBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset) {
+void GLVertexBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset) const {
     assert(vertexBuffer);
     int location = program.attribLocation(strz(name));
     assert(location>=0,"unused attribute"_,name);
@@ -182,8 +164,34 @@ void GLBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int eleme
     glVertexAttribPointer(location, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
     glEnableVertexAttribArray(location);
 }
-void GLBuffer::draw() {
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glDrawArrays(primitiveType, 0, vertexCount);
+}
+/// Index Buffer
+
+GLIndexBuffer::~GLIndexBuffer() { if(indexBuffer) glDeleteBuffers(1,&indexBuffer); }
+void GLIndexBuffer::allocate(int indexCount) {
+    this->indexCount = indexCount;
+    if(indexCount) {
+        if(!indexBuffer) glGenBuffers(1, &indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount*sizeof(uint), 0, GL_STATIC_DRAW );
+    }
+}
+uint* GLIndexBuffer::mapIndexBuffer() {
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    return (uint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+}
+void GLIndexBuffer::unmapIndexBuffer() { glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
+void GLIndexBuffer::upload(const ref<uint>& indices) {
+    if(!indexBuffer) glGenBuffers(1, &indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
+    indexCount = indices.size;
+}
+void GLIndexBuffer::draw() const {
+    assert(indexBuffer);
     /*if (primitiveType == Point) {
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
         glEnable(GL_POINT_SPRITE);
@@ -196,20 +204,13 @@ void GLBuffer::draw() {
         glEnable(GL_LINE_SMOOTH);
         glLineWidth(2);
     }
-    if (indexBuffer) {
-        if(primitiveRestart) {
-            glEnable(GL_PRIMITIVE_RESTART);
-            glPrimitiveRestartIndex(-1);
-        }
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-        glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);
-        if(primitiveRestart) {
-            glDisable(GL_PRIMITIVE_RESTART);
-        }
-    } else {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        glDrawArrays(primitiveType, 0, vertexCount);
+    if(primitiveRestart) {
+        glEnable(GL_PRIMITIVE_RESTART);
+        glPrimitiveRestartIndex(-1);
     }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);
+    if(primitiveRestart) glDisable(GL_PRIMITIVE_RESTART);
 }
 
 void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {

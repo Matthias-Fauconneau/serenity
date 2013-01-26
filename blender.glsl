@@ -55,7 +55,8 @@ shadow {
 
 sun {
  fragment {
-  const vec3 sunColor = vec3(0.75, 0.5, 0.25);
+  //const vec3 sunColor = vec3(0.75, 0.5, 0.25);
+  const vec3 sunColor = vec3(0.875, 0.75, 0.5);
   uniform vec3 sunLightDirection;
   diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor;
  }
@@ -63,7 +64,8 @@ sun {
 
 sky {
  fragment {
-  const vec3 skyColor = vec3(0.25, 0.5, 0.75);
+  //const vec3 skyColor = vec3(0.25, 0.5, 0.75);
+  const vec3 skyColor = vec3(0.125, 0.25, 0.5);
   uniform vec3 skyLightDirection;
   diffuseLight += (1.f+dot(skyLightDirection, normal))/2.f * skyColor;
  }

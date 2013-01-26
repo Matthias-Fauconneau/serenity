@@ -44,34 +44,43 @@ extern char _binary_ ## name ##_glsl_end[]; \
 static ref<byte> name (_binary_ ## name ##_glsl_start,_binary_ ## name ##_glsl_end);
 
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
-struct GLBuffer {
-    GLBuffer(){}
-    GLBuffer(PrimitiveType primitiveType):primitiveType(primitiveType){}
-    move_operator(GLBuffer): primitiveType(o.primitiveType),
-        vertexBuffer(o.vertexBuffer),vertexCount(o.vertexCount),vertexSize(o.vertexSize),
-        indexBuffer(o.indexBuffer),indexCount(o.indexCount),primitiveRestart(o.primitiveRestart) {o.vertexBuffer=o.indexBuffer=0;}
-    void allocate(int indexCount, int vertexCount, int vertexSize);
-    uint* mapIndexBuffer();
-    void unmapIndexBuffer();
+
+struct GLVertexBuffer {
+    GLVertexBuffer(){}
+    move_operator(GLVertexBuffer): vertexBuffer(o.vertexBuffer),vertexCount(o.vertexCount),vertexSize(o.vertexSize){o.vertexBuffer=0;}
+    ~GLVertexBuffer();
+
+    void allocate(int vertexCount, int vertexSize);
     void* mapVertexBuffer();
     void unmapVertexBuffer();
-    void upload(const ref<uint>& indices);
     void upload(const ref<byte>& vertices);
-    template<class T> void upload(const ref<T>& vertices) {
-        vertexSize=sizeof(T);
-        upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T)));
-    }
-    void bind();
-    void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0);
-    void draw();
-    ~GLBuffer();
+    template<class T> void upload(const ref<T>& vertices) { vertexSize=sizeof(T); upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
+    void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0) const;
+    void draw(PrimitiveType primitiveType) const;
 
-    operator bool() { return vertexBuffer; }
+    operator bool() const { return vertexBuffer; }
 
-    PrimitiveType primitiveType=Triangle;
     uint32 vertexBuffer=0;
     uint32 vertexCount=0;
     uint32 vertexSize=0;
+};
+
+struct GLIndexBuffer {
+    GLIndexBuffer(){}
+    GLIndexBuffer(PrimitiveType primitiveType):primitiveType(primitiveType){}
+    move_operator(GLIndexBuffer): primitiveType(o.primitiveType),
+        indexBuffer(o.indexBuffer),indexCount(o.indexCount),primitiveRestart(o.primitiveRestart) {o.indexBuffer=0;}
+    ~GLIndexBuffer();
+
+    void allocate(int indexCount);
+    uint* mapIndexBuffer();
+    void unmapIndexBuffer();
+    void upload(const ref<uint>& indices);
+    void draw() const;
+
+    operator bool() { return indexBuffer; }
+
+    PrimitiveType primitiveType=Triangle;
     uint32 indexBuffer=0;
     uint32 indexCount=0;
     bool primitiveRestart=false;

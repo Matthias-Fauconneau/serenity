@@ -34,7 +34,7 @@ struct TextLayout {
         if(line && line.last()) length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
         float space=0;
         if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
-        if(space<=0 || space>=2*spaceAdvance) space = spaceAdvance; //compact
+        if(space<=0 || space>=3*spaceAdvance) space = spaceAdvance; //compact
 
         //layout
         column=0; pen.x=0;
