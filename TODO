@@ -1,5 +1,0 @@
-.blend decoder:
- parse & render shaders, load & sample textures | use custom shaders
- apply object transforms
- instantiate (with automatic impostors)
- parse lights, cameras, background

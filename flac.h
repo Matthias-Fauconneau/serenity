@@ -1,6 +1,20 @@
 #pragma once
 /// \file flac.h High performance FLAC decoder
-#include "memory.h"
+
+/// Simple writable fixed-capacity memory reference
+template<class T> struct Buffer {
+    T* data=0;
+    uint capacity=0,size=0;
+    Buffer(){}
+    Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
+    Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy(data,o.data,size*sizeof(T));}
+    move_operator_(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
+    ~Buffer(){if(data){unallocate(data,capacity);}}
+    operator T*() { return data; }
+    operator ref<T>() const { return ref<T>(data,size); }
+    constexpr const T* begin() const { return data; }
+    constexpr const T* end() const { return data+size; }
+};
 
 /// Decodes packed bitstreams
 struct BitReader {

@@ -134,7 +134,7 @@ uint GLShader::attribLocation(const ref<byte>& name) {
     return (uint)location;
 }
 
-/// Vertex Buffer
+/// Vertex buffer
 
 GLVertexBuffer::~GLVertexBuffer() { if(vertexBuffer) glDeleteBuffers(1,&vertexBuffer); }
 void GLVertexBuffer::allocate(int vertexCount, int vertexSize) {
@@ -172,7 +172,7 @@ void GLVertexBuffer::draw(PrimitiveType primitiveType, uint instanceCount) const
     if(instanceCount==1) glDrawArrays(primitiveType, 0, vertexCount);
     else glDrawArraysInstanced(primitiveType, 0, vertexCount, instanceCount);
 }
-/// Index Buffer
+/// Index buffer
 
 GLIndexBuffer::~GLIndexBuffer() { if(indexBuffer) glDeleteBuffers(1,&indexBuffer); }
 void GLIndexBuffer::allocate(int indexCount) {

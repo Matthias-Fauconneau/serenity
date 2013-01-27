@@ -61,18 +61,12 @@ struct Monitor : Timer {
         map<ref<byte>, map<ref<byte>, string> > process;
         for(const string& pid: procfs.list(Folders)) if(isInteger(pid)) process[pid]=stat(pid);
         if(o) {
-            /*log("User: "_+dec(toInteger(n["user"_])-toInteger(o["user"_]))+"%"
-                    "\tNice: "_+dec(toInteger(n["nice"_])-toInteger(o["nice"_]))+"%"
-                    "\tIdle: "_+dec(toInteger(n["idle"_])-toInteger(o["idle"_]))+"%"
-                    "\tFree Memory: "_+dec((memory["MemFree"_]+memory["Inactive"_])/1024)+" MB\tDisk Buffer: "_+dec(memory["Active(file)"_]/1024)+" MB"_);*/
             processList.clear();
             processList << string("Name"_) << string("RSS (MB)"_) << string("CPU (%)"_);
             for(string& pid: procfs.list(Folders)) if(isInteger(pid)) {
                 map<ref<byte>,string>& o = this->process[pid];
                 map<ref<byte>,string>& p = process[pid];
                 ref<byte> name = p["name"_].slice(1,p["name"_].size()-2);
-                //const ref<byte> states[]={"Running"_, "Sleeping"_, "Waiting for disk"_, "Zombie"_, "Traced/Stopped"_,  "Paging"_};
-                //ref<byte> state = states["RSDZTW"_.indexOf(p["state"_][0])];
                 int cpu = toInteger(p["utime"_])-toInteger(o["utime"_])+toInteger(p["stime"_])-toInteger(o["stime"_]);
                 float rss = toInteger(p["rss"_])*4/1024.f;
                 if(p["state"_]=="R"_||rss>=2) processList << string(name) << ftoa(rss,1) << dec(cpu);

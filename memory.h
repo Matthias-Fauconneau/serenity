@@ -15,41 +15,16 @@ inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) 
 /// Buffer explicit copy
 template<class T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
 
-/// Typed memory allocation (without initialization)
-#if NOLIBC
-/// Stub runtime memory allocation
-byte* allocate_(uint size);
-byte* reallocate_(byte* buffer, uint size, uint need);
-void unallocate_(byte* buffer, uint size);
-template<class T> T* allocate(uint size) { assert(size); return (T*)allocate_(size*sizeof(T)); }
-template<class T> void reallocate(T*& buffer, int size, int need) { buffer=(T*)reallocate_((byte*)buffer, size*sizeof(T), need*sizeof(T)); }
-template<class T> void unallocate(T*& buffer, int size) { assert(buffer); unallocate_((byte*)buffer, size*sizeof(T)); buffer=0; }
-#else
-/// C runtime memory allocation
+// C runtime memory allocation
 extern "C" void* malloc(size_t size);
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
 extern "C" void* realloc(void* buffer, size_t size);
 extern "C" void free(void* buffer);
+// Typed memory allocation (without initialization)
 template<class T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
 template<class T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
 template<class T> void reallocate(T*& buffer, int unused size, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
 template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); free((void*)buffer); buffer=0; }
-#endif
-
-/// Simple writable fixed-capacity memory reference
-template<class T> struct Buffer {
-    T* data=0;
-    uint capacity=0,size=0;
-    Buffer(){}
-    Buffer(uint capacity, uint size=0):data(allocate<T>(capacity)),capacity(capacity),size(size){}
-    Buffer(const Buffer& o):Buffer(o.capacity,o.size){copy(data,o.data,size*sizeof(T));}
-    move_operator_(Buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
-    ~Buffer(){if(data){unallocate(data,capacity);}}
-    operator T*() { return data; }
-    operator ref<T>() const { return ref<T>(data,size); }
-    constexpr const T* begin() const { return data; }
-    constexpr const T* end() const { return data+size; }
-};
 
 /// Dynamic object allocation (using constructor and destructor)
 inline void* operator new(size_t, void* p) { return p; } //placement new
@@ -57,7 +32,7 @@ template<class T, class... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); 
 template<class T> void free(T* t) { t->~T(); unallocate(t,1); }
 
 /// Unique reference to an heap allocated value
-template<class T> struct unique {
+template<class T> struct c {
     no_copy(unique);
     T* pointer;
     unique():pointer(0){}
