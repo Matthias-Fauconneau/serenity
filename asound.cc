@@ -45,17 +45,6 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-#ifndef MMAP
-// No direct memory access support on OMAP
-enum { HWSYNC=1<<0, APPL=1<<1, AVAIL_MIN=1<<2 };
-struct SyncPtr {
-    uint flags;
-    union { Status status; byte pad1[64]; };
-    union { Control control; byte pad2[64]; };
-};
-typedef IOWR<'A', 0x23,SyncPtr> SYNC_PTR;
-#endif
-
 AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
     : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread) {
     HWParams hparams;
@@ -74,26 +63,13 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     this->periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Write)).data);
-#ifdef MMAP
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Read|Map::Write)).data);
-#else
-    syncPtr = &heap<SyncPtr>();
-    status = &syncPtr->status, control = &syncPtr->control;
-#endif
 }
-AudioOutput::~AudioOutput() {
-#ifndef MMAP
-    free(syncPtr);
-#define sync ({ syncPtr->flags=APPL|AVAIL_MIN; iowr<SYNC_PTR>(*syncPtr); })
-#else
-#define sync ({})
-#endif
-}
-void AudioOutput::start() { sync; if(status->state != Prepared && status->state != Running) io<PREPARE>(); registerPoll(); }
-void AudioOutput::stop() { sync; if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
+
+void AudioOutput::start() { if(status->state != Prepared && status->state != Running) io<PREPARE>(); registerPoll(); }
+void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
-    sync;
     if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
@@ -102,9 +78,6 @@ void AudioOutput::event() {
         if(sampleBits==32) readSize=read32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
-#ifndef MMAP
-        sync;
-#endif
         if(readSize<periodSize) { stop(); return; }
     }
     if(status->state == Prepared) io<START>();

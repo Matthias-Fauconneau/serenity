@@ -70,7 +70,7 @@ struct BlendView : Widget {
     GLTexture skymap;
 
     // Geometry
-    struct Surface {
+    struct Model {
         mat4 transform;
 
         struct Vertex {
@@ -91,11 +91,19 @@ struct BlendView : Widget {
         };
         array<Material> materials;
 
-        array<mat4> instances;
+        struct Instance {
+            mat4 modelTransform;
+            mat3 normalMatrix;
+            Instance(mat4 transform):modelTransform(transform),normalMatrix(transform.normalMatrix()){}
+        };
+        static const uint instanceMin = 2; // Minimum number of instances before using instanced rendering (-1 = disable)
+        array<Instance> instances;
+        GLVertexBuffer instanceBuffer;
+
         // Rendering order (cheap to expensive, front to back)
-        bool operator <(const Surface& o) const { return instances.size()<o.instances.size(); }
+        bool operator <(const Model& o) const { return instances.size()<o.instances.size(); }
     };
-    array<Surface> surfaces;
+    array<Model> models;
 
     BlendView() : folder("Island"_,home()), mmap("Island.blend.orig", folder, Map::Read|Map::Write) { // with write access to fix pointers
         load();
@@ -105,6 +113,9 @@ struct BlendView : Widget {
         skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)), GLTexture::Bilinear);
 
         window.localShortcut(Escape).connect(&::exit);
+
+        glDepthTest(true);
+        glCullFace(true);
     }
 
     /// Recursively fix all pointers in an SDNA structure
@@ -251,10 +262,10 @@ struct BlendView : Widget {
         sun=mat4(); sun.rotateX(sunPitch); sun.rotateZ(sunYaw);
 
         // Parses objects
-        map<const Object*, uint> surfaceIndex;
+        map<const Object*, uint> modelIndex;
         for(const Base& base: scene->base) {
             const Object& object = *base.object;
-            Surface surface;
+            Model model;
 
             if(object.type !=Object::Mesh) continue;
             const Mesh& mesh = *object.data;
@@ -271,12 +282,12 @@ struct BlendView : Widget {
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
 
-                surface.vertices << Surface::Vertex __(position, normal, vec2(0,0));
+                model.vertices << Model::Vertex __(position, normal, vec2(0,0));
                 i++;
             }
 
             vec3 objectMin=0, objectMax=0;
-            for(Surface::Vertex& vertex: surface.vertices) {
+            for(Model::Vertex& vertex: model.vertices) {
                 // Computes object bounds
                 objectMin=min(objectMin, vertex.position);
                 objectMax=max(objectMax, vertex.position);
@@ -294,15 +305,15 @@ struct BlendView : Widget {
                 }
             }
             // Scales positions and transforms to keep unit bounding box in object space
-            for(Surface::Vertex& vertex: surface.vertices) {
+            for(Model::Vertex& vertex: model.vertices) {
                 vertex.position = (vertex.position-objectMin)/(objectMax-objectMin);
             }
             transform.translate(objectMin);
             transform.scale(objectMax-objectMin);
-            surface.transform = transform; //for emitter and particles
+            model.transform = transform; //for emitter and particles
 
             for(int materialIndex: range(mesh.totcol)) {
-                Surface::Material material;
+                Model::Material material;
                 material.name = replace(replace(simplify(toLower(str((const char*)mesh.mat[materialIndex]->id.name+2)))," "_,"_"),"."_,"_"_);
 
                 ref<MLoop> indices(mesh.mloop, mesh.totloop);
@@ -318,55 +329,55 @@ struct BlendView : Widget {
                 }
                 assert(material.indices, "Empty material");
 
-                /*if(mesh.mloopuv) { // Assigns UV coordinates to vertices
+                if(mesh.mloopuv) { // Assigns UV coordinates to vertices
                     ref<MLoopUV> texCoords(mesh.mloopuv, mesh.totloop);
                     uint i=0;
                     for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
                         if(poly.mat_nr!=materialIndex) continue;
                         {
                             vec2 texCoord = fract(vec2(texCoords[poly.loopstart].uv));
-                            vec2& a = surface.vertices[material.indices[i]].texCoord;
+                            vec2& a = model.vertices[material.indices[i]].texCoord;
                             if(a && sqr(a-texCoord)>0.01) error("TODO: duplicate vertex");
                             a = texCoord;
                         }{
                             vec2 texCoord = fract(vec2(texCoords[poly.loopstart+1].uv));
-                            vec2& b = surface.vertices[material.indices[i+1]].texCoord;
+                            vec2& b = model.vertices[material.indices[i+1]].texCoord;
                             if(b && sqr(b-texCoord)>0.01) error("TODO: duplicate vertex");
                             b = texCoord;
                         }
                         for(uint index: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
                             vec2 texCoord = fract(vec2(texCoords[index].uv));
-                            vec2& c = surface.vertices[material.indices[i+2]].texCoord;
+                            vec2& c = model.vertices[material.indices[i+2]].texCoord;
                             if(c && sqr(c-texCoord)>0.01) error("TODO: duplicate vertex");
                             c = texCoord;
                             i += 3; // Keep indices counter synchronized with MPoly
                         }
                     }
-                }*/
+                }
 
-                surface.materials << move(material);
+                model.materials << move(material);
             }
 
             bool render = scene->lay&object.lay; // Visible layers
             for(const ParticleSystem& particle: object.particlesystem) if(!(particle.part->draw&ParticleSettings::PART_DRAW_EMITTER)) render=false;
-            if(render) surface.instances << transform; // Appends an instance
-            surfaceIndex.insert(&object, surfaces.size()); // Keep track of Object <-> Surface mapping (e.g to instanciate particles)
-            surfaces << move(surface);
+            if(render) model.instances << transform; // Appends an instance
+            modelIndex.insert(&object, models.size()); // Keep track of Object <-> Model mapping (e.g to instanciate particles)
+            models << move(model);
         }
 
         // Parses particle systems
         for(const Base& base: scene->base) {
             for(const ParticleSystem& particle: base.object->particlesystem) {
-                const Surface& surface = surfaces[surfaceIndex.at(base.object)];
+                const Model& model = models[modelIndex.at(base.object)];
                 const ParticleSettings& p = *particle.part;
                 if(p.brownfac>10) continue; // FIXME: render birds with brownian dispersion
                 //log("count",particle.totpart*(p.childtype?p.ren_child_nbr:1));
 
                 // Selects N random faces
                 Random random;
-                for(int n=0; n</*particle.totpart/200*/64;) {
-                    assert(surface.materials.size()==1);
-                    const array<uint>& indices = surface.materials[0].indices;
+                for(int n=0; n</*particle.totpart/200*/256;) {
+                    assert(model.materials.size()==1);
+                    const array<uint>& indices = model.materials[0].indices;
                     uint index = random % (indices.size()/3) * 3;
                     uint a=indices[index], b=indices[index+1], c=indices[index+2];
                     uint densityVG = particle.vgroup[ParticleSystem::PSYS_VG_DENSITY];
@@ -378,9 +389,9 @@ struct BlendView : Widget {
 
                     mat4 transform;
                     // Translates
-                    vec3 A = (surface.transform*surface.vertices[a].position).xyz(),
-                            B = (surface.transform*surface.vertices[b].position).xyz(),
-                            C = (surface.transform*surface.vertices[c].position).xyz();
+                    vec3 A = (model.transform*model.vertices[a].position).xyz(),
+                            B = (model.transform*model.vertices[b].position).xyz(),
+                            C = (model.transform*model.vertices[c].position).xyz();
                     float wA = random(), wB = random(), wC = 3-wA-wB;
                     vec3 position = (wA*A+wB*B+wC*C)/3.f;
                     transform.translate(position);
@@ -409,25 +420,28 @@ struct BlendView : Widget {
                     }
                     assert(object);
 
-                    Surface& dupli = surfaces.at(surfaceIndex.at(object));
+                    Model& dupli = models.at(modelIndex.at(object));
                     dupli.instances << transform*dupli.transform;
                     n++;
                 }
             }
         }
 
-        for(uint i=0; i<surfaces.size();) {
-            Surface& surface = surfaces[i];
-            if(!surface.materials || !surface.instances) { surfaces.removeAt(i); continue; } else i++;
+        for(uint i=0; i<models.size();) {
+            Model& model = models[i];
+            if(!model.materials || !model.instances) { models.removeAt(i); continue; } else i++;
 
-            surface.vertexBuffer.upload<Surface::Vertex>(surface.vertices);
+            // Uploads vertices
+            model.vertexBuffer.upload<Model::Vertex>(model.vertices);
 
-            for(Surface::Material& material : surface.materials) {
+            for(Model::Material& material : model.materials) {
+                // Uploads indices
                 material.indexBuffer.upload(material.indices);
 
                 // Compiles shader
-                material.shader = GLShader(string(blender+shaderSource),
-                                          string("transform normal texCoord diffuse shadow sun sky "_+material.name));
+                material.shader = GLShader(string(blender+shaderSource), string(
+                                               (model.instances.size()<Model::instanceMin ? "transform normal"_ : "instancedTransform instancedNormal"_) +
+                                               " texCoord diffuse shadow sun sky "_ +material.name));
 
                 // Loads textures
                 int unit=1;
@@ -436,10 +450,13 @@ struct BlendView : Widget {
                     material.textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)),
                                                 GLTexture::Mipmap|GLTexture::Bilinear|GLTexture::Anisotropic);
                 }
+
+                // Uploads instances
+                if(model.instances.size()>=Model::instanceMin) model.instanceBuffer.upload<Model::Instance>(model.instances);
             }
         }
 
-        quicksort(surfaces); // Sorts by rendering cost (i.e render most instanced object last)
+        quicksort(models); // Sorts by rendering cost (i.e render most instanced object last)
 
         //FIXME: compute smallest enclosing sphere
         worldCenter = (worldMin+worldMax)/2.f; worldRadius=length(worldMax.xy()-worldMin.xy())/2.f;
@@ -458,8 +475,42 @@ struct BlendView : Widget {
         return true;
     }
 
+    //map<string, GLTimerQuery> lastProfile;
     void render(int2 unused position, int2 unused size) override {
+        // Render sun shadow map
+        if(!sunShadow) {
+            sunShadow = GLFrameBuffer(GLTexture(4096,4096,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear|GLTexture::Clamp));
+            sunShadow.bind(true);
+
+            // Normalizes to [-1,1]
+            sun=mat4();
+            sun.translate(-1);
+            sun.scale(2.f/(lightMax-lightMin));
+            sun.translate(-lightMin);
+            sun.rotateX(sunPitch);
+            sun.rotateZ(sunYaw);
+
+            shadow.bind();
+            for(Model& model: models) {
+                model.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Model::Vertex,position));
+                for(const Model::Instance& instance: model.instances) {
+                    shadow["modelViewProjectionTransform"] = sun*instance.modelTransform;
+                    for(const Model::Material& material: model.materials) material.indexBuffer.draw();
+                }
+            }
+
+            // Normalizes xy to [0,1] and z to [-1,1]
+            sun=mat4();
+            sun.scale(1.f/(lightMax-lightMin));
+            sun.translate(-lightMin);
+            sun.rotateX(sunPitch);
+            sun.rotateZ(sunYaw);
+        }
+
         uint width=size.x, height = size.y;
+        if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
+        framebuffer.bind(true);
+
         // Computes projection transform
         mat4 projection;
         projection.perspective(2*atan(36/(2*focalLength)), width, height, 1./4, 4);
@@ -470,70 +521,47 @@ struct BlendView : Widget {
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
-        // View-space lighting
-        mat3 normalMatrix = view.normalMatrix();
-        vec3 sunLightDirection = normalize((view*sun.inverse()).normalMatrix()*vec3(0,0,-1));
-        vec3 skyLightDirection = normalize(normalMatrix*vec3(0,0,1));
+        // World-space lighting
+        vec3 sunLightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
+        vec3 skyLightDirection = vec3(0,0,1);
 
-        // Render sun shadow map
-        if(!sunShadow)
-            sunShadow = GLFrameBuffer(GLTexture(4096,4096,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear|GLTexture::Clamp));
-        sunShadow.bind(true);
-        glDepthTest(true);
-        glCullFace(true);
-
-        // Normalizes to -1,1
-        sun=mat4();
-        sun.translate(-1);
-        sun.scale(2.f/(lightMax-lightMin));
-        sun.translate(-lightMin);
-        sun.rotateX(sunPitch);
-        sun.rotateZ(sunYaw);
-
-        shadow.bind();
-        for(Surface& surface: surfaces) {
-            surface.vertexBuffer.bindAttribute(shadow, "position", 3, __builtin_offsetof(Surface::Vertex,position));
-            for(const mat4& transform: surface.instances) {
-                shadow["modelViewProjectionTransform"] = sun*transform;
-                for(const Surface::Material& material: surface.materials) material.indexBuffer.draw();
-            }
-        }
-
-        // Normalizes to xy to 0,1 and z to -1,1
-        sun=mat4();
-        sun.scale(1.f/(lightMax-lightMin));
-        sun.translate(-lightMin);
-        sun.rotateX(sunPitch);
-        sun.rotateZ(sunYaw);
-
-        if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
-        framebuffer.bind(true);
-        glBlend(false);
-
-        for(Surface& surface: surfaces) {
-            for(Surface::Material& material: surface.materials) {
+        //map<string, GLTimerQuery> profile;
+        for(Model& model: models) {
+            for(Model::Material& material: model.materials) {
                 GLShader& shader = material.shader;
                 shader.bind();
-                shader["sunLightDirection"] = sunLightDirection;
-                shader["skyLightDirection"] = skyLightDirection;
                 shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;
                 shader["shadowMap"] = 0; sunShadow.depthTexture.bind(0);
+                shader["sunLightDirection"] = sunLightDirection;
+                shader["skyLightDirection"] = skyLightDirection;
 
                 {int i=1; for(const string& name: shader.sampler2D) shader[name] = i++; }
                 {int i=1; for(const GLTexture& texture : material.textures) texture.bind(i++); }
 
-                surface.vertexBuffer.bindAttribute(shader,"position",3,__builtin_offsetof(Surface::Vertex,position));
-                surface.vertexBuffer.bindAttribute(shader,"normal",3,__builtin_offsetof(Surface::Vertex,normal));
-                surface.vertexBuffer.bindAttribute(shader,"texCoord",3,__builtin_offsetof(Surface::Vertex,texCoord));
+                model.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Model::Vertex,position));
+                model.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Model::Vertex,normal));
+                model.vertexBuffer.bindAttribute(shader,"aTexCoord",3,__builtin_offsetof(Model::Vertex,texCoord));
 
-                //log(surface.instances.size(),'\t',surface.shader.sampler2D);
-                for(const mat4& transform: surface.instances) {
-                    shader["modelViewProjectionTransform"] = projection*view*transform;
-                    shader["normalMatrix"] = normalMatrix*transform.normalMatrix();
-                    shader["shadowTransform"] = sun*transform;
-                    if(shader["modelTransform"]) shader["modelTransform"] = transform;
-                    material.indexBuffer.draw();
+                //log(model.instances.size(),'\t',model.shader.sampler2D);
+                //GLTimerQuery timerQuery; timerQuery.start();
+                if(model.instances.size()<Model::instanceMin) {
+                    for(const Model::Instance& instance : model.instances) {
+                        shader["modelViewProjectionTransform"] = projection*view*instance.modelTransform;
+                        shader["normalMatrix"] = instance.normalMatrix;
+                        shader["shadowTransform"] = sun*instance.modelTransform;
+                        if(shader["modelTransform"]) shader["modelTransform"] = instance.modelTransform;
+                        material.indexBuffer.draw();
+                    }
+                } else {
+                    shader["viewProjectionTransform"] = projection*view;
+                    shader["shadowTransform"] = sun;
+                    assert(!shader["modelTransform"]);
+                    // FIXME: use quaternion + position + scale = 8 floats instead of 25
+                    model.instanceBuffer.bindAttribute(shader,"aModelTransform",4,__builtin_offsetof(Model::Instance,modelTransform), true);
+                    //model.instanceBuffer.bindAttribute(shader,"aNormalMatrix",9,__builtin_offsetof(Model::Instance,normalMatrix), true);
+                    //material.indexBuffer.draw(model.instances.size());
                 }
+                //timerQuery.stop(); profile.insert(material.name, move(timerQuery));
             }
         }
         //log("---");
@@ -547,13 +575,13 @@ struct BlendView : Widget {
         framebuffer.blit(color);
 
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
-        glDepthTest(false);
-        glCullFace(false);
 
         resolve["framebuffer"]=0; color.bind(0);
         glDrawRectangle(resolve);
 
         GLFrameBuffer::bindWindow(0, window.size);
+
+        //log(lastProfile); lastProfile = move(profile);
     }
 
 } application;

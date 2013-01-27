@@ -1,39 +1,57 @@
 transform {
  vertex {
   uniform mat4 modelViewProjectionTransform;
-  attribute vec3 position;
+  attribute vec3 aPosition;
+  vec3 position = aPosition;
   gl_Position = modelViewProjectionTransform*vec4(position,1);
  }
 }
 
-fragment {
- gl_FragColor = vec4(0,0,0,1);
+instancedTransform {
+ vertex {
+  uniform mat4 viewProjectionTransform;
+  attribute vec3 aPosition;
+  attribute mat4 aModelTransform;
+  vec3 position = (aModelTransform * vec4(aPosition,1)).xyz;
+  gl_Position = viewProjectionTransform*vec4(position,1);
+ }
 }
 
 normal {
- varying vec3 _normal;
+ varying vec3 vNormal;
  vertex {
   uniform mat3 normalMatrix;
-  attribute vec3 normal;
-  _normal = normalMatrix*normal;
+  attribute vec3 aNormal;
+  vNormal = normalMatrix*aNormal;
  }
  fragment {
-  vec3 normal = normalize(_normal);
+  vec3 normal = normalize(vNormal);
+ }
+}
+
+instancedNormal {
+ varying vec3 vNormal;
+ vertex {
+  attribute mat3 aNormalMatrix;
+  attribute vec3 aNormal;
+  vNormal = aNormalMatrix*aNormal;
+ }
+ fragment {
+  vec3 normal = normalize(vNormal);
  }
 }
 
 texCoord {
- varying vec2 _texCoord;
+ varying vec2 vTexCoord;
  vertex {
-  attribute vec2 texCoord;
-  _texCoord = texCoord;
+  attribute vec2 aTexCoord;
+  vTexCoord = aTexCoord;
  }
 }
 
 diffuse {
  fragment {
   vec3 diffuseLight = vec3(0,0,0);
-  vec3 diffuseColor;
  }
 }
 

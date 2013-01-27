@@ -85,8 +85,6 @@ struct Player {
                 }
             }
         }
-        audioThread.priority=-20;
-        audioThread.spawn();
     }
     void queueFile(const ref<byte>& file, const ref<byte>& folder) {
         string title = string(section(section(file,'/',-2,-1),'.',0,-2));
@@ -128,7 +126,7 @@ struct Player {
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        if(play) { output.start(); window.setIcon(playIcon()); }
+        if(play) { output.start(); window.setIcon(playIcon()); audioThread.priority=-20; audioThread.spawn(); }
         else { output.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play; window.render();
     }

@@ -55,8 +55,8 @@ struct GLVertexBuffer {
     void unmapVertexBuffer();
     void upload(const ref<byte>& vertices);
     template<class T> void upload(const ref<T>& vertices) { vertexSize=sizeof(T); upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
-    void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0) const;
-    void draw(PrimitiveType primitiveType) const;
+    void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0, bool instance = false) const;
+    void draw(PrimitiveType primitiveType, uint instanceCount=1) const;
 
     operator bool() const { return vertexBuffer; }
 
@@ -76,7 +76,7 @@ struct GLIndexBuffer {
     uint* mapIndexBuffer();
     void unmapIndexBuffer();
     void upload(const ref<uint>& indices);
-    void draw() const;
+    void draw(uint instanceCount=1) const;
 
     operator bool() { return indexBuffer; }
 
@@ -128,3 +128,16 @@ struct GLFrameBuffer {
     uint width=0, height=0;
     GLTexture depthTexture;
 };
+
+struct GLTimerQuery {
+    GLTimerQuery();
+    move_operator(GLTimerQuery):id(o.id){o.id=0;}
+    ~GLTimerQuery();
+
+    void start();
+    void stop();
+    operator uint() const;
+
+    uint id;
+};
+inline string str(const GLTimerQuery& timer) { return str<uint>(timer); }

@@ -156,17 +156,21 @@ void GLVertexBuffer::upload(const ref<byte> &vertices) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertexCount = vertices.size/vertexSize;
 }
-void GLVertexBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset) const {
+void GLVertexBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset, bool instance) const {
     assert(vertexBuffer);
-    int location = program.attribLocation(strz(name));
-    assert(location>=0,"unused attribute"_,name);
+    int index = program.attribLocation(strz(name));
+    assert(index>=0,"unused attribute"_,name);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glVertexAttribPointer(location, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
-    glEnableVertexAttribArray(location);
+    for(int i=0;i<elementSize;i+=4) {
+        glVertexAttribPointer(index, min(4,elementSize-i), GL_FLOAT, 0, vertexSize, (void*)(offset+i*sizeof(float)));
+    }
+    if(instance) glVertexAttribDivisorARB(index, 1);
+    glEnableVertexAttribArray(index);
 }
-void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
+void GLVertexBuffer::draw(PrimitiveType primitiveType, uint instanceCount) const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDrawArrays(primitiveType, 0, vertexCount);
+    if(instanceCount==1) glDrawArrays(primitiveType, 0, vertexCount);
+    else glDrawArraysInstanced(primitiveType, 0, vertexCount, instanceCount);
 }
 /// Index Buffer
 
@@ -190,7 +194,7 @@ void GLIndexBuffer::upload(const ref<uint>& indices) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
     indexCount = indices.size;
 }
-void GLIndexBuffer::draw() const {
+void GLIndexBuffer::draw(uint instanceCount) const {
     assert(indexBuffer);
     /*if (primitiveType == Point) {
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
@@ -209,7 +213,8 @@ void GLIndexBuffer::draw() const {
         glPrimitiveRestartIndex(-1);
     }
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);
+    if(instanceCount==1) glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);
+    else glDrawElementsInstanced(primitiveType, indexCount, GL_UNSIGNED_INT, 0, instanceCount);
     if(primitiveRestart) glDisable(GL_PRIMITIVE_RESTART);
 }
 
@@ -352,4 +357,14 @@ void GLFrameBuffer::blit(GLTexture& color) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
     glBlitFramebuffer(0,0,width,height,0,0,color.width,color.height,GL_COLOR_BUFFER_BIT,GL_LINEAR);
     glDeleteFramebuffers(1,&target);
+}
+
+GLTimerQuery::GLTimerQuery() { glGenQueries(1, &id); }
+GLTimerQuery::~GLTimerQuery() { glDeleteQueries(1, &id); }
+void GLTimerQuery::start() { glBeginQuery(id, GL_TIME_ELAPSED); }
+void GLTimerQuery::stop() { glEndQuery(id); }
+GLTimerQuery::operator uint() const {
+    { debug( int available=0; glGetQueryObjectiv(id, GL_QUERY_RESULT_AVAILABLE, &available); assert(available); ) }
+    uint elapsed=0; glGetQueryObjectuiv(id, GL_QUERY_RESULT, &elapsed);
+    return elapsed/1e6; //ns to ms
 }

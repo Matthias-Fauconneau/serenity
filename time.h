@@ -2,6 +2,7 @@
 /// \file time.h Time and date operations
 #include "data.h"
 #include "process.h"
+#include "function.h"
 
 /// Returns Unix real-time in seconds
 long currentTime();

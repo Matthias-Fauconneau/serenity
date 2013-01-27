@@ -50,54 +50,48 @@ enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflo
 void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #endif
 
+// Lock access to thread list
+static Lock threadsLock __attribute((init_priority(1001)));
+// Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
+static array<Thread*> threads __attribute((init_priority(1002)));
+// Handle for the main thread (group leader)
+Thread mainThread __attribute((init_priority(1003))) __(20);
+
 // Log
 void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
 // Poll
-void Poll::registerPoll() { thread.appendOnce(this); thread.post(); }
+void Poll::registerPoll() {Locker lock(thread.lock); assert(!thread.contains(this)); thread<<this; thread.post(); }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thread.post();}
 
 // EventFD
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
-// Process-wide structures initialized on first usage
-// Lock access to thread list
-static Lock& threadsLock() { static Lock threadsLock; return threadsLock; }
-// Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
-static array<Thread*>& threads() { static array<Thread*> threads; return threads; }
-// Handle for the main thread (group leader)
-Thread& mainThread() { static Thread mainThread(20); return mainThread; }
 // main
-void yield() { sched_yield(); }
 int main() {
-    mainThread().run();
-#if THREAD
-    while(threads().size()) yield(); // Lets all threads return to event loop
-    Locker lock(threadsLock());
-    for(Thread* thread: threads()) if(thread!=&mainThread()) tgkill(getpid(),thread->tid,SIGKILL); // Kills any remaining thread
-#endif
+    mainThread.run();
+    exit(); // Signals termination to all threads
+    for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
 // Thread
 Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
-    Locker lock(threadsLock()); threads()<<this; // Adds this thread to global thread list
+    Locker lock(threadsLock); threads<<this; // Adds this thread to global thread list
     this->priority=priority;
 }
-#if THREAD
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
-void Thread::spawn() { pthread_create(&thread,0,&::run,this); }
-#endif
+void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 
 void Thread::run() {
     tid=gettid();
     if(priority!=20) check_(setpriority(0,0,priority));
     while(!terminate) processEvents();
-    Locker lock(threadsLock());
-    threads().removeAll(this);
+    Locker lock(threadsLock); threads.removeAll(this);
+    thread = 0;
 }
 bool Thread::processEvents() {
     uint size=this->size();
@@ -132,8 +126,8 @@ void Thread::event() {
 }
 
 void traceAllThreads() {
-    Locker lock(threadsLock());
-    for(Thread* thread: threads()) {
+    Locker lock(threadsLock);
+    for(Thread* thread: threads) {
         thread->terminate=true; // Tries to terminate all other threads cleanly
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
@@ -154,7 +148,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 #endif
 #endif
     string s = trace(1,ip);
-    if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
 #ifndef __arm
@@ -211,17 +205,17 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
         recurse++;
         traceAllThreads();
         string s = trace(1,0);
-        if(threads().size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+        if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
         recurse--;
     }
     log(message);
-    {Locker lock(threadsLock()); for(Thread* thread: threads()) if(thread->tid==gettid()) { threads().removeAll(thread); break; } }
+    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } }
     exit_thread(0);
 }
 
 void exit() {
-    Locker lock(threadsLock());
-    for(Thread* thread: threads()) { thread->terminate=true; thread->post(); }
+    Locker lock(threadsLock);
+    for(Thread* thread: threads) { thread->terminate=true; thread->post(); }
 }
 
 // Environment

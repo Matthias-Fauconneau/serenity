@@ -1,5 +1,5 @@
 #pragma once
-#include "core.h"
+#include "process.h"
 
 /// Generic audio decoder (using ffmpeg)
 struct AudioFile {
@@ -12,6 +12,7 @@ struct AudioFile {
     uint audioPTS=0;
     int16* buffer=0;
     uint bufferSize=0;
+    Lock lock;
 
     AudioFile(){}
     AudioFile(const ref<byte>& path){ open(path); }

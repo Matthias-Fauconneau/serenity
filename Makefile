@@ -104,4 +104,5 @@ install_%.desktop: %.desktop
 	@cp $< $(PREFIX)/share/applications/
 
 install: all $(INSTALL:%=install_%)
+	@echo $(PREFIX)/bin/$(TARGET)
 	@mv $(BUILD)/$(TARGET) $(PREFIX)/bin/$(TARGET)
