@@ -98,18 +98,12 @@ template<class T> struct array {
     /// \}
 
     /// \name Append operators
-    array& operator <<(T&& e) { int s=size()+1; reserve(s); new (end()) T(move(e)); setSize(s); return *this; }
-    array& operator <<(array<T>&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); return *this; }
-    array& operator <<(const T& v) { *this<< copy(v); return *this; }
-    array& operator <<(const ref<T>& a) { int old=size(); reserve(old+a.size); setSize(old+a.size); for(uint i: range(a.size)) new (&at(old+i)) T(copy(a[i])); return *this; }
+    array& operator<<(T&& e) { int s=size()+1; reserve(s); new (end()) T(move(e)); setSize(s); return *this; }
+    array& operator<<(array<T>&& a) { int s=size()+a.size(); reserve(s); copy((byte*)end(),(byte*)a.data(),a.size()*sizeof(T)); setSize(s); return *this; }
+    array& operator<<(const T& v) { *this<< copy(v); return *this; }
+    array& operator<<(const ref<T>& a) { int old=size(); reserve(old+a.size); setSize(old+a.size); for(uint i: range(a.size)) new (&at(old+i)) T(copy(a[i])); return *this; }
     /// \}
 
-    /*/// \name Appends once (if not already contained) operators
-    array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
-    array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
-    array& operator +=(const T& v) { if(!contains(v)) *this<< copy(v); return *this; }
-    array& operator +=(const ref<T>& o) { for(const T& v: o) *this+= copy(v); return *this; }
-    /// \}*/
     /// \name Appends once (if not already contained) operators
     array& appendOnce(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
     array& appendOnce(array&& b) { for(T& v: b) appendOnce(move(v)); return *this; }
@@ -137,8 +131,6 @@ template<class T> struct array {
     T take(int index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value
     T pop() { return take(size()-1); }
-    /// Removes one matching element and returns an index to its successor
-    int removeOne(const T& v) { int i=indexOf(v); if(i>=0) removeAt(i); return i; }
     /// Removes all matching elements
     void removeAll(const T& v) { for(uint i=0; i<size();) if(at(i)==v) removeAt(i); else i++; }
 
@@ -150,10 +142,7 @@ template<class T> struct array {
     /// \}
 
     /// Returns index of the first element matching \a value
-    int indexOf(const T& key) const {
-        //debug(if(size()>32) log("binarySearch might be faster",size());)
-        return ref<T>(*this).indexOf(key);
-    }
+    int indexOf(const T& key) const { return ref<T>(*this).indexOf(key); }
     /// Returns whether this array contains any elements matching \a value
     bool contains(const T& key) const { return ref<T>(*this).contains(key); }
     /// Returns index of the first element less than \a value using binary search (assuming a sorted array)
@@ -177,30 +166,6 @@ template<class T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; ret
 template<class T> array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
-
-// Quicksort
-template<class T> uint partition(array<T>& at, uint left, uint right, uint pivotIndex) {
-    swap(at[pivotIndex], at[right]);
-    const T& pivot = at[right];
-    uint storeIndex = left;
-    for(uint i: range(left,right)) {
-        if(at[i] < pivot) {
-            swap(at[i], at[storeIndex]);
-            storeIndex++;
-        }
-    }
-    swap(at[storeIndex], at[right]);
-    return storeIndex;
-}
-template<class T> void quicksort(array<T>& at, uint left, uint right) {
-    if(left < right) { // If the list has 2 or more items
-        uint pivotIndex = partition(at, left, right, (left + right)/2);
-        if(pivotIndex) quicksort(at, left, pivotIndex-1);
-        quicksort(at, pivotIndex+1, right);
-    }
-}
-/// Quicksorts the array in-place
-template<class T> void quicksort(array<T>& at) { quicksort(at, 0, at.size()-1); }
 
 /// string is an array of bytes
 typedef array<byte> string;

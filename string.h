@@ -80,9 +80,6 @@ template<class T> inline string str(T* const& p) { return str(*p); }*/
 string ftoa(float number, int precision=3, int exponent=0);
 inline string str(const float& n) { return ftoa(n); }
 
-/// Converts references
-template<class T> string str(const unique<T>& t) { return str(*t.pointer); }
-
 /// Converts arrays
 template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<class T> string str(const array<T>& a, char separator=' ') { return str(ref<T>(a),separator); }

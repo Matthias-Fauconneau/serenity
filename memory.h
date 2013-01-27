@@ -30,23 +30,3 @@ template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer);
 inline void* operator new(size_t, void* p) { return p; } //placement new
 template<class T, class... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }
 template<class T> void free(T* t) { t->~T(); unallocate(t,1); }
-
-/// Unique reference to an heap allocated value
-template<class T> struct c {
-    no_copy(unique);
-    T* pointer;
-    unique():pointer(0){}
-    template<class O> unique(unique<O>&& o){pointer=o.pointer; o.pointer=0;}
-    template<class O> unique& operator=(unique<O>&& o){this->~unique(); pointer=o.pointer; o.pointer=0; return *this;}
-    /// Instantiates a new value
-    template<class... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)___)){}
-    ~unique() { if(pointer) free(pointer); }
-    operator T&() { return *pointer; }
-    operator const T&() const { return *pointer; }
-    T* operator ->() { return pointer; }
-    const T* operator ->() const { return pointer; }
-    T* operator &() { return pointer; }
-    const T* operator &() const { return pointer; }
-    explicit operator bool() { return pointer; }
-    bool operator !() const { return !pointer; }
-};

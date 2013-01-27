@@ -115,7 +115,7 @@ struct Taskbar : Socket, Poll {
             {GrabButton r; r.window=e.focus.window; send(raw(r));}
         } else if(type==DestroyNotify) { uint id=e.unmap.window;
             windows.removeAll(id);
-            uint i = tasks.removeOne(id);
+            uint i = tasks.removeAll(id);
             if(i!=uint(-1) && tasks.index == i) tasks.index=tasks.indexOf(windows.last());
             setFocus(windows.last());
         } else if(type==MapNotify) { uint id=e.map.window;

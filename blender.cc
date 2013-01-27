@@ -9,6 +9,30 @@
 #include "gl.h"
 SHADER(blender)
 
+// Quicksort
+template<class T> uint partition(array<T>& at, uint left, uint right, uint pivotIndex) {
+    swap(at[pivotIndex], at[right]);
+    const T& pivot = at[right];
+    uint storeIndex = left;
+    for(uint i: range(left,right)) {
+        if(at[i] < pivot) {
+            swap(at[i], at[storeIndex]);
+            storeIndex++;
+        }
+    }
+    swap(at[storeIndex], at[right]);
+    return storeIndex;
+}
+template<class T> void quicksort(array<T>& at, uint left, uint right) {
+    if(left < right) { // If the list has 2 or more items
+        uint pivotIndex = partition(at, left, right, (left + right)/2);
+        if(pivotIndex) quicksort(at, left, pivotIndex-1);
+        quicksort(at, pivotIndex+1, right);
+    }
+}
+/// Quicksorts the array in-place
+template<class T> void quicksort(array<T>& at) { quicksort(at, 0, at.size()-1); }
+
 /// Used to fix pointers in .blend file-block sections
 struct Block {
     uint64 begin; // First memory address used by pointers pointing in this block
@@ -557,7 +581,7 @@ struct BlendView : Widget {
                     shader["shadowTransform"] = sun;
                     assert(!shader["modelTransform"]);
                     // FIXME: use quaternion + position + scale = 8 floats instead of 25
-                    model.instanceBuffer.bindAttribute(shader,"aModelTransform",4,__builtin_offsetof(Model::Instance,modelTransform), true);
+                    //model.instanceBuffer.bindAttribute(shader,"aModelTransform",4,__builtin_offsetof(Model::Instance,modelTransform), true);
                     //model.instanceBuffer.bindAttribute(shader,"aNormalMatrix",9,__builtin_offsetof(Model::Instance,normalMatrix), true);
                     //material.indexBuffer.draw(model.instances.size());
                 }

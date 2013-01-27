@@ -89,28 +89,26 @@ void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 void Thread::run() {
     tid=gettid();
     if(priority!=20) check_(setpriority(0,0,priority));
-    while(!terminate) processEvents();
-    Locker lock(threadsLock); threads.removeAll(this);
-    thread = 0;
-}
-bool Thread::processEvents() {
-    uint size=this->size();
-    if(size==1) { return terminate=true; }
+    while(!terminate) {
+        uint size=this->size();
+        if(size==1) break; // Terminates when no Poll objects are registered
 
-    pollfd pollfds[size];
-    for(uint i: range(size)) pollfds[i]=*at(i);
-    if(check__( ::poll(pollfds,size,-1) ) != INTR) {
-        for(uint i: range(size)) {
-            if(terminate) return true;
-            Poll* poll=at(i); int revents=pollfds[i].revents;
-            if(revents && !unregistered.contains(poll)) {
-                poll->revents = revents;
-                poll->event();
+        pollfd pollfds[size];
+        for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
+        if(check__( ::poll(pollfds,size,-1) ) != INTR) {
+            for(uint i: range(size)) {
+                if(terminate) break;
+                Poll* poll=at(i); int revents=pollfds[i].revents;
+                if(revents && !unregistered.contains(poll)) {
+                    poll->revents = revents;
+                    poll->event();
+                }
             }
         }
+        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
     }
-    while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); removeOne(poll); queue.removeOne(poll);}
-    return terminate;
+    Locker lock(threadsLock); threads.removeAll(this);
+    thread = 0;
 }
 void Thread::event() {
     EventFD::read();

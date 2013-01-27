@@ -9,10 +9,10 @@ struct AudioFile {
     struct AVStream* audioStream=0;
     struct AVCodecContext* audio=0;
     struct AVFrame* frame=0;
+    Lock avLock;
     uint audioPTS=0;
     int16* buffer=0;
     uint bufferSize=0;
-    Lock lock;
 
     AudioFile(){}
     AudioFile(const ref<byte>& path){ open(path); }

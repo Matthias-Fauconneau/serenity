@@ -28,7 +28,6 @@ struct TextLayout {
 
     uint lastIndex=-1;
     void nextLine(bool justify) {
-        //if(!line) { pen.y+=size; return; }
         //justify
         float length=0; for(const Word& word: line) { if(word) { length+=word.last().pos.x+word.last().advance; } } //sum word length
         if(line && line.last()) length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
@@ -40,7 +39,6 @@ struct TextLayout {
         column=0; pen.x=0;
         lineNumber++; text << TextLine();
         for(uint i: range(line.size())) { Word& word=line[i];
-            //assert(word);
             for(Character& c: word) text.last() << Character __(c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex);
             if(word) pen.x += word.last().pos.x+word.last().advance;
             if(i!=line.size()-1) //editable justified space
@@ -207,6 +205,23 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
     return false;
 }
 
+uint Text::index() {
+    if(!textLines) return 0;
+    if(cursor.line==textLines.size()) return textLines.last().last().editIndex;
+    assert(cursor.line<textLines.size(),cursor.line,textLines.size());
+    assert(cursor.column<=textLines[cursor.line].size(), cursor.column, textLines[cursor.line].size());
+    if(cursor.column<textLines[cursor.line].size()) {
+        uint index = textLines[cursor.line][cursor.column].editIndex;
+        assert(index<text.size());
+        return index;
+    }
+    uint index = 1; // ' ', '\t' or '\n' immediatly after last character
+    uint line=cursor.line;
+    while(line>0 && !textLines[line]) line--, index++; //count \n (not included as characters)
+    if(textLines[line]) index += textLines[line].last().editIndex;
+    return index;
+}
+
 /// TextInput
 
 bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button) {
@@ -274,10 +289,6 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
             }
         }
         else {
-            /*//prevent repeated whitespace
-            if(" \t"_.contains(key)  &&
-                    ((cursor.column<textLines[cursor.line].size() && " \t"_.contains(text[index()]))
-                     || (index()>0 && " \t"_.contains(text[index()-1]))) ) return false;*/
             char c=0;
             if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
             else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';
@@ -302,4 +313,3 @@ void TextInput::render(int2 position, int2 size) {
         fill(offset+int2(x,cursor.line*this->size)+Rect(2,this->size), black);
     }
 }
-

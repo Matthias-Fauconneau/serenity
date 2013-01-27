@@ -61,28 +61,7 @@ struct Text : Widget {
         bool operator >(const Cursor& o)const{return line>o.line || (line==o.line && column>o.column);}
     };
     Cursor cursor; uint editIndex=0;
-    Character& current() {
-        assert(cursor.line<textLines.size());
-        assert(cursor.column<textLines[cursor.line].size());
-        return textLines[cursor.line][cursor.column];
-    }
-    uint index() {
-        if(!textLines) return 0;
-        if(cursor.line==textLines.size()) return textLines.last().last().editIndex;
-        assert(cursor.line<textLines.size(),cursor.line,textLines.size());
-        assert(cursor.column<=textLines[cursor.line].size(), cursor.column, textLines[cursor.line].size());
-        if(cursor.column<textLines[cursor.line].size()) {
-            uint index = textLines[cursor.line][cursor.column].editIndex;
-            assert(index<text.size());
-            return index;
-        }
-        uint index = 1; // ' ', '\t' or '\n' immediatly after last character
-        uint line=cursor.line;
-        while(line>0 && !textLines[line]) line--, index++; //count \n (not included as characters)
-        if(textLines[line]) index += textLines[line].last().editIndex;
-        //assert(index<=text.size());
-        return index;
-    }
+    uint index();
 
     // Inline links
     struct Link { Cursor begin,end; string identifier;};

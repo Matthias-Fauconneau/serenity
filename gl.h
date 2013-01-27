@@ -129,6 +129,7 @@ struct GLFrameBuffer {
     GLTexture depthTexture;
 };
 
+#if ARB_timer_query
 struct GLTimerQuery {
     GLTimerQuery();
     move_operator(GLTimerQuery):id(o.id){o.id=0;}
@@ -141,3 +142,4 @@ struct GLTimerQuery {
     uint id;
 };
 inline string str(const GLTimerQuery& timer) { return str<uint>(timer); }
+#endif

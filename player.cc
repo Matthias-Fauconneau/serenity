@@ -11,7 +11,7 @@
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
 // Gapless playback
-    Thread audioThread;
+    Thread audioThread __(-20);
     static constexpr uint channels = 2;
     AudioFile file;
     AudioOutput output __({this,&Player::read}, 44100, 8192, audioThread);
@@ -23,11 +23,11 @@ struct Player {
             uint read = file.read(output, need);
             assert(read<=need);
             output += read*channels; readSize += read;
-            if(readSize == outputSize) {
+            if(readSize != outputSize) next();
+            else {
                 update(file.position(),file.duration());
                 return readSize;
             }
-            next();
         }
     }
 
@@ -85,6 +85,7 @@ struct Player {
                 }
             }
         }
+        window.render();
     }
     void queueFile(const ref<byte>& file, const ref<byte>& folder) {
         string title = string(section(section(file,'/',-2,-1),'.',0,-2));
@@ -126,7 +127,7 @@ struct Player {
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        if(play) { output.start(); window.setIcon(playIcon()); audioThread.priority=-20; audioThread.spawn(); }
+        if(play) { output.start(); window.setIcon(playIcon()); if(!audioThread.thread) audioThread.spawn(); }
         else { output.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play; window.render();
     }

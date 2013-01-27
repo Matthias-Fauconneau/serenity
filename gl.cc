@@ -2,8 +2,7 @@
 #include "data.h"
 
 #define GL_GLEXT_PROTOTYPES
-#include  <GL/gl.h>
-#include <GL/glu.h>
+#include <GL/gl.h>
 
 /// Context
 
@@ -89,8 +88,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
                     else s.advance(1);
                 }
             }
-            bool declaration = qualifiers.contains(identifier);
-            if(declaration && identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << string(s.identifier("_"_));
+            if(identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << string(s.identifier("_"_));
             while(s && !s.match('\n')) {
                 if(s.match('{')) nest++;
                 else if(s.match('}')) nest--;
@@ -98,7 +96,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
             }
             if(scope && nest==scope.last()) { scope.pop(); continue; } // Remove matching scope closing bracket
             ref<byte> line = s.slice(lineStart, s.index-lineStart);
-            if(trim(line)) ((function || declaration) ? global : main) << line;
+            if(trim(line)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? global : main) << line;
         }
         string glsl = global+"\nvoid main() {\n"_+main+"\n}\n"_;
         uint shader = glCreateShader(type);
@@ -161,11 +159,11 @@ void GLVertexBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int
     int index = program.attribLocation(strz(name));
     assert(index>=0,"unused attribute"_,name);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    for(int i=0;i<elementSize;i+=4) {
-        glVertexAttribPointer(index, min(4,elementSize-i), GL_FLOAT, 0, vertexSize, (void*)(offset+i*sizeof(float)));
+    for(int i=0;i<(elementSize+3)/4;i++) {
+        glEnableVertexAttribArray(index+i);
+        glVertexAttribPointer(index+i, min(4,elementSize-i*4), GL_FLOAT, 0, vertexSize, (void*)(offset+i*4*sizeof(float)));
+        glVertexAttribDivisor(index+i, instance);
     }
-    if(instance) glVertexAttribDivisorARB(index, 1);
-    glEnableVertexAttribArray(index);
 }
 void GLVertexBuffer::draw(PrimitiveType primitiveType, uint instanceCount) const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -359,6 +357,7 @@ void GLFrameBuffer::blit(GLTexture& color) {
     glDeleteFramebuffers(1,&target);
 }
 
+#if ARB_timer_query
 GLTimerQuery::GLTimerQuery() { glGenQueries(1, &id); }
 GLTimerQuery::~GLTimerQuery() { glDeleteQueries(1, &id); }
 void GLTimerQuery::start() { glBeginQuery(id, GL_TIME_ELAPSED); }
@@ -368,3 +367,4 @@ GLTimerQuery::operator uint() const {
     uint elapsed=0; glGetQueryObjectuiv(id, GL_QUERY_RESULT, &elapsed);
     return elapsed/1e6; //ns to ms
 }
+#endif

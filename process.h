@@ -109,8 +109,6 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void spawn();
     /// Processes all events on \a polls and tasks on \a queue until #terminate is set
     void run();
-    /// Processes all events on \a polls and tasks on \a queue
-    bool processEvents();
     /// Processes one queued task
     void event();
 };

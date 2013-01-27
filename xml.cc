@@ -2,6 +2,27 @@
 #include "string.h"
 #include "utf8.h"
 
+/// Unique reference to an heap allocated value
+template<class T> struct unique {
+    no_copy(unique);
+    T* pointer;
+    unique():pointer(0){}
+    template<class O> unique(unique<O>&& o){pointer=o.pointer; o.pointer=0;}
+    template<class O> unique& operator=(unique<O>&& o){this->~unique(); pointer=o.pointer; o.pointer=0; return *this;}
+    /// Instantiates a new value
+    template<class... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)___)){}
+    ~unique() { if(pointer) free(pointer); }
+    operator T&() { return *pointer; }
+    operator const T&() const { return *pointer; }
+    T* operator ->() { return pointer; }
+    const T* operator ->() const { return pointer; }
+    T* operator &() { return pointer; }
+    const T* operator &() const { return pointer; }
+    explicit operator bool() { return pointer; }
+    bool operator !() const { return !pointer; }
+};
+template<class T> string str(const unique<T>& t) { return str(*t.pointer); }
+
 static Element parse(const ref<byte>& document, bool html) {
     assert(document);
     TextData s(document);

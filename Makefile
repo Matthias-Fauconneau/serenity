@@ -1,26 +1,11 @@
 PREFIX ?= /usr
-TARGET ?= test
 BUILD ?= release
-
-ifeq ($(CC),cc)
- #CC := g++ -fabi-version=0
- CC := clang++ -Wno-lambda-extensions
-endif
-
+CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
-FLAGS_fast = -O -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
-
-FLAGS_editor = -DGL
-FLAGS_blender = -DGL
-
+CC += -march=native $(FLAGS_$(BUILD))
 FLAGS_font = -I/usr/include/freetype2
-
-CC += -pipe -std=c++11 -funsigned-char -fno-threadsafe-statics -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers $(FLAGS_$(BUILD)) $(FLAGS_$(TARGET))
-#CC += -Wno-volatile-register-var
-CC += -march=native
-#CC += -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -30,9 +15,8 @@ ICONS_analyzer = play pause
 ICONS_music = music
 ICONS_test = feeds network
 
-SHADERS = $(SHADERS_$(TARGET))
-SHADERS_editor = display editor
-SHADERS_blender = display blender
+SHADERS = display $(SHADERS_$(TARGET))
+SHADERS_blender = blender
 
 SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
 SRCS_profile = profile

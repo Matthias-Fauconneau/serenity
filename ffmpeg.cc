@@ -38,6 +38,7 @@ uint AudioFile::read(int16* output, uint outputSize) {
     uint readSize = 0;
     while(readSize<outputSize) {
         if(!bufferSize) {
+            Locker lock(avLock);
             AVPacket packet;
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
@@ -61,6 +62,6 @@ uint AudioFile::read(int16* output, uint outputSize) {
 
 uint AudioFile::duration() { return file->duration/1000/1000; }
 
-void AudioFile::seek(uint unused position) { av_seek_frame(file,-1,position*1000*1000,0); }
+void AudioFile::seek(uint unused position) { Locker lock(avLock); av_seek_frame(file,-1,position*1000*1000,0); }
 
 void AudioFile::close() { if(frame) avcodec_free_frame(&frame); if(file) avformat_close_input(&file); }

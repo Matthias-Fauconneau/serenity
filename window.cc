@@ -8,20 +8,23 @@
 #include "png.h"
 #include "x.h"
 
-#if NOLIBC
-enum {IPC_RMID=0,IPC_CREAT=01000};
-#endif
 #if GL
 extern "C" {
 void* XOpenDisplay(const char*);
 int XCloseDisplay(void*);
-void* glXChooseVisual(void* dpy, int screen, int *attribList );
-void* glXCreateContext(void* dpy,void* vis, void* shareList, bool direct);
+void** glXChooseFBConfig (void* dpy, int screen, const int* attribList, int* fbCount);
+enum { GLX_RED_SIZE=8, GLX_GREEN_SIZE, GLX_BLUE_SIZE };
+int glXGetFBConfigAttrib(void* dpy, void* config, int attribute, int *value);
+//enum { GLX_RGBA=4 }; //void* glXChooseVisual(void* dpy, int screen, int *attribList );
+enum { GLX_CONTEXT_MAJOR_VERSION=0x2091, GLX_CONTEXT_MINOR_VERSION=0x2092 };
+typedef void* (*glXCreateContextAttribsARB)(void* dpy, void* fbconfig, void* share, bool direct, const int* attribList);
+void* glXGetProcAddress(const char*);
+//void* glXCreateContext(void* dpy,void* vis, void* share, bool direct);
 void glXDestroyContext(void* dpy, void* ctx );
 bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
 void glXSwapBuffers(void* dpy, uint drawable);
+void glFlush();
 }
-#define GLX_RGBA 4
 #include "gl.h"
 #endif
 
@@ -106,9 +109,12 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
 #if GL
         if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
         if(!glContext) {
-            int attributes[] = {GLX_RGBA,0};
-            void* visual = glXChooseVisual(glDisplay,0,attributes); if(!visual) error("No matching visual");
-            glContext = glXCreateContext(glDisplay,visual,0,1); assert(glContext);
+            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, 0};
+            int fbCount=0; void** fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
+            {int value=0; glXGetFBConfigAttrib(glDisplay, fbConfigs[0], 0x8013, &value); log(hex(value));}
+            const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION, 3, GLX_CONTEXT_MINOR_VERSION, 0, 0};
+            glContext = ((glXCreateContextAttribsARB)glXGetProcAddress("glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
+            assert(glContext);
         }
         glXMakeCurrent(glDisplay, id, glContext);
 #else
@@ -202,7 +208,8 @@ void Window::event() {
             state=Server;
         } else {
 #if GL
-            glXSwapBuffers(glDisplay, id);
+            //glXSwapBuffers(glDisplay, id);
+            glFlush();
 #endif
         }
     } else for(;;) {
@@ -252,7 +259,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) render();
             else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
             else if(anchor==Float) {
-                if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; } //to reuse border intersection checks
+                if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; }
                 bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
                 bool left = dragStart.x<dragPosition.x+1, right = dragStart.x>=dragPosition.x+dragSize.x-1;
                 if(e.state&Button1Mask) {
@@ -298,7 +305,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(type==LeaveNotify && hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);
             if(shortcut) (*shortcut)(); //local window shortcut
-            if(widget->mouseEvent(int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
+            if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
+                                   e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
         }
         else if(type==Expose) { if(!e.expose.count) render(); }
         else if(type==UnmapNotify) mapped=false;
@@ -360,7 +368,7 @@ void Window::setGeometry(int2 position, int2 size) {
 }
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
-void Window::render() { if(mapped) queue(); }
+void Window::render() { /*if(mapped)*/ queue(); }
 
 // Keyboard
 uint Window::KeySym(uint8 code, uint8 state) {
