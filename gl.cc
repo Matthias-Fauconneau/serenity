@@ -155,15 +155,13 @@ void GLVertexBuffer::upload(const ref<byte> &vertices) {
     vertexCount = vertices.size/vertexSize;
 }
 void GLVertexBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset, bool instance) const {
-    assert(vertexBuffer);
+    assert(vertexBuffer); assert(elementSize<=4);
     int index = program.attribLocation(strz(name));
     assert(index>=0,"unused attribute"_,name);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    for(int i=0;i<(elementSize+3)/4;i++) {
-        glEnableVertexAttribArray(index+i);
-        glVertexAttribPointer(index+i, min(4,elementSize-i*4), GL_FLOAT, 0, vertexSize, (void*)(offset+i*4*sizeof(float)));
-        glVertexAttribDivisor(index+i, instance);
-    }
+    glEnableVertexAttribArray(index);
+    glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)(offset));
+    glVertexAttribDivisor(index, instance);
 }
 void GLVertexBuffer::draw(PrimitiveType primitiveType, uint instanceCount) const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

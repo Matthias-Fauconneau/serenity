@@ -136,6 +136,7 @@ struct BlendView : Widget {
 
         skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)), GLTexture::Bilinear);
 
+        window.clearBackground = false;
         window.localShortcut(Escape).connect(&::exit);
 
         glDepthTest(true);
@@ -581,9 +582,14 @@ struct BlendView : Widget {
                     shader["shadowTransform"] = sun;
                     assert(!shader["modelTransform"]);
                     // FIXME: use quaternion + position + scale = 8 floats instead of 25
-                    //model.instanceBuffer.bindAttribute(shader,"aModelTransform",4,__builtin_offsetof(Model::Instance,modelTransform), true);
-                    //model.instanceBuffer.bindAttribute(shader,"aNormalMatrix",9,__builtin_offsetof(Model::Instance,normalMatrix), true);
-                    //material.indexBuffer.draw(model.instances.size());
+                    model.instanceBuffer.bindAttribute(shader, "aModelTransform0", 4, __builtin_offsetof(Model::Instance,modelTransform)+00, true);
+                    model.instanceBuffer.bindAttribute(shader, "aModelTransform1", 4, __builtin_offsetof(Model::Instance,modelTransform)+16, true);
+                    model.instanceBuffer.bindAttribute(shader, "aModelTransform2", 4, __builtin_offsetof(Model::Instance,modelTransform)+32, true);
+                    model.instanceBuffer.bindAttribute(shader, "aModelTransform3", 4, __builtin_offsetof(Model::Instance,modelTransform)+48, true);
+                    model.instanceBuffer.bindAttribute(shader,"aNormalMatrix0",3,__builtin_offsetof(Model::Instance,normalMatrix)+00, true);
+                    model.instanceBuffer.bindAttribute(shader,"aNormalMatrix1",3,__builtin_offsetof(Model::Instance,normalMatrix)+12, true);
+                    model.instanceBuffer.bindAttribute(shader,"aNormalMatrix2",3,__builtin_offsetof(Model::Instance,normalMatrix)+24, true);
+                    material.indexBuffer.draw(model.instances.size());
                 }
                 //timerQuery.stop(); profile.insert(material.name, move(timerQuery));
             }

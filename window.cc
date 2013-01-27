@@ -111,7 +111,6 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         if(!glContext) {
             const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, 0};
             int fbCount=0; void** fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
-            {int value=0; glXGetFBConfigAttrib(glDisplay, fbConfigs[0], 0x8013, &value); log(hex(value));}
             const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION, 3, GLX_CONTEXT_MINOR_VERSION, 0, 0};
             glContext = ((glXCreateContextAttribsARB)glXGetProcAddress("glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
             assert(glContext);
@@ -184,7 +183,7 @@ void Window::event() {
         } else {
 #if GL
             glXMakeCurrent(glDisplay, id, glContext);
-            GLFrameBuffer::bindWindow(0,size,true,vec4(vec3(backgroundColor),backgroundOpacity));
+            if(clearBackground) GLFrameBuffer::bindWindow(0, size, true, vec4(vec3(backgroundColor),backgroundOpacity));
             ::softwareRendering=false;
 #endif
         }
@@ -208,7 +207,6 @@ void Window::event() {
             state=Server;
         } else {
 #if GL
-            //glXSwapBuffers(glDisplay, id);
             glFlush();
 #endif
         }

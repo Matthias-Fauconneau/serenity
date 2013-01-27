@@ -10,8 +10,13 @@ transform {
 instancedTransform {
  vertex {
   uniform mat4 viewProjectionTransform;
+  attribute vec4 aModelTransform0, aModelTransform1, aModelTransform2, aModelTransform3;
+  mat4 aModelTransform;
+  aModelTransform[0] = aModelTransform0;
+  aModelTransform[1] = aModelTransform1;
+  aModelTransform[2] = aModelTransform2;
+  aModelTransform[3] = aModelTransform3;
   attribute vec3 aPosition;
-  attribute mat4 aModelTransform;
   vec3 position = (aModelTransform * vec4(aPosition,1)).xyz;
   gl_Position = viewProjectionTransform*vec4(position,1);
  }
@@ -32,7 +37,11 @@ normal {
 instancedNormal {
  varying vec3 vNormal;
  vertex {
-  attribute mat3 aNormalMatrix;
+  attribute vec3 aNormalMatrix0, aNormalMatrix1, aNormalMatrix2;
+  mat3 aNormalMatrix;
+  aNormalMatrix[0] = aNormalMatrix0;
+  aNormalMatrix[1] = aNormalMatrix1;
+  aNormalMatrix[2] = aNormalMatrix2;
   attribute vec3 aNormal;
   vNormal = aNormalMatrix*aNormal;
  }
