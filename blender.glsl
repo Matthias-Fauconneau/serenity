@@ -1,15 +1,17 @@
+#version 130
+
 transform {
  vertex {
-  uniform mat4 modelViewProjectionTransform;
+  uniform mat4 modelViewTransform;
   attribute vec3 aPosition;
   vec3 position = aPosition;
-  gl_Position = modelViewProjectionTransform*vec4(position,1);
+  gl_Position = modelViewTransform*vec4(position,1);
  }
 }
 
 instancedTransform {
  vertex {
-  uniform mat4 viewProjectionTransform;
+  uniform mat4 viewTransform;
   attribute vec4 aModelTransform0, aModelTransform1, aModelTransform2, aModelTransform3;
   mat4 aModelTransform;
   aModelTransform[0] = aModelTransform0;
@@ -18,7 +20,7 @@ instancedTransform {
   aModelTransform[3] = aModelTransform3;
   attribute vec3 aPosition;
   vec3 position = (aModelTransform * vec4(aPosition,1)).xyz;
-  gl_Position = viewProjectionTransform*vec4(position,1);
+  gl_Position = viewTransform*vec4(position,1);
  }
 }
 
@@ -37,13 +39,8 @@ normal {
 instancedNormal {
  varying vec3 vNormal;
  vertex {
-  attribute vec3 aNormalMatrix0, aNormalMatrix1, aNormalMatrix2;
-  mat3 aNormalMatrix;
-  aNormalMatrix[0] = aNormalMatrix0;
-  aNormalMatrix[1] = aNormalMatrix1;
-  aNormalMatrix[2] = aNormalMatrix2;
   attribute vec3 aNormal;
-  vNormal = aNormalMatrix*aNormal;
+  vNormal = mat3(aModelTransform)*aNormal;
  }
  fragment {
   vec3 normal = normalize(vNormal);
@@ -66,17 +63,18 @@ diffuse {
 
 shadow {
  uniform float shadowScale;
- uniform sampler2DShadow shadowMap;
  varying vec4 shadowPosition;
  vertex {
   uniform mat4 shadowTransform;
   shadowPosition = shadowTransform*vec4(position,1);
  }
  fragment {
-  float PCF=0.0;
+  uniform sampler2DShadow shadowMap;
+  float shadowLight = 0;
   for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
-   PCF += shadow2DProj(shadowMap, vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.zw)).r;
-  float shadowLight = 1.0-PCF/4.0;
+     shadowLight += shadow2DProj(shadowMap,
+     vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
+  shadowLight /= 4.0;
  }
 }
 
@@ -112,8 +110,8 @@ skymap {
  vertex {
   attribute vec2 position;
   gl_Position = vec4(position,0.999,1);
-  uniform mat4 inverseViewProjectionMatrix;
-  vec4 viewPos = (inverseViewProjectionMatrix * vec4(position.xy,1,1));
+  uniform mat4 inverseViewMatrix;
+  vec4 viewPos = (inverseViewMatrix * vec4(position.xy,1,1));
   viewRay = viewPos.xyz/viewPos.w;
  }
  fragment {
@@ -125,11 +123,12 @@ skymap {
  }
 }
 
-resolve {
+present {
  fragment {
   uniform sampler2D framebuffer;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1.0/2.4)-0.055; else return 12.92*c; }
   vec3 c = texture2D(framebuffer, texCoord).rgb;
-  gl_FragColor = vec4(sRGB(c.r), sRGB(c.g), sRGB(c.b), 1);
+  gl_FragColor.rgb = vec3(sRGB(c.r), sRGB(c.g), sRGB(c.b));
+  //gl_FragColor.rgb =  texture2D(framebuffer, texCoord).rgb; //#FIXME: sRGB framebuffer doesn't work
  }
 }

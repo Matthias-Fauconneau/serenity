@@ -13,17 +13,15 @@ extern "C" {
 void* XOpenDisplay(const char*);
 int XCloseDisplay(void*);
 void** glXChooseFBConfig (void* dpy, int screen, const int* attribList, int* fbCount);
-enum { GLX_RED_SIZE=8, GLX_GREEN_SIZE, GLX_BLUE_SIZE };
+enum { GLX_RED_SIZE=8, GLX_GREEN_SIZE, GLX_BLUE_SIZE, GLX_ALPHA_SIZE, GLX_DEPTH_SIZE };
 int glXGetFBConfigAttrib(void* dpy, void* config, int attribute, int *value);
-//enum { GLX_RGBA=4 }; //void* glXChooseVisual(void* dpy, int screen, int *attribList );
 enum { GLX_CONTEXT_MAJOR_VERSION=0x2091, GLX_CONTEXT_MINOR_VERSION=0x2092 };
 typedef void* (*glXCreateContextAttribsARB)(void* dpy, void* fbconfig, void* share, bool direct, const int* attribList);
 void* glXGetProcAddress(const char*);
-//void* glXCreateContext(void* dpy,void* vis, void* share, bool direct);
 void glXDestroyContext(void* dpy, void* ctx );
 bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
 void glXSwapBuffers(void* dpy, uint drawable);
-void glFlush();
+void glFinish();
 }
 #include "gl.h"
 #endif
@@ -109,7 +107,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
 #if GL
         if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
         if(!glContext) {
-            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, 0};
+            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, 0};
             int fbCount=0; void** fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
             const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION, 3, GLX_CONTEXT_MINOR_VERSION, 0, 0};
             glContext = ((glXCreateContextAttribsARB)glXGetProcAddress("glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
@@ -183,11 +181,12 @@ void Window::event() {
         } else {
 #if GL
             glXMakeCurrent(glDisplay, id, glContext);
-            if(clearBackground) GLFrameBuffer::bindWindow(0, size, true, vec4(vec3(backgroundColor),backgroundOpacity));
+            if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
             ::softwareRendering=false;
 #endif
         }
 
+        uint startTime = realTime();
         widget->render(0,size);
         assert(!clipStack);
 
@@ -207,9 +206,10 @@ void Window::event() {
             state=Server;
         } else {
 #if GL
-            glFlush();
+            glFinish();
 #endif
         }
+        renderTime = realTime()-startTime;
     } else for(;;) {
         readLock.lock();
         if(!poll()) { readLock.unlock(); break; }

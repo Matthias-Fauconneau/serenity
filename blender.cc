@@ -69,8 +69,8 @@ struct BlendView : Widget {
 
     // Renderer
     GLFrameBuffer framebuffer;
+    GLShader present = GLShader(blender,"screen present"_);
     GLShader shadow = GLShader(blender,"transform"_);
-    GLShader resolve = GLShader(blender,"screen resolve"_);
 
     // File
     Folder folder;
@@ -85,7 +85,7 @@ struct BlendView : Widget {
     // Light
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
     const float sunYaw = 4*PI/3;
-    const float sunPitch = 2*PI/3;
+    const float sunPitch = -PI/3;
     mat4 sun; // sun light transform
     GLFrameBuffer sunShadow;
 
@@ -117,8 +117,7 @@ struct BlendView : Widget {
 
         struct Instance {
             mat4 modelTransform;
-            mat3 normalMatrix;
-            Instance(mat4 transform):modelTransform(transform),normalMatrix(transform.normalMatrix()){}
+            Instance(mat4 transform):modelTransform(transform){}
         };
         static const uint instanceMin = 2; // Minimum number of instances before using instanced rendering (-1 = disable)
         array<Instance> instances;
@@ -134,7 +133,7 @@ struct BlendView : Widget {
         shaderSource << readFile("gpu_shader_material.glsl"_, folder) << readFile("Island.glsl", folder);
         parse();
 
-        skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)), GLTexture::Bilinear);
+        skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)), Bilinear);
 
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&::exit);
@@ -301,6 +300,7 @@ struct BlendView : Widget {
             float scale = length(vec3(transform(0,0),transform(1,1),transform(2,2)));
             if(scale>10) continue; // Currently ignoring water plane, TODO: water reflection
 
+            //assert(mesh.totvert<0xFFFF, mesh.id.name, mesh.totvert);
             ref<MVert> verts(mesh.mvert, mesh.totvert);
             for(uint i: range(verts.size)) {
                 const MVert& vert = verts[i];
@@ -472,8 +472,7 @@ struct BlendView : Widget {
                 int unit=1;
                 for(const string& name: material.shader.sampler2D) {
                     material.shader[name] = unit++;
-                    material.textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)),
-                                                GLTexture::Mipmap|GLTexture::Bilinear|GLTexture::Anisotropic);
+                    material.textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)), Mipmap|Bilinear|Anisotropic);
                 }
 
                 // Uploads instances
@@ -500,15 +499,17 @@ struct BlendView : Widget {
         return true;
     }
 
-    //map<string, GLTimerQuery> lastProfile;
+#define profile( statements ... ) statements
+    profile( map<string, GLTimerQuery> lastProfile; )
     void render(int2 unused position, int2 unused size) override {
         // Render sun shadow map
         if(!sunShadow) {
-            sunShadow = GLFrameBuffer(GLTexture(4096,4096,GLTexture::Depth24|GLTexture::Shadow|GLTexture::Bilinear|GLTexture::Clamp));
-            sunShadow.bind(true);
+            sunShadow = GLFrameBuffer(GLTexture(4096,4096,Depth24|Shadow|Bilinear|Clamp));
+            sunShadow.bind(ClearDepth);
 
             // Normalizes to [-1,1]
             sun=mat4();
+            sun.scale(vec3(1,1,-1));
             sun.translate(-1);
             sun.scale(2.f/(lightMax-lightMin));
             sun.translate(-lightMin);
@@ -519,38 +520,41 @@ struct BlendView : Widget {
             for(Model& model: models) {
                 model.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Model::Vertex,position));
                 for(const Model::Instance& instance: model.instances) {
-                    shadow["modelViewProjectionTransform"] = sun*instance.modelTransform;
+                    shadow["modelViewTransform"] = sun*instance.modelTransform;
                     for(const Model::Material& material: model.materials) material.indexBuffer.draw();
                 }
             }
 
-            // Normalizes xy to [0,1] and z to [-1,1]
-            sun=mat4();
-            sun.scale(1.f/(lightMax-lightMin));
-            sun.translate(-lightMin);
-            sun.rotateX(sunPitch);
-            sun.rotateZ(sunYaw);
+            // Normalizes xyz to [0,1]
+            mat4 sampler2D;
+            sampler2D.scale(1./2);
+            sampler2D.translate(1);
+            sun = sampler2D * sun;
         }
 
         uint width=size.x, height = size.y;
-        if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height);
-        framebuffer.bind(true);
+#if 1
+        if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height,RGB16F,-1);
+        framebuffer.bind(ClearDepth);
+#else
+        //FIXME: sRGB framebuffer doesn't work
+        GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size, ClearDepth);
+#endif
 
-        // Computes projection transform
-        mat4 projection;
-        projection.perspective(2*atan(36/(2*focalLength)), width, height, 1./4, 4);
         // Computes view transform
         mat4 view;
+        view.perspective(2*atan(36/(2*focalLength)), width, height, 1./4, 4);
         view.scale(1.f/worldRadius); // fit scene (isometric approximation)
         view.translate(vec3(0,0,-worldRadius)); // step back
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
+
         // World-space lighting
         vec3 sunLightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
         vec3 skyLightDirection = vec3(0,0,1);
 
-        //map<string, GLTimerQuery> profile;
+        profile( map<string, GLTimerQuery> profile; )
         for(Model& model: models) {
             for(Model::Material& material: model.materials) {
                 GLShader& shader = material.shader;
@@ -565,53 +569,46 @@ struct BlendView : Widget {
 
                 model.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Model::Vertex,position));
                 model.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Model::Vertex,normal));
-                model.vertexBuffer.bindAttribute(shader,"aTexCoord",3,__builtin_offsetof(Model::Vertex,texCoord));
+                if(shader.sampler2D) model.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Model::Vertex,texCoord));
 
-                //log(model.instances.size(),'\t',model.shader.sampler2D);
-                //GLTimerQuery timerQuery; timerQuery.start();
+                profile( GLTimerQuery timerQuery; timerQuery.start(); )
                 if(model.instances.size()<Model::instanceMin) {
                     for(const Model::Instance& instance : model.instances) {
-                        shader["modelViewProjectionTransform"] = projection*view*instance.modelTransform;
-                        shader["normalMatrix"] = instance.normalMatrix;
+                        shader["modelViewTransform"] = view*instance.modelTransform;
+                        shader["normalMatrix"] = instance.modelTransform.normalMatrix();
                         shader["shadowTransform"] = sun*instance.modelTransform;
                         if(shader["modelTransform"]) shader["modelTransform"] = instance.modelTransform;
                         material.indexBuffer.draw();
                     }
                 } else {
-                    shader["viewProjectionTransform"] = projection*view;
+                    shader["viewTransform"] = view;
                     shader["shadowTransform"] = sun;
                     assert(!shader["modelTransform"]);
-                    // FIXME: use quaternion + position + scale = 8 floats instead of 25
+                    // FIXME: use quaternion + position + scale = 8 floats instead of 16
                     model.instanceBuffer.bindAttribute(shader, "aModelTransform0", 4, __builtin_offsetof(Model::Instance,modelTransform)+00, true);
                     model.instanceBuffer.bindAttribute(shader, "aModelTransform1", 4, __builtin_offsetof(Model::Instance,modelTransform)+16, true);
                     model.instanceBuffer.bindAttribute(shader, "aModelTransform2", 4, __builtin_offsetof(Model::Instance,modelTransform)+32, true);
                     model.instanceBuffer.bindAttribute(shader, "aModelTransform3", 4, __builtin_offsetof(Model::Instance,modelTransform)+48, true);
-                    model.instanceBuffer.bindAttribute(shader,"aNormalMatrix0",3,__builtin_offsetof(Model::Instance,normalMatrix)+00, true);
-                    model.instanceBuffer.bindAttribute(shader,"aNormalMatrix1",3,__builtin_offsetof(Model::Instance,normalMatrix)+12, true);
-                    model.instanceBuffer.bindAttribute(shader,"aNormalMatrix2",3,__builtin_offsetof(Model::Instance,normalMatrix)+24, true);
                     material.indexBuffer.draw(model.instances.size());
                 }
-                //timerQuery.stop(); profile.insert(material.name, move(timerQuery));
+                profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
             }
         }
-        //log("---");
 
         //TODO: fog
-        sky["inverseViewProjectionMatrix"] = (projection*view).inverse();
+        sky["inverseViewMatrix"] = view.inverse();
         sky[sky.sampler2D.first()] = 0; skymap.bind(0);
         glDrawRectangle(sky);
 
-        GLTexture color(width,height,GLTexture::RGB16F);
+#if 1
+        GLTexture color(width,height,RGB16F);
         framebuffer.blit(color);
-
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
+        present["framebuffer"]=0; color.bind(0);
+        glDrawRectangle(present);
+#endif
 
-        resolve["framebuffer"]=0; color.bind(0);
-        glDrawRectangle(resolve);
-
-        GLFrameBuffer::bindWindow(0, window.size);
-
-        //log(lastProfile); lastProfile = move(profile);
+        profile( log(window.renderTime, lastProfile); lastProfile = move(profile); )
     }
 
 } application;

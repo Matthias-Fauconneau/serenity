@@ -9,9 +9,9 @@ fragment {
 }
 
 blit {
- attribute vec2 texCoord;
  varying vec2 _texCoord;
  vertex {
+  attribute vec2 texCoord;
   _texCoord = texCoord;
  }
  fragment {

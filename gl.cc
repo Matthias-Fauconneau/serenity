@@ -6,6 +6,7 @@
 
 /// Context
 
+void glFramebufferSRGB(bool enable) { if(enable) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB); }
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
 void glBlend(bool enable, bool add) {
@@ -23,12 +24,6 @@ void glBlend(bool enable, bool add) {
 
 /// Shader
 
-#if GL_PROGRAM_UNIFORM
-void GLUniform::operator=(float v) { glProgramUniform1f(program,location,v); }
-void GLUniform::operator=(vec2 v) { glProgramUniform2f(program,location,v.x,v.y); }
-void GLUniform::operator=(vec4 v) { glProgramUniform4f(program,location,v.x,v.y,v.z,v.w); }
-void GLUniform::operator=(mat4 m) { glProgramUniformMatrix4fv(program,location,1,0,m.data); }
-#else
 void GLUniform::operator=(int v) { assert(location>=0); glUseProgram(program); glUniform1i(location,v); }
 void GLUniform::operator=(float v) { assert(location>=0); glUseProgram(program); glUniform1f(location,v); }
 void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
@@ -36,7 +31,7 @@ void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); 
 void GLUniform::operator=(vec4 v) { assert(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
 void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
 void GLUniform::operator=(mat4 m) { assert(location>=0); glUseProgram(program); glUniformMatrix4fv(location,1,0,m.data); }
-#endif
+
 GLUniform GLShader::operator[](const ref<byte>& name) {
     int location = uniformLocations.value(string(name),-1);
     if(location<0) {
@@ -184,11 +179,19 @@ uint* GLIndexBuffer::mapIndexBuffer() {
     return (uint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
 }
 void GLIndexBuffer::unmapIndexBuffer() { glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
+void GLIndexBuffer::upload(const ref<uint16>& indices) {
+    if(!indexBuffer) glGenBuffers(1, &indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint16), indices.data, GL_STATIC_DRAW);
+    indexCount = indices.size;
+    indexSize = GL_UNSIGNED_SHORT;
+}
 void GLIndexBuffer::upload(const ref<uint>& indices) {
     if(!indexBuffer) glGenBuffers(1, &indexBuffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
     indexCount = indices.size;
+    indexSize = GL_UNSIGNED_INT;
 }
 void GLIndexBuffer::draw(uint instanceCount) const {
     assert(indexBuffer);
@@ -209,8 +212,8 @@ void GLIndexBuffer::draw(uint instanceCount) const {
         glPrimitiveRestartIndex(-1);
     }
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    if(instanceCount==1) glDrawElements(primitiveType, indexCount, GL_UNSIGNED_INT, 0);
-    else glDrawElementsInstanced(primitiveType, indexCount, GL_UNSIGNED_INT, 0, instanceCount);
+    if(instanceCount==1) glDrawElements(primitiveType, indexCount, indexSize, 0);
+    else glDrawElementsInstanced(primitiveType, indexCount, indexSize, 0, instanceCount);
     if(primitiveRestart) glDisable(GL_PRIMITIVE_RESTART);
 }
 
@@ -260,17 +263,16 @@ void glDrawLine(GLShader& shader, vec2 p1, vec2 p2) {
 GLTexture::GLTexture(int width, int height, uint format, const void* data) : width(width), height(height), format(format) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    if((format&3)==sRGB)
+    if((format&3)==sRGB8)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     if((format&3)==sRGBA)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     if((format&3)==Depth24)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
     if((format&3)==RGB16F)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
     if(format&Shadow) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_GEQUAL );
     }
     if(format&Bilinear) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR);
@@ -279,7 +281,9 @@ GLTexture::GLTexture(int width, int height, uint format, const void* data) : wid
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_NEAREST_MIPMAP_NEAREST:GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
-    if(format&Anisotropic) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
+    if(format&Anisotropic) {
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
+    }
     if(format&Clamp) {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -287,7 +291,7 @@ GLTexture::GLTexture(int width, int height, uint format, const void* data) : wid
     if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_2D);
 }
 GLTexture::GLTexture(const Image& image, uint format)
-    : GLTexture(image.width, image.height, (image.alpha?sRGBA:sRGB)|format, image.data) {
+    : GLTexture(image.width, image.height, (image.alpha?sRGBA:sRGB8)|format, image.data) {
     assert(width==image.stride);
 }
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
@@ -301,19 +305,20 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
 }
-GLFrameBuffer::GLFrameBuffer(uint width, uint height):width(width),height(height){
+GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
+    if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
+
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
 
     glGenRenderbuffers(1, &depthBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-    int maxSamples; glGetIntegerv(GL_MAX_SAMPLES,&maxSamples);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, maxSamples, GL_DEPTH_COMPONENT24, width, height);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_DEPTH_COMPONENT24, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
 
     glGenRenderbuffers(1, &colorBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, maxSamples, GL_RGB16F, width, height);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format==RGB16F?GL_RGB16F:GL_SRGB8, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
 
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("");
@@ -323,44 +328,44 @@ GLFrameBuffer::~GLFrameBuffer() {
     if(colorBuffer) glDeleteRenderbuffers(1, &colorBuffer);
     if(id) glDeleteFramebuffers(1,&id);
 }
-void GLFrameBuffer::bind(bool clear, vec4 color) {
+void GLFrameBuffer::bind(uint clearFlags, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER,id);
-  viewportSize = vec2(width,height);
   glViewport(0,0,width,height);
-  if(clear) {
-      glClearColor(color.x,color.y,color.z,color.w);
-      glClear(GL_DEPTH_BUFFER_BIT);
+  viewportSize = vec2(width,height);
+  if(clearFlags) {
+      if(clearFlags&ClearColor) glClearColor(color.x,color.y,color.z,color.w);
+      assert((clearFlags&(~(ClearDepth|ClearColor)))==0, clearFlags);
+      glClear(clearFlags);
   }
-  glDisable(GL_FRAMEBUFFER_SRGB);
-  glBindTexture(GL_TEXTURE_2D, 0);
 }
-void GLFrameBuffer::bindWindow(int2 position, int2 size, bool clear, vec4 color) {
+void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
   glViewport(position.x,position.y,size.x,size.y);
   viewportSize = vec2(size);
-  if(clear) {
-      glClearColor(color.x,color.y,color.z,color.w);
-      glClear(GL_COLOR_BUFFER_BIT);
-  }
-  glEnable(GL_FRAMEBUFFER_SRGB);
+  if(clearFlags&ClearColor) glClearColor(color.x,color.y,color.z,color.w);
+  glClear(clearFlags);
+}
+void GLFrameBuffer::blit(uint target) {
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
+    glBlitFramebuffer(0,0,width,height,0,0,width,height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 void GLFrameBuffer::blit(GLTexture& color) {
+    assert(color.width==width, color.height==height);
     uint target;
     glGenFramebuffers(1,&target);
     glBindFramebuffer(GL_FRAMEBUFFER,target);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,color.id,0);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER,id);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
-    glBlitFramebuffer(0,0,width,height,0,0,color.width,color.height,GL_COLOR_BUFFER_BIT,GL_LINEAR);
+    blit(target);
     glDeleteFramebuffers(1,&target);
 }
 
 #if ARB_timer_query
 GLTimerQuery::GLTimerQuery() { glGenQueries(1, &id); }
 GLTimerQuery::~GLTimerQuery() { glDeleteQueries(1, &id); }
-void GLTimerQuery::start() { glBeginQuery(id, GL_TIME_ELAPSED); }
-void GLTimerQuery::stop() { glEndQuery(id); }
-GLTimerQuery::operator uint() const {
+void GLTimerQuery::start() { glBeginQuery(GL_TIME_ELAPSED, id); }
+void GLTimerQuery::stop() { glEndQuery(GL_TIME_ELAPSED); }
+uint GLTimerQuery::elapsed() const {
     { debug( int available=0; glGetQueryObjectiv(id, GL_QUERY_RESULT_AVAILABLE, &available); assert(available); ) }
     uint elapsed=0; glGetQueryObjectuiv(id, GL_QUERY_RESULT, &elapsed);
     return elapsed/1e6; //ns to ms

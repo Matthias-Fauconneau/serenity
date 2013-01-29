@@ -5,6 +5,7 @@
 #include "map.h"
 #include "image.h"
 
+void glFramebufferSRGB(bool enable);
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
 void glBlend(bool enable, bool add=true);
@@ -75,6 +76,7 @@ struct GLIndexBuffer {
     void allocate(int indexCount);
     uint* mapIndexBuffer();
     void unmapIndexBuffer();
+    void upload(const ref<uint16>& indices);
     void upload(const ref<uint>& indices);
     void draw(uint instanceCount=1) const;
 
@@ -83,6 +85,7 @@ struct GLIndexBuffer {
     PrimitiveType primitiveType=Triangle;
     uint32 indexBuffer=0;
     uint32 indexCount=0;
+    uint32 indexSize=0;
     bool primitiveRestart=false;
 };
 
@@ -91,16 +94,16 @@ void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1),
 void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord=false);
 void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);
 
+enum Format {
+    sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3,
+    Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
 struct GLTexture {
     uint id=0;
     uint width=0, height=0;
     uint format;
     GLTexture(){}
-    enum Format {
-        sRGB=0,sRGBA=1,Depth24=2,RGB16F=3,
-        Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
-    GLTexture(int width, int height, uint format=sRGB, const void* data=0);
-    GLTexture(const Image& image, uint format=sRGB);
+    GLTexture(int width, int height, uint format=sRGB8, const void* data=0);
+    GLTexture(const Image& image, uint format=sRGB8);
     move_operator(GLTexture):id(o.id),width(o.width),height(o.height){o.id=0;}
     ~GLTexture();
 
@@ -110,18 +113,20 @@ struct GLTexture {
     int2 size() const { return int2(width,height); }
 };
 
+enum { ClearDepth=0x100, ClearColor=0x4000 };
 struct GLFrameBuffer {
     move_operator(GLFrameBuffer):
         id(o.id),depthBuffer(o.depthBuffer),colorBuffer(o.colorBuffer),width(o.width),height(o.height),depthTexture(move(o.depthTexture))
     {o.id=o.depthBuffer=o.colorBuffer=0;}
     GLFrameBuffer(){}
     GLFrameBuffer(GLTexture&& depth);
-    GLFrameBuffer(uint width, uint height);
+    GLFrameBuffer(uint width, uint height, uint format=sRGB8, int sampleCount=0);
     ~GLFrameBuffer();
 
     operator bool() const { return id; }
-    void bind(bool clear=false, vec4 color=1);
-    static void bindWindow(int2 position, int2 size, bool clear=false, vec4 color=1);
+    void bind(uint clearFlags=0, vec4 color=1);
+    static void bindWindow(int2 position, int2 size, uint clearFlags=ClearDepth|ClearColor, vec4 color=1);
+    void blit(uint target);
     void blit(GLTexture&);
 
     uint id=0, depthBuffer=0, colorBuffer=0;
@@ -129,6 +134,7 @@ struct GLFrameBuffer {
     GLTexture depthTexture;
 };
 
+#define ARB_timer_query 1
 #if ARB_timer_query
 struct GLTimerQuery {
     GLTimerQuery();
@@ -137,9 +143,9 @@ struct GLTimerQuery {
 
     void start();
     void stop();
-    operator uint() const;
+    uint elapsed() const;
 
     uint id;
 };
-inline string str(const GLTimerQuery& timer) { return str<uint>(timer); }
+inline string str(const GLTimerQuery& timer) { return str(timer.elapsed()); }
 #endif

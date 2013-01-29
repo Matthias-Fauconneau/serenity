@@ -128,6 +128,7 @@ struct Window : Socket, Poll {
 
     /// Selects between software or OpenGL rendering
     Renderer renderer;
+    uint renderTime=0;
     /// System V shared memory
     int shm = 0;
     /// Shared window back buffer
