@@ -1,8 +1,4 @@
 #version 130
-vertex {
-#extension GL_ARB_draw_instanced : require
-#extension GL_ARB_uniform_buffer_object : require
-}
 
 transform {
  vertex {
@@ -12,33 +8,12 @@ transform {
  }
 }
 
-instancedTransform {
- vertex {
-  uniform mat4 viewTransform;
-  struct Instance { mat4 modelViewTransform; mat4 normalMatrix; mat4 shadowTransform; };
-  uniform instanceBuffer { Instance instances[$instanceCount]; };
-  attribute vec3 aPosition;
-  gl_Position = instances[gl_InstanceID].modelViewTransform * vec4(aPosition,1);
- }
-}
-
 normal {
  varying vec3 vNormal;
  vertex {
   uniform mat3 normalMatrix;
   attribute vec3 aNormal;
   vNormal = normalMatrix*aNormal;
- }
- fragment {
-  vec3 normal = normalize(vNormal);
- }
-}
-
-instancedNormal {
- varying vec3 vNormal;
- vertex {
-  attribute vec3 aNormal;
-  vNormal = mat3(instances[gl_InstanceID].normalMatrix)*aNormal;
  }
  fragment {
   vec3 normal = normalize(vNormal);
@@ -72,23 +47,7 @@ shadow {
   for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
      shadowLight += shadow2DProj(shadowMap,
      vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
-  shadowLight /= 4.0;
- }
-}
-
-instancedShadow {
- uniform float shadowScale;
- varying vec4 shadowPosition;
- vertex {
-  shadowPosition = instances[gl_InstanceID].shadowTransform*vec4(aPosition,1);
- }
- fragment {
-  uniform sampler2DShadow shadowMap;
-  float shadowLight = 0;
-  for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
-     shadowLight += shadow2DProj(shadowMap,
-     vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
-  shadowLight /= 4.0;
+  shadowLight /= 4;
  }
 }
 
@@ -115,7 +74,7 @@ screen {
  vertex {
   attribute vec2 position;
   gl_Position = vec4(position,0,1);
-  texCoord = (position+1.0)/2.0;
+  texCoord = (position+1)/2;
  }
 }
 

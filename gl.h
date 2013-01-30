@@ -45,21 +45,6 @@ extern char _binary_ ## name ##_glsl_start[]; \
 extern char _binary_ ## name ##_glsl_end[]; \
 static ref<byte> name (_binary_ ## name ##_glsl_start,_binary_ ## name ##_glsl_end);
 
-struct GLUniformBuffer {
-    GLUniformBuffer(){}
-    move_operator(GLUniformBuffer): id(o.id),size(o.size){o.id=0;}
-    ~GLUniformBuffer();
-
-    void upload(const ref<byte>& data);
-    template<class T> void upload(const ref<T>& data) { upload(ref<byte>((byte*)data.data,data.size*sizeof(T))); }
-    void bind(GLShader& program, const ref<byte>& name) const;
-
-    operator bool() const { return id; }
-
-    uint id=0;
-    int size=0;
-};
-
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
 
 struct GLVertexBuffer {
@@ -73,7 +58,7 @@ struct GLVertexBuffer {
     void upload(const ref<byte>& vertices);
     template<class T> void upload(const ref<T>& vertices) { vertexSize=sizeof(T); upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
     void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0/*, bool instance = false*/) const;
-    void draw(PrimitiveType primitiveType, uint instanceCount=1) const;
+    void draw(PrimitiveType primitiveType) const;
 
     operator bool() const { return vertexBuffer; }
 
@@ -94,7 +79,7 @@ struct GLIndexBuffer {
     void unmapIndexBuffer();
     void upload(const ref<uint16>& indices);
     void upload(const ref<uint>& indices);
-    void draw(uint instanceCount=1) const;
+    void draw() const;
 
     operator bool() { return indexBuffer; }
 

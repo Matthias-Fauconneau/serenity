@@ -122,7 +122,7 @@ struct BlendView : Widget {
         };
         static const uint instanceMin = -1; // Minimum number of instances before using instanced rendering (-1 = disable)
         array<mat4> instances;
-        GLUniformBuffer instanceBuffer;
+        //GLUniformBuffer instanceBuffer;
 
         // Rendering order (cheap to expensive, front to back)
         bool operator <(const Model& o) const { return instances.size()<o.instances.size(); }
@@ -465,15 +465,8 @@ struct BlendView : Widget {
                 material.indexBuffer.upload(material.indices);
 
                 // Compiles shader
-                string source = blender+shaderSource;
-                string tags = "transform normal texCoord diffuse shadow sun sky "_ +material.name;
-                if(model.instances.size()>=Model::instanceMin) {
-                    tags = replace(move(tags),"transform"_,"instancedTransform"_);
-                    tags = replace(move(tags),"normal"_,"instancedNormal"_);
-                    tags = replace(move(tags),"shadow"_,"instancedShadow"_);
-                    source = replace(move(source),"$instanceCount"_,str(model.instances.size()));
-                }
-                material.shader = GLShader(source, tags);
+                material.shader =
+                        GLShader(string(blender+shaderSource), string("transform normal texCoord diffuse shadow sun sky "_ +material.name));
 
                 // Loads textures
                 int unit=1;
@@ -481,11 +474,6 @@ struct BlendView : Widget {
                     material.shader[name] = unit++;
                     material.textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)), Mipmap|Bilinear|Anisotropic);
                 }
-
-                // Uploads instances
-                /*if(model.instances.size()>=Model::instanceMin) {
-                    model.instanceBuffer.upload<Model::Instance>(model.instances);
-                }*/
             }
         }
 
@@ -581,28 +569,12 @@ struct BlendView : Widget {
                 if(shader.sampler2D) model.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Model::Vertex,texCoord));
 
                 profile( GLTimerQuery timerQuery; timerQuery.start(); )
-                if(model.instances.size()<Model::instanceMin) {
-                    for(const mat4& instance : model.instances) {
-                        shader["modelViewTransform"] = view*instance;
-                        shader["normalMatrix"] = instance.normalMatrix();
-                        shader["shadowTransform"] = sun*instance;
-                        if(shader["modelTransform"]) shader["modelTransform"] = instance;
-                        material.indexBuffer.draw();
-                    }
-                } else {
-                    assert(!shader["modelTransform"]);
-
-                    array<Model::Instance> instances (model.instances.size()); //FIXME: map uniform buffer
-                    for(mat4& instance : model.instances) {
-                        Model::Instance glInstance;
-                        glInstance.modelViewTransform = view*instance;
-                        glInstance.normalMatrix = instance.normalMatrix();
-                        glInstance.shadowTransform = sun*instance;
-                        instances << glInstance;
-                    }
-                    model.instanceBuffer.upload<Model::Instance>(instances);
-                    model.instanceBuffer.bind(shader, "instanceBuffer"_);
-                    material.indexBuffer.draw(model.instances.size());
+                for(const mat4& instance : model.instances) {
+                    shader["modelViewTransform"] = view*instance;
+                    shader["normalMatrix"] = instance.normalMatrix();
+                    shader["shadowTransform"] = sun*instance;
+                    if(shader["modelTransform"]) shader["modelTransform"] = instance;
+                    material.indexBuffer.draw();
                 }
                 profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
             }
