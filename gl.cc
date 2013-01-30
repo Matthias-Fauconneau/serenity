@@ -52,7 +52,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
         TextData s (source);
         array<uint> scope;
         for(uint nest=0;s;) { //for each line
-            static array< ref<byte> > qualifiers = split("const uniform attribute varying out"_);
+            static array< ref<byte> > qualifiers = split("struct const uniform attribute varying"_);
             static array< ref<byte> > types = split("void float vec2 vec3 vec4"_);
             uint lineStart = s.index;
             s.whileAny(" \t"_);
@@ -126,6 +126,27 @@ uint GLShader::attribLocation(const ref<byte>& name) {
     if(location<0) error("Unknown attribute"_,name);
     return (uint)location;
 }
+//uint GLShader::maxUniformBlockSize() { int size=0; glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &size); return size; }
+
+/// Uniform buffer
+
+GLUniformBuffer::~GLUniformBuffer() { if(id) glDeleteBuffers(1,&id); }
+void GLUniformBuffer::upload(const ref<byte>& data) {
+    assert(data);
+    if(!id) glGenBuffers(1, &id);
+    glBindBuffer(GL_UNIFORM_BUFFER, id);
+    glBufferData(GL_UNIFORM_BUFFER, data.size, data.data, GL_STATIC_DRAW);
+    size=data.size;
+}
+void GLUniformBuffer::bind(GLShader& program, const ref<byte>& name) const {
+    assert(id);
+    int location = glGetUniformBlockIndex(program.id, strz(name));
+    if(location<0) error("Unknown uniform", name);
+    int size=0; glGetActiveUniformBlockiv(program.id, location, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
+    if(size != this->size) error("Size mismatch", size, this->size);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, id);
+    glUniformBlockBinding(program.id, location, 0);
+}
 
 /// Vertex buffer
 
@@ -142,21 +163,21 @@ void* GLVertexBuffer::mapVertexBuffer() {
     return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
 }
 void GLVertexBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ARRAY_BUFFER, 0); }
-void GLVertexBuffer::upload(const ref<byte> &vertices) {
+void GLVertexBuffer::upload(const ref<byte>& vertices) {
     if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, vertices.size, vertices.data, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertexCount = vertices.size/vertexSize;
 }
-void GLVertexBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset, bool instance) const {
+void GLVertexBuffer::bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset/*, bool instance*/) const {
     assert(vertexBuffer); assert(elementSize<=4);
     int index = program.attribLocation(strz(name));
     assert(index>=0,"unused attribute"_,name);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glEnableVertexAttribArray(index);
     glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)(offset));
-    glVertexAttribDivisor(index, instance);
+    //glVertexAttribDivisor(index, instance);
 }
 void GLVertexBuffer::draw(PrimitiveType primitiveType, uint instanceCount) const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

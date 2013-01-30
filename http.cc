@@ -33,6 +33,7 @@ extern "C" {
  const SSLMethod* TLSv1_client_method();
  SSL* SSL_new(SSLContext *ctx);
  int SSL_set_fd(SSL*, int fd);
+ int SSL_state(SSL*);
  int SSL_connect(SSL*);
  int SSL_shutdown(SSL*);
  int SSL_read(SSL*,void *buf,int num);
@@ -43,6 +44,7 @@ SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port)
         static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
         ssl = SSL_new(ctx);
         SSL_set_fd(ssl, fd);
+        log(SSL_state(ssl));
         SSL_connect(ssl);
     }
 }

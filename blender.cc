@@ -115,13 +115,14 @@ struct BlendView : Widget {
         };
         array<Material> materials;
 
-        struct Instance {
-            mat4 modelTransform;
-            Instance(mat4 transform):modelTransform(transform){}
+        struct Instance { // FIXME: use quaternion + position + scale = 8 floats instead of 16 ?
+            mat4 modelViewTransform;
+            mat4 normalMatrix;
+            mat4 shadowTransform;
         };
-        static const uint instanceMin = 2; // Minimum number of instances before using instanced rendering (-1 = disable)
-        array<Instance> instances;
-        GLVertexBuffer instanceBuffer;
+        static const uint instanceMin = -1; // Minimum number of instances before using instanced rendering (-1 = disable)
+        array<mat4> instances;
+        GLUniformBuffer instanceBuffer;
 
         // Rendering order (cheap to expensive, front to back)
         bool operator <(const Model& o) const { return instances.size()<o.instances.size(); }
@@ -426,7 +427,7 @@ struct BlendView : Widget {
                     transform.scale(10); // HACK FIXME
                     // Orient X axis along normal
                     vec3 e2 = normalize(B-A), e1 = normalize(cross(e2,C-A)), e3 = cross(e1,e2);
-                    mat4 align(e1,e2,e3);
+                    mat4 align(mat3(e1,e2,e3));
                     transform = transform * align;
                     // Random rotation around X axis
                     transform.rotateX(2*PI*random());
@@ -464,9 +465,15 @@ struct BlendView : Widget {
                 material.indexBuffer.upload(material.indices);
 
                 // Compiles shader
-                material.shader = GLShader(string(blender+shaderSource), string(
-                                               (model.instances.size()<Model::instanceMin ? "transform normal"_ : "instancedTransform instancedNormal"_) +
-                                               " texCoord diffuse shadow sun sky "_ +material.name));
+                string source = blender+shaderSource;
+                string tags = "transform normal texCoord diffuse shadow sun sky "_ +material.name;
+                if(model.instances.size()>=Model::instanceMin) {
+                    tags = replace(move(tags),"transform"_,"instancedTransform"_);
+                    tags = replace(move(tags),"normal"_,"instancedNormal"_);
+                    tags = replace(move(tags),"shadow"_,"instancedShadow"_);
+                    source = replace(move(source),"$instanceCount"_,str(model.instances.size()));
+                }
+                material.shader = GLShader(source, tags);
 
                 // Loads textures
                 int unit=1;
@@ -476,7 +483,9 @@ struct BlendView : Widget {
                 }
 
                 // Uploads instances
-                if(model.instances.size()>=Model::instanceMin) model.instanceBuffer.upload<Model::Instance>(model.instances);
+                /*if(model.instances.size()>=Model::instanceMin) {
+                    model.instanceBuffer.upload<Model::Instance>(model.instances);
+                }*/
             }
         }
 
@@ -519,8 +528,8 @@ struct BlendView : Widget {
             shadow.bind();
             for(Model& model: models) {
                 model.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Model::Vertex,position));
-                for(const Model::Instance& instance: model.instances) {
-                    shadow["modelViewTransform"] = sun*instance.modelTransform;
+                for(const mat4& instance: model.instances) {
+                    shadow["modelViewTransform"] = sun*instance;
                     for(const Model::Material& material: model.materials) material.indexBuffer.draw();
                 }
             }
@@ -573,22 +582,26 @@ struct BlendView : Widget {
 
                 profile( GLTimerQuery timerQuery; timerQuery.start(); )
                 if(model.instances.size()<Model::instanceMin) {
-                    for(const Model::Instance& instance : model.instances) {
-                        shader["modelViewTransform"] = view*instance.modelTransform;
-                        shader["normalMatrix"] = instance.modelTransform.normalMatrix();
-                        shader["shadowTransform"] = sun*instance.modelTransform;
-                        if(shader["modelTransform"]) shader["modelTransform"] = instance.modelTransform;
+                    for(const mat4& instance : model.instances) {
+                        shader["modelViewTransform"] = view*instance;
+                        shader["normalMatrix"] = instance.normalMatrix();
+                        shader["shadowTransform"] = sun*instance;
+                        if(shader["modelTransform"]) shader["modelTransform"] = instance;
                         material.indexBuffer.draw();
                     }
                 } else {
-                    shader["viewTransform"] = view;
-                    shader["shadowTransform"] = sun;
                     assert(!shader["modelTransform"]);
-                    // FIXME: use quaternion + position + scale = 8 floats instead of 16
-                    model.instanceBuffer.bindAttribute(shader, "aModelTransform0", 4, __builtin_offsetof(Model::Instance,modelTransform)+00, true);
-                    model.instanceBuffer.bindAttribute(shader, "aModelTransform1", 4, __builtin_offsetof(Model::Instance,modelTransform)+16, true);
-                    model.instanceBuffer.bindAttribute(shader, "aModelTransform2", 4, __builtin_offsetof(Model::Instance,modelTransform)+32, true);
-                    model.instanceBuffer.bindAttribute(shader, "aModelTransform3", 4, __builtin_offsetof(Model::Instance,modelTransform)+48, true);
+
+                    array<Model::Instance> instances (model.instances.size()); //FIXME: map uniform buffer
+                    for(mat4& instance : model.instances) {
+                        Model::Instance glInstance;
+                        glInstance.modelViewTransform = view*instance;
+                        glInstance.normalMatrix = instance.normalMatrix();
+                        glInstance.shadowTransform = sun*instance;
+                        instances << glInstance;
+                    }
+                    model.instanceBuffer.upload<Model::Instance>(instances);
+                    model.instanceBuffer.bind(shader, "instanceBuffer"_);
                     material.indexBuffer.draw(model.instances.size());
                 }
                 profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )

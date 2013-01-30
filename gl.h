@@ -31,6 +31,7 @@ struct GLShader {
     void bind();
     uint attribLocation(const ref<byte>&);
     GLUniform operator[](const ref<byte>&);
+    //static uint maxUniformBlockSize();
 
     uint id=0;
     //using pointer comparison (only works with string literals)
@@ -44,6 +45,21 @@ extern char _binary_ ## name ##_glsl_start[]; \
 extern char _binary_ ## name ##_glsl_end[]; \
 static ref<byte> name (_binary_ ## name ##_glsl_start,_binary_ ## name ##_glsl_end);
 
+struct GLUniformBuffer {
+    GLUniformBuffer(){}
+    move_operator(GLUniformBuffer): id(o.id),size(o.size){o.id=0;}
+    ~GLUniformBuffer();
+
+    void upload(const ref<byte>& data);
+    template<class T> void upload(const ref<T>& data) { upload(ref<byte>((byte*)data.data,data.size*sizeof(T))); }
+    void bind(GLShader& program, const ref<byte>& name) const;
+
+    operator bool() const { return id; }
+
+    uint id=0;
+    int size=0;
+};
+
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
 
 struct GLVertexBuffer {
@@ -56,14 +72,14 @@ struct GLVertexBuffer {
     void unmapVertexBuffer();
     void upload(const ref<byte>& vertices);
     template<class T> void upload(const ref<T>& vertices) { vertexSize=sizeof(T); upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
-    void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0, bool instance = false) const;
+    void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0/*, bool instance = false*/) const;
     void draw(PrimitiveType primitiveType, uint instanceCount=1) const;
 
     operator bool() const { return vertexBuffer; }
 
-    uint32 vertexBuffer=0;
-    uint32 vertexCount=0;
-    uint32 vertexSize=0;
+    uint vertexBuffer=0;
+    uint vertexCount=0;
+    uint vertexSize=0;
 };
 
 struct GLIndexBuffer {
@@ -83,9 +99,9 @@ struct GLIndexBuffer {
     operator bool() { return indexBuffer; }
 
     PrimitiveType primitiveType=Triangle;
-    uint32 indexBuffer=0;
-    uint32 indexCount=0;
-    uint32 indexSize=0;
+    uint indexBuffer=0;
+    uint indexCount=0;
+    uint indexSize=0;
     bool primitiveRestart=false;
 };
 

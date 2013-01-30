@@ -1,26 +1,24 @@
 #version 130
+vertex {
+#extension GL_ARB_draw_instanced : require
+#extension GL_ARB_uniform_buffer_object : require
+}
 
 transform {
  vertex {
   uniform mat4 modelViewTransform;
   attribute vec3 aPosition;
-  vec3 position = aPosition;
-  gl_Position = modelViewTransform*vec4(position,1);
+  gl_Position = modelViewTransform*vec4(aPosition,1);
  }
 }
 
 instancedTransform {
  vertex {
   uniform mat4 viewTransform;
-  attribute vec4 aModelTransform0, aModelTransform1, aModelTransform2, aModelTransform3;
-  mat4 aModelTransform;
-  aModelTransform[0] = aModelTransform0;
-  aModelTransform[1] = aModelTransform1;
-  aModelTransform[2] = aModelTransform2;
-  aModelTransform[3] = aModelTransform3;
+  struct Instance { mat4 modelViewTransform; mat4 normalMatrix; mat4 shadowTransform; };
+  uniform instanceBuffer { Instance instances[$instanceCount]; };
   attribute vec3 aPosition;
-  vec3 position = (aModelTransform * vec4(aPosition,1)).xyz;
-  gl_Position = viewTransform*vec4(position,1);
+  gl_Position = instances[gl_InstanceID].modelViewTransform * vec4(aPosition,1);
  }
 }
 
@@ -40,7 +38,7 @@ instancedNormal {
  varying vec3 vNormal;
  vertex {
   attribute vec3 aNormal;
-  vNormal = mat3(aModelTransform)*aNormal;
+  vNormal = mat3(instances[gl_InstanceID].normalMatrix)*aNormal;
  }
  fragment {
   vec3 normal = normalize(vNormal);
@@ -66,7 +64,23 @@ shadow {
  varying vec4 shadowPosition;
  vertex {
   uniform mat4 shadowTransform;
-  shadowPosition = shadowTransform*vec4(position,1);
+  shadowPosition = shadowTransform*vec4(aPosition,1);
+ }
+ fragment {
+  uniform sampler2DShadow shadowMap;
+  float shadowLight = 0;
+  for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
+     shadowLight += shadow2DProj(shadowMap,
+     vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
+  shadowLight /= 4.0;
+ }
+}
+
+instancedShadow {
+ uniform float shadowScale;
+ varying vec4 shadowPosition;
+ vertex {
+  shadowPosition = instances[gl_InstanceID].shadowTransform*vec4(aPosition,1);
  }
  fragment {
   uniform sampler2DShadow shadowMap;

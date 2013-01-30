@@ -61,7 +61,7 @@ struct mat4; inline mat4 operator*(float s, mat4 M);
 struct mat4 {
     float data[4*4];
     mat4(int d=1) { for(int i=0;i<4*4;i++) data[i]=0; for(int i=0;i<4;i++) M(i,i)=d; }
-    mat4(vec3 e0, vec3 e1, vec3 e2):mat4(1){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
+    mat4(mat3 m):mat4(1){for(int i=0;i<3;i++) for(int j=0;j<3;j++) M(i,j)=m(i,j); }
 
     float M(int i, int j) const { return data[j*4+i]; }
     float& M(int i, int j) { return data[j*4+i]; }
@@ -95,10 +95,10 @@ struct mat4 {
     mat4 inverse() const { return 1/det() * adjugate() ; }
 
     //top-left 3x3 part of the transpose of the inverse
-    mat3 normalMatrix() const {
-        mat4 t = inverse().transpose();
+    mat3 normalMatrix() const { return (mat3)inverse().transpose(); }
+    explicit operator mat3() const {
         mat3 r;
-        for(int i=0;i<3;i++) for(int j=0;j<3;j++) r(i,j)=t(i,j);
+        for(int i=0;i<3;i++) for(int j=0;j<3;j++) r(i,j)=M(i,j);
         return r;
     }
 
