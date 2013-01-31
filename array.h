@@ -167,5 +167,11 @@ template<class T> array<T> replace(array<T>&& a, const T& before, const T& after
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 
+/// Sets the array size to \a size, filling with \a value
+template<class T> void fill(array<T>& a, const T& value, int size) {
+    a.reserve(size); a.setSize(size);
+    for(int i=0;i<size;i++) new (&a[i]) T(copy(value));
+}
+
 /// string is an array of bytes
 typedef array<byte> string;

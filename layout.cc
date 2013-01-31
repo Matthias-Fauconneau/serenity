@@ -33,12 +33,6 @@ int2 Linear::sizeHint() {
     return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
 }
 
-/// Sets the array size to \a size, filling with \a value
-template<class T> void fill(array<T>& a, const T& value, int size) {
-    a.reserve(size); a.setSize(size);
-    for(int i=0;i<size;i++) new (&a[i]) T(copy(value));
-}
-
 array<Rect> Linear::layout(int2 position, int2 size) {
     uint count=this->count();
     if(!count) return __();

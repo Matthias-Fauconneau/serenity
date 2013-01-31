@@ -58,6 +58,19 @@ struct Struct {
 string str(const Struct::Field& f) { return " "_+f.typeName+repeat('*',f.reference)+" "_+f.name+(f.count!=1?"["_+str(f.count)+"]"_:string())+";"_; }
 string str(const Struct& s) { return "struct "_+s.name+" {\n"_+str(s.fields,'\n')+"\n};"_; }
 
+// Renderer definitions
+struct Vertex {
+    vec3 position; // World-space position
+    vec3 normal; // World-space vertex normals
+    vec2 texCoord; // Texture coordinates
+    bool operator==(const Vertex& o){
+        const float e = 0x1.0p-16f;
+        return sqr(position-o.position)<e && sqr(normal-o.normal)<e && sqr(texCoord-o.texCoord)<e;
+    }
+};
+string str(const Vertex& v) { return "("_+str(v.position, v.normal, v.texCoord)+")"_; }
+
+
 /// Parses a .blend file
 struct BlendView : Widget {
     // View
@@ -97,18 +110,14 @@ struct BlendView : Widget {
     struct Model {
         mat4 transform;
 
-        struct Vertex {
-            vec3 position; // World-space position
-            vec3 normal; // World-space vertex normals
-            vec2 texCoord; // Texture coordinates
-        };
         array<Vertex> vertices;
-        GLVertexBuffer vertexBuffer;
 
         struct Material {
             string name;
             GLShader shader;
             array<GLTexture> textures;
+
+            GLVertexBuffer vertexBuffer;
 
             array<uint> indices;
             GLIndexBuffer indexBuffer;
@@ -308,12 +317,12 @@ struct BlendView : Widget {
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
 
-                model.vertices << Model::Vertex __(position, normal, vec2(0,0));
+                model.vertices << Vertex __(position, normal, vec2(0,0));
                 i++;
             }
 
             vec3 objectMin=0, objectMax=0;
-            for(Model::Vertex& vertex: model.vertices) {
+            for(Vertex& vertex: model.vertices) {
                 // Computes object bounds
                 objectMin=min(objectMin, vertex.position);
                 objectMax=max(objectMax, vertex.position);
@@ -331,7 +340,7 @@ struct BlendView : Widget {
                 }
             }
             // Scales positions and transforms to keep unit bounding box in object space
-            for(Model::Vertex& vertex: model.vertices) {
+            for(Vertex& vertex: model.vertices) {
                 vertex.position = (vertex.position-objectMin)/(objectMax-objectMin);
             }
             transform.translate(objectMin);
@@ -457,12 +466,27 @@ struct BlendView : Widget {
             Model& model = models[i];
             if(!model.materials || !model.instances) { models.removeAt(i); continue; } else i++;
 
-            // Uploads vertices
-            model.vertexBuffer.upload<Model::Vertex>(model.vertices);
-
             for(Model::Material& material : model.materials) {
-                // Uploads indices
-                material.indexBuffer.upload(material.indices);
+                //TODO: optimize indices for vertex cache
+                array<uint> remap; fill(remap, uint(-1), model.vertices.size()); //map original index to optimized
+                array<uint> indices (material.indices.size()); //remapped indices
+                array<Vertex> vertices (model.vertices.size());
+                for(uint index: material.indices) {
+                    uint newIndex = remap[index];
+                    if(newIndex == uint(-1)) { newIndex=remap[index]=vertices.size(); vertices << model.vertices[index]; }
+                    indices << newIndex;
+                }
+                log(model.instances.size(), vertices.size(), indices.size(), (float)indices.size()/vertices.size());
+
+                // Uploads geometry
+                material.vertexBuffer.upload<Vertex>(vertices);
+                if(vertices.size()<=0x10000) {
+                    array<uint16> indices16 (indices.size()); //16bit indices
+                    for(uint index: indices) { assert(index<0x10000); indices16 << index; }
+                    material.indexBuffer.upload(indices16);
+                } else {
+                    material.indexBuffer.upload(indices);
+                }
 
                 // Compiles shader
                 material.shader =
@@ -515,10 +539,12 @@ struct BlendView : Widget {
 
             shadow.bind();
             for(Model& model: models) {
-                model.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Model::Vertex,position));
-                for(const mat4& instance: model.instances) {
-                    shadow["modelViewTransform"] = sun*instance;
-                    for(const Model::Material& material: model.materials) material.indexBuffer.draw();
+                for(const Model::Material& material: model.materials) {
+                    material.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
+                    for(const mat4& instance: model.instances) {
+                        shadow["modelViewTransform"] = sun*instance;
+                        material.indexBuffer.draw();
+                    }
                 }
             }
 
@@ -564,9 +590,9 @@ struct BlendView : Widget {
                 {int i=1; for(const string& name: shader.sampler2D) shader[name] = i++; }
                 {int i=1; for(const GLTexture& texture : material.textures) texture.bind(i++); }
 
-                model.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Model::Vertex,position));
-                model.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Model::Vertex,normal));
-                if(shader.sampler2D) model.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Model::Vertex,texCoord));
+                material.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Vertex,position));
+                material.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Vertex,normal));
+                if(shader.sampler2D) material.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Vertex,texCoord));
 
                 profile( GLTimerQuery timerQuery; timerQuery.start(); )
                 for(const mat4& instance : model.instances) {

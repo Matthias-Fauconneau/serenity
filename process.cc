@@ -62,7 +62,12 @@ void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
 // Poll
-void Poll::registerPoll() {Locker lock(thread.lock); assert(!thread.contains(this)); thread<<this; thread.post(); }
+void Poll::registerPoll() {
+    Locker lock(thread.lock);
+    if(thread.unregistered.contains(this)) { thread.unregistered.removeAll(this); }
+    else { assert(!thread.contains(this)); thread<<this; }
+    thread.post();
+}
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thread.post();}
 
