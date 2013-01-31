@@ -206,12 +206,12 @@ void GLIndexBuffer::draw() const {
         glLineWidth(2);
     }
     if(primitiveRestart) {
-        glEnable(GL_PRIMITIVE_RESTART);
-        glPrimitiveRestartIndex(-1);
+        glEnableClientState(GL_PRIMITIVE_RESTART_NV);
+        glPrimitiveRestartIndex(indexSize==GL_UNSIGNED_SHORT?0xFFFF:0xFFFFFFFF);
     }
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glDrawElements(primitiveType, indexCount, indexSize, 0);
-    if(primitiveRestart) glDisable(GL_PRIMITIVE_RESTART);
+    if(primitiveRestart) glDisableClientState(GL_PRIMITIVE_RESTART_NV);
 }
 
 void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {

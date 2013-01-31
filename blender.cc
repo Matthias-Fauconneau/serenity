@@ -467,16 +467,41 @@ struct BlendView : Widget {
             if(!model.materials || !model.instances) { models.removeAt(i); continue; } else i++;
 
             for(Model::Material& material : model.materials) {
-                //TODO: optimize indices for vertex cache
-                array<uint> remap; fill(remap, uint(-1), model.vertices.size()); //map original index to optimized
-                array<uint> indices (material.indices.size()); //remapped indices
+                // Remap indices
+                array<uint> remap(model.vertices.size()); remap.setSize(remap.capacity()); for(uint& index: remap) index=-1;
+                array<uint> indices (material.indices.size());
                 array<Vertex> vertices (model.vertices.size());
                 for(uint index: material.indices) {
                     uint newIndex = remap[index];
                     if(newIndex == uint(-1)) { newIndex=remap[index]=vertices.size(); vertices << model.vertices[index]; }
                     indices << newIndex;
                 }
-                log(model.instances.size(), vertices.size(), indices.size(), (float)indices.size()/vertices.size());
+
+#if 0
+                uint cache[16]; for(uint& index: cache) index=-1; uint fifo=0;
+                uint hit=0;
+                for(uint index: indices) {
+                    for(uint cached: cache) if(index==cached) {hit++; break;}
+                    cache[(fifo++)%16] = index;
+                };
+                if((float)hit/material.indices.size() < 0.617) error("TODO: optimize indices for vertex cache");
+#endif
+#if 0
+                array<uint> tristrip (indices.size());
+                uint A=indices[i+2], B=indices[i+1];
+                tristrip << indices[i] << B << A;
+                for(uint i=3; i<indices.size(); i+=3) {
+                    uint a = indices[i], b = indices[i+1], c = indices[i+2];
+                    if(a!=A || B!=b) tristrip << (vertices.size()<0x10000?0xFFFF:0xFFFFFFFF) << a << b;
+                    tristrip << c;
+                    A=c, B=b;
+                };
+                if(tristrip.size()<indices.size()) {
+                    material.indexBuffer.primitiveType = TriangleStrip;
+                    material.indexBuffer.primitiveRestart = true;
+                    indices = move(tristrip);
+                }
+#endif
 
                 // Uploads geometry
                 material.vertexBuffer.upload<Vertex>(vertices);
