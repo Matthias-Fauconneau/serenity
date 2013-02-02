@@ -104,8 +104,8 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
     for(uint i: range(targetRate)) for(uint j: range(N)) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+j-N/2-1, N);
 }
 Resampler::~Resampler() {
-    for(uint i: range(channelCount)) if(buffer[i]) unallocate(buffer[i],channelCount*bufferSize);
-    if(kernel) unallocate(kernel,N*targetRate);
+    for(uint i: range(channelCount)) if(buffer[i]) unallocate(buffer[i]);
+    if(kernel) unallocate(kernel);
 }
 
 template<bool mix> void Resampler::filter(const float* source, uint sourceSize, float* target, uint targetSize) {

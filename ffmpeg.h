@@ -12,7 +12,7 @@ struct AudioFile {
     Lock avLock;
     uint audioPTS=0;
     int16* buffer=0;
-    uint bufferSize=0;
+    uint bufferIndex=0, bufferSize=0;
 
     AudioFile(){}
     AudioFile(const ref<byte>& path){ open(path); }

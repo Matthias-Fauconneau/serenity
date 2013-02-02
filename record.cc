@@ -98,7 +98,7 @@ void Record::capture(float* audio, uint audioSize) {
         AVPacket pkt={}; av_init_packet(&pkt);
         int gotAudioPacket;
         avcodec_encode_audio2(audioCodec, &pkt, frame, &gotAudioPacket);
-        unallocate(audio16,audioSize*2);
+        unallocate(audio16);
         avcodec_free_frame(&frame);
         if (gotAudioPacket) {
             pkt.stream_index = audioStream->index;

@@ -38,14 +38,14 @@ template<class T> struct array {
     array(const T* data, uint size) : tag(-1) { buffer=__(data, size, 0); }
 
     /// If the array own the data, destroys all initialized elements and frees the buffer
-    ~array() { if(tag!=-1) { for(uint i: range(size())) data()[i].~T(); if(tag==-2) unallocate(buffer.data,buffer.capacity); } }
+    ~array() { if(tag!=-1) { for(uint i: range(size())) data()[i].~T(); if(tag==-2) unallocate(buffer.data); } }
 
     /// Allocates strictly enough memory for \a capacity elements
     void setCapacity(uint capacity) {
         assert(tag!=-1);
         assert(capacity>=size());
         if(tag==-2 && buffer.capacity) { //already on heap: reallocate
-            reallocate<T>((T*&)buffer.data,buffer.capacity,capacity);
+            reallocate<T>((T*&)buffer.data, capacity);
             buffer.capacity=capacity;
         } else if(capacity <= inline_capacity()) {
             if(tag>=0) return; //already inline

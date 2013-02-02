@@ -78,6 +78,9 @@ screen {
  }
 }
 
+impostor {
+}
+
 skymap {
  varying vec3 viewRay;
  vertex {

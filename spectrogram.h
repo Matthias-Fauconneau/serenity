@@ -1,5 +1,6 @@
 #include "widget.h"
 #include "interface.h"
+#include "process.h"
 
 /// Computes pitch in Hz from MIDI \a key
 inline float exp2(float x) { return __builtin_exp2f(x); }

@@ -16,10 +16,10 @@ Spectrogram::Spectrogram(uint N, uint rate, uint bitDepth) : ImageView(Image(F,T
     plan = fftwf_plan_r2r_1d(N, windowed, spectrum, FFTW_R2HC, FFTW_ESTIMATE);
 }
 Spectrogram::~Spectrogram() {
-    unallocate(buffer,N);
-    unallocate(hann,N);
-    unallocate(windowed,N);
-    unallocate(spectrum,N);
+    unallocate(buffer);
+    unallocate(hann);
+    unallocate(windowed);
+    unallocate(spectrum);
     fftwf_destroy_plan(plan);
 }
 
@@ -70,17 +70,10 @@ void Spectrogram::update() {
 
 void Spectrogram::render(int2 position, int2 size) {
     Locker lock(imageLock);
-    /*if(t > 0) {
-        // Shifts image down
-        for(uint y=image.height-1; y>=t; y--)
-            for(uint x: range(image.width))
-                image(x,y) = image(x,y-t);
-        t = 0;
-    }*/
 
     int2 pos = position+(size-image.size())/2;
     blit(pos, image);
 
     fill(0,T/2,F,T/2+1,red); // mark current audio output
-    for(uint x: range(1,88)) fill(x*12,0,x*12+1,T,blue); // mark current audio output
+    for(uint x: range(1,88)) fill(x*12-3,0,x*12-2,T,blue); // mark keys
 }

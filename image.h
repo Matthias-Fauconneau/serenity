@@ -23,7 +23,7 @@ struct Image {
         assert(width && height && o.size() == width*height, width, height, o.size()); assert(o.tag==-2); o.tag = 0;
     }
 
-    ~Image(){ if(data && own) { unallocate(data,height*stride); } }
+    ~Image(){ if(data && own) { unallocate(data); } }
     explicit operator bool() const { return data; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
 

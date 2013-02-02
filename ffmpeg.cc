@@ -22,15 +22,15 @@ bool AudioFile::open(const ref<byte>& path){
             audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_S16;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0 ) {
-                assert(audio->channels == channels);
                 this->rate = audio->sample_rate;
                 break;
             }
         }
     }
     assert(audio, path);
-    assert(audio->sample_fmt == AV_SAMPLE_FMT_FLT || audio->sample_fmt == AV_SAMPLE_FMT_S16);
-    assert(this->rate);
+    assert(audio->sample_rate);
+    assert(audio->channels == channels);
+    assert(audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_FLTP, (int)audio->sample_fmt);
     return true;
 }
 
@@ -45,15 +45,24 @@ uint AudioFile::read(int16* output, uint outputSize) {
                 if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
                 if(used < 0 || !gotFrame) continue;
-                buffer = (int16*)frame->data[0];
-                bufferSize = frame->nb_samples;
+                bufferIndex=0, bufferSize = frame->nb_samples;
+                if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                    buffer = (int16*)frame->data[0];
+                } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+                    if(buffer) unallocate(buffer);
+                    buffer = allocate<int16>(bufferSize*channels);
+                    for(uint i : range(bufferSize)) {
+                        buffer[2*i+0] = ((float*)frame->data[0])[i]*0x1.0p15;
+                        buffer[2*i+1] = ((float*)frame->data[1])[i]*0x1.0p15;
+                    }
+                } else error("Unknown format");
                 audioPTS = packet.dts*audioStream->time_base.num*1000/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, outputSize-readSize);
-        copy(output, buffer, size*channels);
-        bufferSize -= size; buffer += size*channels;
+        copy(output, buffer+bufferIndex, size*channels);
+        bufferSize -= size; bufferIndex += size*channels;
         readSize += size; output+= size*channels;
     }
     assert(readSize == outputSize);

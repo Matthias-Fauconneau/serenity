@@ -23,10 +23,10 @@ extern "C" void free(void* buffer);
 // Typed memory allocation (without initialization)
 template<class T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
 template<class T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
-template<class T> void reallocate(T*& buffer, int unused size, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
-template<class T> void unallocate(T*& buffer, int unused size) { assert(buffer); free((void*)buffer); buffer=0; }
+template<class T> void reallocate(T*& buffer, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
+template<class T> void unallocate(T*& buffer) { assert(buffer); free((void*)buffer); buffer=0; }
 
 /// Dynamic object allocation (using constructor and destructor)
 inline void* operator new(size_t, void* p) { return p; } //placement new
 template<class T, class... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }
-template<class T> void free(T* t) { t->~T(); unallocate(t,1); }
+template<class T> void free(T* t) { t->~T(); unallocate(t); }

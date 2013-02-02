@@ -163,7 +163,7 @@ void Sampler::open(const ref<byte>& path) {
         fftwf_plan p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
         fftwf_execute(p);
         fftwf_destroy_plan(p);
-        unallocate(filter[c],N); // Releases time domain filter
+        unallocate(filter[c]); // Releases time domain filter
         for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; //Cuts frequencies higher than nyquist
     }
 
@@ -372,14 +372,14 @@ Sampler::~Sampler() {
     stopRecord();
 #if REVERB
     for(uint c=0;c<2;c++) {
-        if(reverbFilter[c]) unallocate(reverbFilter[c],N);
-        if(reverbBuffer[c]) unallocate(reverbBuffer[c],N);
+        if(reverbFilter[c]) unallocate(reverbFilter[c]);
+        if(reverbBuffer[c]) unallocate(reverbBuffer[c]);
         fftwf_destroy_plan(forward[c]);
     }
     fftwf_destroy_plan(backward);
-    unallocate(input,N);
-    unallocate(product,N);
-    unallocate(buffer,periodSize*2);
+    unallocate(input);
+    unallocate(product);
+    unallocate(buffer);
 #endif
 }
 constexpr uint Sampler::periodSize;

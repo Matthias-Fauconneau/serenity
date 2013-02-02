@@ -8,6 +8,6 @@ struct Keyboard : Widget {
     signal<> contentChanged;
     void inputNoteEvent(uint key, uint vel);
     void midiNoteEvent(uint key, uint vel);
-    int2 sizeHint() { return int2(-1,102); }
+    int2 sizeHint() { return int2(1056,102); }
     void render(int2 position, int2 size);
 };

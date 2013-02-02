@@ -53,7 +53,7 @@ struct Delay {
     uint index=0, delay=0;
     Delay(uint delay):buffer(allocate<float>(delay)),delay(delay) { assert(delay>0 && delay<=65536); clear(buffer,delay); }
     move_operator(Delay):buffer(o.buffer),index(o.index),delay(o.delay){o.buffer=0;}
-    ~Delay() { if(buffer) unallocate(buffer,delay); }
+    ~Delay() { if(buffer) unallocate(buffer); }
     operator float() { return buffer[index]; }
     void operator()(float in) { buffer[index]=in; index=(index+1)%delay; }
     float operator[](uint offset) const { uint i=(index+offset)%delay; return buffer[i]; }
