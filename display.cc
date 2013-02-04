@@ -47,11 +47,19 @@ void blit(int2 target, const Image& source, vec4 color) {
 #endif
     int4 color8 = int4(color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
     if(source.alpha) {
-        for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-            byte4 s = source(x-target.x,y-target.y); int a=color8.a*int(s.a)/0xFF;
-            byte4& d = framebuffer(x,y);
-            byte4 t = byte4((int4(d)*(0xFF-a) + color8*int4(s)/0xFF*a)/0xFF); t.a=min(0xFF,d.a+a);
-            d = t;
+        if(color==white) {
+            for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+                byte4 s = source(x-target.x,y-target.y); int a=s.a;
+                byte4& d = framebuffer(x,y);
+                d = byte4((int4(d)*(0xFF-a) + int4(s)*a)/0xFF);
+            }
+        } else {
+            for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
+                byte4 s = source(x-target.x,y-target.y); int a=color8.a*int(s.a)/0xFF;
+                byte4& d = framebuffer(x,y);
+                byte4 t = byte4((int4(d)*(0xFF-a) + color8*int4(s)/0xFF*a)/0xFF); t.a=min(0xFF,d.a+a);
+                d = t;
+            }
         }
     } else {
         for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {

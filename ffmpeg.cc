@@ -71,6 +71,6 @@ uint AudioFile::read(int16* output, uint outputSize) {
 
 uint AudioFile::duration() { return file->duration/1000/1000; }
 
-void AudioFile::seek(uint unused position) { Locker lock(avLock); av_seek_frame(file,-1,position*1000*1000,0); }
+void AudioFile::seek(uint position) { Locker lock(avLock); av_seek_frame(file,-1,position*1000*1000,0); }
 
 void AudioFile::close() { if(frame) avcodec_free_frame(&frame); if(file) avformat_close_input(&file); }

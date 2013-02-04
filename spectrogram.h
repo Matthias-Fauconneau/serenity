@@ -18,9 +18,16 @@ struct Spectrogram : ImageView {
     struct fftwf_plan_s* plan;
 
     static constexpr uint F = 1056; // Size of the frequency plot in pixels (88x12)
-    static constexpr uint T = 1056; // Number of updates in one image (one pixel per update)
+    static constexpr uint T = 768; // Number of updates in one image (one pixel per update)
+
     uint t = 0;
     Lock imageLock;
+
+    struct Peak { uint pitch; float intensity; bool operator <(const Peak& o) const {return intensity<o.intensity;} };
+    float pitchIntensity[T][88];
+
+    /*struct Note { uint pitch; float duration, intensity; bool operator <(const Peak& o) const {return intensity*duration<o.intensity*o.duration;} };
+    array<Note> notes;*/
 
     /// Initializes a running spectrogram with \a N bins
     Spectrogram(uint N, uint rate=44100, uint bitDepth=16);

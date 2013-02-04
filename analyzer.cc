@@ -22,14 +22,14 @@ typedef AudioFile AudioStretchFile;
 struct Analyzer {
     // Audio
     AudioStretchFile file __("/root/Documents/StarCraft 2 - Theme Song.m4a"_);
-    Spectrogram spectrogram __(16384, file.rate, 16);
+    Spectrogram spectrogram __(32768, file.rate, 16);
 
     static constexpr uint periodSize = 1024;
     static constexpr uint N = Spectrogram::T*periodSize;
 
-    //Thread thread __(-20); // Audio thread
-    AudioOutput output __({this, &Analyzer::read}, file.rate, periodSize /*, thread*/);
-    Sequencer input __(/*thread*/);
+    Thread thread __(-20); // Audio thread
+    AudioOutput output __({this, &Analyzer::read}, file.rate, periodSize, thread);
+    Sequencer input __(thread);
     Sampler sampler;
 
     int16* buffer = allocate<int16>(N*2);
@@ -65,7 +65,7 @@ struct Analyzer {
         keyboard.contentChanged.connect(&window,&Window::render);
 
         output.start();
-        //thread.spawn();
+        thread.spawn();
     }
     ~Analyzer() { unallocate(buffer); }
 
@@ -103,7 +103,7 @@ struct Analyzer {
         spectrogram.write(buffer+(writeIndex%N)*2, read); // Displays spectrogram without delay
         writeIndex += size;
 
-        while(writeIndex<readIndex+N/2) { // Transforms faster to fill up spectrogram
+        while(writeIndex<readIndex+3*N/4) { // Transforms faster to fill up spectrogram
             uint read = file.read(buffer+(writeIndex%N)*2, size);
             spectrogram.write(buffer+(writeIndex%N)*2, read); // Displays spectrogram without delay
             writeIndex += size;
