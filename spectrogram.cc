@@ -11,15 +11,17 @@ Spectrogram::Spectrogram(uint N, uint rate, uint bitDepth) : ImageView(Image(F,T
     buffer = allocate64<float>(N); clear(buffer,N);
     hann = allocate64<float>(N); for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2;
     windowed = allocate64<float>(N);
-    spectrum = allocate64<float>(N);
+    transform = allocate64<float>(N);
+    spectrum = allocate64<float>(N/2);
     fftwf_init_threads();
     fftwf_plan_with_nthreads(4);
-    plan = fftwf_plan_r2r_1d(N, windowed, spectrum, FFTW_R2HC, FFTW_ESTIMATE);
+    plan = fftwf_plan_r2r_1d(N, windowed, transform, FFTW_R2HC, FFTW_ESTIMATE);
 }
 Spectrogram::~Spectrogram() {
     unallocate(buffer);
     unallocate(hann);
     unallocate(windowed);
+    unallocate(transform);
     unallocate(spectrum);
     fftwf_destroy_plan(plan);
 }
@@ -51,7 +53,84 @@ void Spectrogram::update() {
 
     for(uint i: range(N)) windowed[i] = hann[i]*buffer[i]; // Multiplies window
     fftwf_execute(plan); // Transforms
-    for(int i: range(N)) spectrum[i] /= N; // Normalizes
+    float totalEnergy=0;
+    for(int i: range(N/2)) { // Converts to "power" spectrum
+        float energy = sqrt(sqr(transform[i]) + sqr(transform[N-1-i]));
+        spectrum[i] = energy;
+        totalEnergy += energy;
+    }
+    totalEnergy /= N/2;
+    for(int i: range(N/2)) { // Normalizes spectrum
+        spectrum[i] /= totalEnergy;
+    }
+
+    // Model parameters
+    const uint P = 10; // Number of maximum peaks to select
+    const uint Z = 5; // Number of harmonic hypothesis for each peak
+    const uint Mmax = 12; // Number of partials to search
+    const float dF = exp2(1./24); // Search harmonics within a quartertone distance from ideal
+
+    //FIXME: smooth spectrum before picking peaks
+
+    // Spectral peak-picking (local maximum)
+    struct Peak { //FIXME: use SoA layout
+        uint frequency;
+        float energy;
+        bool operator<(const Peak& o) const {return energy<o.energy;}
+    };
+    array<Peak> peaks;
+    for(uint i: range(1,N/2-1)) {
+        if(spectrum[i-1] < spectrum[i] && spectrum[i] > spectrum[i+1]) {
+            peaks.insertSorted( Peak __(i, spectrum[i]) );
+        }
+    }
+
+    // Grouping peaks in combs
+    struct Comb : array<Peak> {
+        float energy() const { float energy = 0; for(const Peak& peak: *this) energy += peak.energy; return energy; }
+    };
+    array<Comb> combs;
+    for(const Peak& peak: peaks.slice(max(0,int(peaks.size()-P)))) {
+        const float fi = peak.frequency; //TODO: refine using phase-vocoder
+        for(uint z=0; z<Z; z++) { // Harmonic rank hypothesis
+            const float f0 = fi/z;
+            Comb comb;
+            for(uint m=0; m<Mmax; m++) { // Look for expected harmonics
+                const float fm = m*f0;
+                uint frequency = -1; float energy=0;
+                for(const Peak& peak: peaks) {
+                    if(fm/dF <= peak.frequency && peak.frequency <= fm*dF) { // Search strictly within one quatertone
+                        if(peak.energy> energy) frequency = peak.frequency, energy = peak.energy;
+                    }
+                }
+                if(frequency == uint(-1)) continue;
+                comb << Peak __(frequency, energy);
+            }
+            combs << move(comb);
+        }
+    }
+
+    // Selecting comb patterns
+
+    // 1) Minimum support
+    for(uint i=0; i<combs.size(); i++) { const Comb& comb=combs[i];
+        if(comb.size()<Mmax/2) combs.removeAt(i); //at least 6 partials
+        else i++;
+    }
+
+    // 2) Minimum energy
+    for(uint i=0; i<combs.size(); i++) { const Comb& comb=combs[i];
+        if(comb.energy()<10) combs.removeAt(i); //at least 10dB (relative to total energy)
+        else i++;
+    }
+
+    // 3) Competitive energy
+    float Hmax = 0;
+    for(const Comb& comb: combs) Hmax = max(Hmax, comb.energy());
+    for(uint i=0; i<combs.size(); i++) { const Comb& comb=combs[i];
+        if(comb.energy()<0.1*Hmax) combs.removeAt(i); //at least 10% (relative to maximum hypothesis)
+        else i++;
+    }
 
     // Updates spectrogram
     for(uint p: range(88)) {
@@ -62,38 +141,13 @@ void Spectrogram::update() {
             assert(n1>n0);
             float sum=0;
             for(uint n=n0; n<n1; n++) { //FIXME: weight n0 and n1 with overlap
-                float a = sqrt(sqr(spectrum[n]) + sqr(spectrum[N-1-n])); // squared amplitude
+                float a = spectrum[n]; // squared amplitude
                 sum += a;
             }
             sum /= n1-n0;
-            int v = sRGB[clip(0,int(255*((log2(sum)-(bitDepth-8))/8)),255)]; // Logarithmic scale on [-8bit 0]
-            image(f,0) = byte4(0xFF-v);
-        }
-        uint n = round(pitch(21+p)/rate*N); //TODO: bilinear interpolation
-        float intensity = sqrt(sqr(spectrum[n]) + sqr(spectrum[N-1-n]));
-        pitchIntensity[t%T][p] = intensity;
-    }
-
-    // Find peaks (with temporal smoothing)
-    const uint dT = 32;
-    array<Peak> peaks;
-    for(uint p: range(88)) {
-        float intensity = 0;
-        for(int dt: range(0,dT)) { //temporal smoothing
-            intensity += pitchIntensity[(t+T-dt)%T][p];
-        }
-        intensity /= dT;
-
-        if(intensity>0x100) {
-            peaks.insertSorted( Peak __(p, intensity) );
-            if(peaks.size()>6) peaks.take(0);
-        }
-    }
-    t++;
-
-    for(const Peak& peak : peaks) {
-        for(uint f: range(peak.pitch*12,peak.pitch*12+12)) {
-            for(uint t: range(dT)) image(f,t).r = 0;
+            int v = sRGB[clip(0,int(sum),255)];
+            image(f,0) = byte4(v);
+            //for(const Peak& peak: peaks) if(peak.frequency >= n0 && peak.frequency < n1) image(f,0).r = 0;
         }
     }
 }

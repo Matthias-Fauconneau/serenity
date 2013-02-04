@@ -14,7 +14,8 @@ struct Spectrogram : ImageView {
     float* buffer; // Buffer of the last N samples (for overlap save)
     float* hann; // Window to apply to buffer at each update
     float* windowed; // Windowed buffer
-    float* spectrum; // Fourier transform of the windowed buffer
+    float* transform; // Fourier transform of the windowed buffer
+    float* spectrum; // Magnitude of the complex Fourier coefficients
     struct fftwf_plan_s* plan;
 
     static constexpr uint F = 1056; // Size of the frequency plot in pixels (88x12)
@@ -22,12 +23,6 @@ struct Spectrogram : ImageView {
 
     uint t = 0;
     Lock imageLock;
-
-    struct Peak { uint pitch; float intensity; bool operator <(const Peak& o) const {return intensity<o.intensity;} };
-    float pitchIntensity[T][88];
-
-    /*struct Note { uint pitch; float duration, intensity; bool operator <(const Peak& o) const {return intensity*duration<o.intensity*o.duration;} };
-    array<Note> notes;*/
 
     /// Initializes a running spectrogram with \a N bins
     Spectrogram(uint N, uint rate=44100, uint bitDepth=16);
