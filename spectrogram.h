@@ -4,7 +4,9 @@
 
 /// Computes pitch in Hz from MIDI \a key
 inline float exp2(float x) { return __builtin_exp2f(x); }
-inline float pitch(float key) { return 440*exp2((key-69)/12.0); }
+inline float log2(float x) { return __builtin_log2f(x); }
+inline float pitch(float key) { return 440*exp2((key-69)/12); }
+inline float key(float pitch) { return 69+log2(pitch/440)*12; }
 
 struct Spectrogram : ImageView {
     uint N; // Discrete fourier transform size
@@ -15,7 +17,8 @@ struct Spectrogram : ImageView {
     float* hann; // Window to apply to buffer at each update
     float* windowed; // Windowed buffer
     float* transform; // Fourier transform of the windowed buffer
-    float* spectrum; // Magnitude of the complex Fourier coefficients
+    float* rawSpectrum; // Magnitude of the complex Fourier coefficients
+    float* spectrum; // Magnitude of the complex Fourier coefficients (smoothed)
     struct fftwf_plan_s* plan;
 
     static constexpr uint F = 1056; // Size of the frequency plot in pixels (88x12)
@@ -23,6 +26,8 @@ struct Spectrogram : ImageView {
 
     uint t = 0;
     Lock imageLock;
+
+    array<uint> notes[T];
 
     /// Initializes a running spectrogram with \a N bins
     Spectrogram(uint N, uint rate=44100, uint bitDepth=16);

@@ -1,6 +1,5 @@
 #include "process.h"
 #include "ffmpeg.h"
-#include "stretch.h"
 #include "asound.h"
 #include "sequencer.h"
 #include "sampler.h"
@@ -10,6 +9,7 @@
 #include "window.h"
 
 #if STRETCH
+#include "stretch.h"
 struct AudioStretchFile : AudioFile, AudioStretch {
     AudioStretchFile(const ref<byte>& path):AudioFile(path),AudioStretch(rate){}
     uint need(int16 *data, uint size) override { return AudioFile::read(data,size); }
@@ -29,8 +29,10 @@ struct Analyzer {
 
     Thread thread __(-20); // Audio thread
     AudioOutput output __({this, &Analyzer::read}, file.rate, periodSize, thread);
+#if SAMPLER
     Sequencer input __(thread);
     Sampler sampler;
+#endif
 
     int16* buffer = allocate<int16>(N*2);
     uint readIndex=0;
@@ -58,10 +60,11 @@ struct Analyzer {
         toolbar << &elapsed << &slider << &remaining;
         layout << &toolbar << &spectrogram << &keyboard;
 
+#if SAMPLER
         sampler.open("/Samples/Boesendorfer.sfz"_);
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
-
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+#endif
         keyboard.contentChanged.connect(&window,&Window::render);
 
         output.start();
@@ -112,7 +115,11 @@ struct Analyzer {
         window.render();
 
         // Audio output
+#if SAMPLER
         sampler.read(output, size);
+#else
+         for(uint i: range(size*2)) output[i] = 0;
+#endif
         for(uint i: range(size*2)) output[i] += buffer[(readIndex%N)*2+i]<<(16-3); //Mix delayed file with sampler output
         readIndex += size;
 
