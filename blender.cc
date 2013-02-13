@@ -84,7 +84,6 @@ struct BlendView : Widget {
     GLFrameBuffer framebuffer;
     GLShader present = GLShader(blender,"screen present"_);
     GLShader shadow = GLShader(blender,"transform"_);
-    GLShader impostor = GLShader(blender,"screen impostor"_);
 
     // File
     Folder folder;
@@ -125,11 +124,14 @@ struct BlendView : Widget {
         };
         array<Material> materials;
 
-        struct Instance {
-            mat4 transform;
-            GLFrameBuffer impostor;
+        struct Instance { // FIXME: use quaternion + position + scale = 8 floats instead of 16 ?
+            mat4 modelViewTransform;
+            mat4 normalMatrix;
+            mat4 shadowTransform;
         };
-        array<Instance> instances;
+        static const uint instanceMin = -1; // Minimum number of instances before using instanced rendering (-1 = disable)
+        array<mat4> instances;
+        //GLUniformBuffer instanceBuffer;
 
         // Rendering order (cheap to expensive, front to back)
         bool operator <(const Model& o) const { return instances.size()<o.instances.size(); }
@@ -393,7 +395,7 @@ struct BlendView : Widget {
 
             bool render = scene->lay&object.lay; // Visible layers
             for(const ParticleSystem& particle: object.particlesystem) if(!(particle.part->draw&ParticleSettings::PART_DRAW_EMITTER)) render=false;
-            if(render) model.instances << Model::Instance __( transform ); // Appends an instance
+            if(render) model.instances << transform; // Appends an instance
             modelIndex.insert(&object, models.size()); // Keep track of Object <-> Model mapping (e.g to instanciate particles)
             models << move(model);
         }
@@ -408,7 +410,7 @@ struct BlendView : Widget {
 
                 // Selects N random faces
                 Random random;
-                for(int n=0; n</*particle.totpart/200*//*256*/16;) {
+                for(int n=0; n</*particle.totpart/200*/256;) {
                     assert(model.materials.size()==1);
                     const array<uint>& indices = model.materials[0].indices;
                     uint index = random % (indices.size()/3) * 3;
@@ -454,7 +456,7 @@ struct BlendView : Widget {
                     assert(object);
 
                     Model& dupli = models.at(modelIndex.at(object));
-                    dupli.instances << Model::Instance __( transform*dupli.transform );
+                    dupli.instances << transform*dupli.transform;
                     n++;
                 }
             }
@@ -564,8 +566,8 @@ struct BlendView : Widget {
             for(Model& model: models) {
                 for(const Model::Material& material: model.materials) {
                     material.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
-                    for(const Model::Instance& instance: model.instances) {
-                        shadow["modelViewTransform"] = sun*instance.transform;
+                    for(const mat4& instance: model.instances) {
+                        shadow["modelViewTransform"] = sun*instance;
                         material.indexBuffer.draw();
                     }
                 }
@@ -618,22 +620,12 @@ struct BlendView : Widget {
                 if(shader.sampler2D) material.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Vertex,texCoord));
 
                 profile( GLTimerQuery timerQuery; timerQuery.start(); )
-                for(Model::Instance& instance : model.instances) {
-                    if(!instance.impostor) {
-                        instance.impostor = GLFrameBuffer(GLTexture(width/2,height/2));
-                        instance.impostor.bind(ClearDepth);
-                        //TODO: project bounding box
-                        shader["modelViewTransform"] = view*instance.transform;
-                        shader["normalMatrix"] = instance.transform.normalMatrix();
-                        shader["shadowTransform"] = sun*instance.transform;
-                        if(shader["modelTransform"]) shader["modelTransform"] = instance.transform;
-                        material.indexBuffer.draw();
-                    }
-                }
-                framebuffer.bind();
-                for(Model::Instance& instance : model.instances) {
-                    //TODO: project bounding box
-                    glDrawRectangle(impostor, vec2(0,0), vec2(1,1), true);
+                for(const mat4& instance : model.instances) {
+                    shader["modelViewTransform"] = view*instance;
+                    shader["normalMatrix"] = instance.normalMatrix();
+                    shader["shadowTransform"] = sun*instance;
+                    if(shader["modelTransform"]) shader["modelTransform"] = instance;
+                    material.indexBuffer.draw();
                 }
                 profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
             }

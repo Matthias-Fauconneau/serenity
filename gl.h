@@ -120,7 +120,7 @@ struct GLFrameBuffer {
         id(o.id),depthBuffer(o.depthBuffer),colorBuffer(o.colorBuffer),width(o.width),height(o.height),depthTexture(move(o.depthTexture))
     {o.id=o.depthBuffer=o.colorBuffer=0;}
     GLFrameBuffer(){}
-    GLFrameBuffer(GLTexture&& texture,  int sampleCount=0);
+    GLFrameBuffer(GLTexture&& depth);
     GLFrameBuffer(uint width, uint height, uint format=sRGB8, int sampleCount=0);
     ~GLFrameBuffer();
 
@@ -132,7 +132,7 @@ struct GLFrameBuffer {
 
     uint id=0, depthBuffer=0, colorBuffer=0;
     uint width=0, height=0;
-    GLTexture depthTexture, colorTexture;
+    GLTexture depthTexture;
 };
 
 #define ARB_timer_query 1

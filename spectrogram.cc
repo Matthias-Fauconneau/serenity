@@ -97,6 +97,17 @@ void Spectrogram::update() {
         rawSpectrum[i] /= totalEnergy;
     }
 
+#if SMOOTH
+    constexpr int S = 1;
+    for(uint i: range(S,N/2-S)) { // Smooth spectrum with a box filter
+        float sum=0; for(int di=-S; di<=S; di++) sum += rawSpectrum[i+di];
+        spectrum[i] = sum/(S+1+S);
+    }
+#else
+    #define spectrum rawSpectrum
+#endif
+
+#if AUTO
     // Model parameters
 #if 1
     const uint P = 10; // Number of maximum peaks to select
@@ -108,16 +119,6 @@ void Spectrogram::update() {
     const uint M = 8;//12; // Number of partials to search
 #endif
     const float dF = exp2(1./24); // Search harmonics within a quartertone distance from ideal
-
-#if SMOOTH
-    constexpr int S = 1;
-    for(uint i: range(S,N/2-S)) { // Smooth spectrum with a box filter
-        float sum=0; for(int di=-S; di<=S; di++) sum += rawSpectrum[i+di];
-        spectrum[i] = sum/(S+1+S);
-    }
-#else
-    #define spectrum rawSpectrum
-#endif
 
     // Spectral peak-picking (local maximum)
     array<Peak> peaks;
@@ -176,7 +177,7 @@ void Spectrogram::update() {
     }
     stats[2]=combs.size();
 
-    // 3) Detection of sub-harmonics
+    /*// 3) Detection of sub-harmonics
     for(uint i=0; i<combs.size();) { const Comb& low=combs[i];
         for(uint j=0; j<combs.size(); j++) { const Comb& high=combs[j];
             if(abs(high.f0/low.f0-2)<0.001) { // octave-related pair (high partials are all even partials of low)
@@ -194,7 +195,7 @@ void Spectrogram::update() {
         i++; continue;
         remove: combs.removeAt(i);
     }
-    stats[3]=combs.size();
+    stats[3]=combs.size();*/
 
     // 4) Detection of overtones
     for(uint i=0; i<combs.size(); i++) { const Comb& low=combs[i];
@@ -210,7 +211,7 @@ void Spectrogram::update() {
     }
     stats[4]=combs.size();
 
-    // 5) Harmonic overlapping
+    /*// 5) Harmonic overlapping
     for(uint i=0; i<combs.size();) { const Comb& X=combs[i];
         float original = 0; // Energy of peaks weighted down when found in other hypotheses
         for(const Peak& x : X) {
@@ -221,7 +222,7 @@ void Spectrogram::update() {
         if(original < X.energy() / 2) { combs.removeAt(i); continue; }
         i++;
     }
-    stats[5]=combs.size();
+    stats[5]=combs.size();*/
 
     // 6) Competitive energy
     float Hmax = 0;
@@ -251,6 +252,17 @@ void Spectrogram::update() {
         notes[0] << key;
     }
 
+    // Removes too short notes
+    const int dT = 16;
+    for(uint t: range(dT)) {
+        array<uint>& notes = this->notes[1+t];
+        for(uint i=0; i<notes.size(); ) {
+            if(!this->notes[0].contains(notes[i])) { notes.removeAt(i); continue; }
+            i++;
+        }
+    }
+#endif
+
     // Updates spectrogram
     for(uint p: range(88)) {
         for(uint f: range(p*12,p*12+12)) {
@@ -266,6 +278,7 @@ void Spectrogram::update() {
             sum /= n1-n0;
             int v = sRGB[clip(0,int(sum),255)];
             image(f,0) = byte4(v);
+#if AUTO
             /*for(uint i=0; i<combs.size(); i++) { const Comb& comb=combs[i];
                 for(const Peak& peak: comb)
                     if(peak.frequency >= n0 && peak.frequency < n1)
@@ -274,10 +287,12 @@ void Spectrogram::update() {
                     image(f,0) = hsv(float(i)/combs.size(),1,1);
                 }
             }*/
-            for(uint i=0; i<notes[0].size(); i++) {
+            for(uint i=0; i<notes[dT].size(); i++) {
                 //if(21+p == notes[0][i]) image(f,0) = hsv(float(i)/combs.size(),1,1);
-                if(21+p == notes[0][i]) image(f,0) = byte4((1*int4(image(f,0))+1*int4(hsv(float(i)/combs.size(),1,1)))/2);
+                if(21+p == notes[0][i]) image(f,0) = byte4((3*int4(image(f,0))+1*int4(hsv(float(i)/combs.size(),1,1)))/4);
+                if(21+p == notes[dT][i]) image(f,dT) = byte4((1*int4(image(f,dT))+1*int4(255,0,0,255))/2);
             }
+#endif
         }
     }
 }

@@ -296,25 +296,11 @@ void GLTexture::bind(uint sampler) const { assert(id); glActiveTexture(GL_TEXTUR
 
 /// Framebuffer
 
-GLFrameBuffer::GLFrameBuffer(GLTexture&& texture, int sampleCount):width(texture.width),height(texture.height) {
-    assert(sampleCount==0); //TODO: multisample textures
+GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.height),depthTexture(move(depth)) {
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
-    if(texture.format == Depth24) {
-        depthTexture = move(texture);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
-        if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
-    } else {
-        glGenRenderbuffers(1, &depthBuffer);
-        glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-        glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_DEPTH_COMPONENT24, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
-
-        colorTexture = move(texture);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture.id, 0);
-    }
-
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("");
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
 }
 GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
     if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
