@@ -23,7 +23,7 @@ struct SSLSocket : TCPSocket {
 
 /// Implements Data::available using Stream::readUpTo
 template<class T/*: Stream*/> struct DataStream : T, virtual Data {
-    template<class... Args> DataStream(Args... args):T(args ___){} //workaround lack of constructor inheritance support
+    template<Type... Args> DataStream(Args... args):T(args ___){} //workaround lack of constructor inheritance support
     /// Feeds Data buffer using T::readUpTo
     uint available(uint need) override;
 };

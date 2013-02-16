@@ -3,27 +3,27 @@
 // Attributes
 #define unused __attribute((unused))
 #define _packed __attribute((packed))
-
+#define Type typename
 // Move
 template<typename T> struct remove_reference { typedef T type; };
 template<typename T> struct remove_reference<T&> { typedef T type; };
 template<typename T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
-template<class T> __attribute((always_inline)) constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
-template<class T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+template<typename T> __attribute((always_inline)) constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
+template<typename T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 #define move_operator_(T)                        T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
 #define move_operator(T)       no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
 #define default_move(T) T(){} no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&&)____(=default)
 /// base template for explicit copy (overriden by explicitly copyable types)
-template<class T> T copy(const T& o) { return o; }
+template<typename T> T copy(const T& o) { return o; }
 
 // Forward
 template<typename> struct is_lvalue_reference { static constexpr bool value = false; };
 template<typename T> struct is_lvalue_reference<T&> { static constexpr bool value = true; };
 #define is_lvalue_reference(T) is_lvalue_reference<T>::value
-template<class T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
-template<class T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
+template<typename T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
+template<typename T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
 
 // Predicate
 extern void* enabler;
@@ -53,15 +53,15 @@ typedef unsigned int size_t;
 
 // Works around missing support for some C++11 features in QtCreator code model
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
-template<class T> struct ref; //templated typedef using
+template<typename T> struct ref; //templated typedef using
 #define _ //string literal operator _""
 #define __( args... ) //member initialization constructor {}
 #define ___ //variadic template arguments unpack operator ...
 #define ____( ignore... ) //=default, constructor{} initializer
 #else
-namespace std { template<class T> struct initializer_list; }
+namespace std { template<typename T> struct initializer_list; }
 /// \a Unmanaged const memory reference
-template<class T> using ref = std::initializer_list<T>;
+template<typename T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, size_t size);
 #define __( args... ) { args }
@@ -80,10 +80,10 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size);
 #endif
 // Forward declarations to allow string literal messages without header dependencies on string.h/array.h/memory.h
 /// Logs to standard output
-template<class ___ Args> void log(const Args& ___ args);
+template<typename ___ Args> void log(const Args& ___ args);
 template<> void log(const ref<byte>& message);
 /// Logs to standard output and aborts immediatly this thread
-template<class ___ Args> void error(const Args& ___ args)  __attribute((noreturn));
+template<typename ___ Args> void error(const Args& ___ args)  __attribute((noreturn));
 template<> void error(const ref<byte>& message) __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) ({debug( if(!(expr)) error(#expr ""_, ##message);)})
@@ -100,7 +100,7 @@ struct range {
 
 // initializer_list
 namespace std {
-template<class T> struct initializer_list {
+template<typename T> struct initializer_list {
     const T* data;
     uint size;
     constexpr initializer_list() : data(0), size(0) {}
@@ -137,13 +137,13 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return
 #endif
 
 // Basic operations
-template<class T> constexpr T min(T a, T b) { return a<b ? a : b; }
-template<class T> constexpr T max(T a, T b) { return a>b ? a : b; }
-template<class T> constexpr T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
-template<class T> constexpr T abs(T x) { return x>=0 ? x : -x; }
-template<class T> constexpr T sign(T x) { return x>=0 ? 1 : -1; }
-template<class A, class B> bool operator !=(const A& a, const B& b) { return !(a==b); }
-template<class A, class B> bool operator >(const A& a, const B& b) { return b<a; }
+template<typename T> constexpr T min(T a, T b) { return a<b ? a : b; }
+template<typename T> constexpr T max(T a, T b) { return a>b ? a : b; }
+template<typename T> constexpr T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
+template<typename T> constexpr T abs(T x) { return x>=0 ? x : -x; }
+template<typename T> constexpr T sign(T x) { return x>=0 ? 1 : -1; }
+template<typename A, typename B> bool operator !=(const A& a, const B& b) { return !(a==b); }
+template<typename A, typename B> bool operator >(const A& a, const B& b) { return b<a; }
 
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }

@@ -56,7 +56,7 @@ struct GLVertexBuffer {
     void* mapVertexBuffer();
     void unmapVertexBuffer();
     void upload(const ref<byte>& vertices);
-    template<class T> void upload(const ref<T>& vertices) { vertexSize=sizeof(T); upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
+    template<Type T> void upload(const ref<T>& vertices) { vertexSize=sizeof(T); upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
     void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0/*, bool instance = false*/) const;
     void draw(PrimitiveType primitiveType) const;
 

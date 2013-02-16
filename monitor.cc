@@ -5,7 +5,7 @@
 #include "window.h"
 
 /// Convenient partial template specialization to automatically copy ref<byte> keys
-template<class V> struct map<ref<byte>,V> : map<string,V> {
+template<Type V> struct map<ref<byte>,V> : map<string,V> {
     V& operator [](ref<byte> key) { return map<string,V>::operator[](string(key)); }
 };
 

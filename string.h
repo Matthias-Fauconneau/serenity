@@ -3,7 +3,7 @@
 #include "array.h"
 
 // Enforces exact match for overload resolution
-template<class T> string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return string(); }
+template<Type T> string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return string(); }
 
 /// Lexically compare strings
 bool operator <(const ref<byte>& a, const ref<byte>& b);
@@ -72,44 +72,44 @@ inline string str(const long& n) { return dec(n); }
 inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 inline string str(const uint64& n) { return hex(n); }
 inline string str(const int64& n) { return hex(n); }
-template<class T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
+template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 /*inline string str(void* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
-template<class T> inline string str(T* const& p) { return str(*p); }*/
+template<Type T> inline string str(T* const& p) { return str(*p); }*/
 
 /// Converts floating-point numbers
 string ftoa(float number, int precision=3, int exponent=0);
 inline string str(const float& n) { return ftoa(n); }
 
 /// Converts arrays
-template<class T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<class T> string str(const array<T>& a, char separator=' ') { return str(ref<T>(a),separator); }
-template<class T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<class T> string dec(const array<T>& a, char separator=' ') { return dec(ref<T>(a),separator); }
-template<class T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<class T> string hex(const array<T>& a, char separator=' ') { return hex(ref<T>(a),separator); }
+template<Type T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<Type T> string str(const array<T>& a, char separator=' ') { return str(ref<T>(a),separator); }
+template<Type T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<Type T> string dec(const array<T>& a, char separator=' ') { return dec(ref<T>(a),separator); }
+template<Type T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<hex(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<Type T> string hex(const array<T>& a, char separator=' ') { return hex(ref<T>(a),separator); }
 
 /// Converts static arrays
-template<class T, size_t N> string str(const T (&a)[N]) { return str(ref<T>(a,N)); }
+template<Type T, size_t N> string str(const T (&a)[N]) { return str(ref<T>(a,N)); }
 
 /// Expression template to manage recursive concatenation operations
-template<class A, class B> struct cat {
+template<Type A, Type B> struct cat {
     const A& a;
     const B& b;
     uint size() const { return a.size() + b.size(); }
     void copy(byte*& data) const { a.copy(data); b.copy(data); }
     operator array<byte>()  const{ array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
 };
-template<class Aa, class Ab, class Ba, class Bb> cat< cat<Aa, Ab>, cat<Ba, Bb> >
+template<Type Aa, Type Ab, Type Ba, Type Bb> cat< cat<Aa, Ab>, cat<Ba, Bb> >
 operator +(const cat<Aa, Ab>& a, const cat<Ba, Bb>& b) { return __(a,b); }
 /// Specialization to append a string
-template<class A> struct cat<A, ref<byte> > {
+template<Type A> struct cat<A, ref<byte> > {
     const A& a;
     const ref<byte>& b;
     uint size() const { return a.size() + b.size; }
     void copy(byte*& data) const { a.copy(data); ::copy(data,b.data,b.size); data+=b.size; }
     operator array<byte>()  const{ array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
 };
-template<class Aa, class Ab> cat< cat<Aa, Ab>, ref<byte> > operator +(const cat<Aa, Ab>& a, const ref<byte>& b) { return __(a,b); }
+template<Type Aa, Type Ab> cat< cat<Aa, Ab>, ref<byte> > operator +(const cat<Aa, Ab>& a, const ref<byte>& b) { return __(a,b); }
 /// Specialization to concatenate two strings
 template<> struct cat< ref<byte>, ref<byte> > {
     const ref<byte>& a;
@@ -121,14 +121,14 @@ template<> struct cat< ref<byte>, ref<byte> > {
 inline cat< ref<byte>, ref<byte> > operator +(const ref<byte>& a, const ref<byte>& b) { return __(a,b); }
 
 /// Forwards concatenation
-template<class A, class B> const cat<A,B>& str(const cat<A,B>& s) { return s; }
+template<Type A, Type B> const cat<A,B>& str(const cat<A,B>& s) { return s; }
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
-template<class A, class ___ Args> string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }
+template<Type A, Type ___ Args> string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }
 
 /// Logs to standard output using str(...) serialization
-template<class... Args> void log(const Args&... args) { log((ref<byte>)string(str(args ___))); }
+template<Type... Args> void log(const Args&... args) { log((ref<byte>)string(str(args ___))); }
 /// Logs to standard output using str(...) serialization
 template<> inline void log(const string& s) { log((ref<byte>)s); }
 /// Logs to standard output using str(...) serialization and terminate all threads
-template<class... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args ___))); }
+template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args ___))); }

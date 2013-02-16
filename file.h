@@ -43,9 +43,9 @@ struct Stream : Handle {
     /// Reads up to \a size bytes
     array<byte> readUpTo(uint size);
     /// Reads a raw value
-    template<class T> T read() { T t; read((byte*)&t,sizeof(T)); return t; }
+    template<Type T> T read() { T t; read((byte*)&t,sizeof(T)); return t; }
     /// Reads \a size raw values
-    template<class T> array<T> read(uint size) {
+    template<Type T> array<T> read(uint size) {
         array<T> buffer(size); buffer.setSize(size); uint byteSize=size*sizeof(T);
         for(uint i=0;i<byteSize;) i+=readUpTo((byte*)buffer.data()+i, byteSize-i);
         return buffer;
@@ -87,22 +87,22 @@ array<byte> readFile(const ref<byte>& file, const Folder& at=root());
 void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at=root());
 
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
-template<uint major, uint minor, class T> struct IOW { typedef T Type; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
-template<uint major, uint minor, class T> struct IOR { typedef T Type; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
-template<uint major, uint minor, class T> struct IOWR { typedef T Type; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, Type T> struct IOW { typedef T Args; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, Type T> struct IOR { typedef T Args; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 /// Handle to a device
 struct Device : File {
     Device(const ref<byte>& file, int flags=ReadWrite):File(file,root(),flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);
     /// Sends ioctl request with neither input/outputs arguments
-    template<class IO> int io() { return ioctl(IO::io, 0); }
+    template<Type IO> int io() { return ioctl(IO::io, 0); }
     /// Sends ioctl request with \a input arguments
-    template<class IOW> int iow(const typename IOW::Type& input) { return ioctl(IOW::iow, &input); }
+    template<Type IOW> int iow(const typename IOW::Args& input) { return ioctl(IOW::iow, &input); }
     /// Sends ioctl request with output arguments
-    template<class IOR> typename IOR::Type ior() { typename IOR::Type output; ioctl(IOR::ior, &output); return output; }
+    template<Type IOR> typename IOR::Args ior() { typename IOR::Args output; ioctl(IOR::ior, &output); return output; }
     /// Sends ioctl request with \a reference argument
-    template<class IOWR> int iowr(typename IOWR::Type& reference) { return ioctl(IOWR::iowr, &reference); }
+    template<Type IOWR> int iowr(typename IOWR::Args& reference) { return ioctl(IOWR::iowr, &reference); }
 };
 
 /// Managed memory mapping

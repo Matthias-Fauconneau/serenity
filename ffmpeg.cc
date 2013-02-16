@@ -69,6 +69,41 @@ uint AudioFile::read(int16* output, uint outputSize) {
     return readSize;
 }
 
+uint AudioFile::read(float* output, uint outputSize) {
+    uint readSize = 0;
+    while(readSize<outputSize) {
+        if(!bufferSize) {
+            Locker lock(avLock);
+            AVPacket packet;
+            if(av_read_frame(file, &packet) < 0) return readSize;
+            if(file->streams[packet.stream_index]==audioStream) {
+                if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
+                int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
+                if(used < 0 || !gotFrame) continue;
+                bufferIndex=0, bufferSize = frame->nb_samples;
+                if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                    buffer = (int16*)frame->data[0];
+                } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+                    if(buffer) unallocate(buffer);
+                    buffer = allocate<int16>(bufferSize*channels);
+                    for(uint i : range(bufferSize)) {
+                        buffer[2*i+0] = ((float*)frame->data[0])[i]*0x1.0p15;
+                        buffer[2*i+1] = ((float*)frame->data[1])[i]*0x1.0p15;
+                    }
+                } else error("Unknown format");
+                audioPTS = packet.dts*audioStream->time_base.num*1000/audioStream->time_base.den;
+            }
+            av_free_packet(&packet);
+        }
+        uint size = min(bufferSize, outputSize-readSize);
+        copy(output, buffer+bufferIndex, size*channels);
+        bufferSize -= size; bufferIndex += size*channels;
+        readSize += size; output+= size*channels;
+    }
+    assert(readSize == outputSize);
+    return readSize;
+}
+
 uint AudioFile::duration() { return file->duration/1000/1000; }
 
 void AudioFile::seek(uint position) { Locker lock(avLock); av_seek_frame(file,-1,position*1000*1000,0); }

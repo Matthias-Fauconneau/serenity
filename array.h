@@ -6,7 +6,7 @@
 /// Dynamic collections of elements (const or mutable, owned or reference, inline or on heap).
 /// \note Uses move semantics to avoid reference counting when managing an heap buffer
 /// \note Stores small arrays inline (<=31bytes) (TODO: profile)
-template<class T> struct array {
+template<Type T> struct array {
     int8 tag = 0; //0: empty, >0: inline, -1 = reference, -2 = heap buffer
     struct{const T* data; uint size; uint capacity;} buffer = {0,0,0};
     int pad[2]; //Pads to fill half a cache line (tag:1+7+data:8+size:4+capacity:4+2*4 = 31 bytes inline capacity)
@@ -160,10 +160,10 @@ template<class T> struct array {
 };
 
 /// Copies all elements in a new array
-template<class T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; return copy; }
+template<Type T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; return copy; }
 
 /// Replaces in \a array every occurence of \a before with \a after
-template<class T> array<T> replace(array<T>&& a, const T& before, const T& after) {
+template<Type T> array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 

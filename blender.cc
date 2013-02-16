@@ -10,7 +10,7 @@
 #include "display.h"
 
 // Quicksort
-template<class T> uint partition(array<T>& at, uint left, uint right, uint pivotIndex) {
+template<Type T> uint partition(array<T>& at, uint left, uint right, uint pivotIndex) {
     swap(at[pivotIndex], at[right]);
     const T& pivot = at[right];
     uint storeIndex = left;
@@ -23,7 +23,7 @@ template<class T> uint partition(array<T>& at, uint left, uint right, uint pivot
     swap(at[storeIndex], at[right]);
     return storeIndex;
 }
-template<class T> void quicksort(array<T>& at, uint left, uint right) {
+template<Type T> void quicksort(array<T>& at, uint left, uint right) {
     if(left < right) { // If the list has 2 or more items
         uint pivotIndex = partition(at, left, right, (left + right)/2);
         if(pivotIndex) quicksort(at, left, pivotIndex-1);
@@ -31,7 +31,7 @@ template<class T> void quicksort(array<T>& at, uint left, uint right) {
     }
 }
 /// Quicksorts the array in-place
-template<class T> void quicksort(array<T>& at) { quicksort(at, 0, at.size()-1); }
+template<Type T> void quicksort(array<T>& at) { quicksort(at, 0, at.size()-1); }
 
 /// from "An Efﬁcient and Robust Ray–Box Intersection Algorithm"
 static bool intersect(vec3 min, vec3 max, vec3 O, vec3 D, float& t) {

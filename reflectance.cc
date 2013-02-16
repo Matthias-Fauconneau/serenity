@@ -122,7 +122,7 @@ vecc freqz(const vec& b, const vec& a, uint N, float fc = 1) {
 }
 
 /// Displays a plot of Y
-template<class Array> void plot(int2 position, int2 size, const Array& Y) {
+template<Type Array> void plot(int2 position, int2 size, const Array& Y) {
     if(!Y.size()) return;
     float min=0, max=0;
     for(uint x: range(Y.size())) {

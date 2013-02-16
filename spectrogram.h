@@ -1,5 +1,5 @@
 #include "widget.h"
-#include "interface.h"
+#include "ffmpeg.h"
 #include "process.h"
 
 /// Computes pitch in Hz from MIDI \a key
@@ -9,7 +9,7 @@ inline float pitch(float key) { return 440*exp2((key-69)/12); }
 inline float key(float pitch) { return 69+log2(pitch/440)*12; }
 
 struct Spectrogram : Widget {
-    ref<float> signal;
+    AudioFile
     uint duration; // in samples (signal.size/2)
     uint periodSize; // Offset between each STFT (overlap = transformSize-periodSize)
     uint periodCount; //duration/periodSize

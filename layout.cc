@@ -34,7 +34,7 @@ int2 Linear::sizeHint() {
 }
 
 /// Sets the array size to \a size, filling with \a value
-template<class T> void fill(array<T>& a, const T& value, int size) {
+template<Type T> void fill(array<T>& a, const T& value, int size) {
     a.reserve(size); a.setSize(size);
     for(int i=0;i<size;i++) new (&a[i]) T(copy(value));
 }

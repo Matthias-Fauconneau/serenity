@@ -3,10 +3,10 @@
 #include "array.h"
 #include "string.h"
 
-template<class K, class V> struct const_pair { const K& key; const V& value; };
-template<class K, class V> struct pair { K& key; V& value; };
+template<Type K, Type V> struct const_pair { const K& key; const V& value; };
+template<Type K, Type V> struct pair { K& key; V& value; };
 /// Associates keys with values
-template<class K, class V> struct map {
+template<Type K, Type V> struct map {
     array<K> keys;
     array<V> values;
 
@@ -89,10 +89,10 @@ template<class K, class V> struct map {
     iterator end() { return iterator((K*)keys.end(),(V*)values.end()); }
 };
 
-template<class K, class V> map<K,V> copy(const map<K,V>& o) {
+template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
     map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
-template<class K, class V> string str(const map<K,V>& m) {
+template<Type K, Type V> string str(const map<K,V>& m) {
     string s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i])<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }

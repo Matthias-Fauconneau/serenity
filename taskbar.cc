@@ -9,8 +9,8 @@
 #include "png.h"
 
 // Compares to single value
-template<class T>  bool operator ==(const ref<T>& r, const T& value) { return r.size==1 && r.data[0] == value; }
-template<class T> bool operator ==(const array<T>& a, const T& value) { return  (ref<T>)a==value; }
+template<Type T>  bool operator ==(const ref<T>& r, const T& value) { return r.size==1 && r.data[0] == value; }
+template<Type T> bool operator ==(const array<T>& a, const T& value) { return  (ref<T>)a==value; }
 
 /// Shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager
 struct Taskbar : Socket, Poll {

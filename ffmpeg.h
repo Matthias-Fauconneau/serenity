@@ -2,7 +2,7 @@
 #include "process.h"
 
 /// Generic audio decoder (using ffmpeg)
-struct AudioFile {
+template<Type T> struct AudioFile {
     static constexpr uint channels = 2;
     uint rate=0;
     struct AVFormatContext* file=0;
@@ -23,8 +23,7 @@ struct AudioFile {
     bool open(const ref<byte>& path);
     void close();
 
-    uint read(int16* output, uint outputSize);
-    //TODO: float output
+    uint read(T* output, uint outputSize);
     uint position() { return audioPTS/1000;  }
     uint duration();
     void seek(uint position);

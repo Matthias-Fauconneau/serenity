@@ -3,9 +3,9 @@
 #include "array.h"
 
 /// Casts raw memory to \a T
-template<class T> const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
+template<Type T> const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
 /// Casts between element types
-template<class T, class O> ref<T> cast(const ref<O>& o) {
+template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
@@ -74,7 +74,7 @@ struct BinaryData : virtual Data {
     ref<byte> untilNull();
 
     /// Reads one raw \a T element
-    template<class T> const T& read() { const T& t = raw<T>(Data::read(sizeof(T))); return t; }
+    template<Type T> const T& read() { const T& t = raw<T>(Data::read(sizeof(T))); return t; }
     int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
     int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
     int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
@@ -98,17 +98,17 @@ struct BinaryData : virtual Data {
     ReadOperator read() { return __(this); }
 
     /// Reads \a size raw \a T elements
-    template<class T>  ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
+    template<Type T>  ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
 
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {
        BinaryData* s; uint size;
-       template<class T> operator array<T>() { array<T> t(size); for(uint unused i: range(size)) t<<(T)s->read(); return t; }
+       template<Type T> operator array<T>() { array<T> t(size); for(uint unused i: range(size)) t<<(T)s->read(); return t; }
    };
    ArrayReadOperator read(uint size) { return __(this,size); }
 
    /// Reads \a size \a T elements (swap as needed)
-   template<class T>  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
+   template<Type T>  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
 
    bool isBigEndian = false;
 };

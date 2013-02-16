@@ -8,7 +8,7 @@
 #include "spectrogram.h"
 
 /// Displays a plot of Y
-template<class Array> void plot(int2 position, int2 size, const Array& Y) {
+template<Type Array> void plot(int2 position, int2 size, const Array& Y) {
     float min=-1, max=1;
     for(uint x: range(Y.size())) {
         float y = Y[x];
@@ -22,7 +22,7 @@ template<class Array> void plot(int2 position, int2 size, const Array& Y) {
         line(a,b);
     }
 }
-template<class Array> void subplot(int2 position, int2 size, uint w, uint h, uint i, const Array& Y) {
+template<Type Array> void subplot(int2 position, int2 size, uint w, uint h, uint i, const Array& Y) {
     int2 subplot = int2(size.x/w,size.y/h);
     plot(position+int2(i%w,i/w)*subplot, subplot, Y);
 }

@@ -6,14 +6,14 @@
 #include "function.h"
 
 /// Unique reference to an heap allocated value
-template<class T> struct unique {
+template<Type T> struct unique {
     no_copy(unique);
     T* pointer;
     unique():pointer(0){}
-    template<class O> unique(unique<O>&& o){pointer=o.pointer; o.pointer=0;}
-    template<class O> unique& operator=(unique<O>&& o){this->~unique(); pointer=o.pointer; o.pointer=0; return *this;}
+    template<Type O> unique(unique<O>&& o){pointer=o.pointer; o.pointer=0;}
+    template<Type O> unique& operator=(unique<O>&& o){this->~unique(); pointer=o.pointer; o.pointer=0; return *this;}
     /// Instantiates a new value
-    template<class... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)___)){}
+    template<Type... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)___)){}
     ~unique() { if(pointer) free(pointer); }
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }
@@ -24,7 +24,7 @@ template<class T> struct unique {
     explicit operator bool() { return pointer; }
     bool operator !() const { return !pointer; }
 };
-template<class T> string str(const unique<T>& t) { return str(*t.pointer); }
+template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 
 /// XML element providing DOM-like access
 struct Element {
