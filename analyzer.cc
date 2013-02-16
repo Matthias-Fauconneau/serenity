@@ -8,6 +8,8 @@
 #include "layout.h"
 #include "window.h"
 
+#include "time.h"
+
 #if STRETCH
 #include "stretch.h"
 struct AudioStretchFile : AudioFile, AudioStretch {
@@ -22,13 +24,17 @@ typedef AudioFile AudioStretchFile;
 struct Analyzer {
     // Audio
     AudioStretchFile file __("/root/Documents/StarCraft 2 - Theme Song.m4a"_);
-    Spectrogram spectrogram __(32768, file.rate, 16);
+    Spectrogram spectrogram __(16384, file.rate, 16);
 
     static constexpr uint periodSize = 1024;
     static constexpr uint N = Spectrogram::T*periodSize;
 
+#if AUDIO
     Thread thread __(-20); // Audio thread
     AudioOutput output __({this, &Analyzer::read}, file.rate, periodSize, thread);
+#else
+    Timer timer;
+#endif
 #if SAMPLER
     Sequencer input __(thread);
     Sampler sampler;
@@ -49,7 +55,6 @@ struct Analyzer {
     Window window __(&layout,int2(0,spectrogram.sizeHint().y+keyboard.sizeHint().y),"Music Analyzer"_);
 
     Analyzer() {
-        assert(file.rate == output.rate);
 
         window.backgroundCenter=window.backgroundColor=1;
         window.localShortcut(Escape).connect(&exit);
@@ -67,27 +72,59 @@ struct Analyzer {
 #endif
         keyboard.contentChanged.connect(&window,&Window::render);
 
+#if AUDIO
+        assert(file.rate == output.rate);
         output.start();
         thread.spawn();
+#else
+        timer.timeout.connect(this,&Analyzer::timeout);
+        timeout();
+#endif
     }
     ~Analyzer() { unallocate(buffer); }
 
     bool playing=true;
     void togglePlay() { setPlaying(!playing); }
     void setPlaying(bool play) {
-        if(play) { output.start(); window.setIcon(playIcon()); }
-        else { output.stop(); window.setIcon(pauseIcon()); }
         playing=play; window.render();
+        if(play) {
+#if AUDIO
+            output.start();
+#else
+            timeout();
+#endif
+            window.setIcon(playIcon());
+        }
+        else {
+#if AUDIO
+            output.stop();
+#endif
+            window.setIcon(pauseIcon());
+        }
     }
+
     Lock bufferLock;
     void seek(int position) {
+#if AUDIO
         output.stop();
+#endif
         file.seek(position); update(file.position(),file.duration()); window.render();
         Locker lock(bufferLock);
         writeIndex=readIndex;
+#if AUDIO
         output.start();
+#endif
     }
+
+    void timeout() {
+        if(!playing) return;
+        timer.setRelative(periodSize*1000/file.rate);
+        int32 output[2*periodSize];
+        read(output, periodSize);
+    }
+
     void update(int position, int duration) {
+        position -= 3*N/4/file.rate;
         if(slider.value == position) return;
         if(!window.mapped) return;
         slider.value = position; slider.maximum=duration;

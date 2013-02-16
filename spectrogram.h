@@ -43,4 +43,6 @@ struct Spectrogram : ImageView {
     void update();
     /// Renders spectrogram image
     void render(int2 position, int2 size) override;
+    /// User input
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };

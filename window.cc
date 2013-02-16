@@ -165,17 +165,19 @@ void Window::event() {
             currentClip=Rect(size);
             ::softwareRendering=true;
 
-            if(backgroundCenter==backgroundColor) {
-                fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-            } else { // Oxygen-like radial gradient background
-                constexpr int radius=256;
-                int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                        a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
-                if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                uint* dst=(uint*)framebuffer.data;
-                for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                    int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
-                    dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+            if(clearBackground) {
+                if(backgroundCenter==backgroundColor) {
+                    fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                } else { // Oxygen-like radial gradient background
+                    constexpr int radius=256;
+                    int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
+                            a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
+                    if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                    uint* dst=(uint*)framebuffer.data;
+                    for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                        int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
+                        dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+                    }
                 }
             }
         } else {

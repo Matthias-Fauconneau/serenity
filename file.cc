@@ -2,25 +2,8 @@
 #include "linux.h"
 #include "string.h"
 
-#if NOLIBC
-#if __x86_64
-struct stat { long dev; long ino; long nlink; int mode,uid,gid; long rdev,st_size,blksize,blocks; long atime,atimensec,st_mtime,mtimensec,ctime,ctimensec; long pad[3]; };
-#else
-struct stat { uint64 dev; int pad1; int ino; int mode; uint16 nlink; int uid,gid; uint64 rdev; int pad2;
-              uint64 st_size; int blksize; uint64 blocks; long atime,atimensec,st_mtime,mtimensec,ctime,ctimensec; uint64 ino64; };
-#endif
-enum {O_RDONLY, O_WRONLY, O_RDWR, O_CREAT=0100, O_TRUNC=01000, O_APPEND=02000,
-#if __arm__
-      O_DIRECTORY=040000
-#else
-      O_DIRECTORY=0200000
-#endif
-};
-enum {AT_FDCWD=-100};
-#else
 #include <sys/syscall.h>
 static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
-#endif
 struct dirent { long ino, off; short len; char name[]; };
 enum {DT_DIR=4, DT_REG=8};
 

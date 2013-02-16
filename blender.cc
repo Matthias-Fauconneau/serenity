@@ -6,8 +6,8 @@
 #include "time.h"
 #include "jpeg.h"
 #include "window.h"
-#include "gl.h"
-SHADER(blender)
+#include "matrix.h"
+#include "display.h"
 
 // Quicksort
 template<class T> uint partition(array<T>& at, uint left, uint right, uint pivotIndex) {
@@ -32,6 +32,73 @@ template<class T> void quicksort(array<T>& at, uint left, uint right) {
 }
 /// Quicksorts the array in-place
 template<class T> void quicksort(array<T>& at) { quicksort(at, 0, at.size()-1); }
+
+/// from "An Efﬁcient and Robust Ray–Box Intersection Algorithm"
+static bool intersect(vec3 min, vec3 max, vec3 O, vec3 D, float& t) {
+    if(O>min && O<max) return true;
+    float tmin = ((D.x >= 0?min:max).x - O.x) / D.x;
+    float tmax = ((D.x >= 0?max:min).x - O.x) / D.x;
+    float tymin= ((D.y >= 0?min:max).y - O.y) / D.y;
+    float tymax= ((D.y >= 0?max:min).y - O.y) / D.y;
+    if( (tmin > tymax) || (tymin > tmax) ) return false;
+    if(tymin>tmin) tmin=tymin; if(tymax<tmax) tmax=tymax;
+    float tzmin= ((D.z >= 0?min:max).z - O.z) / D.z;
+    float tzmax= ((D.z >= 0?max:min).z - O.z) / D.z;
+    if( (tmin > tzmax) || (tzmin > tmax) ) return false;
+    if(tzmin>tmin) tmin=tzmin; if(tzmax<tmax) tmax=tzmax;
+    t=tmax; return true;
+}
+
+/// from "Fast, Minimum Storage Ray/Triangle Intersection"
+/*static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 D, float& t ) {
+    if(dot(A-O,D)<=0 && dot(B-O,D)<=0 && dot(C-O,D)<=0) return false;
+    vec3 edge1 = B - A;
+    vec3 edge2 = C - A;
+    vec3 pvec = cross( D, edge2 );
+    float det = dot( edge1, pvec );
+    if( det < 0.000001 ) return false;
+    vec3 tvec = O - A;
+    float u = dot(tvec, pvec);
+    if(u < 0 || u > det) return false;
+    vec3 qvec = cross( tvec, edge1 );
+    float v = dot(D, qvec);
+    if(v < 0 || u + v > det) return false;
+    t = dot(edge2, qvec);
+    t /= det;
+    return true;
+}*/
+
+/// from "Yet Faster Ray-Triangle Intersection (using SSE4)"
+struct Triangle { vec3 N; float nd; vec3 U; float ud; vec3 V; float vd; };
+static_assert(sizeof(Triangle)==12*sizeof(float),"");
+struct Hit { vec4 P; float t, u, v; };
+#include "smmintrin.h"
+static const float int_coef_arr[4] = { -1, -1, -1, 1 };
+static const __m128 int_coef = _mm_load_ps(int_coef_arr);
+static bool intersect(const vec4& O, const vec4& D, const Triangle &t, Hit &h) {
+    const __m128 o = _mm_load_ps(&O.x);
+    const __m128 d = _mm_load_ps(&D.x);
+    const __m128 n = _mm_load_ps(&t.N.x);
+    const __m128 det = _mm_dp_ps(n, d, 0x7f);
+    const __m128 dett = _mm_dp_ps( _mm_mul_ps(int_coef, n), o, 0xff);
+    const __m128 oldt = _mm_load_ss(&h.t);
+    if((_mm_movemask_ps(_mm_xor_ps(dett, _mm_sub_ss(_mm_mul_ss(oldt, det), dett)))&1) == 0) { //t
+        const __m128 detp = _mm_add_ps(_mm_mul_ps(o, det), _mm_mul_ps(dett, d));
+        const __m128 detu = _mm_dp_ps(detp, _mm_load_ps(&t.U.x), 0xf1);
+        if((_mm_movemask_ps(_mm_xor_ps(detu, _mm_sub_ss(det, detu)))&1) == 0) { //u
+            const __m128 detv = _mm_dp_ps(detp, _mm_load_ps(&t.V.x), 0xf1);
+            if((_mm_movemask_ps(_mm_xor_ps(detv, _mm_sub_ss(det, _mm_add_ss(detu, detv))))&1) == 0) { //v
+                const __m128 inv_det = _mm_rcp_ss(det);
+                _mm_store_ss(&h.t, _mm_mul_ss(dett, inv_det));
+                _mm_store_ss(&h.u, _mm_mul_ss(detu, inv_det));
+                _mm_store_ss(&h.v, _mm_mul_ss(detv, inv_det));
+                _mm_store_ps(&h.P.x, _mm_mul_ps(detp, _mm_shuffle_ps(inv_det, inv_det, 0)));
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 /// Used to fix pointers in .blend file-block sections
 struct Block {
@@ -63,10 +130,10 @@ struct Vertex {
     vec3 position; // World-space position
     vec3 normal; // World-space vertex normals
     vec2 texCoord; // Texture coordinates
-    bool operator==(const Vertex& o){
+    /*bool operator==(const Vertex& o){
         const float e = 0x1.0p-16f;
         return sqr(position-o.position)<e && sqr(normal-o.normal)<e && sqr(texCoord-o.texCoord)<e;
-    }
+    }*/
 };
 string str(const Vertex& v) { return "("_+str(v.position, v.normal, v.texCoord)+")"_; }
 
@@ -78,18 +145,13 @@ struct BlendView : Widget {
     vec2 rotation=vec2(PI/3,-PI/3); // current view angles (yaw,pitch)
     float focalLength = 90; // current focal length (in mm for a 36mm sensor)
     const float zoomSpeed = 10; // in mm/click
-    Window window __(this, int2(1050,590), "BlendView"_, Window::OpenGL);
-
-    // Renderer
-    GLFrameBuffer framebuffer;
-    GLShader present = GLShader(blender,"screen present"_);
-    GLShader shadow = GLShader(blender,"transform"_);
+    //Window window __(this, int2(1050,590), "BlendView"_);
+    Window window __(this, int2(512,512), "BlendView"_);
 
     // File
     Folder folder;
     Map mmap; // Keep file mmaped
     const Scene* scene=0; // Blender scene (root handle to access all data)
-    string shaderSource; // Custom GLSL shader
 
     // Scene
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
@@ -100,56 +162,49 @@ struct BlendView : Widget {
     const float sunYaw = 4*PI/3;
     const float sunPitch = -PI/3;
     mat4 sun; // sun light transform
-    GLFrameBuffer sunShadow;
 
-    // Sky
-    GLShader sky = GLShader(blender,"skymap"_);
-    GLTexture skymap;
+    // BVH
+    struct Node { //TODO: SIMD
+        static constexpr uint N = 4; // N=4: 128 | N=16 one cache line per component
+        vec3 min[N];
+        vec3 max[N];
+        int children[N]; // 1bit: Node/Leaf, if node: 31bit index, if leaf [27bit index (2G/16), 4bit: (count-1)*4 (16x16 tris)], TODO: flag empty leaves
+        uint axis[3], fill; // N=4: fit, N=16: 48bytes free
+    };
 
     // Geometry
     struct Model {
-        mat4 transform;
+        vec3 bbMin=__builtin_inff(), bbMax=-__builtin_inff(); //Local
 
+        // for particle instancing (FIXME: use precomputed faces)
         array<Vertex> vertices;
+        array<uint> indices;
 
-        struct Material {
-            string name;
-            GLShader shader;
-            array<GLTexture> textures;
+        array<Node> BVH;
+        array<Triangle> leafs;
+        //array<uint> materialIndices; for each face
 
-            GLVertexBuffer vertexBuffer;
+        array<mat4> instances; // World to object
 
-            array<uint> indices;
-            GLIndexBuffer indexBuffer;
-        };
-        array<Material> materials;
-
-        struct Instance { // FIXME: use quaternion + position + scale = 8 floats instead of 16 ?
-            mat4 modelViewTransform;
-            mat4 normalMatrix;
-            mat4 shadowTransform;
-        };
-        static const uint instanceMin = -1; // Minimum number of instances before using instanced rendering (-1 = disable)
-        array<mat4> instances;
-        //GLUniformBuffer instanceBuffer;
-
-        // Rendering order (cheap to expensive, front to back)
+        // Rendering order
         bool operator <(const Model& o) const { return instances.size()<o.instances.size(); }
     };
+
     array<Model> models;
+#if 0
+    //TODO: scene level BVH
+    array<Node> BVH;
+    struct Leaf { mat4 instance; /*Node* root; //shortcut*/ Model* model; };
+#endif
+
+
 
     BlendView() : folder("Island"_,home()), mmap("Island.blend.orig", folder, Map::Read|Map::Write) { // with write access to fix pointers
         load();
-        shaderSource << readFile("gpu_shader_material.glsl"_, folder) << readFile("Island.glsl", folder);
         parse();
-
-        skymap = GLTexture(decodeImage(readFile(string("textures/"_+sky.sampler2D.first()+".jpg"_), folder)), Bilinear);
 
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&::exit);
-
-        glDepthTest(true);
-        glCullFace(true);
     }
 
     /// Recursively fix all pointers in an SDNA structure
@@ -321,81 +376,73 @@ struct BlendView : Widget {
                 i++;
             }
 
-            vec3 objectMin=0, objectMax=0;
             for(Vertex& vertex: model.vertices) {
                 // Computes object bounds
-                objectMin=min(objectMin, vertex.position);
-                objectMax=max(objectMax, vertex.position);
+                model.bbMin=min(model.bbMin, vertex.position);
+                model.bbMax=max(model.bbMax, vertex.position);
 
                 if(scale<10) { // Ignores water plane
                     // Computes scene bounds in world space to fit view
-                    vec3 position = (transform*vertex.position).xyz();
+                    vec3 position = transform*vertex.position;
                     worldMin=min(worldMin, position);
                     worldMax=max(worldMax, position);
 
                     // Compute scene bounds in light space to fit shadow
-                    vec3 P = (sun*position).xyz();
+                    vec3 P = sun*position;
                     lightMin=min(lightMin,P);
                     lightMax=max(lightMax,P);
                 }
             }
-            // Scales positions and transforms to keep unit bounding box in object space
-            for(Vertex& vertex: model.vertices) {
-                vertex.position = (vertex.position-objectMin)/(objectMax-objectMin);
+
+            ref<MLoop> indices(mesh.mloop, mesh.totloop);
+            for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
+                assert(poly.totloop==3 || poly.totloop==4);
+                uint a=indices[poly.loopstart].v, b=indices[poly.loopstart+1].v;
+                for(uint index: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
+                    uint c = indices[index].v;
+                    model.indices << a << b << c;
+
+                    vec3 A = model.vertices[a].position, B = model.vertices[b].position, C = model.vertices[c].position;
+                    Triangle t;
+                    t.N = cross(B-A, C-A); t.nd = -dot(t.N, A);
+                    float n2 = sqr(t.N);
+                    t.U = cross(C-A, t.N) / n2; t.ud = -dot(t.U, A);
+                    t.V = cross(t.N, B-A) / n2; t.vd = -dot(t.V, A);
+                    model.faces << t;
+
+                    b = c;
+                }
             }
-            transform.translate(objectMin);
-            transform.scale(objectMax-objectMin);
-            model.transform = transform; //for emitter and particles
+            assert(model.indices, "Empty model");
 
-            for(int materialIndex: range(mesh.totcol)) {
-                Model::Material material;
-                material.name = replace(replace(simplify(toLower(str((const char*)mesh.mat[materialIndex]->id.name+2)))," "_,"_"),"."_,"_"_);
-
-                ref<MLoop> indices(mesh.mloop, mesh.totloop);
+            /*if(mesh.mloopuv) { // Assigns UV coordinates to vertices
+                ref<MLoopUV> texCoords(mesh.mloopuv, mesh.totloop);
+                uint i=0;
                 for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
-                    assert(poly.totloop==3 || poly.totloop==4);
-                    if(poly.mat_nr!=materialIndex) continue;
-                    uint a=indices[poly.loopstart].v, b=indices[poly.loopstart+1].v;
+                    {
+                        vec2 texCoord = fract(vec2(texCoords[poly.loopstart].uv));
+                        vec2& a = model.vertices[model.indices[i]].texCoord;
+                        if(a && sqr(a-texCoord)>0.01) error("TODO: duplicate vertex");
+                        a = texCoord;
+                    }{
+                        vec2 texCoord = fract(vec2(texCoords[poly.loopstart+1].uv));
+                        vec2& b = model.vertices[model.indices[i+1]].texCoord;
+                        if(b && sqr(b-texCoord)>0.01) error("TODO: duplicate vertex");
+                        b = texCoord;
+                    }
                     for(uint index: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
-                        uint c = indices[index].v;
-                        material.indices << a << b << c;
-                        b = c;
+                        vec2 texCoord = fract(vec2(texCoords[index].uv));
+                        vec2& c = model.vertices[model.indices[i+2]].texCoord;
+                        if(c && sqr(c-texCoord)>0.01) error("TODO: duplicate vertex");
+                        c = texCoord;
+                        i += 3; // Keep indices counter synchronized with MPoly
                     }
                 }
-                assert(material.indices, "Empty material");
-
-                if(mesh.mloopuv) { // Assigns UV coordinates to vertices
-                    ref<MLoopUV> texCoords(mesh.mloopuv, mesh.totloop);
-                    uint i=0;
-                    for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
-                        if(poly.mat_nr!=materialIndex) continue;
-                        {
-                            vec2 texCoord = fract(vec2(texCoords[poly.loopstart].uv));
-                            vec2& a = model.vertices[material.indices[i]].texCoord;
-                            if(a && sqr(a-texCoord)>0.01) error("TODO: duplicate vertex");
-                            a = texCoord;
-                        }{
-                            vec2 texCoord = fract(vec2(texCoords[poly.loopstart+1].uv));
-                            vec2& b = model.vertices[material.indices[i+1]].texCoord;
-                            if(b && sqr(b-texCoord)>0.01) error("TODO: duplicate vertex");
-                            b = texCoord;
-                        }
-                        for(uint index: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
-                            vec2 texCoord = fract(vec2(texCoords[index].uv));
-                            vec2& c = model.vertices[material.indices[i+2]].texCoord;
-                            if(c && sqr(c-texCoord)>0.01) error("TODO: duplicate vertex");
-                            c = texCoord;
-                            i += 3; // Keep indices counter synchronized with MPoly
-                        }
-                    }
-                }
-
-                model.materials << move(material);
-            }
+            }*/
 
             bool render = scene->lay&object.lay; // Visible layers
             for(const ParticleSystem& particle: object.particlesystem) if(!(particle.part->draw&ParticleSettings::PART_DRAW_EMITTER)) render=false;
-            if(render) model.instances << transform; // Appends an instance
+            if(render) model.instances << transform.inverse(); // Appends an instance
             modelIndex.insert(&object, models.size()); // Keep track of Object <-> Model mapping (e.g to instanciate particles)
             models << move(model);
         }
@@ -410,9 +457,8 @@ struct BlendView : Widget {
 
                 // Selects N random faces
                 Random random;
-                for(int n=0; n</*particle.totpart/200*/256;) {
-                    assert(model.materials.size()==1);
-                    const array<uint>& indices = model.materials[0].indices;
+                for(int n=0; n</*particle.totpart/200*//*256*//*16*/1;) {
+                    const array<uint>& indices = model.indices;
                     uint index = random % (indices.size()/3) * 3;
                     uint a=indices[index], b=indices[index+1], c=indices[index+2];
                     uint densityVG = particle.vgroup[ParticleSystem::PSYS_VG_DENSITY];
@@ -424,9 +470,9 @@ struct BlendView : Widget {
 
                     mat4 transform;
                     // Translates
-                    vec3 A = (model.transform*model.vertices[a].position).xyz(),
-                            B = (model.transform*model.vertices[b].position).xyz(),
-                            C = (model.transform*model.vertices[c].position).xyz();
+                    vec3 A = model.vertices[a].position,
+                            B = model.vertices[b].position,
+                            C = model.vertices[c].position;
                     float wA = random(), wB = random(), wC = 3-wA-wB;
                     vec3 position = (wA*A+wB*B+wC*C)/3.f;
                     transform.translate(position);
@@ -456,7 +502,7 @@ struct BlendView : Widget {
                     assert(object);
 
                     Model& dupli = models.at(modelIndex.at(object));
-                    dupli.instances << transform*dupli.transform;
+                    dupli.instances << transform.inverse();
                     n++;
                 }
             }
@@ -464,66 +510,7 @@ struct BlendView : Widget {
 
         for(uint i=0; i<models.size();) {
             Model& model = models[i];
-            if(!model.materials || !model.instances) { models.removeAt(i); continue; } else i++;
-
-            for(Model::Material& material : model.materials) {
-                // Remap indices
-                array<uint> remap(model.vertices.size()); remap.setSize(remap.capacity()); for(uint& index: remap) index=-1;
-                array<uint> indices (material.indices.size());
-                array<Vertex> vertices (model.vertices.size());
-                for(uint index: material.indices) {
-                    uint newIndex = remap[index];
-                    if(newIndex == uint(-1)) { newIndex=remap[index]=vertices.size(); vertices << model.vertices[index]; }
-                    indices << newIndex;
-                }
-
-#if 0
-                uint cache[16]; for(uint& index: cache) index=-1; uint fifo=0;
-                uint hit=0;
-                for(uint index: indices) {
-                    for(uint cached: cache) if(index==cached) {hit++; break;}
-                    cache[(fifo++)%16] = index;
-                };
-                if((float)hit/material.indices.size() < 0.617) error("TODO: optimize indices for vertex cache");
-#endif
-#if 0
-                array<uint> tristrip (indices.size());
-                uint A=indices[i+2], B=indices[i+1];
-                tristrip << indices[i] << B << A;
-                for(uint i=3; i<indices.size(); i+=3) {
-                    uint a = indices[i], b = indices[i+1], c = indices[i+2];
-                    if(a!=A || B!=b) tristrip << (vertices.size()<0x10000?0xFFFF:0xFFFFFFFF) << a << b;
-                    tristrip << c;
-                    A=c, B=b;
-                };
-                if(tristrip.size()<indices.size()) {
-                    material.indexBuffer.primitiveType = TriangleStrip;
-                    material.indexBuffer.primitiveRestart = true;
-                    indices = move(tristrip);
-                }
-#endif
-
-                // Uploads geometry
-                material.vertexBuffer.upload<Vertex>(vertices);
-                if(vertices.size()<=0x10000) {
-                    array<uint16> indices16 (indices.size()); //16bit indices
-                    for(uint index: indices) { assert(index<0x10000); indices16 << index; }
-                    material.indexBuffer.upload(indices16);
-                } else {
-                    material.indexBuffer.upload(indices);
-                }
-
-                // Compiles shader
-                material.shader =
-                        GLShader(string(blender+shaderSource), string("transform normal texCoord diffuse shadow sun sky "_ +material.name));
-
-                // Loads textures
-                int unit=1;
-                for(const string& name: material.shader.sampler2D) {
-                    material.shader[name] = unit++;
-                    material.textures<<GLTexture(decodeImage(readFile(string("textures/"_+name+".jpg"_), folder)), Mipmap|Bilinear|Anisotropic);
-                }
-            }
+            if(!model.instances) { models.removeAt(i); continue; } else i++;
         }
 
         quicksort(models); // Sorts by rendering cost (i.e render most instanced object last)
@@ -545,106 +532,41 @@ struct BlendView : Widget {
         return true;
     }
 
-#define profile( statements ... ) statements
-    profile( map<string, GLTimerQuery> lastProfile; )
     void render(int2 unused position, int2 unused size) override {
-        // Render sun shadow map
-        if(!sunShadow) {
-            sunShadow = GLFrameBuffer(GLTexture(4096,4096,Depth24|Shadow|Bilinear|Clamp));
-            sunShadow.bind(ClearDepth);
-
-            // Normalizes to [-1,1]
-            sun=mat4();
-            sun.scale(vec3(1,1,-1));
-            sun.translate(-1);
-            sun.scale(2.f/(lightMax-lightMin));
-            sun.translate(-lightMin);
-            sun.rotateX(sunPitch);
-            sun.rotateZ(sunYaw);
-
-            shadow.bind();
-            for(Model& model: models) {
-                for(const Model::Material& material: model.materials) {
-                    material.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
-                    for(const mat4& instance: model.instances) {
-                        shadow["modelViewTransform"] = sun*instance;
-                        material.indexBuffer.draw();
-                    }
-                }
-            }
-
-            // Normalizes xyz to [0,1]
-            mat4 sampler2D;
-            sampler2D.scale(1./2);
-            sampler2D.translate(1);
-            sun = sampler2D * sun;
-        }
-
-        uint width=size.x, height = size.y;
-#if 1
-        if(framebuffer.width != width || framebuffer.height != height) framebuffer=GLFrameBuffer(width,height,RGB16F,-1);
-        framebuffer.bind(ClearDepth);
-#else
-        //FIXME: sRGB framebuffer doesn't work
-        GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size, ClearDepth);
-#endif
-
         // Computes view transform
+        uint width = size.x, height = size.y;
         mat4 view;
-        view.perspective(2*atan(36/(2*focalLength)), width, height, 1./4, 4);
-        view.scale(1.f/worldRadius); // fit scene (isometric approximation)
+        //view.perspective(2*atan(36/(2*focalLength)), width, height, 1./4, 4); //FIXME
+        view.scale(2.f/worldRadius); // fit scene (isometric approximation)
         view.translate(vec3(0,0,-worldRadius)); // step back
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
 
-        // World-space lighting
-        vec3 sunLightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
-        vec3 skyLightDirection = vec3(0,0,1);
+        mat4 world = view.inverse();
+        for(uint y : range(height)) for(uint x : range(width)) {
+            vec3 viewPosition = vec3(2.0*x/width-1, 1-2.0*y/height, 0);
+            vec3 viewRay = vec3(0,0,1);
+            //FIXME: perspective division ?
+            /*vec3 worldPosition = world * vec3(screen.x, screen.y, -1);
+            vec3 worldRay = normalize(world * vec3(screen.x, screen.y, 1) - worldPosition ); //FIXME: complicated?*/
+            vec3 worldPosition = world * viewPosition;
+            vec3 worldRay = normalize( (mat3)view.transpose() * viewRay );
 
-        profile( map<string, GLTimerQuery> profile; )
-        for(Model& model: models) {
-            for(Model::Material& material: model.materials) {
-                GLShader& shader = material.shader;
-                shader.bind();
-                shader["shadowScale"] = 1.f/sunShadow.depthTexture.width;
-                shader["shadowMap"] = 0; sunShadow.depthTexture.bind(0);
-                shader["sunLightDirection"] = sunLightDirection;
-                shader["skyLightDirection"] = skyLightDirection;
-
-                {int i=1; for(const string& name: shader.sampler2D) shader[name] = i++; }
-                {int i=1; for(const GLTexture& texture : material.textures) texture.bind(i++); }
-
-                material.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Vertex,position));
-                material.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Vertex,normal));
-                if(shader.sampler2D) material.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Vertex,texCoord));
-
-                profile( GLTimerQuery timerQuery; timerQuery.start(); )
+            Hit hit; hit.t =  -__builtin_inff();
+            for(Model& model: models) {
+                if(model.instances.size()>1) continue;
+                if(model.indices.size() > 96774) continue;
                 for(const mat4& instance : model.instances) {
-                    shader["modelViewTransform"] = view*instance;
-                    shader["normalMatrix"] = instance.normalMatrix();
-                    shader["shadowTransform"] = sun*instance;
-                    if(shader["modelTransform"]) shader["modelTransform"] = instance;
-                    material.indexBuffer.draw();
+                    vec4 objectPosition = vec4(instance * worldPosition, 1.f);
+                    vec4 objectRay = vec4( (mat3)instance * worldRay, 0.f);
+                    float t=0;
+                    if(intersect(model.bbMin,model.bbMax,objectPosition.xyz(),objectRay.xyz(), t) && t>hit.t) {
+                        for(const Triangle& t: model.faces.slice(0, min(256u,model.faces.size()))) intersect(objectPosition, objectRay, t, hit);
+                    }
                 }
-                profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
             }
+            framebuffer(x,y) = byte4(clip<int>(0,-hit.t/worldRadius/2*0xFF,0xFF)); //xyz | normal
         }
-
-        //TODO: fog
-        sky["inverseViewMatrix"] = view.inverse();
-        sky[sky.sampler2D.first()] = 0; skymap.bind(0);
-        glDrawRectangle(sky);
-
-#if 1
-        GLTexture color(width,height,RGB16F);
-        framebuffer.blit(color);
-        GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size);
-        present["framebuffer"]=0; color.bind(0);
-        glDrawRectangle(present);
-#endif
-
-        profile( log(window.renderTime, lastProfile); lastProfile = move(profile); )
     }
-
 } application;

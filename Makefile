@@ -16,7 +16,7 @@ ICONS_music = music
 ICONS_test = feeds network
 
 SHADERS = display $(SHADERS_$(TARGET))
-SHADERS_blender = blender
+# SHADERS_blender = blender
 
 SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
 SRCS_profile = profile

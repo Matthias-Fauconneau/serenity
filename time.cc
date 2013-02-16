@@ -3,14 +3,8 @@
 #include "data.h"
 #include "string.h"
 
-#if NOLIBC
-struct timespec { long tv_sec,tv_nsec; };
-enum {CLOCK_REALTIME=0, CLOCK_THREAD_CPUTIME_ID=3};
-enum {TFD_CLOEXEC = 02000000};
-#else
 #include <time.h>
 #include <sys/timerfd.h>
-#endif
 
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
 long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }

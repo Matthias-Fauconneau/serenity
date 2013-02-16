@@ -308,3 +308,7 @@ void Spectrogram::render(int2 position, int2 size) {
         else if(x%12==1||x%12==4||x%12==6||x%12==9||x%12==11) fill(x*12-3,0,(x+1)*12-3,T,vec4(0,0,0,0.1)); // black keys
     }
 }
+
+bool Spectrogram::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+    return true;
+}

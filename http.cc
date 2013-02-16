@@ -8,9 +8,7 @@
 #include "process.h"
 #include "string.h"
 
-#if NOLIBC
 enum {F_SETFL=4};
-#endif
 struct sockaddress { uint16 family; uint16 port; uint host; int pad[2]; };
 
 // UDPSocket

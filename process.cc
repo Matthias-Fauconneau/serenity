@@ -4,31 +4,6 @@
 #include "data.h"
 #include "trace.h"
 
-#if NOLIBC
-struct rlimit { long cur,max; };
-enum {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NOFILE, RLIMIT_AS};
-enum {SIGHUP=1, SIGINT, SIGQUIT, SIGILL, SIGTRAP, SIGABRT, SIGBUS, SIGFPE, SIGKILL, SIGUSR1, SIGSEGV, SIGUSR2, SIGPIPE, SIGALRM, SIGTERM, SIGIO=29};
-struct siginfo_t {
-    int signo,errno,si_code;
-    union {
-        struct { long revents; int fd; } poll;
-        struct { void *si_addr; };
-    };
-};
-struct ucontext {
-    long flags; void* link; struct { void* sp; int flags; long size; } stack;
-#if __x86_64__
-    long r8,r9,r10,r11,r12,r13,r14,r15,rdi,rsi,rbp,rbx,rdx,rax,rcx,rsp,ip,efl,csgsfs,err,trap,oldmask,cr2;
-#elif __arm__
-    long trap,err,mask,r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,fp,ip,sp,lr,pc,cpsr,fault;
-#elif __i386__
-    long gs,fs,es,ds,edi,esi,ebp,esp,ebx,edx,ecx,eax,trap,err,ip,cs,efl,uesp,ss;
-#endif
-};
-enum {EFD_SEMAPHORE=1};
-enum {SA_SIGINFO=4, SA_RESTORER=0x4000000, SA_RESTART=0x10000000};
-enum {WNOHANG=1};
-#else
 #include <sys/eventfd.h>
 #include <sched.h>
 #define signal signal_
@@ -36,12 +11,12 @@ enum {WNOHANG=1};
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
-//FIXME: use pthread
+
 void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
 int exit_group(int status) { return syscall(SYS_exit_group, status); }
 int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
 int gettid() { return syscall(SYS_gettid); }
-#endif
+
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 
 #if __x86_64
@@ -139,16 +114,12 @@ void traceAllThreads() {
 // Signal handler
 string trace(int skip, void* ip);
 static void handler(int sig, siginfo_t* info, void* ctx) {
-#if NOLIBC
-    void* ip = (void*)(((ucontext*)ctx)->pc);
-#else
 #if __x86_64
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
 #elif __arm
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.arm_pc;
 #elif __i386
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP];
-#endif
 #endif
     string s = trace(1,ip);
     if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
@@ -162,44 +133,16 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     exit_thread(0);
 }
 
-#if NOLIBC
-#if __x86_64
-extern void restore_rt() asm ("__restore_rt"); asm(".text; .align 16; __restore_rt:; movq $15, %rax; syscall;");
-#elif __arm__
-extern void restore_rt() asm ("__restore_rt"); asm(".text; .align 2; .fnstart; .save {r0-r15}; .pad #160; nop; __restore_rt:; mov r7, $119; swi 0; .fnend;");
-#else
-#error Unsupported architecture
-#endif
-#endif
-
 void __attribute((constructor(101))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
-#if NOLIBC
-    struct {
-        void (*sigaction) (int, siginfo_t*, ucontext_t*) = &handler;
-        long flags = SA_SIGINFO|SA_RESTORER|SA_RESTART;
-        void (*restorer)() = &restore_rt;
-        uint mask[2] = {0,0};
-    } sa;
-    check_(sigaction(SIGFPE, &sa, 0, 8));
-    check_(sigaction(SIGABRT, &sa, 0, 8));
-    check_(sigaction(SIGSEGV, &sa, 0, 8));
-    check_(sigaction(SIGTERM, &sa, 0, 8));
-    check_(sigaction(SIGTRAP, &sa, 0, 8));
-#else
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
     check_(sigaction(SIGFPE, &sa, 0));
     check_(sigaction(SIGABRT, &sa, 0));
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-#if __x86_64
-    //setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);
-#endif
-#endif
-
 }
 
 static int recurse=0;
