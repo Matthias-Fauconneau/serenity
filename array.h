@@ -3,9 +3,9 @@
 #include "core.h"
 #include "memory.h"
 
-/// Polyvalent memory reference (const or mutable, owned or reference, inline or on heap).
+/// Dynamic collections of elements (const or mutable, owned or reference, inline or on heap).
 /// \note Uses move semantics to avoid reference counting when managing an heap buffer
-/// \note Stores small arrays inline (<=31bytes)
+/// \note Stores small arrays inline (<=31bytes) (TODO: profile)
 template<class T> struct array {
     int8 tag = 0; //0: empty, >0: inline, -1 = reference, -2 = heap buffer
     struct{const T* data; uint size; uint capacity;} buffer = {0,0,0};

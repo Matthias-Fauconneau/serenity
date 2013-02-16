@@ -130,9 +130,6 @@ template<int unroll> inline void convolve(double* predictor, double* even, doubl
 
 template<int unroll,int channelMode> inline void interleave(const float* A, const float* B, float2* ptr, float2* end) {
     for(;ptr<end;) {
-        __builtin_prefetch(A+32,0,0);
-        __builtin_prefetch(B+32,0,0);
-        __builtin_prefetch(ptr+32,0,0);
         for(uint i: range(unroll)) {
             float a=A[i], b=B[i];
             if(channelMode==Independent) ptr[i]=(float2)__(a,b);

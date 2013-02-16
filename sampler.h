@@ -43,7 +43,7 @@ struct Sampler : Poll {
         float shift;
         array<Note> notes; // Active notes (currently being sampled) in this layer
         Resampler resampler; // Resampler to shift pitch
-        Buffer<float> buffer; // Buffer to mix notes before resampling
+        buffer<float> buffer; // Buffer to mix notes before resampling
     };
     array<Layer> layers;
 

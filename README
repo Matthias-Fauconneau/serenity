@@ -6,7 +6,7 @@
 Serenity is an elegant C++11 framework including:
 
 – Runtime support
-    - #array
+    - #ref, #buffer, #array
     - #string, #log
     - \ref trace "stack trace", \ref profile.cc "profiler"
     - \link disassemble disassembly\endlink

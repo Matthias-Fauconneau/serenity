@@ -30,3 +30,21 @@ template<class T> void unallocate(T*& buffer) { assert(buffer); free((void*)buff
 inline void* operator new(size_t, void* p) { return p; } //placement new
 template<class T, class... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }
 template<class T> void free(T* t) { t->~T(); unallocate(t); }
+
+/// Simple writable fixed-capacity memory reference
+template<class T> struct buffer {
+    T* data=0;
+    uint capacity=0,size=0;
+    buffer(){}
+    explicit buffer(uint capacity):data(allocate64<T>(capacity)),capacity(capacity){}
+    buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){for(T& e: ref<T>(data,size)) e=value;}
+    buffer(const buffer& o):buffer(o.capacity){size=o.size; copy(data,o.data,size*sizeof(T));}
+    move_operator_(buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
+    ~buffer(){if(data){unallocate(data);}}
+    operator T*() { return data; }
+    operator ref<T>() const { return ref<T>(data,size); }
+    constexpr const T* begin() const { return data; }
+    constexpr const T* end() const { return data+size; }
+    const T& operator[](uint i) const { assert(i<size); return data[i]; }
+    T& operator[](uint i) { assert(i<size); return (T&)data[i]; }
+};

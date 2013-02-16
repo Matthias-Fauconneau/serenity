@@ -8,39 +8,30 @@ inline float log2(float x) { return __builtin_log2f(x); }
 inline float pitch(float key) { return 440*exp2((key-69)/12); }
 inline float key(float pitch) { return 69+log2(pitch/440)*12; }
 
-struct Spectrogram : ImageView {
+struct Spectrogram : Widget {
+    ref<float> signal;
+    uint duration; // in samples (signal.size/2)
+    uint periodSize; // Offset between each STFT (overlap = transformSize-periodSize)
+    uint periodCount; //duration/periodSize
     uint N; // Discrete fourier transform size
-    uint rate; // signal rate (to scale frequencies)
-    uint bitDepth; // signal bit depth (to scale to color intensity)
+    uint sampleRate; // signal sampling rate (to scale frequencies)
 
-    float* buffer; // Buffer of the last N samples (for overlap save)
-    float* hann; // Window to apply to buffer at each update
-    float* windowed; // Windowed buffer
-    float* transform; // Fourier transform of the windowed buffer
-    float* rawSpectrum; // Magnitude of the complex Fourier coefficients
-    float* spectrum; // Magnitude of the complex Fourier coefficients (smoothed)
+    buffer<float> hann; // Hann window
+    buffer<float> windowed; // Windowed frame of signal
+    buffer<float> transform; // Fourier transform of the windowed buffer
+    buffer<float> spectrum; // Magnitude of the complex Fourier coefficients
     struct fftwf_plan_s* plan;
 
     static constexpr uint F = 1056; // Size of the frequency plot in pixels (88x12)
-    static constexpr uint T = 768; // Number of updates in one image (one pixel per update)
+    Image image; // Rendered image of the spectrogram
+    buffer<bool> cache; // Flag whether the period was transformed and rendered (FIXME: bits)
 
-    uint t = 0;
-    Lock imageLock;
+    uint time=0; //in periods of periodSize
 
-    array<uint> notes[T];
-
-    /// Initializes a running spectrogram with \a N bins
-    Spectrogram(uint N, uint rate=44100, uint bitDepth=16);
+    /// Setups STFT on \a signal every \a T samples with \a N bins
+    Spectrogram(const ref<float>& signal, uint sampleRate=44100, uint periodSize=1024, uint transformSize=16384);
     ~Spectrogram();
 
-    /// Appends \a size frames (windowed overlap-save over N frames)
-    void write(int16* data, uint size);
-    /// Appends \a size frames (windowed overlap-save over N frames)
-    void write(int32* data, uint size);
-    /// Appends \a size frames (windowed overlap-save over N frames)
-    void write(float* data, uint size);
-    /// Updates spectrogram using written data
-    void update();
     /// Renders spectrogram image
     void render(int2 position, int2 size) override;
     /// User input

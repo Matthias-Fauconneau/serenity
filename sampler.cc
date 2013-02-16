@@ -34,7 +34,6 @@ int noteToMIDI(const ref<byte>& value) {
 
 template<int unroll> inline void accumulate(float4 accumulators[unroll], const float4* ptr, const float4* end) {
     for(;ptr<end;ptr+=unroll) {
-        __builtin_prefetch(ptr+32,0,0);
         for(uint i: range(unroll)) accumulators[i]+=ptr[i]*ptr[i];
     }
 }
@@ -297,7 +296,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
                 uint inSize=align(2,layer.resampler.need(size));
-                if(layer.buffer.capacity<inSize*2) layer.buffer = Buffer<float>(inSize*2);
+                if(layer.buffer.capacity<inSize*2) layer.buffer = ::buffer<float>(inSize*2);
                 clear(layer.buffer.data, inSize*2);
                 for(Note& note: layer.notes) note.read((float4*)layer.buffer.data, inSize/2);
                 layer.resampler.filter<true>(layer.buffer, inSize, buffer, size);

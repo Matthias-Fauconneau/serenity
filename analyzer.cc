@@ -1,37 +1,32 @@
 #include "process.h"
-#include "ffmpeg.h"
-#include "asound.h"
 #include "sequencer.h"
 #include "sampler.h"
 #include "spectrogram.h"
 #include "keyboard.h"
 #include "layout.h"
 #include "window.h"
+#include "data.h"
 
-#include "time.h"
-
-#if STRETCH
-#include "stretch.h"
-struct AudioStretchFile : AudioFile, AudioStretch {
-    AudioStretchFile(const ref<byte>& path):AudioFile(path),AudioStretch(rate){}
-    uint need(int16 *data, uint size) override { return AudioFile::read(data,size); }
-    uint read(int16* data, uint size) { return AudioStretch::read(data,size); }
-};
+#if AUDIO
+#include "asound.h"
 #else
-typedef AudioFile AudioStretchFile;
+#include "time.h"
 #endif
 
-struct Analyzer {
-    // Audio
-    AudioStretchFile file __("/root/Documents/StarCraft 2 - Theme Song.m4a"_);
-    Spectrogram spectrogram __(16384, file.rate, 16);
+//FIXME: accurate libav seek
+struct AudioFile {
+    static constexpr uint rate = 44100; // Raw audio sample rate
+    Map file __("/root/Documents/StarCraft 2 - Theme Song.f32"_);
+};
 
-    static constexpr uint periodSize = 1024;
-    static constexpr uint N = Spectrogram::T*periodSize;
+struct Analyzer {
+    static constexpr uint periodSize = 1024; //STFT frame size
+    const uint duration = file.size / (2*sizeof(float));
+    Spectrogram spectrogram __(cast<float>(file), 16384, rate);
 
 #if AUDIO
     Thread thread __(-20); // Audio thread
-    AudioOutput output __({this, &Analyzer::read}, file.rate, periodSize, thread);
+    AudioOutput output __({this, &Analyzer::read}, rate, periodSize, thread);
 #else
     Timer timer;
 #endif
@@ -39,10 +34,6 @@ struct Analyzer {
     Sequencer input __(thread);
     Sampler sampler;
 #endif
-
-    int16* buffer = allocate<int16>(N*2);
-    uint readIndex=0;
-    uint writeIndex=0;
 
     // Interface
     ICON(play) ICON(pause)
@@ -81,7 +72,6 @@ struct Analyzer {
         timeout();
 #endif
     }
-    ~Analyzer() { unallocate(buffer); }
 
     bool playing=true;
     void togglePlay() { setPlaying(!playing); }

@@ -24,6 +24,7 @@ struct AudioFile {
     void close();
 
     uint read(int16* output, uint outputSize);
+    //TODO: float output
     uint position() { return audioPTS/1000;  }
     uint duration();
     void seek(uint position);
