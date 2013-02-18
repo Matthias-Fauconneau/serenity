@@ -1,11 +1,12 @@
 #include "process.h"
 #include "sequencer.h"
 #include "sampler.h"
+#include "ffmpeg.h"
 #include "spectrogram.h"
 #include "keyboard.h"
 #include "layout.h"
 #include "window.h"
-#include "data.h"
+#include "interface.h"
 
 #if AUDIO
 #include "asound.h"
@@ -13,16 +14,14 @@
 #include "time.h"
 #endif
 
-//FIXME: accurate libav seek
-struct AudioFile {
-    static constexpr uint rate = 44100; // Raw audio sample rate
-    Map file __("/root/Documents/StarCraft 2 - Theme Song.f32"_);
-};
-
 struct Analyzer {
     static constexpr uint periodSize = 1024; //STFT frame size
-    const uint duration = file.size / (2*sizeof(float));
-    Spectrogram spectrogram __(cast<float>(file), 16384, rate);
+    Audio<float> audio = decodeAudio<float>(Map("/root/Documents/StarCraft 2 - Theme Song.m4a"_));
+    Spectrogram spectrogram __(audio, 1024, 16384);
+
+    bool playing = true;
+    uint position = 0;
+    uint duration = audio.data.size / audio.channels / sizeof(float);
 
 #if AUDIO
     Thread thread __(-20); // Audio thread
@@ -73,7 +72,6 @@ struct Analyzer {
 #endif
     }
 
-    bool playing=true;
     void togglePlay() { setPlaying(!playing); }
     void setPlaying(bool play) {
         playing=play; window.render();
@@ -93,28 +91,19 @@ struct Analyzer {
         }
     }
 
-    Lock bufferLock;
     void seek(int position) {
-#if AUDIO
-        output.stop();
-#endif
-        file.seek(position); update(file.position(),file.duration()); window.render();
-        Locker lock(bufferLock);
-        writeIndex=readIndex;
-#if AUDIO
-        output.start();
-#endif
+        this->position=position; //file.seek(position); update(file.position(),file.duration()); window.render(); TODO
     }
 
     void timeout() {
         if(!playing) return;
-        timer.setRelative(periodSize*1000/file.rate);
+        timer.setRelative(periodSize*1000/audio.rate);
         int32 output[2*periodSize];
         read(output, periodSize);
     }
 
     void update(int position, int duration) {
-        position -= 3*N/4/file.rate;
+        //position -= 3*spectrogram.N/4;
         if(slider.value == position) return;
         if(!window.mapped) return;
         slider.value = position; slider.maximum=duration;
@@ -124,20 +113,9 @@ struct Analyzer {
 
     /// Playback files and mixes sampler (audio thread)
     uint read(int32* output, uint size) {
-        update(file.position(),file.duration());
+        update(position, duration);
         assert(size==periodSize);
-
-        // Spectrogram
-        Locker lock(bufferLock);
-        uint read = file.read(buffer+(writeIndex%N)*2, size);
-        spectrogram.write(buffer+(writeIndex%N)*2, read); // Displays spectrogram without delay
-        writeIndex += size;
-
-        while(writeIndex<readIndex+3*N/4) { // Transforms faster to fill up spectrogram
-            uint read = file.read(buffer+(writeIndex%N)*2, size);
-            spectrogram.write(buffer+(writeIndex%N)*2, read); // Displays spectrogram without delay
-            writeIndex += size;
-        }
+        spectrogram.position = position / spectrogram.periodSize;
 
         window.render();
 
@@ -147,9 +125,9 @@ struct Analyzer {
 #else
          for(uint i: range(size*2)) output[i] = 0;
 #endif
-        for(uint i: range(size*2)) output[i] += buffer[(readIndex%N)*2+i]<<(16-3); //Mix delayed file with sampler output
-        readIndex += size;
+        for(uint i: range(size*2)) output[i] += audio.data[position*2+i]*0x1.0p29f; //Mix delayed file with sampler output
 
+        position += size;
         return size;
     }
 } test;

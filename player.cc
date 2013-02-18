@@ -11,7 +11,6 @@
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
 // Gapless playback
-    //Thread audioThread __(-20);
     static constexpr uint channels = 2;
     AudioFile file;
     AudioOutput output __({this,&Player::read}, 44100, 8192);
@@ -25,7 +24,7 @@ struct Player {
             output += read*channels; readSize += read;
             if(readSize != outputSize) next();
             else {
-                update(file.position(),file.duration());
+                update(file.position()/file.rate,file.duration()/file.rate);
                 return readSize;
             }
         }
@@ -47,6 +46,7 @@ struct Player {
 // Content
     array<string> folders;
     array<string> files;
+    Map data;
 
     Player() {
         albums.always=titles.always=true;
@@ -109,8 +109,8 @@ struct Player {
     }
     void playTitle(uint index) {
         window.setTitle(toUTF8(titles[index].text));
-        ref<byte> path = files[index];
-        file.open(string("/Music/"_+path));
+        data = Map(string("/Music/"_+files[index]));
+        file.open(data);
         assert(output.channels==file.channels);
         if(output.rate!=file.rate) {
             output.~AudioOutput();
@@ -118,6 +118,7 @@ struct Player {
             output.start();
         }
         setPlaying(true);
+        data.lock(); //Lock file to avoid any underrun when system cannot seek fast enough under I/O pressure
     }
     void next() {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
@@ -141,15 +142,15 @@ struct Player {
         titles.index=-1;
     }
     void seek(int position) {
-        if(file) { file.seek(position); update(file.position(),file.duration()); }
+        if(file) { file.seek(position); update(file.position()/file.rate,file.duration()/file.rate); }
     }
-    void update(int position, int duration) {
+    void update(uint position, uint duration) {
         if(slider.value == position) return;
         writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));
         if(!window.mapped) return;
         slider.value = position; slider.maximum=duration;
-        elapsed.setText(string(dec(uint64(position/60),2)+":"_+dec(uint64(position%60),2)));
-        remaining.setText(string(dec(uint64((duration-position)/60),2)+":"_+dec(uint64((duration-position)%60),2)));
+        elapsed.setText(string(dec(position/60,2)+":"_+dec(position%60,2)));
+        remaining.setText(string(dec((duration-position)/60,2)+":"_+dec((duration-position)%60,2)));
         window.render();
     }
 } application;

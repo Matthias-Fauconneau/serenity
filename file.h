@@ -70,21 +70,21 @@ enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000,
 /// Handle to a file
 struct File : Stream {
     File(int fd):Stream(fd){}
-    /// Opens \a file
+    /// Opens \a path
     /// If read only, fails if not existing
     /// If write only, fails if existing
-    File(const ref<byte>& file, const Folder& at=root(), uint flags=ReadOnly);
+    File(const ref<byte>& path, const Folder& at=root(), uint flags=ReadOnly);
     /// Returns file size
     int size() const;
     /// Seeks to \a index
     void seek(int index);
 };
-/// Returns whether \a file exists (as a file)
-bool existsFile(const ref<byte>& file, const Folder& at=root());
+/// Returns whether \a path exists (as a file)
+bool existsFile(const ref<byte>& path, const Folder& at=root());
 /// Reads whole \a file content
-array<byte> readFile(const ref<byte>& file, const Folder& at=root());
+array<byte> readFile(const ref<byte>& path, const Folder& at=root());
 /// Writes \a content into \a file (overwrites any existing file)
-void writeFile(const ref<byte>& file, const ref<byte>& content, const Folder& at=root());
+void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at=root());
 
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOW { typedef T Args; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
@@ -92,7 +92,7 @@ template<uint major, uint minor, Type T> struct IOR { typedef T Args; static con
 template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 /// Handle to a device
 struct Device : File {
-    Device(const ref<byte>& file, int flags=ReadWrite):File(file,root(),flags){}
+    Device(const ref<byte>& path, int flags=ReadWrite):File(path, root(), flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);
     /// Sends ioctl request with neither input/outputs arguments
@@ -112,7 +112,7 @@ struct Map : ref<byte> {
 
     Map(){}
     Map(const File& file, uint prot=Read);
-    Map(const ref<byte>& file, const Folder& at=root(), uint prot=Read):Map(File(file,at),prot){}
+    Map(const ref<byte>& path, const Folder& at=root(), uint prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, uint prot, uint flags=Shared);
     move_operator(Map):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
     ~Map();

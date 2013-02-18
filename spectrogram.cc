@@ -5,9 +5,8 @@
 const float PI = 3.14159265358979323846;
 inline float cos(float t) { return __builtin_cosf(t); }
 
-Spectrogram::Spectrogram(const ref<float>& signal, uint sampleRate, uint periodSize, uint transformSize) :
-    signal(signal), duration(signal.size/2),
-    periodSize(periodSize), periodCount(duration/periodSize), N(transformSize), sampleRate(sampleRate),
+Spectrogram::Spectrogram(const Audio<float>& audio, uint periodSize, uint transformSize) :
+    signal(audio.data), duration(signal.size/2), periodSize(periodSize), periodCount(duration/periodSize), N(transformSize), sampleRate(audio.rate),
     image(F, periodCount), cache(periodCount) {
     hann = buffer<float>(N); for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2;
     windowed = buffer<float>(N);
@@ -22,7 +21,7 @@ Spectrogram::~Spectrogram() {
 }
 
 void Spectrogram::render(int2 position, int2 size) {
-    for(uint t: range(time,time+size.y)) {
+    for(uint t: range(this->position, this->position+size.y)) {
         if(cache[t]) continue;
 
         for(uint i: range(N)) windowed[i] = hann[i]*signal[t*periodSize+i]; // Multiplies window
@@ -58,7 +57,7 @@ void Spectrogram::render(int2 position, int2 size) {
         }
     }
 
-    blit(position+int2((size.x-image.width)/2,-time), image);
+    blit(position+int2((size.x-image.width)/2,-this->position), image);
     //fill(0,3*T/4,F,3*T/4+1,red); // mark current audio output
     for(uint x: range(1,88)) {
         if(x%12==3||x%12==8) fill(x*12-3,0,x*12-2, size.y, vec4(0,0,0,0.1)); // B/C, E/F
@@ -66,6 +65,6 @@ void Spectrogram::render(int2 position, int2 size) {
     }
 }
 
-bool Spectrogram::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+/*bool Spectrogram::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     return true;
-}
+}*/
