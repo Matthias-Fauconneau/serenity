@@ -6,14 +6,14 @@
 template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
 /// Raw zero initialization
-inline void clear(byte* buffer, int size) { for(int i=0;i<size;i++) buffer[i]=0; }
+inline void clear(byte* buffer, uint size) { for(uint i: range(size)) buffer[i]=0; }
 /// Buffer default initialization
-template<Type T> void clear(T* buffer, int size, const T& value=T()) { for(int i=0;i<size;i++) buffer[i]=value; }
+template<Type T> void clear(T* buffer, uint size, const T& value=T()) { for(uint i: range(size)) buffer[i]=value; }
 
 /// Raw memory copy
-inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
+inline void copy(byte* dst,const byte* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
 /// Buffer explicit copy
-template<Type T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
+template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);
@@ -37,10 +37,10 @@ template<Type T> struct buffer {
     uint capacity=0,size=0;
     buffer(){}
     explicit buffer(uint capacity):data(allocate64<T>(capacity)),capacity(capacity){}
-    buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){for(T& e: ref<T>(data,size)) e=value;}
-    buffer(const buffer& o):buffer(o.capacity){size=o.size; copy(data,o.data,size*sizeof(T));}
+    buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){clear(data,size,value);}
     move_operator_(buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     ~buffer(){if(data){unallocate(data);}}
+    explicit operator bool() const { return data; }
     operator T*() { return data; }
     operator ref<T>() const { return ref<T>(data,size); }
     constexpr const T* begin() const { return data; }
@@ -48,3 +48,4 @@ template<Type T> struct buffer {
     const T& operator[](uint i) const { assert(i<size); return data[i]; }
     T& operator[](uint i) { assert(i<size); return (T&)data[i]; }
 };
+template<Type T> inline buffer<T> copy(const buffer<T>& o){buffer<T> t(o.capacity); t.size=o.size; copy(t.data,o.data,o.size); return t; }

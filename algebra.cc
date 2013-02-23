@@ -35,6 +35,10 @@ Matrix operator *(const Permutation& P, Matrix&& A) {
     return PA;
 }
 
+Matrix identity(uint size) { Matrix I(size,size); I.clear(); for(uint i: range(size)) I(i,i)=1; return I; }
+
+template<> string str(const Permutation& P) { return str(P*identity(P.order.size())); }
+
 // Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
 void pivot(Matrix &A, Permutation& P, uint j) {
     uint best=j;
@@ -54,27 +58,27 @@ PLU factorize(Matrix&& A) {
     Permutation P(n);
     // pivot first column
     pivot(A, P, 0);
-    Expression d = 1/A(0,0); for(uint i=1;i<n;i++) A(0,i) *= d;
+    float d = 1/A(0,0); for(uint i=1;i<n;i++) A(0,i) *= d;
     // compute an L column, pivot to interchange rows, compute an U row.
     for (uint j=1;j<n-1;j++) {
         for(uint i=j;i<n;i++) { // L column
-            Expression sum = 0;
+            float sum = 0;
             for(uint k=0;k<j;k++) sum += A(i,k)*A(k,j);
             A(i,j) -= sum;
         }
         pivot(A, P, j); //pivot
-        Expression d = 1/A(j,j);
+        float d = 1/A(j,j);
         for(uint k=j+1;k<n;k++) { //U row
-            Expression sum = 0;
+            float sum = 0;
             for(uint i=0; i<j; i++) sum += A(j,i)*A(i,k);
             A(j,k) = (A(j,k)-sum)*d;
         }
     }
     // compute last L element
-    Expression sum = 0;
+    float sum = 0;
     for(uint k=0;k<n-1;k++) sum += A(n-1,k)*A(k,n-1);
     A(n-1,n-1) -= sum;
-    return { move(P), move(A) };
+    return __( move(P), move(A) );
 }
 
 LU unpack(Matrix&& LU) {
@@ -86,20 +90,20 @@ LU unpack(Matrix&& LU) {
         U(i,i) = 1;
         for(uint j=i+1;j<L.n;j++) U(i,j)=move(L(i,j)), L(i,j) = 0;
     }
-    return { move(L), move(U) };
+    return __( move(L), move(U) );
 }
 
-Expression determinant(const Permutation& P, const Matrix& LU) {
-    Expression det = Expression( P.determinant() );
+float determinant(const Permutation& P, const Matrix& LU) {
+    float det = P.determinant();
     for(uint i=0;i<LU.n;i++) det *= LU(i,i);
     return det;
 }
 
-Vector solve(const Permutation& P, const Matrix &LU, Vector&& b) {
+Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
     assert(determinant(P,LU),"Coefficient matrix is singular"_);
     uint n=LU.n;
     Vector x(n);
-    for(uint i=0;i<n;i++) x[i] = copy(b[P[i]]); // Reorder b in x
+    for(uint i=0;i<n;i++) x[i] = b[P[i]]; // Reorder b in x
     for(uint i=0;i<n;i++) { // Forward substitution from packed L
         for(uint j=0;j<i;j++) x[i] -= LU(i,j)*x[j];
         x[i] = x[i]*(1/LU(i,i));
@@ -142,7 +146,7 @@ Vector solve(const Matrix& A, const Vector& b) {
     log(U);
     if(A!=P*(L*U)) log(A),log(L*U),log(P*(L*U)),assert(A==P*(L*U));
     log(b);
-    Vector x = solve(P,LU,copy(b));
+    Vector x = solve(P,LU,b);
     log(x);
     return x;
 }

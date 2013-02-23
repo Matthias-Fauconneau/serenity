@@ -1,30 +1,29 @@
 #pragma once
-/// Symbolic linear algebra (matrix operations, linear solver)
-#include "expression.h"
+/// Numeric linear algebra (matrix operations, linear solver)
+#include "memory.h"
+#include "string.h"
+#define NaN __builtin_nan("")
 
-/// Matrix for symbolic linear algebra
+/// Matrix for numeric linear algebra
 struct Matrix {
-    no_copy(Matrix);
-    Matrix(Matrix&& o) : data(o.data), m(o.m), n(o.n) { o.data=0; }
-    Matrix& operator=(Matrix&& o) {assert(&o!=this); this->~Matrix(); data=o.data; m=o.m; n=o.n; o.data=0; return *this; }
-    /// Allocate a m-row, n-column matrix initialized to invalid expressions
-    Matrix(uint m, uint n):data(new Expression[m*n]),m(m),n(n) {}
-    template<size_t N> Matrix(const Expression (&a)[N]):Matrix(sqrt(N),sqrt(N)) {
-        for(uint i: range(m)) for(uint j: range(n)) at(i,j)=Expression(::copy(a[i*m+j]));
+    default_move(Matrix);
+    /// Allocate a m-row, n-column matrix initialized to Nan
+    Matrix(uint m, uint n):data(m*n,NaN),m(m),n(n) {}
+    template<size_t N> Matrix(const float (&a)[N]):Matrix(sqrt(N),sqrt(N)) {
+        for(uint i: range(m)) for(uint j: range(n)) at(i,j)=a[i*m+j];
     }
-    ~Matrix() { if(data) delete[] data; }
 
-    const Expression& at(uint i, uint j) const { assert(data && i<m && j<n); return data[j*m+i]; }
-    Expression& at(uint i, uint j) { assert(data && i<m && j<n); return data[j*m+i]; }
-    const Expression& operator()(uint i, uint j) const { return at(i,j); }
-    Expression& operator()(uint i, uint j) { return at(i,j); }
+    const float& at(uint i, uint j) const { assert(data && i<m && j<n); return data[j*m+i]; }
+    float& at(uint i, uint j) { assert(data && i<m && j<n); return data[j*m+i]; }
+    const float& operator()(uint i, uint j) const { return at(i,j); }
+    float& operator()(uint i, uint j) { return at(i,j); }
 
     void clear() { for(uint i=0;i<m;i++) for(uint j=0;j<n;j++) at(i,j)=0; }
 
-    Expression* data; /// elements stored in column-major order
+    buffer<float> data; /// elements stored in column-major order
     uint m=0,n=0; /// row and column count
 };
-template<> inline Matrix copy(const Matrix& a) { Matrix o(a.m,a.n); copy(o.data,a.data,a.m*a.n); return o; }
+template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.data=copy(o.data); return move(t); }
 
 /// Returns true if both matrices are identical
 bool operator==(const Matrix& a,const Matrix& b);
@@ -33,7 +32,7 @@ inline bool operator!=(const Matrix& a,const Matrix& b) { return !(a==b); }
 /// Matrix multiplication (composition of linear transformations)
 Matrix operator*(const Matrix& a,const Matrix& b);
 
-/// Logs to standard text output
+/// Converts matrix to text
 template<> string str(const Matrix& a);
 
 /// Permutation matrix
@@ -49,6 +48,9 @@ struct Permutation {
 };
 
 Matrix operator *(const Permutation& P, Matrix&& A);
+
+/// Converts permutation matrix to text
+template<> string str(const Permutation& P);
 
 // Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
 void pivot(Matrix &A, Permutation& P, uint j);
@@ -66,23 +68,23 @@ LU unpack(Matrix&& LU);
 #define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
 
 /// Compute determinant of a packed PLU matrix (product along diagonal)
-Expression determinant(const Permutation& P, const Matrix& LU);
+float determinant(const Permutation& P, const Matrix& LU);
 
 /// Vector for symbolic linear algebra (i.e n-row, single column matrix)
 struct Vector : Matrix {
-    Vector(Matrix&& o):Matrix(move(o)){ assert(n==1); }
+    //Vector(Matrix&& o):Matrix(move(o)){ assert(n==1); }
     Vector(int n):Matrix(n,1){}
-    Vector(const ref<Expression>& list) : Vector(list.size) {
-        int i=0; for(auto& e: list) { at(i,0)=Expression(::copy(e)); i++; }
+    Vector(const ref<float>& list) : Vector(list.size) {
+        int i=0; for(auto& e: list) { at(i,0)=e; i++; }
     }
-    const Expression& operator[](uint i) const { assert(data && i<m); return data[i]; }
-    Expression& operator[](uint i) { assert(data && i<m); return data[i]; }
+    const float& operator[](uint i) const { assert(data && i<m); return data[i]; }
+    float& operator[](uint i) { assert(data && i<m); return data[i]; }
 };
-template<> inline Vector copy(const Vector& a) { return copy<Matrix>(a); }
+//template<> inline Vector copy(const Vector& a) { return copy<Matrix>(a); }
 template<> inline string str(const Vector& a) { return str<Matrix>(a); }
 
 /// Solves PLUx=b
-Vector solve(const Permutation& P, const Matrix &LU, Vector&& b);
+Vector solve(const Permutation& P, const Matrix &LU, const Vector& b);
 
 /// Solves Ax[j]=e[j] using LU factorization
 Matrix inverse(const Matrix &A);
