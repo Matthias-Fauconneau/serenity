@@ -1,3 +1,5 @@
+algebra.cc
+algebra.h
 analyzer.cc
 data.h
 file.h
@@ -103,3 +105,4 @@ record.h
 spectrogram.h
 trace.h
 test.cc
+windows.h

@@ -1,13 +1,14 @@
 PREFIX ?= /usr
 BUILD ?= release
-CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+# CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+CC = i686-w64-mingw32-gcc -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
 CC += -march=native $(FLAGS_$(BUILD))
 FLAGS_font = -I/usr/include/freetype2
 
-ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
+# ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
 ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next
@@ -15,7 +16,7 @@ ICONS_analyzer = play pause
 ICONS_music = music
 ICONS_test = feeds network
 
-SHADERS = display $(SHADERS_$(TARGET))
+# SHADERS = display $(SHADERS_$(TARGET))
 # SHADERS_blender = blender
 
 SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
@@ -31,6 +32,7 @@ LIBS_record = swscale avformat avcodec
 LIBS_sampler = fftw3f_threads
 LIBS_spectrogram = fftw3f_threads
 LIBS_stretch = rubberband
+LIBS_test = kernel32
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -78,7 +80,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@g++ $(LIBS:%=-l%) -o $(BUILD)/$(TARGET) $(filter %.o, $^)
+	$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET).exe $(filter %.o, $^)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
