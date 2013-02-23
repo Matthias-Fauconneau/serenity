@@ -1,60 +1,10 @@
+#include "process.h"
 
-#if 0
-#include "core.h"
-//windows.h
-extern "C" {
-#define WINAPI __stdcall
-
-typedef void* HANDLE;
-typedef HANDLE HINSTANCE;
-
-struct FileAttribute {
-	uint fileAttributes;
-	long creationTime;
-	long lastAccessTime;
-	long lastWriteTime;
-	uint fileSizeHigh;
-	uint fileSizeLow;
-};
-
-enum { GENERIC_WRITE=0x40000000, GENERIC_READ=0x80000000 };
-enum { FILE_SHARE_READ=1, FILE_SHARE_WRITE, OPEN_EXISTING };
-enum { STD_ERROR_HANDLE=-12, STD_OUTPUT_HANDLE=-11, STD_INPUT_HANDLE=-10 };
-
-HANDLE WINAPI CreateFileA(const char* path, int access, int shareMode, int securityAttributes, int creationDisposition, int flags, int templateFile);
-bool WINAPI WriteFile(HANDLE hFile, const char* buffer, int size, int* written, int* overlapped);
-bool WINAPI ReadFile(HANDLE hFile, char* buffer, int size, int* read, int* overlapped);
-bool WINAPI GetFileAttributesExA(char* name, int type, FileAttribute* info);
-HANDLE WINAPI GetStdHandle(int nStdHandle);
-
-}
-#else
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-#include "core.h"
-#if 1
-extern "C" int WinMain(HINSTANCE,HINSTANCE,char*,int)  {
-    HANDLE stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    WriteFile(stdout, "Hello World!\n", sizeof("Hello World!\n")-1, 0, 0);
-    return 0;
-}
-#endif
-
-#if 0
-#include <stdio.h>
-int main() {
-    printf("Hello World!\n");
-}
-#endif
-
-#if 0
-#include <windows.h>
-int WinMain(HINSTANCE,HINSTANCE,LPSTR,int)  {
-  MessageBox(0,"Hello, Windows","MinGW Test Program",MB_OK);
-  return 0;
-}
-#endif
+struct WindowsTest {
+    WindowsTest() {
+        log("Hello World!"_);
+    }
+} test;
 
 #if 0
 #include <windows.h>

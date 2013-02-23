@@ -23,7 +23,7 @@ SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
 SRCS_profile = profile
 
 LIBS_time = rt
-LIBS_process = pthread
+# LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_gl = X11 GL

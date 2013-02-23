@@ -1,6 +1,8 @@
 #pragma once
 /// \file process.h \link Thread Threaded event loops\endlink, \link Lock synchronization\endlink, execute, process environment and arguments
 #include "array.h"
+
+#if linux
 #include "file.h"
 
 extern "C" {
@@ -129,3 +131,4 @@ array< ref<byte> > arguments();
 const Folder& home(); //$HOME
 const Folder& config(); //$HOME/.config
 const Folder& cache(); //$HOME/.cache
+#endif

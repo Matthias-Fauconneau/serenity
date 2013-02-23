@@ -1,9 +1,13 @@
 #include "process.h"
+#if linux
 #include "linux.h"
-#include "file.h"
+#else
+#include "windows.h"
+#endif
+#include "string.h"
+#if linux
 #include "data.h"
 #include "trace.h"
-
 #include <sys/eventfd.h>
 #include <sched.h>
 #define signal signal_
@@ -11,32 +15,19 @@
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
-
-void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
-int exit_group(int status) { return syscall(SYS_exit_group, status); }
-int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
-int gettid() { return syscall(SYS_gettid); }
-
-static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
-
-#if __x86_64
-// Configures floating-point exceptions
-enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
-void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #endif
 
-// Lock access to thread list
-static Lock threadsLock __attribute((init_priority(1001)));
-// Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
-static array<Thread*> threads __attribute((init_priority(1002)));
-// Handle for the main thread (group leader)
-Thread mainThread __attribute((init_priority(1003))) __(20);
-
 // Log
+#if linux
 void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
+#else
+static HANDLE stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+void log_(const ref<byte>& buffer) { WriteFile(stdout, buffer.data,buffer.size, 0, 0); }
+#endif
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
 // Poll
+#if linux
 void Poll::registerPoll() {
     Locker lock(thread.lock);
     if(thread.unregistered.contains(this)) { thread.unregistered.removeAll(this); }
@@ -45,19 +36,24 @@ void Poll::registerPoll() {
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thread.post();}
+#endif
 
-// EventFD
+// Threads
+#if linux
+void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
+int exit_group(int status) { return syscall(SYS_exit_group, status); }
+int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
+int gettid() { return syscall(SYS_gettid); }
+
+// Lock access to thread list
+static Lock threadsLock __attribute((init_priority(1001)));
+// Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
+static array<Thread*> threads __attribute((init_priority(1002)));
+// Handle for the main thread (group leader)
+Thread mainThread __attribute((init_priority(1003))) __(20);
+
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
-// main
-int main() {
-    mainThread.run();
-    exit(); // Signals termination to all threads
-    for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
-    return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
-}
-
-// Thread
 Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
     Locker lock(threadsLock); threads<<this; // Adds this thread to global thread list
@@ -90,6 +86,7 @@ void Thread::run() {
     Locker lock(threadsLock); threads.removeAll(this);
     thread = 0;
 }
+
 void Thread::event() {
     EventFD::read();
     if(queue){
@@ -102,6 +99,19 @@ void Thread::event() {
         poll->event();
     }
 }
+#endif
+
+// Debugger
+#if linux
+
+static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
+                                         "Invalid"_, "Denormal"_};
+
+#if __x86_64
+// Configures floating-point exceptions
+enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
+void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
+#endif
 
 void traceAllThreads() {
     Locker lock(threadsLock);
@@ -158,13 +168,31 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
     {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } }
     exit_thread(0);
 }
+#else
+template<> void error(const ref<byte>& message) { log(message); ExitProcess(-1); }
+#endif
+
+// Entry point
+int main() {
+#if linux
+    mainThread.run();
+    exit(); // Signals termination to all threads
+    for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
+#endif
+    return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+}
 
 void exit() {
+#if linux
     Locker lock(threadsLock);
     for(Thread* thread: threads) { thread->terminate=true; thread->post(); }
+#else
+    //FIXME
+#endif
 }
 
 // Environment
+#if linux
 void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     if(!existsFile(path)) { warn("Executable not found",path); return; }
 
@@ -206,5 +234,4 @@ array< ref<byte> > arguments() {
 const Folder& home() { static Folder home(getenv("HOME"_)); return home; }
 const Folder& config() { static Folder config=Folder(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache=Folder(".cache"_,home(),true); return cache; }
-
-string userErrors;
+#endif
