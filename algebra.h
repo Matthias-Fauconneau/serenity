@@ -9,11 +9,8 @@ struct Matrix {
     Matrix& operator=(Matrix&& o) {assert(&o!=this); this->~Matrix(); data=o.data; m=o.m; n=o.n; o.data=0; return *this; }
     /// Allocate a m-row, n-column matrix initialized to invalid expressions
     Matrix(uint m, uint n):data(new Expression[m*n]),m(m),n(n) {}
-    Matrix(const ref< ref<Expression> >& list) : Matrix(list[0].size,list.size) {
-        for(uint i: range(m)) for(uint j: range(n)) at(i,j)=Expression(::copy(list[i][j]));
-    }
-    Matrix(const ref<Expression>& list) : Matrix(sqrt(list.size),sqrt(list.size)) {
-        for(uint i: range(m)) for(uint j: range(n)) at(i,j)=Expression(::copy(list[i*m+j]));
+    template<size_t N> Matrix(const Expression (&a)[N]):Matrix(sqrt(N),sqrt(N)) {
+        for(uint i: range(m)) for(uint j: range(n)) at(i,j)=Expression(::copy(a[i*m+j]));
     }
     ~Matrix() { if(data) delete[] data; }
 
@@ -64,6 +61,9 @@ PLU factorize(Matrix&& A);
 /// Returns L and U from a packed LU matrix.
 struct LU { Matrix L,U; };
 LU unpack(Matrix&& LU);
+
+/// Convenience macro to emulate multiple return arguments
+#define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
 
 /// Compute determinant of a packed PLU matrix (product along diagonal)
 Expression determinant(const Permutation& P, const Matrix& LU);

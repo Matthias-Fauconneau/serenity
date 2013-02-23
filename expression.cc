@@ -27,7 +27,7 @@ Expression abs(const Expression& a) {
 
 void Expression::invariant() const {
     assert(this);
-    assert(type>Invalid && type <= Pow);
+    assert(type>Invalid && type <= Pow, (int)type);
     if(type!=Integer) assert(!integer);
     if(type==Symbol) assert(symbol); else assert(!symbol);
     if(type==Symbol||type==Integer) assert(!a),assert(!b);

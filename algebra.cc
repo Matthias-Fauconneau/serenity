@@ -111,9 +111,6 @@ Vector solve(const Permutation& P, const Matrix &LU, Vector&& b) {
     return x;
 }
 
-/// convenience macro to emulate multiple return arguments
-#define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
-
 Matrix inverse(const Matrix &A) {
     log(A);
     multi(P,LU, = factorize(copy(A)); ) //compute P,LU
