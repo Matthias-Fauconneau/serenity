@@ -13,7 +13,7 @@ template<Type T> void clear(T* buffer, int size, const T& value=T()) { for(int i
 /// Raw memory copy
 inline void copy(byte* dst,const byte* src, int size) { for(int i=0;i<size;i++) dst[i]=src[i]; }
 /// Buffer explicit copy
-template<Type T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=src[i]; }
+template<Type T> void copy(T* dst,const T* src, int count) { for(int i=0;i<count;i++) dst[i]=copy(src[i]); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);
