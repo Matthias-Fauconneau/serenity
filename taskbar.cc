@@ -8,6 +8,9 @@
 #include "calendar.h"
 #include "png.h"
 
+/// Display size
+extern int2 displaySize;
+
 // Compares to single value
 template<Type T>  bool operator ==(const ref<T>& r, const T& value) { return r.size==1 && r.data[0] == value; }
 template<Type T> bool operator ==(const array<T>& a, const T& value) { return  (ref<T>)a==value; }

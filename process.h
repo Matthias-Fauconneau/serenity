@@ -2,6 +2,9 @@
 /// \file process.h \link Thread Threaded event loops\endlink, \link Lock synchronization\endlink, execute, process environment and arguments
 #include "array.h"
 
+/// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
+extern struct Thread mainThread;
+
 #if linux
 #include "file.h"
 
@@ -65,9 +68,6 @@ struct Semaphore {
     operator int() { return counter; }
 };
 
-/// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
-extern struct Thread mainThread;
-
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {
     no_copy(Poll);
@@ -114,10 +114,14 @@ struct Thread : array<Poll*>, EventFD, Poll {
     /// Processes one queued task
     void event();
 };
+#else
+struct Thread { Thread(int unused priority=0){} };
+#endif
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all file-scope objects and exits process.
 void exit();
 
+#if linux
 /// Execute binary at \a path with command line arguments \a args
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);
 

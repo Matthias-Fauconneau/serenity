@@ -155,3 +155,13 @@ inline float ceil(float f) { return __builtin_ceilf(f); }
 inline float fract(float f) { double one=1; return __builtin_modf(f, &one); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline float pow(float x, float y) { return __builtin_powf(x,y); }
+
+// Platform
+#if linux
+#define linux( statements... ) statements
+#define windows( statements... )
+#else
+/// Compiles \a statements in executable only if \a DEBUG flag is set
+#define linux( statements... )
+#define windows( statements... ) statements
+#endif

@@ -24,6 +24,7 @@ SRCS_profile = profile
 
 LIBS_time = rt
 # LIBS_process = pthread
+LIBS_window = gdi32 opengl32
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_gl = X11 GL
@@ -80,7 +81,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	$(CC) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET).exe $(filter %.o, $^)
+	$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET).exe
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png

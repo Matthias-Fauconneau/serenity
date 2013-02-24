@@ -5,16 +5,17 @@
 #include "image.h"
 #include "map.h"
 #include "widget.h"
+#if linux
 #include "x.h"
-
-/// Display size
-extern int2 displaySize;
+#else
+#include "platform.h"
+#endif
 
 enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
               Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
 
 /// Interfaces \a widget as a window on an X11 display server
-struct Window : Socket, Poll {
+struct Window linux( : Socket, Poll ) {
     no_copy(Window);
     enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display
@@ -27,32 +28,41 @@ struct Window : Socket, Poll {
         Window(widget, size, name, Image(),"_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread, renderer){}
     ~Window() { destroy(); }
 
+    /// Creates window.
+    void create();
+    /// Destroys window.
+    void destroy();
+
+    /// Schedules window rendering after all events have been processed (i.e Poll::wait())
+    void render();
+
+#if linux
     /// Event handler
     void event();
+#else
+    LRESULT event(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+#endif
+
+#if linux
     /// Processes one X event
     void processEvent(uint8 type, const XEvent& e);
     /// Returns Atom for \a name
     uint Atom(const ref<byte>& name);
     /// Returns KeySym for key \a code and modifier \a state
-    uint KeySym(uint8 code, uint8 state);
+    Key KeySym(uint8 code, uint8 state);
     /// Returns KeyCode for \a sym
     uint KeyCode(Key sym);
     /// Returns property \a name on \a window
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
+#endif
 
-    /// Creates window.
-    void create();
-    /// Destroys window.
-    void destroy();
+#if linux
     /// Shows window.
     void show();
     /// Hides window.
     void hide();
     /// Toggle visibility (e.g for popup menus)
     void toggle() { if(mapped) hide(); else show(); }
-
-    /// Schedules window rendering after all events have been processed (i.e Poll::wait())
-    void render();
 
     /// Moves window to \a position
     void setPosition(int2 position);
@@ -66,9 +76,12 @@ struct Window : Socket, Poll {
     void setIcon(const Image& icon);
     /// Sets window type to \a type
     void setType(const ref<byte>& type);
+#endif
 
     /// Registers local shortcut on \a key
     signal<>& localShortcut(Key);
+
+#if linux
     /// Registers global shortcut on \a key
     signal<>& globalShortcut(Key);
 
@@ -87,6 +100,7 @@ struct Window : Socket, Poll {
 
     /// Returns a snapshot of the root window
     Image getSnapshot();
+#endif
 
     /// Widget managed by this window
     Widget* widget;
@@ -103,11 +117,28 @@ struct Window : Socket, Poll {
     /// If set, this window will always be anchored to this position
     Anchor anchor = Float;
     /// Window position and size
-    int2 position, size;
+    int2 position=0, size=0;
+
+    /// Selects between software or OpenGL rendering
+    Renderer renderer;
     /// Window background intensity and opacity
     float backgroundColor=14./16, backgroundCenter=15./16, backgroundOpacity=1;
     bool clearBackground = true, featherBorder = false;
 
+    /// Shortcuts triggered when a key is pressed
+    map<uint16, signal<> > shortcuts;
+
+    /// Current cursor
+    Cursor cursor = Cursor::Arrow;
+    /// Current cursor position
+    int2 cursorPosition;
+    /// Drag state
+    int2 dragStart, dragPosition, dragSize;
+
+    /// Signals when a render request completed
+    signal<> frameReady;
+
+#if linux
     /// Root window
     uint root = 0;
     /// Root visual
@@ -118,17 +149,11 @@ struct Window : Socket, Poll {
     /// Synchronize reading from event and readReply
     Lock readLock;
 
-    /// Shortcuts triggered when a key is pressed
-    map<uint16, signal<> > shortcuts;
-
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;
     /// Associated window resource (relative to \a id)
     enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment };
 
-    /// Selects between software or OpenGL rendering
-    Renderer renderer;
-    uint renderTime=0;
     /// System V shared memory
     int shm = 0;
     /// Shared window back buffer
@@ -146,14 +171,8 @@ struct Window : Socket, Poll {
     array<QEvent> eventQueue;
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);
-
-    /// Current cursor
-    Cursor cursor = Cursor::Arrow;
-    /// Current cursor position
-    int2 cursorPosition;
-    /// Drag state
-    int2 dragStart, dragPosition, dragSize;
-
-    /// Signals when a render request completed
-    signal<> frameReady;
+#else
+    HWND hWnd;
+    HDC hDC;
+#endif
 };

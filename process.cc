@@ -1,10 +1,6 @@
 #include "process.h"
-#if linux
-#include "linux.h"
-#else
-#include "windows.h"
-#endif
 #include "string.h"
+#include "platform.h"
 #if linux
 #include "data.h"
 #include "trace.h"
@@ -39,18 +35,18 @@ void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thr
 #endif
 
 // Threads
+// Handle for the main thread (group leader)
+Thread mainThread __attribute((init_priority(1003))) __(20);
 #if linux
-void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
-int exit_group(int status) { return syscall(SYS_exit_group, status); }
-int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
-int gettid() { return syscall(SYS_gettid); }
-
 // Lock access to thread list
 static Lock threadsLock __attribute((init_priority(1001)));
 // Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
 static array<Thread*> threads __attribute((init_priority(1002)));
-// Handle for the main thread (group leader)
-Thread mainThread __attribute((init_priority(1003))) __(20);
+
+void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
+int exit_group(int status) { return syscall(SYS_exit_group, status); }
+int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
+int gettid() { return syscall(SYS_gettid); }
 
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
@@ -170,17 +166,28 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
 }
 #else
 template<> void error(const ref<byte>& message) { log(message); ExitProcess(-1); }
+extern "C" void __cxa_pure_virtual() { error("cxa_pure_virtual"_); }
 #endif
 
 // Entry point
-int main() {
 #if linux
+int main() {
     mainThread.run();
     exit(); // Signals termination to all threads
     for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
-#endif
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
+#else
+int WinMain(HINSTANCE,HINSTANCE,LPSTR,int) {
+    MSG msg;
+    while (GetMessage(&msg,0,0,0) > 0) {
+      TranslateMessage(&msg);
+      DispatchMessage(&msg);
+      if(msg.message == WM_QUIT) break;
+    }
+    return 0;
+}
+#endif
 
 void exit() {
 #if linux
@@ -190,6 +197,7 @@ void exit() {
     //FIXME
 #endif
 }
+
 
 // Environment
 #if linux

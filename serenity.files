@@ -12,7 +12,7 @@ utf8.cc
 array.h
 desktop.cc
 ico.h
-linux.h
+platform.h
 pdf.cc
 resample.cc
 stretch.h
@@ -105,4 +105,3 @@ record.h
 spectrogram.h
 trace.h
 test.cc
-windows.h

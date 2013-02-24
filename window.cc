@@ -1,11 +1,13 @@
 #include "window.h"
 #include "display.h"
 #include "widget.h"
+
+#if linux
 #include "file.h"
 #include "data.h"
-#include "linux.h"
 #include "time.h"
 #include "png.h"
+#include "linux.h"
 #include "x.h"
 
 #if GL
@@ -26,11 +28,6 @@ void glFinish();
 #include "gl.h"
 #endif
 
-// Public globals
-int2 displaySize;
-Widget* focus;
-Widget* drag;
-
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace Render { int EXT, event, errorBase; } using namespace Render;
 #if GL
@@ -38,13 +35,27 @@ static void* glDisplay=0;
 static void* glContext=0;
 #endif
 
-static __thread Window* current; // Window being rendered in this thread
-string getSelection(bool clipboard) { assert(current); return current->getSelection(clipboard); }
-void setCursor(Rect region, Cursor cursor) { assert(current); return current->setCursor(region,cursor); }
+int2 displaySize;
+#endif
 
-// Creates X window
+// Public globals
+
+Widget* focus;
+Widget* drag;
+static __thread Window* window; // Window being rendered in this thread
+#if linux
+string getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
+void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
+#else
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+    return window->event(hwnd,msg,wparam,lparam);
+}
+#endif
+
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, Renderer renderer)
-    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
+    : linux(Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), )
+      widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
+#if linux
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
@@ -84,19 +95,21 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         assert(format);
         read<uint>(r.numSubpixels);
     }
-
+    {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
+#endif
     if((size.x<0||size.y<0) && widget) {
         int2 hint=widget->sizeHint();
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
+#if linux
     if(size.x==0) size.x=displaySize.x;
     if(size.y==0) size.y=displaySize.y-16;
-    position=0;
     if(anchor==Bottom) position.y=displaySize.y-size.y;
+#endif
     this->size=size;
-    {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
     create();
+#if linux
     setTitle(title);
     setIcon(icon);
     setType(type);
@@ -118,24 +131,59 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         error("OpenGL unsupported");
 #endif
     }
+#endif
 }
+
 void Window::create() {
     assert(!created);
+#if linux
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
+#else
+    WNDCLASS wc;
+    wc.style=CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc=WindowProc;
+    wc.cbClsExtra=0;
+    wc.cbWndExtra=0;
+    wc.hInstance=0; //0x400000
+    wc.hIcon=LoadIcon(0,IDI_WINLOGO);
+    wc.hCursor=LoadCursor(0,IDC_ARROW);
+    wc.hbrBackground=(HBRUSH)COLOR_WINDOWFRAME;
+    wc.lpszMenuName=0;
+    wc.lpszClassName="Wine";
+    RegisterClass(&wc);
+    window = this;
+    hWnd = CreateWindow("Wine", "Wine", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, size.x, size.y, 0, 0, 0, 0);
+    hDC = GetDC(hWnd);  //get current windows device context
+    PIXELFORMATDESCRIPTOR pfd;
+    pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+    pfd.nVersion = 1;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL;
+    pfd.iPixelType = PFD_TYPE_RGBA;
+    pfd.cColorBits = 24; pfd.cDepthBits = 0; pfd.cStencilBits = 0;
+    uint nPixelFormat = ChoosePixelFormat(hDC, &pfd);
+    SetPixelFormat(hDC, nPixelFormat, &pfd);
+    HGLRC hGLRC = wglCreateContext(hDC);
+    wglMakeCurrent(hDC, hGLRC);
+#endif
     created = true;
 }
 void Window::destroy() {
     if(!created) return;
+#if linux
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
+#else
+    //TODO
+#endif
     created = false;
 }
 
+#if linux
 // Render
 void Window::event() {
     current=this;
@@ -211,7 +259,6 @@ void Window::event() {
             glFinish();
 #endif
         }
-        renderTime = realTime()-startTime;
     } else for(;;) {
         readLock.lock();
         if(!poll()) { readLock.unlock(); break; }
@@ -290,16 +337,16 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonRelease) drag=0;
         else if(type==KeyPress) {
-            uint key = KeySym(e.key, e.state);
-            if(focus && focus->keyPress((Key)key, (Modifiers)e.state)) render(); //normal keyPress event
+            Key key = KeySym(e.key, e.state);
+            if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); //normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
                 if(shortcut) (*shortcut)(); //local window shortcut
             }
         }
         else if(type==KeyRelease) {
-            uint key = KeySym(e.key, e.state);
-            if(focus && focus->keyRelease((Key)key, (Modifiers)e.state)) render();
+            Key key = KeySym(e.key, e.state);
+            if(focus && focus->keyRelease(key, (Modifiers)e.state)) render();
         }
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
@@ -337,7 +384,43 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else eventQueue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
     }
 }
+void Window::render() { /*if(mapped)*/ queue(); }
+#else
+LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
+    if(type==WM_CREATE) {
+        ShowWindow(hwnd, 10);
+        UpdateWindow(hwnd);
+    }
+    else if(type==WM_PAINT) {
+        RECT r; GetClientRect(hwnd,&r);
+        PAINTSTRUCT ps; HDC dc=BeginPaint(hwnd,&ps);
+        DrawText(dc,"Hello World",-1,&r,DT_SINGLELINE|DT_CENTER|DT_VCENTER);
+        EndPaint(hwnd,&ps);
+    }
+    else if(type==WM_KEYDOWN) {
+        Key key = Key(wparam);
+        if(focus && focus->keyPress(key, NoModifiers)) render(); //normal keyPress event
+        else {
+            signal<>* shortcut = shortcuts.find(key);
+            if(shortcut) (*shortcut)(); //local window shortcut
+        }
+    }
+    else if(type==WM_KEYUP) {
+        Key key = Key(wparam);
+        if(focus && focus->keyRelease(key, NoModifiers)) render();
+    }
+    else if(type==WM_CLOSE || type==WM_DESTROY) PostQuitMessage(0);
+    else return DefWindowProc(hwnd, type, wparam, lparam);
+    return 0;
+}
+void Window::render() {
+    PostMessage(hWnd, WM_PAINT, 0, 0);
+}
+#endif
 
+#if linux
+void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
+void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
 void Window::setPosition(int2 position) {
     if(position.x<0) position.x=displaySize.x+position.x;
@@ -366,12 +449,9 @@ void Window::setGeometry(int2 position, int2 size) {
     else if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
     else if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
 }
-void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
-void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
-void Window::render() { /*if(mapped)*/ queue(); }
 
 // Keyboard
-uint Window::KeySym(uint8 code, uint8 state) {
+Key Window::KeySym(uint8 code, uint8 state) {
     GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({GetKeyboardMapping r; r.keycode=code; raw(r);}));
     array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
     if(!keysyms) return 0;
@@ -384,7 +464,10 @@ uint Window::KeyCode(Key sym) {
     if(!keycode) warn("Unknown KeySym",int(sym));
     return keycode;
 }
+#endif
+
 signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
+#if linux
 signal<>& Window::globalShortcut(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
@@ -471,3 +554,4 @@ Image Window::getSnapshot() {
     shmctl(shm, IPC_RMID, 0);
     return image;
 }
+#endif
