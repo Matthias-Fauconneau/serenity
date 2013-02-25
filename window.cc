@@ -434,14 +434,11 @@ LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
         frameReady();
 
         if(renderer == Raster) {
-            /*if(featherBorder) { //feather borders
+            if(featherBorder) { //feather borders
                 const bool corner = 1;
                 if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
                 if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-                //if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-                //if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-            }*/
-            log(buffer.width, buffer.height);
+            }
             PAINTSTRUCT ps;
             HDC hdcDst = BeginPaint(hWnd, &ps);
             HDC hdcSrc = CreateCompatibleDC(hdcDst);
@@ -450,17 +447,6 @@ LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
             BitBlt(hdcDst, 0, 0, buffer.width, buffer.height, hdcSrc, 0, 0, SRCCOPY);
             DeleteDC(hdcSrc);
             EndPaint(hWnd, &ps);
-            /*glBindTexture(GL_TEXTURE_2D, id);
-            glTexImage2D(GL_TEXTURE_2D, 0, 3, buffer.width, buffer.height, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer.data);
-            vec2 min = vec2(-1,-1), max = vec2(1,1);
-            vec2 positions[] = { vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y) };
-            glVertexPointer(2,GL_FLOAT,0,positions);
-            glEnableClientState(GL_VERTEX_ARRAY);
-            vec2 texCoords[] = { vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0) }; //flip Y
-            glTexCoordPointer(2,GL_FLOAT,0,texCoords);
-            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-            glDrawArrays(GL_TRIANGLE_STRIP,0,4);
-            glFinish();*/
         }
     }
     else if(type==WM_SYSKEYDOWN || type==WM_KEYDOWN) {
@@ -480,7 +466,6 @@ LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
     return 0;
 }
 void Window::render() {
-    log("render");
     PostMessage(hWnd, WM_PAINT, 0, 0);
 }
 #endif

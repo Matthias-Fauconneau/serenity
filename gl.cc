@@ -1,11 +1,6 @@
 #include "gl.h"
 #include "data.h"
 
-#ifndef linux
-#define WIN32_LEAN_AND_MEAN
-#undef Type
-#undef unused
-#endif
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
 
