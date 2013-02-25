@@ -1,12 +1,16 @@
 #include "gl.h"
 #include "data.h"
 
+#ifndef linux
+#define WIN32_LEAN_AND_MEAN
+#undef Type
+#undef unused
+#endif
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
 
 /// Context
 
-void glFramebufferSRGB(bool enable) { if(enable) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB); }
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
 void glBlend(bool enable, bool add) {

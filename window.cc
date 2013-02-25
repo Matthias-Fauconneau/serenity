@@ -36,6 +36,8 @@ static void* glContext=0;
 #endif
 
 int2 displaySize;
+#else
+#include <GL/gl.h>
 #endif
 
 // Public globals
@@ -131,6 +133,8 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         error("OpenGL unsupported");
 #endif
     }
+#else
+    (void)icon; (void)type; (void)thread;
 #endif
 }
 
@@ -158,6 +162,7 @@ void Window::create() {
     RegisterClass(&wc);
     window = this;
     hWnd = CreateWindow("Wine", "Wine", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, size.x, size.y, 0, 0, 0, 0);
+    SetActiveWindow(hWnd);
     hDC = GetDC(hWnd);  //get current windows device context
     PIXELFORMATDESCRIPTOR pfd;
     pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
@@ -167,8 +172,9 @@ void Window::create() {
     pfd.cColorBits = 24; pfd.cDepthBits = 0; pfd.cStencilBits = 0;
     uint nPixelFormat = ChoosePixelFormat(hDC, &pfd);
     SetPixelFormat(hDC, nPixelFormat, &pfd);
-    HGLRC hGLRC = wglCreateContext(hDC);
+    hGLRC = wglCreateContext(hDC);
     wglMakeCurrent(hDC, hGLRC);
+    glGenTextures(1, &id);
 #endif
     created = true;
 }
@@ -233,10 +239,11 @@ void Window::event() {
             glXMakeCurrent(glDisplay, id, glContext);
             if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
             ::softwareRendering=false;
+#else
+            error("Unsupported");
 #endif
         }
 
-        uint startTime = realTime();
         widget->render(0,size);
         assert(!clipStack);
 
@@ -392,12 +399,71 @@ LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
         UpdateWindow(hwnd);
     }
     else if(type==WM_PAINT) {
-        RECT r; GetClientRect(hwnd,&r);
-        PAINTSTRUCT ps; HDC dc=BeginPaint(hwnd,&ps);
-        DrawText(dc,"Hello World",-1,&r,DT_SINGLELINE|DT_CENTER|DT_VCENTER);
-        EndPaint(hwnd,&ps);
+        assert(size);
+        currentClip=Rect(size);
+
+        if(renderer == Raster) {
+            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) buffer = Image(size.x, size.y);
+            framebuffer=share(buffer);
+            currentClip=Rect(size);
+            ::softwareRendering=true;
+
+            if(clearBackground) {
+                if(backgroundCenter==backgroundColor) {
+                    fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                } else { // Oxygen-like radial gradient background
+                    constexpr int radius=256;
+                    int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
+                            a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
+                    if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                    uint* dst=(uint*)framebuffer.data;
+                    for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                        int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
+                        dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+                    }
+                }
+            }
+        } else {
+            ::softwareRendering=false;
+            error("Unsupported");
+        }
+
+        widget->render(0,size);
+        assert(!clipStack);
+
+        frameReady();
+
+        if(renderer == Raster) {
+            /*if(featherBorder) { //feather borders
+                const bool corner = 1;
+                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+                //if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
+                //if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+            }*/
+            log(buffer.width, buffer.height);
+            PAINTSTRUCT ps;
+            HDC hdcDst = BeginPaint(hWnd, &ps);
+            HDC hdcSrc = CreateCompatibleDC(hdcDst);
+            HBITMAP hBitmap = CreateBitmap(buffer.width, buffer.height, 1, 32, buffer.data);
+            SelectObject(hdcSrc, hBitmap);
+            BitBlt(hdcDst, 0, 0, buffer.width, buffer.height, hdcSrc, 0, 0, SRCCOPY);
+            DeleteDC(hdcSrc);
+            EndPaint(hWnd, &ps);
+            /*glBindTexture(GL_TEXTURE_2D, id);
+            glTexImage2D(GL_TEXTURE_2D, 0, 3, buffer.width, buffer.height, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer.data);
+            vec2 min = vec2(-1,-1), max = vec2(1,1);
+            vec2 positions[] = { vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y) };
+            glVertexPointer(2,GL_FLOAT,0,positions);
+            glEnableClientState(GL_VERTEX_ARRAY);
+            vec2 texCoords[] = { vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0) }; //flip Y
+            glTexCoordPointer(2,GL_FLOAT,0,texCoords);
+            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+            glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+            glFinish();*/
+        }
     }
-    else if(type==WM_KEYDOWN) {
+    else if(type==WM_SYSKEYDOWN || type==WM_KEYDOWN) {
         Key key = Key(wparam);
         if(focus && focus->keyPress(key, NoModifiers)) render(); //normal keyPress event
         else {
@@ -405,7 +471,7 @@ LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
             if(shortcut) (*shortcut)(); //local window shortcut
         }
     }
-    else if(type==WM_KEYUP) {
+    else if(type==WM_SYSKEYUP || type==WM_KEYUP) {
         Key key = Key(wparam);
         if(focus && focus->keyRelease(key, NoModifiers)) render();
     }
@@ -414,6 +480,7 @@ LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
     return 0;
 }
 void Window::render() {
+    log("render");
     PostMessage(hWnd, WM_PAINT, 0, 0);
 }
 #endif

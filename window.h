@@ -174,5 +174,8 @@ struct Window linux( : Socket, Poll ) {
 #else
     HWND hWnd;
     HDC hDC;
+    HGLRC hGLRC;
+    Image buffer;
+    uint id;
 #endif
 };
