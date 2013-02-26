@@ -116,14 +116,9 @@ Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
 }
 
 Matrix inverse(const Matrix &A) {
-    log(A);
     multi(P,LU, = factorize(copy(A)); ) //compute P,LU
-    log(determinant(P,LU));
-    //log(P.order);
     multi(L,U, = unpack(copy(LU)); ) //unpack LU -> L,U
-    //log(L);
-    //log(U);
-    if(A!=P*(L*U)) log(A),log(P*(L*U)),assert(A==P*(L*U));
+    //if(A!=P*(L*U)) log("|A|",determinant(P,LU)), log("A",A), log(P*(L*U)), error("A==P*(L*U)");
     uint n = A.n;
     Matrix A_1(n,n);
     for(uint j=0;j<n;j++) {
@@ -131,23 +126,16 @@ Matrix inverse(const Matrix &A) {
         Vector x = solve(P,LU,move(e));
         for(uint i=0;i<n;i++) A_1(i,j) = move(x[i]);
     }
-    log(A_1);
     Matrix I(n,n); for(uint i=0;i<n;i++) { for(uint j=0;j<n;j++) I(i,j)=0; I(i,i)=1; }
     assert(A_1*A==I,A_1*A);
     return A_1;
 }
 
 Vector solve(const Matrix& A, const Vector& b) {
-    log(A);
     multi(P,LU, = factorize(copy(A)); ) //compute P,LU
-    log(determinant(P,LU));
     multi(L,U, = unpack(copy(LU)); ) //unpack LU -> L,U
-    log(L);
-    log(U);
-    if(A!=P*(L*U)) log(A),log(L*U),log(P*(L*U)),assert(A==P*(L*U));
-    log(b);
+    //if(A!=P*(L*U)) log("|A|",determinant(P,LU)), log("A",A), log(P*(L*U)), error("A==P*(L*U)");
     Vector x = solve(P,LU,b);
-    log(x);
     return x;
 }
 

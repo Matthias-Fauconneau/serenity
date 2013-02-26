@@ -7,7 +7,7 @@
 #include "data.h"
 #include "time.h"
 #include "png.h"
-#include "linux.h"
+#include "platform.h"
 #include "x.h"
 
 #if GL
@@ -55,7 +55,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 #endif
 
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, Renderer renderer)
-    : linux(Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), )
+    :
+#if linux
+      Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread),
+#endif
       widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
 #if linux
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
@@ -192,7 +195,7 @@ void Window::destroy() {
 #if linux
 // Render
 void Window::event() {
-    current=this;
+    window=this;
     if(revents==IDLE) {
         if(autoResize) {
             int2 hint = widget->sizeHint();
@@ -275,7 +278,7 @@ void Window::event() {
         processEvent(type, e);
         while(eventQueue) { readLock.lock(); QEvent e=eventQueue.take(0); readLock.unlock(); processEvent(e.type, e.event); }
     };
-    current=0;
+    window=0;
 }
 
 // Events
@@ -506,9 +509,9 @@ void Window::setGeometry(int2 position, int2 size) {
 Key Window::KeySym(uint8 code, uint8 state) {
     GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({GetKeyboardMapping r; r.keycode=code; raw(r);}));
     array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
-    if(!keysyms) return 0;
+    if(!keysyms) return (Key)0;
     if(keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
-    return keysyms[state&1];
+    return (Key)keysyms[state&1];
 }
 uint Window::KeyCode(Key sym) {
     uint keycode=0;

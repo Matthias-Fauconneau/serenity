@@ -79,6 +79,8 @@ struct Vector : Matrix {
     }
     const float& operator[](uint i) const { assert(data && i<m); return data[i]; }
     float& operator[](uint i) { assert(data && i<m); return data[i]; }
+    const float& operator()(uint i) const { assert(data && i<m); return data[i]; }
+    float& operator()(uint i) { assert(data && i<m); return data[i]; }
 };
 //template<> inline Vector copy(const Vector& a) { return copy<Matrix>(a); }
 template<> inline string str(const Vector& a) { return str<Matrix>(a); }

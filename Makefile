@@ -2,10 +2,10 @@ PREFIX ?= /usr
 BUILD ?= release
 ifeq ($(BUILD),windows)
 CC = i686-w64-mingw32-gcc -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra
-CC += -Dwindows
+CC += -Dwindows=1
 else
 CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
-CC += -Dlinux
+CC += -Dlinux=1
 endif
 FLAGS_windows = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
@@ -14,7 +14,9 @@ FLAGS_release = -O3
 CC += -march=native $(FLAGS_$(BUILD))
 FLAGS_font = -I/usr/include/freetype2
 
-# ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
+ifneq ($(BUILD),windows)
+ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
+endif
 ICONS_taskbar = button
 ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next

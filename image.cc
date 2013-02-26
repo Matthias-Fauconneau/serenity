@@ -41,9 +41,10 @@ Image resize(const Image& image, uint width, uint height) {
         for(uint dy: range(height)) {
             for(uint dx: range(width)) {
                 float x = dx*scaleX, y=dy*scaleY;
-                const int fx = round(x*256), fy = round(y*256);
-                int ix = fx/256, iy = fy/256;
-                int u = fx%256, v = fy%256;
+                const uint fx = round(x*256), fy = round(y*256);
+                uint ix = fx/256, iy = fy/256;
+                uint u = fx%256, v = fy%256;
+                if(ix==source.width-1) u=0; if(iy==source.height-1) v=0;
                 byte* s = (byte*)src+iy*stride+ix*4;
                 byte4 d;
                 for(int i=0; i<4; i++) {
