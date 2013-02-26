@@ -22,7 +22,9 @@ extern "C" void* realloc(void* buffer, size_t size);
 extern "C" void free(void* buffer);
 // Typed memory allocation (without initialization)
 template<Type T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
+#if linux
 template<Type T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
+#endif
 template<Type T> void reallocate(T*& buffer, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
 template<Type T> void unallocate(T*& buffer) { assert(buffer); free((void*)buffer); buffer=0; }
 
@@ -36,8 +38,8 @@ template<Type T> struct buffer {
     T* data=0;
     uint capacity=0,size=0;
     buffer(){}
-    explicit buffer(uint capacity):data(allocate64<T>(capacity)),capacity(capacity){}
-    buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){clear(data,size,value);}
+    explicit buffer(uint capacity):data(allocate<T>(capacity)),capacity(capacity){}
+    buffer(uint size, const T& value):data(allocate<T>(size)),capacity(size),size(size){clear(data,size,value);}
     move_operator_(buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     ~buffer(){if(data){unallocate(data);}}
     explicit operator bool() const { return data; }
