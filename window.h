@@ -15,7 +15,11 @@ enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom
               Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
 
 /// Interfaces \a widget as a window on an X11 display server
-struct Window linux( : Socket, Poll ) {
+struct Window
+#if linux
+        : Socket, Poll
+#endif
+{
     no_copy(Window);
     enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display

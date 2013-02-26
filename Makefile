@@ -1,7 +1,13 @@
 PREFIX ?= /usr
 BUILD ?= release
-# CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
-CC = i686-w64-mingw32-gcc -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+ifeq ($(BUILD),windows)
+CC = i686-w64-mingw32-gcc -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra
+CC += -Dwindows
+else
+CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+CC += -Dlinux
+endif
+FLAGS_windows = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
 FLAGS_release = -O3
@@ -23,8 +29,11 @@ SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
 SRCS_profile = profile
 
 LIBS_time = rt
-# LIBS_process = pthread
+ifeq ($(BUILD),windows)
+LIBS_process = kernel32
 LIBS_window = gdi32 opengl32
+else
+LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
 LIBS_gl = X11 GL
@@ -33,7 +42,7 @@ LIBS_record = swscale avformat avcodec
 LIBS_sampler = fftw3f_threads
 LIBS_spectrogram = fftw3f_threads
 LIBS_stretch = rubberband
-LIBS_test = kernel32
+endif
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -81,7 +90,11 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
+ifeq ($(BUILD),windows)
 	$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET).exe
+else
+	$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
+endif
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
