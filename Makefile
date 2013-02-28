@@ -93,9 +93,9 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
 ifeq ($(BUILD),windows)
-	$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET).exe
+	@$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET).exe
 else
-	$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
+	@$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
 endif
 	@echo $(BUILD)/$(TARGET)
 

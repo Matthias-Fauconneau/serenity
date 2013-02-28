@@ -170,17 +170,18 @@ template<uint base> string itoa(int64 number, int pad) {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    while(64-i<pad) buf[--i] = '0';
+    //while(64-i+(number<0)<pad) buf[--i] = '0';
     if(number<0) buf[--i]='-';
+    while(64-i<pad) buf[--i] = ' ';
     return string(ref<byte>(buf+i,64-i));
 }
 template string itoa<10>(int64,int);
 
-string ftoa(float n, int precision, int exponent) {
+string ftoa(float n, int precision, int pad, int exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
     uint32 e=0; if(exponent) while(n!=0 && abs(n)<1) n*=exponent, e++;
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
-    return (n>=0?""_:"-"_)+utoa<10>(abs(n))+(precision?"."_+utoa<10>(uint64(m*abs(n))%m,precision):string())+(e?"e-"_+str(e):string());
+    return itoa(round(m*n)/m,pad)+(precision?"."_+utoa<10>(uint64(round(m*abs(n)))%m,precision):string())+(e?"e-"_+str(e):string());
 }

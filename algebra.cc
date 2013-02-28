@@ -14,17 +14,17 @@ Matrix operator*(const Matrix& a,const Matrix& b) {
 }
 
 template<> string str(const Matrix& a) {
-    string s("["_);
+    string s("[ "_);
     for(uint i=0;i<a.m;i++) {
-        if(a.n==1) s<< "\t"_+str(a(i,0));
+        if(a.n==1) s<<ftoa(a(i,0),0,3)<<' ';
         else {
             for(uint j=0;j<a.n;j++) {
-                s<< "\t"_+str(a(i,j));
+                s<<ftoa(a(i,j),0,3)<<' ';
             }
-            if(i<a.m-1) s<<"\n"_;
+            if(i<a.m-1) s<<"\n  "_;
         }
     }
-    s << " ]"_;
+    s << "]"_;
     return s;
 }
 
@@ -115,10 +115,14 @@ Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
     return x;
 }
 
+Vector solve(const Matrix& A, const Vector& b) {
+    multi(P,LU, = factorize(copy(A)); ) //compute P,LU
+    Vector x = solve(P,LU,b);
+    return x;
+}
+
 Matrix inverse(const Matrix &A) {
     multi(P,LU, = factorize(copy(A)); ) //compute P,LU
-    multi(L,U, = unpack(copy(LU)); ) //unpack LU -> L,U
-    //if(A!=P*(L*U)) log("|A|",determinant(P,LU)), log("A",A), log(P*(L*U)), error("A==P*(L*U)");
     uint n = A.n;
     Matrix A_1(n,n);
     for(uint j=0;j<n;j++) {
@@ -130,12 +134,3 @@ Matrix inverse(const Matrix &A) {
     assert(A_1*A==I,A_1*A);
     return A_1;
 }
-
-Vector solve(const Matrix& A, const Vector& b) {
-    multi(P,LU, = factorize(copy(A)); ) //compute P,LU
-    multi(L,U, = unpack(copy(LU)); ) //unpack LU -> L,U
-    //if(A!=P*(L*U)) log("|A|",determinant(P,LU)), log("A",A), log(P*(L*U)), error("A==P*(L*U)");
-    Vector x = solve(P,LU,b);
-    return x;
-}
-
