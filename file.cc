@@ -1,13 +1,11 @@
 #include "file.h"
-#include "platform.h"
+#include "linux.h"
 #include "string.h"
 
-#if linux
 #include <sys/syscall.h>
 static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
 struct dirent { long ino, off; short len; char name[]; };
 enum {DT_DIR=4, DT_REG=8};
-#endif
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }

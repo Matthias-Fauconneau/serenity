@@ -1,12 +1,10 @@
 #pragma once
 /// \file process.h \link Thread Threaded event loops\endlink, \link Lock synchronization\endlink, execute, process environment and arguments
 #include "array.h"
+#include "file.h"
 
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
-
-#if linux
-#include "file.h"
 
 extern "C" {
 typedef unsigned long int pthread_t;
@@ -114,14 +112,10 @@ struct Thread : array<Poll*>, EventFD, Poll {
     /// Processes one queued task
     void event();
 };
-#else
-struct Thread { Thread(int unused priority=0){} };
-#endif
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all file-scope objects and exits process.
 void exit();
 
-#if linux
 /// Execute binary at \a path with command line arguments \a args
 void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);
 
@@ -135,4 +129,3 @@ array< ref<byte> > arguments();
 const Folder& home(); //$HOME
 const Folder& config(); //$HOME/.config
 const Folder& cache(); //$HOME/.cache
-#endif

@@ -4,26 +4,37 @@
 #include "string.h"
 #define NaN __builtin_nan("")
 
-/// Matrix for numeric linear algebra
+/// Sparse CSR matrix for numeric linear algebra
 struct Matrix {
     default_move(Matrix);
-    /// Allocate a m-row, n-column matrix initialized to Nan
-    Matrix(uint m, uint n):data(m*n,NaN),m(m),n(n) {}
+    /// Allocate a m-row, n-column sparse matrix
+    Matrix(uint m, uint n):m(m),n(n),lines(m+1,0){}
     template<size_t N> Matrix(const float (&a)[N]):Matrix(sqrt(N),sqrt(N)) {
         for(uint i: range(m)) for(uint j: range(n)) at(i,j)=a[i*m+j];
     }
 
-    const float& at(uint i, uint j) const { assert(data && i<m && j<n); return data[j*m+i]; }
-    float& at(uint i, uint j) { assert(data && i<m && j<n); return data[j*m+i]; }
-    const float& operator()(uint i, uint j) const { return at(i,j); }
+    float at(uint i, uint j) const {
+        assert(i<m && j<n);
+        for(uint i: range(lines[i],lines[i+1])) if(data[i].column==j) return data[i].value;
+        return 0;
+    }
+    float& at(uint i, uint j) {
+        assert(i<m && j<n);
+        for(uint i: range(lines[i],lines[i+1])) if(data[i].column == j) return data[i].value;
+        uint index=lines[i]; for(; index<lines[i+1]; index++) if(data[index].column > j) break;
+        data.insertAt(index, Element __(j,0));
+        for(uint i: range(i+1,lines.size)) lines[i]++;
+        return data[index].value;
+    }
+    float operator()(uint i, uint j) const { return at(i,j); }
     float& operator()(uint i, uint j) { return at(i,j); }
 
-    void clear() { for(uint i=0;i<m;i++) for(uint j=0;j<n;j++) at(i,j)=0; }
-
-    buffer<float> data; /// elements stored in column-major order
     uint m=0,n=0; /// row and column count
+    buffer<uint> lines; /// indices of the first element of each line
+    struct Element { uint column; float value; };
+    array<Element> data; /// elements stored top-down left-right
 };
-template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.data=copy(o.data); return move(t); }
+template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.lines=copy(o.lines); t.data=copy(o.data); return move(t); }
 
 /// Returns true if both matrices are identical
 bool operator==(const Matrix& a,const Matrix& b);
@@ -70,20 +81,24 @@ LU unpack(Matrix&& LU);
 /// Compute determinant of a packed PLU matrix (product along diagonal)
 float determinant(const Permutation& P, const Matrix& LU);
 
-/// Vector for symbolic linear algebra (i.e n-row, single column matrix)
-struct Vector : Matrix {
-    //Vector(Matrix&& o):Matrix(move(o)){ assert(n==1); }
-    Vector(int n):Matrix(n,1){}
-    Vector(const ref<float>& list) : Vector(list.size) {
-        int i=0; for(auto& e: list) { at(i,0)=e; i++; }
-    }
-    const float& operator[](uint i) const { assert(data && i<m); return data[i]; }
-    float& operator[](uint i) { assert(data && i<m); return data[i]; }
-    const float& operator()(uint i) const { assert(data && i<m); return data[i]; }
-    float& operator()(uint i) { assert(data && i<m); return data[i]; }
+/// Dense vector for numeric linear algebra
+struct Vector {
+    default_move(Vector);
+    /// Allocates an n-component vector
+    Vector(uint n):data(n,NaN),n(n){}
+    Vector(const ref<float>& o) : Vector(o.size) { for(uint i: range(n)) at(i)=o[i]; }
+
+    const float& at(uint i) const { assert(data && i<n); return data[i]; }
+    float& at(uint i) { assert(data && i<n); return data[i]; }
+    const float& operator[](uint i) const { return at(i); }
+    float& operator[](uint i) { return at(i); }
+    const float& operator()(uint i) const { return at(i); }
+    float& operator()(uint i) { return at(i); }
+
+    buffer<float> data; /// elements stored in column-major order
+    uint n=0; /// component count
 };
-//template<> inline Vector copy(const Vector& a) { return copy<Matrix>(a); }
-template<> inline string str(const Vector& a) { return str<Matrix>(a); }
+template<> inline string str(const Vector& a) { string s; for(uint i: range(a.n)) { s<<str(a[i]); if(i<a.n-1) s<<' ';} return s; }
 
 /// Solves PLUx=b
 Vector solve(const Permutation& P, const Matrix &LU, const Vector& b);

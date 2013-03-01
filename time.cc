@@ -1,5 +1,5 @@
 #include "time.h"
-#include "platform.h"
+#include "linux.h"
 #include "data.h"
 #include "string.h"
 

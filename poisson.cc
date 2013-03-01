@@ -13,7 +13,7 @@ struct PoissonSolver : Widget {
     Window window __(this, int2(-1,-1), "Poisson"_);
     PoissonSolver() {
         const uint N = Mx*My; // Total sample count
-        Matrix A (N,N); A.clear(); // Poisson operator
+        Matrix A (N,N); // Poisson operator
         Vector b (N); // Right-hand vector
         for(uint x: range(Mx)) {
             for(uint y: range(My)) {
@@ -39,6 +39,8 @@ struct PoissonSolver : Widget {
                 }
             }
         }
+        log(A);
+        log(b);
 
         multi(P,LU, = factorize(copy(A)); ) //compute P,LU
         multi(L,U, = unpack(copy(LU)); ) //unpack LU -> L,U

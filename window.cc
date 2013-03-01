@@ -1,13 +1,11 @@
 #include "window.h"
 #include "display.h"
 #include "widget.h"
-
-#if linux
 #include "file.h"
 #include "data.h"
 #include "time.h"
 #include "png.h"
-#include "platform.h"
+#include "linux.h"
 #include "x.h"
 
 #if GL
@@ -36,31 +34,19 @@ static void* glContext=0;
 #endif
 
 int2 displaySize;
-#else
-#include <GL/gl.h>
-#endif
 
 // Public globals
 
 Widget* focus;
 Widget* drag;
 static __thread Window* window; // Window being rendered in this thread
-#if linux
+
 string getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
-#else
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-    return window->event(hwnd,msg,wparam,lparam);
-}
-#endif
+
 
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, Renderer renderer)
-    :
-#if linux
-      Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread),
-#endif
-      widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
-#if linux
+    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path)) error("X connection failed");
@@ -101,20 +87,17 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         read<uint>(r.numSubpixels);
     }
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
-#endif
+
     if((size.x<0||size.y<0) && widget) {
         int2 hint=widget->sizeHint();
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
-#if linux
     if(size.x==0) size.x=displaySize.x;
     if(size.y==0) size.y=displaySize.y-16;
     if(anchor==Bottom) position.y=displaySize.y-size.y;
-#endif
     this->size=size;
     create();
-#if linux
     setTitle(title);
     setIcon(icon);
     setType(type);
@@ -136,63 +119,26 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         error("OpenGL unsupported");
 #endif
     }
-#else
-    (void)icon; (void)type; (void)thread;
-#endif
 }
 
 void Window::create() {
     assert(!created);
-#if linux
-    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual; r.colormap=id+Colormap;
+    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual;
+        r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
-#else
-    WNDCLASS wc;
-    wc.style=CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc=WindowProc;
-    wc.cbClsExtra=0;
-    wc.cbWndExtra=0;
-    wc.hInstance=0; //0x400000
-    wc.hIcon=LoadIcon(0,IDI_WINLOGO);
-    wc.hCursor=LoadCursor(0,IDC_ARROW);
-    wc.hbrBackground=(HBRUSH)COLOR_WINDOWFRAME;
-    wc.lpszMenuName=0;
-    wc.lpszClassName="Wine";
-    RegisterClass(&wc);
-    window = this;
-    hWnd = CreateWindow("Wine", "Wine", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, size.x, size.y, 0, 0, 0, 0);
-    SetActiveWindow(hWnd);
-    hDC = GetDC(hWnd);  //get current windows device context
-    PIXELFORMATDESCRIPTOR pfd;
-    pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-    pfd.nVersion = 1;
-    pfd.dwFlags = PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL;
-    pfd.iPixelType = PFD_TYPE_RGBA;
-    pfd.cColorBits = 24; pfd.cDepthBits = 0; pfd.cStencilBits = 0;
-    uint nPixelFormat = ChoosePixelFormat(hDC, &pfd);
-    SetPixelFormat(hDC, nPixelFormat, &pfd);
-    hGLRC = wglCreateContext(hDC);
-    wglMakeCurrent(hDC, hGLRC);
-    glGenTextures(1, &id);
-#endif
     created = true;
 }
 void Window::destroy() {
     if(!created) return;
-#if linux
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
-#else
-    //TODO
-#endif
     created = false;
 }
 
-#if linux
 // Render
 void Window::event() {
     window=this;
@@ -395,85 +341,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
     }
 }
 void Window::render() { /*if(mapped)*/ queue(); }
-#else
-LRESULT Window::event(HWND hwnd, UINT type, WPARAM wparam, LPARAM lparam) {
-    if(type==WM_CREATE) {
-        ShowWindow(hwnd, 10);
-        UpdateWindow(hwnd);
-    }
-    else if(type==WM_PAINT) {
-        assert(size);
-        currentClip=Rect(size);
 
-        if(renderer == Raster) {
-            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) buffer = Image(size.x, size.y);
-            framebuffer=share(buffer);
-            currentClip=Rect(size);
-            ::softwareRendering=true;
-
-            if(clearBackground) {
-                if(backgroundCenter==backgroundColor) {
-                    fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                } else { // Oxygen-like radial gradient background
-                    constexpr int radius=256;
-                    int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                            a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
-                    if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                    uint* dst=(uint*)framebuffer.data;
-                    for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                        int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
-                        dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
-                    }
-                }
-            }
-        } else {
-            ::softwareRendering=false;
-            error("Unsupported");
-        }
-
-        widget->render(0,size);
-        assert(!clipStack);
-
-        frameReady();
-
-        if(renderer == Raster) {
-            if(featherBorder) { //feather borders
-                const bool corner = 1;
-                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-            }
-            PAINTSTRUCT ps;
-            HDC hdcDst = BeginPaint(hWnd, &ps);
-            HDC hdcSrc = CreateCompatibleDC(hdcDst);
-            HBITMAP hBitmap = CreateBitmap(buffer.width, buffer.height, 1, 32, buffer.data);
-            SelectObject(hdcSrc, hBitmap);
-            BitBlt(hdcDst, 0, 0, buffer.width, buffer.height, hdcSrc, 0, 0, SRCCOPY);
-            DeleteDC(hdcSrc);
-            EndPaint(hWnd, &ps);
-        }
-    }
-    else if(type==WM_SYSKEYDOWN || type==WM_KEYDOWN) {
-        Key key = Key(wparam);
-        if(focus && focus->keyPress(key, NoModifiers)) render(); //normal keyPress event
-        else {
-            signal<>* shortcut = shortcuts.find(key);
-            if(shortcut) (*shortcut)(); //local window shortcut
-        }
-    }
-    else if(type==WM_SYSKEYUP || type==WM_KEYUP) {
-        Key key = Key(wparam);
-        if(focus && focus->keyRelease(key, NoModifiers)) render();
-    }
-    else if(type==WM_CLOSE || type==WM_DESTROY) PostQuitMessage(0);
-    else return DefWindowProc(hwnd, type, wparam, lparam);
-    return 0;
-}
-void Window::render() {
-    PostMessage(hWnd, WM_PAINT, 0, 0);
-}
-#endif
-
-#if linux
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
@@ -519,10 +387,8 @@ uint Window::KeyCode(Key sym) {
     if(!keycode) warn("Unknown KeySym",int(sym));
     return keycode;
 }
-#endif
 
 signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
-#if linux
 signal<>& Window::globalShortcut(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
@@ -609,4 +475,3 @@ Image Window::getSnapshot() {
     shmctl(shm, IPC_RMID, 0);
     return image;
 }
-#endif

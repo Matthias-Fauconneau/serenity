@@ -1,7 +1,6 @@
 #include "process.h"
 #include "string.h"
-#include "platform.h"
-#if linux
+#include "linux.h"
 #include "data.h"
 #include "trace.h"
 #include <sys/eventfd.h>
@@ -11,19 +10,12 @@
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
-#endif
 
 // Log
-#if linux
 void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
-#else
-static HANDLE stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-void log_(const ref<byte>& buffer) { WriteFile(stdout, buffer.data,buffer.size, 0, 0); }
-#endif
 template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
 
 // Poll
-#if linux
 void Poll::registerPoll() {
     Locker lock(thread.lock);
     if(thread.unregistered.contains(this)) { thread.unregistered.removeAll(this); }
@@ -32,12 +24,11 @@ void Poll::registerPoll() {
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thread.post();}
-#endif
 
 // Threads
+
 // Handle for the main thread (group leader)
 Thread mainThread __attribute((init_priority(1003))) __(20);
-#if linux
 // Lock access to thread list
 static Lock threadsLock __attribute((init_priority(1001)));
 // Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
@@ -95,10 +86,8 @@ void Thread::event() {
         poll->event();
     }
 }
-#endif
 
 // Debugger
-#if linux
 
 static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
                                          "Invalid"_, "Denormal"_};
@@ -164,43 +153,21 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
     {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } }
     exit_thread(0);
 }
-#else
-template<> void error(const ref<byte>& message) { log(message); ExitProcess(-1); }
-extern "C" void __cxa_pure_virtual() { error("cxa_pure_virtual"_); }
-#endif
 
 // Entry point
-#if linux
 int main() {
     mainThread.run();
     exit(); // Signals termination to all threads
     for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
-#else
-int WinMain(HINSTANCE,HINSTANCE,LPSTR,int) {
-    MSG msg;
-    while (GetMessage(&msg,0,0,0) > 0) {
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-      if(msg.message == WM_QUIT) break;
-    }
-    return 0;
-}
-#endif
 
 void exit() {
-#if linux
     Locker lock(threadsLock);
     for(Thread* thread: threads) { thread->terminate=true; thread->post(); }
-#else
-    //FIXME
-#endif
 }
 
-
 // Environment
-#if linux
 void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     if(!existsFile(path)) { warn("Executable not found",path); return; }
 
@@ -242,4 +209,3 @@ array< ref<byte> > arguments() {
 const Folder& home() { static Folder home(getenv("HOME"_)); return home; }
 const Folder& config() { static Folder config=Folder(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache=Folder(".cache"_,home(),true); return cache; }
-#endif

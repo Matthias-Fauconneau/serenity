@@ -12,7 +12,7 @@ utf8.cc
 array.h
 desktop.cc
 ico.h
-platform.h
+linux.h
 pdf.cc
 resample.cc
 stretch.h

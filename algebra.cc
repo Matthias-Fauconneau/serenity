@@ -35,7 +35,7 @@ Matrix operator *(const Permutation& P, Matrix&& A) {
     return PA;
 }
 
-Matrix identity(uint size) { Matrix I(size,size); I.clear(); for(uint i: range(size)) I(i,i)=1; return I; }
+Matrix identity(uint size) { Matrix I(size,size); for(uint i: range(size)) I(i,i)=1; return I; }
 
 template<> string str(const Permutation& P) { return str(P*identity(P.order.size())); }
 

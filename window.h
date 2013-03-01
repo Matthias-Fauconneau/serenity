@@ -5,21 +5,13 @@
 #include "image.h"
 #include "map.h"
 #include "widget.h"
-#if linux
 #include "x.h"
-#else
-#include "platform.h"
-#endif
 
 enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
               Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
 
 /// Interfaces \a widget as a window on an X11 display server
-struct Window
-#if linux
-        : Socket, Poll
-#endif
-{
+struct Window : Socket, Poll {
     no_copy(Window);
     enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display
@@ -40,14 +32,9 @@ struct Window
     /// Schedules window rendering after all events have been processed (i.e Poll::wait())
     void render();
 
-#if linux
     /// Event handler
     void event();
-#else
-    LRESULT event(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-#endif
 
-#if linux
     /// Processes one X event
     void processEvent(uint8 type, const XEvent& e);
     /// Returns Atom for \a name
@@ -58,9 +45,7 @@ struct Window
     uint KeyCode(Key sym);
     /// Returns property \a name on \a window
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
-#endif
 
-#if linux
     /// Shows window.
     void show();
     /// Hides window.
@@ -80,12 +65,9 @@ struct Window
     void setIcon(const Image& icon);
     /// Sets window type to \a type
     void setType(const ref<byte>& type);
-#endif
 
     /// Registers local shortcut on \a key
     signal<>& localShortcut(Key);
-
-#if linux
     /// Registers global shortcut on \a key
     signal<>& globalShortcut(Key);
 
@@ -104,7 +86,6 @@ struct Window
 
     /// Returns a snapshot of the root window
     Image getSnapshot();
-#endif
 
     /// Widget managed by this window
     Widget* widget;
@@ -142,7 +123,6 @@ struct Window
     /// Signals when a render request completed
     signal<> frameReady;
 
-#if linux
     /// Root window
     uint root = 0;
     /// Root visual
@@ -175,11 +155,4 @@ struct Window
     array<QEvent> eventQueue;
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);
-#else
-    HWND hWnd;
-    HDC hDC;
-    HGLRC hGLRC;
-    Image buffer;
-    uint id;
-#endif
 };

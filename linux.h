@@ -1,8 +1,7 @@
 #pragma once
-/// \file platform.h Linux kernel syscalls and error codes | Win32 API
+/// \file linux.h Linux kernel syscalls and error codes
 #include "core.h"
 
-#if linux
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -21,13 +20,3 @@ constexpr ref<byte> errno[] = {"OK"_, "PERM"_, "NOENT"_, "SRCH"_, "INTR"_, "IO"_
 #define check_(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) warn(#expr ""_, errno[-e], ##message); })
 /// Aborts if \a expr is negative and logs corresponding error code (unless EINTR or EAGAIN)
 #define check__(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST && -e!=INTR && -e!=AGAIN) warn(#expr ""_, errno[-e], ##message); e; })
-
-#else
-
-#define WIN32_LEAN_AND_MEAN
-#undef Type
-#undef unused
-#define Escape Escape_
-#include <windows.h>
-#undef Escape
-#endif
