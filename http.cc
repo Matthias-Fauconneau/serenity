@@ -8,7 +8,6 @@
 #include "process.h"
 #include "string.h"
 
-enum {F_SETFL=4};
 struct sockaddress { uint16 family; uint16 port; uint host; int pad[2]; };
 
 // UDPSocket
