@@ -35,7 +35,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             quarter = sorted.values.last();
             if(sorted.values[sorted.values.size()-3]==9) half = 9;
             else half = sorted.values[sorted.values.size()-4];
-            log(quarter, half, sorted);
+            //log(quarter, half, sorted);
         }
     }
     //TODO: OCR glyphs and factorize logic
@@ -320,7 +320,7 @@ trillCancelTie: ;
     }
     for(Tie t : tied) if(notes[t.ri][t.rx].contains(t.ry)) notes[t.ri][t.rx].remove(t.ry);
 
-    /// Fix chords with diadics (shifted x positions) or double notes (TODO: use MIDI assistance)
+    /// Fix chords with diadics (shifted x positions) or double notes
     for(map<int, map< int, Note> >& staff : notes) {
         for(uint i: range(staff.keys.size())) {
             if(i>0) {
@@ -333,24 +333,25 @@ trillCancelTie: ;
                                     abs(x-pX)<2 ||
                                     (abs(x-pX)<=22 && y==pY && chord.size()==1) || //cancel repeated note in diadic
                                     (abs(x-pX)<10 && abs(y-pY)<180 && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
-                                    ((abs(x-pX)<18 && abs(y-pY)<20) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
+                                    ((abs(x-pX)<17 && abs(y-pY)<20) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
+                                    ((abs(x-pX)<18 && abs(y-pY)<14) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
                                     ((abs(x-pX)<=19 && abs(y-pY)<=7) && (y!=pY))
                                     )) {
+                            if(i<staff.keys.size()-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) { //prevent stealing diadic from wrong chord
+                                for(int nY : staff.values[i+1].keys) if(abs(nY-y)<=abs(x-pX)) goto skip;
+                            }
                             if(lastChord.size()<=chord.size()) {
                                 if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
-                                lastChord.remove(pY); debug[vec2(pX,-pY)]<<string("->"_); goto again;
+                                lastChord.remove(pY); debug[vec2(pX,-pY)]<<str("->"_,abs(x-pX),abs(y-pY)); goto again;
                             } else if(lastChord.size()>=chord.size() && (
                                           (abs(x-pX)<=17 && abs(y-pY)<=6)
                                           || (chord.size()==1 && abs(x-pX)<=22 && abs(y-pY)<=0)
                                           )) {
-                                if(i<staff.keys.size()-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) { //prevent stealing diadic from wrong chord
-                                    for(int nY : staff.values[i+1].keys) if(abs(nY-y)<=abs(x-pX)) goto skip;
-                                }
                                 if(!lastChord.contains(y)) lastChord.insertSorted(y,chord.at(y));
                                 chord.remove(y); debug[vec2(x,-y)]<<str("<-"_,x-pX,y-pY); goto again;
-                                skip:;
-                            } else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
-                        } else if(abs(x-pX)<10 || (abs(x-pX)<20 && abs(y-pY)<20)) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                            } //else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
+                        } //else if(abs(x-pX)<10 || (abs(x-pX)<20 && abs(y-pY)<20)) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                        skip:;
                     }
                 }
             }

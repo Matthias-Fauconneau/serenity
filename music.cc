@@ -149,8 +149,8 @@ struct Music {
         audio.start();
         thread.spawn();
         //openSheet("Kingdom Dance"_);
-        openSheet("Skyrim - Dragonborn"_);
-        //openSheet("Starcraft II - Fire and Fury"_);
+        //openSheet("Skyrim - Dragonborn"_);
+        openSheet("Starcraft II - Fire and Fury"_);
         toggleAnnotations();
     }
 
@@ -166,7 +166,7 @@ struct Music {
                                         scale*next-pdfScore.ScrollArea::size.y) //and at least next
                                     );*/
             //pdfScore.center(int2(0,scale*current));
-            // Current staff  is always second staff from bottom edge (allows to repeat page, track scrolling, see keyboard in peripheral vision)
+            // Always set current staff as second staff from bottom edge (allows to repeat page, track scrolling, see keyboard)
             pdfScore.delta.y = -(scale*next-pdfScore.ScrollArea::size.y);
         }
         //midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
