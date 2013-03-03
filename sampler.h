@@ -15,7 +15,7 @@ struct Note : FLAC {
     float4 level; //current note attenuation
     float4 step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
     Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
-    Semaphore writeCount __((int)buffer.capacity); //audio thread release free samples, decoder thread acquires
+    Semaphore writeCount __((int)audio.capacity); //audio thread release free samples, decoder thread acquires
     uint16 releaseTime; //to compute step
     uint8 key=0; //to match release sample
     ref<float> envelope; //to level release sample
@@ -43,13 +43,15 @@ struct Sampler : Poll {
         float shift;
         array<Note> notes; // Active notes (currently being sampled) in this layer
         Resampler resampler; // Resampler to shift pitch
-        buffer<float> buffer; // Buffer to mix notes before resampling
+        buffer<float> audio; // Buffer to mix notes before resampling
     };
     array<Layer> layers;
 
     uint rate = 0;
     static constexpr uint periodSize = 128; // same as resampler latency and 1m wave propagation time
+    //static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb)
 
+#define REVERB 1
 #if REVERB
     /// Convolution reverb
     bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).

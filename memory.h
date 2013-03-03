@@ -39,6 +39,7 @@ template<Type T> struct buffer {
     explicit buffer(uint capacity):data(allocate64<T>(capacity)),capacity(capacity){}
     buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){clear(data,size,value);}
     move_operator_(buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
+    explicit buffer(const buffer& o):buffer(o.capacity){size=o.size; copy(data,o.data,size);}
     ~buffer(){if(data){unallocate(data);}}
     explicit operator bool() const { return data; }
     operator T*() { return data; }
@@ -48,4 +49,3 @@ template<Type T> struct buffer {
     const T& operator[](uint i) const { assert(i<size); return data[i]; }
     T& operator[](uint i) { assert(i<size); return (T&)data[i]; }
 };
-template<Type T> inline buffer<T> copy(const buffer<T>& o){buffer<T> t(o.capacity); t.size=o.size; copy(t.data,o.data,o.size); return t; }

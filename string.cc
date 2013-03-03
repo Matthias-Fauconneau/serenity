@@ -170,9 +170,8 @@ template<uint base> string itoa(int64 number, int pad) {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    //while(64-i+(number<0)<pad) buf[--i] = '0';
     if(number<0) buf[--i]='-';
-    while(64-i<pad) buf[--i] = ' ';
+    while(64-i<pad) buf[--i] = '0';
     return string(ref<byte>(buf+i,64-i));
 }
 template string itoa<10>(int64,int);

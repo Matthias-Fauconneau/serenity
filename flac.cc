@@ -148,7 +148,7 @@ template<int unroll> inline void interleave(const int channelMode,const float* A
 
 uint64 rice=0, predict=0, order=0;
 void FLAC::decodeFrame() {
-    assert(blockSize && blockSize<buffer.capacity);
+    assert(blockSize && blockSize<audio.capacity);
     int allocSize = align(4096,blockSize);
     float block[2][allocSize];
     setRoundMode(Down);
@@ -245,14 +245,14 @@ void FLAC::decodeFrame() {
     setRoundMode(Even);
     index=align(8,index);
     skip(16);
-    assert(blockSize<=readIndex+buffer.capacity-writeIndex,blockSize,readIndex,buffer.capacity,writeIndex); buffer.size+=blockSize;
-    uint beforeWrap=buffer.capacity-writeIndex;
+    assert(blockSize<=readIndex+audio.capacity-writeIndex,blockSize,readIndex,audio.capacity,writeIndex); audio.size+=blockSize;
+    uint beforeWrap=audio.capacity-writeIndex;
     if(blockSize>beforeWrap) {
-        interleave<4>(channelMode,block[0],block[1],buffer+writeIndex,buffer+buffer.capacity);
-        interleave<4>(channelMode,block[0]+beforeWrap,block[1]+beforeWrap,buffer,buffer+blockSize-beforeWrap);
+        interleave<4>(channelMode,block[0],block[1],audio+writeIndex,audio+audio.capacity);
+        interleave<4>(channelMode,block[0]+beforeWrap,block[1]+beforeWrap,audio,audio+blockSize-beforeWrap);
         writeIndex = blockSize-beforeWrap;
     } else {
-        interleave<4>(channelMode,block[0],block[1],buffer+writeIndex,buffer+writeIndex+blockSize);
+        interleave<4>(channelMode,block[0],block[1],audio+writeIndex,audio+writeIndex+blockSize);
         writeIndex += blockSize;
     }
     if(index<bsize) parseFrame(); else blockSize=0;
@@ -260,16 +260,16 @@ void FLAC::decodeFrame() {
 }
 
 uint FLAC::read(float2 *out, uint size) {
-    while(buffer.size<size){ if(blockSize==0) { size=buffer.size; break; } decodeFrame(); }
-    uint beforeWrap = buffer.capacity-readIndex;
+    while(audio.size<size){ if(blockSize==0) { size=audio.size; break; } decodeFrame(); }
+    uint beforeWrap = audio.capacity-readIndex;
     if(size>beforeWrap) {
-        copy(out,buffer+readIndex,beforeWrap);
-        copy(out+beforeWrap,buffer+0,size-beforeWrap);
+        copy(out,audio+readIndex,beforeWrap);
+        copy(out+beforeWrap,audio+0,size-beforeWrap);
         readIndex=size-beforeWrap;
     } else {
-        copy(out,buffer+readIndex,size);
+        copy(out,audio+readIndex,size);
         readIndex+=size;
     }
-    buffer.size-=size; position+=size;
+    audio.size-=size; position+=size;
     return size;
 }

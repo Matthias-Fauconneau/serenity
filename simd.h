@@ -20,8 +20,12 @@ inline float extract(float4 v, int i) { return __builtin_ia32_vec_ext_v4sf(v,i);
 #endif
 #endif
 
+typedef int word4 __attribute((vector_size(16)));
+inline word4 cvtps(float4 a) { return (word4)_mm_cvtps_epi32(a); }
+
 // AVX intrinsics
-#if __AVX__
+//#if __AVX__
+#if 0
 #include "immintrin.h"
 #ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
 #include "avxintrin.h"

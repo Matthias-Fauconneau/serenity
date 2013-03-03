@@ -1,12 +1,7 @@
 PREFIX ?= /usr
 BUILD ?= release
-ifeq ($(BUILD),windows)
-CC = i686-w64-mingw32-gcc -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra
-CC += -Dwindows=1
-else
-CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
-CC += -Dlinux=1
-endif
+CC := g++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+#CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_windows = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_debug = -g -fno-omit-frame-pointer -DDEBUG
 FLAGS_profile = -g -O3 -finstrument-functions
@@ -14,9 +9,7 @@ FLAGS_release = -O3
 CC += -march=native $(FLAGS_$(BUILD))
 FLAGS_font = -I/usr/include/freetype2
 
-ifneq ($(BUILD),windows)
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
-endif
 ICONS_taskbar = button
 ICONS_desktop = feeds network shutdown
 ICONS_player = play pause next
@@ -31,10 +24,6 @@ SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
 SRCS_profile = profile
 
 LIBS_time = rt
-ifeq ($(BUILD),windows)
-LIBS_process = kernel32
-LIBS_window = gdi32 opengl32
-else
 LIBS_process = pthread
 LIBS_font = freetype
 LIBS_http = ssl
@@ -44,7 +33,6 @@ LIBS_record = swscale avformat avcodec
 LIBS_sampler = fftw3f_threads
 LIBS_spectrogram = fftw3f_threads
 LIBS_stretch = rubberband
-endif
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop
@@ -92,11 +80,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-ifeq ($(BUILD),windows)
-	@$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET).exe
-else
 	@$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
-endif
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png

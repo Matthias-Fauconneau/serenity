@@ -13,6 +13,7 @@
 #include "score.h"
 #include "midiscore.h"
 #include "record.h"
+#include "keyboard.h"
 
 // Simple human readable/editable format for score synchronization annotations
 map<uint, Chord> parseAnnotations(string&& annotations) {
@@ -136,17 +137,20 @@ struct Music {
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
-        window.localShortcut(Key('r')).connect(this,&Music::toggleRecord);
+        //window.localShortcut(Key('r')).connect(this,&Music::toggleRecord);
+        window.localShortcut(Key('r')).connect(this,&Music::toggleReverb);
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);
         window.localShortcut(Delete).connect(&score,&Score::remove);
         window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
-        window.localShortcut(Key('r')).connect(this,&Music::toggleReverb);
 
         showSheetList();
         audio.start();
         thread.spawn();
+        //openSheet("Starcraft II - Fire and Fury"_);
+        openSheet("Kingdom Dance"_);
+        toggleAnnotations();
     }
 
     void toggleReverb() { sampler.enableReverb=!sampler.enableReverb; }

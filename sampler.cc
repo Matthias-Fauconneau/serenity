@@ -38,9 +38,9 @@ template<int unroll> inline void accumulate(float4 accumulators[unroll], const f
     }
 }
 float Note::sumOfSquares(uint size) {
-    size =size/2; uint index = readIndex/2, capacity = buffer.capacity/2; //align to float4
+    size =size/2; uint index = readIndex/2, capacity = audio.capacity/2; //align to float4
     uint beforeWrap = capacity-index;
-    const float4* buffer = (float4*)this->buffer.data;
+    const float4* buffer = (float4*)audio.data;
     constexpr uint unroll=4; //4*4*4~64bytes: 1 prefetch/line
     float4 accumulators[unroll]={}; //breaks dependency chain to pipeline the unrolled loops
     if(size>beforeWrap) { //wrap
@@ -76,12 +76,12 @@ void Sampler::open(const ref<byte>& path) {
                 sample->map = Map(path,folder);
                 sample->data = Note(sample->map);
                 if(!existsFile(string(path+".env"_),folder)) {
-                    Note copy = sample->data;
+                    Note copy = ::copy(sample->data);
                     array<float> envelope; uint size=0;
                     while(copy.blockSize!=0) {
                         const uint period=1<<8;
                         while(copy.blockSize!=0 && size<period) { size+=copy.blockSize; copy.decodeFrame(); }
-                        if(size>=period) { envelope << copy.sumOfSquares(period); copy.readIndex=(copy.readIndex+period)%copy.buffer.capacity; size-=period; }
+                        if(size>=period) { envelope << copy.sumOfSquares(period); copy.readIndex=(copy.readIndex+period)%copy.audio.capacity; size-=period; }
                     }
                     log(string(path+".env"_),envelope.size());
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
@@ -123,7 +123,7 @@ void Sampler::open(const ref<byte>& path) {
                 layers.grow(layers.size()+1);
                 layer = &layers.last();
                 layer->shift = shift;
-                layer->notes.reserve(64); // Avoid locking (FIXME: heap pointers array)
+                layer->notes.reserve(128); // Avoid locking (FIXME: heap pointers array)
                 if(shift) {
                     const uint size = 2048; //1024; // Accurate frequency resolution while keeping reasonnable filter bank size
                     new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)));
@@ -163,7 +163,7 @@ void Sampler::open(const ref<byte>& path) {
         fftwf_execute(p);
         fftwf_destroy_plan(p);
         unallocate(filter[c]); // Releases time domain filter
-        for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; //Cuts frequencies higher than nyquist
+        //for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; // Low-pass (some samples are aliased) //FIXME: only on those samples
     }
 
     // Allocates reverb buffer and temporary buffers
@@ -208,7 +208,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * s.volume;
             }
             if(level<0x1p-15) return;
-            Note note = s.data;
+            Note note = ::copy(s.data);
             if(!current) note.key=key;
             note.step=(float4)__(1,1,1,1);
             note.releaseTime=s.releaseTime;
@@ -221,8 +221,8 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
                 if(layer == 0) { error("Layer not instantiated at initialization",key, s.lokey, s.hikey, s.pitch_keycenter, shift); return; }
                 if(layer->notes.size()==layer->notes.capacity()) {
-                    Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use a list of heap pointer instead)
                     log(layer->notes.size());
+                    Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use a list of heap pointer instead)
                     layer->notes.reserve(layer->notes.size()*2);
                 }
                 layer->notes << move(note);
@@ -239,7 +239,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
 /// Background decoder (background thread)
 
 void Note::decode(uint need) {
-    assert(need<=buffer.capacity);
+    assert(need<=audio.capacity);
     while(readCount<=int(need) && blockSize && (int)writeCount>=blockSize) {
         int size=blockSize; writeCount.acquire(size); FLAC::decodeFrame(); readCount.release(size);
     }
@@ -247,7 +247,7 @@ void Note::decode(uint need) {
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
         for(Layer& layer: layers) for(uint j=0; j<layer.notes.size(); j++) { Note& note=layer.notes[j];
-            if((note.blockSize==0 && note.readCount<2*128) || extract(note.level,0)<0x1p-23) layer.notes.removeAt(j); else j++;
+            if((note.blockSize==0 && note.readCount<int(2*periodSize)) || extract(note.level,0)<0x1p-23) layer.notes.removeAt(j); else j++;
         }
         noteReadLock.unlock();
     }
@@ -255,9 +255,9 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     for(;;) {
         Note* note=0; uint minBufferSize=-1;
         for(Layer& layer: layers) for(Note& n: layer.notes) { // find least buffered note
-            if(n.blockSize && n.writeCount>=n.blockSize && n.buffer.size<minBufferSize) {
+            if(n.blockSize && n.writeCount>=n.blockSize && n.audio.size<minBufferSize) {
                 note=&n;
-                minBufferSize=n.buffer.size;
+                minBufferSize=n.audio.size;
             }
         }
         if(!note) break; //all notes are already fully buffered
@@ -275,20 +275,20 @@ void Note::read(float4* out, uint size) {
         log("decoder underrun");
         readCount.acquire(size*2); //ensure decoder follows
     }
-    uint beforeWrap = (buffer.capacity-readIndex)/2;
+    uint beforeWrap = (audio.capacity-readIndex)/2;
     if(size>beforeWrap) {
-        mix(level,step,out,(float4*)(buffer+readIndex),beforeWrap);
-        mix(level,step,out+beforeWrap,(float4*)(buffer+0),size-beforeWrap);
+        mix(level,step,out,(float4*)(audio+readIndex),beforeWrap);
+        mix(level,step,out+beforeWrap,(float4*)(audio+0),size-beforeWrap);
         readIndex = (size-beforeWrap)*2;
     } else {
-        mix(level,step,out,(float4*)(buffer+readIndex),size);
+        mix(level,step,out,(float4*)(audio+readIndex),size);
         readIndex += size*2;
     }
-    buffer.size-=size*2; writeCount.release(size*2); //allow decoder to continue
+    audio.size-=size*2; writeCount.release(size*2); //allow decoder to continue
     position+=size*2; //keep track of position for release sample level matching
 }
 uint Sampler::read(int32* output, uint size) { // Audio thread
-    float8 buffer64[size*2/8]; // Force alignment
+    float4 buffer64[size*2/4]; // Force alignment
     float* buffer = (float*)buffer64;
     clear(buffer, size*2);
 
@@ -296,10 +296,10 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
                 uint inSize=align(2,layer.resampler.need(size));
-                if(layer.buffer.capacity<inSize*2) layer.buffer = ::buffer<float>(inSize*2);
-                clear(layer.buffer.data, inSize*2);
-                for(Note& note: layer.notes) note.read((float4*)layer.buffer.data, inSize/2);
-                layer.resampler.filter<true>(layer.buffer, inSize, buffer, size);
+                if(layer.audio.capacity<inSize*2) layer.audio = ::buffer<float>(inSize*2);
+                clear(layer.audio.data, inSize*2);
+                for(Note& note: layer.notes) note.read((float4*)layer.audio.data, inSize/2);
+                layer.resampler.filter<true>(layer.audio, inSize, buffer, size);
             } else {
                  for(Note& note: layer.notes) note.read((float4*)buffer, size/2);
             }
@@ -344,7 +344,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
             for(uint i: range(2*size)) buffer[i] *= 0x1p6f; // 24bit samples to 32bit output with 2bit head room to add multiple notes
         }
         // Converts mixing buffer to signed 32bit output
-        for(uint i: range(size/4)) ((word8*)output)[i] = cvtps(((float8*)buffer)[i]);
+        for(uint i: range(size/2)) ((word4*)output)[i] = cvtps(((float4*)buffer)[i]);
     }
 
     time+=size;
@@ -378,7 +378,6 @@ Sampler::~Sampler() {
     fftwf_destroy_plan(backward);
     unallocate(input);
     unallocate(product);
-    unallocate(buffer);
 #endif
 }
 constexpr uint Sampler::periodSize;

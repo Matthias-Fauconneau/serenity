@@ -75,7 +75,8 @@ void AudioOutput::event() {
     if(available>=(int)periodSize) {
         uint readSize;
         if(sampleBits==16) readSize=read16(((int16*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
-        if(sampleBits==32) readSize=read32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
+        else if(sampleBits==32) readSize=read32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
+        else error(sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
         if(readSize<periodSize) { stop(); return; }
