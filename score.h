@@ -64,11 +64,13 @@ struct Score {
     signal<float,float,float> nextStaff;
     map<vec2, string> debug;
     int pass=-1;
-    int msScore=0;
+    int msScore=0; //HACK
+    map<int,int> histogram;
+    int quarter=0, half=0;
 
     void clear() {
         staffs.clear(); lastClef=lastPos=0; repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear();
         notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0;
-        active.clear(); expected.clear(); debug.clear(); pass=-1;
+        active.clear(); expected.clear(); debug.clear(); pass=-1; histogram.clear();
     }
 };

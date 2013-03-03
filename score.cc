@@ -27,7 +27,17 @@ void Score::onPath(const ref<vec2>& p) {
 }
 
 void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int code, int fontIndex) {
-    if(index == 0) pass++;
+    if(index == 0) {
+        pass++;
+        if(histogram) { //FIXME: OCR
+            map<int, int> sorted;
+            for(pair<int,int> sample: histogram) if(!sorted.contains(sample.value)) sorted.insertSorted(sample.value, sample.key); //insertion sort
+            quarter = sorted.values.last();
+            if(sorted.values[sorted.values.size()-3]==9) half = 9;
+            else half = sorted.values[sorted.values.size()-4];
+            log(quarter, half, sorted);
+        }
+    }
     //TODO: OCR glyphs and factorize logic
     if(pass==0) { // 1st pass: split score in staves
         //FIXME: (lastClef.y+pos.y)/2 breaks wrapped ties, use lastClef.y+110 if pos.y-lastClef.y>130, or switch to a better staff detection method
@@ -46,12 +56,13 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         } else if(font=="OpusStd"_) {
             if((code==3||code==6 ||code==5 /*||code==7*/) && pos.x<200) { //FIXME: OCR
                 if(pos.y-lastClef.y>130 && staffCount!=1) {
-                    //staffs << (lastClef.y+pos.y)/2+12;
-                    staffs << lastClef.y+110;
+                    if(pos.y-lastClef.y>200) staffs << lastClef.y+110; // for ties wrapped on staff before page breaks
+                    else staffs << (lastClef.y+pos.y)/2+12;
                     staffCount=1;
                 } else staffCount++;
                 lastClef=pos;
             }
+            histogram[code]++;
         } else if(endsWith(font,"Opus"_)) {
             if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200) {
                 if(pos.y-lastClef.y>110 && staffCount!=1) {
@@ -91,7 +102,8 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             break_:;
         }
     } else if(pass==1) { // 2nd pass: detect notes and assign to staves
-        //log(font); debug[pos]=str(code,fontIndex);
+        //log(font);
+        //debug[pos]=str(code,fontIndex);
         uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
         if(i>=notes.size()) notes.grow(i+1);
         int duration=-1;
@@ -119,11 +131,11 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             else if(code==60) duration = 16; //whole
         } else if(find(font,"Opus"_)) {
             if(font=="OpusStd"_) { //FIXME: OCR
-                if(/*code==7*/code==8) {
+                if(code == quarter /*code==7*//*code==8*/) {
                     if(size<30) duration= 0; //grace
                     else duration = 4; //quarter
                 }
-                else if(code == 9 /*|| code == 10 || code==11*/) duration = 8; //half
+                else if(code == half/*code == 9/10/11*/) duration = 8; //half
                 else if(code==16) duration = 16; //whole
             } else if(endsWith(font,"Opus"_)) {
                 if(fontIndex==53) {
@@ -310,33 +322,38 @@ trillCancelTie: ;
 
     /// Fix chords with diadics (shifted x positions) or double notes (TODO: use MIDI assistance)
     for(map<int, map< int, Note> >& staff : notes) {
-        int lastX=0;
-        for(int x : staff.keys) {
-            if(lastX>0) {
+        for(uint i: range(staff.keys.size())) {
+            if(i>0) {
+                int pX = staff.keys[i-1]; map< int, Note>& lastChord = staff.values[i-1];
+                int x = staff.keys[i]; map< int, Note>& chord = staff.values[i];
                 again: ;
-                for(int y: staff[x].keys) {
-                    for(int y2 : staff[lastX].keys) {
-                        if(staff[lastX].at(y2).duration && ( //TODO: negative if as close as second closest
-                                    abs(x-lastX)<2 ||
-                                    (abs(x-lastX)<=22 && y==y2) || //double note
-                                    (abs(x-lastX)<10 && abs(y-y2)<180 && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)) ||
-                                    ((abs(x-lastX)<18 && abs(y-y2)<20) && (y!=y2 || staff[lastX].size()>1 || staff[x].size()>1)) ||
-                                    ((abs(x-lastX)<=19 && abs(y-y2)<=7) && (y!=y2))
+                for(int y: chord.keys) {
+                    for(int pY : lastChord.keys) {
+                        if(lastChord.at(pY).duration && ( //TODO: negative if as close as second closest
+                                    abs(x-pX)<2 ||
+                                    (abs(x-pX)<=22 && y==pY && chord.size()==1) || //cancel repeated note in diadic
+                                    (abs(x-pX)<10 && abs(y-pY)<180 && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
+                                    ((abs(x-pX)<18 && abs(y-pY)<20) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
+                                    ((abs(x-pX)<=19 && abs(y-pY)<=7) && (y!=pY))
                                     )) {
-                            if(staff[lastX].size()<=staff[x].size()) {
-                                if(!staff[x].contains(y2)) staff[x].insertSorted(y2,staff[lastX].at(y2));
-                                staff[lastX].remove(y2); debug[vec2(lastX,-y2)]<<string("->"_); goto again;
-                            } else if(staff[lastX].size()>=staff[x].size() && (
-                                          (abs(x-lastX)<=17/*16*/ && abs(y-y2)<=6) ||
-                                          (abs(x-lastX)<=22 && abs(y-y2)<=0)) ) {
-                                if(!staff[lastX].contains(y)) staff[lastX].insertSorted(y,staff[x].at(y));
-                                staff[x].remove(y); debug[vec2(x,-y)]<<string("<-"_); goto again;
-                            } else debug[vec2(x,-y)]<<str("?"_,x-lastX,y-y2);
-                        } else if(abs(x-lastX)<10 || (abs(x-lastX)<30 && abs(y-y2)<30)) debug[vec2(x,-y)]<<"!"_+str(x-lastX,y-y2);
+                            if(lastChord.size()<=chord.size()) {
+                                if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
+                                lastChord.remove(pY); debug[vec2(pX,-pY)]<<string("->"_); goto again;
+                            } else if(lastChord.size()>=chord.size() && (
+                                          (abs(x-pX)<=17 && abs(y-pY)<=6)
+                                          || (chord.size()==1 && abs(x-pX)<=22 && abs(y-pY)<=0)
+                                          )) {
+                                if(i<staff.keys.size()-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) { //prevent stealing diadic from wrong chord
+                                    for(int nY : staff.values[i+1].keys) if(abs(nY-y)<=abs(x-pX)) goto skip;
+                                }
+                                if(!lastChord.contains(y)) lastChord.insertSorted(y,chord.at(y));
+                                chord.remove(y); debug[vec2(x,-y)]<<str("<-"_,x-pX,y-pY); goto again;
+                                skip:;
+                            } else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
+                        } else if(abs(x-pX)<10 || (abs(x-pX)<20 && abs(y-pY)<20)) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
                     }
                 }
             }
-            lastX=x;
         }
     }
 
@@ -398,7 +415,7 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]]<<str(notes[i].key)+" "_+str((uint)notes[i].duration);
+        debug[positions[i]]<<str(notes[i].key); //+" "_+str((uint)notes[i].duration);
     }
 }
 
