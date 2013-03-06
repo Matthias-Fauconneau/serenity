@@ -49,13 +49,15 @@ template<Type K, Type V> struct map {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << key; values << value; return values.last();
     }
-
+    V& insertMulti(const K& key, const V& value) {
+        keys << key; values << value; return values.last();
+    }
     V& insertSorted(const K& key, const V& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         return  values.insertAt(keys.insertSorted(key),value);
     }
-    V& insertMulti(const K& key, const V& value) {
-        keys << key; values << value; return values.last();
+    V& insertSortedMulti(const K& key, const V& value) {
+        return  values.insertAt(keys.insertSorted(key),value);
     }
 
     V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }

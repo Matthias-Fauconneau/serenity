@@ -148,9 +148,10 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
+        openSheet("Adagio for TRON"_);
         //openSheet("Kingdom Dance"_);
         //openSheet("Skyrim - Dragonborn"_);
-        openSheet("Starcraft II - Fire and Fury"_);
+        //openSheet("Starcraft II - Fire and Fury"_);
         toggleAnnotations();
     }
 

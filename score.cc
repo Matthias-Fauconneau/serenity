@@ -66,7 +66,8 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         } else if(endsWith(font,"Opus"_)) {
             if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200) {
                 if(pos.y-lastClef.y>110 && staffCount!=1) {
-                    staffs << (lastClef.y+pos.y)/2; //+14 //-6; //-18; FIXME
+                    if(pos.y-lastClef.y>200) staffs << lastClef.y+110; // for ties wrapped on staff before page breaks
+                    else staffs << (lastClef.y+pos.y)/2; //+14 //-6; //-18; FIXME?
                     staffCount=1;
                 } else staffCount++;
                 lastClef=pos;
@@ -241,6 +242,49 @@ void Score::parse() {
         }
     }
 
+    /// Fix chords with diadics (shifted x positions) or double notes
+    for(map<int, map< int, Note> >& staff : notes) {
+        for(uint i: range(staff.keys.size())) {
+            if(i>0) {
+                int pX = staff.keys[i-1]; map< int, Note>& lastChord = staff.values[i-1];
+                int x = staff.keys[i]; map< int, Note>& chord = staff.values[i];
+                int lastD=0; for(const Note& note: lastChord.values) lastD=max(lastD, note.duration);
+                again: ;
+                for(int y: chord.keys) {
+                    for(int pY : lastChord.keys) {
+                        if(lastChord.at(pY).duration && (
+                                    abs(x-pX)<2 ||
+                                    //(abs(x-pX)<=22 && y==pY && chord.size()==1) || //cancel repeated note in diadic
+                                    (abs(x-pX)<10 && abs(y-pY)<180 && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
+                                    ((abs(x-pX)<18 && abs(y-pY)<=36) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
+                                    ((abs(x-pX)<=19 && abs(y-pY)<=7) && (y!=pY)) ||
+                                    (lastD>=16 && (abs(x-pX)<=26 && abs(y-pY)<=18) && (y!=pY || lastChord.size()>1 || chord.size()>1))
+                                    )) {
+                            if(i<staff.keys.size()-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) { //prevent stealing diadic from wrong chord
+                                for(int nY : staff.values[i+1].keys) if(abs(nY-y)<=abs(x-pX)) goto skip;
+                            }
+                            if((lastChord.size()>=chord.size() || (lastChord.size()==3 && chord.size()==4)) && ( //FIXME
+                                          (abs(x-pX)<18 && abs(y-pY)<=36) ||
+                                          (chord.size()==1 && abs(x-pX)<=22 && abs(y-pY)<=0) ||
+                                    (lastD>=16 && (abs(x-pX)<=26 && abs(y-pY)<=18) && (y!=pY || lastChord.size()>1 || chord.size()>1))
+                                          )) {
+                                /*if(!lastChord.contains(y))*/ lastChord.insertSortedMulti(y,chord.at(y)); //tie only one duplicate
+                                chord.remove(y); debug[vec2(x,-y)]<<str("<"_,x-pX,y-pY,lastD); goto again;
+                            } else if(lastChord.size()<=chord.size() && !(lastChord.size()==3 && chord.size()==4)/*FIXME*/) {
+                                if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
+                                lastChord.remove(pY); debug[vec2(pX,-pY)]<<str(">"_,abs(x-pX),abs(y-pY)); goto again;
+                            } //else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
+                        } //else if(abs(x-pX)<26 && abs(y-pY)<40) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                        goto ok; //FIXME
+                        skip:;
+                        //debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                        ok:;
+                    }
+                }
+            }
+        }
+    }
+
     /// Detect and remove tied notes
     array<Tie> tied;
     for(Line tie : ties) {
@@ -267,19 +311,20 @@ alreadyTied: ;
                 for(int y : notes[i][x].keys) {
                     int ry = y-t.ly;
                     /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
-                    if(!noteBetween && lx > 0 && rx < -16 && abs(ry) < 7) {
-                        debug[vec2(x,-y)]=string("B"_);
-                        noteBetween++;
-                        if(abs(x-t.lx)<32) noteBetween++;
+                    if(lx > 0 && rx < -16 && abs(ry) < 5) {
+                        debug[vec2(x,-y)]=str("B"_,ry);
+                        if(noteBetween && (noteBetween==2 || notes[t.li][t.lx].at(t.ly).duration==8)) notes[i][x].remove(y);
+                        noteBetween++; //if(abs(x-t.lx)<32) noteBetween++;
                         break;
                     }
                     /// Detect right note of a tie
                     if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>=-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
-                        //debug[vec2(x,-y-24)]=string("R"_+str(rx,ry));
+                        //debug[vec2(x,-y)]=string("R"_+str(rx,ry));
+                        if(noteBetween) debug[vec2(x,-y)]=str("B"_,l,ry);
                         goto staffDone;
-                    } else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug[vec2(x,-y+16)]<<str("!R"_,rx,ry);
+                    } else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug[vec2(x,-y)]<<str("!R"_,rx,ry,l);
                 }
             }
 staffDone: ;
@@ -320,40 +365,15 @@ trillCancelTie: ;
     }
     for(Tie t : tied) if(notes[t.ri][t.rx].contains(t.ry)) notes[t.ri][t.rx].remove(t.ry);
 
-    /// Fix chords with diadics (shifted x positions) or double notes
-    for(map<int, map< int, Note> >& staff : notes) {
+    /// Removes duplicates (added to tie only once)
+    for(Staff& staff: notes) {
         for(uint i: range(staff.keys.size())) {
-            if(i>0) {
-                int pX = staff.keys[i-1]; map< int, Note>& lastChord = staff.values[i-1];
-                int x = staff.keys[i]; map< int, Note>& chord = staff.values[i];
-                again: ;
-                for(int y: chord.keys) {
-                    for(int pY : lastChord.keys) {
-                        if(lastChord.at(pY).duration && ( //TODO: negative if as close as second closest
-                                    abs(x-pX)<2 ||
-                                    (abs(x-pX)<=22 && y==pY && chord.size()==1) || //cancel repeated note in diadic
-                                    (abs(x-pX)<10 && abs(y-pY)<180 && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
-                                    ((abs(x-pX)<17 && abs(y-pY)<20) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
-                                    ((abs(x-pX)<18 && abs(y-pY)<14) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
-                                    ((abs(x-pX)<=19 && abs(y-pY)<=7) && (y!=pY))
-                                    )) {
-                            if(i<staff.keys.size()-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) { //prevent stealing diadic from wrong chord
-                                for(int nY : staff.values[i+1].keys) if(abs(nY-y)<=abs(x-pX)) goto skip;
-                            }
-                            if(lastChord.size()<=chord.size()) {
-                                if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
-                                lastChord.remove(pY); debug[vec2(pX,-pY)]<<str("->"_,abs(x-pX),abs(y-pY)); goto again;
-                            } else if(lastChord.size()>=chord.size() && (
-                                          (abs(x-pX)<=17 && abs(y-pY)<=6)
-                                          || (chord.size()==1 && abs(x-pX)<=22 && abs(y-pY)<=0)
-                                          )) {
-                                if(!lastChord.contains(y)) lastChord.insertSorted(y,chord.at(y));
-                                chord.remove(y); debug[vec2(x,-y)]<<str("<-"_,x-pX,y-pY); goto again;
-                            } //else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
-                        } //else if(abs(x-pX)<10 || (abs(x-pX)<20 && abs(y-pY)<20)) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
-                        skip:;
-                    }
+            map< int, Note>& chord = staff.values[i];
+            for(uint i=0;i<chord.size();) {
+                for(uint j=0;j<chord.size();j++) {
+                    if(i!=j && chord.keys[i]==chord.keys[j]) { chord.keys.removeAt(i), chord.values.removeAt(i); goto continue2; }
                 }
+                i++; continue2:;
             }
         }
     }
@@ -387,7 +407,7 @@ trillCancelTie: ;
         }
     }
 
-    for(float y: staffs) debug[vec2(0,y-16)]=string("________"_);
+    for(int i: range(staffs.size())) debug[vec2(0,staffs[i]-16)]=str(staffs[i]-staffs[max(0,i-1)],"________"_);
 }
 
 void Score::synchronize(const map<uint,Chord>& MIDI) {
