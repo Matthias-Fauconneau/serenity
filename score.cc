@@ -55,7 +55,8 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
         } else if(font=="OpusStd"_) {
             if((code==3||code==6 ||code==5 /*||code==7*/) && pos.x<200) { //FIXME: OCR
-                if(pos.y-lastClef.y>130 && staffCount!=1) {
+                if(pos.y-lastClef.y>148 && staffCount!=1) {
+                    log(pos.y-lastClef.y);
                     if(pos.y-lastClef.y>200) staffs << lastClef.y+110; // for ties wrapped on staff before page breaks
                     else staffs << (lastClef.y+pos.y)/2+12;
                     staffCount=1;
@@ -65,7 +66,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             histogram[code]++;
         } else if(endsWith(font,"Opus"_)) {
             if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200) {
-                if(pos.y-lastClef.y>110 && staffCount!=1) {
+                if(pos.y-lastClef.y>148 && staffCount!=1) {
                     if(pos.y-lastClef.y>200) staffs << lastClef.y+110; // for ties wrapped on staff before page breaks
                     else staffs << (lastClef.y+pos.y)/2; //+14 //-6; //-18; FIXME?
                     staffCount=1;
@@ -155,8 +156,8 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 const array<float>& y = matches.keys; const array<vec2>& m = matches.values;
                 if(m.size()==4 && abs(y[0]-y[1])<15 && abs(y[1]-y[2])>121 && abs(y[2]-y[3])<15 ) {
                     vec2 pos = (m[0]+m[1]+m[2]+m[3])/4.f;
-                    debug[pos]=string(":"_);
                     uint i=0; for(;i<repeats.size() && repeats[i].y*1000+repeats[i].x < pos.y*1000+pos.x;i++) {} repeats.insertAt(i,pos);
+                    debug[pos]=str(":"_,i);
                 }
             } else if(code==77) { //tremolo
                 tremolos << Line(pos,pos);
@@ -301,10 +302,10 @@ void Score::parse() {
                     /// Detect first note of a tie
                     if(!t.ly || abs(ly)<abs(t.dy)) {
                         if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-49 && ly>-34 && ly<15 && rx<1) {
-                            debug[vec2(x,-y)]=string("L"_);
+                            //debug[vec2(x,-y)]=string("L"_);
                             for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied; //debug[vec2(x,-y)]=string("&&"_+str(lx,ly,rx,ry));
                             t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                        } else if(lx>-49 && lx<4 && ly>-40 && ly<20 && rx<1) debug[vec2(x,-y)]<<string("!L"_+str(lx,ly,rx));
+                        } //else if(lx>-49 && lx<4 && ly>-40 && ly<20 && rx<1) debug[vec2(x,-y)]<<string("!L"_+str(lx,ly,rx));
                     }
 alreadyTied: ;
                 }
@@ -313,16 +314,17 @@ alreadyTied: ;
                     /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
                     if(lx > 0 && rx < -16 && abs(ry) < 5) {
                         debug[vec2(x,-y)]=str("B"_,ry);
-                        if(noteBetween && (noteBetween==2 || notes[t.li][t.lx].at(t.ly).duration==8)) notes[i][x].remove(y);
+                        //if(noteBetween && (noteBetween==2 || notes[t.li][t.lx].at(t.ly).duration==8)) notes[i][x].remove(y);
+                        if(notes[t.li][t.lx].at(t.ly).duration>=8 && noteBetween==1) notes[i][x].remove(y);
                         noteBetween++; //if(abs(x-t.lx)<32) noteBetween++;
                         break;
                     }
                     /// Detect right note of a tie
-                    if( /*(!noteBetween || (noteBetween<2 && l<210)) &&*/ ry>=-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                    if( (!noteBetween || (noteBetween<2 && l>210)) && ry>/*=*/-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
-                        //debug[vec2(x,-y)]=string("R"_+str(rx,ry));
-                        if(noteBetween) debug[vec2(x,-y)]=str("B"_,l,ry);
+                        debug[vec2(x,-y)]=string("R"_+str(rx,ry));
+                        //if(noteBetween) debug[vec2(x,-y)]=str("B"_,l,ry);
                         goto staffDone;
                     } else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug[vec2(x,-y)]<<str("!R"_,rx,ry,l);
                 }
@@ -331,8 +333,8 @@ staffDone: ;
             /// Detect notes tied over a line wrap
             if(t.ly && (!noteBetween || (noteBetween<2 && l>150)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
                 debug[tie.a]=string("W"_);
-                float ly = -t.ly-staffs[i]+14;
-                debug[vec2(notes[i+1].keys.first(),staffs[i+1]+ly)]=string("R"_);
+                float ly = -t.ly-staffs[i]; //+14?
+                debug[vec2(notes[i+1].keys.first(),staffs[i+1]+ly)]<<string("R"_);
                 for(int x=0;x<1;x++) {
                     int rx = notes[i+1].keys[x];
                     int ry = notes[i+1].values[x].keys[0];
@@ -354,7 +356,7 @@ alreadyTied1: ;
                                 goto alreadyTied2;
                             tied << t;
                             goto tieFound;
-                        } else if(abs(ly-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2+12)]<<"Y"_+str(dy,min);
+                        } else if(abs(ly-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2)]<<"Y"_+str(dy,min);
 alreadyTied2: ;
                     }
                 }
@@ -392,13 +394,13 @@ trillCancelTie: ;
     int startIndex=-2;
     for(vec2 pos : repeats) {
         uint i=0; for(;i<staffs.size()-1 && pos.y>staffs[i];i++) {}
-        if(!notes[i].values) continue;
+        if(!notes[i].values) { error("Empty staff?"); continue; }
         int index=notes[i].values[0].values[0].scoreIndex-1;
         for(int x : notes[i].keys) { if(x>pos.x) break; index=notes[i][x].values[0].scoreIndex; }
         if(startIndex < -1) {
             startIndex=index; debug[pos]=dec(startIndex)+"{"_;
         } else {
-            if(index>startIndex) continue;
+            //if(index>startIndex) { log("index > startIndex",index,startIndex); continue; }
             { array<vec2> cat; cat<<positions.slice(0,index+1)<<positions.slice(startIndex+1); positions = move(cat); }
             { array<int> cat; cat<<indices.slice(0,index+1)<<indices.slice(startIndex+1); indices = move(cat); }
             { array<int> cat; cat<<durations.slice(0,index+1)<<durations.slice(startIndex+1); durations = move(cat); }
