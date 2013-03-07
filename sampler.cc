@@ -220,6 +220,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
                 if(layer == 0) { error("Layer not instantiated at initialization",key, s.lokey, s.hikey, s.pitch_keycenter, shift); return; }
+                static uint max=95; if(layer->notes.size()>max) log(max=layer->notes.size());
                 if(layer->notes.size()==layer->notes.capacity()) {
                     log(layer->notes.size());
                     Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use a list of heap pointer instead)

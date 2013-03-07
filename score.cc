@@ -64,7 +64,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                     staffCount++;
                     maxStaffDistance = max(maxStaffDistance, pos.y-lastClef.y);
                 }
-                lastClef=pos;
+                lastClef=pos; keys<<pos.y;
             }
             histogram[code]++;
         } else if(endsWith(font,"Opus"_)) {
@@ -340,21 +340,23 @@ staffDone: ;
             /// Detect notes tied over a line wrap
             if(t.ly && (!noteBetween || (noteBetween<2 && l>156)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
                 debug[tie.a]<<"W"_+str(l);
-                float ly = -t.ly-staffs[i]+8; //<- fix dragonborn, break ?
-                debug[vec2(notes[i+1].keys.first(),staffs[i+1]+ly)]<<string("R"_);
+                //float ly = -t.ly-staffs[i]+8; //<- fix dragonborn, break ?
+                float ly=100; for(float y: keys) if(abs(-y-t.ly) < abs(ly)) ly = -y-t.ly;
                 for(int x=0;x<1;x++) {
                     int rx = notes[i+1].keys[x];
                     int ry = notes[i+1].values[x].keys[0];
                     for(Line trill : trills) if(abs(rx-trill.a.x)<8 && -ry-trill.a.y>0 && -ry-trill.a.y<200) goto trillCancelTie;
                     float min=15/*14*/;
                     for(float y2 : notes[i+1].values[x].keys) {
-                        float dy = (-y2-staffs[i+1])-ly;
+                        float ry=100; for(float y: keys) if(abs(-y-y2) < abs(ry)) ry = -y-y2;
+                        float dy = ry-ly;
                         for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied1;
                         if(dy>=0) min=::min(min, abs(dy));
 alreadyTied1: ;
                     }
                     for(float y2 : notes[i+1].values[x].keys) {
-                        float dy = (-y2-staffs[i+1])-ly;
+                        float ry=100; for(float y: keys) if(abs(-y-y2) < abs(ry)) ry = -y-y2;
+                        float dy = ry-ly;
                         if(dy>=-15/*12*/ && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
                             debug[vec2(rx,-y2)]<<str("W"_,dy,noteBetween,l);
@@ -363,7 +365,7 @@ alreadyTied1: ;
                                 goto alreadyTied2;
                             tied << t;
                             goto tieFound;
-                        } else if(abs(ly-(-y2-staffs[i+1]))<100) debug[vec2(rx,-y2)]<<"Y"_+str(dy,min);
+                        } else if(dy<100) debug[vec2(rx,-y2)]<<"Y"_+str(dy,min);
 alreadyTied2: ;
                     }
                 }

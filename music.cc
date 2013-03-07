@@ -148,7 +148,6 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
-        openSheet("Touch the Sky"_);
         toggleAnnotations();
     }
 

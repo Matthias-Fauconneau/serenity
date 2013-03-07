@@ -11,7 +11,7 @@ struct Score {
     void onPath(const ref<vec2>&);
     void onGlyph(int, vec2, float,const ref<byte>&, int, int);
 
-    array<float> staffs;
+    array<float> staffs; array<float> keys;
     vec2 lastClef=0, lastPos=0; float maxStaffDistance=100;
     uint staffCount=0;
     array<vec2> repeats;
@@ -69,7 +69,7 @@ struct Score {
     int quarter=0, half=0, whole=0;
 
     void clear() {
-        staffs.clear(); lastClef=lastPos=0; maxStaffDistance=100;
+        staffs.clear(); keys.clear(); lastClef=lastPos=0; maxStaffDistance=100;
         repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear();
         notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0;
         active.clear(); expected.clear(); debug.clear(); pass=-1; histogram.clear();
