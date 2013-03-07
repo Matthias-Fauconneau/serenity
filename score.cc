@@ -56,7 +56,6 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         } else if(font=="OpusStd"_) {
             if((code==3||code==6 ||code==5 /*||code==7*/) && pos.x<200) { //FIXME: OCR
                 if(pos.y-lastClef.y>148 && staffCount!=1) {
-                    log(pos.y-lastClef.y);
                     if(pos.y-lastClef.y>200) staffs << lastClef.y+110; // for ties wrapped on staff before page breaks
                     else staffs << (lastClef.y+pos.y)/2+12;
                     staffCount=1;
@@ -259,9 +258,10 @@ void Score::parse() {
                                     (abs(x-pX)<10 && abs(y-pY)<180 && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
                                     ((abs(x-pX)<18 && abs(y-pY)<=36) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
                                     ((abs(x-pX)<=19 && abs(y-pY)<=7) && (y!=pY)) ||
-                                    (lastD>=16 && (abs(x-pX)<=26 && abs(y-pY)<=18) && (y!=pY || lastChord.size()>1 || chord.size()>1))
+                                    ((lastD>=16 || (y==pY && lastChord.at(pY).duration>=8 && lastChord.size()>1)) && (abs(x-pX)<=26 && abs(y-pY)<=18) && (y!=pY || lastChord.size()>1 || chord.size()>1))
                                     )) {
-                            if(i<staff.keys.size()-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) { //prevent stealing diadic from wrong chord
+                            //prevent stealing diadic from wrong chord
+                            if( (!(lastD>=16) || (y==pY && lastChord.at(pY).duration<16)) && i<staff.keys.size()-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) {
                                 for(int nY : staff.values[i+1].keys) if(abs(nY-y)<=abs(x-pX)) goto skip;
                             }
                             if((lastChord.size()>=chord.size() || (lastChord.size()==3 && chord.size()==4)) && ( //FIXME
@@ -274,11 +274,11 @@ void Score::parse() {
                             } else if(lastChord.size()<=chord.size() && !(lastChord.size()==3 && chord.size()==4)/*FIXME*/) {
                                 if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
                                 lastChord.remove(pY); debug[vec2(pX,-pY)]<<str(">"_,abs(x-pX),abs(y-pY)); goto again;
-                            } //else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
-                        } //else if(abs(x-pX)<26 && abs(y-pY)<40) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                            } else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
+                        } else if(abs(x-pX)<26 && abs(y-pY)<40) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
                         goto ok; //FIXME
                         skip:;
-                        //debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                        debug[vec2(x,-y)]<<"m"_+str(x-pX,y-pY);
                         ok:;
                     }
                 }

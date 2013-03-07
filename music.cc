@@ -148,6 +148,8 @@ struct Music {
         showSheetList();
         audio.start();
         thread.spawn();
+        //openSheet("Inception - Time"_);
+        openSheet("Kingdom Dance"_);
         toggleAnnotations();
     }
 
