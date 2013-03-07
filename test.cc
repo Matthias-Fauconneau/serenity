@@ -1,13 +1,14 @@
-#include "process.h"
 #include "window.h"
-#include "display.h"
+#include "pdf.h"
+#include "interface.h"
 
-struct WindowsTest : Widget {
-    Window window  __(this, int2(1050,1050), "WindowsTest"_);
-    WindowsTest() {
-        window.localShortcut(Escape).connect(&::exit);
-    }
-    void render(int2 position, int2 size) {
-        fill(position+Rect(size),red);
+struct PDFTest {
+    Scroll<PDF> pdf;
+    Window window __(&pdf.area(),int2(0,0),"PDFTest"_);
+    PDFTest() {
+        //pdf.open(readFile("Sheets/Battlestar Sonatica.pdf",root()));
+        pdf.open(readFile("Sheets/Evenstar.pdf",root()));
+        window.backgroundCenter=window.backgroundColor=0xFF;
+        window.localShortcut(Escape).connect(&exit);
     }
 } test;

@@ -12,7 +12,7 @@ struct Score {
     void onGlyph(int, vec2, float,const ref<byte>&, int, int);
 
     array<float> staffs; array<float> keys;
-    vec2 lastClef=0, lastPos=0; float maxStaffDistance=100;
+    vec2 previousClef=0, lastClef=0, lastPos=0; float maxStaffDistance=100;
     uint staffCount=0;
     array<vec2> repeats;
 
@@ -53,6 +53,7 @@ struct Score {
     bool editMode=false;
     bool showActive=false; // Toggles whether active notes are highlighted
     bool showExpected=false; // Toggles whether expected notes are highlighted (set on errors, cleared on sucess)
+    int errors=0;
     void toggleEdit();
     void previous();
     void next();
@@ -69,9 +70,9 @@ struct Score {
     int quarter=0, half=0, whole=0;
 
     void clear() {
-        staffs.clear(); keys.clear(); lastClef=lastPos=0; maxStaffDistance=100;
+        staffs.clear(); keys.clear(); previousClef=lastClef=lastPos=0; maxStaffDistance=100;
         repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear();
         notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0;
-        active.clear(); expected.clear(); debug.clear(); pass=-1; histogram.clear();
+        active.clear(); expected.clear(); debug.clear(); pass=-1; histogram.clear(); errors=0;
     }
 };

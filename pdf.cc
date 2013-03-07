@@ -17,7 +17,7 @@ struct Variant { //TODO: union
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
     Variant(map<ref<byte>,Variant>&& dict) : type(Dict), dict(move(dict)) {}
     operator bool() const { return type!=Empty; }
-    int integer() const { assert(type==Integer, float(number)); return number; }
+    int integer() const { assert(type==Integer, *this); return number; }
     double real() const { assert(type==Real||type==Integer); return number; }
 };
 string str(const Variant& o) {
@@ -69,23 +69,37 @@ static Variant parse(TextData& s) {
             }
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
-                int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,1).integer();
-                if(predictor != 12) error("Unsupported predictor",predictor);
-                int size = stream.size();
-                int w = v.dict.at("DecodeParms"_).dict.value("Columns"_,1).integer();
-                int h = size/(w+1);
-                assert(size == (w+1)*h);
+                uint size = stream.size();
+                uint width = v.dict.at("DecodeParms"_).dict.value("Columns"_,1).integer();
+                uint height = size/(width+1);
+                assert(size == (width+1)*height); // grayscale
                 const byte* src = stream.data();
-                byte* dst = stream.data();
-                for(int y=0;y<h;y++) {
-                    int filter = *src++;
-                    if(filter != 2) error("Unsupported filter",filter);
-                    for(int x=0;x<w;x++) {
-                        *dst = (y>0 ? *(dst-w) : 0) + *src;
-                        dst++; src++;
+                byte* dst = stream.data(); // in-place
+                int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,1).integer();
+                if(predictor>=10) { // PNG predictor
+                    uint8 prior[width]; clear(prior,width);
+                    for(uint unused y: range(height)) {
+                        uint filter = *src++; assert(filter<=4,"Unknown PNG filter",filter);
+                        uint8 a=0;
+                        if(filter==0) for(uint i=0;i<width;i++) dst[i]= prior[i]=      src[i];
+                        if(filter==1) for(uint i=0;i<width;i++) dst[i]= prior[i]= a= a+src[i];
+                        if(filter==2) for(uint i=0;i<width;i++) dst[i]= prior[i]=      prior[i]+src[i];
+                        if(filter==3) for(uint i=0;i<width;i++) dst[i]= prior[i]= a= uint8((int(prior[i])+int(a))/2)+src[i];
+                        if(filter==4) {
+                            int b=0;
+                            for(uint i=0;i<width;i++) {
+                                int c = b;
+                                b = prior[i];
+                                int d = int(a) + b - c;
+                                int pa = abs(d-int(a)), pb = abs(d-b), pc = abs(d-c);
+                                uint8 p = uint8(pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+                                dst[i]= prior[i]=a= p+src[i];
+                            }
+                        }
+                        src+=width; dst+=width;
                     }
-                }
-                stream.shrink(size-h);
+                } else error("Unsupported predictor",predictor);
+                stream.shrink(size-height);
             }
             v.data=move(stream);
         }
@@ -110,7 +124,7 @@ void PDF::open(const ref<byte>& data) {
     {
         TextData s(data);
         for(s.index=s.buffer.size()-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
-        s.index=s.integer(); assert(s.index!=uint(-1));
+        int index=s.integer(); assert(index!=-1,s.untilEnd()); s.index=index;
         int root=0;
         struct CompressedXRef { uint object, index; }; array<CompressedXRef> compressedXRefs;
         for(;;) { /// Parse XRefs
@@ -225,7 +239,8 @@ void PDF::open(const ref<byte>& data) {
                     int depth=object.dict.at("BitsPerComponent"_).number/8;
                     byte4 palette[256]; bool indexed=false;
                     if(depth==1 && object.dict.contains("ColorSpace"_)) {
-                        Variant cs = parse(xref[object.dict.at("ColorSpace"_).integer()]);
+                        Variant cs = object.dict.at("ColorSpace"_).data ? move(object.dict.at("ColorSpace"_).data) :
+                                                                          parse(xref[object.dict.at("ColorSpace"_).integer()]);
                         if(cs.data=="DeviceGray"_) {}
                         else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
                             TextData s (cs.list[3].data);
