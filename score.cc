@@ -35,6 +35,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             quarter = sorted.values.last();
             if(sorted.values[sorted.values.size()-3]==9) half = 9;
             else half = sorted.values[sorted.values.size()-4];
+            if(sorted.values.contains(16)) whole=16;
             //log(quarter, half, sorted);
         }
     }
@@ -55,11 +56,14 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
         } else if(font=="OpusStd"_) {
             if((code==3||code==6 ||code==5 /*||code==7*/) && pos.x<200) { //FIXME: OCR
-                if(pos.y-lastClef.y>148 && staffCount!=1) {
+                if(pos.y-lastClef.y>maxStaffDistance*1.1 && staffCount!=1) {
                     if(pos.y-lastClef.y>200) staffs << lastClef.y+110; // for ties wrapped on staff before page breaks
                     else staffs << (lastClef.y+pos.y)/2+12;
                     staffCount=1;
-                } else staffCount++;
+                } else {
+                    staffCount++;
+                    maxStaffDistance = max(maxStaffDistance, pos.y-lastClef.y);
+                }
                 lastClef=pos;
             }
             histogram[code]++;
@@ -137,7 +141,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                     else duration = 4; //quarter
                 }
                 else if(code == half/*code == 9/10/11*/) duration = 8; //half
-                else if(code==16) duration = 16; //whole
+                else if(code == whole) duration = 16; //whole
             } else if(endsWith(font,"Opus"_)) {
                 if(fontIndex==53) {
                     if(size<30) duration= 0; //grace
@@ -317,13 +321,13 @@ alreadyTied: ;
                         //if(noteBetween && (noteBetween==2 || notes[t.li][t.lx].at(t.ly).duration==8)) notes[i][x].remove(y);
                         noteBetween++;
                         if(abs(ry)<5) {
-                            if(notes[t.li][t.lx].at(t.ly).duration>=8 && sameNoteBetween==1) notes[i][x].remove(y);
+                            if(notes[t.li][t.lx].at(t.ly).duration>=8 && sameNoteBetween==(l<330?1:2)) notes[i][x].remove(y);
                             sameNoteBetween++;
                         }
                         break;
                     }
                     /// Detect right note of a tie
-                    if( (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>/*=*/-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>/*=*/-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
                         debug[vec2(x,-y)]=string("R"_+str(rx,ry,noteBetween,l));
@@ -336,7 +340,7 @@ staffDone: ;
             /// Detect notes tied over a line wrap
             if(t.ly && (!noteBetween || (noteBetween<2 && l>156)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
                 debug[tie.a]<<"W"_+str(l);
-                float ly = -t.ly-staffs[i]; //+14?
+                float ly = -t.ly-staffs[i]+8; //<- fix dragonborn, break ?
                 debug[vec2(notes[i+1].keys.first(),staffs[i+1]+ly)]<<string("R"_);
                 for(int x=0;x<1;x++) {
                     int rx = notes[i+1].keys[x];
