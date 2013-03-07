@@ -291,7 +291,7 @@ void Score::parse() {
     for(Line tie : ties) {
         int l = abs(tie.b.x-tie.a.x);
         uint staff=0; for(;staff<staffs.size()-1 && tie.a.y>staffs[staff];staff++) {}
-        int noteBetween=0; Tie t;
+        int noteBetween=0; int sameNoteBetween=0; Tie t;
         for(uint i=staff>0?staff-1:0;i<staff+1;i++) {
             for(int x : notes[i].keys) {
                 int lx = x-tie.a.x;
@@ -312,27 +312,30 @@ alreadyTied: ;
                 for(int y : notes[i][x].keys) {
                     int ry = y-t.ly;
                     /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
-                    if(lx > 0 && rx < -16 && abs(ry) < 5) {
+                    if(lx > 0 && rx < -16 && abs(ry) < 7) {
                         debug[vec2(x,-y)]=str("B"_,ry);
                         //if(noteBetween && (noteBetween==2 || notes[t.li][t.lx].at(t.ly).duration==8)) notes[i][x].remove(y);
-                        if(notes[t.li][t.lx].at(t.ly).duration>=8 && noteBetween==1) notes[i][x].remove(y);
-                        noteBetween++; //if(abs(x-t.lx)<32) noteBetween++;
+                        noteBetween++;
+                        if(abs(ry)<5) {
+                            if(notes[t.li][t.lx].at(t.ly).duration>=8 && sameNoteBetween==1) notes[i][x].remove(y);
+                            sameNoteBetween++;
+                        }
                         break;
                     }
                     /// Detect right note of a tie
-                    if( (!noteBetween || (noteBetween<2 && l>210)) && ry>/*=*/-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                    if( (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>/*=*/-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
-                        debug[vec2(x,-y)]=string("R"_+str(rx,ry));
+                        debug[vec2(x,-y)]=string("R"_+str(rx,ry,noteBetween,l));
                         //if(noteBetween) debug[vec2(x,-y)]=str("B"_,l,ry);
                         goto staffDone;
-                    } else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug[vec2(x,-y)]<<str("!R"_,rx,ry,l);
+                    } else if(rx>-40 && rx<40 && ry>-40 && ry<40) debug[vec2(x,-y)]<<str("!R"_,rx,ry,noteBetween,l);
                 }
             }
 staffDone: ;
             /// Detect notes tied over a line wrap
-            if(t.ly && (!noteBetween || (noteBetween<2 && l>150)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
-                debug[tie.a]=string("W"_);
+            if(t.ly && (!noteBetween || (noteBetween<2 && l>156)) && i+1<staffs.size() && tie.b.x > notes[i].keys.last()+10 ) {
+                debug[tie.a]<<"W"_+str(l);
                 float ly = -t.ly-staffs[i]; //+14?
                 debug[vec2(notes[i+1].keys.first(),staffs[i+1]+ly)]<<string("R"_);
                 for(int x=0;x<1;x++) {
@@ -350,7 +353,7 @@ alreadyTied1: ;
                         float dy = (-y2-staffs[i+1])-ly;
                         if(dy>=-15/*12*/ && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
-                            debug[vec2(rx,-y2)]<<str("W"_,dy);
+                            debug[vec2(rx,-y2)]<<str("W"_,dy,noteBetween,l);
                             for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
                                 //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
                                 goto alreadyTied2;
