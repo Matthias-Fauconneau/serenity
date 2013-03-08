@@ -46,8 +46,8 @@ struct Score {
     array<int> indices; // MIDI-synchronized character indices in associated PDF
     array<int> durations; // MIDI-synchronized character indices in associated PDF
 
-    uint chordIndex=-1, noteIndex=0, currentStaff=0;
-    int chordSize=0;
+    uint chordIndex=-1, noteIndex=0, currentStaff=0; float currentX=0;
+    int chordSize=0; //Initial expected set size (to allow missing notes on large chords)
     map<int,int> active;
     map<int,int> expected;
     bool editMode=false;
@@ -59,6 +59,7 @@ struct Score {
     void next();
     void insert();
     void remove();
+    void expect();
     void seek(uint time);
     void noteEvent(uint, uint);
     signal<const map<int,vec4>&> activeNotesChanged;

@@ -3,7 +3,7 @@
 #include "vector.h"
 #include "image.h"
 
-//#define GL 1
+#define GL 0
 
 extern bool softwareRendering;
 /// Current window framebuffer (X11 shared memory mapped by Window::render)

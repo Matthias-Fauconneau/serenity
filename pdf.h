@@ -21,7 +21,7 @@ struct mat32 {
 
 /// Portable Document Format renderer
 struct PDF : Widget {
-    void clear() { blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear(); annotations.clear(); }
+    void clear() { images.clear(); blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear(); annotations.clear(); }
     void open(const ref<byte>& data);
     int2 sizeHint() override;
     void render(int2 position, int2 size) override;
@@ -56,7 +56,7 @@ struct PDF : Widget {
     signal<int /*index*/, vec2 /*position*/, float /*size*/,const ref<byte>& /*font*/, int /*code*/, int /*fontIndex*/> onGlyph;
     signal<const ref<vec2>&> onPath;
     array< array<vec2> > paths;
-    float normalizedScale = 0; // scale semantic positions to "pixels" (normalize width to 1280)
+    float normalizedScale = 0; // normalize positions (scale PDF width to 1280)
 
     map<int,vec4> colors;
     /// Overrides color for the given characters

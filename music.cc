@@ -92,8 +92,8 @@ struct Music {
     Thread thread __(-20);
     AudioOutput audio __({&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread);
     Sequencer input __(thread);
-
     Record record;
+    vec2 position=0, target=0, speed=0; //smooth scroll
 
     Music() {
         layout << &sheets;// << &keyboard;
@@ -122,6 +122,7 @@ struct Music {
         keyboard.contentChanged.connect(&window,&Window::render);
         midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
+        window.frameReady.connect(this,&Music::smoothScroll);
 
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);
@@ -154,22 +155,26 @@ struct Music {
     void toggleReverb() { sampler.enableReverb=!sampler.enableReverb; }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float unused previous, float current, float unused next) {
+    void nextStaff(float current, float next, float x) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             if(!pdfScore.size) pdfScore.size=window.size; //FIXME: called before first render, no layout
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
-            /*pdfScore.delta.y = -min(scale*current, // prevent scrolling past current
-                                    max(scale*previous, //scroll to see at least previous
-                                        scale*next-pdfScore.ScrollArea::size.y) //and at least next
-                                    );*/
-            //pdfScore.center(int2(0,scale*current));
             // Always set current staff as second staff from bottom edge (allows to repeat page, track scrolling, see keyboard)
-            pdfScore.delta.y = -(scale*next-pdfScore.ScrollArea::size.y);
+            float t = (x/pdfScore.normalizedScale-pdfScore.x1)/(pdfScore.x2-pdfScore.x1); assert(t>=0 && t<=1);
+            target = vec2(0, -(scale*( (1-t)*current + t*next )-pdfScore.ScrollArea::size.y));
+            if(!position) position=target, pdfScore.delta=int2(round(position));
         }
-        //midiScore.delta.y = -min(current, max(previous, next-midiScore.ScrollArea::size.y));
         midiScore.center(int2(0,current));
     }
-
+    /// Scrolls to target at 60px/s (vsync)
+    void smoothScroll() {
+        if(pdfScore.annotations) return;
+        const float k=1./(2*60), b=1./2; //stiffness and damping constants
+        speed = b*speed + k*(target-position);
+        position = position + speed; //Euler integration
+        pdfScore.delta=int2(round(position));
+        if(round(target)!=round(position)) window.render();
+    }
     /// Toggles MIDI playing
     bool play=false;
     void togglePlay() {
@@ -219,11 +224,11 @@ struct Music {
             if(midi.notes) score.synchronize(copy(midi.notes));
             else if(existsFile(string(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(string(name+".not"_),folder)));
             layout.first()= &pdfScore.area();
-            pdfScore.delta = 0;
+            pdfScore.delta = 0; position=0,speed=0,target=0;
         } else if(existsFile(string(name+".mid"_),folder)) {
             midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature,midi.ticksPerBeat);
             layout.first()= &midiScore.area();
-            midiScore.delta=0;
+            midiScore.delta=0; position=0,speed=0,target=0;
             midiScore.widget().render(int2(0,0),int2(1280,0)); //compute note positions for score scrolling
             score.chords = copy(midiScore.notes);
             score.staffs = move(midiScore.staffs);

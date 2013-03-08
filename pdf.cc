@@ -236,31 +236,39 @@ void PDF::open(const ref<byte>& data) {
                     if(images.contains(string(e.key))) continue;
                     Variant object = parse(xref[e.value.integer()]);
                     Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
-                    int depth=object.dict.at("BitsPerComponent"_).number/8;
+                    int depth=object.dict.at("BitsPerComponent"_).integer();
+                    assert(depth, object.dict.at("BitsPerComponent"_).integer());
                     byte4 palette[256]; bool indexed=false;
-                    if(depth==1 && object.dict.contains("ColorSpace"_)) {
+                    if(depth==8 && object.dict.contains("ColorSpace"_)) {
                         Variant cs = object.dict.at("ColorSpace"_).data ? move(object.dict.at("ColorSpace"_).data) :
                                                                           parse(xref[object.dict.at("ColorSpace"_).integer()]);
-                        if(cs.data=="DeviceGray"_) {}
-                        else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
-                            TextData s (cs.list[3].data);
-                            for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
-                            indexed=true;
-                        } else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceRGB"_ && cs.list[2].integer()==255) {
-                            Data s = cs.list[3].integer()?parse(xref[cs.list[3].integer()]).data:move(cs.list[3].data);
-                            for(int i=0;i<256;i++) {
-                                byte r=s.next(), g=s.next(), b=s.next();
-                                palette[i]=byte4(b,g,r,0xFF); }
-                            indexed=true;
-                        } else { log("Unsupported colorspace",cs,cs.list[1].integer()?parse(xref[cs.list[1].integer()]).data:""_); continue; }
+                        if(cs.data=="DeviceGray"_ || cs.data=="DeviceRGB"_) {}
+                        else {
+                            if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
+                                TextData s (cs.list[3].data);
+                                for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
+                                indexed=true;
+                            } else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceRGB"_ && cs.list[2].integer()==255) {
+                                Data s = cs.list[3].integer()?parse(xref[cs.list[3].integer()]).data:move(cs.list[3].data);
+                                for(int i=0;i<256;i++) {
+                                    byte r=s.next(), g=s.next(), b=s.next();
+                                    palette[i]=byte4(b,g,r,0xFF); }
+                                indexed=true;
+                            } else { log("Unsupported colorspace",cs,cs.list[1].integer()?parse(xref[cs.list[1].integer()]).data:""_); continue; }
+                        }
                     }
-                    const uint8* src = (uint8*)object.data.data(); assert(object.data.size()==image.height*image.width*depth);
+                    const uint8* src = (uint8*)object.data.data(); assert(object.data.size()==image.height*image.width*depth/8);
                     byte4* dst = (byte4*)image.data;
-                    /**/  if(depth==1) {
+                    if(depth==1) {
+                        assert(image.width%8==0);
+                        for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width; src++) {
+                            for(int b=7;b>=0;b--,x++,dst++) dst[0] = src[0]&(1<<b) ? 0 : 0xFF;
+                        }
+                    } else if(depth==8) {
                         if(indexed) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=palette[src[0]];
                         else for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src++) dst[0]=byte4(src[0],src[0],src[0],0xFF);
-                    } else if(depth==3) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=3) dst[0]=byte4(src[0],src[1],src[2],0xFF);
-                    else if(depth==4) {
+                    } else if(depth==24) for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=3) dst[0]=byte4(src[0],src[1],src[2],0xFF);
+                    else if(depth==32) {
                         for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width;x++,dst++,src+=4) dst[0]=byte4(src[0],src[1],src[2],src[3]);
                         image.alpha=true;
                     }
@@ -497,11 +505,11 @@ void PDF::render(int2 position, int2 size) {
         ::blit(position+int2(scale*blit.pos),blit.resized);
     }
 
-    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position-int2(0,100))/scale,vec2(-position-int2(0,100))/scale)))) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position-int2(0,200))/scale,vec2(-position-int2(0,200))/scale)))) {
         vec2 a = scale*l.a, b = scale*l.b;
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
-        if(a.y > currentClip.max.y+100 && b.y > currentClip.max.y+100) break;
+        if(a.y > currentClip.max.y+200 && b.y > currentClip.max.y+200) break;
         if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
         line(a,b);
     }
@@ -522,11 +530,11 @@ void PDF::render(int2 position, int2 size) {
         }
     }
 
-    int i=characters.binarySearch(Character __(0,0,0,vec2(-position)/scale));
+    int i=characters.binarySearch(Character __(0,0,0,vec2(-position-int2(0,100))/scale));
     for(const Character& c: characters.slice(i)) {
         int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
-        if(pos.y<=currentClip.min.y) { i++; continue; }
-        if(pos.y>=currentClip.max.y) break;
+        if(pos.y<=currentClip.min.y-100) { i++; continue; }
+        if(pos.y>=currentClip.max.y+100) break;
         c.font->font.setSize(scale*c.size);
         const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
         if(glyph.image) blit(pos+glyph.offset,glyph.image,colors.value(i,black));

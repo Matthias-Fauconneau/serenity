@@ -94,7 +94,7 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 lastClef=pos;
             }
         } else if(font=="Manual"_) { // Manual annotations
-            if(!staffs || (pos.x < 300 && lastPos.x > 900 && pos.y > lastPos.y)) { staffs << lastClef.y+70; lastClef=pos; }
+            if(!staffs || (pos.x < 300 && lastPos.x > 900 && pos.y > lastPos.y)) { staffs << lastClef.y+100/*70*/; lastClef=pos; }
             lastPos=pos;
             uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
             if(i>=notes.size()) notes.grow(i+1);
@@ -532,6 +532,28 @@ void Score::remove() {
     }
 }
 
+void Score::expect() {
+    while(!expected && chordIndex<chords.size()-1) {
+        int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
+            if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(note.key) /*skip double notes*/ ) {
+                expected.insert(note.key, i);
+                errors = 0; showExpected = false; // Hides highlighting while succeeding
+            }
+            while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
+                assert(currentStaff<staffs.size());
+                currentStaff++;
+                currentX=0;
+            }
+            currentX = max(currentX, positions[i].x);
+            i++;
+        }
+        nextStaff(staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)], currentX);
+        chordSize = expected.size();
+        noteIndex += chords.values[chordIndex].size();
+        chordIndex++;
+    }
+}
+
 void Score::seek(uint unused time) {
     if(!staffs) return;
     assert(time==0,"TODO");
@@ -539,19 +561,8 @@ void Score::seek(uint unused time) {
         expected.clear();
         expected.insert(0,noteIndex=0);
     } else if(chords) {
-        chordIndex=0, noteIndex=0; currentStaff=0; expected.clear(); active.clear();
-        nextStaff(0,0,0);
-        int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-            if(note.duration > 0 && //skip graces
-                    !expected.contains(note.key) //skip double notes
-                    ) expected.insert(note.key, i);
-            while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
-                assert(currentStaff<staffs.size());
-                nextStaff(staffs[currentStaff],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
-                currentStaff++;
-            }
-            i++;
-        }
+        chordIndex=0, chordSize=0, noteIndex=0; currentStaff=0; currentX=0; expected.clear(); active.clear();
+        expect();
     }
     if(!showActive) {
         map<int,vec4> activeNotes;
@@ -595,23 +606,7 @@ void Score::noteEvent(uint key, uint vel) {
             if(active.contains(key)) while(active.contains(key)) active.remove(key);
             else return;
         }
-        while(!expected && chordIndex<chords.size()-1) {
-            noteIndex+=chords.values[chordIndex].size();
-            chordIndex++;
-            int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-                if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(note.key) /*skip double notes*/ ) {
-                    expected.insert(note.key, i);
-                    errors = 0; showExpected = false; // Hides highlighting while succeeding
-                }
-                while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size()-1) {
-                    assert(currentStaff<staffs.size());
-                    if(currentStaff>0) nextStaff(staffs[currentStaff-1],staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+2)]);
-                    currentStaff++;
-                }
-                i++;
-            }
-            chordSize = expected.size();
-        }
+        expect();
     }
     if(showActive) for(int i: active.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,red);
     if(showExpected) for(int i: expected.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insertMulti(indices?indices[i]:i,blue);
