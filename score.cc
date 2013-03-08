@@ -14,12 +14,15 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[3]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(span.y>2 && span.x<370 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<22) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30) || (span.x>360 && span.y<36))) {
+        if(span.y>2 && span.x<500 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<22) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30) || (span.x>360 && span.y<36))) {
             ties.appendOnce( Line(vec2(min.x,p[0].y),vec2(max.x,p[3].y)) );
-        }
+            //ties.appendOnce( Line(vec2(min.x,center.y),vec2(max.x,center.y)) );
+            debug[center]="V"_+str(span);
+        }else debug[center]="!V"_+str(span);
     } else if(p.size==10) {
         if(span.x>36 && span.x<1000 && span.y>10 && (span.y<14 || (span.x>100 && span.y<29))) {
             ties.appendOnce( Line(vec2(min.x,center.y),vec2(max.x,center.y)) );
+            debug[center]="X"_+str(span);
         }
     }
 }
@@ -85,8 +88,11 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
         } else if(endsWith(font,"Inkpen2"_)) {
             if(fontIndex==5/*treble*/||fontIndex==23/*bass*/) {
-                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+pos.y)/2;
-                lastClef=pos;
+                if(lastClef.y != 0 && pos.y-lastClef.y>128 && staffCount!=1) {
+                    staffs << (lastClef.y+pos.y)/2;
+                    staffCount=1;
+                } else staffCount++;
+                lastClef=pos; keys<<pos.y;
             }
         } else if(find(font,"NWCV15"_)) {
             if(code==97/*treble*/||code==98/*bass*/) {
@@ -266,10 +272,10 @@ void Score::parse() {
                                     (lastD>=16 && (abs(x-pX)<=26 && abs(y-pY)<=18) && (y!=pY || lastChord.size()>1 || chord.size()>1))
                                           )) {
                                 lastChord.insertSortedMulti(y,chord.at(y)); //tie only one duplicate
-                                chord.remove(y); /*debug[vec2(x,-y)]<<str("<"_,x-pX,y-pY,lastD);*/ goto again;
+                                chord.remove(y); debug[vec2(x,-y)]<<str("<"_,x-pX,y-pY); goto again;
                             } else if(lastChord.size()<=chord.size() && !(lastChord.size()==3 && chord.size()==4)/*FIXME*/) {
                                 if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
-                                lastChord.remove(pY); /*debug[vec2(pX,-pY)]<<str(">"_,abs(x-pX),abs(y-pY));*/ goto again;
+                                lastChord.remove(pY); debug[vec2(pX,-pY)]<<str(">"_,abs(x-pX),abs(y-pY)); goto again;
                             } //else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
                         } //else if(abs(x-pX)<26 && abs(y-pY)<40) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
                         skip:;
@@ -295,9 +301,10 @@ void Score::parse() {
                     /// Detect first note of a tie
                     if(!t.ly || abs(ly)<abs(t.dy)) {
                         if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-49 && ly>-34 && ly<15 && rx<1) {
+                            debug[vec2(x,-y)]=string("L"_);
                             for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied;
                             t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                        }
+                        } else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly,rx);
                     }
 alreadyTied: ;
                 }
@@ -313,11 +320,12 @@ alreadyTied: ;
                         break;
                     }
                     /// Detect right note of a tie
-                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>/*=*/-6 && ry < 7 && rx < 21 && rx > -10/*-9*//*-12*/) {
+                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>-6 && ry < 7 && rx < 21 && rx > -10) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
+                        debug[vec2(x,-y)]="R"_+str(rx,ry);
                         goto staffDone;
-                    }
+                    } else if(rx>-50 && rx<50 && ry>-50 && ry<50) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
                 }
             }
 staffDone: ;
@@ -341,9 +349,7 @@ alreadyTied1: ;
                         float dy = ry-ly;
                         if(dy>=-15 && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
-                            for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry)
-                                //error(-t.ly-staffs[i]-(-y2-staffs[i+1]), -o.ly-staffs[i]-(-y2-staffs[i+1]));
-                                goto alreadyTied2;
+                            for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied2;
                             tied << t;
                             goto tieFound;
                         }
@@ -547,7 +553,7 @@ void Score::expect() {
             currentX = max(currentX, positions[i].x);
             i++;
         }
-        nextStaff(staffs[currentStaff],staffs[min(staffs.size()-1,currentStaff+1)], currentX);
+        nextStaff(staffs[min(staffs.size()-1,currentStaff+1)],staffs[min(staffs.size()-1,currentStaff+2)], currentX);
         chordSize = expected.size();
         noteIndex += chords.values[chordIndex].size();
         chordIndex++;
@@ -599,6 +605,10 @@ void Score::noteEvent(uint key, uint vel) {
             if(expected.contains(key)) {
                 active.insertMulti(key,expected.at(key));
                 expected.remove(key);
+            }
+            else if(chordSize>=4 && expected.contains(key+12)) {
+                active.insertMulti(key,expected.at(key+12));
+                expected.remove(key+12);
             }
             else if(!showExpected) { errors++; if(errors>1) showExpected = true; } // Shows expected notes on errors (allows one error before showing)
             else return; // no changes

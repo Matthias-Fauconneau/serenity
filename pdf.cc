@@ -485,7 +485,7 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         mat32 Trm = Tm*Cm;
         uint16 index = font->font.index(code);
         vec2 position = vec2(Trm.dx,Trm.dy);
-        extend(position); extend(position+Trm.m11*font->font.size(index));
+        if(position.y>y2) y2=position.y; //extend(position); extend(position+Trm.m11*font->font.size(index));
         characters << Character __(font, Trm.m11*fontSize, index, position, code);
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size()) advance += fontSize*font->widths[code]/1000;

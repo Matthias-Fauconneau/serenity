@@ -166,10 +166,10 @@ struct Music {
         }
         midiScore.center(int2(0,current));
     }
-    /// Scrolls to target at 60px/s (vsync)
+    /// Smoothly scrolls towards target
     void smoothScroll() {
         if(pdfScore.annotations) return;
-        const float k=1./(2*60), b=1./2; //stiffness and damping constants
+        const float k=1./(8*60), b=1./2; //stiffness and damping constants
         speed = b*speed + k*(target-position);
         position = position + speed; //Euler integration
         pdfScore.delta=int2(round(position));
