@@ -5,7 +5,7 @@
 
 struct PoissonSolver : Widget {
     // Parameters
-    const uint Mx=9, My=9; // Spatial resolutions
+    const uint Mx=7, My=7; // Spatial resolutions
     const float Lx=1, Ly=1; // Physical dimensions
     const float dx = Lx/Mx, dy = Ly/My; // Physical resolutions
     const float T0 = 0, T1 = 1; // Lateral boundary conditions

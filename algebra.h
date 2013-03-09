@@ -58,10 +58,10 @@ struct Matrix {
             iterator end(){ return __(data, stop); }
         };
         Slice operator()(uint start, uint stop) const {
-            assert(start<A.n && stop<=A.n && start<stop, start, stop, A.n);
-            uint startIndex=0, stopIndex=0;
-            for(uint index: range(A.lines[i],A.lines[i+1])) if(A.data[index].column >= start) { startIndex=index; break; }
-            for(uint index: range(startIndex,A.lines[i+1])) if(A.data[index].column >= stop) { stopIndex=index; break; }
+            assert(start<A.n && stop<=A.n && start<=stop, start, stop, A.n);
+            uint first=A.lines[i], last=A.lines[i+1], startIndex=last, stopIndex=last;
+            for(uint index: range(first,last)) if(A.data[index].column >= start) { startIndex=index; break; }
+            for(uint index: range(startIndex,last)) if(A.data[index].column >= stop) { stopIndex=index; break; }
             return __(A.data,startIndex,stopIndex);
         }
         Slice::iterator begin(){ return __(A.data, A.lines[i]); }
@@ -110,7 +110,6 @@ template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.lines=buff
 
 /// Returns true if both matrices are identical
 bool operator==(const Matrix& a,const Matrix& b);
-inline bool operator!=(const Matrix& a,const Matrix& b) { return !(a==b); }
 
 /// Matrix multiplication (composition of linear transformations)
 Matrix operator*(const Matrix& a,const Matrix& b);
@@ -123,7 +122,6 @@ struct Permutation {
     int even=1; //1 if even count of swaps, -1 if odd count of swaps (used for determinant)
     buffer<int> order;
 
-    //default_move(Permutation);
     Permutation(int n) : order(n) { order.size=n; for(uint i: range(n)) order[i] = i; } // identity ordering
     void swap(int i, int j) { ::swap(order[i],order[j]); even=-even; }
     int determinant() const { return even; }
@@ -135,17 +133,13 @@ Matrix operator *(const Permutation& P, Matrix&& A);
 /// Converts permutation matrix to text
 template<> string str(const Permutation& P);
 
-// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
+/// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
 void pivot(Matrix &A, Permutation& P, uint j);
 
 /// Factorizes any matrix as the product of a lower triangular matrix and an upper triangular matrix
 /// \return permutations (P) and packed LU (U's diagonal is 1).
 struct PLU { Permutation P; Matrix LU; };
 PLU factorize(Matrix&& A);
-
-/*/// Returns L and U from a packed LU matrix.
-struct LU { Matrix L,U; };
-LU unpack(Matrix&& LU);*/
 
 /// Convenience macro to emulate multiple return arguments
 #define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
@@ -177,6 +171,3 @@ Vector solve(const Permutation& P, const Matrix &LU, const Vector& b);
 
 /// Solves Ax=b using LU factorization
 Vector solve(const Matrix& A, const Vector& b);
-
-/*/// Solves Ax[j]=e[j] using LU factorization
-Matrix inverse(const Matrix &A);*/
