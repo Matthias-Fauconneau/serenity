@@ -100,13 +100,8 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
                 lastClef=pos;
             }
         } else if(font=="Manual"_) { // Manual annotations
-            if(!staffs || (pos.x < 300 && lastPos.x > 900 && pos.y > lastPos.y)) { staffs << lastClef.y+100/*70*/; lastClef=pos; }
+            if(!staffs || (pos.x < 300 && lastPos.x > 640 && pos.y > lastPos.y)) { staffs << lastClef.y+40/*80*//*70*/; lastClef=pos; }
             lastPos=pos;
-            uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
-            if(i>=notes.size()) notes.grow(i+1);
-            for(int x : notes[i].keys) if(abs(x-pos.x)<16) { notes[i].sorted(x).insertSorted(-pos.y, Note(index,4)); goto break_; }
-            /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
-            break_:;
         }
     } else if(pass==1) { // 2nd pass: detect notes and assign to staves
         uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
@@ -198,6 +193,16 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
             else if(code==106) duration = 8; //half
             else if(code==105) duration = 16; //whole
+        } else if(font=="Manual"_) {
+            uint i=0; for(;i<staffs.size() && pos.y>staffs[i];i++) {}
+            if(i>=notes.size()) notes.grow(i+1);
+            for(int x : notes[i].keys) if(abs(x-pos.x)<16) {
+                if(!notes[i].sorted(x).contains(-pos.y)) notes[i].sorted(x).insertSorted(-pos.y, Note(index,4));
+                goto break_;
+            }
+            /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
+            break_:;
+            //debug[floor(pos)]<<str(index)+" "_;
         }
         if(duration<0) return;
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
@@ -300,11 +305,11 @@ void Score::parse() {
 
                     /// Detect first note of a tie
                     if(!t.ly || abs(ly)<abs(t.dy)) {
-                        if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-49 && ly>-34 && ly<15 && rx<1) {
-                            debug[vec2(x,-y)]=string("L"_);
+                        if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-46/*49*/ && ly>-34 && ly<15 && rx<1) {
+                            debug[vec2(x,-y)]<<str("L"_,lx);
                             for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied;
                             t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                        } else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly,rx);
+                        } //else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly,rx);
                     }
 alreadyTied: ;
                 }
@@ -320,12 +325,12 @@ alreadyTied: ;
                         break;
                     }
                     /// Detect right note of a tie
-                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>-6 && ry < 7 && rx < 21 && rx > -10) {
+                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>-6 && ry <=12 && rx < 21 && rx > -10) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
-                        debug[vec2(x,-y)]="R"_+str(rx,ry);
+                        debug[vec2(x,-y)]<<"R"_+str(rx,ry);
                         goto staffDone;
-                    } else if(rx>-50 && rx<50 && ry>-50 && ry<50) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
+                    } else if(rx>-20 && rx<21 && ry>-20 && ry<20) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
                 }
             }
 staffDone: ;
@@ -381,6 +386,7 @@ trillCancelTie: ;
         for(int x : staff.keys) for(int y : staff.at(x).keys) {
             staff.at(x).at(y).scoreIndex=indices.size();
             positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
+            //debug[positions.last()]<<str(i)+" "_;
         }
         i++;
     }
@@ -402,7 +408,7 @@ trillCancelTie: ;
         }
     }
 
-    for(int i: range(staffs.size())) debug[vec2(0,staffs[i]-16)]=str(staffs[i]-staffs[max(0,i-1)],"________"_);
+    for(int i: range(staffs.size())) debug[vec2(0,staffs[i]-16)]=str(i,staffs[i]-staffs[max(0,i-1)],"________"_);
 }
 
 void Score::synchronize(const map<uint,Chord>& MIDI) {
@@ -431,7 +437,7 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]]=str(notes[i].key); //,notes[i].duration);
+        debug[positions[i]]<<str(notes[i].key); //,notes[i].duration);
     }
 }
 
@@ -447,7 +453,7 @@ void Score::annotate(map<uint,Chord>&& chords) {
     uint t=-1; for(uint i: range(min(notes.size(),positions.size()))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) this->chords.insert(++t);
         this->chords.at(t) << notes[i];
-        debug[positions[i]]=str(notes[i].key);
+        debug[positions[i]]<<str(notes[i].key);
     }
 }
 
@@ -501,7 +507,7 @@ void Score::insert() {
             uint t=-1; for(uint i: range(notes.size())) {
                 if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
                 chords.at(t) << notes[i];
-                debug[positions[i]]=str(notes[i].key);
+                debug[positions[i]]<<str(notes[i].key);
             }
             annotationsChanged(chords);
         }
@@ -526,7 +532,7 @@ void Score::remove() {
             uint t=-1; for(uint i: range(notes.size())) {
                 if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
                 chords.at(t) << notes[i];
-                debug[positions[i]]=str(notes[i].key);
+                debug[positions[i]]<<str(notes[i].key);
             }
             annotationsChanged(chords);
         }

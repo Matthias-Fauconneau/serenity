@@ -41,9 +41,12 @@ struct PDFScore : PDF {
                 positions << pos;
             }
         }
-        int i=0; for(vec2 position: positions) {
+        {int i=0; for(vec2 position: positions) {
             onGlyph(i++,position*scale,32,"Manual"_,0,0);
-        }
+        }}
+        {int i=0; for(vec2 position: positions) {
+            onGlyph(i++,position*scale,32,"Manual"_,0,0);
+        }}
     }
     bool editMode=false;
     void toggleEdit() { editMode=!editMode; }
@@ -150,6 +153,7 @@ struct Music {
         audio.start();
         thread.spawn();
         toggleAnnotations();
+        openSheet("Game of Thrones"_);
     }
 
     void toggleReverb() { sampler.enableReverb=!sampler.enableReverb; }
