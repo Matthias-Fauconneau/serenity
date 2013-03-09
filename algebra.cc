@@ -89,8 +89,8 @@ Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
     return x;
 }
 
-Vector solve(const Matrix& A, const Vector& b) {
-    multi(P,LU, = factorize(copy(A)); ) //compute P,LU
+Vector solve(Matrix&& A, const Vector& b) {
+    multi(P,LU, = factorize(move(A)); )
     Vector x = solve(P,LU,b);
     return x;
 }

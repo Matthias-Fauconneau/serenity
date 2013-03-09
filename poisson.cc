@@ -40,7 +40,8 @@ struct PoissonSolver : Widget {
             }
         }
 
-        Vector u = solve(A,b);
+        auto PLU = factorize(move(A));
+        Vector u = solve(PLU,b);
 
         // Visualization
         image = Image(Mx, My);

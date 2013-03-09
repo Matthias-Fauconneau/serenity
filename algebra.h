@@ -7,11 +7,7 @@
 /// Sparse CSR matrix
 struct Matrix {
     default_move(Matrix);
-    /// Allocate a m-row, n-column sparse matrix
     Matrix(uint m, uint n):m(m),n(n),lines(m+1,0){}
-    template<size_t N> Matrix(const float (&a)[N]):Matrix(sqrt(N),sqrt(N)) {
-        for(uint i: range(m)) for(uint j: range(n)) at(i,j)=a[i*m+j];
-    }
 
     struct Element { uint column; float value; };
     struct Row {
@@ -104,18 +100,11 @@ struct Matrix {
 
     uint m=0,n=0; /// row and column count
     buffer<uint> lines; /// indices of the first element of each line
-    array<Element> data; /// elements stored top-down left-right
+    array<Element> data; /// elements stored in order
 };
-template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.lines=buffer<uint>(o.lines); t.data=copy(o.data); return move(t); }
-
-/// Returns true if both matrices are identical
-bool operator==(const Matrix& a,const Matrix& b);
-
-/// Matrix multiplication (composition of linear transformations)
-Matrix operator*(const Matrix& a,const Matrix& b);
-
-/// Converts matrix to text
-template<> string str(const Matrix& a);
+//template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.lines=buffer<uint>(o.lines); t.data=copy(o.data); return move(t); }
+//bool operator==(const Matrix& a,const Matrix& b);
+//template<> string str(const Matrix& a);
 
 /// Permutation matrix
 struct Permutation {  
@@ -127,11 +116,8 @@ struct Permutation {
     int determinant() const { return even; }
     int operator[](int i) const { return order[i]; } //b[P[i]] = (P*b)[i]
 };
-
-Matrix operator *(const Permutation& P, Matrix&& A);
-
-/// Converts permutation matrix to text
-template<> string str(const Permutation& P);
+//Matrix operator *(const Permutation& P, Matrix&& A);
+//template<> string str(const Permutation& P);
 
 /// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
 void pivot(Matrix &A, Permutation& P, uint j);
@@ -141,18 +127,16 @@ void pivot(Matrix &A, Permutation& P, uint j);
 struct PLU { Permutation P; Matrix LU; };
 PLU factorize(Matrix&& A);
 
-/// Convenience macro to emulate multiple return arguments
+/// Convenience macro to extract multiple return arguments
 #define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
 
 /// Compute determinant of a packed PLU matrix (product along diagonal)
-float determinant(const Permutation& P, const Matrix& LU);
+debug( float determinant(const Permutation& P, const Matrix& LU); )
 
 /// Dense vector
 struct Vector {
     default_move(Vector);
-    /// Allocates an n-component vector
     Vector(uint n):data(n,NaN),n(n){}
-    Vector(const ref<float>& o) : Vector(o.size) { for(uint i: range(n)) at(i)=o[i]; }
 
     const float& at(uint i) const { assert(data && i<n); return data[i]; }
     float& at(uint i) { assert(data && i<n); return data[i]; }
@@ -164,10 +148,11 @@ struct Vector {
     buffer<float> data; /// elements stored in column-major order
     uint n=0; /// component count
 };
-template<> inline string str(const Vector& a) { string s; for(uint i: range(a.n)) { s<<str(a[i]); if(i<a.n-1) s<<' ';} return s; }
+//template<> inline string str(const Vector& a) { string s; for(uint i: range(a.n)) { s<<str(a[i]); if(i<a.n-1) s<<' ';} return s; }
 
 /// Solves PLUx=b
-Vector solve(const Permutation& P, const Matrix &LU, const Vector& b);
+Vector solve(const Permutation& P, const Matrix& LU, const Vector& b);
+inline Vector solve(const PLU& PLU, const Vector& b) { return solve(PLU.P, PLU.LU, b); }
 
 /// Solves Ax=b using LU factorization
-Vector solve(const Matrix& A, const Vector& b);
+Vector solve(Matrix&& A, const Vector& b);
