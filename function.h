@@ -63,7 +63,7 @@ template<Type... Args> struct signal {
     template<class C, class B, predicate(__is_base_of(B,C))>
     void connect(const C* object, void (B::*pmf)(Args...) const) { delegates<< function<void(Args...)>(static_cast<const B*>(object),pmf); }
     /// Returns whether this signal is connected to any delegate
-    explicit operator bool() { return delegates.size(); }
+    explicit operator bool() { return delegates.size; }
     /// Returns the emit operator as an anonymous function
     operator function<void(Args...)>(){ return __(this,&signal<Args...>::operator()); }
     /// Clears all connections

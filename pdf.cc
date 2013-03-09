@@ -69,12 +69,12 @@ static Variant parse(TextData& s) {
             }
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
-                uint size = stream.size();
+                uint size = stream.size;
                 uint width = v.dict.at("DecodeParms"_).dict.value("Columns"_,1).integer();
                 uint height = size/(width+1);
                 assert(size == (width+1)*height); // grayscale
-                const byte* src = stream.data();
-                byte* dst = stream.data(); // in-place
+                const byte* src = stream.data;
+                byte* dst = stream.data; // in-place
                 int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,1).integer();
                 if(predictor>=10) { // PNG predictor
                     uint8 prior[width]; clear(prior,width);
@@ -123,7 +123,7 @@ void PDF::open(const ref<byte>& data) {
     array<string> xref; map<ref<byte>,Variant> catalog;
     {
         TextData s(data);
-        for(s.index=s.buffer.size()-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
+        for(s.index=s.buffer.size-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
         int index=s.integer(); assert(index!=-1,s.untilEnd()); s.index=index;
         int root=0;
         struct CompressedXRef { uint object, index; }; array<CompressedXRef> compressedXRefs;
@@ -132,7 +132,7 @@ void PDF::open(const ref<byte>& data) {
                 s.skip();
                 uint i=s.integer(); s.skip();
                 uint n=s.integer(); s.skip();
-                if(xref.size()<i+n) xref.grow(i+n);
+                if(xref.size<i+n) xref.grow(i+n);
                 for(;n>0;n--,i++) {
                     int offset=s.integer(); s.skip(); s.integer(); s.skip();
                     if(s.match('n')) {
@@ -147,7 +147,7 @@ void PDF::open(const ref<byte>& data) {
                 uint i=s.integer(); s.skip();
                 uint unused n=s.integer(); s.skip();
                 if(!s.match("obj"_)) error("");
-                if(xref.size()<=i) xref.grow(i+1);
+                if(xref.size<=i) xref.grow(i+1);
                 xref[i]=string(s.slice(s.index));
             }
             Variant object = parse(s);
@@ -158,12 +158,12 @@ void PDF::open(const ref<byte>& data) {
                 int w1 = W[1].integer(); assert(w1==2||w1==3,w1);
                 assert(W[2].integer()==0 || W[2].integer()==1);
                 uint n=dict.at("Size"_).integer();
-                if(xref.size()<n) xref.grow(n);
+                if(xref.size<n) xref.grow(n);
                 BinaryData b(object.data,true);
                 array<Variant> list;
                 if(dict.contains("Index"_)) list = move(dict.at("Index"_).list);
                 else list << Variant(0) << Variant(dict.at("Size"_).integer());
-                for(uint l: range(list.size()/2)) {
+                for(uint l: range(list.size/2)) {
                     for(uint i=list[l*2].integer(),n=list[l*2+1].integer();n>0;n--,i++) {
                         uint8 type=b.read();
                         if(type==0) { // free objects
@@ -206,10 +206,10 @@ void PDF::open(const ref<byte>& data) {
     Variant kids = move(parse(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
     array<Variant> pages = kids.list ? move(kids.list) : parse(xref[kids.integer()]).list;
     y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
-    for(uint i=0; i<pages.size(); i++) {
+    for(uint i=0; i<pages.size; i++) {
         const Variant& page = pages[i];
-        uint pageFirstBlit = blits.size(), pageFirstLine = lines.size(), pageFirstCharacter = characters.size(), pageFirstPath=paths.size(),
-                pageFirstPolygon=polygons.size();
+        uint pageFirstBlit = blits.size, pageFirstLine = lines.size, pageFirstCharacter = characters.size, pageFirstPath=paths.size,
+                pageFirstPolygon=polygons.size;
         auto dict = parse(xref[page.integer()]).dict;
         if(dict.contains("Resources"_)) {
             auto resources = toDict(xref,move(dict.at("Resources"_)));
@@ -257,7 +257,7 @@ void PDF::open(const ref<byte>& data) {
                             } else { log("Unsupported colorspace",cs,cs.list[1].integer()?parse(xref[cs.list[1].integer()]).data:""_); continue; }
                         }
                     }
-                    const uint8* src = (uint8*)object.data.data(); assert(object.data.size()==image.height*image.width*depth/8);
+                    const uint8* src = (uint8*)object.data.data; assert(object.data.size==image.height*image.width*depth/8);
                     byte4* dst = (byte4*)image.data;
                     if(depth==1) {
                         assert(image.width%8==0);
@@ -295,7 +295,7 @@ void PDF::open(const ref<byte>& data) {
             while(s.skip(), s) {
                 ref<byte> id = s.word("'*"_);
                 if(!id) {
-                    assert(!((s[0]>='a' && s[0]<='z')||(s[0]>='A' && s[0]<='Z')||s[0]=='\''||s[0]=='"'),s.peek(min(16u,s.buffer.size()-s.index)));
+                    assert(!((s[0]>='a' && s[0]<='z')||(s[0]>='A' && s[0]<='Z')||s[0]=='\''||s[0]=='"'),s.peek(min(16u,s.buffer.size-s.index)));
                     args << parse(s);
                     continue;
                 }
@@ -382,11 +382,11 @@ void PDF::open(const ref<byte>& data) {
         // translate from page to document
         //const array<Variant>& cropBox = (dict.value("CropBox"_)?:dict.at("MediaBox"_)).list; pageOffset += vec2(0,-cropBox[3].real()); vec2 offset = pageOffset;
         pageOffset += vec2(0,y1-y2-16); vec2 offset = pageOffset+vec2(0,-y1);
-        for(uint i: range(pageFirstBlit,blits.size())) blits[i].pos += offset;
-        for(uint i: range(pageFirstLine,lines.size())) lines[i].a += offset, lines[i].b += offset;
-        for(uint i: range(pageFirstCharacter,characters.size())) characters[i].pos += offset;
-        for(uint i: range(pageFirstPath,paths.size())) for(vec2& pos: paths[i]) pos += offset;
-        for(uint i: range(pageFirstPolygon,polygons.size())) {
+        for(uint i: range(pageFirstBlit,blits.size)) blits[i].pos += offset;
+        for(uint i: range(pageFirstLine,lines.size)) lines[i].a += offset, lines[i].b += offset;
+        for(uint i: range(pageFirstCharacter,characters.size)) characters[i].pos += offset;
+        for(uint i: range(pageFirstPath,paths.size)) for(vec2& pos: paths[i]) pos += offset;
+        for(uint i: range(pageFirstPolygon,polygons.size)) {
             polygons[i].min+=offset; polygons[i].max+=offset;
             for(Line& l: polygons[i].edges) l.a += offset, l.b += offset;
         }
@@ -407,21 +407,21 @@ void PDF::open(const ref<byte>& data) {
     }
 
     // insertion sorts blits for culling
-    if(blits) for(int i : range(1,blits.size())) {
+    if(blits) for(int i : range(1,blits.size)) {
         auto e = move(blits[i]);
         while(i>0 && blits[i-1] > e) { blits[i]=move(blits[i-1]);  i--; }
         blits[i] = move(e);
     }
 
     // insertion sorts lines for culling
-    if(lines) for(int i : range(1,lines.size())) {
+    if(lines) for(int i : range(1,lines.size)) {
         auto e = lines[i];
         while(i>0 && e < lines[i-1]) { lines[i]=lines[i-1];  i--; }
         lines[i] = e;
     }
 
     // insertion sorts characters for culling
-    if(characters) for(int i : range(1,characters.size())) {
+    if(characters) for(int i : range(1,characters.size)) {
         auto e = characters[i];
         while(i>0 && characters[i-1] > e) { characters[i]=characters[i-1];  i--; }
         characters[i] = e;
@@ -429,8 +429,8 @@ void PDF::open(const ref<byte>& data) {
 
     scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
     for(const array<vec2>& path : paths) { array<vec2> scaled; for(vec2 pos : path) scaled<<scale*pos; onPath(scaled); }
-    for(uint i: range(characters.size())) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code, c.index); }
-    for(uint i: range(characters.size())) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code, c.index); }
+    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code, c.index); }
+    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code, c.index); }
     paths.clear();
 }
 
@@ -439,7 +439,7 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
     for(array<vec2>& path : paths) {
         for(vec2 p : path) extend(p);
         array<vec2> polyline;
-        for(uint i=0; i<path.size()-3; i+=3) {
+        for(uint i=0; i<path.size-3; i+=3) {
             if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
                 polyline << copy(path[i]);
             } else {
@@ -448,8 +448,8 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
         }
         polyline << copy(path.last());
         array<Line> lines;
-        if((flags&Stroke) || (flags&Fill) || polyline.size()>16) {
-            for(uint i: range(polyline.size()-1)) {
+        if((flags&Stroke) || (flags&Fill) || polyline.size>16) {
+            for(uint i: range(polyline.size-1)) {
                 if(polyline[i] != polyline[i+1])
                     lines << Line __( polyline[i], polyline[i+1] );
             }
@@ -464,8 +464,8 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
             }
             polygon.edges = move(lines);
             float area=0;
-            for(uint i: range(polyline.size())) {
-                area += cross(polyline[(i+1)%polyline.size()]-polyline[i], polyline[(i+2)%polyline.size()]-polyline[i]);
+            for(uint i: range(polyline.size)) {
+                area += cross(polyline[(i+1)%polyline.size]-polyline[i], polyline[(i+2)%polyline.size]-polyline[i]);
             }
             if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b);
             polygons << move(polygon);
@@ -488,7 +488,7 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         if(position.y>y2) y2=position.y; //extend(position); extend(position+Trm.m11*font->font.size(index));
         characters << Character __(font, Trm.m11*fontSize, index, position, code);
         float advance = spacing+(code==' '?wordSpacing:0);
-        if(code < font->widths.size()) advance += fontSize*font->widths[code]/1000;
+        if(code < font->widths.size) advance += fontSize*font->widths[code]/1000;
         else advance += font->font.linearAdvance(index);
         Tm = mat32(advance, 0) * Tm;
     }

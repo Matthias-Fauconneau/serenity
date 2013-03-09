@@ -11,9 +11,9 @@ template<Type K, Type V> struct map {
     array<V> values;
 
     void reserve(int size) { return keys.reserve(size); values.reserve(size); }
-    uint size() const { return keys.size(); }
+    uint size() const { return keys.size; }
     bool contains(const K& key) const { return keys.contains(key); }
-    explicit operator bool() const { return keys.size(); }
+    explicit operator bool() const { return keys.size; }
     void clear() { keys.clear(); values.clear(); }
 
     const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}

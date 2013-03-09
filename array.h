@@ -1,8 +1,8 @@
 #pragma once
-/// \file array.h Common array container
+/// \file array.h Contiguous collection of elements
 #include "core.h"
 
-/// Dynamic collections of elements (can hold either a const reference or a mutable heap allocation).
+/// Contiguous collection of elements (can hold either a const reference or a mutable heap allocation).
 /// \note Uses move semantics to avoid reference counting when managing an heap allocation
 template<Type T> struct array {
     T* data=0; /// Pointer to the buffer valid while not reallocated
@@ -19,7 +19,7 @@ template<Type T> struct array {
     array(uint capacity, uint size, const T& value):size(size){assert(capacity>=size); reserve(capacity); ::clear(data,size,value);}
     /// Copies elements from a reference
     explicit array(const ref<T>& ref){reserve(ref.size); size=ref.size; for(uint i: range(ref.size)) new (&at(i)) T(ref[i]);}
-    /// References \a size elements from read-only \a data pointer
+    /// References \a size elements from const \a data pointer
     array(const T* data, uint size):data((T*)data),size(size){}
     /// If the array own the data, destroys all initialized elements and frees the buffer
     ~array() { if(capacity) { for(uint i: range(size)) data[i].~T(); unallocate(data); } }
@@ -33,21 +33,27 @@ template<Type T> struct array {
     /// Resizes the array to \a size and default initialize new elements
     void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (&at(i)) T(); }
     /// Sets the array size to \a size and destroys removed elements
-    void shrink(uint size) { assert(capacity && size<=this->size); for(uint i: range(size,this->size)) at(i).~T(); this.size=size; }
+    void shrink(uint size) { assert(capacity && size<=this->size); for(uint i: range(size,this->size)) at(i).~T(); this->size=size; }
     /// Removes all elements
-    void clear() { if(size()) shrink(0); }
+    void clear() { if(size) shrink(0); }
 
     /// Returns true if not empty
     explicit operator bool() const { return size; }
-    /// Returns a reference to the elements contained in this array
+    /// Returns a const reference to the elements contained in this array
     operator ref<T>() const { return ref<T>(data,size); }
+    /// Returns a mutable reference to the elements contained in this array
+    explicit operator mutable_ref<T>() { return mutable_ref<T>(data,size); }
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 
-    /// Slices a reference to elements from \a pos to \a pos + \a size
+    /// Slices a const reference to elements from \a pos to \a pos + \a size
     ref<T> slice(uint pos, uint size) const { return ref<T>(*this).slice(pos,size); }
-    /// Slices a reference to elements from \a pos the end of the array
+    /// Slices a const reference to elements from \a pos the end of the array
     ref<T> slice(uint pos) const { return ref<T>(*this).slice(pos); }
+    /// Slices a mutable reference to elements from \a pos to \a pos + \a size
+    mutable_ref<T> mutable_slice(uint pos, uint size) { return mutable_ref<T>(*this).slice(pos,size); }
+    /// Slices a mutable reference to elements from \a pos the end of the array
+    mutable_ref<T> mutable_slice(uint pos) { return mutable_ref<T>(*this).slice(pos); }
 
     /// \name Accessors
     const T& at(uint i) const { assert(i<size); return data[i]; }

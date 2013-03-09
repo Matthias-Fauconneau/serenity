@@ -94,7 +94,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
         }
         string glsl = global+"\nvoid main() {\n"_+main+"\n}\n"_;
         uint shader = glCreateShader(type);
-        const char* data = glsl.data(); int size = glsl.size();
+        const char* data = glsl.data; int size = glsl.size;
         glShaderSource(shader, 1, &data,&size);
         glCompileShader(shader);
 

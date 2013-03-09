@@ -4,7 +4,6 @@
 #include "process.h"
 #include "linux.h"
 #include "map.h"
-#include "memory.h"
 #include "process.h"
 #include "string.h"
 
@@ -49,8 +48,8 @@ SSLSocket::~SSLSocket() { if(ssl) SSL_shutdown(ssl); }
 array<byte> SSLSocket::readUpTo(int size) {
     if(!ssl) return TCPSocket::readUpTo(size);
     array<byte> buffer(size);
-    size=SSL_read(ssl, buffer.data(), size);
-    if(size>=0) buffer.setSize(size); else warn("SSL error",size);
+    size=SSL_read(ssl, buffer.data, size);
+    if(size>=0) buffer.size=size; else warn("SSL error",size);
     return buffer;
 }
 void SSLSocket::write(const ref<byte>& buffer) {
@@ -230,7 +229,7 @@ void HTTP::event() {
     }
     if(state == Cache) {
         if(!content) log("Missing content",buffer);
-        if(content.size()>1024) log("Downloaded",url,content.size()/1024,"KB"); else log("Downloaded",url,content.size(),"B");
+        if(content.size>1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
         redirect << cacheFile(url);
         for(const string& file: redirect) {Folder(section(file,'/'),cache(),true); writeFile(file,content,cache());}
         state=Handle; queue(); return;  //Cache other outstanding requests before handling this one

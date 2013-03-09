@@ -10,13 +10,13 @@
 /// Displays a plot of Y
 template<Type Array> void plot(int2 position, int2 size, const Array& Y) {
     float min=-1, max=1;
-    for(uint x: range(Y.size())) {
+    for(uint x: range(Y.size)) {
         float y = Y[x];
         min=::min(min,y);
         max=::max(max,y);
     }
-    vec2 scale = vec2(size.x/(Y.size()-1.), size.y/(max-min));
-    for(uint x: range(Y.size()-1)) {
+    vec2 scale = vec2(size.x/(Y.size-1.), size.y/(max-min));
+    for(uint x: range(Y.size-1)) {
         vec2 a = vec2(position)+scale*vec2(x,  (max-min)-(Y[x]-min));
         vec2 b = vec2(position)+scale*vec2(x+1, (max-min)-(Y[x+1]-min));
         line(a,b);
@@ -151,7 +151,7 @@ struct Synthesizer : VBox {
         ::clear(buffer,2*periodSize);
 
         // Synthesize all notes
-        for(uint i=0; i<strings.size();) { Note& note=strings.values[i];
+        for(uint i=0; i<strings.size;) { Note& note=strings.values[i];
             if(note.read(buffer,periodSize)) i++;
             else { strings.keys.removeAt(i); strings.values.removeAt(i); clear(); if(strings) *this << &strings.values.last(); }
         }

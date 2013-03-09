@@ -1,6 +1,6 @@
 #pragma once
+#include "core.h"
 /// \file flac.h High performance FLAC decoder
-#include "memory.h"
 
 /// Decodes packed bitstreams
 struct BitReader {

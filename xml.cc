@@ -149,9 +149,9 @@ string unescape(const ref<byte>& xml) {
 "quot \" acute ´ amp & apos ' lt < gt > nbsp \xA0 copy © euro € reg ® trade ™ lsaquo ‹ rsaquo › ldquo “ rdquo ” laquo « raquo » rsquo ’ hellip … ndash – not ¬ mdash — "
 "larr ← uarr ↑ rarr → darr ↓ infin ∞ deg ° middot · bull • "
 "aacute á Aacute Á agrave à Agrave À acirc â ccedil ç Ccedil Ç eacute é Eacute É egrave è Egrave È ecirc ê euml ë ocirc ô ouml ö oslash ø oelig œ iacute í icirc î Icirc Î iuml ï ugrave ù ucirc û szlig ß yen ¥"_,' ');
-        assert(kv.size()%2==0,kv.size());
-        entities.reserve(kv.size()/2);
-        for(uint i=0;i<kv.size();i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
+        assert(kv.size%2==0,kv.size);
+        entities.reserve(kv.size/2);
+        for(uint i=0;i<kv.size;i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
     string out;
     for(TextData s(xml);s;) {

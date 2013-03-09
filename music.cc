@@ -54,7 +54,7 @@ struct PDFScore : PDF {
         if(!editMode || event!=Press) return false;
         vec2 position = vec2(cursor)/scale;
         int best=-1; float D=60;
-        for(int i: range(positions.size())) {
+        for(int i: range(positions.size)) {
             vec2 delta = positions[i]-position;
             float d = length(delta);
             if(d<D) { D=d; if(abs(delta.x)<16) best=i; else best=-1; }

@@ -59,7 +59,6 @@ score.h
 window.cc
 gl.cc
 interface.h
-memory.h
 process.h
 sequencer.cc
 text.cc

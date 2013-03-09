@@ -27,7 +27,6 @@
    POSSIBILITY OF SUCH DAMAGE.
 */
 #include "resample.h"
-#include "memory.h"
 #include "simd.h"
 
 inline float product(const float* kernel, const float* signal, int len) {

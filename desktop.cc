@@ -87,7 +87,7 @@ struct Desktop {
                 if(!existsFile(path)) { warn("Executable not found",exec); continue; }
                 array<string> arguments;  arguments<<string(section(entries["Exec"_],' ',1,-1));
                 for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
-                for(uint i=0; i<arguments.size();) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
+                for(uint i=0; i<arguments.size;) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
                 shortcuts << Command(move(icon),string(entries["Name"_]),move(path),move(arguments));
             }
         }

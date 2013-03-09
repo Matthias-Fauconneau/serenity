@@ -77,8 +77,8 @@ struct Player {
             if(existsFolder(album,"Music"_)) {
                 albums.index = folders.indexOf(string(album));
                 array<string> files = Folder(album,"Music"_).list(Recursive|Files);
-                uint i=0; for(;i<files.size();i++) if(files[i]==title) break;
-                for(;i<files.size();i++) queueFile(files[i], album);
+                uint i=0; for(;i<files.size;i++) if(files[i]==title) break;
+                for(;i<files.size;i++) queueFile(files[i], album);
                 if(files) {
                     next();
                     seek(toInteger(section(mark,0,1,2)));
@@ -90,8 +90,8 @@ struct Player {
     void queueFile(const ref<byte>& file, const ref<byte>& folder) {
         string title = string(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
-        while(i<title.size() && title[i]>='0'&&title[i]<='9') i++; //skip track number
-        while(i<title.size() && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
+        while(i<title.size && title[i]>='0'&&title[i]<='9') i++; //skip track number
+        while(i<title.size && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
         titles << Text(replace(title.slice(i),"_"_," "_), 16);
         files <<  folder+"/"_+file;
     }

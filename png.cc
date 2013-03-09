@@ -1,7 +1,6 @@
 #include "png.h"
 #include "inflate.h"
 #include "data.h"
-#include "memory.h"
 
 template<Type T> struct rgba { T r,g,b,a; operator byte4() const { return byte4 __(b,g,r,a); } };
 template<Type T> struct rgb { T r,g,b; operator byte4() const { return byte4 __(b,g,r,255); } };

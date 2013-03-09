@@ -66,7 +66,7 @@ void HTML::load(const URL& url, Map&& document) {
         else if(score>=second) second=score;
         return true;
     });
-    while(best->name=="a"_ && best->children.size()==1) best=&best->children.first();
+    while(best->name=="a"_ && best->children.size==1) best=&best->children.first();
     const Element& content = *best;
     log(url,max,second);
     parse(url, content);
@@ -132,7 +132,7 @@ void HTML::flushText() {
 void HTML::flushImages() {
     if(!images) return;
     UniformGrid<ImageLink>& grid = heap<UniformGrid<ImageLink> >();
-    grid.reserve(images.size());
+    grid.reserve(images.size);
     for(URL& image: images) {
         grid<<ImageLink();
         heap<ImageLoader>(move(image), &grid.last().image, contentChanged);

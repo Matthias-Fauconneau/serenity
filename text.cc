@@ -32,16 +32,16 @@ struct TextLayout {
         float length=0; for(const Word& word: line) { if(word) { length+=word.last().pos.x+word.last().advance; } } //sum word length
         if(line && line.last()) length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
         float space=0;
-        if(justify && line.size()>1) space = (wrap-length)/(line.size()-1);
+        if(justify && line.size>1) space = (wrap-length)/(line.size-1);
         if(space<=0 || space>=3*spaceAdvance) space = spaceAdvance; //compact
 
         //layout
         column=0; pen.x=0;
         lineNumber++; text << TextLine();
-        for(uint i: range(line.size())) { Word& word=line[i];
+        for(uint i: range(line.size)) { Word& word=line[i];
             for(Character& c: word) text.last() << Character __(c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex);
             if(word) pen.x += word.last().pos.x+word.last().advance;
-            if(i!=line.size()-1) //editable justified space
+            if(i!=line.size-1) //editable justified space
                 text.last() << Character __(0,pen,0,0,spaceAdvance,lastIndex=lastIndex+1);
             pen.x += space;
         }
@@ -129,14 +129,14 @@ void Text::layout() {
     textSize=int2(0,size);
     TextLayout layout(text, size, wrap);
 
-    textLines.clear(); textLines.reserve(layout.text.size());
-    debug( cursor.line = -1, cursor.column=-1;  ) uint currentIndex=0;
+    textLines.clear(); textLines.reserve(layout.text.size);
+    cursor.line = -1, cursor.column=-1; uint currentIndex=0;
     for(const TextLayout::TextLine& line: layout.text) {
         TextLine textLine;
         for(const TextLayout::Character& o: line) {
             currentIndex = o.editIndex;
             if(currentIndex==editIndex) { //restore cursor after relayout
-                cursor = Cursor __(textLines.size(), textLine.size());
+                cursor = Cursor __(textLines.size, textLine.size);
             }
             if(o.font) {
                 const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
@@ -148,18 +148,18 @@ void Text::layout() {
             }
         }
         currentIndex++;
-        if(currentIndex==editIndex) cursor = Cursor __(textLines.size(), textLine.size()); //end of line
+        if(currentIndex==editIndex) cursor = Cursor __(textLines.size, textLine.size); //end of line
         textLines << move(textLine);
     }
-    if(!text.size()) { assert(editIndex==0); cursor = Cursor __(0,0); }
-    else if(currentIndex==editIndex) cursor = Cursor __(textLines.size()-1, textLines.last().size()); //end of text
+    if(!text.size) { assert(editIndex==0); cursor = Cursor __(0,0); }
+    else if(currentIndex==editIndex) cursor = Cursor __(textLines.size-1, textLines.last().size); //end of text
     links = move(layout.links);
     for(TextLayout::Line layoutLine: layout.lines) {
         for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {
             const TextLayout::TextLine& textLine = layout.text[line];
-            if(layoutLine.begin.column<textLine.size()) {
+            if(layoutLine.begin.column<textLine.size) {
                 TextLayout::Character first = (line==layoutLine.begin.line) ? textLine[layoutLine.begin.column] : textLine.first();
-                TextLayout::Character last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size()) ? textLine[layoutLine.end.column] : textLine.last();
+                TextLayout::Character last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size) ? textLine[layoutLine.end.column] : textLine.last();
                 assert(first.pos.y == last.pos.y);
                 lines << Line __( int2(first.pos+vec2(0,1)), int2(last.pos+vec2(last.font?last.font->advance(last.index):0,2)));
             }
@@ -181,7 +181,7 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
     if(!button) return false;
     position -= max(int2(0),(size-textSize)/2);
     if(!Rect(textSize).contains(position)) return false;
-    for(uint line: range(textLines.size())) {
+    for(uint line: range(textLines.size)) {
         if(position.y < (int)(line*this->size) || position.y > (int)(line+1)*this->size) continue;
         const TextLine& textLine = textLines[line];
         if(!textLine) goto break_;
@@ -189,14 +189,14 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
         const Character& first = textLine.first();
         if(position.x <= first.center) { cursor = Cursor __(line,0); goto break_; }
         // Between characters
-        for(uint column: range(0,textLine.size()-1)) {
+        for(uint column: range(0,textLine.size-1)) {
             const Character& prev = textLine[column];
             const Character& next = textLine[column+1];
             if(position.x >= prev.center && position.x <= next.center) { cursor = Cursor __(line,column+1); goto break_; }
         }
         // After last character
         const Character& last = textLine.last();
-        if(position.x >= last.center) { cursor = Cursor __(line,textLine.size()); goto break_; }
+        if(position.x >= last.center) { cursor = Cursor __(line,textLine.size); goto break_; }
     }
     if(event == Press && textClicked) { textClicked(); return true; }
     break_:;
@@ -207,12 +207,12 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
 
 uint Text::index() {
     if(!textLines) return 0;
-    if(cursor.line==textLines.size()) return textLines.last().last().editIndex;
-    assert(cursor.line<textLines.size(),cursor.line,textLines.size());
-    assert(cursor.column<=textLines[cursor.line].size(), cursor.column, textLines[cursor.line].size());
-    if(cursor.column<textLines[cursor.line].size()) {
+    if(cursor.line==textLines.size) return textLines.last().last().editIndex;
+    assert(cursor.line<textLines.size,cursor.line,textLines.size);
+    assert(cursor.column<=textLines[cursor.line].size, cursor.column, textLines[cursor.line].size);
+    if(cursor.column<textLines[cursor.line].size) {
         uint index = textLines[cursor.line][cursor.column].editIndex;
-        assert(index<text.size());
+        assert(index<text.size);
         return index;
     }
     uint index = 1; // ' ', '\t' or '\n' immediatly after last character
@@ -230,7 +230,7 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
     if(event==Press && button==MiddleButton) {
         Text::mouseEvent(position,size,event,button);
         array<uint> selection = toUTF32(getSelection());
-        editIndex=index()+selection.size(); array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
+        editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
         layout();
         if(textChanged) textChanged(toUTF8(text));
         return true;
@@ -241,12 +241,12 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
 }
 
 bool TextInput::keyPress(Key key, Modifiers modifiers) {
-    cursor.line=min(cursor.line,textLines.size()-1);
+    cursor.line=min(cursor.line,textLines.size-1);
     const TextLine& textLine = textLines[cursor.line];
 
     if(modifiers&Control && key=='v') {
         array<uint> selection = toUTF32(getSelection(true));
-        editIndex=index()+selection.size(); array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
+        editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
         layout();
         if(textChanged) textChanged(toUTF8(text));
         return true;
@@ -255,30 +255,30 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
     if(key==UpArrow) {
         if(cursor.line>0) cursor.line--;
     } else if(key==DownArrow) {
-         if(cursor.line<textLines.size()-1) cursor.line++;
+         if(cursor.line<textLines.size-1) cursor.line++;
     } else {
-        cursor.column=min(cursor.column,textLine.size());
+        cursor.column=min(cursor.column,textLine.size);
 
         /**/  if(key==LeftArrow) {
             if(cursor.column>0) cursor.column--;
-            else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size();
+            else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size;
         }
         else if(key==RightArrow) {
-            if(cursor.column<textLine.size()) cursor.column++;
-            else if(cursor.line<textLines.size()-1) cursor.line++, cursor.column=0;
+            if(cursor.column<textLine.size) cursor.column++;
+            else if(cursor.line<textLines.size-1) cursor.line++, cursor.column=0;
         }
         else if(key==Home) cursor.column=0;
-        else if(key==End) cursor.column=textLine.size();
+        else if(key==End) cursor.column=textLine.size;
         else if(key==Delete) {
-            if(cursor.column<textLine.size() || cursor.line<textLines.size()-1) {
+            if(cursor.column<textLine.size || cursor.line<textLines.size-1) {
                 text.removeAt(editIndex=index()); layout(); if(textChanged) textChanged(toUTF8(text));
             }
         }
         else if(key==BackSpace) { //LeftArrow+Delete
             if(cursor.column>0) cursor.column--;
-            else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size();
+            else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size;
             else return false;
-            if(index()<text.size()) {
+            if(index()<text.size) {
                 text.removeAt(editIndex=index()); layout(); if(textChanged) textChanged(toUTF8(text));
             }
         }
@@ -304,10 +304,10 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
 void TextInput::render(int2 position, int2 size) {
     Text::render(position, size);
     if(focus==this) {
-        assert(cursor.line < textLines.size(), cursor.line, textLines.size());
+        assert(cursor.line < textLines.size, cursor.line, textLines.size);
         const TextLine& textLine = textLines[cursor.line];
         int x = 0;
-        if(cursor.column<textLine.size()) x= textLine[cursor.column].pos.x;
+        if(cursor.column<textLine.size) x= textLine[cursor.column].pos.x;
         else if(textLine) x=textLine.last().pos.x+textLine.last().advance;
         int2 offset = position+max(int2(0),(size-textSize)/2);
         fill(offset+int2(x,cursor.line*this->size)+Rect(2,this->size), black);

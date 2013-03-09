@@ -19,9 +19,9 @@ struct Image {
         : data(allocate<byte4>(height*(stride?:width))), width(width), height(height), stride(stride?:width), own(true), alpha(alpha) {
         assert(width); assert(height);
     }
-    /*Image(array<byte4>&& o, uint width, uint height, bool alpha) : data(o.data),width(width),height(height),stride(width),own(true),alpha(alpha) {
-        assert(width && height && o.size == width*height, width, height, o.size); assert(o.tag==-2); o.tag = 0;
-    }*/
+    Image(array<byte4>&& o, uint width, uint height, bool alpha) : data(o.data),width(width),height(height),stride(width),own(true),alpha(alpha) {
+        assert(width && height && o.size == width*height, width, height, o.size); o.capacity=o.size=0; o.data=0;
+    }
 
     ~Image(){ if(data && own) { unallocate(data); } }
     explicit operator bool() const { return data; }

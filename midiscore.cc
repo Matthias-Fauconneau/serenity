@@ -72,8 +72,8 @@ void MidiScore::render(int2 position, int2 size) {
         uint t = notes.keys[i]*4/ticksPerBeat;
 
         // Removes released notes from active sets
-        for(uint s: range(2)) for(uint i=0;i<active[s].size();) if(active[s][i].start+active[s][i].duration<=t) active[s].removeAt(i); else i++;
-        uint sustain[2] = { active[0].size(), active[1].size() }; // Remaining notes kept sustained
+        for(uint s: range(2)) for(uint i=0;i<active[s].size;) if(active[s][i].start+active[s][i].duration<=t) active[s].removeAt(i); else i++;
+        uint sustain[2] = { active[0].size, active[1].size }; // Remaining notes kept sustained
 
         if(int(t/staffTime)>lastSystem) { // Draws system
             lastSystem=t/staffTime;
@@ -98,8 +98,8 @@ void MidiScore::render(int2 position, int2 size) {
             while(
                   current[s] && // any notes to move ?
                   ((s==0 && current[s].last().key>=52) || (s==1 && current[s].first().key<68)) && // prevent stealing from far notes (TODO: relative to last active)
-                  current[s].size()>=current[!s].size() && // keep new notes balanced
-                  active[s].size()>=active[!s].size() && // keep active (sustain+new) notes balanced
+                  current[s].size>=current[!s].size && // keep new notes balanced
+                  active[s].size>=active[!s].size && // keep active (sustain+new) notes balanced
                   (!current[!s] ||
                    (s==1 && abs(int(current[!s].first().key-current[s].first().key))<=12) || // keep short span on new notes (left)
                    (s==0 && abs(int(current[!s].last().key-current[s].last().key))<=12) ) && // keep short span on new notes (right)
@@ -107,8 +107,8 @@ void MidiScore::render(int2 position, int2 size) {
                    (s==1 && abs(int(active[!s][0].key-current[s].first().key))<=18) || // keep short span with active notes (left)
                    (s==0 && abs(int(active[!s][sustain[!s]-1].key-current[s].last().key))<=18) ) && // keep short span with active notes (right)
                   (
-                      active[s].size()>active[!s].size()+1 || // balance active notes
-                      current[s].size()>current[!s].size()+1 || // balance load
+                      active[s].size>active[!s].size+1 || // balance active notes
+                      current[s].size>current[!s].size+1 || // balance load
                       // both new notes and active notes load are balanced
                       (current[0] && current[1] && s == 0 && abs(int(current[1].first().key-current[1].last().key))<abs(int(current[0].first().key-current[0].last().key))) || // minimize left span
                       (current[0] && current[1] && s == 1 && abs(int(current[0].first().key-current[0].last().key))<abs(int(current[1].first().key-current[1].last().key))) || // minimize right span
@@ -161,13 +161,13 @@ void MidiScore::render(int2 position, int2 size) {
                 Clef clef = (Clef)s;
                 bool tailUp=true; int dx = tailUp ? 12 : 0; uint slurY=tailUp?-1:0;
                 uint begin=0;
-                for(uint i: range(quavers[s].size())) {
+                for(uint i: range(quavers[s].size)) {
                     MidiNote note = quavers[s][i];
                     int2 position = page(s, note.start, staffY(clef, note.key));
                     if(tailUp) slurY=min<uint>(slurY,position.y);
                     else slurY=max<uint>(slurY,position.y);
                     uint duration=note.duration;
-                    if(i+1>=quavers[s].size() || quavers[s][i+1].duration<duration || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
+                    if(i+1>=quavers[s].size || quavers[s][i+1].duration<duration || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
                         ref<MidiNote> linked = quavers[s].slice(begin,i+1-begin);
                         if(linked.size==1) slurY+=tailUp?-32:32; else slurY+=tailUp?-24:24;
                         int2 lastPosition=0;

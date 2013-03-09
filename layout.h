@@ -23,7 +23,7 @@ struct Layout : Widget {
 struct Widgets : virtual Layout, array<Widget*> {
     Widgets(){}
     Widgets(const ref<Widget*>& widgets):array(widgets){}
-    uint count() const { return array::size(); }
+    uint count() const { return array::size; }
     Widget& at(int i)  { return *array::at(i); }
 };
 
@@ -32,7 +32,7 @@ struct Widgets : virtual Layout, array<Widget*> {
 template<class T> struct Array : virtual Layout, array<T> {
     Array(){}
     Array(array<T>&& items) : array<T>(move(items)){}
-    uint count() const { return array<T>::size(); }
+    uint count() const { return array<T>::size; }
     Widget& at(int i) { return array<T>::at(i); }
 };
 

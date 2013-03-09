@@ -2,7 +2,6 @@
 /// \file xml.h XML parser
 #include "map.h"
 #include "data.h"
-#include "memory.h"
 #include "function.h"
 
 /// Unique reference to an heap allocated value

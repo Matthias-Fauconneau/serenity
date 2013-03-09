@@ -83,7 +83,7 @@ void Sampler::open(const ref<byte>& path) {
                         while(copy.blockSize!=0 && size<period) { size+=copy.blockSize; copy.decodeFrame(); }
                         if(size>=period) { envelope << copy.sumOfSquares(period); copy.readIndex=(copy.readIndex+period)%copy.audio.capacity; size-=period; }
                     }
-                    log(string(path+".env"_),envelope.size());
+                    log(string(path+".env"_),envelope.size);
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
@@ -120,7 +120,7 @@ void Sampler::open(const ref<byte>& path) {
             Layer* layer=0;
             for(Layer& l : layers) if(l.shift==shift) layer=&l;
             if(layer == 0) { // Generates pitch shifting (resampling) filter banks
-                layers.grow(layers.size()+1);
+                layers.grow(layers.size+1);
                 layer = &layers.last();
                 layer->shift = shift;
                 layer->notes.reserve(128); // Avoid locking (FIXME: heap pointers array)
@@ -220,11 +220,11 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
                 if(layer == 0) { error("Layer not instantiated at initialization",key, s.lokey, s.hikey, s.pitch_keycenter, shift); return; }
-                static uint max=95; if(layer->notes.size()>max) log(max=layer->notes.size());
-                if(layer->notes.size()==layer->notes.capacity()) {
-                    log(layer->notes.size());
+                static uint max=95; if(layer->notes.size>max) log(max=layer->notes.size);
+                if(layer->notes.size==layer->notes.capacity) {
+                    log(layer->notes.size);
                     Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use a list of heap pointer instead)
-                    layer->notes.reserve(layer->notes.size()*2);
+                    layer->notes.reserve(layer->notes.size*2);
                 }
                 layer->notes << move(note);
             }
@@ -247,7 +247,7 @@ void Note::decode(uint need) {
 }
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
-        for(Layer& layer: layers) for(uint j=0; j<layer.notes.size(); j++) { Note& note=layer.notes[j];
+        for(Layer& layer: layers) for(uint j=0; j<layer.notes.size; j++) { Note& note=layer.notes[j];
             if((note.blockSize==0 && note.readCount<int(2*periodSize)) || extract(note.level,0)<0x1p-23) layer.notes.removeAt(j); else j++;
         }
         noteReadLock.unlock();

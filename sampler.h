@@ -92,5 +92,5 @@ struct Sampler : Poll {
     File record=0;
     signal<float* /*data*/, uint /*size*/> frameReady;
 
-    operator bool() const { return samples.size(); }
+    operator bool() const { return samples.size; }
 };

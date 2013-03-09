@@ -50,8 +50,8 @@ struct Taskbar : Socket, Poll {
         window.anchor=Top;
         panel<<&button<<&tasks<<&clock;
         string path = "/tmp/.X11-unix/X"_+(getenv("DISPLAY"_)/*?:":0"_*/).slice(1);
-        struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data(),path.size());
-        check_(connect(Socket::fd,(const sockaddr*)&addr,2+path.size()),path);
+        struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
+        check_(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path);
         {ConnectionSetup r;
             string authority = getenv("HOME"_)+"/.Xauthority"_;
             if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
@@ -97,7 +97,7 @@ struct Taskbar : Socket, Poll {
     }
 
     void processEvent(uint8 type, const XEvent& e) {
-        uint previousIndex=tasks.index, previousSize=tasks.size();
+        uint previousIndex=tasks.index, previousSize=tasks.size;
         if(type==0) return;
         if(type==1) error("Unexpected reply");
         type&=0b01111111; //msb set if sent by SendEvent
@@ -162,7 +162,7 @@ struct Taskbar : Socket, Poll {
             } else return;
         } else if(type==CreateNotify||type==ConfigureNotify||type==UnmapNotify||type==ClientMessage||type==ReparentNotify||type==MappingNotify||type==FocusIn) {
         } else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
-        if(previousIndex!=tasks.index || previousSize!=tasks.size()) window.render();
+        if(previousIndex!=tasks.index || previousSize!=tasks.size) window.render();
     }
 
     /// Adds \a id to \a windows and to \a tasks if necessary
@@ -176,13 +176,13 @@ struct Taskbar : Socket, Poll {
         }
         if(wa.mapState!=IsViewable) return -1;
         array<uint> type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
-        if(type.size()>0 && type.first()==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
-        if(type.size()>0 && type.first()!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_) && type.first()!=Atom("_NET_WM_WINDOW_TYPE_DIALOG"_)) return -1;
+        if(type.size>0 && type.first()==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
+        if(type.size>0 && type.first()!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_) && type.first()!=Atom("_NET_WM_WINDOW_TYPE_DIALOG"_)) return -1;
         if(getProperty<uint>(id,"_NET_WM_STATE"_).contains(Atom("_NET_WM_SKIP_TASKBAR"_))) return -1;
         string title = getTitle(id); if(!title) return -1;
         Image icon = getIcon(id);
         tasks<< Task(this,id,move(icon),move(title));
-        return tasks.array::size()-1;
+        return tasks.array::size-1;
     }
 
     string getTitle(uint id) {
@@ -192,9 +192,9 @@ struct Taskbar : Socket, Poll {
     }
     Image getIcon(uint id) {
         array<uint> buffer = getProperty<uint>(id,"_NET_WM_ICON"_,2+128*128);
-        if(buffer.size()<3) return Image();
+        if(buffer.size<3) return Image();
         uint w=buffer[0], h=buffer[1];
-        if(buffer.size()<2+w*h) return Image();
+        if(buffer.size<2+w*h) return Image();
         return resize(Image(array<byte4>(cast<byte4>(buffer.slice(2,w*h))),w,h,true), 16, 16);
     }
 

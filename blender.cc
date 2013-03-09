@@ -31,7 +31,7 @@ template<Type T> void quicksort(array<T>& at, uint left, uint right) {
     }
 }
 /// Quicksorts the array in-place
-template<Type T> void quicksort(array<T>& at) { quicksort(at, 0, at.size()-1); }
+template<Type T> void quicksort(array<T>& at) { quicksort(at, 0, at.size-1); }
 
 /// from "An Efﬁcient and Robust Ray–Box Intersection Algorithm"
 static bool intersect(vec3 min, vec3 max, vec3 O, vec3 D, float& t) {
@@ -187,7 +187,7 @@ struct BlendView : Widget {
         array<mat4> instances; // World to object
 
         // Rendering order
-        bool operator <(const Model& o) const { return instances.size()<o.instances.size(); }
+        bool operator <(const Model& o) const { return instances.size<o.instances.size; }
     };
 
     array<Model> models;
@@ -301,7 +301,7 @@ struct BlendView : Widget {
                             }
                         }
                         s.whileNot('['); if(s.match('[')) { //parse static arrays
-                            name.size -= 1+(s.buffer.size()-s.index);
+                            name.size -= 1+(s.buffer.size-s.index);
                             count = s.integer();
                             s.match(']');
                             while(s.match('[')) { // Flatten multiple indices
@@ -443,7 +443,7 @@ struct BlendView : Widget {
             bool render = scene->lay&object.lay; // Visible layers
             for(const ParticleSystem& particle: object.particlesystem) if(!(particle.part->draw&ParticleSettings::PART_DRAW_EMITTER)) render=false;
             if(render) model.instances << transform.inverse(); // Appends an instance
-            modelIndex.insert(&object, models.size()); // Keep track of Object <-> Model mapping (e.g to instanciate particles)
+            modelIndex.insert(&object, models.size); // Keep track of Object <-> Model mapping (e.g to instanciate particles)
             models << move(model);
         }
 
@@ -459,7 +459,7 @@ struct BlendView : Widget {
                 Random random;
                 for(int n=0; n</*particle.totpart/200*//*256*//*16*/1;) {
                     const array<uint>& indices = model.indices;
-                    uint index = random % (indices.size()/3) * 3;
+                    uint index = random % (indices.size/3) * 3;
                     uint a=indices[index], b=indices[index+1], c=indices[index+2];
                     uint densityVG = particle.vgroup[ParticleSystem::PSYS_VG_DENSITY];
                     if(densityVG) {
@@ -508,7 +508,7 @@ struct BlendView : Widget {
             }
         }
 
-        for(uint i=0; i<models.size();) {
+        for(uint i=0; i<models.size;) {
             Model& model = models[i];
             if(!model.instances) { models.removeAt(i); continue; } else i++;
         }
@@ -555,14 +555,14 @@ struct BlendView : Widget {
 
             Hit hit; hit.t =  -__builtin_inff();
             for(Model& model: models) {
-                if(model.instances.size()>1) continue;
-                if(model.indices.size() > 96774) continue;
+                if(model.instances.size>1) continue;
+                if(model.indices.size > 96774) continue;
                 for(const mat4& instance : model.instances) {
                     vec4 objectPosition = vec4(instance * worldPosition, 1.f);
                     vec4 objectRay = vec4( (mat3)instance * worldRay, 0.f);
                     float t=0;
                     if(intersect(model.bbMin,model.bbMax,objectPosition.xyz(),objectRay.xyz(), t) && t>hit.t) {
-                        for(const Triangle& t: model.faces.slice(0, min(256u,model.faces.size()))) intersect(objectPosition, objectRay, t, hit);
+                        for(const Triangle& t: model.faces.slice(0, min(256u,model.faces.size))) intersect(objectPosition, objectRay, t, hit);
                     }
                 }
             }

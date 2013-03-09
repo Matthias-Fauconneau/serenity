@@ -34,32 +34,32 @@ vec zeros(uint N) { vec r(N); r.setSize(N); for(uint i: range(N)) r[i] = 0; retu
 
 /// \name Vector operations
 vec operator+(const vec& A, const vec& B) {
-    uint N=A.size(); assert(B.size()==N); vec R(N); R.setSize(N);
+    uint N=A.size; assert(B.size==N); vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[i]+B[i];
     return R;
 }
 vec operator-(const vec& A, const vec& B) {
-    uint N=A.size(); assert(B.size()==N); vec R(N); R.setSize(N);
+    uint N=A.size; assert(B.size==N); vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[i]-B[i];
     return R;
 }
 vec operator*(float A, const vec& B) {
-    uint N=B.size(); vec R(N); R.setSize(N);
+    uint N=B.size; vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A*B[i];
     return R;
 }
 vec operator*(const vec& A, float B) {
-    uint N=A.size(); vec R(N); R.setSize(N);
+    uint N=A.size; vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[i]*B;
     return R;
 }
 vec operator/(const vec& A, float B) {
-    uint N=A.size(); vec R(N); R.setSize(N);
+    uint N=A.size; vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[i]/B;
     return R;
 }
 vec& operator+=(vec& A, const vec& B) {
-    uint N=A.size(); assert(B.size()==N);
+    uint N=A.size; assert(B.size==N);
     for(uint i: range(N)) A[i]+=B[i];
     return A;
 }
@@ -67,26 +67,26 @@ vec& operator+=(vec& A, const vec& B) {
 
 /// Flips a vector
 vec flip(const vec& A) {
-    uint N=A.size(); vec R(N); R.setSize(N);
+    uint N=A.size; vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=A[N-1-i];
     return R;
 }
 
 /// Applies \a dB to all elements
 vec dB(const vec& A) {
-    uint N=A.size(); vec R(N); R.setSize(N);
+    uint N=A.size; vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=dB(A[i]);
     return R;
 }
 
 /// Filters data x using digital filter b/a
 vec filter(const vec& b, const vec& a, const vec& x) {
-    uint N = x.size();
+    uint N = x.size;
     vec y(N); y.setSize(N);
     for(uint n: range(N)) {
         y[n] = 0;
-        for(uint i: range(0,min(n,b.size()))) y[n] += b[i]*x[n-1-i]; //feedforward
-        for(uint i: range(1,min(n,a.size()))) y[n] -= a[i]*y[n-1-i]; //feedback
+        for(uint i: range(0,min(n,b.size))) y[n] += b[i]*x[n-1-i]; //feedforward
+        for(uint i: range(1,min(n,a.size))) y[n] -= a[i]*y[n-1-i]; //feedback
     }
     return y;
 }
@@ -97,13 +97,13 @@ typedef array<complex> vecc;
 
 /// Applies norm to all elements
 vec norm(const vecc& A) {
-    uint N=A.size(); vec R(N); R.setSize(N);
+    uint N=A.size; vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=norm(A[i]);
     return R;
 }
 /// Applies phase to all elements
 vec phase(const vecc& A) {
-    uint N=A.size(); vec R(N); R.setSize(N);
+    uint N=A.size; vec R(N); R.setSize(N);
     for(uint i: range(N)) R[i]=phase(A[i]);
     return R;
 }
@@ -114,8 +114,8 @@ vecc freqz(const vec& b, const vec& a, uint N, float fc = 1) {
     vecc y(N); y.setSize(N);
     for(uint i: range(N)) {
         float w = 2*PI*fc*i/(N-1);
-        complex n (0,0); for(uint k: range(b.size())) n += polar(b[k], -w*k);
-        complex d (0,0); for(uint l: range(a.size())) d += polar(a[l], -w*l);
+        complex n (0,0); for(uint k: range(b.size)) n += polar(b[k], -w*k);
+        complex d (0,0); for(uint l: range(a.size)) d += polar(a[l], -w*l);
         y[i] = (n/d);
     }
     return y;
@@ -123,16 +123,16 @@ vecc freqz(const vec& b, const vec& a, uint N, float fc = 1) {
 
 /// Displays a plot of Y
 template<Type Array> void plot(int2 position, int2 size, const Array& Y) {
-    if(!Y.size()) return;
+    if(!Y.size) return;
     float min=0, max=0;
-    for(uint x: range(Y.size())) {
+    for(uint x: range(Y.size)) {
         float y = Y[x];
         min=::min(min,y);
         max=::max(max,y);
     }
     min = -(max = ::max(abs(min),abs(max)));
-    vec2 scale = vec2(size.x/(Y.size()-1.), size.y/(max-min));
-    for(uint x: range(Y.size()-1)) {
+    vec2 scale = vec2(size.x/(Y.size-1.), size.y/(max-min));
+    for(uint x: range(Y.size-1)) {
         vec2 a = vec2(position)+scale*vec2(x,  (max-min)-(Y[x]-min));
         vec2 b = vec2(position)+scale*vec2(x+1, (max-min)-(Y[x+1]-min));
         line(a,b);
@@ -165,7 +165,7 @@ struct PassiveReflectancePlot : Widget {
             A1 << -2*radius*cos(angle); // 2nd-order section coeff
             A2 << radius*radius; // 2nd-order section coeff
         }
-        const uint N = A1.size();
+        const uint N = A1.size;
         vec A; A << 1 << zeros(2*N);
         for(uint i: range(N)) { // A=Π[i](1/(1+a1[i]z[-1]+a2[i]z[-2]) (polynomial multiplication = feedforward filter)
             float denominator[] = {1, A1[i], A2[i]};
@@ -206,8 +206,8 @@ struct PassiveReflectancePlot : Widget {
     Window window __(this,int2(0,1680/2),"Passive Reflectance"_);
     int2 sizeHint() { return int2(-1,-1); }
     void render(int2 position, int2 size) {
-        const uint w = 1, h = plots.size();
-        for(uint i : range(plots.size())) {
+        const uint w = 1, h = plots.size;
+        for(uint i : range(plots.size)) {
             int2 plotSize = int2(size.x/w,size.y/h);
             int2 plotPosition = position+int2(i%w,i/w)*plotSize;
             const Plot& plot = plots[i];

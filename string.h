@@ -104,6 +104,7 @@ template<Type A, Type B> struct Cat {
 template<Type Aa, Type Ab, Type Ba, Type Bb> Cat<Cat<Aa, Ab>, Cat<Ba, Bb>> operator+(const Cat<Aa, Ab>& a, const Cat<Ba, Bb>& b) { return __(a,b); }
 template<Type Aa, Type Ab> Cat< Cat<Aa, Ab>, ref<byte> > operator+(const Cat<Aa, Ab>& a, const ref<byte>& b) { return __(a,b); }
 inline Cat< ref<byte>, ref<byte> > operator+(const ref<byte>& a, const ref<byte>& b) { return __(a,b); }
+
 /// Forwards concatenation
 template<Type A, Type B> const Cat<A,B>& str(const Cat<A,B>& s) { return s; }
 /// Converts and concatenates all arguments separating with spaces

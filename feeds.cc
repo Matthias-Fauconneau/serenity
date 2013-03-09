@@ -67,7 +67,7 @@ void Feeds::loadFeed(const URL& url unused, Map&& document) {
     array<Entry> entries; int count=0;
     auto addEntry = [this,&favicon,&count,&entries](const Element& e)->void{
         if(count>=16) return; //limit history
-        if(array::size()+entries.size()>=array::capacity()) return; //limit total entry count
+        if(array::size+entries.size>=array::capacity) return; //limit total entry count
         string title = e("title"_).text();
         string guid = e("guid"_).text(); if(!guid) guid=e("pubDate"_).text();
         string link = string(e("link"_)["href"_]); if(!link) link=e("link"_).text();
@@ -77,7 +77,7 @@ void Feeds::loadFeed(const URL& url unused, Map&& document) {
     };
     feed.xpath("feed/entry"_,addEntry);
     feed.xpath("rss/channel/item"_,addEntry);
-    for(int i=entries.size()-1;i>=0;i--) *this<< move(entries[i]); //oldest first
+    for(int i=entries.size-1;i>=0;i--) *this<< move(entries[i]); //oldest first
     listChanged();
 }
 
