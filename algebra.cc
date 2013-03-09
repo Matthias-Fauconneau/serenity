@@ -28,26 +28,29 @@ template<> string str(const Matrix& a) {
     return s;
 }
 
-Matrix operator *(const Permutation& P, Matrix&& A) {
-    assert(P.order.size()==A.m && P.order.size()==A.n);
+/*Matrix operator *(const Permutation& P, Matrix&& A) {
+    assert(P.order.size==A.m && P.order.size==A.n);
     Matrix PA(A.m,A.n);
-    for(uint i: range(A.m)) for(uint j: range(A.n)) PA(P[i],j)=move(A(i,j));
+    for(uint i: range(A.m)) for(uint j: range(A.n)) PA(P[i],j)=A(i,j);
     return PA;
-}
+}*/
 
 Matrix identity(uint size) { Matrix I(size,size); for(uint i: range(size)) I(i,i)=1; return I; }
 
-template<> string str(const Permutation& P) { return str(P*identity(P.order.size())); }
+//template<> string str(const Permutation& P) { return str(P*identity(P.order.size)); }
 
-// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
+// Swap row j with the row having the maximum value on column j, while maintaining a permutation matrix P
 void pivot(Matrix &A, Permutation& P, uint j) {
-    uint best=j;
+    uint best=j; float maximum=abs<float>(A(best,j));
     for(uint i: range(j,A.m)) { // Find biggest on or below diagonal
-        if(abs(A(i,j))>abs(A(best,j))) best=i;
+        float a = A(i,j); //TODO: sparse column iterator
+        float value = abs(a);
+        if(value>maximum) best=i, maximum=value;
     }
-    assert(A(best,j),A);
+    assert(maximum,A);
     if(best != j) { //swap rows i <-> j
-        for(uint k: range(A.n)) swap(A(best,k),A(j,k));
+        //for(uint k: range(A.n)) swap(A(best,k),A(j,k)); //TODO: sparse swap
+        for(uint k: range(A.n)) { float t=A(best,k); A(best,k)=(float)A(j,k); A(j,k)=t; }
         P.swap(best,j);
     }
 }
@@ -57,40 +60,29 @@ PLU factorize(Matrix&& A) {
     uint n = A.n;
     Permutation P(n);
     pivot(A, P, 0); // pivot first column
-    float d = 1/A(0,0); for(uint i: range(1,n)) A(0,i) *= d;
+    float d = 1/A(0,0); for(Matrix::Element& e: A[0](1,n)) e.value *= d;
     // compute an L column, pivot to interchange rows, compute an U row.
     for(uint j: range(1,n-1)) {
         for(uint i: range(j,n)) { // L column
             float sum = 0;
             for(uint k: range(j)) sum += A(i,k)*A(k,j);
+            //for(const Matrix::Element& e: A[i])  sum += e.value * A(e.column,j);
             A(i,j) -= sum;
         }
         pivot(A, P, j);
         float d = 1/A(j,j);
         for(uint k: range(j+1,n)) { //U row
             float sum = 0;
-            for(uint i: range(j)) sum += A(j,i)*A(i,k);
+            for(uint i: range(j)) sum += A(j,i)*A(i,k); //TODO: sparse row iterator
             A(j,k) = (A(j,k)-sum)*d;
         }
     }
     // compute last L element
     float sum = 0;
-    for(uint k: range(n-1)) sum += A(n-1,k)*A(k,n-1);
+    for(uint k: range(n-1)) sum += A(n-1,k)*A(k,n-1); //TODO: sparse row iterator
     A(n-1,n-1) -= sum;
     return __( move(P), move(A) );
 }
-
-/*LU unpack(Matrix&& LU) {
-    assert(LU.m==LU.n);
-    Matrix L = move(LU);
-    Matrix U(L.m,L.n);
-    for(uint i: range(L.m)) {
-        for(uint j: range(i)) U(i,j) = 0;
-        U(i,i) = 1;
-        for(uint j: range(i+1,L.n)) U(i,j)=move(L(i,j)), L(i,j) = 0;
-    }
-    return __( move(L), move(U) );
-}*/
 
 float determinant(const Permutation& P, const Matrix& LU) {
     float det = P.determinant();
@@ -104,11 +96,11 @@ Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
     Vector x(n);
     for(uint i: range(n)) x[i] = b[P[i]]; // Reorder b in x
     for(uint i: range(n)) { // Forward substitution from packed L
-        for(uint j: range(i)) x[i] -= LU(i,j)*x[j];
+        for(uint j: range(i)) x[i] -= LU(i,j)*x[j]; //TODO: sparse row iterator
         x[i] = x[i]*(1/LU(i,i));
     }
     for(int i=n-2;i>=0;i--) { // Backward substition from packed U
-        for(uint j: range(i+1,n)) x[i] -= LU(i,j) * x[j];
+        for(uint j: range(i+1,n)) x[i] -= LU(i,j) * x[j]; //TODO: sparse row iterator
         //implicit ones on diagonal -> no division
     }
     return x;
@@ -132,4 +124,16 @@ Vector solve(const Matrix& A, const Vector& b) {
     Matrix I(n,n); for(uint i=0;i<n;i++) { for(uint j=0;j<n;j++) I(i,j)=0; I(i,i)=1; }
     assert(A_1*A==I,A_1*A);
     return A_1;
+}*/
+
+/*LU unpack(Matrix&& LU) {
+    assert(LU.m==LU.n);
+    Matrix L = move(LU);
+    Matrix U(L.m,L.n);
+    for(uint i: range(L.m)) {
+        for(uint j: range(i)) U(i,j) = 0;
+        U(i,i) = 1;
+        for(uint j: range(i+1,L.n)) U(i,j)=move(L(i,j)), L(i,j) = 0;
+    }
+    return __( move(L), move(U) );
 }*/

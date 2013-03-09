@@ -93,7 +93,12 @@ struct range {
     uint start,stop;
     range(uint start, uint stop):start(start),stop(stop){}
     range(uint size):range(0,size){}
-    struct iterator { uint i; uint operator*() {return i;} uint operator++(){return i++;} bool operator !=(const iterator& o) const{return i<o.i;}};
+    struct iterator {
+        uint i;
+        uint operator*() { return i; }
+        iterator& operator++() { i++; return *this; }
+        bool operator !=(const iterator& o) const{ return i<o.i; }
+    };
     iterator begin(){ return __(start); }
     iterator end(){ return __(stop); }
 };
