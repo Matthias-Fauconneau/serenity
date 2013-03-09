@@ -18,10 +18,10 @@ struct Matrix {
         uint n; // Number of columns (for bound checking)
         mutable_ref<Element> operator()(uint start, uint stop) const {
             assert(start<n && stop<=n && start<stop);
-            uint startIndex=0, stopIndex=0;
+            uint startIndex=row.size, stopIndex=row.size;
             for(uint index: range(row.size)) if(row[index].column >= start) { startIndex=index; break; }
             for(uint index: range(startIndex,row.size)) if(row[index].column >= stop) { stopIndex=index; break; }
-            return row.mutable_slice(startIndex,stopIndex);
+            return row.mutable_slice(startIndex,stopIndex-startIndex);
         }
         Element* begin(){ return row.begin(); }
         Element* end(){ return row.end(); }
@@ -34,10 +34,10 @@ struct Matrix {
         uint n; // Number of columns (for bound checking)
         ref<Element> operator()(uint start, uint stop) const {
             assert(start<n && stop<=n && start<=stop);
-            uint startIndex=0, stopIndex=0;
+            uint startIndex=row.size, stopIndex=row.size;
             for(uint index: range(row.size)) if(row[index].column >= start) { startIndex=index; break; }
             for(uint index: range(startIndex,row.size)) if(row[index].column >= stop) { stopIndex=index; break; }
-            return row.slice(startIndex,stopIndex);
+            return row.slice(startIndex,stopIndex-startIndex);
         }
         const Element* begin(){ return row.begin(); }
         const Element* end(){ return row.end(); }
@@ -61,9 +61,8 @@ struct Matrix {
         }
         float operator=(float v) {
             for(Element& e: row) if(e.column == j) return e.value=v;
-            // Implicit fill-in
-            if(!v) return v; //TODO: assert(v) ?
-            row.insertSorted( Element __(j,v) );
+            if(!v) return v;
+            row.insertSorted( Element __(j,v) ); // Implicit fill-in
             return v;
         }
         void operator+=(float v) { operator=( operator float() + v); }
@@ -75,6 +74,10 @@ struct Matrix {
     uint m=0,n=0; /// row and column count
     array< array<Element> > rows;
 };
+Matrix operator*(const Matrix& a,const Matrix& b);
+bool operator==(const Matrix& a,const Matrix& b);
+template<> string str(const Matrix& a);
+inline Matrix identity(uint size) { Matrix I(size,size); for(uint i: range(size)) I(i,i)=1; return I; }
 
 /// Permutation matrix
 struct Permutation {  
@@ -95,16 +98,13 @@ void pivot(Matrix &A, Permutation& P, uint j);
 struct PLU { Permutation P; Matrix LU; };
 PLU factorize(Matrix&& A);
 
-/// Convenience macro to extract multiple return arguments
-#define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
-
 /// Compute determinant of a packed PLU matrix (product along diagonal)
 float determinant(const Permutation& P, const Matrix& LU);
 
 /// Dense vector
 struct Vector {
     default_move(Vector);
-    Vector(uint n):data(n,n,NaN),n(n){}
+    Vector(uint n):data(n,NaN),n(n){}
 
     const float& at(uint i) const { assert(data && i<n); return data[i]; }
     float& at(uint i) { assert(data && i<n); return data[i]; }
@@ -119,7 +119,10 @@ struct Vector {
 
 /// Solves PLUx=b
 Vector solve(const Permutation& P, const Matrix& LU, const Vector& b);
+/// Solves PLUx=b
 inline Vector solve(const PLU& PLU, const Vector& b) { return solve(PLU.P, PLU.LU, b); }
-
 /// Solves Ax=b using LU factorization
-Vector solve(Matrix&& A, const Vector& b);
+inline Vector solve(Matrix&& A, const Vector& b) { PLU PLU = factorize(move(A)); Vector x = solve(PLU.P,PLU.LU,b); return x; }
+/// Solves PLUx[j]=e[j]
+Matrix inverse(const Permutation& P, const Matrix &LU);
+inline Matrix inverse(const PLU& PLU) { return inverse(PLU.P, PLU.LU); }

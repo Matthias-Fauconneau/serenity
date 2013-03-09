@@ -1,5 +1,12 @@
 #include "algebra.h"
 
+Matrix operator*(const Matrix& a, const Matrix& b) {
+    assert(a.n==b.m);
+    Matrix r(a.m,b.n);
+    for(uint i: range(r.m)) for(uint j: range(r.n)) for(uint k: range(a.n)) r(i,j) += a(i,k)*b(k,j);
+    return r;
+}
+
 bool operator==(const Matrix& a,const Matrix& b) {
     assert(a.m==b.m && a.n==b.n);
     for(uint i: range(a.m)) for(uint j: range(a.n)) if(a(i,j)!=b(i,j)) return false;
@@ -85,8 +92,13 @@ Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
     return x;
 }
 
-Vector solve(Matrix&& A, const Vector& b) {
-    multi(P,LU, = factorize(move(A)); )
-    Vector x = solve(P,LU,b);
-    return x;
+Matrix inverse(const Permutation& P, const Matrix &LU) {
+    uint n = LU.n;
+    Matrix A_1(n,n);
+    for(uint j=0;j<n;j++) {
+        Vector e(n); for(uint i=0;i<n;i++) e[i] = 0; e[j] = 1;
+        Vector x = solve(P,LU,move(e));
+        for(uint i=0;i<n;i++) A_1(i,j) = move(x[i]);
+    }
+    return A_1;
 }

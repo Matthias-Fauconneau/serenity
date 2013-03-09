@@ -41,6 +41,7 @@ struct PoissonSolver : Widget {
         }
 
         auto PLU = factorize(move(A));
+        //assert(inverse(PLU)*A==identity(A.n), inverse(PLU)*A);
         Vector u = solve(PLU,b);
 
         // Visualization
