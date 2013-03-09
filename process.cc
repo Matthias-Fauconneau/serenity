@@ -53,7 +53,7 @@ void Thread::run() {
     tid=gettid();
     if(priority!=20) check_(setpriority(0,0,priority));
     while(!terminate) {
-        uint size=this->size();
+        uint size=this->size;
         if(size==1) break; // Terminates when no Poll objects are registered
 
         pollfd pollfds[size];
@@ -117,7 +117,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP];
 #endif
     string s = trace(1,ip);
-    if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    if(threads.size>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
 #ifndef __arm
@@ -146,7 +146,7 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
         recurse++;
         traceAllThreads();
         string s = trace(1,0);
-        if(threads.size()>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+        if(threads.size>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
         recurse--;
     }
     log(message);
@@ -174,17 +174,17 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     array<stringz> args0(1+args.size);
     args0 << strz(path);
     for(const auto& arg: args) args0 << strz(arg);
-    const char* argv[args0.size()+1];
-    for(uint i: range(args0.size())) argv[i]=args0[i];
-    argv[args0.size()]=0;
+    const char* argv[args0.size+1];
+    for(uint i: range(args0.size)) argv[i]=args0[i];
+    argv[args0.size]=0;
 
     array< ref<byte> > env0;
     static string environ = File("proc/self/environ"_).readUpTo(4096);
     for(TextData s(environ);s;) env0<<s.until('\0');
 
-    const char* envp[env0.size()+1];
-    for(uint i: range(env0.size())) envp[i]=env0[i].data;
-    envp[env0.size()]=0;
+    const char* envp[env0.size+1];
+    for(uint i: range(env0.size)) envp[i]=env0[i].data;
+    envp[env0.size]=0;
 
     int pid = fork();
     if(pid==0) { if(!execve(strz(path),(char*const*)argv,(char*const*)envp)) exit_group(-1); }

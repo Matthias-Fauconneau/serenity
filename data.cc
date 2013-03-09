@@ -9,7 +9,7 @@ ref<byte> BinaryData::untilNull() {
 
 bool BinaryData::seekLast(const ref<byte>& key) {
     peek(-1); //try to completely read source
-    for(index=buffer.size()-key.size;index>0;index--) { if(peek(key.size) == key) return true; }
+    for(index=buffer.size-key.size;index>0;index--) { if(peek(key.size) == key) return true; }
     return false;
 }
 

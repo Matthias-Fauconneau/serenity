@@ -7,7 +7,7 @@
 /// Sparse CSR matrix
 struct Matrix {
     default_move(Matrix);
-    Matrix(uint m, uint n):m(m),n(n),lines(m+1,0){}
+    Matrix(uint m, uint n):m(m),n(n),lines(m+1,m+1,0){}
 
     struct Element { uint column; float value; };
     struct Row {
@@ -99,7 +99,7 @@ struct Matrix {
     ElementRef operator()(uint i, uint j) { return at(i,j); }
 
     uint m=0,n=0; /// row and column count
-    buffer<uint> lines; /// indices of the first element of each line
+    array<uint> lines; /// indices of the first element of each line
     array<Element> data; /// elements stored in order
 };
 //template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.lines=buffer<uint>(o.lines); t.data=copy(o.data); return move(t); }
@@ -109,9 +109,9 @@ struct Matrix {
 /// Permutation matrix
 struct Permutation {  
     int even=1; //1 if even count of swaps, -1 if odd count of swaps (used for determinant)
-    buffer<int> order;
+    array<int> order;
 
-    Permutation(int n) : order(n) { order.size=n; for(uint i: range(n)) order[i] = i; } // identity ordering
+    Permutation(int n) : order(n,n) { for(uint i: range(n)) order[i] = i; } // identity ordering
     void swap(int i, int j) { ::swap(order[i],order[j]); even=-even; }
     int determinant() const { return even; }
     int operator[](int i) const { return order[i]; } //b[P[i]] = (P*b)[i]
@@ -131,12 +131,12 @@ PLU factorize(Matrix&& A);
 #define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
 
 /// Compute determinant of a packed PLU matrix (product along diagonal)
-debug( float determinant(const Permutation& P, const Matrix& LU); )
+float determinant(const Permutation& P, const Matrix& LU);
 
 /// Dense vector
 struct Vector {
     default_move(Vector);
-    Vector(uint n):data(n,NaN),n(n){}
+    Vector(uint n):data(n,n,NaN),n(n){}
 
     const float& at(uint i) const { assert(data && i<n); return data[i]; }
     float& at(uint i) { assert(data && i<n); return data[i]; }
@@ -145,7 +145,7 @@ struct Vector {
     const float& operator()(uint i) const { return at(i); }
     float& operator()(uint i) { return at(i); }
 
-    buffer<float> data; /// elements stored in column-major order
+    array<float> data; /// elements stored in column-major order
     uint n=0; /// component count
 };
 //template<> inline string str(const Vector& a) { string s; for(uint i: range(a.n)) { s<<str(a[i]); if(i<a.n-1) s<<' ';} return s; }

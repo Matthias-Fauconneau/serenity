@@ -1,6 +1,5 @@
 #include "algebra.h"
 
-debug(
 bool operator==(const Matrix& a,const Matrix& b) {
     assert(a.m==b.m && a.n==b.n);
     for(uint i: range(a.m)) for(uint j: range(a.n)) if(a(i,j)!=b(i,j)) return false;
@@ -21,7 +20,6 @@ template<> string str(const Matrix& a) {
     s << "]"_;
     return s;
 }
-)
 
 // Swap row j with the row having the maximum value on column j, while maintaining a permutation matrix P
 void pivot(Matrix &A, Permutation& P, uint j) {
@@ -65,13 +63,11 @@ PLU factorize(Matrix&& A) {
     return __( move(P), move(A) );
 }
 
-debug(
 float determinant(const Permutation& P, const Matrix& LU) {
     float det = P.determinant();
     for(uint i: range(LU.n)) det *= LU(i,i);
     return det;
 }
-)
 
 Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
     assert(determinant(P,LU),"Coefficient matrix is singular"_);

@@ -69,11 +69,11 @@ Image decodePNG(const ref<byte>& file) {
             break;
         } else if(tag == raw<uint32>("PLTE"_)) {
             ref<rgb3> plte = s.read<rgb3>(size/3);
-            palette.reserve(plte.size); palette.setSize(plte.size);
+            palette.reserve(plte.size); palette.size=plte.size;
             for(uint i: range(plte.size)) palette[i]=plte[i];
         }  else if(tag == raw<uint32>("tRNS"_)) {
             ref<byte> trns = s.read<byte>(size);
-            assert(trns.size<=palette.size());
+            assert(trns.size<=palette.size);
             for(uint i: range(trns.size)) palette[i].a=trns[i];
             alpha=true;
         } else {
@@ -86,10 +86,10 @@ Image decodePNG(const ref<byte>& file) {
     if(bitDepth==4) {
         assert(depth==1,depth);
         assert(width%2==0);
-        if(data.size() != height*(1+width*depth*bitDepth/8)) { warn("Invalid PNG",data.size(),height*(1+width*depth),width,height,depth); return Image(); }
-        const byte* src = data.data();
+        if(data.size != height*(1+width*depth*bitDepth/8)) { warn("Invalid PNG",data.size,height*(1+width*depth)); return Image(); }
+        const byte* src = data.data;
         array<byte> bytes; bytes.grow(height*(1+width*depth));
-        byte* dst = bytes.data();
+        byte* dst = bytes.data;
         for(uint y=0;y<height;y++) {
             dst[0] = src[0]; src++; dst++;
             for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
@@ -97,10 +97,10 @@ Image decodePNG(const ref<byte>& file) {
         }
         data = move(bytes);
     }
-    if(data.size() < height*(1+width*depth)) { warn("Invalid PNG",data.size(),height*(1+width*depth),width,height,depth); return Image(); }
+    if(data.size < height*(1+width*depth)) { warn("Invalid PNG",data.size,height*(1+width*depth),width,height,depth); return Image(); }
     byte4* image = allocate<byte4>(width*height);
     int w=width,h=height;
-    const byte* src=data.data();
+    const byte* src=data.data;
     for(int i=0;i==0 || (interlace && i<7);i++) {
         int xStride=1,yStride=1;
         int offset=0;
@@ -149,27 +149,32 @@ uint adler32(const ref<byte> data) {
 
 array<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
-    array<byte> data(w*h*4+h); data.setSize(data.capacity());
-    byte* dst = data.data(); const byte* src = (byte*)image.data;
-    for(uint unused y: range(h)) { *dst++ = 0; for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]); dst+=w*4, src+=image.stride*4; }
+    array<byte> data(w*h*4+h,w*h*4+h);
+    byte* dst = data.data; const byte* src = (byte*)image.data;
+    for(uint unused y: range(h)) {
+        *dst++ = 0;
+        for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]);
+        dst+=w*4, src+=image.stride*4;
+    }
     return data;
 }
 
 array<byte> encodePNG(const Image& image) {
     array<byte> file = string("\x89PNG\r\n\x1A\n"_);
-    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr = __( .w=big32(image.width), .h=big32(image.height), .depth=8, .type=6, .compression=0, .filter=0, .interlace=0 );
+    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr =
+           __( .w=big32(image.width), .h=big32(image.height), .depth=8, .type=6, .compression=0, .filter=0, .interlace=0 );
     array<byte> IHDR = "IHDR"_+raw(ihdr);
-    file<< raw(big32(IHDR.size()-4)) << IHDR << raw(big32(crc32(IHDR)));
+    file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
 
     array<byte> IDAT = "IDAT"_+"\x78\x01"_; //zlib header: method=8, window=7, check=0, level=1
     array<byte> data = filter(image);
-    for(uint i=0; i<data.size();) {
-        uint16 len = min(data.size()-i,65535u), nlen = ~len;
-        IDAT << (i+len==data.size()) << raw(len) << raw(nlen) << data.slice(i,len);
+    for(uint i=0; i<data.size;) {
+        uint16 len = min(data.size-i,65535u), nlen = ~len;
+        IDAT << (i+len==data.size) << raw(len) << raw(nlen) << data.slice(i,len);
         i+=len;
     }
     IDAT<< raw(big32(adler32(data)));
-    file<< raw(big32(IDAT.size()-4)) << IDAT << raw(big32(crc32(IDAT)));
+    file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
 
     file<<raw(big32(0))<<"IEND"_<<raw(big32(crc32("IEND"_)));
     return file;

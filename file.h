@@ -46,8 +46,8 @@ struct Stream : Handle {
     template<Type T> T read() { T t; read((byte*)&t,sizeof(T)); return t; }
     /// Reads \a size raw values
     template<Type T> array<T> read(uint size) {
-        array<T> buffer(size); buffer.setSize(size); uint byteSize=size*sizeof(T);
-        for(uint i=0;i<byteSize;) i+=readUpTo((byte*)buffer.data()+i, byteSize-i);
+        array<T> buffer(size,size); uint byteSize=size*sizeof(T);
+        for(uint i=0;i<byteSize;) i+=readUpTo(buffer.data+i, byteSize-i);
         return buffer;
     }
     /// Polls whether reading would block

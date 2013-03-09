@@ -82,7 +82,7 @@ generic vector normalize(const vector& a){ return a/length(a); }
 inline bool isNaN(float x) { return __builtin_isnan(x); }
 generic bool isNaN(const vector& v){ for(uint i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
 
-generic string str(const vector& v) { string s = string("("_); for(uint i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
+generic string str(const vector& v) { string s("("_); for(uint i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
 
 #undef vector
 #undef generic

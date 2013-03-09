@@ -23,7 +23,7 @@ struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
-    debug(void invariant() const;)
+    void invariant() const;
     /// Default constructs an undetermined date
     Date(){}
     /// Constructs a calendar date (unspecified hour)

@@ -2,7 +2,7 @@
 /// \file core.h move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range, std::initializer_list (aka ref), fat string and basic operations
 // Attributes
 #define unused __attribute((unused))
-#define _packed __attribute((packed))
+#define packed __attribute((packed))
 #define Type typename
 // Move
 template<typename T> struct remove_reference { typedef T type; };
@@ -53,40 +53,40 @@ typedef unsigned int size_t;
 
 // Works around missing support for some C++11 features in QtCreator code model
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
-template<typename T> struct ref; //templated typedef using
 #define _ //string literal operator _""
 #define __( args... ) //member initialization constructor {}
-#define ___ //variadic template arguments unpack operator ...
-#define ____( ignore... ) //=default, constructor{} initializer
+//#define ___ //variadic template arguments unpack operator ...
+//#define ____( ignore... ) //=default, constructor{} initializer
+#define ___ ...
+#define ____( ignore... ) ignore
+#define __thread
 #else
+#define __( args... ) { args }
+#define ___ ...
+#define ____( ignore... ) ignore
+#endif
+
 namespace std { template<typename T> struct initializer_list; }
 /// \a Unmanaged const memory reference
 template<typename T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, size_t size);
-#define __( args... ) { args }
-#define ___ ...
-#define ____( ignore... ) ignore
-#define __thread
-#endif
 
-#ifdef DEBUG
-#define debug( statements... ) statements
-#define warn error
-#else
-/// Compiles \a statements in executable only if \a DEBUG flag is set
-#define debug( statements... )
-#define warn log
-#endif
-// Forward declarations to allow string literal messages without header dependencies on string.h/array.h/memory.h
 /// Logs to standard output
 template<typename ___ Args> void log(const Args& ___ args);
 template<> void log(const ref<byte>& message);
 /// Logs to standard output and aborts immediatly this thread
 template<typename ___ Args> void error(const Args& ___ args)  __attribute((noreturn));
 template<> void error(const ref<byte>& message) __attribute((noreturn));
+
+#ifdef DEBUG
+#define warn error
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
-#define assert(expr, message...) ({debug( if(!(expr)) error(#expr ""_, ##message);)})
+#define assert(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
+#else
+#define warn log
+#define assert(expr, message...) ({})
+#endif
 
 /// Numeric range iterations
 struct range {
@@ -102,6 +102,16 @@ struct range {
     iterator begin(){ return __(start); }
     iterator end(){ return __(stop); }
 };
+
+// Memory operations
+/// Raw zero initialization
+inline void clear(byte* buffer, uint size) { for(uint i: range(size)) buffer[i]=0; }
+/// Buffer default initialization
+template<Type T> void clear(T* buffer, uint size, const T& value=T()) { for(uint i: range(size)) buffer[i]=value; }
+/// Raw memory copy
+inline void copy(byte* dst,const byte* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
+/// Buffer explicit copy
+template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
 
 // initializer_list
 namespace std {
@@ -133,13 +143,23 @@ template<typename T> struct initializer_list {
     int indexOf(const T& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& key) const { return indexOf(key)>=0; }
+    /// Copies elements to \a target and increments pointer
+    void cat(T*& target) const { ::copy(target,data,size); target+=size; }
 };
 }
 
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return ref<byte>((byte*)data,size); }
-#endif
+
+/// References raw memory representation of \a t
+template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
+/// Casts raw memory to \a T
+template<Type T> const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *(T*)a.data; }
+/// Casts between element types
+template<Type T, Type O> ref<T> cast(const ref<O>& o) {
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
+}
 
 // Basic operations
 template<typename T> constexpr T min(T a, T b) { return a<b ? a : b; }
@@ -150,6 +170,7 @@ template<typename T> constexpr T sign(T x) { return x>=0 ? 1 : -1; }
 template<typename A, typename B> bool operator !=(const A& a, const B& b) { return !(a==b); }
 template<typename A, typename B> bool operator >(const A& a, const B& b) { return b<a; }
 
+// Integer operations
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 
@@ -160,3 +181,19 @@ inline float ceil(float f) { return __builtin_ceilf(f); }
 inline float fract(float f) { double one=1; return __builtin_modf(f, &one); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline float pow(float x, float y) { return __builtin_powf(x,y); }
+
+// C runtime memory allocation
+extern "C" void* malloc(size_t size);
+extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
+extern "C" void* realloc(void* buffer, size_t size);
+extern "C" void free(void* buffer);
+// Typed memory allocation (without initialization)
+template<Type T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
+template<Type T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
+template<Type T> void reallocate(T*& buffer, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
+template<Type T> void unallocate(T*& buffer) { assert(buffer); free((void*)buffer); buffer=0; }
+
+/// Dynamic object allocation (using constructor and destructor)
+inline void* operator new(size_t, void* p) { return p; } //placement new
+template<Type T, Type... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }
+template<Type T> void free(T* t) { t->~T(); unallocate(t); }

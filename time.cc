@@ -17,7 +17,7 @@ int daysInMonth(int month, int year=0) {
 }
 
 template<Type T> bool inRange(T min, T x, T max) { return x>=min && x<max; }
-debug(void Date::invariant() const {
+void Date::invariant() const {
     //Date
     if(year>=0) { assert(inRange(2012, year, 2099)); }
     if(month>=0) { assert(year>=0); assert(inRange(0, month, 12)); }
@@ -32,7 +32,7 @@ debug(void Date::invariant() const {
     if(hours>=0) { assert(inRange(0, hours, 24)); }
     if(minutes>=0) { assert(inRange(0, minutes, 60)); assert(hours>=0); }
     if(seconds>=0) { assert(inRange(0, seconds, 60)); assert(minutes>=0); }
-})
+}
 int Date::days() const {
     assert(year>=0 && month>=0);
     int days=0; //days from Thursday, 1st January 1970
@@ -42,7 +42,7 @@ int Date::days() const {
 }
 Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day),weekDay(weekDay) {
     if(weekDay<0 && day>=0) this->weekDay=(Thursday+days())%7;
-    debug(invariant();)
+    invariant();
 }
 bool Date::summerTime() const { //FIXME: always European Summer Time
     int lastMarchSunday = 31-1-(Date(31-1,March,year).weekDay+1)%7; // after 01:00 UTC on the last Sunday in March
@@ -79,11 +79,11 @@ Date::Date(long time) {
         }
     }
 
-    debug(invariant();)
+    invariant();
     assert(long(*this)==time);
 }
 Date::operator long() const {
-    debug(invariant();)
+    invariant();
     return ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0)-localTimeOffset())*60+(seconds>=0?seconds:0);
 }
 
@@ -156,7 +156,7 @@ Date parse(TextData& s) {
             }
         }
     }
-    debug(date.invariant();) //assert(date.hours>=0 || date.year>=0,date,s.buffer);
+    date.invariant();
     return date;
 }
 

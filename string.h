@@ -50,7 +50,7 @@ string simplify(string&& s);
 /// Repeats a character
 string repeat(char c, uint times);
 
-struct stringz : string { operator char*(){return (char*)data();}};
+struct stringz : string { operator char*(){return data;}};
 /// Copies the reference and appends a null byte
 stringz strz(const ref<byte>& s);
 
@@ -92,36 +92,20 @@ template<Type T> string hex(const array<T>& a, char separator=' ') { return hex(
 template<Type T, size_t N> string str(const T (&a)[N]) { return str(ref<T>(a,N)); }
 
 /// Expression template to manage recursive concatenation operations
-template<Type A, Type B> struct cat {
+template<Type A, Type B> struct Cat {
     const A& a;
     const B& b;
-    uint size() const { return a.size() + b.size(); }
-    void copy(byte*& data) const { a.copy(data); b.copy(data); }
-    operator array<byte>()  const{ array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
+    uint size = a.size + b.size;
+    Cat(const A& a, const B& b):a(a),b(b){}
+    void cat(byte*& data) const { a.cat(data); b.cat(data); }
+    operator array<byte>()  const{ array<byte> r(size); r.size=size; byte* data=r.data; cat(data); return r; }
 };
-template<Type Aa, Type Ab, Type Ba, Type Bb> cat< cat<Aa, Ab>, cat<Ba, Bb> >
-operator +(const cat<Aa, Ab>& a, const cat<Ba, Bb>& b) { return __(a,b); }
-/// Specialization to append a string
-template<Type A> struct cat<A, ref<byte> > {
-    const A& a;
-    const ref<byte>& b;
-    uint size() const { return a.size() + b.size; }
-    void copy(byte*& data) const { a.copy(data); ::copy(data,b.data,b.size); data+=b.size; }
-    operator array<byte>()  const{ array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
-};
-template<Type Aa, Type Ab> cat< cat<Aa, Ab>, ref<byte> > operator +(const cat<Aa, Ab>& a, const ref<byte>& b) { return __(a,b); }
-/// Specialization to concatenate two strings
-template<> struct cat< ref<byte>, ref<byte> > {
-    const ref<byte>& a;
-    const ref<byte>& b;
-    uint size() const { return a.size + b.size; }
-    void copy(byte*& data) const { ::copy(data,a.data,a.size); data+=a.size; ::copy(data,b.data,b.size); data+=b.size; }
-    operator array<byte>() const { array<byte> r(size()); r.setSize(size()); byte* data=r.data(); copy(data); return r; }
-};
-inline cat< ref<byte>, ref<byte> > operator +(const ref<byte>& a, const ref<byte>& b) { return __(a,b); }
-
+/// Concatenation operators
+template<Type Aa, Type Ab, Type Ba, Type Bb> Cat<Cat<Aa, Ab>, Cat<Ba, Bb>> operator+(const Cat<Aa, Ab>& a, const Cat<Ba, Bb>& b) { return __(a,b); }
+template<Type Aa, Type Ab> Cat< Cat<Aa, Ab>, ref<byte> > operator+(const Cat<Aa, Ab>& a, const ref<byte>& b) { return __(a,b); }
+inline Cat< ref<byte>, ref<byte> > operator+(const ref<byte>& a, const ref<byte>& b) { return __(a,b); }
 /// Forwards concatenation
-template<Type A, Type B> const cat<A,B>& str(const cat<A,B>& s) { return s; }
+template<Type A, Type B> const Cat<A,B>& str(const Cat<A,B>& s) { return s; }
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
 template<Type A, Type ___ Args> string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }

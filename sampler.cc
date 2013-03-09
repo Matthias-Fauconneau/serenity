@@ -360,7 +360,7 @@ void Sampler::startRecord(const ref<byte>& name) {
     record = File(path,home(),WriteOnly|Create|Truncate);
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
              int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=44100; int32 bps=rate*channels*sizeof(int32);
-        int16 stride=channels*sizeof(int32); int16 bitdepth=32; char data[4]={'d','a','t','a'}; /*size?*/ } _packed header;
+        int16 stride=channels*sizeof(int32); int16 bitdepth=32; char data[4]={'d','a','t','a'}; /*size?*/ } packed header;
     record.write(raw(header));
     recordStart = time;
 }

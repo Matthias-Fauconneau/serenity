@@ -49,7 +49,7 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
 
 /// Helps modularization by binding unrelated objects through persistent connections
 template<Type... Args> struct signal {
-    array< function<void(Args...)> > delegates;
+    array< function<void(Args...)>> delegates;
     /// Emits the signal to all registered delegates
     void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args ___); }
     /// Connects an anonymous function

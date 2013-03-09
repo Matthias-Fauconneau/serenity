@@ -418,5 +418,5 @@ array<byte> inflate(const ref<byte>& source, bool zlib) {
       reallocate(buffer, new_out_buf_capacity);
       out_buf_capacity = new_out_buf_capacity;
     }
-    array<byte> data; data.tag=-2; data.buffer = __((byte*)buffer, pOut_len, out_buf_capacity); return data;
+    array<byte> data; data.data = (byte*)buffer; data.size=pOut_len; data.capacity=out_buf_capacity; return data;
 }

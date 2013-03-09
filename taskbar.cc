@@ -241,7 +241,7 @@ struct Taskbar : Socket, Poll {
     uint16 sequence=-1;
     void send(const ref<byte>& request) { write( request); sequence++; }
 
-    struct QEvent { uint8 type; XEvent event; } _packed;
+    struct QEvent { uint8 type; XEvent event; } packed;
     array<QEvent> queue;
 
     template<class T> T readReply() {

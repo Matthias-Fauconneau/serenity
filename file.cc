@@ -42,15 +42,13 @@ void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,bu
 int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), fd, buffer, size); }
 array<byte> Stream::read(uint capacity) {
     array<byte> buffer(capacity);
-    int size = check( ::read(fd,buffer.data(),capacity) );
-    assert((uint)size==capacity,size,capacity);
-    buffer.setSize(size);
+    buffer.size = check( ::read(fd, buffer.data, capacity) );
+    assert(buffer.size==capacity, buffer.size, capacity);
     return buffer;
 }
 array<byte> Stream::readUpTo(uint capacity) {
     array<byte> buffer(capacity);
-    int size = check( ::read(fd,buffer.data(),capacity) );
-    if(size) { buffer.setCapacity(size); buffer.setSize(size); }
+    buffer.size = check( ::read(fd, buffer.data, capacity) );
     return buffer;
 }
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd __(fd,POLLIN); return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
@@ -66,8 +64,9 @@ int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, requ
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
 array<byte> readFile(const ref<byte>& path, const Folder& at) {
     File file(path,at);
-    debug(if(file.size()>1<<24) {log(path,"use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_);})
-    return file.read(file.size());
+    uint size=file.size();
+    if(size>1<<24) log(path,"use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_);
+    return file.read(size);
 }
 void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at) { File(path,at,WriteOnly|Create|Truncate).write(content); }
 

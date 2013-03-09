@@ -66,9 +66,9 @@ Sequencer::~Sequencer() {
     track << 0x00 << 0xFF << 0x2F << 0x00; //EndOfTrack
 
     struct { char name[4]={'M','T','h','d'}; int32 size=big32(6); int16 format=big16(0);
-        int16 trackCount=big16(1); int16 timeDivision=big16(500); } _packed MThd;
+        int16 trackCount=big16(1); int16 timeDivision=big16(500); } packed MThd;
     write(raw(MThd));
-    struct { char name[4]={'M','T','r','k'}; int32 size=0; } _packed MTrk; MTrk.size=big32(track.size());
+    struct { char name[4]={'M','T','r','k'}; int32 size=0; } packed MTrk; MTrk.size=big32(track.size());
     write(raw(MTrk));
     write(track);
 }

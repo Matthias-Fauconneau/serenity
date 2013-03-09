@@ -130,14 +130,14 @@ string toLower(const ref<byte>& s) {
 }
 
 string simplify(string&& s) {
-    for(uint i=0; i<s.size();) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
-    for(uint i=0; i<s.size();) {
+    for(uint i=0; i<s.size;) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
+    for(uint i=0; i<s.size;) {
         byte c=s[i];
         if(c=='\r') { s.removeAt(i); continue; } //Removes any \r
         i++;
-        if(c==' '||c=='\t'||c=='\n') while(i<s.size()) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //Simplify whitespace
+        if(c==' '||c=='\t'||c=='\n') while(i<s.size) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //Simplify whitespace
     }
-    for(int i=s.size()-1;i>0;i--) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim trailing
+    for(int i=s.size-1;i>0;i--) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim trailing
     return move(s);
 }
 
