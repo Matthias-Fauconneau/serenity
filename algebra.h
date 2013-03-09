@@ -15,15 +15,15 @@ struct Matrix {
 
     float at(uint i, uint j) const {
         assert(i<m && j<n);
-        for(uint i: range(lines[i],lines[i+1])) if(data[i].column==j) return data[i].value;
+        for(uint index: range(lines[i],lines[i+1])) if(data[index].column==j) return data[index].value;
         return 0;
     }
     float& at(uint i, uint j) {
         assert(i<m && j<n);
-        for(uint i: range(lines[i],lines[i+1])) if(data[i].column == j) return data[i].value;
+        for(uint index: range(lines[i],lines[i+1])) if(data[index].column == j) return data[index].value;
         uint index=lines[i]; for(; index<lines[i+1]; index++) if(data[index].column > j) break;
         data.insertAt(index, Element __(j,0));
-        for(uint i: range(i+1,lines.size)) lines[i]++;
+        for(uint index: range(i+1,lines.size)) lines[index]++;
         return data[index].value;
     }
     float operator()(uint i, uint j) const { return at(i,j); }
@@ -34,7 +34,7 @@ struct Matrix {
     struct Element { uint column; float value; };
     array<Element> data; /// elements stored top-down left-right
 };
-template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.lines=copy(o.lines); t.data=copy(o.data); return move(t); }
+template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.lines=buffer<uint>(o.lines); t.data=copy(o.data); return move(t); }
 
 /// Returns true if both matrices are identical
 bool operator==(const Matrix& a,const Matrix& b);

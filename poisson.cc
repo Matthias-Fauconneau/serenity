@@ -5,7 +5,7 @@
 
 struct PoissonSolver : Widget {
     // Parameters
-    const uint Mx=6, My=6; // Spatial resolutions
+    const uint Mx=9, My=9; // Spatial resolutions
     const float Lx=1, Ly=1; // Physical dimensions
     const float dx = Lx/Mx, dy = Ly/My; // Physical resolutions
     const float T0 = 0, T1 = 1; // Lateral boundary conditions
@@ -39,12 +39,12 @@ struct PoissonSolver : Widget {
                 }
             }
         }
-        log(A);
-        log(b);
+        //log(A);
+        //log(b);
 
         multi(P,LU, = factorize(copy(A)); ) //compute P,LU
         multi(L,U, = unpack(copy(LU)); ) //unpack LU -> L,U
-                log(L); log(U);
+        //log(L); log(U);
 
         Vector u = solve(A,b);
 
@@ -52,9 +52,9 @@ struct PoissonSolver : Widget {
         image = Image(Mx, My);
         for(uint x: range(Mx)) {
             for(uint y: range(My)) {
-                image(x,y) = LU(x,y) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
-                //uint i = y*Mx+x;
-                //image(x,y) = clip(0, int(u(i)*0xFF), 0xFF); // [0,1] -> [black,white]
+                //image(x,y) = LU(x,y) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
+                uint i = y*Mx+x;
+                image(x,y) = clip(0, int(u(i)*0xFF), 0xFF); // [0,1] -> [black,white]
                 //image(x,y) = byte4(clip(0, int(-u(i)*0xFF), 0xFF), 0, clip(0, int(u(i)*0xFF), 0xFF), 0xFF); [-1,0,1] -> [blue,black,red]
             }
         }
