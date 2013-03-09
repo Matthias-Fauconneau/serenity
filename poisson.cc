@@ -39,12 +39,6 @@ struct PoissonSolver : Widget {
                 }
             }
         }
-        //log(A);
-        //log(b);
-
-        multi(P,LU, = factorize(copy(A)); ) //compute P,LU
-        multi(L,U, = unpack(copy(LU)); ) //unpack LU -> L,U
-        //log(L); log(U);
 
         Vector u = solve(A,b);
 

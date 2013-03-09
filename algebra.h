@@ -71,9 +71,9 @@ void pivot(Matrix &A, Permutation& P, uint j);
 struct PLU { Permutation P; Matrix LU; };
 PLU factorize(Matrix&& A);
 
-/// Returns L and U from a packed LU matrix.
+/*/// Returns L and U from a packed LU matrix.
 struct LU { Matrix L,U; };
-LU unpack(Matrix&& LU);
+LU unpack(Matrix&& LU);*/
 
 /// Convenience macro to emulate multiple return arguments
 #define multi(A, B, F) auto A##B_ F auto A = move(A##B_.A); auto B=move(A##B_.B);
@@ -103,8 +103,8 @@ template<> inline string str(const Vector& a) { string s; for(uint i: range(a.n)
 /// Solves PLUx=b
 Vector solve(const Permutation& P, const Matrix &LU, const Vector& b);
 
-/// Solves Ax[j]=e[j] using LU factorization
-Matrix inverse(const Matrix &A);
-
 /// Solves Ax=b using LU factorization
 Vector solve(const Matrix& A, const Vector& b);
+
+/*/// Solves Ax[j]=e[j] using LU factorization
+Matrix inverse(const Matrix &A);*/
