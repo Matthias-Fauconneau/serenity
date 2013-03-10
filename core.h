@@ -4,15 +4,15 @@
 // Attributes
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define notrace __attribute((no_instrument_function))
-#define artificial __attribute((always_inline, artificial))
+#define notrace inline __attribute((no_instrument_function))
+#define always_inline inline __attribute((always_inline))
 #define flatten __attribute((flatten))
 // Move
 template<Type T> struct remove_reference { typedef T type; };
 template<Type T> struct remove_reference<T&> { typedef T type; };
 template<Type T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
-template<Type T> __attribute((always_inline)) constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
+template<Type T> always_inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 template<Type T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 #define move_operator_(T)                        T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
