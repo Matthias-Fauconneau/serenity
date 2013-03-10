@@ -5,6 +5,8 @@
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define notrace __attribute((no_instrument_function))
+#define artificial __attribute((always_inline, artificial))
+#define flatten __attribute((flatten))
 // Move
 template<Type T> struct remove_reference { typedef T type; };
 template<Type T> struct remove_reference<T&> { typedef T type; };
@@ -206,7 +208,7 @@ template<Type T> struct buffer {
     T* data=0;
     uint capacity=0,size=0;
     buffer(){}
-    explicit buffer(uint capacity):data(allocate64<T>(capacity)),capacity(capacity){}
+    explicit buffer(uint size):data(allocate64<T>(size)),capacity(size),size(size){}
     buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){clear(data,size,value);}
     move_operator_(buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     explicit buffer(const buffer& o):buffer(o.capacity){size=o.size; copy(data,o.data,size);}

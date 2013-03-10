@@ -6,25 +6,39 @@
 /// Traces functions to time their execution times and displays statistics on exit
 struct Profile {
     struct Frame { void* function; uint64 time; uint64 tsc; };
-    array<Frame> stack {1,1,Frame{0,0,rdtsc()}};
-    map<void*, uint64> profile;
+    Frame stack[16] = {Frame{0,0,rdtsc()}};
+    Frame* top = stack;
+    struct Function { uint64 time=0; uint count=0,depth=-1; bool operator<(const Function& o)const{return time<o.time;} };
+    map<void*, Function> profile;
 
     ~Profile() {
-        map<uint64, void*> sort;
+        map<Function, void*> sort;
         uint64 total=0;
-        for(auto e: profile) if(e.value>0) { sort.insertSortedMulti(e.value, e.key); total+=e.value; }
-        for(auto e: sort) if(100*e.key/total>=1) log(str((uint)round(100.f*e.key/total))+"%\t"_+findNearestLine(e.value).function);
+        for(auto e: profile) /*if(e.value>0)*/ { sort.insertSortedMulti(e.value, e.key); total+=e.value.time; }
+        for(auto e: sort) {
+            /*if(100*e.key.time/total>=1)*/
+            Symbol s = findNearestLine(e.value);
+            log(str((uint)round(100.f*e.key.time/total))+"%"_
+                +"\t"_+str(e.key.count)
+                +"\t"_+str(e.key.depth)
+                +"\t"_+s.file+":"_+str(s.line)+"     \t"_+s.function);
+        }
     }
     void enter(void* function) {
-        stack.last().time += rdtsc()-stack.last().tsc;
-        stack << Profile::Frame{function,0,rdtsc()};
+        uint64 tsc = rdtsc();
+        top->time += tsc-top->tsc;
+        top++;
+        *top = Frame{function,0,tsc};
     }
     void exit() {
-        Frame frame = stack.pop();
-        frame.time += rdtsc()-frame.tsc;
-        for(const Frame& ancestor: stack) if(frame.function==ancestor.function) return; //only topmost recursive
-        profile[frame.function] += frame.time;
-        if(stack) stack.last().tsc = rdtsc();
+        uint64 tsc = rdtsc();
+        top->time += tsc-top->tsc;
+        Function& f = profile[top->function];
+        f.count++;
+        f.time += top->time;
+        f.depth = min<uint>(f.depth,top-stack);
+        top--;
+        top->tsc = tsc;
     }
 };
 Profile profile;

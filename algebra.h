@@ -3,10 +3,6 @@
 #include "string.h"
 #define NaN __builtin_nan("")
 
-// Profiling
-#include "time.h"
-extern uint64 rowSlice, constElement, elementRead, elementWrite, elementAdd;
-
 /// Sparse CSR matrix
 struct Matrix {
     default_move(Matrix);
@@ -14,7 +10,7 @@ struct Matrix {
 
     struct Element {
         uint column; float value;
-        bool operator<(const Element& o) const { return column<o.column; }
+        inline notrace bool operator<(const Element& o) const;
     };
 
     struct Row {
@@ -22,7 +18,6 @@ struct Matrix {
         uint n; // Number of columns (for bound checking)
         mutable_ref<Element> operator()(uint start, uint stop) const {
             assert(start<n && stop<=n && start<stop);
-            tsc tsc(rowSlice);
             uint startIndex=row.size, stopIndex=row.size;
             for(uint index: range(row.size)) if(row[index].column >= start) { startIndex=index; break; }
             for(uint index: range(startIndex,row.size)) if(row[index].column >= stop) { stopIndex=index; break; }
@@ -39,7 +34,6 @@ struct Matrix {
         uint n; // Number of columns (for bound checking)
         ref<Element> operator()(uint start, uint stop) const {
             assert(start<n && stop<=n && start<=stop);
-            tsc tsc(rowSlice);
             uint startIndex=row.size, stopIndex=row.size;
             for(uint index: range(row.size)) if(row[index].column >= start) { startIndex=index; break; }
             for(uint index: range(startIndex,row.size)) if(row[index].column >= stop) { stopIndex=index; break; }
@@ -51,32 +45,28 @@ struct Matrix {
     ConstRow row(uint i) const { assert(i<m); return {rows[i],n}; }
     ConstRow operator[](uint i) const { return row(i); }
 
-    float at(uint i, uint j) const {
+    float operator()(uint i, uint j) const {
         assert(i<m && j<n);
-        tsc tsc(constElement);
         for(const Element& e: row(i)) if(e.column==j) return e.value;
         return 0;
     }
-    float operator()(uint i, uint j) const { return at(i,j); }
 
     struct ElementRef {
         array<Element>& row;
         uint j;
         operator float() const {
-            tsc tsc(elementRead);
             if(row.size>8) {
                 uint index = row.binarySearch(Element{j,0});
                 if(index<row.size) {
                     const Element& e = row[index];
                     if(e.column==j) return e.value;
                 }
-            } else {
-                for(const Element& e: row) if(e.column == j) return e.value;
+                return 0;
             }
+            for(const Element& e: row) if(e.column == j) return e.value;
             return 0;
         }
         float operator=(float v) {
-            tsc tsc(elementWrite);
             for(Element& e: row) if(e.column == j) return e.value=v;
             if(!v) return v;
             row.insertSorted( Element{j,v} ); // Implicit fill-in
@@ -85,12 +75,12 @@ struct Matrix {
         void operator+=(float v) { operator=( operator float() + v); }
         void operator-=(float v) { operator=( operator float() - v); }
     };
-    ElementRef at(uint i, uint j) { assert(i<m && j<n); return {rows[i],j}; }
-    ElementRef operator()(uint i, uint j) { return at(i,j); }
+    ElementRef operator()(uint i, uint j) { assert(i<m && j<n); return {rows[i],j};; }
 
     uint m=0,n=0; /// row and column count
     array< array<Element> > rows;
 };
+inline artificial bool Matrix::Element::operator<(const Element& o) const { return column<o.column; }
 template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.rows=copy(o.rows); return move(t); }
 template<> string str(const Matrix& a);
 Matrix operator*(const Matrix& a,const Matrix& b);
@@ -120,20 +110,7 @@ PLU factorize(Matrix&& A);
 float determinant(const Permutation& P, const Matrix& LU);
 
 /// Dense vector
-struct Vector {
-    default_move(Vector);
-    Vector(uint n):data(n,NaN),n(n){}
-
-    const float& at(uint i) const { assert(data && i<n); return data[i]; }
-    float& at(uint i) { assert(data && i<n); return data[i]; }
-    const float& operator[](uint i) const { return at(i); }
-    float& operator[](uint i) { return at(i); }
-    const float& operator()(uint i) const { return at(i); }
-    float& operator()(uint i) { return at(i); }
-
-    buffer<float> data; /// elements stored in column-major order
-    uint n=0; /// component count
-};
+typedef buffer<float> Vector;
 
 /// Solves PLUx=b
 Vector solve(const Permutation& P, const Matrix& LU, const Vector& b);

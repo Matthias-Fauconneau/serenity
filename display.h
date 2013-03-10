@@ -16,17 +16,17 @@ inline void push(Rect clip) { clipStack << currentClip; currentClip=currentClip 
 inline void pop() { currentClip=clipStack.pop(); }
 
 // Colors
-constexpr vec4 black __(0, 0, 0, 1);
-constexpr vec4 darkGray __(13./16, 13./16, 13./16, 1);
-constexpr vec4 lightGray __(15./16, 15./16, 15./16, 1);
-constexpr vec4 white __(1, 1, 1, 1);
-constexpr vec4 highlight __(8./16, 12./16, 14./16, 1);
-constexpr vec4 blue __(0, 0, 1, 1);
-constexpr vec4 cyan __(0, 1, 1, 1);
-constexpr vec4 green __(0, 1, 0, 1);
-constexpr vec4 yellow __(0, 1, 1, 1);
-constexpr vec4 red __(1, 0, 0, 1);
-constexpr vec4 magenta __(1, 0, 1, 1);
+constexpr vec4 black(0, 0, 0, 1);
+constexpr vec4 darkGray(13./16, 13./16, 13./16, 1);
+constexpr vec4 lightGray (15./16, 15./16, 15./16, 1);
+constexpr vec4 white (1, 1, 1, 1);
+constexpr vec4 highlight (8./16, 12./16, 14./16, 1);
+constexpr vec4 blue (0, 0, 1, 1);
+constexpr vec4 cyan (0, 1, 1, 1);
+constexpr vec4 green (0, 1, 0, 1);
+constexpr vec4 yellow (0, 1, 1, 1);
+constexpr vec4 red (1, 0, 0, 1);
+constexpr vec4 magenta (1, 0, 1, 1);
 
 // Gamma correction
 struct SRGB {

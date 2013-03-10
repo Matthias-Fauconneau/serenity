@@ -2,10 +2,10 @@
 #include "inflate.h"
 #include "data.h"
 
-template<Type T> struct rgba { T r,g,b,a; operator byte4() const { return byte4 __(b,g,r,a); } };
-template<Type T> struct rgb { T r,g,b; operator byte4() const { return byte4 __(b,g,r,255); } };
-template<Type T> struct ia { T i,a; operator byte4() const {return byte4 __(i,i,i,a); } };
-template<Type T> struct luma { T i; operator byte4() const {return byte4 __(i,i,i,255); } };
+template<Type T> struct rgba { T r,g,b,a; operator byte4() const { return byte4 {b,g,r,a}; } };
+template<Type T> struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255}; } };
+template<Type T> struct ia { T i,a; operator byte4() const {return byte4 {i,i,i,a}; } };
+template<Type T> struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } };
 
 typedef vector<rgb,uint8,3> rgb3;
 
@@ -55,7 +55,7 @@ Image decodePNG(const ref<byte>& file) {
         if(tag == raw<uint32>("IHDR"_)) {
             width = s.read(), height = s.read();
             bitDepth = s.read(); if(bitDepth!=8 && bitDepth != 4){ log("Unsupported PNG depth"_,bitDepth,width,height); return Image(); }
-            type = s.read(); depth = (int[])__(1,0,3,1,2,0,4)[type]; assert(depth>0&&depth<=4,type);
+            type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             alpha = depth==2||depth==4;
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
@@ -160,8 +160,7 @@ array<byte> filter(const Image& image) {
 
 array<byte> encodePNG(const Image& image) {
     array<byte> file = string("\x89PNG\r\n\x1A\n"_);
-    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr =
-           __( .w=big32(image.width), .h=big32(image.height), .depth=8, .type=6, .compression=0, .filter=0, .interlace=0 );
+    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
     array<byte> IHDR = "IHDR"_+raw(ihdr);
     file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
 
