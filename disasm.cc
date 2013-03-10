@@ -64,7 +64,7 @@ int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
 
 void disassemble(const ref<byte>& code) {
     for(const byte* c=code.begin(), *end=code.end();c<end;) {
-        string s=hex(int(c-code.begin()),2)+":\t"_  /*+hex(ref<byte>(c,5))+"\t"_*/;
+        string s=hex(int(c-code.begin()),2)+":\t"_  +hex(ref<byte>(c,6))+"\t"_;
         uint8 op = *c++;
         int size=2/*operand size*//*, asize=3*//*address size*/, scalar=0;
         if(op==0x66) size=1, op = *c++; //for SSE size=2 -> float (ps), size=1 -> double (pd)
@@ -190,6 +190,10 @@ void disassemble(const ref<byte>& code) {
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst); r&=7;
             s<< shs[r]+" "_+dst+", "_+hex(imm(c,0),2);
+        } else if(op==0xC2) {
+            s<<"ret "_<<hex(imm(c,1),1);
+        } else if(op==0xC4 || op==0xC5) {
+            s<<"invalid"_;
         } else if(op==0xC6 || op==0xC7) { //mov r/m, imm
             if(!(op&1)) size=0;
             string dst; int r = modrm(rex,size,c,dst); if(r&7) error(r);
@@ -202,6 +206,9 @@ void disassemble(const ref<byte>& code) {
             if(!(op&1)) size=0;
             string dst; int r=modrm(rex,size,c,dst); r&=7;
             s<< shs[r]+" "_+dst+", cl"_;
+        } else if(op==0xE2) {
+            int disp = imm(c,0);
+            s<< "loop rcx, "_ + hex(int(c-code.begin())+disp,0);
         } else if(op==0xE8) { //call imm32
             int disp = imm(c,size);
             s<< "call  "_ + hex(int(c-code.begin())+disp,2);
@@ -218,16 +225,15 @@ void disassemble(const ref<byte>& code) {
             else if(r==2) s<< "not "_+s;
             else if(r==3) s<< "neg "_+s;
             else error("F7"_,r);
-        } else if(op==0xF8) {
-            s<< "clc"_;
-        } else if(op==0xFC) {
-            s<< "cld"_;
+        } else if(op==0xF8) { s<< "clc"_;
+        } else if(op==0xFA) { s<< "cli"_;
+        } else if(op==0xFC) { s<< "cld"_;
         } else if(op==0xFF) {
             string s; int r = modrm(rex,size,c,s); r&=7;
             /**/  if(r==0) s<< "inc "_+s;
             else if(r==1) s<< "dec "_+s;
             else error("FF"_,r);
-        } else error("Unkown opcode"_,hex(op));
+        } else error("Unknown opcode"_,hex(op),size,scalar,rex);
         log(s);
         assert(end<=code.end());
     }
