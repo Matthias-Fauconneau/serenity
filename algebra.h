@@ -74,9 +74,10 @@ struct Matrix {
     uint m=0,n=0; /// row and column count
     array< array<Element> > rows;
 };
+template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.rows=copy(o.rows); return move(t); }
+template<> string str(const Matrix& a);
 Matrix operator*(const Matrix& a,const Matrix& b);
 bool operator==(const Matrix& a,const Matrix& b);
-template<> string str(const Matrix& a);
 inline Matrix identity(uint size) { Matrix I(size,size); for(uint i: range(size)) I(i,i)=1; return I; }
 
 /// Permutation matrix

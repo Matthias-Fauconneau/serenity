@@ -1,4 +1,5 @@
 #include "algebra.h"
+#include "time.h"
 
 Matrix operator*(const Matrix& a, const Matrix& b) {
     assert(a.n==b.m);
@@ -37,7 +38,7 @@ void pivot(Matrix &A, Permutation& P, uint j) {
     }
     assert(maximum,A);
     if(best != j) { //swap rows i <-> j
-        for(uint k: range(A.n)) { float t=A(best,k); A(best,k)=(float)A(j,k); A(j,k)=t; } //TODO: sparse swap
+        swap(A.rows[best],A.rows[j]);
         P.swap(best,j);
     }
 }

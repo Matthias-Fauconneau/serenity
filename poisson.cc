@@ -1,20 +1,17 @@
 #include "process.h"
 #include "algebra.h"
-#include "window.h"
-#include "display.h"
 
-struct PoissonSolver : Widget {
-    // Parameters
-    const uint Mx=7, My=7; // Spatial resolutions
+struct PoissonSolver {
+    //const uint Mx=32, My=32; // Spatial resolutions
+    const uint Mx=4, My=4; // Spatial resolutions
     const float Lx=1, Ly=1; // Physical dimensions
     const float dx = Lx/Mx, dy = Ly/My; // Physical resolutions
     const float T0 = 0, T1 = 1; // Lateral boundary conditions
-    Image image;
-    Window window __(this, int2(-1,-1), "Poisson"_);
+    const uint N = Mx*My; // Total sample count
+    Vector u;
     PoissonSolver() {
-        const uint N = Mx*My; // Total sample count
-        Matrix A (N,N); // Poisson operator
-        Vector b (N); // Right-hand vector
+        Matrix A(N,N); // Poisson operator
+        Vector b(N); // Right-hand vector
         for(uint x: range(Mx)) {
             for(uint y: range(My)) {
                 uint i = y*Mx+x;
@@ -42,21 +39,37 @@ struct PoissonSolver : Widget {
 
         auto PLU = factorize(move(A));
         //assert(inverse(PLU)*A==identity(A.n), inverse(PLU)*A);
-        Vector u = solve(PLU,b);
-
-        // Visualization
+        u = solve(PLU,b);
+    }
+};
+#if PROFILE
+PoissonSolver profile;
+#else
+#include "window.h"
+#include "display.h"
+struct PoissonTest : PoissonSolver, Widget {
+    Image image;
+    Window window __(this, int2(-1,-1), "Poisson"_);
+    PoissonTest() {
+        // Result visualization
         image = Image(Mx, My);
         for(uint x: range(Mx)) {
             for(uint y: range(My)) {
-                //image(x,y) = LU(x,y) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
                 uint i = y*Mx+x;
                 image(x,y) = clip(0, int(u(i)*0xFF), 0xFF); // [0,1] -> [black,white]
                 //image(x,y) = byte4(clip(0, int(-u(i)*0xFF), 0xFF), 0, clip(0, int(u(i)*0xFF), 0xFF), 0xFF); [-1,0,1] -> [blue,black,red]
             }
         }
         image = resize(image, 16*Mx, 16*My);
+
+        // Matrix visualization
+        //image = Image(N, N);
+        //for(uint i: range(N)) for(uint j: range(N)) image(j,i) = A(i,j) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
+        //for(uint i: range(N)) for(uint j: range(N)) image(j,i) = PLU.LU(i,j) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
+
         window.localShortcut(Escape).connect(&exit);
     }
     int2 sizeHint() { return int2(16*Mx, 16*My); }
     void render(int2 position, int2) { blit(position, image); }
 } test;
+#endif

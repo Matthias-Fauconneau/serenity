@@ -19,6 +19,8 @@ inline uint64 rdtsc() { return 0; } //STUB
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
 struct tsc { uint64 start=rdtsc(); operator uint64(){ return rdtsc()-start; } };
+/// Logs the time spent executing a scope
+struct ScopeTimer { uint64 start=cpuTime(); ~ScopeTimer(){log(round((cpuTime()-start)/1000.f));}};
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
