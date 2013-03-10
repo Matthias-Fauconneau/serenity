@@ -81,8 +81,6 @@ struct PoissonTest : PoissonSolver, Widget {
     int2 sizeHint() { return int2(16*Mx, 16*My); }
     void render(int2 position, int2) { blit(position, image); }
 } test;
-#elif PROFILE
-PoissonSolver test[2];
 #else
-PoissonSolver test[16];
+PoissonSolver test[9]; //O_o: 8 times -> +50ms
 #endif

@@ -3,7 +3,7 @@
 #include "string.h"
 #define NaN __builtin_nan("")
 
-//#define profile( statements... ) // O_o: 10ms faster with profile
+//#define profile( statements... ) // O_o: 20ms faster with profile
 #define profile( statements... ) statements
 
 /// Sparse CSR matrix
@@ -15,80 +15,41 @@ struct Matrix {
         uint column; float value;
         notrace bool operator<(const Element& o) const;
     };
-
-    struct Row {
-        array<Element>& row;
-        uint n; // Number of columns (for bound checking)
-        mutable_ref<Element> operator()(uint stop) const {
-            assert(stop<=n);
-            return row.mutable_slice(0, row.binarySearch(Element{stop,0}));
-        }
-        mutable_ref<Element> operator()(uint start, uint stop) const {
-            assert(start<n && stop<=n && start<stop);
-#if 1 // O_o: 20ms faster (called once)
-            uint startIndex=row.size, stopIndex=row.size;
-            for(uint index: range(row.size)) if(row[index].column >= start) { startIndex=index; break; }
-            for(uint index: range(startIndex,row.size)) if(row[index].column >= stop) { stopIndex=index; break; }
-#else
-            uint startIndex = row.binarySearch(Element{start,0});
-            uint stopIndex = row.binarySearch(Element{stop,0});
-#endif
-            return row.mutable_slice(startIndex,stopIndex-startIndex);
-        }
-        Element* begin(){ return row.begin(); }
-        Element* end(){ return row.end(); }
-    };
-    Row operator[](uint i) { assert(i<m); return {rows[i],n}; }
-
-    struct ConstRow {
-        const array<Element>& row;
-        uint n; // Number of columns (for bound checking)
-        notrace ref<Element> operator()(uint stop) const;
-        ref<Element> operator()(uint start, uint stop) const {
-            assert(start<n && stop<=n && start<=stop);
-            uint startIndex = row.binarySearch(Element{start,0});
-            uint stopIndex = row.binarySearch(Element{stop,0});
-            return row.slice(startIndex,stopIndex-startIndex);
-        }
-        const Element* begin(){ return row.begin(); }
-        const Element* end(){ return row.end(); }
-    };
-    notrace ConstRow operator[](uint i) const;
-
     notrace float operator()(uint i, uint j) const;
 
     struct ElementRef {
         array<Element>& row;
         uint j;
         notrace operator float() const;
-        float operator=(float v) {
-            profile( extern uint insert, remove, assign, noop; )
-            uint index = row.binarySearch(Element{j,0});
-            if(index<row.size) {
-                Element& e = row[index];
-                if(e.column==j) { profile( if(v) assign++; else remove++; ) return e.value=v; }
-            }
-            assert(v);
-            if(!v) { profile( noop++; ) return v; }
-            profile( insert++; )
-            row.insertAt(index, Element{j,v});
-            return v;
-        }
+        notrace float operator=(float v);
     };
-    ElementRef operator()(uint i, uint j) { assert(i<m && j<n); return {rows[i],j}; }
+    notrace ElementRef operator()(uint i, uint j);
+
+    struct ConstRow {
+        const array<Element>& row;
+        uint n; // Number of columns (for bound checking)
+        notrace ref<Element> operator()(uint stop) const;
+        notrace ref<Element> operator()(uint start, uint stop) const;
+        const Element* begin(){ return row.begin(); }
+        const Element* end(){ return row.end(); }
+    };
+    notrace ConstRow operator[](uint i) const;
+
+    struct Row {
+        array<Element>& row;
+        uint n; // Number of columns (for bound checking)
+        notrace mutable_ref<Element> operator()(uint stop) const;
+        notrace mutable_ref<Element> operator()(uint start, uint stop) const;
+        Element* begin(){ return row.begin(); }
+        Element* end(){ return row.end(); }
+    };
+    notrace Row operator[](uint i);
 
     uint m=0,n=0; /// row and column count
     array< array<Element> > rows;
 };
 
 inline bool Matrix::Element::operator<(const Element& o) const { return column<o.column; }
-
-inline ref<Matrix::Element> Matrix::ConstRow::operator()(uint stop) const {
-    assert(stop<=n);
-    return row.slice(0, row.binarySearch(Element{stop,0}));
-}
-
-inline Matrix::ConstRow Matrix::operator[](uint i) const { assert(i<m); return {rows[i],n}; }
 
 always_inline float Matrix::operator()(uint i, uint j) const {
     assert(i<m && j<n);
@@ -109,6 +70,50 @@ always_inline Matrix::ElementRef::operator float() const {
     }
     return 0;
 }
+inline float Matrix::ElementRef::operator=(float v) {
+    profile( extern uint insert, remove, assign, noop; )
+            uint index = row.binarySearch(Element{j,0});
+    if(index<row.size) {
+        Element& e = row[index];
+        if(e.column==j) { profile( if(v) assign++; else remove++; ) return e.value=v; }
+    }
+    assert(v);
+    if(!v) { profile( noop++; ) return v; }
+    profile( insert++; )
+            row.insertAt(index, Element{j,v});
+    return v;
+}
+inline Matrix::ElementRef Matrix::operator()(uint i, uint j) { assert(i<m && j<n); return {rows[i],j}; }
+
+inline ref<Matrix::Element> Matrix::ConstRow::operator()(uint stop) const {
+    assert(stop<=n);
+    return row.slice(0, row.binarySearch(Element{stop,0}));
+}
+inline ref<Matrix::Element> Matrix::ConstRow::operator()(uint start, uint stop) const {
+    assert(start<n && stop<=n && start<=stop);
+    uint startIndex = row.binarySearch(Element{start,0});
+    uint stopIndex = row.binarySearch(Element{stop,0});
+    return row.slice(startIndex,stopIndex-startIndex);
+}
+inline Matrix::ConstRow Matrix::operator[](uint i) const { assert(i<m); return {rows[i],n}; }
+
+inline mutable_ref<Matrix::Element> Matrix::Row::operator()(uint stop) const {
+    assert(stop<=n);
+    return row.mutable_slice(0, row.binarySearch(Element{stop,0}));
+}
+inline mutable_ref<Matrix::Element> Matrix::Row::operator()(uint start, uint stop) const {
+    assert(start<n && stop<=n && start<stop);
+#if 1 // O_o: 10ms faster (called once)
+    uint startIndex=row.size, stopIndex=row.size;
+    for(uint index: range(row.size)) if(row[index].column >= start) { startIndex=index; break; }
+    for(uint index: range(startIndex,row.size)) if(row[index].column >= stop) { stopIndex=index; break; }
+#else
+    uint startIndex = row.binarySearch(Element{start,0});
+    uint stopIndex = row.binarySearch(Element{stop,0});
+#endif
+    return row.mutable_slice(startIndex,stopIndex-startIndex);
+}
+inline Matrix::Row Matrix::operator[](uint i) { assert(i<m); return {rows[i],n}; }
 
 template<> inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.rows=copy(o.rows); return move(t); }
 template<> string str(const Matrix& a);
@@ -126,9 +131,6 @@ struct Permutation {
     int determinant() const { return even; }
     int operator[](int i) const { return order[i]; } //b[P[i]] = (P*b)[i]
 };
-
-/// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
-void pivot(Matrix &A, Permutation& P, uint j);
 
 /// Factorizes any matrix as the product of a lower triangular matrix and an upper triangular matrix
 /// \return permutations (P) and packed LU (U's diagonal is 1).

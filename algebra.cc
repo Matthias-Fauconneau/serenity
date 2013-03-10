@@ -28,8 +28,8 @@ template<> string str(const Matrix& a) {
     return s;
 }
 
-// Swap row j with the row having the maximum value on column j, while maintaining a permutation matrix P
-void pivot(Matrix& A, Permutation& P, uint j) {
+/// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
+inline void pivot(Matrix& A, Permutation& P, uint j) {
     uint best=j; float maximum=abs<float>(A(best,j));
     for(uint i: range(j,A.m)) { // Find biggest on or below diagonal //TODO: sparse column iterator ?
         float value = abs<float>(A(i,j));
