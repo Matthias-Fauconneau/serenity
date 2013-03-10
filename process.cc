@@ -28,7 +28,7 @@ void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thr
 // Threads
 
 // Handle for the main thread (group leader)
-Thread mainThread __attribute((init_priority(1003))) __(20);
+Thread mainThread __attribute((init_priority(1003))) (20);
 // Lock access to thread list
 static Lock threadsLock __attribute((init_priority(1001)));
 // Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting

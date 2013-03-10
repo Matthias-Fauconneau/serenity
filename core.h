@@ -1,9 +1,10 @@
 #pragma once
-/// \file core.h move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range, std::initializer_list (aka ref), fat string and basic operations
+/// \file core.h meta definitions, primitive types, log, range, std::initializer_list (aka ref) and other essential functions
+#define Type typename
 // Attributes
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define Type typename
+#define notrace __attribute((no_instrument_function))
 // Move
 template<Type T> struct remove_reference { typedef T type; };
 template<Type T> struct remove_reference<T&> { typedef T type; };
@@ -14,8 +15,8 @@ template<Type T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 #define move_operator_(T)                        T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
 #define move_operator(T)       no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
-#define default_move(T) T(){} no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&&)____(=default)
-/// base template for explicit copy (overriden by explicitly copyable types)
+#define default_move(T) T(){} no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&&)=default
+/// Base template for explicit copy (overriden by explicitly copyable types)
 template<Type T> T copy(const T& o) { return o; }
 
 // Forward
@@ -51,32 +52,20 @@ typedef unsigned long size_t;
 typedef unsigned int size_t;
 #endif
 
-// Works around missing support for some C++11 features in QtCreator code model
-#ifndef __GXX_EXPERIMENTAL_CXX0X__
-#define _ //string literal operator _""
-#define __( args... ) //member initialization constructor {}
-//#define ___ //variadic template arguments unpack operator ...
-//#define ____( ignore... ) //=default, constructor{} initializer
-#define ___ ...
-#define ____( ignore... ) ignore
-#define __thread
-#else
-#define __( args... ) { args }
-#define ___ ...
-#define ____( ignore... ) ignore
-#endif
-
 namespace std { template<Type T> struct initializer_list; }
 /// \a Const memory reference to contiguous elements
 template<Type T> using ref = std::initializer_list<T>;
 /// Returns reference to string literals
 inline constexpr ref<byte> operator "" _(const char* data, size_t size);
+#ifndef __GXX_EXPERIMENTAL_CXX0X__
+#define _ // QtCreator doesn't parse operator _""
+#endif
 
 /// Logs to standard output
-template<Type ___ Args> void log(const Args& ___ args);
+template<Type... Args> void log(const Args&... args);
 template<> void log(const ref<byte>& message);
 /// Logs to standard output and aborts immediatly this thread
-template<Type ___ Args> void error(const Args& ___ args)  __attribute((noreturn));
+template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
 template<> void error(const ref<byte>& message) __attribute((noreturn));
 
 #ifdef DEBUG
@@ -99,8 +88,8 @@ struct range {
         iterator& operator++() { i++; return *this; }
         bool operator !=(const iterator& o) const{ return i<o.i; }
     };
-    iterator begin(){ return __(start); }
-    iterator end(){ return __(stop); }
+    iterator begin(){ return {start}; }
+    iterator end(){ return {stop}; }
 };
 
 // Memory operations
@@ -209,7 +198,7 @@ template<Type T> void unallocate(T*& buffer) { assert(buffer); free((void*)buffe
 
 /// Dynamic object allocation (using constructor and destructor)
 inline void* operator new(size_t, void* p) { return p; } //placement new
-template<Type T, Type... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)___); return *t; }
+template<Type T, Type... Args> T& heap(Args&&... args) { T* t=allocate<T>(1); new (t) T(forward<Args>(args)...); return *t; }
 template<Type T> void free(T* t) { t->~T(); unallocate(t); }
 
 /// Simple writable fixed-capacity memory reference

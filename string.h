@@ -101,19 +101,19 @@ template<Type A, Type B> struct Cat {
     operator array<byte>()  const{ array<byte> r(size); r.size=size; byte* data=r.data; cat(data); return r; }
 };
 /// Concatenation operators
-template<Type Aa, Type Ab, Type Ba, Type Bb> Cat<Cat<Aa, Ab>, Cat<Ba, Bb>> operator+(const Cat<Aa, Ab>& a, const Cat<Ba, Bb>& b) { return __(a,b); }
-template<Type Aa, Type Ab> Cat< Cat<Aa, Ab>, ref<byte> > operator+(const Cat<Aa, Ab>& a, const ref<byte>& b) { return __(a,b); }
-inline Cat< ref<byte>, ref<byte> > operator+(const ref<byte>& a, const ref<byte>& b) { return __(a,b); }
+template<Type Aa, Type Ab, Type Ba, Type Bb> Cat<Cat<Aa, Ab>, Cat<Ba, Bb>> operator+(const Cat<Aa, Ab>& a, const Cat<Ba, Bb>& b) { return {a,b}; }
+template<Type Aa, Type Ab> Cat< Cat<Aa, Ab>, ref<byte> > operator+(const Cat<Aa, Ab>& a, const ref<byte>& b) { return {a,b}; }
+inline Cat< ref<byte>, ref<byte> > operator+(const ref<byte>& a, const ref<byte>& b) { return {a,b}; }
 
 /// Forwards concatenation
 template<Type A, Type B> const Cat<A,B>& str(const Cat<A,B>& s) { return s; }
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
-template<Type A, Type ___ Args> string str(const A& a, const Args& ___ args) { return str(a)+" "_+str(args ___); }
+template<Type A, Type... Args> string str(const A& a, const Args&... args) { return str(a)+" "_+str(args...); }
 
 /// Logs to standard output using str(...) serialization
-template<Type... Args> void log(const Args&... args) { log((ref<byte>)string(str(args ___))); }
+template<Type... Args> void log(const Args&... args) { log((ref<byte>)string(str(args...))); }
 /// Logs to standard output using str(...) serialization
 template<> inline void log(const string& s) { log((ref<byte>)s); }
 /// Logs to standard output using str(...) serialization and terminate all threads
-template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args ___))); }
+template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args...))); }

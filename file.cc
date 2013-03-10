@@ -51,7 +51,7 @@ array<byte> Stream::readUpTo(uint capacity) {
     buffer.size = check( ::read(fd, buffer.data, capacity) );
     return buffer;
 }
-bool Stream::poll(int timeout) { assert(fd); pollfd pollfd __(fd,POLLIN); return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
+bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 void Stream::write(const byte* data, uint size) { int unused wrote=check(::write(fd,data,size)); assert(wrote==(int)size); }
 void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}

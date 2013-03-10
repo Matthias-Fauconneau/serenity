@@ -11,7 +11,7 @@ template<template<typename> class V, Type T, uint N> struct vector : V<T> {
     /// Initializes all components to the same value \a v
     vector(T v){ for(uint i=0;i<N;i++) at(i)=v; }
     /// Initializes components separately
-    template<Type... Args> explicit constexpr vector(T a, T b, Args... args):____(V<T>{a,b,T(args)...}){
+    template<Type... Args> explicit constexpr vector(T a, T b, Args... args):V<T>{a,b,T(args)...}{
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Initializes components from a fixed size array

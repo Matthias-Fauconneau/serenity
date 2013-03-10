@@ -71,9 +71,9 @@ struct Poll : pollfd {
     no_copy(Poll);
     Thread& thread; /// Thread monitoring this pollfd
     /// Poll can be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
-    Poll(Thread& thread=mainThread):____(pollfd{0,0,0},)thread(thread){}
+    Poll(Thread& thread=mainThread):pollfd{0,0,0},thread(thread){}
     /// Creates an handle to participate in an event loop, use \a registerPoll when ready
-    Poll(int fd, int events=POLLIN, Thread& thread=mainThread):____(pollfd{fd,(short)events,0},)thread(thread){}
+    Poll(int fd, int events=POLLIN, Thread& thread=mainThread):pollfd{fd,(short)events,0},thread(thread){}
     ~Poll(){ unregisterPoll(); }
     /// Registers \a fd to the event loop
     void registerPoll();

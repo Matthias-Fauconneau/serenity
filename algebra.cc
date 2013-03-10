@@ -1,6 +1,9 @@
 #include "algebra.h"
 #include "time.h"
 
+// Profiling
+uint64 rowSlice, constElement, elementRead, elementWrite, elementAdd;
+
 Matrix operator*(const Matrix& a, const Matrix& b) {
     assert(a.n==b.m);
     Matrix r(a.m,b.n);
@@ -45,6 +48,7 @@ void pivot(Matrix &A, Permutation& P, uint j) {
 
 PLU factorize(Matrix&& A) {
     assert(A.m==A.n);
+    rowSlice=0, constElement=0, elementRead=0, elementWrite=0, elementAdd=0; ScopeTimer timer; uint64 total=rdtsc();
     uint n = A.n;
     Permutation P(n);
     pivot(A, P, 0); // pivot first column
@@ -68,7 +72,15 @@ PLU factorize(Matrix&& A) {
     float sum = 0;
     for(const Matrix::Element& e: A[n-1](0,n-1))  sum += e.value * A(e.column,n-1);
     A(n-1,n-1) -= sum;
-    return __( move(P), move(A) );
+    total=rdtsc()-total;
+    log(
+                "rowSlice",1.f*rowSlice/total,
+                "constElement", 1.f*constElement/total,
+                "elementRead", 1.f*elementRead/total,
+                "elementWrite", 1.f*elementWrite/total,
+                "elementAdd", 1.f*elementAdd/total,
+                "Remaining", 1.f*(total-rowSlice-constElement-elementRead-elementWrite-elementAdd)/total);
+    return {move(P), move(A)};
 }
 
 float determinant(const Permutation& P, const Matrix& LU) {

@@ -87,7 +87,7 @@ struct BinaryData : virtual Data {
         operator uint8() { return s->read<uint8>(); }
         operator int8() { return s->read<int8>(); }
     };
-    ReadOperator read() { return __(this); }
+    ReadOperator read() { return {this}; }
 
     /// Reads \a size raw \a T elements
     template<Type T>  ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
@@ -97,7 +97,7 @@ struct BinaryData : virtual Data {
        BinaryData* s; uint size;
        template<Type T> operator array<T>() { array<T> t(size); for(uint unused i: range(size)) t<<(T)s->read(); return t; }
    };
-   ArrayReadOperator read(uint size) { return __(this,size); }
+   ArrayReadOperator read(uint size) { return {this,size}; }
 
    /// Reads \a size \a T elements (swap as needed)
    template<Type T>  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }

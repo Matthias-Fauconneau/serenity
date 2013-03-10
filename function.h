@@ -9,7 +9,7 @@ template<Type F, Type R, Type... Args> struct lambda;
 template<Type F, Type R, Type... Args> struct lambda<F, R(Args...)> : functor<R(Args...)> {
     F f;
     lambda(F&& f):f(move(f)){}
-    virtual R operator()(Args... args) const override { return f(forward<Args>(args)___); }
+    virtual R operator()(Args... args) const override { return f(forward<Args>(args)...); }
 };
 // functor template specialization for methods
 template<Type O, Type R, Type... Args> struct method;
@@ -17,7 +17,7 @@ template<Type O, Type R, Type... Args> struct method<O, R(Args...)> : functor<R(
     O* object;
     R (O::*pmf)(Args...);
     method(O* object, R (O::*pmf)(Args...)): object(object), pmf(pmf){}
-    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)___); }
+    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)...); }
 };
 // functor template specialization for const methods
 template<Type O, Type R, Type... Args> struct const_method;
@@ -25,7 +25,7 @@ template<Type O, Type R, Type... Args> struct const_method<O, R(Args...)> : func
     const O* object;
     R (O::*pmf)(Args...) const;
     const_method(const O* object, R (O::*pmf)(Args...) const): object(object), pmf(pmf){}
-    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)___); }
+    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)...); }
 };
 
 template<Type R, Type... Args> struct function;
@@ -44,14 +44,14 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
         new (any) const_method<O,R(Args...)>(object, pmf);
     }
 #pragma GCC system_header //-Wstrict-aliasing
-    virtual R operator()(Args... args) const override { return ((functor<R(Args...)>&)any)(forward<Args>(args)___); }
+    virtual R operator()(Args... args) const override { return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
 };
 
 /// Helps modularization by binding unrelated objects through persistent connections
 template<Type... Args> struct signal {
     array< function<void(Args...)>> delegates;
     /// Emits the signal to all registered delegates
-    void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args ___); }
+    void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args...); }
     /// Connects an anonymous function
     template<Type F> void connect(F f) { delegates<< f; }
     /// Connects a function

@@ -27,9 +27,7 @@ inline word4 cvtps(float4 a) { return (word4)_mm_cvtps_epi32(a); }
 //#if __AVX__
 #if 0
 #include "immintrin.h"
-#ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
 #include "avxintrin.h"
-#endif
 
 typedef float float8 __attribute((vector_size(32),may_alias));
 inline float8 load8(const float* p) { return *(float8*)p; }

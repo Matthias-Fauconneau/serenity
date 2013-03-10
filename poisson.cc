@@ -2,8 +2,11 @@
 #include "algebra.h"
 
 struct PoissonSolver {
-    //const uint Mx=32, My=32; // Spatial resolutions
-    const uint Mx=4, My=4; // Spatial resolutions
+#if PROFILE
+    const uint Mx=24, My=24; // Spatial resolutions
+#else
+    const uint Mx=48, My=48; // Spatial resolutions
+#endif
     const float Lx=1, Ly=1; // Physical dimensions
     const float dx = Lx/Mx, dy = Ly/My; // Physical resolutions
     const float T0 = 0, T1 = 1; // Lateral boundary conditions
@@ -42,8 +45,8 @@ struct PoissonSolver {
         u = solve(PLU,b);
     }
 };
-#if PROFILE
-PoissonSolver profile;
+#if 1
+PoissonSolver test;
 #else
 #include "window.h"
 #include "display.h"

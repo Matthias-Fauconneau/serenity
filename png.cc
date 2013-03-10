@@ -55,7 +55,7 @@ Image decodePNG(const ref<byte>& file) {
         if(tag == raw<uint32>("IHDR"_)) {
             width = s.read(), height = s.read();
             bitDepth = s.read(); if(bitDepth!=8 && bitDepth != 4){ log("Unsupported PNG depth"_,bitDepth,width,height); return Image(); }
-            type = s.read(); ____(depth = (int[])__(1,0,3,1,2,0,4)[type];) assert(depth>0&&depth<=4,type);
+            type = s.read(); depth = (int[])__(1,0,3,1,2,0,4)[type]; assert(depth>0&&depth<=4,type);
             alpha = depth==2||depth==4;
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);

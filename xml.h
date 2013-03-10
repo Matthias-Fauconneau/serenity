@@ -12,7 +12,7 @@ template<Type T> struct unique {
     template<Type O> unique(unique<O>&& o){pointer=o.pointer; o.pointer=0;}
     template<Type O> unique& operator=(unique<O>&& o){this->~unique(); pointer=o.pointer; o.pointer=0; return *this;}
     /// Instantiates a new value
-    template<Type... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)___)){}
+    template<Type... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)...)){}
     ~unique() { if(pointer) free(pointer); }
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }
