@@ -1,5 +1,4 @@
 #include "algebra.h"
-#include "time.h"
 
 Matrix operator*(const Matrix& a, const Matrix& b) {
     assert(a.n==b.m);
