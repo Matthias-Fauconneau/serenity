@@ -116,7 +116,7 @@ template<Type T> struct array {
     int indexOf(const T& key) const { return ref<T>(*this).indexOf(key); }
     /// Returns whether this array contains any elements matching \a value
     bool contains(const T& key) const { return ref<T>(*this).contains(key); }
-    /// Returns index of the first element less than \a value using binary search (assuming a sorted array)
+    /// Returns index to the last element less than or equal to \a value using binary search (assuming a sorted array)
     flatten int binarySearch(const T& key) const {
         uint min=0, max=size;
         while(min<max) {

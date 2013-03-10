@@ -8,19 +8,17 @@ struct Profile {
     struct Frame { void* function; uint64 time; uint64 tsc; };
     Frame stack[16] = {Frame{0,0,rdtsc()}};
     Frame* top = stack;
-    struct Function { uint64 time=0; uint count=0,depth=-1; bool operator<(const Function& o)const{return time<o.time;} };
+    struct Function { uint time=0,count=0; bool operator<(const Function& o)const{return time<o.time;} };
     map<void*, Function> profile;
 
     ~Profile() {
         map<Function, void*> sort;
         uint64 total=0;
-        for(auto e: profile) /*if(e.value>0)*/ { sort.insertSortedMulti(e.value, e.key); total+=e.value.time; }
-        for(auto e: sort) {
-            /*if(100*e.key.time/total>=1)*/
+        for(auto e: profile) { sort.insertSortedMulti(e.value, e.key); total+=e.value.time; }
+        for(auto e: sort) if(100.f*e.key.time/total>=1) {
             Symbol s = findNearestLine(e.value);
             log(str((uint)round(100.f*e.key.time/total))+"%"_
                 +"\t"_+str(e.key.count)
-                +"\t"_+str(e.key.depth)
                 +"\t"_+s.file+":"_+str(s.line)+"     \t"_+s.function);
         }
     }
@@ -36,7 +34,6 @@ struct Profile {
         Function& f = profile[top->function];
         f.count++;
         f.time += top->time;
-        f.depth = min<uint>(f.depth,top-stack);
         top--;
         top->tsc = tsc;
     }

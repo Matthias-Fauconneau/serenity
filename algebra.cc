@@ -1,10 +1,9 @@
 #include "algebra.h"
-#include "time.h"
 
 Matrix operator*(const Matrix& a, const Matrix& b) {
     assert(a.n==b.m);
     Matrix r(a.m,b.n);
-    for(uint i: range(r.m)) for(uint j: range(r.n)) for(uint k: range(a.n)) r(i,j) += a(i,k)*b(k,j);
+    for(uint i: range(r.m)) for(uint j: range(r.n)) for(uint k: range(a.n)) r(i,j) = r(i,j) + a(i,k)*b(k,j);
     return r;
 }
 
@@ -30,7 +29,7 @@ template<> string str(const Matrix& a) {
 }
 
 // Swap row j with the row having the maximum value on column j, while maintaining a permutation matrix P
-void pivot(Matrix &A, Permutation& P, uint j) {
+void pivot(Matrix& A, Permutation& P, uint j) {
     uint best=j; float maximum=abs<float>(A(best,j));
     for(uint i: range(j,A.m)) { // Find biggest on or below diagonal //TODO: sparse column iterator ?
         float value = abs<float>(A(i,j));
@@ -43,33 +42,33 @@ void pivot(Matrix &A, Permutation& P, uint j) {
     }
 }
 
-PLU factorize(Matrix&& A) {
+PLU factorize(Matrix&& LU) {
+    const Matrix& A = LU;
     assert(A.m==A.n);
-    ScopeTimer timer;
     uint n = A.n;
     Permutation P(n);
-    pivot(A, P, 0); // pivot first column
-    float d = 1/A(0,0); for(Matrix::Element& e: A[0](1,n)) e.value *= d;
-    // compute an L column, pivot to interchange rows, compute an U row.
+    pivot(LU, P, 0); // Pivots first column
+    float d = 1/A(0,0); for(Matrix::Element& e: LU[0](1,n)) e.value *= d;
     for(uint j: range(1,n-1)) {
-        for(uint i: range(j,n)) { // L column
+        for(uint i: range(j,n)) { // Computes an L column
             float sum = 0;
-            for(const Matrix::Element& e: A[i](0,j))  sum += e.value * A(e.column,j);
-            A(i,j) -= sum;
+            for(const Matrix::Element& e: A[i](j)) sum += e.value * A(e.column,j);
+            if(sum) LU(i,j) = LU(i,j) - sum; //FIXME
         }
-        pivot(A, P, j);
+        pivot(LU, P, j); // Pivots to interchange rows
         float d = 1/A(j,j);
-        for(uint k: range(j+1,n)) { //U row
+        for(uint k: range(j+1,n)) { // Computes an U row
             float sum = 0;
-            for(const Matrix::Element& e: A[j](0,j))  sum += e.value * A(e.column,k);
-            A(j,k) = (A(j,k)-sum)*d;
+            for(const Matrix::Element& e: A[j](j)) sum += e.value * A(e.column,k);
+            float a = (A(j,k)-sum)*d;
+            if(a) LU(j,k) = a; //FIXME
         }
     }
-    // compute last L element
+    // Computes last L element
     float sum = 0;
-    for(const Matrix::Element& e: A[n-1](0,n-1))  sum += e.value * A(e.column,n-1);
-    A(n-1,n-1) -= sum;
-    return {move(P), move(A)};
+    for(const Matrix::Element& e: A[n-1](n-1)) sum += e.value * A(e.column,n-1);
+    LU(n-1,n-1) = LU(n-1,n-1) - sum;
+    return {move(P), move(LU)};
 }
 
 float determinant(const Permutation& P, const Matrix& LU) {
@@ -84,7 +83,7 @@ Vector solve(const Permutation& P, const Matrix &LU, const Vector& b) {
     Vector x(n);
     for(uint i: range(n)) x[i] = b[P[i]]; // Reorder b in x
     for(uint i: range(n)) { // Forward substitution from packed L
-        for(const Matrix::Element& e: LU[i](0,i)) x[i] -= e.value * x[e.column];
+        for(const Matrix::Element& e: LU[i](i)) x[i] -= e.value * x[e.column];
         x[i] = x[i] / LU(i,i);
     }
     for(int i=n-2;i>=0;i--) { // Backward substition from packed U

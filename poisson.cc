@@ -1,5 +1,8 @@
 #include "process.h"
 #include "algebra.h"
+#include "time.h"
+
+profile( uint insert, remove, assign, noop; )
 
 struct PoissonSolver {
     const uint Mx=32, My=32; // Spatial resolutions
@@ -36,14 +39,21 @@ struct PoissonSolver {
             }
         }
 
-        auto PLU = factorize(move(A));
-        //assert(inverse(PLU)*A==identity(A.n), inverse(PLU)*A);
-        u = solve(PLU,b);
+        {
+            profile( insert=0, remove=0, assign=0, noop=0; )
+            ScopeTimer timer;
+            auto PLU = factorize(move(A));
+            //assert(inverse(PLU)*A==identity(A.n), inverse(PLU)*A);
+            u = solve(PLU,b);
+            profile( uint total = insert+remove+assign+noop;
+                    string s=str("insert",100.f*insert/total,"assign",100.f*assign/total);
+                        if(remove) s<<" remove "_<<str(100.f*remove/total);
+                        if(noop) s<<" noop "_<<str(100.f*noop/total);
+                        log(s); )
+        }
     }
 };
-#if 1
-PoissonSolver test;
-#else
+#if DEBUG
 #include "window.h"
 #include "display.h"
 struct PoissonTest : PoissonSolver, Widget {
@@ -71,4 +81,8 @@ struct PoissonTest : PoissonSolver, Widget {
     int2 sizeHint() { return int2(16*Mx, 16*My); }
     void render(int2 position, int2) { blit(position, image); }
 } test;
+#elif PROFILE
+PoissonSolver test[2];
+#else
+PoissonSolver test[16];
 #endif
