@@ -3,6 +3,8 @@
 #include "time.h"
 
 profile( uint insert, remove, assign, noop; )
+profile( tsc total,L,U,S; )
+profile( uint Z, NZ; )
 
 struct PoissonSolver {
     const uint Mx=32, My=32; // Spatial resolutions
@@ -10,10 +12,11 @@ struct PoissonSolver {
     const float dx = Lx/Mx, dy = Ly/My; // Physical resolutions
     const float T0 = 0, T1 = 1; // Lateral boundary conditions
     const uint N = Mx*My; // Total sample count
-    Vector u;
+    Matrix A{N,N}; // Poisson operator
+    Vector b{N}; // Right-hand vector
+    PLU LU; // Factorized operator
+    Vector u; // Solution
     PoissonSolver() {
-        Matrix A(N,N); // Poisson operator
-        Vector b(N); // Right-hand vector
         for(uint x: range(Mx)) {
             for(uint y: range(My)) {
                 uint i = y*Mx+x;
@@ -42,14 +45,15 @@ struct PoissonSolver {
         {
             profile( insert=0, remove=0, assign=0, noop=0; )
             ScopeTimer timer;
-            auto PLU = factorize(move(A));
+            LU = factorize(move(A));
             //assert(inverse(PLU)*A==identity(A.n), inverse(PLU)*A);
-            u = solve(PLU,b);
-            profile( uint total = insert+remove+assign+noop;
+            u = solve(LU,b);
+            /*profile( uint total = insert+remove+assign+noop;
                     string s=str("insert",100.f*insert/total,"assign",100.f*assign/total);
                         if(remove) s<<" remove "_<<str(100.f*remove/total);
                         if(noop) s<<" noop "_<<str(100.f*noop/total);
-                        log(s); )
+                        log(s); )*/
+            //profile( log("L",100.f*L/total,"U",100.f*U/total); )
         }
     }
 };
@@ -60,7 +64,7 @@ struct PoissonTest : PoissonSolver, Widget {
     Image image;
     Window window {this, int2(-1,-1), "Poisson"_};
     PoissonTest() {
-        // Result visualization
+        // Shows solution
         image = Image(Mx, My);
         for(uint x: range(Mx)) {
             for(uint y: range(My)) {
@@ -71,10 +75,10 @@ struct PoissonTest : PoissonSolver, Widget {
         }
         image = resize(image, 16*Mx, 16*My);
 
-        // Matrix visualization
+        // Shows operator
         //image = Image(N, N);
         //for(uint i: range(N)) for(uint j: range(N)) image(j,i) = A(i,j) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
-        //for(uint i: range(N)) for(uint j: range(N)) image(j,i) = PLU.LU(i,j) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
+        //for(uint i: range(N)) for(uint j: range(N)) image(j,i) = LU.LU(i,j) == 0 ? 0 : 0xFF; // Operator coefficients [0,non zero] -> [black, white]
 
         window.localShortcut(Escape).connect(&exit);
     }

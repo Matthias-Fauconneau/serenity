@@ -16,8 +16,7 @@ inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)
 #endif
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
-/// Adds the time spent executing a scope to a counter
-struct tsc { uint64& total; tsc(uint64& total):total(total){} uint64 start=rdtsc(); ~tsc(){total+=rdtsc()-start; } };
+struct tsc { uint64 total=0; uint64 tsc; void start(){tsc=rdtsc();} void stop(){total+=rdtsc()-tsc;} operator uint64(){return total;} };
 /// Logs the time spent executing a scope
 struct ScopeTimer { uint64 start=cpuTime(); ~ScopeTimer(){log((uint)round((cpuTime()-start)/1000.f),"ms");}};
 

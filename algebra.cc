@@ -1,4 +1,5 @@
 #include "algebra.h"
+#include "time.h"
 
 Matrix operator*(const Matrix& a, const Matrix& b) {
     assert(a.n==b.m);
@@ -44,6 +45,7 @@ inline void pivot(Matrix& A, Permutation& P, uint j) {
 }
 
 PLU factorize(Matrix&& LU) {
+    //profile( extern tsc total,L,U; total.start(); )
     const Matrix& A = LU;
     assert(A.m==A.n);
     uint n = A.n;
@@ -51,24 +53,32 @@ PLU factorize(Matrix&& LU) {
     pivot(LU, P, 0); // Pivots first column
     float d = 1/A(0,0); for(Matrix::Element& e: LU[0](1,n)) e.value *= d;
     for(uint j: range(1,n-1)) {
-        for(uint i: range(j,n)) { // Computes an L column
+        // Computes an L column
+        //profile( L.start(); )
+        for(uint i: range(j,n)) {
             float sum = 0;
             for(const Matrix::Element& e: A[i](j)) sum += e.value * A(e.column,j);
             if(sum) LU(i,j) = LU(i,j) - sum; //FIXME
         }
-        pivot(LU, P, j); // Pivots to interchange rows
+        //profile( L.stop(); )
+        // Pivots to interchange rows
+        pivot(LU, P, j);
+        // Computes an U row
+        //profile( U.start(); )
         float d = 1/A(j,j);
-        for(uint k: range(j+1,n)) { // Computes an U row
+        for(uint k: range(j+1,n)) {
             float sum = 0;
             for(const Matrix::Element& e: A[j](j)) sum += e.value * A(e.column,k);
             float a = (A(j,k)-sum)*d;
-            if(a) LU(j,k) = a; //FIXME
+            if(a) LU(j,k) = a;
         }
+        //profile( U.stop(); )
     }
     // Computes last L element
     float sum = 0;
     for(const Matrix::Element& e: A[n-1](n-1)) sum += e.value * A(e.column,n-1);
     LU(n-1,n-1) = LU(n-1,n-1) - sum;
+    //profile( total.stop(); )
     return {move(P), move(LU)};
 }
 
