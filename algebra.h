@@ -20,30 +20,30 @@ struct Matrix {
     struct ElementRef {
         array<Element>& row;
         uint j;
-        notrace operator float() const;
-        notrace float operator=(float v);
+        inline operator float() const;
+        inline float operator=(float v);
     };
-    notrace ElementRef operator()(uint i, uint j);
+    inline ElementRef operator()(uint i, uint j);
 
     struct ConstRow {
         const array<Element>& row;
         uint n; // Number of columns (for bound checking)
-        notrace ref<Element> operator()(uint stop) const;
-        notrace ref<Element> operator()(uint start, uint stop) const;
+        inline ref<Element> operator()(uint stop) const;
+        inline ref<Element> operator()(uint start, uint stop) const;
         const Element* begin(){ return row.begin(); }
         const Element* end(){ return row.end(); }
     };
-    notrace ConstRow operator[](uint i) const;
+    inline ConstRow operator[](uint i) const;
 
     struct Row {
         array<Element>& row;
         uint n; // Number of columns (for bound checking)
-        notrace mutable_ref<Element> operator()(uint stop) const;
-        notrace mutable_ref<Element> operator()(uint start, uint stop) const;
+        inline mutable_ref<Element> operator()(uint stop) const;
+        inline mutable_ref<Element> operator()(uint start, uint stop) const;
         Element* begin(){ return row.begin(); }
         Element* end(){ return row.end(); }
     };
-    notrace Row operator[](uint i);
+    inline Row operator[](uint i);
 
     uint m=0,n=0; /// row and column count
     array< array<Element> > rows;

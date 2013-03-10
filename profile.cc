@@ -14,7 +14,7 @@ struct Profile {
     ~Profile() {
         map<Function, void*> sort;
         uint64 total=0;
-        for(auto e: profile) if(e.value.count>2) { sort.insertSortedMulti(e.value, e.key); total+=e.value.time; }
+        for(auto e: profile) if(e.value.count>9) { sort.insertSortedMulti(e.value, e.key); total+=e.value.time; }
         for(auto e: sort) if(100.f*e.key.time/total>=1) {
             Symbol s = findNearestLine(e.value);
             log(str((uint)round(100.f*e.key.time/total))+"%"_
