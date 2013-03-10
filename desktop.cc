@@ -48,13 +48,13 @@ map<ref<byte>,ref<byte> > readSettings(const ref<byte>& file) {
 struct Desktop {
     Feeds feeds;
     Scroll<HTML> page;
-    Clock clock __( 64 );
+    Clock clock{ 64 };
     Events calendar;
-    VBox timeBox;//  __(&clock, &calendar);
+    VBox timeBox;// {&clock, &calendar};
     List<Command> shortcuts;
-    HBox applets;// __(&feeds, &timeBox, &shortcuts);
-    Window window __(&applets,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_);
-    Window browser __(0,0,"Browser"_);
+    HBox applets;//{&feeds, &timeBox, &shortcuts};
+    Window window{&applets,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_};
+    Window browser{0,0,"Browser"_};
     Desktop() {
         if(!existsFile("launcher"_,config())) log("No launcher settings [.config/launcher]");
         else {

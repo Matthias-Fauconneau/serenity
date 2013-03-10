@@ -4,15 +4,13 @@
 // Attributes
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define notrace inline __attribute((no_instrument_function))
-#define always_inline inline __attribute((always_inline))
 #define flatten __attribute((flatten))
 // Move
 template<Type T> struct remove_reference { typedef T type; };
 template<Type T> struct remove_reference<T&> { typedef T type; };
 template<Type T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
-template<Type T> always_inline constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
+template<Type T> inline __attribute((always_inline)) constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
 template<Type T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 #define move_operator_(T)                        T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
@@ -209,6 +207,7 @@ template<Type T> struct buffer {
     uint capacity=0,size=0;
     buffer(){}
     explicit buffer(uint size):data(allocate64<T>(size)),capacity(size),size(size){}
+    buffer(uint capacity, uint size):data(allocate64<T>(capacity)),capacity(capacity),size(size){}
     buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){clear(data,size,value);}
     move_operator_(buffer):data(o.data),capacity(o.capacity),size(o.size){o.data=0;}
     explicit buffer(const buffer& o):buffer(o.capacity){size=o.size; copy(data,o.data,size);}

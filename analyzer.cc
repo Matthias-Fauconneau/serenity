@@ -16,7 +16,7 @@
 
 struct Analyzer {
     static constexpr uint periodSize = 1024; //STFT frame size
-    Audio<float> audio = decodeAudio<float>(Map("/root/Documents/StarCraft 2 - Theme Song.m4a"_));
+    Audio<float> audio = decodeAudio<float>(readFile("/root/Documents/StarCraft 2 - Theme Song.m4a"_));
     Spectrogram spectrogram __(audio, 1024, 16384);
 
     bool playing = true;

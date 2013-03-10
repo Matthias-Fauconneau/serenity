@@ -2,10 +2,6 @@
 #include "algebra.h"
 #include "time.h"
 
-profile( uint insert, remove, assign, noop; )
-profile( tsc total,L,U,S; )
-profile( uint Z, NZ; )
-
 struct PoissonSolver {
     const uint Mx=32, My=32; // Spatial resolutions
     const float Lx=1, Ly=1; // Physical dimensions
@@ -43,17 +39,10 @@ struct PoissonSolver {
         }
 
         {
-            profile( insert=0, remove=0, assign=0, noop=0; )
             ScopeTimer timer;
             LU = factorize(move(A));
             //assert(inverse(PLU)*A==identity(A.n), inverse(PLU)*A);
             u = solve(LU,b);
-            /*profile( uint total = insert+remove+assign+noop;
-                    string s=str("insert",100.f*insert/total,"assign",100.f*assign/total);
-                        if(remove) s<<" remove "_<<str(100.f*remove/total);
-                        if(noop) s<<" noop "_<<str(100.f*noop/total);
-                        log(s); )*/
-            //profile( log("L",100.f*L/total,"U",100.f*U/total); )
         }
     }
 };
@@ -86,5 +75,5 @@ struct PoissonTest : PoissonSolver, Widget {
     void render(int2 position, int2) { blit(position, image); }
 } test;
 #else
-PoissonSolver test[9]; //O_o: 8 times -> +50ms
+PoissonSolver test[9]; //O_o: 8 times -> +10ms
 #endif

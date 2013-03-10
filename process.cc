@@ -88,16 +88,7 @@ void Thread::event() {
 }
 
 // Debugger
-
-static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
-                                         "Invalid"_, "Denormal"_};
-
-#if __x86_64
-// Configures floating-point exceptions
-enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
-void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
-#endif
-
+string trace(int skip, void* ip);
 void traceAllThreads() {
     Locker lock(threadsLock);
     for(Thread* thread: threads) {
@@ -105,9 +96,8 @@ void traceAllThreads() {
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
 }
-
-// Signal handler
-string trace(int skip, void* ip);
+static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
+                                         "Invalid"_, "Denormal"_};
 static void handler(int sig, siginfo_t* info, void* ctx) {
 #if __x86_64
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
@@ -127,7 +117,11 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     if(sig==SIGTERM) log("Terminated");
     exit_thread(0);
 }
-
+#if __x86_64
+// Configures floating-point exceptions
+enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
+void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
+#endif
 void __attribute((constructor(101))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
     rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
@@ -138,6 +132,7 @@ void __attribute((constructor(101))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
+    //setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);
 }
 
 static int recurse=0;

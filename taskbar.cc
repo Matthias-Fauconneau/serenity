@@ -34,13 +34,13 @@ struct Taskbar : Socket, Poll {
 
     array<uint> windows;
 
-    ICON(button) TriggerButton button __(resize(buttonIcon(), 16,16));
+    ICON(button) TriggerButton button{resize(buttonIcon(), 16,16)};
     Bar<Task> tasks;
-    Clock clock __(16);
+    Clock clock{16};
     Events calendar;
-    Window popup __(0,int2(256,-1));
+    Window popup{0,int2(256,-1)};
     HBox panel;//__(&button, &tasks, &clock);
-    Window window __(0,int2(0,16));
+    Window window{0,int2(0,16)};
     uint root=window.root;
     uint desktop=0;
     uint escapeCode = window.KeyCode(Escape);
@@ -248,7 +248,7 @@ struct Taskbar : Socket, Poll {
         for(;;) { uint8 type = read<uint8>();
             if(type==0){XError e=read<XError>(); if(e.code!=3) window.processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
             else if(type==1) return read<T>();
-            else queue << QEvent __(type, read<XEvent>()); //queue events to avoid reentrance
+            else queue << QEvent{type, read<XEvent>()}; //queue events to avoid reentrance
         }
     }
 

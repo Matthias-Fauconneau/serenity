@@ -74,7 +74,7 @@ template<Type K, Type V> struct map {
         const K* k; const V* v;
         const_iterator(const K* k, const V* v) : k(k), v(v) {}
         bool operator!=(const const_iterator& o) const { return k != o.k; }
-        const_pair<K,V> operator* () const { return __(*k,*v); }
+        const_pair<K,V> operator* () const { return {*k,*v}; }
         const const_iterator& operator++ () { k++; v++; return *this; }
     };
     const_iterator begin() const { return const_iterator(keys.begin(),values.begin()); }

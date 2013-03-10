@@ -40,7 +40,7 @@ array<Event> getEvents(Date query) {
             if(query.minutes>=0 && date.minutes!=query.minutes) continue;
             if(query.weekDay>=0 && date.weekDay>=0 && date.weekDay!=query.weekDay) continue;
             if(exceptions.contains(title)) for(Date date: exceptions.at(title)) if(date.day==query.day && date.month==query.month) goto skip;
-            events.insertSorted(Event __(date,end,move(title)));
+            events.insertSorted(Event{date,end,move(title)});
             skip:;
         }
     }

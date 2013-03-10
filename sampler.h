@@ -15,7 +15,7 @@ struct Note : FLAC {
     float4 level; //current note attenuation
     float4 step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
     Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
-    Semaphore writeCount __((int)audio.capacity); //audio thread release free samples, decoder thread acquires
+    Semaphore writeCount{(int)audio.capacity}; //audio thread release free samples, decoder thread acquires
     uint16 releaseTime; //to compute step
     uint8 key=0; //to match release sample
     ref<float> envelope; //to level release sample

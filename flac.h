@@ -27,7 +27,7 @@ struct BitReader {
 
 typedef float float2 __attribute((vector_size(8)));
 struct FLAC : BitReader {
-    buffer<float2> audio __(1<<16,0);
+    buffer<float2> audio {1<<16,0};
     uint writeIndex = 0;
     uint readIndex = 0;
     uint16 blockSize = 0, rate = 0;

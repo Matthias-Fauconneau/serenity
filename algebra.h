@@ -3,8 +3,6 @@
 #include "string.h"
 #define NaN __builtin_nan("")
 #include "disasm.h"
-//#define profile( statements... ) // O_o: 20ms faster with profile
-#define profile( statements... ) statements
 
 /// Sparse CSR matrix
 struct Matrix {
@@ -14,7 +12,7 @@ struct Matrix {
     struct Element {
         uint column; float value;
         Element(uint column, float value=0):column(column),value(value){}
-        notrace bool operator<(const Element& o) const;
+        inline bool operator<(const Element& o) const;
     };
     float operator()(uint i, uint j) const;
 
@@ -24,7 +22,7 @@ struct Matrix {
         inline operator float() const;
         inline float operator=(float v);
     };
-    notrace ElementRef operator()(uint i, uint j);
+    inline ElementRef operator()(uint i, uint j);
 
     struct ConstRow {
         const array<Element>& row;
@@ -34,7 +32,7 @@ struct Matrix {
         const Element* begin(){ return row.begin(); }
         const Element* end(){ return row.end(); }
     };
-    notrace ConstRow operator[](uint i) const;
+    inline ConstRow operator[](uint i) const;
 
     struct Row {
         array<Element>& row;
@@ -44,7 +42,7 @@ struct Matrix {
         Element* begin(){ return row.begin(); }
         Element* end(){ return row.end(); }
     };
-    notrace Row operator[](uint i);
+    inline Row operator[](uint i);
 
     uint m=0,n=0; /// row and column count
     array< array<Element> > rows;
@@ -52,7 +50,7 @@ struct Matrix {
 
 inline bool Matrix::Element::operator<(const Element& o) const { return column<o.column; }
 
-always_inline float Matrix::operator()(uint i, uint j) const {
+inline float Matrix::operator()(uint i, uint j) const {
     assert(i<m && j<n);
     const array<Element>& row = rows[i];
     uint index = row.binarySearch(j);
@@ -63,7 +61,7 @@ always_inline float Matrix::operator()(uint i, uint j) const {
     return 0;
 }
 
-always_inline Matrix::ElementRef::operator float() const {
+inline __attribute((always_inline)) Matrix::ElementRef::operator float() const {
     uint index = row.binarySearch(j);
     if(index<row.size) {
         const Element& e = row[index];
@@ -72,15 +70,12 @@ always_inline Matrix::ElementRef::operator float() const {
     return 0;
 }
 inline float Matrix::ElementRef::operator=(float v) {
-    profile( extern uint insert, remove, assign, noop );
     uint index = row.binarySearch(j);
     if(index<row.size) {
         Element& e = row[index];
-        if(e.column==j) { profile( if(v) assign++; else remove++; ) return e.value=v; }
+        if(e.column==j) return e.value=v;
     }
     assert(v);
-    if(!v) { profile( noop++; ) return v; }
-    profile( insert++ );
     row.insertAt(index, Element(j,v));
     return v;
 }

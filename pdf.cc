@@ -181,7 +181,7 @@ void PDF::open(const ref<byte>& data) {
                             uint16 stream=b.read();
                             if(w1==3) stream = stream<<16|(uint8)b.read();
                             uint8 index=0; if(W[2].integer()) index=b.read();
-                            compressedXRefs << CompressedXRef __(stream,index);
+                            compressedXRefs << CompressedXRef{stream,index};
                         } else error("type",type);
                     }
                 }
@@ -343,7 +343,7 @@ void PDF::open(const ref<byte>& data) {
                     OP2('c','m') Cm=mat32(f(0),f(1),f(2),f(3),f(4),f(5))*Cm;
                     OP2('D','o') if(images.contains(args[0].data)) {
                         extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
-                        blits<<Blit __(Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)));
+                        blits<<Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data))};
                     }
                     OP2('E','T') ;
                     OP2('g','s') ;
@@ -451,9 +451,9 @@ void PDF::drawPath(array<array<vec2> >& paths, int flags) {
         if((flags&Stroke) || (flags&Fill) || polyline.size>16) {
             for(uint i: range(polyline.size-1)) {
                 if(polyline[i] != polyline[i+1])
-                    lines << Line __( polyline[i], polyline[i+1] );
+                    lines << Line{ polyline[i], polyline[i+1] };
             }
-            if(flags&Close) lines << Line __( polyline.last(), polyline.first() );
+            if(flags&Close) lines << Line{polyline.last(), polyline.first()};
         }
         if(flags&Fill) {
             Polygon polygon;
@@ -486,7 +486,7 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         uint16 index = font->font.index(code);
         vec2 position = vec2(Trm.dx,Trm.dy);
         if(position.y>y2) y2=position.y; //extend(position); extend(position+Trm.m11*font->font.size(index));
-        characters << Character __(font, Trm.m11*fontSize, index, position, code);
+        characters << Character{font, Trm.m11*fontSize, index, position, code};
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size) advance += fontSize*font->widths[code]/1000;
         else advance += font->font.linearAdvance(index);
@@ -505,7 +505,7 @@ void PDF::render(int2 position, int2 size) {
         ::blit(position+int2(scale*blit.pos),blit.resized);
     }
 
-    for(const Line& l: lines.slice(lines.binarySearch(Line __(vec2(-position-int2(0,200))/scale,vec2(-position-int2(0,200))/scale)))) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-position-int2(0,200))/scale,vec2(-position-int2(0,200))/scale}))) {
         vec2 a = scale*l.a, b = scale*l.b;
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
@@ -530,7 +530,7 @@ void PDF::render(int2 position, int2 size) {
         }
     }
 
-    int i=characters.binarySearch(Character __(0,0,0,vec2(-position-int2(0,100))/scale));
+    int i=characters.binarySearch(Character{0,0,0,vec2(-position-int2(0,100))/scale});
     for(const Character& c: characters.slice(i)) {
         int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
         if(pos.y<=currentClip.min.y-100) { i++; continue; }
@@ -541,7 +541,7 @@ void PDF::render(int2 position, int2 size) {
         i++;
     }
 
-    static Font font __(string(),array<float>(),::Font(File("dejavu/DejaVuSans.ttf"_,::fonts()),10));
+    static Font font{string(),array<float>(),::Font(File("dejavu/DejaVuSans.ttf"_,::fonts()),10)};
     for(const pair<vec2,string>& text: annotations) {
         int2 pos = position+int2(text.key*scale/normalizedScale);
         if(pos.y<=currentClip.min.y) continue;

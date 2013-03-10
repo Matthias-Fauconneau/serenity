@@ -13,7 +13,7 @@ struct Player {
 // Gapless playback
     static constexpr uint channels = 2;
     AudioFile file;
-    AudioOutput output __({this,&Player::read}, 44100, 8192);
+    AudioOutput output{{this,&Player::read}, 44100, 8192};
     uint read(int16* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {
@@ -24,29 +24,28 @@ struct Player {
             output += read*channels; readSize += read;
             if(readSize != outputSize) next();
             else {
-                update(file.position()/file.rate,file.duration()/file.rate);
+                update(file.position/file.rate,file.duration/file.rate);
                 return readSize;
             }
         }
     }
 
 // Interface
-    ICON(play) ICON(pause) ToggleButton playButton __(playIcon(), pauseIcon());
-    ICON(next) TriggerButton nextButton __(nextIcon());
-    Text elapsed __(string("00:00"_));
+    ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
+    ICON(next) TriggerButton nextButton{nextIcon()};
+    Text elapsed = "00:00"_;
     Slider slider;
-    Text remaining __(string("00:00"_));
-    HBox toolbar;//__(&playButton, &nextButton, &elapsed, &slider, &remaining);
+    Text remaining = "00:00"_;
+    HBox toolbar;//{&playButton, &nextButton, &elapsed, &slider, &remaining};
     Scroll< List<Text> > albums;
     Scroll< List<Text> > titles;
-    HBox main;// __( &albums.area(), &titles.area() );
-    VBox layout;// __( &toolbar, &main );
-    Window window __(&layout, int2(-1050/2,-1680/2), "Player"_, pauseIcon());
+    HBox main;//{ &albums.area(), &titles.area() };
+    VBox layout;//{ &toolbar, &main };
+    Window window {&layout, int2(-1050/2,-1680/2), "Player"_, pauseIcon()};
 
 // Content
     array<string> folders;
     array<string> files;
-    Map data;
 
     Player() {
         albums.always=titles.always=true;
@@ -109,16 +108,15 @@ struct Player {
     }
     void playTitle(uint index) {
         window.setTitle(toUTF8(titles[index].text));
-        data = Map(string("/Music/"_+files[index]));
-        file.open(data);
+        if(!file.openPath(string("/Music/"_+files[index]))) return;
         assert(output.channels==file.channels);
         if(output.rate!=file.rate) {
+            assert(file.rate, files[index]);
             output.~AudioOutput();
             new (&output) AudioOutput({this,&Player::read}, file.rate, 8192);
             output.start();
         }
         setPlaying(true);
-        data.lock(); //Lock file to avoid any underrun when system cannot seek fast enough under I/O pressure
     }
     void next() {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
@@ -129,7 +127,7 @@ struct Player {
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
         if(play == playButton.enabled) return;
-        if(play) { output.start(); window.setIcon(playIcon()); /*if(!audioThread.thread) audioThread.spawn();*/ }
+        if(play) { output.start(); window.setIcon(playIcon()); }
         else { output.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play; window.render();
     }
@@ -142,10 +140,10 @@ struct Player {
         titles.index=-1;
     }
     void seek(int position) {
-        if(file) { file.seek(position); update(file.position()/file.rate,file.duration()/file.rate); }
+        if(file) { file.seek(position); update(file.position/file.rate,file.duration/file.rate); }
     }
     void update(uint position, uint duration) {
-        if(slider.value == position) return;
+        if(slider.value == (int)position) return;
         writeFile("/Music/.last"_,string(files[titles.index]+"\0"_+dec(position)));
         if(!window.mapped) return;
         slider.value = position; slider.maximum=duration;

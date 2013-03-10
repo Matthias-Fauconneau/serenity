@@ -41,7 +41,7 @@ template<Type T> void fill(array<T>& a, const T& value, int size) {
 
 array<Rect> Linear::layout(int2 position, int2 size) {
     uint count=this->count();
-    if(!count) return __();
+    if(!count) return {};
     size = xy(size);
     int width = size.x /*remaining space*/; int expanding=0, height=0;
     int widths[count], heights[count];

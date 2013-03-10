@@ -54,7 +54,7 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     hparams.interval(SampleBits) = sampleBits;
     hparams.interval(FrameBits) = sampleBits*channels;
     hparams.interval(Channels) = channels;
-    hparams.interval(Rate) = rate;
+    hparams.interval(Rate) = rate; assert(rate);
     hparams.interval(Periods) = 2;
     hparams.interval(PeriodSize) = periodSize;
     iowr<HW_PARAMS>(hparams);

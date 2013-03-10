@@ -132,10 +132,10 @@ template<int unroll,int channelMode> inline void interleave(const float* A, cons
     for(;ptr<end;) {
         for(uint i: range(unroll)) {
             float a=A[i], b=B[i];
-            if(channelMode==Independent) ptr[i]=(float2)__(a,b);
-            else if(channelMode==LeftSide) ptr[i]=(float2)__(a,a-b);
-            else if(channelMode==MidSide) a-=b/2, ptr[i]=(float2)__(a+b,a);
-            else if(channelMode==RightSide) ptr[i]=(float2)__(a+b, b);
+            if(channelMode==Independent) ptr[i]=(float2){a,b};
+            else if(channelMode==LeftSide) ptr[i]=(float2){a,a-b};
+            else if(channelMode==MidSide) a-=b/2, ptr[i]=(float2){a+b,a};
+            else if(channelMode==RightSide) ptr[i]=(float2){a+b, b};
         }
         A+=unroll; B+=unroll; ptr+=unroll;
     }

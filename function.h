@@ -65,7 +65,7 @@ template<Type... Args> struct signal {
     /// Returns whether this signal is connected to any delegate
     explicit operator bool() { return delegates.size; }
     /// Returns the emit operator as an anonymous function
-    operator function<void(Args...)>(){ return __(this,&signal<Args...>::operator()); }
+    operator function<void(Args...)>(){ return {this,&signal<Args...>::operator()}; }
     /// Clears all connections
     void clear() { delegates.clear(); }
 };

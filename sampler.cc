@@ -193,7 +193,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
             current=&note; //schedule release sample
             //release fade out current note
             float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(rate*note.releaseTime)));
-            note.step=(float4)__(step,step,step,step);
+            note.step=(float4){step,step,step,step};
         }
         if(!current) return; //already fully decayed
     }
@@ -210,11 +210,11 @@ void Sampler::noteEvent(uint key, uint velocity) {
             if(level<0x1p-15) return;
             Note note = ::copy(s.data);
             if(!current) note.key=key;
-            note.step=(float4)__(1,1,1,1);
+            note.step=(float4){1,1,1,1};
             note.releaseTime=s.releaseTime;
             note.envelope=s.envelope;
             if(note.sampleSize==16) level*=0x1p8;
-            note.level=(float4)__(level,level,level,level);
+            note.level=(float4){level,level,level,level};
             {Locker lock(noteReadLock);
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;

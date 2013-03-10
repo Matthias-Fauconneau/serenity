@@ -9,21 +9,32 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
-bool AudioFile::open(const ref<byte>& data){
-    static int unused once=(av_register_all(), 0);
+AudioFile::AudioFile() { static int unused once=(av_register_all(), 0); }
+
+bool AudioFile::openPath(const ref<byte>& path) {
+    close();
+    if(avformat_open_input(&file, strz(path), 0, 0)) { file=0; return false; }
+    return open();
+}
+
+bool AudioFile::openData(array<byte>&& data) {
     close();
     file = avformat_alloc_context();
     file->pb = avio_alloc_context((uint8*)data.data, data.size, 0, 0, 0, 0, 0);
+    data.data=0; data.capacity=data.size=0; // data is now owned by ffmpeg
     if(avformat_open_input(&file, 0, 0, 0)) { file=0; return false; }
+    return open();
+}
+bool AudioFile::open() {
     avformat_find_stream_info(file, 0);
-    if(file->duration <= 0) return false;
+    if(file->duration <= 0) { file=0; return false; }
     for(uint i=0; i<file->nb_streams; i++) {
         if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
             audioStream = file->streams[i];
             audio = audioStream->codec;
-            //audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_S16; FIXME: expose
+            audio->request_sample_fmt = audio->sample_fmt = AV_SAMPLE_FMT_S16; //TODO: S16P
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
-            if(codec && avcodec_open2(audio, codec, 0) >= 0 ) {
+            if(codec && avcodec_open2(audio, codec, 0) >= 0) {
                 rate = audio->sample_rate;
                 duration = audioStream->duration*audioStream->time_base.num*rate/audioStream->time_base.den;
                 break;
@@ -32,7 +43,7 @@ bool AudioFile::open(const ref<byte>& data){
     }
     assert(audio);
     assert(audio->sample_rate);
-    assert(audio->channels == channels);
+    assert((uint)audio->channels == channels);
     assert(audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_FLTP, (int)audio->sample_fmt);
     return true;
 }
@@ -58,7 +69,7 @@ uint AudioFile::read(int16* output, uint outputSize) {
                         ((int16*)buffer)[2*i+1] = ((float*)frame->data[1])[i]*0x1.0p15f;
                     }
                 } else error("Unknown format");
-                position = packet.dts*audioStream->time_base.num*1000/audioStream->time_base.den;
+                position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
@@ -111,11 +122,11 @@ void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, po
 
 void AudioFile::close() { if(frame) avcodec_free_frame(&frame); if(file) avformat_close_input(&file); }
 
-template<Type T> Audio<T> decodeAudio(const ref<byte>& data) {
-    AudioFile file(data);
+template<Type T> Audio<T> decodeAudio(array<byte>&& data) {
+    AudioFile file; file.openData(move(data));
     uint size = file.duration*file.channels;
-    Audio<T> audio __(file.channels, file.rate, buffer<T>(size));
+    Audio<T> audio {file.channels, file.rate, buffer<T>(size)};
     audio.data.size = file.read(audio.data.data, size);
     return audio;
 }
-template Audio<float> decodeAudio(const ref<byte>& data);
+template Audio<float> decodeAudio(array<byte>&& data);

@@ -90,7 +90,7 @@ template<Type T> struct array {
     /// Inserts a value at \a index
     T& insertAt(int index, const T& v) { return insertAt(index,copy(v)); }
     /// Inserts an element immediatly after the first lesser value in array
-    flatten int insertSorted(T&& e) { uint i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
+    flatten int insertSorted(T&& e) { uint i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; } //O_o: +30ms on poisson (never used)
     /// Inserts a value immediatly after the first lesser value in array
     int insertSorted(const T& v) { return insertSorted(copy(v)); }
 

@@ -55,7 +55,7 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
 /// \note \a headers and \a content will be added to request
 /// \note If \a secure is true, an SSL connection will be used
 /// \note HTTP should always be allocated on heap and no references should be taken.
-    HTTP(URL&& url, Handler handler, array<string>&& headers =__(), const ref<byte>& method="GET"_);
+    HTTP(URL&& url, Handler handler, array<string>&& headers={}, const ref<byte>& method="GET"_);
 
    enum { Request, Header, Content, Cache, Handle, Done } state = Request;
     void request();

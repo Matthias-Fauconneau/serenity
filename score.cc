@@ -501,7 +501,7 @@ void Score::insert() {
         array<MidiNote> notes; //flatten chords for robust synchronization
         uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }
         if(noteIndex<=notes.size) {
-            notes.insertAt(noteIndex,MidiNote __(0,0,0));
+            notes.insertAt(noteIndex,MidiNote{0,0,0});
 
             chords.clear(); debug.clear(); //reconstruct chords from PDF
             uint t=-1; for(uint i: range(notes.size)) {
@@ -592,8 +592,8 @@ void Score::noteEvent(uint key, uint vel) {
             array<MidiNote> notes; //flatten chords for robust synchronization
             uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }
             if(noteIndex<=notes.size) {
-                if(noteIndex==notes.size) notes << MidiNote __(key, t, 1);
-                else notes[noteIndex]=MidiNote __(key, t, 1);
+                if(noteIndex==notes.size) notes << MidiNote{key, t, 1};
+                else notes[noteIndex]=MidiNote{key, t, 1};
 
                 chords.clear(); debug.clear(); //reconstruct chords from PDF
                 uint t=-1; for(uint i: range(notes.size)) {

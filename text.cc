@@ -24,7 +24,7 @@ struct TextLayout {
     array<Text::Link> links;
 
     uint lineNumber=0,column=0;
-    Text::Cursor current() { return Text::Cursor __(lineNumber, column); }
+    Text::Cursor current() { return Text::Cursor{lineNumber, column}; }
 
     uint lastIndex=-1;
     void nextLine(bool justify) {
@@ -39,10 +39,10 @@ struct TextLayout {
         column=0; pen.x=0;
         lineNumber++; text << TextLine();
         for(uint i: range(line.size)) { Word& word=line[i];
-            for(Character& c: word) text.last() << Character __(c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex);
+            for(Character& c: word) text.last() << Character{c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex};
             if(word) pen.x += word.last().pos.x+word.last().advance;
             if(i!=line.size-1) //editable justified space
-                text.last() << Character __(0,pen,0,0,spaceAdvance,lastIndex=lastIndex+1);
+                text.last() << Character{0,pen,0,0,spaceAdvance,lastIndex=lastIndex+1};
             pen.x += space;
         }
         lastIndex++;
@@ -83,7 +83,7 @@ struct TextLayout {
                 }
                 Format newFormat = ::format(c);
                 if(format&Underline && !(newFormat&Underline) && (current()>underlineBegin))
-                    lines << Line __(underlineBegin, current());
+                    lines << Line{underlineBegin, current()};
                 format=newFormat;
                 if(format&Bold) {
                     if(!defaultBold.contains(size)) defaultBold.insert(size,Font(File("dejavu/DejaVuSans-Bold.ttf"_,fonts()), size));
@@ -112,7 +112,7 @@ struct TextLayout {
             previous = index;
             float advance = font->advance(index);
             const Image& image = font->glyph(index).image;
-            if(image) { word << Character __(font, vec2(pen.x,0), index, image.width, advance, i); column++; }
+            if(image) { word << Character{font, vec2(pen.x,0), index, image.width, advance, i}; column++; }
             pen.x += advance;
         }
         float length=0; for(const Word& word: line) if(word) length+=word.last().pos.x+word.last().advance+spaceAdvance;
@@ -136,23 +136,23 @@ void Text::layout() {
         for(const TextLayout::Character& o: line) {
             currentIndex = o.editIndex;
             if(currentIndex==editIndex) { //restore cursor after relayout
-                cursor = Cursor __(textLines.size, textLine.size);
+                cursor = Cursor{textLines.size, textLine.size};
             }
             if(o.font) {
                 const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
-                Character c __(int2(o.pos)+glyph.offset, share(glyph.image), o.editIndex, int(o.pos.x+o.advance/2), (int)glyph.image.height, int(o.advance));
+                Character c{int2(o.pos)+glyph.offset, share(glyph.image), o.editIndex, int(o.pos.x+o.advance/2), (int)glyph.image.height, int(o.advance)};
                 textSize=max(textSize,int2(c.pos)+c.image.size());
                 textLine << move(c);
             } else { //format character
-                textLine << Character __(int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size, int(o.advance));
+                textLine << Character{int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size, int(o.advance)};
             }
         }
         currentIndex++;
-        if(currentIndex==editIndex) cursor = Cursor __(textLines.size, textLine.size); //end of line
+        if(currentIndex==editIndex) cursor = Cursor{textLines.size, textLine.size}; //end of line
         textLines << move(textLine);
     }
-    if(!text.size) { assert(editIndex==0); cursor = Cursor __(0,0); }
-    else if(currentIndex==editIndex) cursor = Cursor __(textLines.size-1, textLines.last().size); //end of text
+    if(!text.size) { assert(editIndex==0); cursor = Cursor{0,0}; }
+    else if(currentIndex==editIndex) cursor = Cursor{textLines.size-1, textLines.last().size}; //end of text
     links = move(layout.links);
     for(TextLayout::Line layoutLine: layout.lines) {
         for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {
@@ -161,7 +161,7 @@ void Text::layout() {
                 TextLayout::Character first = (line==layoutLine.begin.line) ? textLine[layoutLine.begin.column] : textLine.first();
                 TextLayout::Character last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size) ? textLine[layoutLine.end.column] : textLine.last();
                 assert(first.pos.y == last.pos.y);
-                lines << Line __( int2(first.pos+vec2(0,1)), int2(last.pos+vec2(last.font?last.font->advance(last.index):0,2)));
+                lines << Line{ int2(first.pos+vec2(0,1)), int2(last.pos+vec2(last.font?last.font->advance(last.index):0,2))};
             }
         }
     }
@@ -187,16 +187,16 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
         if(!textLine) goto break_;
         // Before first character
         const Character& first = textLine.first();
-        if(position.x <= first.center) { cursor = Cursor __(line,0); goto break_; }
+        if(position.x <= first.center) { cursor = Cursor{line,0}; goto break_; }
         // Between characters
         for(uint column: range(0,textLine.size-1)) {
             const Character& prev = textLine[column];
             const Character& next = textLine[column+1];
-            if(position.x >= prev.center && position.x <= next.center) { cursor = Cursor __(line,column+1); goto break_; }
+            if(position.x >= prev.center && position.x <= next.center) { cursor = Cursor{line,column+1}; goto break_; }
         }
         // After last character
         const Character& last = textLine.last();
-        if(position.x >= last.center) { cursor = Cursor __(line,textLine.size); goto break_; }
+        if(position.x >= last.center) { cursor = Cursor{line,textLine.size}; goto break_; }
     }
     if(event == Press && textClicked) { textClicked(); return true; }
     break_:;

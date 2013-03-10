@@ -20,7 +20,7 @@ struct PDFTest {
 #include "display.h"
 #include "window.h"
 struct VSyncTest : Widget {
-    Window window __(this,0,"VSync"_,Window::OpenGL);
+    Window window{this,0,"VSync"_,Window::OpenGL};
     VSyncTest(){ window.localShortcut(Escape).connect(&exit); }
     uint count=0; void render(int2 position, int2 size) {fill(position+Rect(size),((count++)%2)?black:white); window.render(); if(count>100) exit();}
 } test;

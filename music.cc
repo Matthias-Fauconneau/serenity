@@ -22,7 +22,7 @@ map<uint, Chord> parseAnnotations(string&& annotations) {
     for(TextData s(annotations);s;) {
         while(!s.match('\n')) {
             uint key = s.integer(); s.match(' ');
-            chords[t] << MidiNote __(key,t,1);
+            chords[t] << MidiNote{key,t,1};
             i++;
         }
         t++;
@@ -78,10 +78,10 @@ struct PDFScore : PDF {
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
-    Folder folder __("Sheets"_);
+    Folder folder{"Sheets"_};
     ICON(music)
     VBox layout;
-    Window window __(&layout,int2(0,0),"Piano"_,musicIcon());
+    Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
     List<Text> sheets;
 
     string name;
@@ -92,9 +92,9 @@ struct Music {
     Keyboard keyboard;
 
     Sampler sampler;
-    Thread thread __(-20);
-    AudioOutput audio __({&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread);
-    Sequencer input __(thread);
+    Thread thread{-20};
+    AudioOutput audio{{&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread};
+    Sequencer input{thread};
     Record record;
     vec2 position=0, target=0, speed=0; //smooth scroll
 
@@ -153,7 +153,6 @@ struct Music {
         audio.start();
         thread.spawn();
         toggleAnnotations();
-        openSheet("Game of Thrones"_);
     }
 
     void toggleReverb() { sampler.enableReverb=!sampler.enableReverb; }

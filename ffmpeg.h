@@ -16,13 +16,13 @@ struct AudioFile {
     void* buffer=0;
     uint bufferIndex=0, bufferSize=0;
 
-    AudioFile(){}
-    AudioFile(const ref<byte>& data){ open(data); }
+    AudioFile();
     ~AudioFile() { close(); }
 
     operator bool() { return file; }
-
-    bool open(const ref<byte>& data);
+    bool openPath(const ref<byte>& path);
+    bool openData(array<byte>&& data);
+    bool open();
     void close();
 
     // \note As \a buffer type depends on previous usages of \a read, switching between overloads may only happen when no data is buffered
@@ -39,4 +39,4 @@ template<Type T> struct Audio {
     buffer<T> data;
 };
 
-template<Type T> Audio<T> decodeAudio(const ref<byte>& data);
+template<Type T> Audio<T> decodeAudio(array<byte>&& data);

@@ -33,8 +33,8 @@ int MidiScore::staffX(int t) { return systemHeader+t%staffTime*(size.x-systemHea
 int2 MidiScore::page(int staff, int t, int h) { return position+int2(staffX(t),t/staffTime*systemHeight+(!staff)*staffHeight+2*staffMargin+h*staffInterval/2); }
 
 static void glyph(int2 position, const ref<byte> name, vec4 color=black) {
-    //static Font font __("/usr/share/lilypond/2.16.1/fonts/otf/emmentaler-20.otf"_,128);
-    static Font font __("/Sheets/emmentaler-20.otf"_,128);
+    //static Font font{"/usr/share/lilypond/2.16.1/fonts/otf/emmentaler-20.otf"_,128};
+    static Font font{"/Sheets/emmentaler-20.otf"_,128};
     const Glyph& glyph = font.glyph(font.index(name));
     blit(position+glyph.offset,glyph.image,color);
 }
