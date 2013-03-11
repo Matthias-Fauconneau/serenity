@@ -39,3 +39,10 @@ void Keyboard::render(int2 position, int2 size) {
         }
     }
 }
+
+bool Keyboard::mouseEvent(int2 cursor, int2 size, Event event, Button) {
+    uint key = 21+88*cursor.x/size.x;
+    if(event==Press) noteEvent(key, 100);
+    if(event==Release) noteEvent(key, 0);
+    return true;
+}

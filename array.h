@@ -74,10 +74,17 @@ template<Type T> struct array {
     /// \}
 
     /// \name Appends once (if not already contained) operators
+    array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
+    array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
+    array& operator +=(const T& v) { if(!contains(v)) *this<<copy(v); return *this; }
+    array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; }
+    /// \}
+
+    /// \name Appends once (if not already contained) operators
     array& appendOnce(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
     array& appendOnce(array&& b) { for(T& v: b) appendOnce(move(v)); return *this; }
-    array& appendOnce(const T& v) { if(!contains(v)) appendOnce(copy(v)); return *this; }
-    array& appendOnce(const ref<T>& o) { for(const T& v: o) appendOnce(copy(v)); return *this; }
+    array& appendOnce(const T& v) { if(!contains(v)) *this<<copy(v); return *this; }
+    array& appendOnce(const ref<T>& o) { for(const T& v: o) appendOnce(v); return *this; }
     /// \}
 
     /// Inserts an element at \a index

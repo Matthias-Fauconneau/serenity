@@ -4,7 +4,11 @@
 // Attributes
 #define unused __attribute((unused))
 #define packed __attribute((packed))
+#ifdef __clang__
+#define flatten
+#else
 #define flatten __attribute((flatten))
+#endif
 // Move
 template<Type T> struct remove_reference { typedef T type; };
 template<Type T> struct remove_reference<T&> { typedef T type; };

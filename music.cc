@@ -76,6 +76,22 @@ struct PDFScore : PDF {
     }
 };
 
+/// Dummy input for testing without a MIDI keyboard
+struct KeyboardInput : Widget {
+    signal<uint,uint> noteEvent;
+    bool keyPress(Key key, Modifiers) override {
+        int i = "awsedftgyhujkolp;']\\"_.indexOf(key);
+        if(i>=0) noteEvent(60+i,100);
+        return false;
+    }
+    bool keyRelease(Key key, Modifiers) override {
+        int i = "awsedftgyhujkolp;']\\"_.indexOf(key);
+        if(i>=0) noteEvent(60+i,0);
+        return false;
+    }
+    void render(int2, int2){};
+};
+
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
     Folder folder{"Sheets"_};
@@ -95,13 +111,14 @@ struct Music {
     Thread thread{-20};
     AudioOutput audio{{&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread};
     Sequencer input{thread};
+    KeyboardInput keyboardInput;
 #if RECORD
     Record record;
 #endif
     vec2 position=0, target=0, speed=0; //smooth scroll
 
     Music() {
-        layout << &sheets;// << &keyboard;
+        layout << &sheets; sheets.expanding=true;
         sampler.open("/Samples/Boesendorfer.sfz"_);
 
         array<string> files = folder.list(Files);
@@ -121,6 +138,15 @@ struct Music {
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&score,&Score::noteEvent);
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+
+        focus=&keyboardInput;
+        keyboardInput.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        keyboardInput.noteEvent.connect(&score,&Score::noteEvent);
+        keyboardInput.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+
+        keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        keyboard.noteEvent.connect(&score,&Score::noteEvent);
+        keyboard.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 
         keyboard.contentChanged.connect(&window,&Window::render);
         midiScore.contentChanged.connect(&window,&Window::render);
@@ -142,12 +168,13 @@ struct Music {
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
 #if REVERB
-        window.localShortcut(Key('r')).connect([]{ sampler.enableReverb=!sampler.enableReverb; });
+        window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
 #endif
 #if RECORD
         window.localShortcut(Key('r')).connect(this,&Music::toggleRecord);
         sampler.frameReady.connect(&record,&Record::capture);
 #endif
+        window.localShortcut(Key('k')).connect([this]{ if(layout.removeOne(&keyboard)==-1) layout<<&keyboard; });
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);

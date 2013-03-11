@@ -125,7 +125,7 @@ void Window::create() {
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual;
         r.colormap=id+Colormap;
         r.overrideRedirect=overrideRedirect;
-        r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
+        r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
@@ -290,8 +290,10 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
             if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key)) render();
         }
-        else if(type==ButtonRelease) drag=0;
-        else if(type==KeyPress) {
+        else if(type==ButtonRelease) {
+            drag=0;
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
+        } else if(type==KeyPress) {
             Key key = KeySym(e.key, e.state);
             if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); //normal keyPress event
             else {
