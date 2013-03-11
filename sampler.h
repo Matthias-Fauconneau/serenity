@@ -6,7 +6,10 @@
 #include "flac.h"
 #include "process.h"
 #include "map.h"
+#define REVERB 0
+#if REVERB
 #include <fftw3.h>
+#endif
 
 typedef float float4 __attribute((vector_size(16)));
 struct Note : FLAC {
@@ -51,7 +54,6 @@ struct Sampler : Poll {
     static constexpr uint periodSize = 128; // same as resampler latency and 1m wave propagation time
     //static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb)
 
-#define REVERB 1
 #if REVERB
     /// Convolution reverb
     bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).

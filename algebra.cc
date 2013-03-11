@@ -43,7 +43,7 @@ inline void pivot(Matrix& A, Permutation& P, uint j) {
 }
 
 PLU factorize(Matrix&& LU) {
-    const Matrix& A = LU;
+    const Matrix& A = LU; //const access to LU
     assert(A.m==A.n);
     uint n = A.n;
     Permutation P(n);
@@ -54,17 +54,17 @@ PLU factorize(Matrix&& LU) {
         for(uint i: range(j,n)) {
             float sum = 0;
             for(const Matrix::Element& e: A[i](j)) sum += e.value * A(e.column,j);
-            if(sum) LU(i,j) = LU(i,j) - sum; //FIXME
+            if(sum) LU(i,j) = LU(i,j) - sum; // l[ij] = a[ij] - Σ( l[ik]·u[kj] )
         }
         // Pivots to interchange rows
         pivot(LU, P, j);
         // Computes an U row
         float d = 1/A(j,j);
-        for(uint k: range(j+1,n)) {
+        for(uint i: range(j+1,n)) {
             float sum = 0;
-            for(const Matrix::Element& e: A[j](j)) sum += e.value * A(e.column,k);
-            float a = (A(j,k)-sum)*d;
-            if(a) LU(j,k) = a;
+            for(const Matrix::Element& e: A[j](j)) sum += e.value * A(e.column,i);
+            float a = (A(j,i)-sum)*d;
+            if(a) LU(j,i) = a; // u[ij] = ( a[ij] - Σ( l[ik]·u[kj] ) ) / l[jj]
         }
     }
     // Computes last L element

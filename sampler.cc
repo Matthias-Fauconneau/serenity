@@ -342,7 +342,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
         } else
 #endif
         {
-            for(uint i: range(2*size)) buffer[i] *= 0x1p6f; // 24bit samples to 32bit output with 2bit head room to add multiple notes
+            for(uint i: range(2*size)) buffer[i] *= 0x1p5f; // 24bit samples to 32bit output with 3bit head room to add multiple notes
         }
         // Converts mixing buffer to signed 32bit output
         for(uint i: range(size/2)) ((word4*)output)[i] = cvtps(((float4*)buffer)[i]);

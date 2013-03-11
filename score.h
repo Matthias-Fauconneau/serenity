@@ -71,7 +71,7 @@ struct Score {
     int quarter=0, half=0, whole=0;
 
     void clear() {
-        staffs.clear(); keys.clear(); previousClef=lastClef=lastPos=0; maxStaffDistance=100;
+        staffs.clear(); keys.clear(); previousClef=lastClef=lastPos=0; maxStaffDistance=100; staffCount=0;
         repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear();
         notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0;
         active.clear(); expected.clear(); debug.clear(); pass=-1; histogram.clear(); errors=0;

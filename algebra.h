@@ -51,10 +51,7 @@ inline float Matrix::operator()(uint i, uint j) const {
     assert(i<m && j<n);
     const array<Element>& row = rows[i];
     uint index = row.binarySearch(j);
-    if(index<row.size) {
-        const Element& e = row[index];
-        if(e.column==j) return e.value;
-    }
+    if(index<row.size) { const Element& e = row[index]; if(e.column==j) return e.value; }
     return 0;
 }
 
@@ -102,7 +99,7 @@ struct Permutation {
     int operator[](int i) const { return order[i]; } //b[P[i]] = (P*b)[i]
 };
 
-/// Factorizes any invertible matrix as the product of a lower triangular matrix and an upper triangular matrix
+/// Factorizes an invertible matrix as the product of a lower triangular matrix and an upper triangular matrix
 /// \return permutations (P) and packed LU (U's diagonal is 1).
 struct PLU { Permutation P; Matrix LU; };
 PLU factorize(Matrix&& A);

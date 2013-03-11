@@ -14,16 +14,16 @@ void Score::onPath(const ref<vec2>& p) {
             tremolos << Line(p[0], p[3]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
-        if(span.y>2 && span.x<500 && (span.y<14 || (span.x>90 && span.y<17) || (span.x>100 && span.y<22) || (span.x>200 && span.y<27) || (span.x>300 && span.y<30) || (span.x>360 && span.y<36))) {
+        if(span.y>2 && span.x<500 && span.y<14+span.x/17) {
             ties.appendOnce( Line(vec2(min.x,p[0].y),vec2(max.x,p[3].y)) );
             //ties.appendOnce( Line(vec2(min.x,center.y),vec2(max.x,center.y)) );
             debug[center]="V"_+str(span);
-        }else debug[center]="!V"_+str(span);
+        } else debug[center]="!V"_+str(span);
     } else if(p.size==10) {
         if(span.x>36 && span.x<1000 && span.y>10 && (span.y<14 || (span.x>100 && span.y<29))) {
             ties.appendOnce( Line(vec2(min.x,center.y),vec2(max.x,center.y)) );
             debug[center]="X"_+str(span);
-        }
+        } else debug[center]="!X"_+str(span);
     }
 }
 
@@ -96,11 +96,15 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
         } else if(find(font,"NWCV15"_)) {
             if(code==97/*treble*/||code==98/*bass*/) {
-                if(lastClef.y != 0 && pos.y-lastClef.y>128) staffs << (lastClef.y+pos.y)/2;
+                if(lastClef.y != 0 && pos.y-lastClef.y>128 && staffCount!=1) {
+                    staffs << (lastClef.y+pos.y)/2;
+                    staffCount=1;
+                } else staffCount++;
                 lastClef=pos;
             }
         } else if(font=="Manual"_) { // Manual annotations
-            if(!staffs || (pos.x < 300 && lastPos.x > 640 && pos.y > lastPos.y)) { staffs << lastClef.y+40/*80*//*70*/; lastClef=pos; }
+            if(!staffs || (pos.x < 300 && lastPos.x > 640 && pos.y > lastPos.y)) { staffs << lastClef.y+40; lastClef=pos; }
+            else lastClef.y=max(lastClef.y, pos.y);
             lastPos=pos;
         }
     } else if(pass==1) { // 2nd pass: detect notes and assign to staves
@@ -110,36 +114,36 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
         if(font=="MScore-20"_) { //TODO: glyph OCR
             if(msScore) {
                 if(code==14) {
-                    if(size<30) duration= 0; //grace
+                    if(size<34) duration= 0; //grace
                     else duration = 4; //quarter
                 }
                 else if(code==15) duration = 8; //half
                 else if(code==16) duration = 16; //whole
             } else {
                 if(code==5) {
-                    if(size<30) duration= 0; //grace
+                    if(size<34) duration= 0; //grace
                     else duration = 4; //quarter
                 }
                 else if(code == 9) duration = 8; //half
             }
         } else if(find(font,"LilyPond"_)) {
             if(code==62) {
-                if(size<30) duration= 0; //grace
+                if(size<34) duration= 0; //grace
                 else duration = 4; //quarter
             }
             else if(code==61) duration = 8; //half
             else if(code==60) duration = 16; //whole
         } else if(find(font,"Opus"_)) {
             if(font=="OpusStd"_) { //FIXME: OCR
-                if(code == quarter /*code==7*//*code==8*/) {
-                    if(size<30) duration= 0; //grace
+                if(code == quarter) {
+                    if(size<34) duration= 0; //grace
                     else duration = 4; //quarter
                 }
-                else if(code == half/*code == 9/10/11*/) duration = 8; //half
+                else if(code == half) duration = 8; //half
                 else if(code == whole) duration = 16; //whole
             } else if(endsWith(font,"Opus"_)) {
                 if(fontIndex==53) {
-                    if(size<30) duration= 0; //grace
+                    if(size<34) duration= 0; //grace
                     else duration = 4; //quarter
                 }
                 else if(fontIndex==66) duration = 8; //half
@@ -202,7 +206,6 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             }
             /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
             break_:;
-            //debug[floor(pos)]<<str(index)+" "_;
         }
         if(duration<0) return;
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
@@ -273,7 +276,7 @@ void Score::parse() {
                             }
                             if((lastChord.size()>=chord.size() || (lastChord.size()==3 && chord.size()==4)/*FIXME*/) && (
                                           (abs(x-pX)<18 && abs(y-pY)<=36) ||
-                                          (chord.size()==1 && abs(x-pX)<=22 && abs(y-pY)<=0) ||
+                                          (chord.size()==1 && abs(x-pX)<=23 && abs(y-pY)<=0) ||
                                     (lastD>=16 && (abs(x-pX)<=26 && abs(y-pY)<=18) && (y!=pY || lastChord.size()>1 || chord.size()>1))
                                           )) {
                                 lastChord.insertSortedMulti(y,chord.at(y)); //tie only one duplicate
@@ -281,8 +284,8 @@ void Score::parse() {
                             } else if(lastChord.size()<=chord.size() && !(lastChord.size()==3 && chord.size()==4)/*FIXME*/) {
                                 if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
                                 lastChord.remove(pY); debug[vec2(pX,-pY)]<<str(">"_,abs(x-pX),abs(y-pY)); goto again;
-                            } //else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
-                        } //else if(abs(x-pX)<26 && abs(y-pY)<40) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                            } else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
+                        } else if(abs(x-pX)<30 && abs(y-pY)<40) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
                         skip:;
                     }
                 }
@@ -309,7 +312,7 @@ void Score::parse() {
                             debug[vec2(x,-y)]<<str("L"_,lx);
                             for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied;
                             t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                        } //else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly,rx);
+                        } else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly,rx);
                     }
 alreadyTied: ;
                 }
@@ -325,12 +328,12 @@ alreadyTied: ;
                         break;
                     }
                     /// Detect right note of a tie
-                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>-6 && ry <=12 && rx < 21 && rx > -10) {
+                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>-5/*13*/ && ry <=12 && rx < 21 && rx > -10) {
                         t.ri=i;t.rx=x; t.ry=y;
                         tied << t; //defer remove for double ties
-                        debug[vec2(x,-y)]<<"R"_+str(rx,ry);
+                        debug[vec2(x,-y)]<<"R"_+str(rx,ry,t.ly);
                         goto staffDone;
-                    } else if(rx>-20 && rx<21 && ry>-20 && ry<20) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
+                    } else if(rx>-50 && rx<50 && ry>-50 && ry<50) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
                 }
             }
 staffDone: ;
@@ -612,7 +615,7 @@ void Score::noteEvent(uint key, uint vel) {
                 active.insertMulti(key,expected.at(key));
                 expected.remove(key);
             }
-            else if(chordSize>=4 && expected.contains(key+12)) {
+            else if(chordSize>=3 && expected.contains(key+12)) {
                 active.insertMulti(key,expected.at(key+12));
                 expected.remove(key+12);
             }

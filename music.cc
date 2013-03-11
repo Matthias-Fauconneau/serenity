@@ -95,7 +95,9 @@ struct Music {
     Thread thread{-20};
     AudioOutput audio{{&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread};
     Sequencer input{thread};
+#if RECORD
     Record record;
+#endif
     vec2 position=0, target=0, speed=0; //smooth scroll
 
     Music() {
@@ -120,8 +122,6 @@ struct Music {
         input.noteEvent.connect(&score,&Score::noteEvent);
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 
-        sampler.frameReady.connect(&record,&Record::capture);
-
         keyboard.contentChanged.connect(&window,&Window::render);
         midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
@@ -141,8 +141,13 @@ struct Music {
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
-        //window.localShortcut(Key('r')).connect(this,&Music::toggleRecord);
-        window.localShortcut(Key('r')).connect(this,&Music::toggleReverb);
+#if REVERB
+        window.localShortcut(Key('r')).connect([]{ sampler.enableReverb=!sampler.enableReverb; });
+#endif
+#if RECORD
+        window.localShortcut(Key('r')).connect(this,&Music::toggleRecord);
+        sampler.frameReady.connect(&record,&Record::capture);
+#endif
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);
@@ -154,8 +159,6 @@ struct Music {
         thread.spawn();
         toggleAnnotations();
     }
-
-    void toggleReverb() { sampler.enableReverb=!sampler.enableReverb; }
 
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float current, float next, float x) {
@@ -186,7 +189,7 @@ struct Music {
         else { score.showActive=false; sampler.timeChanged.delegates.clear(); }
     }
 
-
+#if RECORD
     void toggleRecord() {
         if(!name) name=string("Piano"_);
         if(record) { record.stop(); window.setTitle(name); }
@@ -197,6 +200,7 @@ struct Music {
             if(!play) togglePlay();
         }
     }
+#endif
 
     /// Shows PDF+MIDI sheets selection to open
     void showSheetList() {
