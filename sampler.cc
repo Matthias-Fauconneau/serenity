@@ -53,11 +53,11 @@ float Note::sumOfSquares(uint size) {
     return (extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/(1<<24)/(1<<24);
 }
 
-void Sampler::open(const ref<byte>& path) {
+void Sampler::open(const ref<byte>& file, const Folder& root) {
     // parse sfz and map samples
     Sample group;
-    TextData s = readFile(path);
-    Folder folder = section(path,'.',0,-2); // Samples are implicilty in a subfolder with same name as .sfz files
+    TextData s = readFile(file, root);
+    Folder folder (section((file),'.',0,-2), root); // Samples must be in a subfolder with the same name as the .sfz file
     Sample* sample=&group;
     for(;;) {
         s.whileAny(" \n\r"_);

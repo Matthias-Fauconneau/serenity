@@ -20,8 +20,8 @@ struct Window : Socket, Poll {
            const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread, Renderer renderer=Raster);
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size, const ref<byte>& name, Renderer renderer) :
-        Window(widget, size, name, Image(),"_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread, renderer){}
+    Window(Widget* widget, int2 size, const ref<byte>& name,  const Image& icon, Renderer renderer) :
+        Window(widget, size, name, icon, "_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread, renderer){}
     ~Window() { destroy(); }
 
     /// Creates window.

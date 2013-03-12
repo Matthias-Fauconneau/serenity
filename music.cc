@@ -12,8 +12,11 @@
 #include "pdf.h"
 #include "score.h"
 #include "midiscore.h"
-#include "record.h"
 #include "keyboard.h"
+
+#if RECORD
+#include "record.h"
+#endif
 
 // Simple human readable/editable format for score synchronization annotations
 map<uint, Chord> parseAnnotations(string&& annotations) {
@@ -94,7 +97,8 @@ struct KeyboardInput : Widget {
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
-    Folder folder{"Sheets"_};
+    Folder root = arguments() ? arguments()[0] : "/"_;
+    Folder folder{"Sheets"_,root};
     ICON(music)
     VBox layout;
     Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
@@ -110,7 +114,9 @@ struct Music {
     Sampler sampler;
     Thread thread{-20};
     AudioOutput audio{{&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread};
+#if MIDI
     Sequencer input{thread};
+#endif
     KeyboardInput keyboardInput;
 #if RECORD
     Record record;
@@ -119,7 +125,7 @@ struct Music {
 
     Music() {
         layout << &sheets; sheets.expanding=true;
-        sampler.open("/Samples/Boesendorfer.sfz"_);
+        sampler.open("Boesendorfer.sfz"_,Folder("Samples"_,root));
 
         array<string> files = folder.list(Files);
         for(string& file : files) {
@@ -135,9 +141,11 @@ struct Music {
         midi.noteEvent.connect(&score,&Score::noteEvent);
         midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
 
+#if MIDI
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&score,&Score::noteEvent);
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+#endif
 
         focus=&keyboardInput;
         keyboardInput.noteEvent.connect(&sampler,&Sampler::noteEvent);
@@ -171,10 +179,10 @@ struct Music {
         window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
 #endif
 #if RECORD
-        window.localShortcut(Key('r')).connect(this,&Music::toggleRecord);
+        window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
         sampler.frameReady.connect(&record,&Record::capture);
 #endif
-        window.localShortcut(Key('k')).connect([this]{ if(layout.removeOne(&keyboard)==-1) layout<<&keyboard; });
+        window.localShortcut(Key('y')).connect([this]{ if(layout.removeOne(&keyboard)==-1) layout<<&keyboard; });
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);

@@ -8,6 +8,36 @@
 #include "linux.h"
 #include "x.h"
 
+#define XAUTH 1
+#if XAUTH
+//#include <stdio.h>
+//#include <string.h>
+//#include <unistd.h>
+#include <netinet/in.h>
+
+struct Xauth {
+    unsigned short   family;
+    unsigned short   address_length;
+    char    	    *address;
+    unsigned short   number_length;
+    char    	    *number;
+    unsigned short   name_length;
+    char    	    *name;
+    unsigned short   data_length;
+    char   	    *data;
+};
+extern "C" Xauth* XauGetAuthByAddr(uint family, uint, const char* address, uint, const char* number, uint, const char* name);
+extern "C" void XauDisposeAuth(Xauth* auth);
+
+/*static size_t memdup(char **dst, void *src, size_t len) {
+    if(len) *dst = (char*)malloc(len);
+    else *dst = 0;
+    if(!*dst) return 0;
+    memcpy(*dst, src, len);
+    return len;
+}*/
+#endif
+
 #if GL
 extern "C" {
 void* XOpenDisplay(const char*);
@@ -23,20 +53,15 @@ bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
 void glXSwapBuffers(void* dpy, uint drawable);
 void glFinish();
 }
+static void* glDisplay=0;
+static void* glContext=0;
 #include "gl.h"
 #endif
 
+// Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace Render { int EXT, event, errorBase; } using namespace Render;
-#if GL
-static void* glDisplay=0;
-static void* glContext=0;
-#endif
-
 int2 displaySize;
-
-// Public globals
-
 Widget* focus;
 Widget* drag;
 static __thread Window* window; // Window being rendered in this thread
@@ -44,16 +69,30 @@ static __thread Window* window; // Window being rendered in this thread
 string getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
-
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, Renderer renderer)
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
     string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
+#if XAUTH
+        char hostnamebuf[256];
+        gethostname(hostnamebuf, sizeof(hostnamebuf));
+        ref<byte> host = str((const char*)hostnamebuf);
+        string display = getenv("DISPLAY"_);
+        ref<byte> authName = "MIT-MAGIC-COOKIE-1"_;
+        Xauth* auth = XauGetAuthByAddr(256, host.size, host.data, display.size-1, display.data+1, authName.size, authName.data);
+        assert(auth);
+        send(string(raw(r)
+                    + ref<byte>(auth->name,align(4,r.nameSize=auth->name_length))
+                    + ref<byte>(auth->data,r.dataSize=auth->data_length)) );
+        XauDisposeAuth(auth);
+#else
         string authority = getenv("HOME"_)+"/.Xauthority"_;
         if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
-        else send(raw(r)); }
+        else send(raw(r));
+#endif
+    }
     {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
         read(align(4,r.vendorLength));
         read<XFormat>(r.numFormats);
@@ -292,7 +331,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonRelease) {
             drag=0;
-            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
+            if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
         } else if(type==KeyPress) {
             Key key = KeySym(e.key, e.state);
             if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); //normal keyPress event

@@ -4,10 +4,17 @@
 #include "function.h"
 
 /// Audio output through ALSA PCM interface
+#define ASOUND 1
+#if ASOUND
+struct AudioOutput : /*Device,*/ Poll {
+    struct _snd_pcm* pcm=0;
+    bool running = false;
+#else
 struct AudioOutput : Device, Poll {
-    uint sampleBits;
-    uint channels = 2, rate;
-    uint periodSize, bufferSize;
+#endif
+    uint sampleBits = 0;
+    uint channels = 2, rate = 0;
+    uint periodSize = 0, bufferSize = 0;
 
     /// Configures PCM output
     AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread);

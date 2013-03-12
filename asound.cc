@@ -1,6 +1,64 @@
 #include "asound.h"
 #include "string.h"
 
+#if ASOUND
+#include <sys/types.h>
+#include <alsa/global.h>
+struct snd_input_t;
+struct snd_output_t;
+#include <alsa/conf.h>
+#include <alsa/pcm.h>
+#include <alsa/timer.h>
+#include <alsa/control.h>
+
+AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread) : Poll(0,POLLOUT,thread) {
+    snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NO_SOFTVOL|SND_PCM_NO_AUTO_RESAMPLE);
+    byte alloca_hw[snd_pcm_hw_params_sizeof()];
+    snd_pcm_hw_params_t* hw=(snd_pcm_hw_params_t*)alloca_hw; snd_pcm_hw_params_any(pcm,hw);
+    snd_pcm_hw_params_set_access(pcm,hw, SND_PCM_ACCESS_MMAP_INTERLEAVED);
+    snd_pcm_hw_params_set_format(pcm,hw, sampleBits==16?SND_PCM_FORMAT_S16_LE:SND_PCM_FORMAT_S32_LE);
+    snd_pcm_format_t format; snd_pcm_hw_params_get_format(hw, &format);
+    if(format==SND_PCM_FORMAT_S16_LE) this->sampleBits=16;
+    else if(format==SND_PCM_FORMAT_S32_LE) this->sampleBits=32;
+    else error((uint)format);
+    snd_pcm_hw_params_set_channels(pcm,hw, 2);
+    snd_pcm_hw_params_set_rate(pcm,hw, rate, 0);
+    snd_pcm_hw_params_set_period_size(pcm, hw, periodSize, 0);
+    snd_pcm_uframes_t period_size; snd_pcm_hw_params_get_period_size(hw, &period_size, 0);
+    this->periodSize=period_size;
+    snd_pcm_hw_params_set_periods(pcm, hw, 2, 0);
+    uint periods; snd_pcm_hw_params_get_periods(hw, &periods, 0);
+    bufferSize = periods * this->periodSize;
+    snd_pcm_hw_params(pcm, hw);
+    byte alloca_sw[snd_pcm_sw_params_sizeof()];
+    snd_pcm_sw_params_t *sw=(snd_pcm_sw_params_t*)alloca_sw;
+    snd_pcm_sw_params_current(pcm, sw);
+    snd_pcm_sw_params_set_avail_min(pcm, sw, this->periodSize);
+    snd_pcm_sw_params(pcm,sw);
+    log(periodSize, periods, bufferSize);
+}
+void AudioOutput::start() { if(running) return; snd_pcm_poll_descriptors(pcm,this,1); registerPoll(); running=true; }
+void AudioOutput::stop() { if(!running) return; unregisterPoll(); snd_pcm_drain(pcm); running=false; }
+void AudioOutput::event() {
+    unsigned short revents;
+    snd_pcm_poll_descriptors_revents(pcm, this, 1, &revents);
+    if(!(revents & POLLOUT)) return;
+    if( snd_pcm_state(pcm) == SND_PCM_STATE_XRUN ) { warn("xrun"_); snd_pcm_prepare(pcm); }
+    snd_pcm_uframes_t frames = (snd_pcm_uframes_t)snd_pcm_avail(pcm); //snd_pcm_avail_update(pcm); //
+    if(frames>=periodSize) {
+        const snd_pcm_channel_area_t* areas; snd_pcm_uframes_t offset;
+        frames=periodSize;
+        snd_pcm_mmap_begin(pcm, &areas, &offset, &frames);
+        assert(frames == periodSize);
+        if(sampleBits==16) frames=read16((int16*)areas[0].addr+offset*channels, periodSize);
+        else if(sampleBits==32) frames=read32((int32*)areas[0].addr+offset*channels, periodSize);
+        else error(sampleBits);
+        snd_pcm_mmap_commit(pcm, offset, frames);
+        if(snd_pcm_state(pcm) == SND_PCM_STATE_PREPARED) snd_pcm_start(pcm);
+    } else log(frames);
+}
+
+#else
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
 enum Format { S16_LE=2, S32_LE=10 };
@@ -83,3 +141,4 @@ void AudioOutput::event() {
     }
     if(status->state == Prepared) io<START>();
 }
+#endif

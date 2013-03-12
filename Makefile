@@ -1,7 +1,7 @@
 PREFIX ?= /usr
 BUILD ?= debug
-# CC := g++ -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
-CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+CC := g++ -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
+#CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -DDEBUG -g
 FLAGS_profile = -DPROFILE -g -O3 -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile
 FLAGS_release = -O3
@@ -16,7 +16,7 @@ ICONS_analyzer = play pause
 ICONS_music = music
 ICONS_test = feeds network
 
-# SHADERS = display $(SHADERS_$(TARGET))
+ SHADERS = display $(SHADERS_$(TARGET))
 # SHADERS_blender = blender
 
 SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
@@ -29,7 +29,9 @@ LIBS_http = ssl
 LIBS_gl = X11 GL
 LIBS_ffmpeg = avformat avcodec
 LIBS_record = swscale avformat avcodec
-LIBS_sampler = fftw3f_threads
+LIBS_asound = asound
+# LIBS_sampler = fftw3f_threads
+LIBS_window = Xau
 LIBS_spectrogram = fftw3f_threads
 LIBS_stretch = rubberband
 

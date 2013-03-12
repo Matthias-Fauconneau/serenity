@@ -101,8 +101,8 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
         int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
         int length=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&length);
         if(!status || length>1) {
-            string buffer(length); buffer.setSize(length-1);
-            glGetShaderInfoLog(shader, length, 0, buffer.data());
+            string buffer(length,length-1);
+            glGetShaderInfoLog(shader, length, 0, buffer.data);
             error(glsl,"Shader failed\n",buffer);
         }
         glAttachShader(id, shader);
@@ -112,8 +112,8 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
     int status=0; glGetProgramiv(id, GL_LINK_STATUS, &status);
     int length=0; glGetProgramiv(id , GL_INFO_LOG_LENGTH , &length);
     if(!status || length>1) {
-        string buffer(length); buffer.setSize(length-1);
-        glGetProgramInfoLog(id, length, 0, buffer.data());
+        string buffer(length,length-1);
+        glGetProgramInfoLog(id, length, 0, buffer.data);
         error(tags, "Program failed\n",buffer);
     }
     for(ref<byte>& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag);
@@ -355,15 +355,3 @@ void GLFrameBuffer::blit(GLTexture& color) {
     blit(target);
     glDeleteFramebuffers(1,&target);
 }
-
-#if ARB_timer_query
-GLTimerQuery::GLTimerQuery() { glGenQueries(1, &id); }
-GLTimerQuery::~GLTimerQuery() { glDeleteQueries(1, &id); }
-void GLTimerQuery::start() { glBeginQuery(GL_TIME_ELAPSED, id); }
-void GLTimerQuery::stop() { glEndQuery(GL_TIME_ELAPSED); }
-uint GLTimerQuery::elapsed() const {
-    { debug( int available=0; glGetQueryObjectiv(id, GL_QUERY_RESULT_AVAILABLE, &available); assert(available); ) }
-    uint elapsed=0; glGetQueryObjectuiv(id, GL_QUERY_RESULT, &elapsed);
-    return elapsed/1e6; //ns to ms
-}
-#endif

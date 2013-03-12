@@ -77,7 +77,8 @@ struct Sampler : Poll {
     ~Sampler();
 
     /// Opens a .sfz instrument and maps all its samples
-    void open(const ref<byte>& path); array<Sample> samples;
+    void open(const ref<byte>& path, const Folder& root=::root());
+    array<Sample> samples;
 
     /// Receives MIDI note events
     void noteEvent(uint key, uint velocity);
