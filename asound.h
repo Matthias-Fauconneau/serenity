@@ -33,10 +33,12 @@ struct AudioOutput : Device, Poll {
     void event();
 
 private:
+    function<uint(int16* output, uint size)> read16 = [](int16*,uint){return 0;};
+    function<uint(int32* output, uint size)> read32 = [](int32*,uint){return 0;};
+#if !ASOUND
     Map maps[3];
     void* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
-    function<uint(int16* output, uint size)> read16 = [](int16*,uint){return 0;};
-    function<uint(int32* output, uint size)> read32 = [](int32*,uint){return 0;};
+#endif
 };

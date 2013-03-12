@@ -113,7 +113,7 @@ void Sampler::open(const ref<byte>& file, const Folder& root) {
 
     for(Sample& s: samples) {
         s.data.decode(1<<12); // Predecodes 4K (10ms)
-        s.map.lock(); // Locks compressed samples in memory
+        //s.map.lock(); // Locks compressed samples in memory (PERM error if unprivileged)
 
         for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
             float shift = key-s.pitch_keycenter; //TODO: tune

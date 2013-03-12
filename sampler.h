@@ -51,8 +51,9 @@ struct Sampler : Poll {
     array<Layer> layers;
 
     uint rate = 0;
-    static constexpr uint periodSize = 128; // same as resampler latency and 1m wave propagation time
+    //static constexpr uint periodSize = 128; // same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb)
+    static constexpr uint periodSize = 1024; // maximum compatibility (when latency is not critical)
 
 #if REVERB
     /// Convolution reverb

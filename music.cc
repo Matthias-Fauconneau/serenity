@@ -101,7 +101,8 @@ struct Music {
     Folder folder{"Sheets"_,root};
     ICON(music)
     VBox layout;
-    Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
+    //Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
+    Window window {&layout,int2(959,752),"Piano"_,musicIcon()};
     List<Text> sheets;
 
     string name;
@@ -112,8 +113,8 @@ struct Music {
     Keyboard keyboard;
 
     Sampler sampler;
-    Thread thread{-20};
-    AudioOutput audio{{&sampler, &Sampler::read}, 44100, Sampler::periodSize, thread};
+    Thread& thread = mainThread; //Thread thread{-20};
+    AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
 #if MIDI
     Sequencer input{thread};
 #endif
@@ -191,7 +192,7 @@ struct Music {
 
         showSheetList();
         audio.start();
-        thread.spawn();
+        //thread.spawn();
         toggleAnnotations();
     }
 

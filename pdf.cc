@@ -541,7 +541,8 @@ void PDF::render(int2 position, int2 size) {
         i++;
     }
 
-    static Font font{string(),array<float>(),::Font(File("dejavu/DejaVuSans.ttf"_,::fonts()),10)};
+    static Folder dejavu = existsFolder("dejavu"_,::fonts()) ? Folder("dejavu"_,::fonts()) : Folder("truetype/ttf-dejavu/"_,::fonts());
+    static Font font{string(),array<float>(),::Font(File("DejaVuSans.ttf"_,dejavu),10)};
     for(const pair<vec2,string>& text: annotations) {
         int2 pos = position+int2(text.key*scale/normalizedScale);
         if(pos.y<=currentClip.min.y) continue;
