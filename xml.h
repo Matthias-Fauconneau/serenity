@@ -4,27 +4,6 @@
 #include "data.h"
 #include "function.h"
 
-/// Unique reference to an heap allocated value
-template<Type T> struct unique {
-    no_copy(unique);
-    T* pointer;
-    unique():pointer(0){}
-    template<Type O> unique(unique<O>&& o){pointer=o.pointer; o.pointer=0;}
-    template<Type O> unique& operator=(unique<O>&& o){this->~unique(); pointer=o.pointer; o.pointer=0; return *this;}
-    /// Instantiates a new value
-    template<Type... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)...)){}
-    ~unique() { if(pointer) free(pointer); }
-    operator T&() { return *pointer; }
-    operator const T&() const { return *pointer; }
-    T* operator ->() { return pointer; }
-    const T* operator ->() const { return pointer; }
-    T* operator &() { return pointer; }
-    const T* operator &() const { return pointer; }
-    explicit operator bool() { return pointer; }
-    bool operator !() const { return !pointer; }
-};
-template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
-
 /// XML element providing DOM-like access
 struct Element {
     string name, content;

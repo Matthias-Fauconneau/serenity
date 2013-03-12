@@ -73,8 +73,7 @@ inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 inline string str(const uint64& n) { return hex(n); }
 inline string str(const int64& n) { return hex(n); }
 template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
-/*inline string str(void* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
-template<Type T> inline string str(T* const& p) { return str(*p); }*/
+template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
 string ftoa(float number, int precision=2, int pad=0, int exponent=0);

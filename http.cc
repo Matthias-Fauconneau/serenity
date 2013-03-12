@@ -40,7 +40,6 @@ SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port)
         static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
         ssl = SSL_new(ctx);
         SSL_set_fd(ssl, fd);
-        log(SSL_state(ssl));
         SSL_connect(ssl);
     }
 }
@@ -118,24 +117,26 @@ URL::URL(const ref<byte>& url) {
     TextData s(url);
     if(find(url,"://"_)) scheme = string(s.until("://"_));
     else s.match("//"_); //net_path
-    ref<byte> domain = s.untilAny("/?"_); if(s[-1]=='?') s.index--;
+    ref<byte> domain = s.whileNo("/?"_);
     host = string(section(domain,'@',-2,-1));
+    if(!host.contains('.')) path=move(host);
     if(domain.contains('@')) authorization = base64(section(domain,'@'));
     path << s.until('#');
-    if(!scheme) { path=host+"/"_+path; host.clear(); }
     fragment = string(s.untilEnd());
 }
 URL URL::relative(URL&& url) const {
-    if(!url.scheme && !url.host && !startsWith(url.path,"/"_) && path.contains('/')) url.path = section(path,'/',0,-2)+"/"_+url.path;
-    if(!url.scheme) url.scheme=copy(scheme);
+    if(!url.scheme) {
+        if(!url.path && url.host) url.path=move(url.host);
+        if(!url.host && !startsWith(url.path,"/"_)) url.path = section(path,'/',0,-2)+"/"_+url.path;
+        url.scheme=copy(scheme);
+    }
     if(!url.host) url.host=copy(host);
     if(startsWith(url.path,"."_)) url.path.removeAt(0);
-    while(startsWith(url.path,"/"_)) url.path.removeAt(0);
     assert(!host.contains('/'));
     return move(url);
 }
 string str(const URL& url) {
-    return url.scheme+(url.scheme?"://"_:""_)+url.authorization+(url.authorization?"@"_:""_)+url.host+"/"_+url.path+(url.fragment?"#"_:""_)+url.fragment;
+    return url.scheme+(url.scheme?"://"_:""_)+url.authorization+(url.authorization?"@"_:""_)+url.host+url.path+(url.fragment?"#"_:""_)+url.fragment;
 }
 
 template<class T> uint DataStream<T>::available(uint need) {
@@ -150,18 +151,19 @@ template<class T> uint DataStream<T>::available(uint need) {
 // HTTP
 string cacheFile(const URL& url) {
     string name = replace(url.path,"/"_,"."_);
-    if(!name || name=="."_) name=string("index.htm"_);
-    assert(!url.host.contains('/'));
+    if(startsWith(name,"."_)) name.removeAt(0);
+    if(!name) name=string("index.htm"_);
+    assert(url.host && !url.host.contains('/'));
     return url.host+"/"_+name;
 }
 HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>& method)
     : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
       url(move(url)), headers(move(headers)), method(method), handler(handler) {
-    if(!Socket::fd) { log("Unknown host",url.host); state=Done; free(this); return; }
+    if(!Socket::fd) { warn("Unknown host",this->url.host); state=Done; free(this); return; }
     registerPoll();
 }
 void HTTP::request() {
-    string request = method+" /"_+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: Accept-Encoding: gzip,deflate
+    string request = method+" "_+(url.path?:"/"_)+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: deflate, gzip
     for(const string& header: headers) request << header+"\r\n"_;
     write(string(request+"\r\n"_)); state=Header;
 }

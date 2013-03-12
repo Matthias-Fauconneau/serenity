@@ -1,5 +1,5 @@
 PREFIX ?= /usr
-BUILD ?= release
+BUILD ?= debug
 # CC := g++ -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
 CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -fno-rtti -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -DDEBUG -g

@@ -5,15 +5,6 @@
 #include "file.h"
 #include "ico.h"
 
-/// Item with #link to an article
-struct Entry : Item {
-    /// Global unique identifier
-    string guid;
-    /// Link to the associated article
-    string link;
-    Entry(string&& guid, string&& link, Image&& icon, string&& text, int size=16):Linear(Left),Item(move(icon),move(text),size),guid(move(guid)),link(move(link)){}
-};
-
 /// Image shared between several \link Entry Entries\endlink
 struct Favicon {
     const string host;
@@ -28,14 +19,32 @@ struct Favicon {
     void update();
 };
 
+/// Item with #link to an article
+struct Entry : Item {
+    /// Global unique identifier
+    string guid;
+    /// Link to the associated article
+    string link;
+    /// Favicon of the website
+    Favicon* favicon=0;
+    Entry(string&& guid, string&& link, Image&& icon, string&& text, int size=16)
+        : Linear(Left),Item(move(icon),move(text),size), guid(move(guid)), link(move(link)){}
+    Entry(string&& guid, string&& link, Favicon* favicon, string&& text, int size=16)
+        : Linear(Left),Item(share(favicon->image),move(text),size), guid(move(guid)), link(move(link)), favicon(favicon){
+        favicon->users << &icon.image;
+    }
+    ~Entry() { if(favicon) favicon->users.removeAll(&icon.image); }
+};
+
 /// List of entries fetched from feeds
 /// \note .config/feeds contains the list of feeds to fetch, .config/read contains the list of read articles
-struct Feeds : List<Entry> {
+struct Feeds : VBox, HighlightSelection {
     File readConfig;
     Map readMap;
     signal<> listChanged;
     signal< const ref<byte>& /*link*/, const ref<byte>& /*title*/, const Image& /*favicon*/ > pageChanged;
-    array<Favicon*> favicons; //store strong references to favicons weakly referenced by entries (on heap because of ImageLoader)
+    array<unique<Favicon>> favicons; //store strong references to favicons (weakly referenced by entries)
+    array<unique<Entry>> entries; // back referenced by favicons for asynchronous load
 
     Feeds();
     /// Polls all feeds
