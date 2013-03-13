@@ -185,7 +185,6 @@ inline uint align(uint width, uint offset) { assert((width&(width-1))==0); retur
 inline float floor(float x) { return __builtin_floorf(x); }
 inline float round(float x) { return __builtin_roundf(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
-inline float fract(float q) { double d=1; return __builtin_modf(q, &d); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline float pow(float x, float y) { return __builtin_powf(x,y); }
 

@@ -22,32 +22,37 @@ struct Calculator {
 #if 1
 #include "time.h"
 #include "string.h"
-inline double mod(double q, double d) { return __builtin_modf(q, &d); }
+inline double mod(double q, double d) { return __builtin_fmod(q, d); }
 const double PI = 3.14159265358979323846;
 inline double cos(double t) { return __builtin_cos(t); }
 inline double sin(double t) { return __builtin_sin(t); }
 inline double asin(double t) { return __builtin_asin(t); }
 inline double atan(double t) { return __builtin_atan(t); }
-inline double atan(double x, double y) { return __builtin_atan2(y, x); }
+inline double atan(double y, double x) { return __builtin_atan2(y, x); }
+string hours(float hours) { return dec(int(hours)%24,2)+":"_+dec(int(abs(hours)*60)%60,2); }
+string seconds(float seconds) { return dec(int(seconds/60/60)%24,2)+":"_+dec(int(abs(seconds/60))%60,2); }
 struct Sun {
     Sun() {
-        float D = (float(currentTime())/60/60-12)/24 - 30*365.25; //days since GMT noon on 1 January 2000
-        float L = 280.460 + 0.9856474*D; L=mod(L*PI/180,2*PI); //mean longitude
-        float g = 357.528 + 0.9856003*D; g=mod(g*PI/180,2*PI); //mean anomaly
-        float l = L + 1.915*sin(g) + 0.020*sin(2*g); //ecliptic longitude
-        float e = (23.439-0.0000004*D)*PI/180; //obliquity of the ecliptic
-        float alpha = atan(cos(e)*cos(l), cos(e)*sin(l)); //right ascension
-        float d = atan(sin(e)*sin(l)); //declination
+        double U = currentTime();
+        double JD = 2440587.5 + U/60/60/24;
+        double D = JD - 2451545.0;
+        double L = (280.460 + 0.9856474*D)*PI/180; //mean longitude
+        double g = (357.528 + 0.9856003*D)*PI/180; //mean anomaly
+        double lambda = L + (1.915*sin(g) + 0.020*sin(2*g))*PI/180; //ecliptic longitude
+        log("ecliptic longitude",mod(lambda*180/PI,360));
+        double e = (23.439-0.0000004*D)*PI/180; //obliquity of the ecliptic
+        double alpha = atan(cos(e)*sin(lambda), cos(e)*cos(lambda)); //right ascension
+        double delta = asin( sin(e)*sin(lambda) ); //declination (-2.6)
+        log("obliquity",mod(e*180/PI,360),"ascension", 360+alpha*180/PI, "declination", delta*180/PI);
         //for Orsay, France
-        float lambda = 2.1875*PI/180; //longitude (positive east)
-        float phi = 48.6993*PI/180; //latitude
-        float GMST = 18.6973 + 24.06570*D;
-        float thetaG = GMST*PI/12;
-        float h = thetaG - lambda - alpha; //hour angle
-        float sin_a = sin(phi)*sin(d) + cos(phi)*cos(d)*cos(h);
-        float a = asin( sin_a  ); //altitude
-        float t = a*12/PI; //solar time
-        log(dec(int(t/60),2)+":"_+dec(int(t)%60,2));
+        double lambda0 = -2.1875*PI/180; //longitude (positive west)
+        double phi = 48.6993*PI/180; //latitude
+        double GMST = mod(18.6973 + 24.06570*D, 24); //Greenwich mean sidereal time (hours)
+        double h = GMST*PI/12 - lambda0 - alpha; //hour angle (time since meridian)
+        log("hour angle", h*180/PI, hours(h*12/PI));
+        double A = atan( sin(h), cos(h)*sin(phi) - sin(e)*sin(lambda)*cos(phi)); //azimuth (measured from south, turning positive to the West)
+        double a = asin( sin(phi)*sin(delta) + cos(phi)*cos(delta)*cos(h) ); //altitude
+        log("A", 180+A*180/PI, "a", a*180/PI);
     }
 } test;
 #endif

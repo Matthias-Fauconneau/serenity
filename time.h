@@ -28,7 +28,7 @@ struct Date {
     Date(){}
     /// Constructs a calendar date (unspecified hour)
     Date(int monthDay, int month, int year, int weekDay=-1);
-    /// Converts UNIX \a timestamp (in secondes) to a local time calendar date
+    /// Converts UNIX \a timestamp (in seconds) to a local time calendar date
     Date(long timestamp);
     /// Returns days from Thursday, 1st January 1970
     int days() const;

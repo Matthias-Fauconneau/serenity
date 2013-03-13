@@ -176,11 +176,22 @@ template<uint base> string itoa(int64 number, int pad) {
 }
 template string itoa<10>(int64,int);
 
-string ftoa(float n, int precision, int pad, int exponent) {
+inline double exp2(double x) { return __builtin_exp2(x); }
+inline double log2(double x) { return __builtin_log2(x); }
+inline double exp10(double x) { return exp2(x*log2(10)); }
+inline double log10(double x) { return __builtin_log10(x); }
+string ftoa(double n, int precision, int pad, int exponent) {
+    bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
-    uint32 e=0; if(exponent) while(n!=0 && abs(n)<1) n*=exponent, e++;
+    uint32 e=0; if(exponent) e=round(log10(n)), n /= exp10(e);
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
-    return itoa(round(m*n)/m,pad)+(precision?"."_+utoa<10>(uint64(round(m*abs(n)))%m,precision):string())+(e?"e-"_+str(e):string());
+    double integer=1, fract=__builtin_modf(n, &integer);
+    string s;
+    if(sign) s<<'-';
+    s << utoa(integer,pad);
+    if(precision) s <<'.'<< utoa<10>(round(fract*exp10(precision)),precision);
+    if(e) s<<'e'<<itoa<10>(e);
+    return move(s);
 }
