@@ -182,10 +182,10 @@ template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 
 // Floating-point operations
-inline float floor(float f) { return __builtin_floorf(f); }
-inline float round(float f) { return __builtin_roundf(f); }
-inline float ceil(float f) { return __builtin_ceilf(f); }
-inline float fract(float f) { double one=1; return __builtin_modf(f, &one); }
+inline float floor(float x) { return __builtin_floorf(x); }
+inline float round(float x) { return __builtin_roundf(x); }
+inline float ceil(float x) { return __builtin_ceilf(x); }
+inline float fract(float q) { double d=1; return __builtin_modf(q, &d); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline float pow(float x, float y) { return __builtin_powf(x,y); }
 

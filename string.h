@@ -78,6 +78,7 @@ template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 /// Converts floating-point numbers
 string ftoa(float number, int precision=2, int pad=0, int exponent=0);
 inline string str(const float& n) { return ftoa(n); }
+inline string str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
 template<Type T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }

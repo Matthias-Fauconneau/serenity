@@ -31,7 +31,6 @@ LIBS_ffmpeg = avformat avcodec
 LIBS_record = swscale avformat avcodec
 LIBS_asound = asound
 # LIBS_sampler = fftw3f_threads
-LIBS_window = Xau
 LIBS_spectrogram = fftw3f_threads
 LIBS_stretch = rubberband
 

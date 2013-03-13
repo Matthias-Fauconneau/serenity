@@ -8,36 +8,6 @@
 #include "linux.h"
 #include "x.h"
 
-#define XAUTH 1
-#if XAUTH
-//#include <stdio.h>
-//#include <string.h>
-//#include <unistd.h>
-#include <netinet/in.h>
-
-struct Xauth {
-    unsigned short   family;
-    unsigned short   address_length;
-    char    	    *address;
-    unsigned short   number_length;
-    char    	    *number;
-    unsigned short   name_length;
-    char    	    *name;
-    unsigned short   data_length;
-    char   	    *data;
-};
-extern "C" Xauth* XauGetAuthByAddr(uint family, uint, const char* address, uint, const char* number, uint, const char* name);
-extern "C" void XauDisposeAuth(Xauth* auth);
-
-/*static size_t memdup(char **dst, void *src, size_t len) {
-    if(len) *dst = (char*)malloc(len);
-    else *dst = 0;
-    if(!*dst) return 0;
-    memcpy(*dst, src, len);
-    return len;
-}*/
-#endif
-
 #if GL
 extern "C" {
 void* XOpenDisplay(const char*);
@@ -75,23 +45,10 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
-#if XAUTH
-        char hostnamebuf[256];
-        gethostname(hostnamebuf, sizeof(hostnamebuf));
-        ref<byte> host = str((const char*)hostnamebuf);
-        string display = getenv("DISPLAY"_);
-        ref<byte> authName = "MIT-MAGIC-COOKIE-1"_;
-        Xauth* auth = XauGetAuthByAddr(256, host.size, host.data, display.size-1, display.data+1, authName.size, authName.data);
-        assert(auth);
-        send(string(raw(r)
-                    + ref<byte>(auth->name,align(4,r.nameSize=auth->name_length))
-                    + ref<byte>(auth->data,r.dataSize=auth->data_length)) );
-        XauDisposeAuth(auth);
-#else
-        string authority = getenv("HOME"_)+"/.Xauthority"_;
-        if(existsFile(authority)) send(string(raw(r)+readFile(authority).slice(18,align(4,(r.nameSize=18))+(r.dataSize=16))));
-        else send(raw(r));
-#endif
+        if(existsFile(".Xauthority"_,home())) {
+            BinaryData s(readFile(".Xauthority"_,home())); s.advance(4); s.untilNull();/*host*/ s.untilNull();/*display*/
+            send(string(raw(r)+s.read<byte>(align(4,(r.nameSize=18))+(r.dataSize=16))));
+        } else send(raw(r));
     }
     {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
         read(align(4,r.vendorLength));
