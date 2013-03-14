@@ -36,8 +36,6 @@ inline real deg(real t) { return t/PI*180; }
 inline real rad(real t) { return t/180*PI; }
 struct Sun {
     Sun(float longitude, float latitude) {
-        real G = 6.6738e-11; //Gravitationnal constant [N·(m/kg)²]
-        real c = 2.9979e8; //Speed of light [m/s]
         // Orbital parameters
         real Ms = 1.9891e30; //Mass of the sun [kg]
         real m = 5.9736e24; //Mass of the earth [kg]
@@ -46,32 +44,27 @@ struct Sun {
         real Omega = rad(348.74); // Longitude of ascending node
         real omega = rad(114.21); // Argument of perihelion
         real epsilon = rad(23.439); //Obliquity of the ecliptic
+        real G = 6.6738e-11; //Gravitationnal constant [N·(m/kg)²]
         real n = sqrt(G*(Ms+m)/(a*a*a)); //Mean motion [rad/s]
 
         // J2000 Phases
         real U = currentTime(); //Unix time
         real T = U - 10957.5*24*60*60; // J2000 time [s]
-        real M0 = rad(357.51716); //Mean anomaly at J2000 [rad]
-        real GMST0 = 18.697/12*PI; //J2000 hour angle of the vernal equinox
+        real M0 = rad(357.51716); //Mean anomaly at J2000
+        real GMST0 = 18.697; //J2000 hour angle of the vernal equinox [h]
+        real ratio = 1+24*60*60/(2*PI/n); //Sidereal day per solar day
+        real GMST = GMST0 + ratio*T/60/60; // Greenwich mean sidereal time
 
         real M = M0 + n*T; //Mean anomaly
         real vu = M + 2*e*sin(M) + 5/4*e*e*sin(2*M); //True anomaly
-        //Omega + omega = Longitude of the periapsis
-        real l = vu + Omega + omega; //Ecliptic longitude
-        real k = n*a/c; //Light-time correction
-        real lambda = PI + l + k; //Ecliptic longitude (geocentric)
-        real alpha = atan(cos(epsilon)*sin(lambda), cos(epsilon)*cos(lambda)); //right ascension
-        real delta = asin(sin(epsilon)*sin(lambda)); // declination
-        real year = 2*PI/n; //Sidereal year [s]
-        real day = 1+24*60*60/year; //Sidereal day (sidereal day per year = solar day per year + 1)
-        real GMST = GMST0 + day*2*PI*T/(24*60*60); // Greenwich mean sidereal time
-        real h = GMST - longitude - alpha; // Local solar hour angle
-        real noon = U-mod(h,2*PI)/PI*12*60*60;
-        float w0 = acos(-tan(latitude)*tan(delta))/PI*12*60*60;
+        real l = vu + Omega + omega; //Ecliptic longitude (Omega + omega = Longitude of the periapsis)
+        real lambda = PI + l; //Ecliptic longitude (geocentric)
+        real alpha = atan(cos(epsilon)*sin(lambda), cos(epsilon)*cos(lambda)); //Right ascension
+        real delta = asin(sin(epsilon)*sin(lambda)); //Declination
+        real h = GMST - (longitude + alpha)/PI*12; // Solar hour angle [h]
+        real w0 = acos(-tan(latitude)*tan(delta))/PI*12*60*60; // Half day length [s]
+        real noon = U-mod(h,24)*60*60; // Solar noon in unix time [s]
         log(str(Date(noon-w0), "hh:mm"_),str(Date(noon), "hh:mm"_),str(Date(noon+w0), "hh:mm"_));
-        /*real A = atan( sin(h), cos(h)*sin(latitude) - sin(e)*sin(lambda)*cos(latitude)); //azimuth
-        real a = asin( sin(latitude)*sin(delta) + cos(latitude)*cos(delta)*cos(h) ); //altitude
-        log("A", 180+A*180/PI, "a", a*180/PI);*/
     }
 } test(-2.1875*PI/180, 48.6993*PI/180); //Orsay, France
 #endif
