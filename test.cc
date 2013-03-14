@@ -22,36 +22,56 @@ struct Calculator {
 #if 1
 #include "time.h"
 #include "string.h"
-inline double mod(double q, double d) { return __builtin_fmod(q, d); }
-const double PI = 3.14159265358979323846;
-inline double cos(double t) { return __builtin_cos(t); }
-inline double sin(double t) { return __builtin_sin(t); }
-inline double tan(double t) { return __builtin_tan(t); }
-inline double acos(double t) { return __builtin_acos(t); }
-inline double asin(double t) { return __builtin_asin(t); }
-inline double atan(double t) { return __builtin_atan(t); }
-inline double atan(double y, double x) { return __builtin_atan2(y, x); }
-string hours(double hours) { return (hours<0?"-"_:""_)+dec(mod(abs(hours),24),2)+":"_+dec(mod(abs(hours)*60,60),2); }
-string seconds(double seconds) { return dec(int(seconds/60/60)%24,2)+":"_+dec(int(abs(seconds/60))%60,2); }
+typedef double real;
+inline real mod(real q, real d) { return __builtin_fmod(q, d); }
+const real PI = 3.14159265358979323846;
+inline real cos(real t) { return __builtin_cos(t); }
+inline real sin(real t) { return __builtin_sin(t); }
+inline real tan(real t) { return __builtin_tan(t); }
+inline real acos(real t) { return __builtin_acos(t); }
+inline real asin(real t) { return __builtin_asin(t); }
+inline real atan(real t) { return __builtin_atan(t); }
+inline real atan(real y, real x) { return __builtin_atan2(y, x); }
+inline real deg(real t) { return t/PI*180; }
+inline real rad(real t) { return t/180*PI; }
 struct Sun {
-    Sun(float longitude /*positive west*/, float latitude) {
-        double U = currentTime(); //Unix time
-        double D = U/60/60/24 - 10957.5; //J2000 day
-        double L = (280.460 + 0.9856474*D)*PI/180; //mean longitude
-        double g = (357.528 + 0.9856003*D)*PI/180; //mean anomaly
-        double lambda = L + (1.915*sin(g) + 0.020*sin(2*g))*PI/180; //ecliptic longitude
-        double e = (23.439-0.0000004*D)*PI/180; //obliquity of the ecliptic
-        double alpha = atan(cos(e)*sin(lambda), cos(e)*cos(lambda)); //right ascension
-        double delta = asin(sin(e)*sin(lambda)); //declination
-        double phi = latitude*PI/180; //latitude
-        double GMST = 18.6973 + 24.06570*D; //Greenwich mean sidereal time (hours)
-        double h = GMST*PI/12 - longitude*PI/180 - alpha; //hour angle (time since meridian)
-        double noon = U-mod(h,2*PI)*12*60*60/PI; // h = 0
-        float w0 = acos(-tan(phi)*tan(delta))/PI*12*60*60;
+    Sun(float longitude, float latitude) {
+        real G = 6.6738e-11; //Gravitationnal constant [N·(m/kg)²]
+        real c = 2.9979e8; //Speed of light [m/s]
+        // Orbital parameters
+        real Ms = 1.9891e30; //Mass of the sun [kg]
+        real m = 5.9736e24; //Mass of the earth [kg]
+        real a = 1.4960e11; //Semi-major axis [m]
+        real e = 0.01671123; // Earth eccentricity
+        real Omega = rad(348.74); // Longitude of ascending node
+        real omega = rad(114.21); // Argument of perihelion
+        real epsilon = rad(23.439); //Obliquity of the ecliptic
+        real n = sqrt(G*(Ms+m)/(a*a*a)); //Mean motion [rad/s]
+
+        // J2000 Phases
+        real U = currentTime(); //Unix time
+        real T = U - 10957.5*24*60*60; // J2000 time [s]
+        real M0 = rad(357.51716); //Mean anomaly at J2000 [rad]
+        real GMST0 = 18.697/12*PI; //J2000 hour angle of the vernal equinox
+
+        real M = M0 + n*T; //Mean anomaly
+        real vu = M + 2*e*sin(M) + 5/4*e*e*sin(2*M); //True anomaly
+        //Omega + omega = Longitude of the periapsis
+        real l = vu + Omega + omega; //Ecliptic longitude
+        real k = n*a/c; //Light-time correction
+        real lambda = PI + l + k; //Ecliptic longitude (geocentric)
+        real alpha = atan(cos(epsilon)*sin(lambda), cos(epsilon)*cos(lambda)); //right ascension
+        real delta = asin(sin(epsilon)*sin(lambda)); // declination
+        real year = 2*PI/n; //Sidereal year [s]
+        real day = 1+24*60*60/year; //Sidereal day (sidereal day per year = solar day per year + 1)
+        real GMST = GMST0 + day*2*PI*T/(24*60*60); // Greenwich mean sidereal time
+        real h = GMST - longitude - alpha; // Local solar hour angle
+        real noon = U-mod(h,2*PI)/PI*12*60*60;
+        float w0 = acos(-tan(latitude)*tan(delta))/PI*12*60*60;
         log(str(Date(noon-w0), "hh:mm"_),str(Date(noon), "hh:mm"_),str(Date(noon+w0), "hh:mm"_));
-        double A = atan( sin(h), cos(h)*sin(phi) - sin(e)*sin(lambda)*cos(phi)); //azimuth
-        double a = asin( sin(phi)*sin(delta) + cos(phi)*cos(delta)*cos(h) ); //altitude
-        log("A", 180+A*180/PI, "a", a*180/PI);
+        /*real A = atan( sin(h), cos(h)*sin(latitude) - sin(e)*sin(lambda)*cos(latitude)); //azimuth
+        real a = asin( sin(latitude)*sin(delta) + cos(latitude)*cos(delta)*cos(h) ); //altitude
+        log("A", 180+A*180/PI, "a", a*180/PI);*/
     }
-} test(-2.1875, 48.6993); //Orsay, France
+} test(-2.1875*PI/180, 48.6993*PI/180); //Orsay, France
 #endif
