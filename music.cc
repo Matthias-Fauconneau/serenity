@@ -101,8 +101,7 @@ struct Music {
     Folder folder{"Sheets"_,root};
     ICON(music)
     VBox layout;
-    //Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
-    Window window {&layout,int2(959,752),"Piano"_,musicIcon()};
+    Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
     List<Text> sheets;
 
     string name;
@@ -113,7 +112,12 @@ struct Music {
     Keyboard keyboard;
 
     Sampler sampler;
-    Thread& thread = mainThread; //Thread thread{-20};
+#define THREAD 1
+#if THREAD
+    Thread thread{-20};
+#else
+    Thread& thread = mainThread;
+#endif
     AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
 #if MIDI
     Sequencer input{thread};
@@ -126,7 +130,7 @@ struct Music {
 
     Music() {
         layout << &sheets; sheets.expanding=true;
-        sampler.open("Boesendorfer.sfz"_,Folder("Samples"_,root));
+        sampler.open(audio.rate, "Boesendorfer.sfz"_,Folder("Samples"_,root));
 
         array<string> files = folder.list(Files);
         for(string& file : files) {
@@ -192,8 +196,9 @@ struct Music {
 
         showSheetList();
         audio.start();
-        //thread.spawn();
-        toggleAnnotations();
+#if THREAD
+        thread.spawn();
+#endif
     }
 
     /// Called by score to scroll PDF as needed when playing

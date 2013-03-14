@@ -24,21 +24,17 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint unused periodSize, Thr
     else error((uint)format);
     check( snd_pcm_hw_params_set_channels(pcm,hw, 2) );
     check( snd_pcm_hw_params_set_rate(pcm,hw, rate, 0), rate );
+    check( snd_pcm_hw_params_get_rate(hw, &rate, 0) ); this->rate=rate;
     check( snd_pcm_hw_params_set_period_size(pcm, hw, periodSize, 0), periodSize);
-    snd_pcm_uframes_t period_size; check( snd_pcm_hw_params_get_period_size(hw, &period_size, 0) );
-    //snd_pcm_uframes_t period_size; check( snd_pcm_hw_params_set_period_size_first(pcm, hw, &period_size, 0) );
-    this->periodSize=period_size;
-    //check( snd_pcm_hw_params_set_periods(pcm, hw, 2, 0) );
-    //uint periods=0; check( snd_pcm_hw_params_get_periods(hw, &periods, 0) );
-    uint periods=0; check( snd_pcm_hw_params_set_periods_first(pcm, hw, &periods, 0) );
-    bufferSize = periods * this->periodSize;
+    snd_pcm_uframes_t period_size; check( snd_pcm_hw_params_get_period_size(hw, &period_size, 0) ); this->periodSize=period_size;
+    uint periods=0; check( snd_pcm_hw_params_set_periods_first(pcm, hw, &periods, 0) ); bufferSize = periods * this->periodSize;
     check( snd_pcm_hw_params(pcm, hw) );
     byte alloca_sw[snd_pcm_sw_params_sizeof()];
     snd_pcm_sw_params_t *sw=(snd_pcm_sw_params_t*)alloca_sw;
     snd_pcm_sw_params_current(pcm, sw);
     snd_pcm_sw_params_set_avail_min(pcm, sw, this->periodSize);
     snd_pcm_sw_params(pcm,sw);
-    log(this->periodSize, periods, bufferSize);
+    log(this->rate, this->periodSize, periods, bufferSize);
 }
 void AudioOutput::start() { if(running) return; snd_pcm_poll_descriptors(pcm,this,1); registerPoll(); running=true; }
 void AudioOutput::stop() { if(!running) return; unregisterPoll(); snd_pcm_drain(pcm); running=false; }

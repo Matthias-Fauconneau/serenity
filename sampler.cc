@@ -53,7 +53,7 @@ float Note::sumOfSquares(uint size) {
     return (extract(sum,0)+extract(sum,1)+extract(sum,2)+extract(sum,3))/(1<<24)/(1<<24);
 }
 
-void Sampler::open(const ref<byte>& file, const Folder& root) {
+void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
     // parse sfz and map samples
     Sample group;
     TextData s = readFile(file, root);
@@ -124,9 +124,9 @@ void Sampler::open(const ref<byte>& file, const Folder& root) {
                 layer = &layers.last();
                 layer->shift = shift;
                 layer->notes.reserve(128); // Avoid locking (FIXME: heap pointers array)
-                if(shift) {
+                if(shift || rate!=outputRate) {
                     const uint size = 2048; //1024; // Accurate frequency resolution while keeping reasonnable filter bank size
-                    new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)));
+                    new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate));
                 }
             }
         }
