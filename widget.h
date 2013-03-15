@@ -43,14 +43,15 @@ struct Widget {
     virtual bool keyRelease(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
 };
 
-/// Current widget that has the keyboard input focus
-extern Widget* focus;
-/// Current widget that has the drag focus
-extern Widget* drag;
-
+// Accessors to the window which received the current event (may only be called from event methods)
+/// Reports keyboard events to this widget
+void setFocus(Widget* widget);
+/// Returns whether this widget has the keyboard focus
+bool hasFocus(Widget* widget);
+/// Reports further mouse motion events only to this widget (until mouse button is released)
+void setDrag(Widget* widget);
 /// Returns last text selection (or if clipboard is true, last copy)
 string getSelection(bool clipboard=false);
-
 /// Cursor icons
 enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
 /// Sets cursor to be shown when mouse is in the given rectangle

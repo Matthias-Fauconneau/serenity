@@ -20,7 +20,7 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) 
     if(event==Press && button==LeftButton) { dragStart=cursor, flickStart=delta; }
     if(widget().mouseEvent(cursor-delta,max(hint,size),event,button)) return true;
     if(event==Motion && button==LeftButton && size.y<hint.y) {
-        drag=this;
+        setDrag(this);
         delta = min(int2(0,0), max(size-hint, flickStart+cursor-dragStart));
         return true;
     }
@@ -58,7 +58,7 @@ bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button bu
         if(widgets[i].contains(cursor)) {
             if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
             if(event==Press && button == LeftButton) {
-                focus=this;
+                setFocus(this);
                 setActive(i);
                 itemPressed(index);
                 return true;
@@ -84,7 +84,7 @@ void Selection::setActive(uint i) {
 void HighlightSelection::render(int2 position, int2 size) {
     array<Rect> widgets = layout(position, size);
     for(uint i: range(count())) {
-        if(i==index && (always || focus==this || focus==&at(i))) fill(widgets[i], highlight);
+        if(i==index && (always || hasFocus(this) || hasFocus(&at(i)))) fill(widgets[i], highlight);
         at(i).render(widgets[i]);
     }
 }

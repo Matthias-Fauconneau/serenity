@@ -5,10 +5,9 @@ SHADER(display);
 #endif
 
 bool softwareRendering = true;
+Image framebuffer;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
-Image framebuffer;
-SRGB sRGB;
 
 void fill(Rect rect, vec4 color) {
     rect = rect & currentClip;

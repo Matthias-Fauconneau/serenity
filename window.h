@@ -112,12 +112,16 @@ struct Window : Socket, Poll {
 
     /// Shortcuts triggered when a key is pressed
     map<uint16, signal<>> shortcuts;
+    /// Current widget that has the keyboard input focus
+    Widget* focus=0;
+    /// Current widget that has the drag focus
+    Widget* drag=0;
 
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Current cursor position
     int2 cursorPosition;
-    /// Drag state
+    /// Window drag state
     int2 dragStart, dragPosition, dragSize;
 
     /// Signals when a render request completed

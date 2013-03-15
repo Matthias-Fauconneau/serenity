@@ -32,10 +32,11 @@ static void* glContext=0;
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace Render { int EXT, event, errorBase; } using namespace Render;
 int2 displaySize;
-Widget* focus;
-Widget* drag;
-static __thread Window* window; // Window being rendered in this thread
 
+static __thread Window* window; // Current window for Widget event and render methods
+void setFocus(Widget* widget) { assert(window); window->focus=widget; }
+bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
+void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 string getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
@@ -161,7 +162,6 @@ void Window::event() {
             }
             framebuffer=share(buffer);
             currentClip=Rect(size);
-            ::softwareRendering=true;
 
             if(clearBackground) {
                 if(backgroundCenter==backgroundColor) {
@@ -178,15 +178,16 @@ void Window::event() {
                     }
                 }
             }
-        } else {
 #if GL
+            ::softwareRendering=true;
+        } else {
             glXMakeCurrent(glDisplay, id, glContext);
             if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
             ::softwareRendering=false;
-#else
-            error("Unsupported");
-#endif
         }
+#else
+        } else error("Unsupported");
+#endif
 
         widget->render(0,size);
         assert(!clipStack);
@@ -203,6 +204,7 @@ void Window::event() {
             r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
             r.srcW=size.x; r.srcH=size.y; send(raw(r));
             state=Server;
+            framebuffer=Image();
         } else {
 #if GL
             glFinish();

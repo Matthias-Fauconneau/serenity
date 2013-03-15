@@ -109,5 +109,5 @@ void Feeds::readNext() {
             return;
         }
     }
-    if(focus==this) focus=0; load(); pageChanged(""_,""_,Image()); //return to desktop
+    if(hasFocus(this)) setFocus(0); load(); pageChanged(""_,""_,Image()); //return to desktop
 }

@@ -227,7 +227,7 @@ uint Text::index() {
 
 bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button) {
     setCursor(position+Rect(size),::Cursor::Text);
-    focus=this;
+    setFocus(this);
     if(event==Press && button==MiddleButton) {
         Text::mouseEvent(position,size,event,button);
         array<uint> selection = toUTF32(getSelection());
@@ -304,7 +304,7 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
 
 void TextInput::render(int2 position, int2 size) {
     Text::render(position, size);
-    if(focus==this) {
+    if(hasFocus(this)) {
         assert(cursor.line < textLines.size, cursor.line, textLines.size);
         const TextLine& textLine = textLines[cursor.line];
         int x = 0;
