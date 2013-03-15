@@ -285,8 +285,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(cursor!=lastCursor) setCursor(cursor);
         }
         else if(type==ButtonPress) {
+            Widget* focus=this->focus; this->focus=0;
             dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key)) render();
+            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render();
         }
         else if(type==ButtonRelease) {
             drag=0;
@@ -400,8 +401,8 @@ uint Window::Atom(const ref<byte>& name) {
     InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; return readReply<InternAtomReply>(string(raw(r)+name+pad(4,r.length))).atom;
 }
 template<class T> array<T> Window::getProperty(uint window, const ref<byte>& name, uint size) {
-    GetPropertyReply r=readReply<GetPropertyReply>(({ GetProperty r; r.window=window; r.property=Atom(name); r.length=size; raw(r); }));
-    { uint size=r.length*r.format/8; array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
+    GetProperty r; GetPropertyReply reply=readReply<GetPropertyReply>(({r.window=window; r.property=Atom(name); r.length=size; raw(r); }));
+    { uint size=reply.length*reply.format/8; array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
 }
 template array<uint> Window::getProperty(uint window, const ref<byte>& name, uint size);
 template array<byte> Window::getProperty(uint window, const ref<byte>& name, uint size);
@@ -420,7 +421,7 @@ void Window::setIcon(const Image& icon) {
 }
 
 string Window::getSelection(bool clipboard) {
-    uint owner = readReply<GetSelectionOwnerReply>(({GetSelectionOwner r; if(clipboard) r.selection=Atom("CLIPBOARD"_); raw(r); })).owner;
+    GetSelectionOwner r; uint owner = readReply<GetSelectionOwnerReply>(({ if(clipboard) r.selection=Atom("CLIPBOARD"_); raw(r); })).owner;
     if(!owner) return string();
     {ConvertSelection r; r.requestor=id; if(clipboard) r.selection=Atom("CLIPBOARD"_); r.target=Atom("UTF8_STRING"_); send(raw(r));}
     for(;;) {

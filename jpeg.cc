@@ -3460,5 +3460,5 @@ Image decodeJPEG(const ref<byte>& file) {
     int width, height, depth;
     jpeg_decoder_mem_stream mem_stream((uint8*)file.data, file.size);
     byte4* data = (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4);
-    return Image(data,width,height,width,true,false);
+    return Image(data,data,width,height,width,false);
 }

@@ -35,8 +35,8 @@ struct WeekViewPrint : Widget {
         }
     };
 
-    Window window __(this,int2(0,0),"WeekView"_);
-    Image page __(2480,3508);
+    Window window {this,int2(0,0),"WeekView"};
+    Image page {2480,3508};
     WeekViewPrint(){
         renderPage();
         writeFile("week.png"_,encodePNG(page),home());

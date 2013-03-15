@@ -58,7 +58,8 @@ struct Text : Widget {
         uint line=0,column=0;
         Cursor(){}
         Cursor(uint line, uint column):line(line),column(column){}
-        bool operator >(const Cursor& o)const{return line>o.line || (line==o.line && column>o.column);}
+        bool operator ==(const Cursor& o) const { return line==o.line && column==o.column; }
+        bool operator <(const Cursor& o) const { return line<o.line || (line==o.line && column<o.column); }
     };
     Cursor cursor; uint editIndex=0;
     uint index();

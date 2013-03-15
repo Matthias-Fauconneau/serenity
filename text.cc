@@ -8,7 +8,6 @@ map<int,Font> defaultItalic;
 map<int,Font> defaultMono;
 
 /// Layouts formatted text with wrapping, justification and links
-/// \note Characters are positioned with .4 subpixel precision
 struct TextLayout {
     float size;
     float wrap;
@@ -131,13 +130,13 @@ void Text::layout() {
     TextLayout layout(text, size, wrap);
 
     textLines.clear(); textLines.reserve(layout.text.size);
-    cursor.line = 0, cursor.column=0; uint currentIndex=0;
+    cursor=Cursor(0,0); uint currentIndex=0;
     for(const TextLayout::TextLine& line: layout.text) {
         TextLine textLine;
         for(const TextLayout::Character& o: line) {
             currentIndex = o.editIndex;
-            if(currentIndex==editIndex) { //restore cursor after relayout
-                cursor = Cursor{textLines.size, textLine.size};
+            if(currentIndex<=editIndex) { //restore cursor after relayout
+                cursor = Cursor(textLines.size, textLine.size);
             }
             if(o.font) {
                 const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
@@ -149,11 +148,11 @@ void Text::layout() {
             }
         }
         currentIndex++;
-        if(currentIndex==editIndex) cursor = Cursor{textLines.size, textLine.size}; //end of line
+        if(currentIndex<=editIndex) cursor = Cursor(textLines.size, textLine.size); //end of line
         textLines << move(textLine);
     }
     if(!text.size) { assert(editIndex==0); cursor = Cursor(0,0); }
-    else if(currentIndex==editIndex) { assert(textLines); cursor = Cursor{textLines.size-1, textLines.last().size}; } //end of text
+    else if(currentIndex<=editIndex) { assert(textLines); cursor = Cursor(textLines.size-1, textLines.last().size); } //end of text
     links = move(layout.links);
     for(TextLayout::Line layoutLine: layout.lines) {
         for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {
@@ -179,7 +178,7 @@ void Text::render(int2 position, int2 size) {
 }
 
 bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
-    if(!button) return false;
+    if(event==Release || (event==Motion && !button)) return false;
     position -= max(int2(0),(size-textSize)/2);
     if(!Rect(textSize).contains(position)) return false;
     for(uint line: range(textLines.size)) {
@@ -188,20 +187,20 @@ bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
         if(!textLine) goto break_;
         // Before first character
         const Character& first = textLine.first();
-        if(position.x <= first.center) { cursor = Cursor{line,0}; goto break_; }
+        if(position.x <= first.center) { cursor = Cursor(line,0); goto break_; }
         // Between characters
         for(uint column: range(0,textLine.size-1)) {
             const Character& prev = textLine[column];
             const Character& next = textLine[column+1];
-            if(position.x >= prev.center && position.x <= next.center) { cursor = Cursor{line,column+1}; goto break_; }
+            if(position.x >= prev.center && position.x <= next.center) { cursor = Cursor(line,column+1); goto break_; }
         }
         // After last character
         const Character& last = textLine.last();
-        if(position.x >= last.center) { cursor = Cursor{line,textLine.size}; goto break_; }
+        if(position.x >= last.center) { cursor = Cursor(line,textLine.size); goto break_; }
     }
     if(event == Press && textClicked) { textClicked(); return true; }
     break_:;
-    if(event == Press) for(const Link& link: links) if(cursor>link.begin && link.end>cursor) { linkActivated(link.identifier); return true; }
+    if(event == Press) for(const Link& link: links) if(link.begin<cursor && cursor<link.end) { linkActivated(link.identifier); return true; }
     if(event == Press && textClicked) { textClicked(); return true; }
     return false;
 }
@@ -227,16 +226,18 @@ uint Text::index() {
 
 bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button) {
     setCursor(position+Rect(size),::Cursor::Text);
-    setFocus(this);
+    if(event==Press) setFocus(this);
     if(event==Press && button==MiddleButton) {
         Text::mouseEvent(position,size,event,button);
         array<uint> selection = toUTF32(getSelection());
-        editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
+        if(!text) { editIndex=selection.size; text=move(selection); }
+        else { editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat); }
         layout();
         if(textChanged) textChanged(toUTF8(text));
         return true;
     }
-    bool contentChanged = Text::mouseEvent(position,size,event,button);
+    Cursor cursor;
+    bool contentChanged = Text::mouseEvent(position,size,event,button) || this->cursor!=cursor;
     if(event==Press && button==LeftButton) { selectionStart = cursor; return true; }
     return contentChanged;
 }
@@ -247,7 +248,8 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
 
     if(modifiers&Control && key=='v') {
         array<uint> selection = toUTF32(getSelection(true));
-        editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat);
+        if(!text) { text=move(selection); editIndex=selection.size; }
+        else { editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat); }
         layout();
         if(textChanged) textChanged(toUTF8(text));
         return true;

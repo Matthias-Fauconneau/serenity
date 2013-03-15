@@ -7,6 +7,12 @@ Image flip(Image&& image) {
     return move(image);
 }
 
+Image crop(Image&& image, uint x, uint y, uint w, uint h) {
+    assert(x<image.width && y<image.height && x+w<image.width && y+h<image.height);
+    image.buffer=0;
+    return Image(image.buffer, image.data+y*image.stride+x, w, h, image.stride, image.alpha);
+}
+
 Image resize(const Image& image, uint width, uint height) {
     if(!image) return Image();
     if(width==image.width && height==image.height) return copy(image);

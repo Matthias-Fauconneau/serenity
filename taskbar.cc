@@ -39,7 +39,7 @@ struct Taskbar : Socket, Poll {
     Clock clock{16};
     Events calendar;
     Window popup{0,int2(256,-1)};
-    HBox panel;//__(&button, &tasks, &clock);
+    HBox panel;//{&button, &tasks, &clock};
     Window window{0,int2(0,16)};
     uint root=window.root;
     uint desktop=0;

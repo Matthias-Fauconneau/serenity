@@ -79,7 +79,7 @@ void Calendar::setActive(Date active) {
 void Calendar::previousMonth() { active.month--; if(active.month<0) active.year--, active.month=11; setActive(active); }
 void Calendar::nextMonth() { active.month++; if(active.month>11) active.year++, active.month=0; setActive(active); }
 
-Events::Events()/*:VBox(__(&date, &month, &events))*/ {
+Events::Events()/*:VBox{&date, &month, &events}*/ {
     *this<<&date<<&month<<&events; date<<string( "<"_)<<string(""_)<<string(">"_);
     date.main=Linear::Spread;
     date[0].textClicked.connect(this, &Events::previousMonth);

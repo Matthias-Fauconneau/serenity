@@ -23,7 +23,7 @@ struct Calendar : GridSelection<Text> {
 
 /// Shows current date, month grid and events
 struct Events : VBox {
-    HList<Text> date;// __(array<Text>{string( "<"_), string(""_), string(">"_)});
+    HList<Text> date;
     Calendar month;
     Text events;
     signal<> eventAlarm;

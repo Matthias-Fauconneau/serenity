@@ -131,7 +131,7 @@ template<Type T> struct initializer_list {
     /// Slices a reference to elements from \a pos to \a pos + \a size
     initializer_list<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return initializer_list<T>(data+pos,size); }
     /// Slices a reference to elements from to the end of the reference
-    initializer_list<T> slice(uint pos) const { assert(pos<=size); return initializer_list<T>(data+pos,size-pos); }
+    initializer_list<T> slice(uint pos) const { assert(pos<=size,pos,size); return initializer_list<T>(data+pos,size-pos); }
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
     int indexOf(const T& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value

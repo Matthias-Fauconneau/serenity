@@ -124,7 +124,7 @@ Image decodePNG(const ref<byte>& file) {
         assert(palette);
         for(uint i: range(width*height)) image[i]=palette[image[i][0]];
     }
-    return Image(image,width,height,width,true,alpha);
+    return Image(image,image,width,height,width,alpha);
 }
 
 uint32 crc32(const ref<byte>& data) {
