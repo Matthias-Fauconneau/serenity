@@ -3,9 +3,8 @@
 #include "jpeg.h"
 #include "ico.h"
 
-ImageLoader::ImageLoader(URL&& url, Image* target, function<void()>&& imageLoaded, int2 size, uint maximumAge) : target(target), imageLoaded(imageLoaded), size(size) {
-    getURL(move(url), Handler(this, &ImageLoader::load), maximumAge);
-}
+ImageLoader::ImageLoader(URL&& url, Image* target, function<void()>&& imageLoaded, int2 size, uint maximumAge)
+    : target(target), imageLoaded(imageLoaded), size(size) { getURL(move(url), Handler(this, &ImageLoader::load), maximumAge); }
 
 void ImageLoader::load(const URL&, Map&& file) {
     Image image = decodeImage(file);

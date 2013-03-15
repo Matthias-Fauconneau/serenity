@@ -4,15 +4,14 @@
 #include "calendar.h"
 #include "feeds.h"
 
-struct Search : TextInput {
-    string browser;
+struct Runner : TextInput {
     signal<> triggered;
     bool keyPress(Key key, Modifiers modifiers) override;
 };
 
-bool Search::keyPress(Key key, Modifiers modifiers) {
+bool Runner::keyPress(Key key, Modifiers modifiers) {
     if(key == Return) {
-        array<string> args; args<<string("google.com/search?q="_+toUTF8(text)); execute("/usr/bin/chromium-browser"_,args,false);
+        array<string> args; args<<string("-ow=http://google.com/search?q="_+toUTF8(text)); execute("/usr/bin/qupzilla"_,args,false);
         setText(string()); triggered(); return true;
     }
     else return TextInput::keyPress(key, modifiers);
@@ -44,16 +43,28 @@ map<ref<byte>,ref<byte> > readSettings(const ref<byte>& file) {
     return entries;
 }
 
+struct Weather : ImageView {
+    signal<> contentChanged;
+    Weather(){get();}
+    void get() { getURL("http://www.yr.no/place/France/Île-de-France/Orsay/meteogram.png"_, Handler(this, &Weather::load), 2*60); }
+    void load(const URL&, Map&& file) { image = decodeImage(file); contentChanged(); }
+    bool mouseEvent(int2, int2, Event event, Button) { if(event==Press) get(); return false; }
+} test;
+
 /// Displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
 struct Desktop {
     Feeds feeds;
     Scroll<HTML> page;
-    Clock clock{ 64 };
-    Events calendar;
-    VBox timeBox;// {&clock, &calendar};
-    List<Command> shortcuts;
-    HBox applets;//{&feeds, &timeBox, &shortcuts};
-    Window window{&applets,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_};
+
+    Runner runner;
+      Clock clock{ 64 };
+      Events calendar;
+     VBox timeBox;// {&clock, &calendar};
+     List<Command> shortcuts;
+    HBox hbox;//{&feeds, &timeBox, &shortcuts};
+    Weather weather;
+    VBox vbox;//{&runner, &hbox, &weather};
+    Window window{&vbox,0,"Desktop"_,Image(),"_NET_WM_WINDOW_TYPE_DESKTOP"_};
     Window browser{0,0,"Browser"_};
     Desktop() {
         if(!existsFile("launcher"_,config())) log("No launcher settings [.config/launcher]");
@@ -93,9 +104,11 @@ struct Desktop {
         }
 
         timeBox<<&clock<<&calendar;
-        applets<<&feeds<<&timeBox<<&shortcuts;
+        hbox<<&feeds<<&timeBox<<&shortcuts;
+        vbox<<&runner<<&hbox<<&weather;
         clock.timeout.connect(&window, &Window::render);
         feeds.listChanged.connect(&window,&Window::render);
+        weather.contentChanged.connect(&window,&Window::render);
         feeds.pageChanged.connect(this,&Desktop::showPage);
         browser.localShortcut(Escape).connect(&browser, &Window::destroy);
         browser.localShortcut(RightArrow).connect(&feeds, &Feeds::readNext);

@@ -131,7 +131,7 @@ void Text::layout() {
     TextLayout layout(text, size, wrap);
 
     textLines.clear(); textLines.reserve(layout.text.size);
-    cursor.line = -1, cursor.column=-1; uint currentIndex=0;
+    cursor.line = 0, cursor.column=0; uint currentIndex=0;
     for(const TextLayout::TextLine& line: layout.text) {
         TextLine textLine;
         for(const TextLayout::Character& o: line) {
@@ -152,8 +152,8 @@ void Text::layout() {
         if(currentIndex==editIndex) cursor = Cursor{textLines.size, textLine.size}; //end of line
         textLines << move(textLine);
     }
-    if(!text.size) { assert(editIndex==0); cursor = Cursor{0,0}; }
-    else if(currentIndex==editIndex) cursor = Cursor{textLines.size-1, textLines.last().size}; //end of text
+    if(!text.size) { assert(editIndex==0); cursor = Cursor(0,0); }
+    else if(currentIndex==editIndex) { assert(textLines); cursor = Cursor{textLines.size-1, textLines.last().size}; } //end of text
     links = move(layout.links);
     for(TextLayout::Line layoutLine: layout.lines) {
         for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {
@@ -237,7 +237,7 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
         return true;
     }
     bool contentChanged = Text::mouseEvent(position,size,event,button);
-    if(event==Press && button==LeftButton) selectionStart = cursor;
+    if(event==Press && button==LeftButton) { selectionStart = cursor; return true; }
     return contentChanged;
 }
 
@@ -295,7 +295,7 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
             else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';
             else if(key==KP_Multiply) c='*'; else if(key==KP_Add) c='+'; else if(key==KP_Sub) c='-'; else if(key==KP_Divide) c='/';
             else return false;
-            editIndex=index()+1; if(text) text.insertAt(index(), c); else text<<c; layout(); if(textChanged) textChanged(toUTF8(text));
+            editIndex=index()+1; if(text) text.insertAt(index(), c); else text<<c, editIndex=1; layout(); if(textChanged) textChanged(toUTF8(text));
         }
     }
     if(!(modifiers&Shift)) selectionStart=cursor;

@@ -19,7 +19,7 @@ struct Calculator {
     }
 } test;
 #endif
-#if 1
+#if 0
 #include "time.h"
 #include "string.h"
 typedef double real;
@@ -37,30 +37,30 @@ inline real rad(real t) { return t/180*PI; }
 struct Sun {
     Sun(float longitude, float latitude) {
         // Orbital parameters
-        real Ms = 1.9891e30; //Mass of the sun [kg]
-        real m = 5.9736e24; //Mass of the earth [kg]
-        real a = 1.4960e11; //Semi-major axis [m]
         real e = 0.01671123; // Earth eccentricity
         real Omega = rad(348.74); // Longitude of ascending node
         real omega = rad(114.21); // Argument of perihelion
         real epsilon = rad(23.439); //Obliquity of the ecliptic
-        real G = 6.6738e-11; //Gravitationnal constant [N·(m/kg)²]
-        real n = sqrt(G*(Ms+m)/(a*a*a)); //Mean motion [rad/s]
+        real year = 365.2145; //Sidereal year [solar day]
+        real n = 2*PI/(year*24*60*60); //Mean motion [rad/s]
 
-        // J2000 Phases
+        // Time
         real U = currentTime(); //Unix time
         real T = U - 10957.5*24*60*60; // J2000 time [s]
         real M0 = rad(357.51716); //Mean anomaly at J2000
         real GMST0 = 18.697; //J2000 hour angle of the vernal equinox [h]
-        real ratio = 1+24*60*60/(2*PI/n); //Sidereal day per solar day
-        real GMST = GMST0 + ratio*T/60/60; // Greenwich mean sidereal time
+        real ratio = 1+1/year; //Sidereal day per solar day
+        real GMST = GMST0 + ratio*T/60/60; // Greenwich mean sidereal time [h]
 
+        // Positions
         real M = M0 + n*T; //Mean anomaly
         real vu = M + 2*e*sin(M) + 5/4*e*e*sin(2*M); //True anomaly
         real l = vu + Omega + omega; //Ecliptic longitude (Omega + omega = Longitude of the periapsis)
         real lambda = PI + l; //Ecliptic longitude (geocentric)
         real alpha = atan(cos(epsilon)*sin(lambda), cos(epsilon)*cos(lambda)); //Right ascension
         real delta = asin(sin(epsilon)*sin(lambda)); //Declination
+
+        // Hours
         real h = GMST - (longitude + alpha)/PI*12; // Solar hour angle [h]
         real w0 = acos(-tan(latitude)*tan(delta))/PI*12*60*60; // Half day length [s]
         real noon = U-mod(h,24)*60*60; // Solar noon in unix time [s]

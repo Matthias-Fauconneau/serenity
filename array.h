@@ -56,8 +56,8 @@ template<Type T> struct array {
     mutable_ref<T> mutable_slice(uint pos) { return mutable_ref<T>(*this).slice(pos); }
 
     /// \name Accessors
-    const T& at(uint i) const { assert(i<size); return data[i]; }
-    T& at(uint i) { assert(i<size); return data[i]; }
+    const T& at(uint i) const { assert(i<size,i,size); return data[i]; }
+    T& at(uint i) { assert(i<size,i,size); return data[i]; }
     const T& operator [](uint i) const { return at(i); }
     T& operator [](uint i) { return at(i); }
     const T& first() const { return at(0); }

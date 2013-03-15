@@ -17,7 +17,7 @@ Feeds::Feeds() : readConfig("read"_,config(),ReadWrite|Create|Append), readMap(r
 void Feeds::load() {
     clear(); entries.clear(); favicons.clear();
     entries << unique<Entry>(string(),string(":refresh"_),::resize(feedsIcon(),16,16),string("Feeds"_)); *this << &this->entries.last();
-    for(TextData s=readFile("feeds"_,config());s;) { ref<byte> url=s.line(); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 60); }
+    for(TextData s=readFile("feeds"_,config());s;) { ref<byte> url=s.line(); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 30); }
 }
 
 bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
@@ -55,7 +55,7 @@ void Feeds::loadFeed(const URL& url unused, Map&& document) {
     Element feed = parseXML(document);
     string link = feed.text("rss/channel/link"_);
     if(!link) link=string(feed("feed"_)("link"_)["href"_]);
-    assert(link,url);
+    assert(link,url,feed);
     URL channel = URL(link);
     assert(channel.host);
     Favicon* favicon=0;

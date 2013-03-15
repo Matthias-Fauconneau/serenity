@@ -376,8 +376,8 @@ Key Window::KeySym(uint8 code, uint8 state) {
     GetKeyboardMapping req; GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({req.keycode=code; raw(req);}));
     array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
     if(!keysyms) return (Key)0;
-    if(keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
-    return (Key)keysyms[state&1];
+    if(keysyms.size>=2 && keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
+    return (Key)keysyms[state&1 && keysyms.size>=2];
 }
 uint Window::KeyCode(Key sym) {
     uint keycode=0;

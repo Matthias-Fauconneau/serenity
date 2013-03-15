@@ -163,10 +163,30 @@ HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>&
     registerPoll();
 }
 void HTTP::request() {
-    string request = method+" "_+(url.path?:"/"_)+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Browser\r\n"_; //TODO: deflate, gzip
+    string request = method+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"_; //User-Agent: Browser\r\n
     for(const string& header: headers) request << header+"\r\n"_;
     write(string(request+"\r\n"_)); state=Header;
 }
+#if 0
+GET /ggmain.rss HTTP/1.1[CRLF]
+GET /ggmain.rss HTTP/1.1
+Host: www.girlgeniusonline.com[CRLF]
+Host: www.girlgeniusonline.com
+Connection: close[CRLF]
+Connection: close
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8[CRLF]
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US, *[CRLF]
+Accept-Language: en-US, *
+Accept-Charset: ISO-8859-1,UTF-8;q=0.7,*;q=0.7[CRLF]
+Accept-Charset: ISO-8859-1,UTF-8;q=0.7,*;q=0.7
+Cache-Control: no-cache[CRLF]
+Cache-Control: no-cache
+Referer: http://web-sniffer.net/[CRLF]
+
+Referer: http://web-sniffer.net/
+#endif
+
 void HTTP::header() {
     string file = cacheFile(url);
     // Status
@@ -184,6 +204,7 @@ void HTTP::header() {
     else if(status==400) log("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
     else if(status==404) log("Not Found"_,url);
     else if(status==408) log("Request timeout"_);
+    else if(status==500) log("Internal Server Error"_,untilEnd());
     else if(status==502) log("Bad gateway"_);
     else if(status==504) log("Gateway timeout"_);
     else { log("Unhandled status",status,"from",url); state=Done; free(this); return; }
@@ -194,7 +215,7 @@ void HTTP::header() {
         ref<byte> value=until("\r\n"_);
         if(key=="Content-Length"_) contentLength=toInteger(value);
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
-        else if((key=="Location"_ && (status==301||status==302)) || key=="Refresh"_) {
+        else if((key=="Location"_ && status!=200) || key=="Refresh"_) {
             if(startsWith(value,"0;URL="_)) value=value.slice(6);
             url = url.relative(value);
             uint ip = resolve(url.host);
@@ -230,7 +251,7 @@ void HTTP::event() {
         else state=Cache;
     }
     if(state == Cache) {
-        if(!content) log("Missing content",buffer);
+        if(!content) { log("Missing content",buffer); state=Done; free(this); return; }
         if(content.size>1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
         redirect << cacheFile(url);
         for(const string& file: redirect) {Folder(section(file,'/'),cache(),true); writeFile(file,content,cache());}
