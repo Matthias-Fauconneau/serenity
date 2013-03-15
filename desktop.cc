@@ -91,7 +91,7 @@ map<ref<byte>,ref<byte> > readSettings(const ref<byte>& file) {
 struct Weather : ImageView {
     signal<> contentChanged;
     Weather(){get();}
-    void get() { getURL("http://www.yr.no/place/France/Île-de-France/Orsay/meteogram.png"_, Handler(this, &Weather::load), 2*60); }
+    void get() { getURL("http://www.yr.no/place/France/Île-de-France/Orsay/meteogram.png"_, Handler(this, &Weather::load), 60); }
     void load(const URL&, Map&& file) { image = crop(decodeImage(file), 6, 24, 816, 242); contentChanged(); }
     bool mouseEvent(int2, int2, Event event, Button) { if(event==Press) get(); return false; }
 } test;

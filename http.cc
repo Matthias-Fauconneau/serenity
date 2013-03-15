@@ -163,29 +163,10 @@ HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>&
     registerPoll();
 }
 void HTTP::request() {
-    string request = method+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"_; //User-Agent: Browser\r\n
+    string request = method+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"_;
     for(const string& header: headers) request << header+"\r\n"_;
     write(string(request+"\r\n"_)); state=Header;
 }
-#if 0
-GET /ggmain.rss HTTP/1.1[CRLF]
-GET /ggmain.rss HTTP/1.1
-Host: www.girlgeniusonline.com[CRLF]
-Host: www.girlgeniusonline.com
-Connection: close[CRLF]
-Connection: close
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8[CRLF]
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
-Accept-Language: en-US, *[CRLF]
-Accept-Language: en-US, *
-Accept-Charset: ISO-8859-1,UTF-8;q=0.7,*;q=0.7[CRLF]
-Accept-Charset: ISO-8859-1,UTF-8;q=0.7,*;q=0.7
-Cache-Control: no-cache[CRLF]
-Cache-Control: no-cache
-Referer: http://web-sniffer.net/[CRLF]
-
-Referer: http://web-sniffer.net/
-#endif
 
 void HTTP::header() {
     string file = cacheFile(url);
@@ -232,6 +213,7 @@ void HTTP::header() {
 void HTTP::event() {
     if((revents&POLLHUP) && state <= Content) { log("Connection broken",url); state=Done; free(this); return; }
     if(state == Request) { events=POLLIN; request(); return; }
+    if(!(revents&POLLIN)) { log("No data",url,revents); state=Done; free(this); return; }
     if(state == Header) { header(); }
     if(state == Content) {
         if(contentLength) {

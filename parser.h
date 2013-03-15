@@ -15,10 +15,13 @@ struct word {
 inline bool operator ==(word a, word b) { return a.id == b.id; }
 inline const string& str(const word& w) { return pool[w.id]; }
 
+/// Dynamically typed value used as arguments to Action (TODO: runtime type checking)
 struct Value {
+    /// Returns the string representation of the boxed value (for grammar debugging)
     virtual string str() const = 0;
 };
 inline string str(const Value& value) { return value.str(); }
+/// Instance of a dynamic Value
 template<Type T> struct ValueT : Value {
     T value;
     ValueT(T value):value(value){}
@@ -26,15 +29,17 @@ template<Type T> struct ValueT : Value {
     string str() const override { return string(::str(value)); }
 };
 
+/// Dynamically typed function called by parser (TODO: runtime type checking)
 struct Action { virtual unique<Value> invoke(ref< unique<Value> >) const=0; };
-template<Type T, Type... Params> struct ActionFunction;
-template<Type T, Type... Params> struct ActionFunction<T(Params...)> : Action {
+/// Unpacks dynamic Value arguments to call the action implementation
+template<Type F> struct ActionFunction;
+template<Type O, Type T, Type... Params> struct ActionFunction<T (O::*)(Params...) const> : Action {
     function<T(Params...)> f;
     ActionFunction(function<T(Params...)> f):f(f){}
 
     /// Unpacks ref<unique<Value>>
-    template<Type P, Type... R, Type... Args> unique<Value> invoke(ref< unique<Value> > s, Args... args) const {
-        return invoke<R...>(s.slice(1), args..., *(const ValueT<P>*)&s[0]);
+    template<Type P, Type... RemainingParams, Type... Args> unique<Value> invoke(ref< unique<Value> > s, Args... args) const {
+        return invoke<RemainingParams...>(s.slice(1), args..., *(const ValueT<P>*)&s[0]);
     }
     template<Type... Args> unique<Value> invoke(ref< unique<Value> > unused s, Args... args) const {
         assert(s.size==0);
@@ -133,16 +138,12 @@ struct Parser {
     array<word> follow(const word& X);
 
     map<word, unique<Action> > actions;
+    /// References an action implementation as a dynamic ActionFunction
     struct ActionRef {
-        Parser* parser;
-        word name;
-        ActionRef(Parser* parser, word name):parser(parser),name(name){}
-        /// Converts a function value to an ActionFunction reference
-        template<Type T, Type... Args> void operator=(function<T(Args...)> func) {
-            parser->actions.insert(word(name), unique<ActionFunction<T(Args...)>>(func) );
-        }
+        Parser* parser; word name;
+        template<Type F> void operator=(F f) { parser->actions.insert(word(name), unique<ActionFunction<decltype(&F::operator())>>(f)); }
     };
-    ActionRef operator[](const ref<byte>& name) { return ActionRef(this,name); }
+    ActionRef operator[](const ref<byte>& name) { return {this,name}; }
 
     /// Generates a parser from EBNF \a grammar
     void generate(const ref<byte>& grammar);
