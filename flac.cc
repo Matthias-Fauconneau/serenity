@@ -33,7 +33,7 @@ int BitReader::sbinary(int size) {
     return word>>int8(64-size);
 }
 
-static uint8 log2[256];
+static uint8 log2i[256];
 uint BitReader::unary() {
     assert(index<bsize);
     // 64bit word optimization of "uint size=0; while(!bit()) size++; assert(size<(64-8)+64);"
@@ -46,7 +46,7 @@ uint BitReader::unary() {
     assert(w);
     uint8 b=w>>(64-8);
     while(!b) size+=8, w<<=8, b=w>>(64-8);
-    size += log2[b];
+    size += log2i[b];
     index += size+1;
     return size;
 }
@@ -63,7 +63,7 @@ uint BitReader::utf8() {
 }
 
 FLAC::FLAC(const ref<byte>& data) {
-    static bool unused once = ({ int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2[i++]=7-l; assert(i==256); true;});
+    static bool unused once = ({ int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2i[i++]=7-l; assert(i==256); true;});
     BitReader::setData(data);
     assert(startsWith(data,"fLaC"_)); skip(32);
     for(;;) { //METADATA_BLOCK*
@@ -106,17 +106,17 @@ void FLAC::parseFrame() {
     this->blockSize = blockSize;
 }
 
-inline double round(double x) { //setRoundMode(Down) to round towards negative infinity
-    const double lead = 0x1.0p52f+0x1.0p51f; //add leading bit 2**(52-16) to force rounding //+p51 to also force negative numbers
+inline double roundDown(double x) { //depends on setRoundMode(Down) to round towards negative infinity
+    const double lead = 0x1.0p52f+0x1.0p51f; //add leading bit to force rounding (+1p51 to also force negative numbers)
     return x+lead-lead;
 }
 
 template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned, double*& misaligned, float*& signal) {
     double2 sum = {0,0};
     for(uint i: range(unroll)) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers
-    double sample = round(extract(sum,0)+extract(sum,1))+double(*signal); //add residue to prediction [SS2SD=2]
+    double sample = roundDown(extract(sum,0)+extract(sum,1))+double(*signal); //add residue to prediction [SS2SD=2]
     aligned[2*unroll]= misaligned[2*unroll]= sample; aligned++; misaligned++; //write out contexts, misalign align, align misalign
-    *signal = sample; signal++; //write out decoded sample SD2SS=8
+    *signal = sample; signal++; //write out decoded sample [SD2SS=8]
 }
 
 template<int unroll> inline void convolve(double* predictor, double* even, double* odd, float* signal, float* end) {
@@ -233,7 +233,7 @@ void FLAC::decodeFrame() {
         if(order%2) { //for odd order: compute first sample with 'right' predictor without advancing context to begin unrolled loops with even context
             double sum=0;
             for(uint i: range(order)) sum += predictor[i+1] * even[i];
-            double sample = round(sum)+*signal;
+            double sample = roundDown(sum)+*signal;
             even[order]=odd[order]= sample; //write out context
             *signal = sample; signal++; //write out decoded sample //TODO: float
         }

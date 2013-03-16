@@ -6,17 +6,6 @@
 #include "simd.h"
 #include "string.h"
 
-/// Floating point operations
-inline float exp2(float x) { return __builtin_exp2f(x); }
-inline float log2(float x) { return __builtin_log2f(x); }
-inline float exp10(float x) { return exp2(x*log2(10)); }
-inline float log10(float x) { return __builtin_log10f(x); }
-inline float dB(float x) { return 10*log10(x); }
-
-inline string str(const Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
-
-/// SFZ
-
 int noteToMIDI(const ref<byte>& value) {
     int note=24;
     int i=0;

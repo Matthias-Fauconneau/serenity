@@ -176,10 +176,6 @@ template<uint base> string itoa(int64 number, int pad) {
 }
 template string itoa<10>(int64,int);
 
-inline double exp2(double x) { return __builtin_exp2(x); }
-inline double log2(double x) { return __builtin_log2(x); }
-inline double exp10(double x) { return exp2(x*log2(10)); }
-inline double log10(double x) { return __builtin_log10(x); }
 string ftoa(double n, int precision, int pad, int exponent) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return string("NaN"_);

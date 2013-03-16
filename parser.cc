@@ -153,10 +153,10 @@ void Parser::generate(const ref<byte>& grammar) {
     /// Parses grammar
     TextData s(grammar);
     word firstRule=""_;
+    s.skip();
     while(s) {
-        s.skip();
-        if(s.match('#')) { s.line(); continue; }
-        word name = s.until(':'); assert(name); if(!firstRule) firstRule=name;
+        if(s.match('#') || s.match("//"_)) { s.line(); s.skip(); continue; }
+        word name = s.until(':'); assert(name,"Missing rule name"); if(!firstRule) firstRule=name;
         if(rules.contains(name))
             error("duplicate",rules[rules.indexOf(name)],"and", str(name)+":"_+s.line(),
                     " \t(use choice operator '|' instead of multiple rules)");
@@ -168,21 +168,34 @@ void Parser::generate(const ref<byte>& grammar) {
                 Attribute attribute(name, actions.contains(action)?&actions.at(action):0);
                 while(!s.match('}')) {
                     word token = s.word();
-                    assert(token,s.untilEnd());
-                    assert(rule.tokens.contains(token),"'"_+str(token)+"'"_,rule.tokens);
-                    int index = rule.tokens.indexOf(token);
+                    int index=-1;
+                    if(s.match('[')) { index=s.integer(); s.match(']'); }
+                    int found=-1; int count=0;
+                    for(uint i: range(rule.tokens.size)) {
+                        if(rule.tokens[i]!=token) continue;
+                        if(index<0) {
+                             if(count==0) found=i;
+                             else error("Multiple match for",token,"in",rule.tokens);
+                        } else {
+                            if(count==index) found=i;
+                        }
+                        count++;
+                    }
+                    if(found<0) error("No match for",token,"in",rule.tokens);
                     s.match('.');
                     word name = s.word();
                     assert(name,s.until('}'));
-                    attribute.inputs << Attribute::Input{index,name};
+                    if(attribute.inputs.contains(Attribute::Input{found,name})) error(str(token)+"."_+str(name),"used twice");
+                    attribute.inputs << Attribute::Input{found,name};
                     s.skip();
                 }
                 rule.attributes << move(attribute);
                 s.whileAny(" "_);
             }
             rules<< move(rule);
-            if(!s.match('|')) { if(!s.match('\n')) error("Expected newline",s.untilEnd()); break; }
+            if(!s.match('|')) { if(s && !s.match('\n')) error("Expected newline",s.untilEnd()); break; }
         }
+        s.skip();
     }
     //log(rules,'\n');
     rules.insertAt(0,Rule(""_,firstRule));
@@ -300,8 +313,8 @@ Node Parser::parse(const ref<byte>& text) {
         if(action>0) {
             if(verbose) log(input[i],"shift",action,/*states[action].items,"\t",*/stack);
             stack << action;
-            inputStack << i;
             i++;
+            inputStack << i;
         }
         else if(action<0) {
             const Rule& rule=extended[-action];
@@ -320,14 +333,18 @@ Node Parser::parse(const ref<byte>& text) {
                 for(const Attribute& attribute: rule.attributes) {
                     array<unique<Value>> values;
                     if(attribute.inputs) {
-                        for(Attribute::Input input: attribute.inputs) values<< node.children[input.index]->values.take(input.name); //synthesize
+                        for(Attribute::Input input: attribute.inputs) {
+                            if(!node.children[input.index]->values.contains(input.name))
+                                error("Missing attribute '"_+str(input.name)+"' in"_,node.children[input.index],"for",rule);
+                            values<< node.children[input.index]->values.take(input.name); //synthesize
+                        }
                         assert(attribute.action);
                         node.values.insert(attribute.name,attribute.action->invoke(values));
                     } else {
-                        uint begin = inputStack[inputStack.size-1-rule.size()]+1;
+                        uint begin = inputStack[inputStack.size-1-rule.size()];
                         ref<byte> token = text.slice(begin, i-begin); //immediate
                         values << unique< ValueT< ref<byte> > >(token);
-                        assert(attribute.action);
+                        assert(attribute.action, "No action handling attributes for",rule, attribute);
                         node.values.insert(attribute.name, attribute.action->invoke(values));
                     }
                 }

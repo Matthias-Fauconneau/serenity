@@ -37,6 +37,7 @@ struct Sample {
     int16 trigger=0; uint16 lovel=0; uint16 hivel=127; uint16 lokey=0; uint16 hikey=127; //Input controls
     int16 pitch_keycenter=60; uint16 releaseTime=0; int16 amp_veltrack=100; float volume=1; //Performance parameters
 };
+inline string str(const Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
 
 /// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {

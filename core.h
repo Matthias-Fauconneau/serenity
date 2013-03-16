@@ -4,38 +4,25 @@
 // Attributes
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#ifdef __clang__
-#define flatten
-#else
-#define flatten __attribute((flatten))
-#endif
 // Move
 template<Type T> struct remove_reference { typedef T type; };
 template<Type T> struct remove_reference<T&> { typedef T type; };
 template<Type T> struct remove_reference<T&&> { typedef T type; };
 #define remove_reference(T) typename remove_reference<T>::type
 template<Type T> inline __attribute((always_inline)) constexpr remove_reference(T)&& move(T&& t) { return (remove_reference(T)&&)(t); }
-template<Type T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
-#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
-#define move_operator_(T)                        T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
-#define move_operator(T)       no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
-#define default_move(T) T(){} no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&&)=default
-/// Base template for explicit copy (overriden by explicitly copyable types)
+// Base template for explicit copy (overriden by explicitly copyable types)
 template<Type T> T copy(const T& o) { return o; }
-
 // Forward
 template<Type> struct is_lvalue_reference { static constexpr bool value = false; };
 template<Type T> struct is_lvalue_reference<T&> { static constexpr bool value = true; };
 #define is_lvalue_reference(T) is_lvalue_reference<T>::value
 template<Type T> constexpr T&& forward(remove_reference(T)& t) { return (T&&)t; }
 template<Type T> constexpr T&& forward(remove_reference(T)&& t){ static_assert(!is_lvalue_reference(T),""); return (T&&)t; }
-
-// Predicate
-extern void* enabler;
-template<bool> struct predicate {};
-template<> struct predicate<true> { typedef void* type; };
-#define predicate(E) typename predicate<E>::type& condition = enabler
-#define predicate1(E) typename predicate<E>::type& condition1 = enabler
+// Move constructors/operators declarators
+#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
+#define move_operator_(T)                        T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
+#define move_operator(T)       no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&& o)
+#define default_move(T) T(){} no_copy(T); T& operator=(T&& o){this->~T(); new (this) T(move(o)); return *this;} T(T&&)=default
 
 // Integer types
 typedef char byte;
@@ -43,7 +30,6 @@ typedef signed char int8;
 typedef unsigned char uint8;
 typedef signed short int16;
 typedef unsigned short uint16;
-typedef unsigned short ushort;
 typedef signed int int32;
 typedef unsigned int uint32;
 typedef unsigned int uint;
@@ -169,6 +155,7 @@ template<Type T> struct mutable_ref {
 };
 
 // Basic operations
+template<Type T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 template<Type T> constexpr T min(T a, T b) { return a<b ? a : b; }
 template<Type T> constexpr T max(T a, T b) { return a>b ? a : b; }
 template<Type T> constexpr T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
@@ -185,8 +172,18 @@ inline uint align(uint width, uint offset) { assert((width&(width-1))==0); retur
 inline float floor(float x) { return __builtin_floorf(x); }
 inline float round(float x) { return __builtin_roundf(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
-inline float sqrt(float f) { return __builtin_sqrtf(f); }
-inline float pow(float x, float y) { return __builtin_powf(x,y); }
+inline double floor(double x) { return __builtin_floor(x); }
+inline double round(double x) { return __builtin_round(x); }
+inline double ceil(double x) { return __builtin_ceil(x); }
+inline double sqrt(double f) { return __builtin_sqrt(f); }
+inline double pow(double x, double y) { return __builtin_pow(x,y); }
+inline double exp(double x) { return __builtin_exp(x); }
+inline double ln(double x) { return __builtin_log(x); }
+inline double exp2(double x) { return __builtin_exp2(x); }
+inline double log2(double x) { return __builtin_log2(x); }
+inline double exp10(double x) { return exp(x*ln(10)); }
+//inline double exp10(double x) { return __builtin_exp10(x); }
+inline double log10(double x) { return __builtin_log10(x); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);

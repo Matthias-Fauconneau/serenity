@@ -97,7 +97,7 @@ template<Type T> struct array {
     /// Inserts a value at \a index
     T& insertAt(int index, const T& v) { return insertAt(index,copy(v)); }
     /// Inserts an element immediatly after the first lesser value in array
-    flatten int insertSorted(T&& e) { uint i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; } //O_o: +30ms on poisson (never used)
+    int insertSorted(T&& e) { uint i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
     /// Inserts a value immediatly after the first lesser value in array
     int insertSorted(const T& v) { return insertSorted(copy(v)); }
 
@@ -124,7 +124,7 @@ template<Type T> struct array {
     /// Returns whether this array contains any elements matching \a value
     bool contains(const T& key) const { return ref<T>(*this).contains(key); }
     /// Returns index to the last element less than or equal to \a value using binary search (assuming a sorted array)
-    flatten int binarySearch(const T& key) const {
+    int binarySearch(const T& key) const {
         uint min=0, max=size;
         while(min<max) {
             uint mid = (min+max)/2;

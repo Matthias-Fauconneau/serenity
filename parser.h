@@ -57,6 +57,7 @@ struct Attribute {
     struct Input { int index; word name; };
     array<Input> inputs;
 };
+inline bool operator ==(const Attribute::Input& a, const Attribute::Input& b) { return a.index == b.index && a.name == b.name; }
 inline string str(const Attribute::Input& v) { return str(v.index,v.name); }
 inline string str(const Attribute& v) { return str(v.name,"= action("_+str(v.inputs)+")"_); }
 

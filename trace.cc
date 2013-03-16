@@ -125,7 +125,7 @@ Symbol findNearestLine(void* find) {
     for(const Sym& sym: symtab) if(find >= sym.value && find < sym.value+sym.size) symbol.function = demangle(str(strtab+sym.name));
     for(BinaryData& s = debug_line;s.index<s.buffer.size;) {
         uint begin = s.index;
-        struct CU { uint size; ushort version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
+        struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) s.untilNull();
@@ -176,7 +176,7 @@ Symbol findNearestLine(void* find) {
                 address += delta;
             }
             else if(opcode == fixed_advance_pc) {
-                ushort delta = s.read();
+                uint16 delta = s.read();
                 if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
                  address += delta;
             }
