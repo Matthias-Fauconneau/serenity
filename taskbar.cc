@@ -208,10 +208,10 @@ struct Taskbar : Socket, Poll {
         }
         return atom;
     }
-    template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=128*128+2) {
+    template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128) {
         {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
-        {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8;
-            array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
+        {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8; assert(align(4,size)%sizeof(T)==0);
+                    array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size/sizeof(T)*sizeof(T); if(pad) read(pad); return a; }
     }
 
     void raiseTask(uint index) { raise(tasks[index].id); {GrabKey r; r.window=tasks[index].id; r.keycode=escapeCode; send(raw(r));}}

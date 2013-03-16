@@ -1,7 +1,6 @@
 #pragma once
 #include "map.h"
 #include "string.h"
-#include "data.h"
 #include "function.h"
 
 /// word is an index in a string table allowing fast move/copy/compare
@@ -71,8 +70,9 @@ struct Rule {
     Rule(word symbol, word A):symbol(symbol){tokens<<A;}
     Rule(word symbol, word A, word B):symbol(symbol){tokens<<A<<B;}
     Rule(word symbol, array<word>&& tokens):symbol(symbol),tokens(move(tokens)){}
-    Rule(word symbol, array<word>&& tokens, int original, int end, int from, int to, array<Attribute>&& attributes):
-        symbol(symbol),tokens(move(tokens)),original(original),end(end),from(from),to(to),extended(str(from)+str(symbol)+str(to)),attributes(move(attributes)){}
+    Rule(word symbol, array<word>&& tokens, int original, int end, int from, int to, array<Attribute>&& attributes) :
+        symbol(symbol), tokens(move(tokens)), original(original), end(end), from(from), to(to),
+        extended(str(from)+str(symbol)+str(to)), attributes(move(attributes)) {}
     uint size() const { return tokens.size; }
     word operator []( int i ) const { return tokens[i]; }
 };
@@ -125,7 +125,7 @@ struct Parser {
     bool isTerminal(word w) { return terminal.contains(w); }
     bool isNonTerminal(word w) { return nonterminal.contains(w); }
     /// Parses rule expressions and generate rules from EBNF as needed
-    array<word> parseRuleExpression(TextData& s);
+    array<word> parseRuleExpression(struct TextData& s);
     /// Computes item sets
     void computeItemSet(array<Item>& items, int index);
     /// Computes transitions

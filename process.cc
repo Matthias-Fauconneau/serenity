@@ -124,7 +124,7 @@ void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|
 #endif
 void __attribute((constructor(101))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recusive calls
-    rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
+    //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
     check_(sigaction(SIGFPE, &sa, 0));

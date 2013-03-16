@@ -213,7 +213,7 @@ void HTTP::header() {
 void HTTP::event() {
     if((revents&POLLHUP) && state <= Content) { log("Connection broken",url); state=Done; free(this); return; }
     if(state == Request) { events=POLLIN; request(); return; }
-    if(!(revents&POLLIN)) { log("No data",url,revents); state=Done; free(this); return; }
+    if(!(revents&POLLIN) && state <= Content) { log("No data",url,revents,available(1),Data::available(1)); state=Done; free(this); return; }
     if(state == Header) { header(); }
     if(state == Content) {
         if(contentLength) {
@@ -237,7 +237,7 @@ void HTTP::event() {
         if(content.size>1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
         redirect << cacheFile(url);
         for(const string& file: redirect) {Folder(section(file,'/'),cache(),true); writeFile(file,content,cache());}
-        state=Handle; queue(); return;  //Cache other outstanding requests before handling this one
+        state=Handle; queue(); return; //Cache other outstanding requests before handling this one
     }
     if(state==Handle) {
         handler(url,Map(cacheFile(url),cache()));

@@ -10,12 +10,12 @@ template<Type V> struct map<ref<byte>,V> : map<string,V> {
 };
 
 struct Monitor : Timer {
-    UniformGrid<Text> coreList __(2);
-    UniformGrid<Text> processList __(3);
-    VBox layout; //__(&coreList,&processList);
-    Window window __(&layout,int2(-1,-1),"Monitor"_);
-    Folder procfs __("proc"_);
-    Folder coretemp __("sys/bus/platform/drivers/coretemp/coretemp.0"_);
+    UniformGrid<Text> coreList {2};
+    UniformGrid<Text> processList {3};
+    VBox layout; //{&coreList,&processList};
+    Window window {&layout,int2(-1,-1),"Monitor"_};
+    Folder procfs {"proc"_};
+    Folder coretemp {"sys/bus/platform/drivers/coretemp/coretemp.0"_};
 
     /// Returns system statistics
     map<ref<byte>,string> stat() {
@@ -45,7 +45,7 @@ struct Monitor : Timer {
         for(int i: range(1,1+coretemp.list(Files).size/5)) {
             string label = readFile(string("temp"_+dec(i)+"_label"_),coretemp);
             int input = toInteger(readFile(string("temp"_+dec(i)+"_input"_),coretemp))/1000;
-            if(input>89) { window.show(); log(trim(label), dec(input)+"°C"_); }
+            if(input>86) { window.show(); log(trim(label), dec(input)+"°C"_); }
             coreList << move(label)  << string(dec(input)+"°C"_);
         }
 

@@ -1,6 +1,5 @@
 #include "parser.h"
-//#include "process.h"
-#include "file.h"
+#include "data.h"
 
 array<string> pool;
 static const word e = "ε"_;
@@ -289,8 +288,9 @@ void Parser::generate(const ref<byte>& grammar) {
 Node Parser::parse(const ref<byte>& text) {
     /// LR parser
     array<word> input; for(char c: text) input<< str(c); input<<"end"_;
-    array<int> stack; stack<< 0;
-    array<Node> nodeStack;
+    array<int> stack; stack<< 0; // Parser stack
+    array<int> inputStack; inputStack<< 0; // Input position stack
+    array<Node> nodeStack; // Parse tree stack
     constexpr bool verbose = false;
     for(int i=0;;) {
         if(!isTerminal(input[i])) { log("Invalid",input[i]); return input[i]; }
@@ -300,12 +300,12 @@ Node Parser::parse(const ref<byte>& text) {
         if(action>0) {
             if(verbose) log(input[i],"shift",action,/*states[action].items,"\t",*/stack);
             stack << action;
+            inputStack << i;
             i++;
         }
         else if(action<0) {
             const Rule& rule=extended[-action];
             if(verbose) log(input[i],"reduce", -action, rule,"\t",stack);
-
             Node node = rule.symbol;
             array<Node> nonterminal;
             for(word token: rule.tokens) if(!isTerminal(token)) nonterminal<< nodeStack.pop();
@@ -324,7 +324,8 @@ Node Parser::parse(const ref<byte>& text) {
                         assert(attribute.action);
                         node.values.insert(attribute.name,attribute.action->invoke(values));
                     } else {
-                        string token = str(node); //immediate (FIXME: slice input instead of flattening parse tree)
+                        uint begin = inputStack[inputStack.size-1-rule.size()]+1;
+                        ref<byte> token = text.slice(begin, i-begin); //immediate
                         values << unique< ValueT< ref<byte> > >(token);
                         assert(attribute.action);
                         node.values.insert(attribute.name, attribute.action->invoke(values));
@@ -335,8 +336,10 @@ Node Parser::parse(const ref<byte>& text) {
             nodeStack<< move(node);
 
             stack.shrink(stack.size-rule.size());
+            inputStack.shrink(inputStack.size-rule.size());
             if(verbose) log("goto",stack.last(),rule.symbol,states[stack.last()].transitions.at(rule.symbol));
             stack<< states[stack.last()].transitions.at(rule.symbol);
+            inputStack<< i;
         } else break;
     }
     Node root = nodeStack.pop();
