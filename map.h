@@ -5,16 +5,26 @@
 
 template<Type K, Type V> struct const_pair { const K& key; const V& value; };
 template<Type K, Type V> struct pair { K& key; V& value; };
+template<Type K, Type V> struct key_value { K key; V value; };
 /// Associates keys with values
 template<Type K, Type V> struct map {
     array<K> keys;
     array<V> values;
 
-    void reserve(int size) { return keys.reserve(size); values.reserve(size); }
+    default_move(map);
+    map(const ref<key_value<K,V>>& pairs){
+        for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
+    }
+    map(const ref<K>& keys, const ref<V>& values):keys(keys),values(values){ assert(keys.size==values.size); }
+
     uint size() const { return keys.size; }
-    bool contains(const K& key) const { return keys.contains(key); }
-    explicit operator bool() const { return keys.size; }
+    void reserve(int size) { return keys.reserve(size); values.reserve(size); }
     void clear() { keys.clear(); values.clear(); }
+
+    explicit operator bool() const { return keys.size; }
+    bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
+
+    bool contains(const K& key) const { return keys.contains(key); }
 
     const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
     V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}

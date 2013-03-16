@@ -74,7 +74,7 @@ void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at
 Map::Map(const File& file, uint prot) { size=file.size(); data = size?(byte*)check(mmap(0,size,prot,Private,file.fd,0)):0; }
 Map::Map(uint fd, uint offset, uint size, uint prot, uint flags){ this->size=size; data=(byte*)check(mmap(0,size,prot,flags,fd,offset)); }
 Map::~Map() { if(data) munmap((void*)data,size); }
-void Map::lock(uint size) const { check_(mlock(data, min(this->size,size))); }
+void Map::lock(uint size) const { check_(mlock(data, min<size_t>(this->size,size))); }
 
 // File system
 void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at) {

@@ -96,10 +96,10 @@ template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(s
 namespace std {
 template<Type T> struct initializer_list {
     const T* data;
-    uint size;
+    size_t size;
     constexpr initializer_list() : data(0), size(0) {}
     /// References \a size elements from const \a data pointer
-    constexpr initializer_list(const T* data, uint size) : data(data), size(size) {}
+    constexpr initializer_list(const T* data, size_t size) : data(data), size(size) {}
     /// References elements sliced from \a begin to \a end
     constexpr initializer_list(const T* begin,const T* end) : data(begin), size(uint(end-begin)) {}
     /// References elements from a static array
