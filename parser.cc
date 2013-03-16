@@ -71,7 +71,7 @@ array<word> Parser::parseRuleExpression(TextData& s) {
             word token = s.identifier();
             if(token) { tokens<< token; used+=token; }
             if(!s||s.peek()=='|'||s.peek()==')'||s.peek()=='{'||s.peek()=='\n') break;
-            assert(token,str(s.peek()),s.untilEnd());
+            assert(token,s.untilEnd());
         }
     }
     return tokens;
@@ -162,10 +162,17 @@ void Parser::generate(const ref<byte>& grammar) {
                     " \t(use choice operator '|' instead of multiple rules)");
         for(;;) {
             Rule rule(name, parseRuleExpression(s));
-            if(s.match('{')) {
+            while(s.match('{')) {
                 s.skip(); word name=s.word(); s.skip(); s.match(':'); s.skip();
-                word action = s.word(); s.skip();
-                Attribute attribute(name, actions.contains(action)?&actions.at(action):0);
+                int save=s.index;
+                word action = s.word();
+                Attribute attribute(name, 0);
+                if(s.match('.')) s.index=save;
+                else {
+                    if(!actions.contains(action)) { error("Unknown action",action); return; }
+                    attribute.action = &actions.at(action);
+                    s.skip();
+                }
                 while(!s.match('}')) {
                     word token = s.word();
                     int index=-1;
@@ -181,7 +188,7 @@ void Parser::generate(const ref<byte>& grammar) {
                         }
                         count++;
                     }
-                    if(found<0) error("No match for",token,"in",rule.tokens);
+                    if(found<0) error("No match for '"_+str(token)+"' in {"_,rule.tokens,"}"_);
                     s.match('.');
                     word name = s.word();
                     assert(name,s.until('}'));
@@ -193,7 +200,9 @@ void Parser::generate(const ref<byte>& grammar) {
                 s.whileAny(" "_);
             }
             rules<< move(rule);
-            if(!s.match('|')) { if(s && !s.match('\n')) error("Expected newline",s.untilEnd()); break; }
+            if(s.match('|')) continue;
+            else if(s.match('\n')) { s.skip(); if(s.match('|')) continue; else break; }
+            else if(s) { error("Expected newline",s.untilEnd()); break; }
         }
         s.skip();
     }
@@ -306,7 +315,7 @@ Node Parser::parse(const ref<byte>& text) {
     array<Node> nodeStack; // Parse tree stack
     constexpr bool verbose = false;
     for(int i=0;;) {
-        if(!isTerminal(input[i])) { log("Invalid",input[i]); return input[i]; }
+        if(!isTerminal(input[i])) { log("Invalid token '"_+str(input[i])+"'"_); return input[i]; }
         const map<word, int>& transitions = states[stack.last()].transitions;
         if(!transitions.contains(input[i])) { log("Expected {",transitions.keys,"} at ",input.slice(0,i),"|",input.slice(i)); return input[i]; }
         int action = transitions.at(input[i]);
@@ -331,19 +340,28 @@ Node Parser::parse(const ref<byte>& text) {
             }
             if(rule.attributes) {
                 for(const Attribute& attribute: rule.attributes) {
-                    array<unique<Value>> values;
                     if(attribute.inputs) {
-                        for(Attribute::Input input: attribute.inputs) {
-                            if(!node.children[input.index]->values.contains(input.name))
-                                error("Missing attribute '"_+str(input.name)+"' in"_,node.children[input.index],"for",rule);
-                            values<< node.children[input.index]->values.take(input.name); //synthesize
+                        if(attribute.action) {
+                            array<Value*> values;
+                            for(const Attribute::Input& input: attribute.inputs) {
+                                if(!node.children[input.index]->values.contains(input.name))
+                                    error("Missing attribute '"_+str(input.name)+"' in"_,node.children[input.index],"for",rule);
+                                Value* value = &node.children[input.index]->values.at(input.name);
+                                if(!value) error("Attribute was already forwarded, declare forwarding action last");
+                                values<< value; //synthesize
+                            }
+                            node.values.insert(attribute.name,attribute.action->invoke(values));
                         }
-                        assert(attribute.action);
-                        node.values.insert(attribute.name,attribute.action->invoke(values));
+                        else {
+                            if(attribute.inputs.size!=1) error("Invalid forwarding");
+                            const Attribute::Input& input = attribute.inputs[0];
+                            node.values.insert(attribute.name, node.children[input.index]->values.take(input.name)); //or copy ?
+                        }
                     } else {
                         uint begin = inputStack[inputStack.size-1-rule.size()];
                         ref<byte> token = text.slice(begin, i-begin); //immediate
-                        values << unique< ValueT< ref<byte> > >(token);
+                        ValueT<ref<byte>> value(token);
+                        array<Value*> values; values<<&value;
                         assert(attribute.action, "No action handling attributes for",rule, attribute);
                         node.values.insert(attribute.name, attribute.action->invoke(values));
                     }

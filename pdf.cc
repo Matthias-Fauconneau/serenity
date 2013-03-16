@@ -116,7 +116,7 @@ static Variant parse(TextData& s) {
     return Variant();
 }
 static Variant parse(const ref<byte>& buffer) { TextData s(buffer); return parse(s); }
-static map<ref<byte>,Variant> toDict(const array< string >& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.integer()]).dict; }
+static map<ref<byte>,Variant> toDict(const array<string>& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.integer()]).dict; }
 
 void PDF::open(const ref<byte>& data) {
     clear();
@@ -290,7 +290,7 @@ void PDF::open(const ref<byte>& data) {
             //y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
             Cm=Tm=mat32(); array<mat32> stack;
             Font* font=0; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat32 Tlm;
-            array< array<vec2> > path;
+            array<array<vec2>> path;
             array<Variant> args;
             while(s.skip(), s) {
                 ref<byte> id = s.word("'*"_);
@@ -435,7 +435,7 @@ void PDF::open(const ref<byte>& data) {
 }
 
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
-void PDF::drawPath(array<array<vec2> >& paths, int flags) {
+void PDF::drawPath(array<array<vec2>>& paths, int flags) {
     for(array<vec2>& path : paths) {
         for(vec2 p : path) extend(p);
         array<vec2> polyline;

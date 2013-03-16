@@ -266,12 +266,12 @@ struct BlendView : Widget {
                 data.advance(4); //SDNA
                 data.advance(4); //NAME
                 uint nameCount = data.read();
-                array< ref<byte> > names;
+                array<ref<byte>> names;
                 for(uint unused i: range(nameCount)) names << data.untilNull();
                 data.align(4);
                 data.advance(4); //TYPE
                 uint typeCount = data.read();
-                array< ref<byte> > types;
+                array<ref<byte>> types;
                 for(uint unused i: range(typeCount)) types << data.untilNull();
                 data.align(4);
                 data.advance(4); //TLEN

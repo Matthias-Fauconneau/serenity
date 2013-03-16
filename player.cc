@@ -37,8 +37,8 @@ struct Player {
     Slider slider;
     Text remaining = "00:00"_;
     HBox toolbar;//{&playButton, &nextButton, &elapsed, &slider, &remaining};
-    Scroll< List<Text> > albums;
-    Scroll< List<Text> > titles;
+    Scroll< List<Text>> albums;
+    Scroll< List<Text>> titles;
     HBox main;//{ &albums.area(), &titles.area() };
     VBox layout;//{ &toolbar, &main };
     Window window {&layout, int2(-1050/2,-1680/2), "Player"_, pauseIcon()};

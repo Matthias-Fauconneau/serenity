@@ -32,9 +32,9 @@ struct Score {
         Note(int index, int duration) : index(index), duration(duration) {}
         int index,duration,scoreIndex=-1;
     };
-    typedef map<int, map< int, Note> > Staff;
+    typedef map<int, map<int, Note>> Staff;
     array<Staff> notes; //[staff][x][y]
-    map<int, array<vec2> > dots;
+    map<int, array<vec2>> dots;
     //map<vec2,Note> nearStaffLimit;
 
     void parse();

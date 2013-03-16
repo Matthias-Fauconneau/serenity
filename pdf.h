@@ -33,7 +33,7 @@ struct PDF : Widget {
     struct Line { vec2 a,b; bool operator <(const Line& o) const{return a.y<o.a.y || b.y<o.b.y;}};
     array<Line> lines;
     enum Flags { Close=1,Stroke=2,Fill=4,OddEven=8,Winding=16,Trace=32 };
-    void drawPath(array<array<vec2> >& paths, int flags);
+    void drawPath(array<array<vec2>>& paths, int flags);
 
     struct Font {
         string name;
@@ -55,7 +55,7 @@ struct PDF : Widget {
     /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document
     signal<int /*index*/, vec2 /*position*/, float /*size*/,const ref<byte>& /*font*/, int /*code*/, int /*fontIndex*/> onGlyph;
     signal<const ref<vec2>&> onPath;
-    array< array<vec2> > paths;
+    array<array<vec2>> paths;
     float normalizedScale = 0; // normalize positions (scale PDF width to 1280)
 
     map<int,vec4> colors;

@@ -55,7 +55,7 @@ template<> struct predicate<true> { typedef void* type; };
 
 /// Helps modularization by binding unrelated objects through persistent connections
 template<Type... Args> struct signal {
-    array< function<void(Args...)>> delegates;
+    array<function<void(Args...)>> delegates;
     /// Emits the signal to all registered delegates
     void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args...); }
     /// Connects an anonymous function

@@ -123,7 +123,7 @@ void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool 
 string getenv(const ref<byte>& name);
 
 /// Returns command line arguments
-array< ref<byte> > arguments();
+array<ref<byte>> arguments();
 
 /// Returns standard folders
 const Folder& home(); //$HOME

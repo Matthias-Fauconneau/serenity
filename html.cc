@@ -15,7 +15,7 @@ void ImageLoader::load(const URL&, Map&& file) {
     free(this);
 }
 
-static array< ref<byte> > paragraphElement, textElement, boldElement, ignoreElement;
+static array<ref<byte>> paragraphElement, textElement, boldElement, ignoreElement;
 
 void HTML::go(const ref<byte>& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 24*60); }
 void HTML::load(const URL& url, Map&& document) {
@@ -130,7 +130,7 @@ void HTML::flushText() {
 }
 void HTML::flushImages() {
     if(!images) return;
-    UniformGrid<ImageLink>& grid = heap<UniformGrid<ImageLink> >();
+    UniformGrid<ImageLink>& grid = heap<UniformGrid<ImageLink>>();
     grid.reserve(images.size);
     for(URL& image: images) {
         grid<<ImageLink();

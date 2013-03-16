@@ -19,7 +19,7 @@ struct Font {
     Map keep; array<byte> data;
     struct FT_FaceRec_*  face=0;
     float fontSize=0, ascender=0;
-    map<uint, map<uint16, Glyph> > cache;
+    map<uint, map<uint16, Glyph>> cache;
 
     Font(){}
     move_operator(Font):keep(move(o.keep)),data(move(o.data)),face(o.face),fontSize(o.fontSize),ascender(o.ascender),cache(move(o.cache)){ o.face=0; }

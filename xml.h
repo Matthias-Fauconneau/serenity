@@ -7,8 +7,8 @@
 /// XML element providing DOM-like access
 struct Element {
     string name, content;
-    map< string, string > attributes;
-    array< unique<Element> > children; //inline array of heap Element instead of heap array of inline Element (faster resize)
+    map<string, string> attributes;
+    array<unique<Element>> children; //inline array of heap Element instead of heap array of inline Element (faster resize)
     Element(){}
     /// Creates a content element from \a content
     Element(string&& content):content(move(content)){}

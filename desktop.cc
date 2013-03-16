@@ -75,8 +75,8 @@ bool Command::mouseEvent(int2, int2, Event event, Button button) {
     return false;
 }
 
-map<ref<byte>,ref<byte> > readSettings(const ref<byte>& file) {
-    map<ref<byte>,ref<byte> > entries;
+map<ref<byte>,ref<byte>> readSettings(const ref<byte>& file) {
+    map<ref<byte>,ref<byte>> entries;
     for(TextData s(file);s;) {
         if(s.matchAny("[#"_)) s.line();
         else {
@@ -123,7 +123,7 @@ struct Desktop {
                 if(!desktop || startsWith(desktop,"#"_)) continue;
                 if(!existsFile(desktop)) { warn("Missing settings","'"_+desktop+"'"_); continue; }
                 string file = readFile(desktop);
-                map<ref<byte>,ref<byte> > entries = readSettings(file);
+                map<ref<byte>,ref<byte>> entries = readSettings(file);
 
                 static constexpr ref<byte> iconPaths[] = {
                     "/usr/share/pixmaps/"_,

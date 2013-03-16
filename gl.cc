@@ -43,16 +43,16 @@ GLUniform GLShader::operator[](const ref<byte>& name) {
 
 GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
     id = glCreateProgram();
-    array< ref<byte> > knownTags;
+    array<ref<byte>> knownTags;
     for(uint type: (uint[]){GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {
-        array< ref<byte> > tags_;
+        array<ref<byte>> tags_;
         tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
         string global, main;
         TextData s (source);
         array<uint> scope;
         for(uint nest=0;s;) { //for each line
-            static array< ref<byte> > qualifiers = split("struct const uniform attribute varying"_);
-            static array< ref<byte> > types = split("void float vec2 vec3 vec4"_);
+            static array<ref<byte>> qualifiers = split("struct const uniform attribute varying"_);
+            static array<ref<byte>> types = split("void float vec2 vec3 vec4"_);
             uint lineStart = s.index;
             s.whileAny(" \t"_);
             ref<byte> identifier = s.identifier("_"_);

@@ -49,7 +49,7 @@ Element::Element(TextData& s, bool html) {
         s.skip();
     }
     if(html) {
-        static array< ref<byte> > voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
+        static array<ref<byte>> voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
         if(voidElements.contains(name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
             s.skip();
@@ -143,9 +143,9 @@ string Element::str(uint depth) const {
 string str(const Element& e) { return e.str(); }
 
 string unescape(const ref<byte>& xml) {
-    static map< ref<byte>, ref<byte> > entities;
+    static map<ref<byte>, ref<byte>> entities;
     if(!entities) {
-        array< ref<byte> > kv = split(
+        array<ref<byte>> kv = split(
 "quot \" acute ´ amp & apos ' lt < gt > nbsp \xA0 copy © euro € reg ® trade ™ lsaquo ‹ rsaquo › ldquo “ rdquo ” laquo « raquo » rsquo ’ hellip … ndash – not ¬ mdash — "
 "larr ← uarr ↑ rarr → darr ↓ infin ∞ deg ° middot · bull • "
 "aacute á Aacute Á agrave à Agrave À acirc â ccedil ç Ccedil Ç eacute é Eacute É egrave è Egrave È ecirc ê euml ë ocirc ô ouml ö oslash ø oelig œ iacute í icirc î Icirc Î iuml ï ugrave ù ucirc û szlig ß yen ¥"_,' ');

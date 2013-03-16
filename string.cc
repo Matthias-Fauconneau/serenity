@@ -92,8 +92,8 @@ double toDecimal(const ref<byte>& number) {
 
 /// string
 
-array< ref<byte> > split(const ref<byte>& str, byte sep) {
-    array< ref<byte> > list;
+array<ref<byte>> split(const ref<byte>& str, byte sep) {
+    array<ref<byte>> list;
     auto b=str.begin();
     auto end=str.end();
     for(;;) {

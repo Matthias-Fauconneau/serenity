@@ -21,23 +21,23 @@ struct Monitor : Timer {
     map<ref<byte>,string> stat() {
         string stat = File("stat"_,procfs).readUpTo(4096);
         const ref<byte> keys[]={""_,"user"_, "nice"_, "idle"_};
-        array< ref<byte> > fields = split(stat,' ');
-        map< ref<byte>, string> stats;
+        array<ref<byte>> fields = split(stat,' ');
+        map<ref<byte>, string> stats;
         for(uint i: range(3)) stats[keys[i]]=string(fields[i]);
         return stats;
     }
     /// Returns process statistics
     map<ref<byte>, string> stat(const ref<byte>& pid) {
         const ref<byte> keys[]={"pid"_, "name"_, "state"_, "parent"_, "group"_, "session"_, "tty"_, "tpgid"_, "flags"_, "minflt"_, "cminflt"_, "majflt"_, "cmajflt"_, "utime"_, "stime"_, "cutime"_, "cstime"_, "priority"_, "nice"_, "#threads"_, "itrealvalue"_, "starttime"_, "vsize"_, "rss"_};
-        map< ref<byte>, string> stats;
+        map<ref<byte>, string> stats;
         if(!existsFolder(pid,procfs)) return stats;
         string stat = File("stat"_,Folder(pid,procfs)).readUpTo(4096);
-        array< ref<byte> > fields = split(stat,' ');
+        array<ref<byte>> fields = split(stat,' ');
         for(uint i: range(24)) stats[string(keys[i])]=string(fields[i]);
         return stats;
     }
     map<ref<byte>, string> system;
-    map<ref<byte>, map<ref<byte>,string> > process;
+    map<ref<byte>, map<ref<byte>,string>> process;
     Monitor() { window.localShortcut(Escape).connect(&exit); layout<<&coreList<<&processList; event(); }
     void event() {
         // Thermal monitor
@@ -58,7 +58,7 @@ struct Monitor : Timer {
         }
         map<ref<byte>, string>& o = this->system;
         map<ref<byte>, string> n = stat();
-        map<ref<byte>, map<ref<byte>, string> > process;
+        map<ref<byte>, map<ref<byte>, string>> process;
         for(const string& pid: procfs.list(Folders)) if(isInteger(pid)) process[pid]=stat(pid);
         if(o) {
             processList.clear();

@@ -18,7 +18,7 @@ template<Type T> struct array {
     /// Allocates a buffer for \a capacity elements and fill with value
     array(uint capacity, uint size, const T& value):size(size){assert(capacity>=size); reserve(capacity); ::clear(data,size,value);}
     /// Copies elements from a reference
-    explicit array(const ref<T>& ref){reserve(ref.size); size=ref.size; for(uint i: range(ref.size)) new (&at(i)) T(ref[i]);}
+    explicit array(const ref<T>& ref){reserve(ref.size); size=ref.size; for(uint i: range(ref.size)) new (data+i) T(ref[i]);}
     /// References \a size elements from const \a data pointer
     array(const T* data, uint size):data((T*)data),size(size){}
     /// If the array own the data, destroys all initialized elements and frees the buffer
@@ -31,7 +31,7 @@ template<Type T> struct array {
         }
     }
     /// Resizes the array to \a size and default initialize new elements
-    void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (&at(i)) T(); }
+    void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (data+i) T(); }
     /// Sets the array size to \a size and destroys removed elements
     void shrink(uint size) { assert(capacity && size<=this->size); for(uint i: range(size,this->size)) at(i).~T(); this->size=size; }
     /// Removes all elements
@@ -70,7 +70,7 @@ template<Type T> struct array {
     array& operator<<(T&& e) {uint s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
     array& operator<<(array<T>&& a) {uint s=size+a.size; reserve(s); copy((byte*)end(),(byte*)a.data,a.size*sizeof(T)); size=s; return *this; }
     array& operator<<(const T& v) { *this<< copy(v); return *this; }
-    array& operator<<(const ref<T>& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (&at(s+i)) T(copy(a[i])); return *this; }
+    array& operator<<(const ref<T>& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (data+s+i) T(copy(a[i])); return *this; }
     /// \}
 
     /// \name Appends once (if not already contained) operators
@@ -90,8 +90,8 @@ template<Type T> struct array {
     /// Inserts an element at \a index
     T& insertAt(int index, T&& e) {
         reserve(++size);
-        for(int i=size-2;i>=index;i--) copy((byte*)&at(i+1),(const byte*)&at(i),sizeof(T));
-        new (&at(index)) T(move(e));
+        for(int i=size-2;i>=index;i--) copy((byte*)(data+i+1),(const byte*)(data+i),sizeof(T));
+        new (data+index) T(move(e));
         return at(index);
     }
     /// Inserts a value at \a index
@@ -102,7 +102,7 @@ template<Type T> struct array {
     int insertSorted(const T& v) { return insertSorted(copy(v)); }
 
     /// Removes one element at \a index
-    void removeAt(uint index) { at(index).~T(); for(uint i: range(index, size-1)) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); size--; }
+    void removeAt(uint index) { at(index).~T(); for(uint i: range(index, size-1)) copy((byte*)(data+i),(byte*)(data+i+1),sizeof(T)); size--; }
     /// Removes one element at \a index and returns its value
     T take(int index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value

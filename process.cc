@@ -173,7 +173,7 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     for(uint i: range(args0.size)) argv[i]=args0[i];
     argv[args0.size]=0;
 
-    array< ref<byte> > env0;
+    array<ref<byte>> env0;
     static string environ = File("proc/self/environ"_).readUpTo(4096);
     for(TextData s(environ);s;) env0<<s.until('\0');
 
@@ -196,7 +196,7 @@ string getenv(const ref<byte>& name) {
     return string();
 }
 
-array< ref<byte> > arguments() {
+array<ref<byte>> arguments() {
     static string arguments = File("proc/self/cmdline"_).readUpTo(4096);
     return split(section(arguments,0,1,-1),0);
 }

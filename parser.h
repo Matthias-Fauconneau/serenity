@@ -29,7 +29,7 @@ template<Type T> struct ValueT : Value {
 };
 
 /// Dynamically typed function called by parser (TODO: runtime type checking)
-struct Action { virtual unique<Value> invoke(ref< unique<Value> >) const=0; };
+struct Action { virtual unique<Value> invoke(ref<Value*>) const=0; };
 /// Unpacks dynamic Value arguments to call the action implementation
 template<Type F> struct ActionFunction;
 template<Type O, Type T, Type... Params> struct ActionFunction<T (O::*)(Params...) const> : Action {
@@ -37,14 +37,14 @@ template<Type O, Type T, Type... Params> struct ActionFunction<T (O::*)(Params..
     ActionFunction(function<T(Params...)> f):f(f){}
 
     /// Unpacks ref<unique<Value>>
-    template<Type P, Type... RemainingParams, Type... Args> unique<Value> invoke(ref< unique<Value> > s, Args... args) const {
-        return invoke<RemainingParams...>(s.slice(1), args..., *(const ValueT<P>*)&s[0]);
+    template<Type A, Type... RemainingArgs, Type... Args> unique<Value> invoke(ref<Value*> pack, Args... args) const {
+        return invoke<RemainingArgs...>(pack.slice(1), args..., *(const ValueT<A>*)pack[0]);
     }
-    template<Type... Args> unique<Value> invoke(ref< unique<Value> > unused s, Args... args) const {
-        assert(s.size==0);
-        return (unique< ValueT<T> >)f(args...);
+    template<Type... Args> unique<Value> invoke(ref<Value*> unused empty, Args... args) const {
+        assert(empty.size==0);
+        return (unique<ValueT<T>>)f(args...);
     }
-    unique<Value> invoke(ref< unique<Value> > s) const override { return invoke<Params...>(s); }
+    unique<Value> invoke(ref<Value*> s) const override { return invoke<Params...>(s); }
 };
 
 struct Attribute {
@@ -107,8 +107,8 @@ inline string str(const State& state) { return " "_+str(state.items,"\n+"_); }
 
 struct Node {
     word name;
-    array<unique<Node> > children;
-    map<word, unique<Value> > values;
+    array<unique<Node>> children;
+    map<word, unique<Value>> values;
     Node(word name):name(name){}
 };
 inline string str(const Node& node) {
@@ -132,13 +132,13 @@ struct Parser {
     /// Computes transitions
     void computeTransitions(int current, word token);
     /// Computes first set
-    map<word, array<word> > firstSets;
+    map<word, array<word>> firstSets;
     array<word> first(const word& X);
     array<word> first(const word& X, const ref<word>& Y);
     /// Computes follow set
     array<word> follow(const word& X);
 
-    map<word, unique<Action> > actions;
+    map<word, unique<Action>> actions;
     /// References an action implementation as a dynamic ActionFunction
     struct ActionRef {
         Parser* parser; word name;

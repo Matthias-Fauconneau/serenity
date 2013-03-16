@@ -44,7 +44,7 @@ struct Matrix {
     Row operator[](uint i) { assert(i<m); return {rows[i],n}; }
 
     uint m=0,n=0; /// row and column count
-    array< array<Element> > rows;
+    array<array<Element>> rows;
 };
 
 inline float Matrix::operator()(uint i, uint j) const {

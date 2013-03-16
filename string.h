@@ -12,7 +12,7 @@ bool operator <(const ref<byte>& a, const ref<byte>& b);
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 ref<byte> section(const ref<byte>& str, byte separator, int begin=0, int end=1);
 /// Returns an array of references splitting \a str wherever \a separator occurs
-array< ref<byte> > split(const ref<byte>& str, byte separator=' ');
+array<ref<byte>> split(const ref<byte>& str, byte separator=' ');
 /// Returns a reference with heading and trailing whitespace removed
 ref<byte> trim(const ref<byte>& s);
 
@@ -102,8 +102,8 @@ template<Type A, Type B> struct Cat {
 };
 /// Concatenation operators
 template<Type Aa, Type Ab, Type Ba, Type Bb> Cat<Cat<Aa, Ab>, Cat<Ba, Bb>> operator+(const Cat<Aa, Ab>& a, const Cat<Ba, Bb>& b) { return {a,b}; }
-template<Type Aa, Type Ab> Cat< Cat<Aa, Ab>, ref<byte> > operator+(const Cat<Aa, Ab>& a, const ref<byte>& b) { return {a,b}; }
-inline Cat< ref<byte>, ref<byte> > operator+(const ref<byte>& a, const ref<byte>& b) { return {a,b}; }
+template<Type Aa, Type Ab> Cat< Cat<Aa, Ab>, ref<byte>> operator+(const Cat<Aa, Ab>& a, const ref<byte>& b) { return {a,b}; }
+inline Cat< ref<byte>, ref<byte>> operator+(const ref<byte>& a, const ref<byte>& b) { return {a,b}; }
 
 /// Forwards concatenation
 template<Type A, Type B> const Cat<A,B>& str(const Cat<A,B>& s) { return s; }

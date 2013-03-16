@@ -246,7 +246,7 @@ void Score::parse() {
     staffs << (lastClef.y+110); //add a last split at the bottom of the last page
 
     /// Lengthens dotted notes
-    for(pair< int,array<vec2> > dots: this->dots) {
+    for(pair< int,array<vec2>> dots: this->dots) {
         for(vec2 pos: dots.value) for(int x : notes[dots.key].keys) {
             if(x>pos.x-16) break;
             if(x>pos.x-48) for(int y : notes[dots.key][x].keys) if(-y>pos.y-16&&-y<pos.y+32) notes[dots.key][x].at(y).duration = notes[dots.key][x].at(y).duration*3/2;
@@ -254,11 +254,11 @@ void Score::parse() {
     }
 
     /// Fix chords with diadics (shifted x positions) or double notes
-    for(map<int, map< int, Note> >& staff : notes) {
+    for(map<int, map<int, Note>>& staff : notes) {
         for(uint i: range(staff.keys.size)) {
             if(i>0) {
-                int pX = staff.keys[i-1]; map< int, Note>& lastChord = staff.values[i-1];
-                int x = staff.keys[i]; map< int, Note>& chord = staff.values[i];
+                int pX = staff.keys[i-1]; map<int, Note>& lastChord = staff.values[i-1];
+                int x = staff.keys[i]; map<int, Note>& chord = staff.values[i];
                 int lastD=0; for(const Note& note: lastChord.values) lastD=max(lastD, note.duration);
                 again: ;
                 for(int y: chord.keys) {
@@ -374,7 +374,7 @@ trillCancelTie: ;
     /// Removes duplicates (added to tie only once)
     for(Staff& staff: notes) {
         for(uint i: range(staff.keys.size)) {
-            map< int, Note>& chord = staff.values[i];
+            map<int, Note>& chord = staff.values[i];
             for(uint i=0;i<chord.size();) {
                 for(uint j=0;j<chord.size();j++) {
                     if(i!=j && chord.keys[i]==chord.keys[j]) { chord.keys.removeAt(i), chord.values.removeAt(i); goto continue2; }
