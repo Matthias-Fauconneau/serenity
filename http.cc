@@ -163,7 +163,7 @@ HTTP::HTTP(URL&& url, Handler handler, array<string>&& headers, const ref<byte>&
     registerPoll();
 }
 void HTTP::request() {
-    string request = method+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"_;
+    string request = method+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Serenity\r\n"_;
     for(const string& header: headers) request << header+"\r\n"_;
     write(string(request+"\r\n"_)); state=Header;
 }

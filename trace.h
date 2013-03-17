@@ -2,6 +2,7 @@
 /// \file trace.h stack trace using ELF/DWARF debug informations
 #include "string.h"
 
+string demangle(const ref<byte>& symbol);
 struct Symbol { string function; ref<byte> file; uint line=0; };
 /// Returns debug symbol nearest to address
 Symbol findNearestLine(void* address);

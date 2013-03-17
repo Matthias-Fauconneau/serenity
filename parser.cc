@@ -331,7 +331,7 @@ Node Parser::parse(const ref<byte>& text) {
             Node node = rule.symbol;
             array<Node> nonterminal;
             for(word token: rule.tokens) if(!isTerminal(token)) nonterminal<< nodeStack.pop();
-            if(!rule.attributes && nonterminal.size==1) { // automatically forward attributes
+            if(!rule.attributes && nonterminal.size==1) { // automatically forward all attributes (TODO: partial forward)
                 node.values = move(nonterminal.first().values);
             }
             for(word token: rule.tokens) {
@@ -342,7 +342,7 @@ Node Parser::parse(const ref<byte>& text) {
                 for(const Attribute& attribute: rule.attributes) {
                     if(attribute.inputs) {
                         if(attribute.action) {
-                            array<Value*> values;
+                            array<const Value*> values;
                             for(const Attribute::Input& input: attribute.inputs) {
                                 if(!node.children[input.index]->values.contains(input.name))
                                     error("Missing attribute '"_+str(input.name)+"' in"_,node.children[input.index],"for",rule);
@@ -355,13 +355,12 @@ Node Parser::parse(const ref<byte>& text) {
                         else {
                             if(attribute.inputs.size!=1) error("Invalid forwarding");
                             const Attribute::Input& input = attribute.inputs[0];
-                            node.values.insert(attribute.name, node.children[input.index]->values.take(input.name)); //or copy ?
+                            node.values.insert(attribute.name, node.children[input.index]->values.take(input.name)); //move
                         }
                     } else {
                         uint begin = inputStack[inputStack.size-1-rule.size()];
-                        ref<byte> token = text.slice(begin, i-begin); //immediate
-                        ValueT<ref<byte>> value(token);
-                        array<Value*> values; values<<&value;
+                        ValueT<ref<byte>> value = text.slice(begin, i-begin);
+                        array<const Value*> values; values<<&value;
                         assert(attribute.action, "No action handling attributes for",rule, attribute);
                         node.values.insert(attribute.name, attribute.action->invoke(values));
                     }

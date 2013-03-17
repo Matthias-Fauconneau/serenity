@@ -54,6 +54,7 @@ bool isInteger(const ref<byte>& s) {
 
 long toInteger(const ref<byte>& number, int base) {
     assert(base>=2 && base<=16);
+    assert(number);
     int sign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
@@ -141,8 +142,8 @@ string simplify(string&& s) {
     return move(s);
 }
 
-string repeat(char c, uint times) {
-    string s; for(uint unused i: range(times)) s<<c; return s;
+string repeat(const ref<byte>& s, uint times) {
+    string r; for(uint unused i: range(times)) r<<s; return r;
 }
 
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return r; }

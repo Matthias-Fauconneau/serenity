@@ -107,7 +107,8 @@ string demangle(TextData& s, bool function=true) {
     if(ref) r<<'&';
     return r;
 }
-string demangle(const ref<byte>& symbol) { TextData s(symbol); return s.match('_')&&s.peek()=='Z'? demangle(s) : string(s.untilEnd()); }
+//string demangle(const ref<byte>& symbol) { TextData s(symbol); return s.match('_')&&s.peek()=='Z'? demangle(s) : string(s.untilEnd()); }
+string demangle(const ref<byte>& symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findNearestLine(void* find) {
     static Map exe = "/proc/self/exe"_;

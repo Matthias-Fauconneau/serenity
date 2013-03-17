@@ -6,6 +6,7 @@
 
 /// Convenient partial template specialization to automatically copy ref<byte> keys
 template<Type V> struct map<ref<byte>,V> : map<string,V> {
+    V& at(ref<byte> key) { return map<string,V>::at(string(key)); }
     V& operator [](ref<byte> key) { return map<string,V>::operator[](string(key)); }
 };
 
@@ -43,8 +44,8 @@ struct Monitor : Timer {
         // Thermal monitor
         coreList.clear();
         for(int i: range(1,1+coretemp.list(Files).size/5)) {
-            string label = readFile(string("temp"_+dec(i)+"_label"_),coretemp);
-            int input = toInteger(readFile(string("temp"_+dec(i)+"_input"_),coretemp))/1000;
+            string label = File(string("temp"_+dec(i)+"_label"_),coretemp).readUpTo(64);
+            int input = toInteger(File(string("temp"_+dec(i)+"_input"_),coretemp).readUpTo(64))/1000;
             if(input>86) { window.show(); log(trim(label), dec(input)+"°C"_); }
             coreList << move(label)  << string(dec(input)+"°C"_);
         }
@@ -65,9 +66,10 @@ struct Monitor : Timer {
             processList << string("Name"_) << string("RSS (MB)"_) << string("CPU (%)"_);
             for(string& pid: procfs.list(Folders)) if(isInteger(pid)) {
                 map<ref<byte>,string>& o = this->process[pid];
+                if(!o) continue; //new process
                 map<ref<byte>,string>& p = process[pid];
                 ref<byte> name = p["name"_].slice(1,p["name"_].size-2);
-                int cpu = toInteger(p["utime"_])-toInteger(o["utime"_])+toInteger(p["stime"_])-toInteger(o["stime"_]);
+                int cpu = toInteger(p.at("utime"_))-toInteger(o.at("utime"_))+toInteger(p.at("stime"_))-toInteger(o.at("stime"_));
                 float rss = toInteger(p["rss"_])*4/1024.f;
                 if(p["state"_]=="R"_||rss>=2) processList << string(name) << ftoa(rss,1) << dec(cpu);
             }

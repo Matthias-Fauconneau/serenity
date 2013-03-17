@@ -229,6 +229,7 @@ template<Type T> struct unique {
     template<Type O> unique(unique<O>&& o){pointer=o.pointer; o.pointer=0;}
     template<Type O> unique& operator=(unique<O>&& o){this->~unique(); pointer=o.pointer; o.pointer=0; return *this;}
     /// Instantiates a new value
+    unique(T&& o):pointer(&heap<T>(move(o))){}
     template<Type... Args> unique(Args&&... args):pointer(&heap<T>(forward<Args>(args)...)){}
     ~unique() { if(pointer) free(pointer); }
     operator T&() { return *pointer; }
@@ -240,3 +241,4 @@ template<Type T> struct unique {
     explicit operator bool() { return pointer; }
     bool operator !() const { return !pointer; }
 };
+template<Type T> unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.pointer)); }

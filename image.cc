@@ -8,7 +8,7 @@ Image flip(Image&& image) {
 }
 
 Image crop(Image&& image, uint x, uint y, uint w, uint h) {
-    assert(x<image.width && y<image.height && x+w<image.width && y+h<image.height);
+    x=min(x,image.width); y=min(y,image.height); w=min(w,image.width-x); h=min(h,image.height-y);
     image.buffer=0;
     return Image(image.buffer, image.data+y*image.stride+x, w, h, image.stride, image.alpha);
 }
@@ -74,5 +74,5 @@ Image decodeImage(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
-    else { if(file.size) log("Unknown image format"_,hex(file.slice(0,min(file.size,4u)))); return Image(); }
+    else { if(file.size) log("Unknown image format"_,/*hex(file.slice(0,min(file.size,4ul)))*/file); return Image(); }
 }
