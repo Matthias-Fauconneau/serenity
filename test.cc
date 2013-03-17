@@ -100,13 +100,18 @@ struct Unit {
             Name quantity = quantities.keys[i];
             map<Name, int>& dimensions = quantities.values[i];
             for(;;) { //may match several times
-                for(auto dimension: dimensions)
+                for(auto dimension: dimensions) {
                     if((dimension.value>0 && base[dimension.key]<dimension.value) ||
                        (dimension.value<0 && base[dimension.key]>dimension.value) ) goto break2_;
+                }
                 /*else*/ {
-                    for(auto dimension: dimensions) base[dimension.key] -= dimension.value;
-                    for(auto unit: units) if(unit.quantity == quantity) { simple.base[unit] += 1; goto break_; }// Find the SI unit for the quantity
-                        /**/ else error("No unit for quantity",quantity);
+                    for(auto unit: units) {
+                        if(unit.quantity == quantity) { // Find the SI unit for the quantity
+                            simple.base[unit] += 1;
+                            for(auto dimension: dimensions) base[dimension.key] -= dimension.value; //Removes the matched dimensions
+                            goto break_;
+                        }
+                    } /*else*/ error("No unit for quantity",quantity);
                     break_:;
                 }
             }
@@ -149,7 +154,23 @@ real magnitude(const Unit& a, const Unit& b) {
 }
 
 struct Quantity { real value; Unit unit; };
-template<> string str(const Quantity& o) { Unit u = o.unit.minimal(); return str(ftoa(o.value*u.magnitude()/o.unit.magnitude(),4,0,1),u); }
+template<> string str(const Quantity& o) {
+    Unit unit = o.unit.minimal();
+    real value = o.value*unit.magnitude()/o.unit.magnitude();
+    int exponent = round(log10(value)/3); // Engineer notation
+    string prefixedUnit;
+    if(exponent) {
+        for(auto u: unit.base) if(u.value==1) {
+            assert(exponent>=-3 && exponent <= 3);
+            prefixedUnit = ref<ref<byte>>{"n"_,"μ"_,"m"_,""_,"K"_,"M"_,"G"_}[exponent+3] + u.key.name;
+            u.key.name = prefixedUnit;
+            value /= exp10(3*exponent);
+            goto break_;
+        } /*else*/ error("exponent");
+        break_:;
+    }
+    return str(value,unit);
+}
 Quantity operator+(const Quantity& a, const Quantity& b) { return {a.value*magnitude(a.unit,b.unit)+b.value, copy(b.unit)}; }
 Quantity operator-(const Quantity& a, const Quantity& b) { return {a.value*magnitude(a.unit,b.unit)-b.value, copy(b.unit)}; }
 Quantity operator*(const Quantity& a, const Quantity& b) { return {a.value*b.value,a.unit*b.unit}; }
