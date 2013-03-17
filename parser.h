@@ -125,6 +125,7 @@ struct Node {
     word name;
     array<unique<Node>> children;
     map<word, unique<Value>> values;
+    ref<byte> input;
     Node(word name):name(name){}
 };
 inline string str(const Node& node) {

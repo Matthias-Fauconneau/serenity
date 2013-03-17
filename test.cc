@@ -27,8 +27,8 @@ int operator/(const map<Name, int>& A, const map<Name, int>& B) {
     return times;
 }
 
+static Dimensions dimensionless;
 static map<Name, Dimensions> quantities = {
-{"1"_,{}}, // Dimensionless
 // Base quantities
 {"length"_,{{"L"_,1}}},
 {"time"_,{{"T"_,1}}},
@@ -43,7 +43,7 @@ static map<Name, Dimensions> quantities = {
 
 struct ReferenceUnit {
     Name name, quantity; real magnitude;
-    const Dimensions& dimensions() const { return quantities[quantity]; }
+    const Dimensions& dimensions() const { return quantities.contains(quantity) ? quantities.at(quantity) : dimensionless; }
 };
 bool operator ==(const ReferenceUnit& a, const ReferenceUnit& b) { return a.name == b.name; }
 template<> string str(const ReferenceUnit& o) { return string(o.name); }
@@ -55,14 +55,16 @@ static ref<ReferenceUnit> units = {
     // Time
     {"s"_,"time"_,1},{"min"_,"time"_,60},{"h"_,"time"_,60*60},{"days"_,"time"_,24*60*60},
     {"weeks"_,"time"_,7*24*60*60},{"years"_,"time"_,365.25*24*60*60},
-    {"Hz"_,"frequency"_,1}
+    {"Hz"_,"frequency"_,1},
+    // Digital storage
+    {"b"_,"information"_,1},{"B"_,"information"_,8}
 };
 
 struct UnitTerm {
     ReferenceUnit unit; int power; //unit power
-    int prefix; //magnitude exponent prefix
-    UnitTerm(ReferenceUnit unit, int power, int prefix=0):unit(unit),power(power),prefix(prefix){}
-    real magnitude() const { return pow(unit.magnitude*exp10(prefix), power); }
+    Name prefix; real prefixValue=0; // prefix magnitude modifier
+    UnitTerm(ReferenceUnit unit, int power):unit(unit),power(power){}
+    real magnitude() const { return pow(unit.magnitude*prefixValue, power); }
     Dimensions dimensions() const { return power*unit.dimensions(); }
 };
 
@@ -92,13 +94,14 @@ struct Unit {
     Unit minimal() const {
         Dimensions dimensions = this->dimensions();
         Unit simple;
-        for(int i=quantities.size()-1; i>0; i--) { // Greedily match quantities from most complex to simplest
+        for(int i=quantities.size()-1; i>0 && dimensions; i--) { // Greedily match quantities from most complex to simplest
             Dimensions& quantity = quantities.values[i];
             int times = dimensions/quantity;
             if(!times) continue;
             simple.units << unitsFor(quantity).first();
             dimensions -= times * quantity; //Removes the matched dimensions
         }
+        for(UnitTerm unit: units) if(!unit.dimensions()) simple.units << unit; // forward dimensionless quantities
         return simple;
     }
 };
@@ -107,10 +110,7 @@ template<> string str(const Unit& o) {
     string s;
     for(UnitTerm unit: o.units) {
         assert(unit.power!=0);
-        static ref<ref<byte>> prefixes =
-        {"n"_,"·10¹ n"_,"·10² n"_,"μ"_,"·10¹ μ"_,"·10² μ"_,"m"_,"c"_,"d"_,""_,"D"_,"h"_,"K"_,"·10¹ K"_,"·10² K"_,"M"_,"·10¹ M"_,"·10² M"_,"G"_};
-        assert(unit.prefix>=-9 && unit.prefix <= 9 && unit.prefix%3==0);
-        s << prefixes[unit.prefix+9] << unit.unit.name;
+        s << unit.prefix << unit.unit.name;
         if(unit.power<0) s << "⁻"_;
         if(unit.power!=1) s << utf8(toUTF32("⁰¹²³⁴⁵⁶⁷⁸⁹"_)[abs(unit.power)]);
     }
@@ -118,7 +118,7 @@ template<> string str(const Unit& o) {
 }
 Unit operator*(const Unit& a, const Unit& b) { Unit p = copy(a); p.units << b.units; return p; }
 Unit operator/(const Unit& a, const Unit& b) {
-    Unit p = copy(a); for(const UnitTerm& unit: b.units) p.units << UnitTerm(unit.unit, -unit.power, unit.prefix);
+    Unit p = copy(a); for(const UnitTerm& unit: b.units) { UnitTerm u=unit; u.power=-u.power; p.units << u; }
     return p;
 }
 /// Returns the ratio of the magnitude of a over the magnitude of b for comparable quantities
@@ -131,18 +131,26 @@ struct Quantity { real value; Unit unit; };
 template<> string str(const Quantity& o) {
     Unit unit = o.unit.minimal();
     real value = o.value*o.unit.magnitude()/unit.magnitude();
-    //TODO: refine unit selection before using prefix notation
     for(UnitTerm& u: unit.units) {
-        for(const UnitTerm& alt: unitsFor(u.dimensions())) {
-            real altValue = value*u.magnitude()/alt.magnitude();
-            if( abs(log10(altValue)) < abs(log10(value)) ) u=alt, value=altValue; // Greedily minimize log distance to 1
+        if(u.dimensions()) {
+            for(const UnitTerm& alt: unitsFor(u.dimensions())) {
+                real altValue = value*u.magnitude()/alt.magnitude();
+                if( abs(log10(altValue)) < abs(log10(value)) ) u=alt, value=altValue; // Greedily minimize log distance to 1
+            }
+        } else {
+            for(const ReferenceUnit& alt: units) if(alt.quantity == u.unit.quantity) {
+                real altValue = value*u.magnitude()/alt.magnitude;
+                if( abs(log10(altValue)) < abs(log10(value)) ) u=UnitTerm(alt,1), value=altValue; // Greedily minimize log distance to 1
+            }
         }
     }
-    int exponent = round(log10(value)/3)*3;
+    int exponent = round(log10(value)/3);
     if(exponent) {
         for(UnitTerm& u: unit.units) if(u.power==1) {
-            u.prefix = exponent;
-            value /= exp10(exponent);
+            static ref<ref<byte>> prefixes = {"n"_,"μ"_,"m"_,""_,"K"_,"M"_,"G"_};
+            assert(exponent>=-3 && exponent <= 3, value, exponent);
+            u.prefix = prefixes[exponent+3];
+            value /= exp10(exponent*3);
             break;
         }
     }
@@ -172,16 +180,23 @@ struct Calculator {
         parser["unit"_]=  [](ref<byte> name)->Unit{
             for(const ReferenceUnit& unit: units) if(unit.name==name) return Unit{array<UnitTerm>{UnitTerm(unit,1)}};
            error("Unknown unit", name);
-           return Unit{array<UnitTerm>{UnitTerm({name,"1"_,1},1)}}; //Create a new dimensionless unit
+           return Unit{array<UnitTerm>({UnitTerm({name,name,1},1)})}; //Create a new dimensionless unit
         };
         parser["unitMul"_] = [](const Unit& a, const Unit& b)->Unit { return a*b; };
         parser["unitDiv"_] = [](const Unit& a, const Unit& b)->Unit { return a/b; };
+        parser["prefixUnit"_]=[](const ref<byte>& prefix, const Unit& unit)->Unit {
+            Unit u=copy(unit);
+            u.units.first().prefix = prefix;
+            u.units.first().prefixValue = map<Name, real>{{"n"_,1e-9},{"μ"_,1e-6},{"m"_,1e-3},{"K"_,1e3},{"M"_,1e6},{"G"_,1e9},
+                                                                                     {"Ki"_,1024},{"Mi"_,pow(1024,2)},{"Gi"_,1e-9}}.at(prefix);
+            return u;
+        };
         // S-attributed EBNF grammar for quantity calculus
         //TODO: for(units) rules << {name, {unit: []{ return unit }}};
         parser.generate( //TODO: own file
                     R"(
                     S: Expr
-                      | Expr " in " Unit {quantity: convert Expr.quantity Unit.unit}
+                      | Expr " in " UnitExpr {quantity: convert Expr.quantity UnitExpr.unit}
                     Expr: Term
                           | Expr '+' Term {quantity: add Expr.quantity Term.quantity}
                           | Expr '-' Term {quantity: sub Expr.quantity Term.quantity}
@@ -189,18 +204,21 @@ struct Calculator {
                           | Term '*' Factor {quantity: mul Term.quantity Factor.quantity}
                           | Term '/' Factor {quantity: div Term.quantity Factor.quantity}
                     Factor: Number {quantity: dimensionless Number.value}
-                              | Number Unit {quantity: quantity Number.value Unit.unit}
+                              | Number UnitExpr {quantity: quantity Number.value UnitExpr.unit}
                               | '(' Expr ')'
                     Number: Decimal
                                 | Decimal 'e' Integer {value: e Decimal.value Integer.value}
                                 | Decimal 'p' Integer {value: p Decimal.value Integer.value}
                     Decimal: '-'? [0-9]+ ('.' [0-9]+)? {value: decimal}
                     Integer:  '-'? [0-9]+ {value: decimal}
-                    Unit: ("m"|"m²"|"m³"|"L"|"s"|"h"|"min"|"days"|"weeks"|"years"|"Hz") {unit: unit}
-                          #| Unit '.' Unit {unit: unitMul Unit[0].unit Unit[1].unit}
-                          #| Unit '/' Unit {unit: unitDiv Unit[0].unit Unit[1].unit}
+                    UnitExpr: Unit
+                                 | Prefix Unit {unit: prefixUnit Prefix Unit.unit }
+                               #| Unit '.' Unit {unit: unitMul Unit[0].unit Unit[1].unit}
+                               #| Unit '/' Unit {unit: unitDiv Unit[0].unit Unit[1].unit}
+                    Unit: ("m"|"L"|"s"|"h"|"min"|"days"|"weeks"|"years"|"Hz"|"b"|"B") {unit: unit}
+                    Prefix: ("n"|"μ"|"m"|"K"|"M"|"G"|"Ki"|"Mi"|"Gi")
                                                       )"_);
-                const ref<byte>& input =  "0.01L"_;
+        const ref<byte>& input =  "1GiB"_;
         Node result = parser.parse(input);
         log(input,"=",result.values.at("quantity"_));
     }

@@ -191,7 +191,6 @@ void Parser::generate(const ref<byte>& grammar) {
                     if(found<0) error("No match for '"_+str(token)+"' in {"_,rule.tokens,"}"_);
                     s.match('.');
                     word name = s.word();
-                    assert(name,s.until('}'));
                     if(attribute.inputs.contains(Attribute::Input{found,name})) error(str(token)+"."_+str(name),"used twice");
                     attribute.inputs << Attribute::Input{found,name};
                     s.skip();
@@ -329,6 +328,8 @@ Node Parser::parse(const ref<byte>& text) {
             const Rule& rule=extended[-action];
             if(verbose) log(input[i],"reduce", -action, rule,"\t",stack);
             Node node = rule.symbol;
+            uint begin = inputStack[inputStack.size-1-rule.size()];
+            node.input = text.slice(begin, i-begin);
             array<Node> nonterminal;
             for(word token: rule.tokens) if(!isTerminal(token)) nonterminal<< nodeStack.pop();
             if(!rule.attributes && nonterminal.size==1) { // automatically forward all attributes (TODO: partial forward)
@@ -342,13 +343,19 @@ Node Parser::parse(const ref<byte>& text) {
                 for(const Attribute& attribute: rule.attributes) {
                     if(attribute.inputs) {
                         if(attribute.action) {
+                            array<ValueT<ref<byte>>> literals; //need to stay allocated
                             array<const Value*> values;
                             for(const Attribute::Input& input: attribute.inputs) {
-                                if(!node.children[input.index]->values.contains(input.name))
-                                    error("Missing attribute '"_+str(input.name)+"' in"_,node.children[input.index],"for",rule);
-                                Value* value = &node.children[input.index]->values.at(input.name);
-                                if(!value) error("Attribute was already forwarded, declare forwarding action last");
-                                values<< value; //synthesize
+                                if(input.name) {
+                                    if(!node.children[input.index]->values.contains(input.name))
+                                        error("Missing attribute '"_+str(input.name)+"' in"_,node.children[input.index],"for",rule);
+                                    Value* value = &node.children[input.index]->values.at(input.name);
+                                    if(!value) error("Attribute was already forwarded, declare forwarding action last");
+                                    values<< value;
+                                } else { //literal attribute
+                                    literals << copy(node.children[input.index]->input);
+                                    values << &literals.last();
+                                }
                             }
                             node.values.insert(attribute.name,attribute.action->invoke(values));
                         }
@@ -357,9 +364,8 @@ Node Parser::parse(const ref<byte>& text) {
                             const Attribute::Input& input = attribute.inputs[0];
                             node.values.insert(attribute.name, node.children[input.index]->values.take(input.name)); //move
                         }
-                    } else {
-                        uint begin = inputStack[inputStack.size-1-rule.size()];
-                        ValueT<ref<byte>> value = text.slice(begin, i-begin);
+                    } else { //No arguments (literal attribute)
+                        ValueT<ref<byte>> value = copy(node.input);
                         array<const Value*> values; values<<&value;
                         assert(attribute.action, "No action handling attributes for",rule, attribute);
                         node.values.insert(attribute.name, attribute.action->invoke(values));
