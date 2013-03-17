@@ -55,7 +55,7 @@ int main() {
 typedef double real;
 typedef ref<byte> Name;
 
-static map<Name, map<Name, int>> dimensions = {
+static map<Name, map<Name, int>> quantities = {
 {"1"_,{}}, // Dimensionless
 // Base quantities
 {"length"_,{{"L"_,1}}},
@@ -66,11 +66,17 @@ static map<Name, map<Name, int>> dimensions = {
 {"frequency"_,{{"T"_,-1}}}
         };
 
-struct ReferenceUnit { Name name; Name dimension; real magnitude; };
+struct ReferenceUnit { Name name; Name quantity; real magnitude; };
 bool operator ==(const ReferenceUnit& a, const ReferenceUnit& b) { return a.name == b.name; }
 template<> string str(const ReferenceUnit& o) { return string(o.name); }
 
-static ref<ReferenceUnit> units = {{"s"_,"time"_,1},{"min"_,"time"_,60},{"h"_,"time"_,60*60}};
+static ref<ReferenceUnit> units = {
+    // Time
+    {"s"_,"time"_,1},{"min"_,"time"_,60},{"h"_,"time"_,60*60},{"days"_,"time"_,24*60*60},
+    {"weeks"_,"time"_,7*24*60*60},{"years"_,"time"_,365.25*24*60*60},
+    // Frequency
+    {"Hz"_,"frequency"_,1}
+};
 
 struct Unit {
     map<ReferenceUnit, int> base; // Set of units composing this one
@@ -83,8 +89,33 @@ struct Unit {
     /// Returns the decomposition of this unit on the canonical basic dimensions (L,T,M,Θ)
     map<Name, int> canonical() const {
         map<Name, int> base;
-        for(auto unit: this->base) for(auto dimension: dimensions[unit.key.dimension]) base[dimension.key] += unit.value*dimension.value;
+        for(auto unit: this->base) for(auto dimension: quantities[unit.key.quantity]) base[dimension.key] += unit.value*dimension.value;
         return base;
+    }
+    /// Returns the simplification of this unit in a minimal number of reference units
+    Unit minimal() const {
+        map<Name, int> base = canonical();
+        Unit simple;
+        for(int i=quantities.size()-1; i>0; i--) { // Greedily match quantities from most complex to simplest
+            Name quantity = quantities.keys[i];
+            map<Name, int>& dimensions = quantities.values[i];
+            for(;;) { //may match several times
+                for(auto dimension: dimensions)
+                    if((dimension.value>0 && base[dimension.key]<dimension.value) ||
+                       (dimension.value<0 && base[dimension.key]>dimension.value) ) goto break2_;
+                /*else*/ {
+                    for(auto dimension: dimensions) base[dimension.key] -= dimension.value;
+                    for(auto unit: units) if(unit.quantity == quantity) { simple.base[unit] += 1; goto break_; }// Find the SI unit for the quantity
+                        /**/ else error("No unit for quantity",quantity);
+                    break_:;
+                }
+            }
+            break2_: ;
+        }
+        for(auto unit: this->base) { // Appends any remaining dimensionless units
+            if(unit.key.quantity=="1"_) simple.base[unit.key] = unit.value;
+        }
+        return simple;
     }
 };
 Unit copy(const Unit& o) { return {copy(o.base)}; }
@@ -118,7 +149,7 @@ real magnitude(const Unit& a, const Unit& b) {
 }
 
 struct Quantity { real value; Unit unit; };
-template<> string str(const Quantity& o) { return str(o.value,o.unit); }
+template<> string str(const Quantity& o) { Unit u = o.unit.minimal(); return str(ftoa(o.value*u.magnitude()/o.unit.magnitude(),4,0,1),u); }
 Quantity operator+(const Quantity& a, const Quantity& b) { return {a.value*magnitude(a.unit,b.unit)+b.value, copy(b.unit)}; }
 Quantity operator-(const Quantity& a, const Quantity& b) { return {a.value*magnitude(a.unit,b.unit)-b.value, copy(b.unit)}; }
 Quantity operator*(const Quantity& a, const Quantity& b) { return {a.value*b.value,a.unit*b.unit}; }
@@ -135,16 +166,18 @@ struct Calculator {
         parser["sub"_] = [](const Quantity& a, const Quantity& b)->Quantity{ return a-b; };
         parser["mul"_] = [](const Quantity& a, const Quantity& b)->Quantity{ return a*b; };
         parser["div"_] =  [](const Quantity& a, const Quantity& b)->Quantity{ return a/b; };
-        parser["unit"_]=  [](ref<byte> name)->Unit{
-            for(const ReferenceUnit& unit: units) if(unit.name==name) return Unit{{{unit,1}}};
-           error("Unknown unit", name);
-            return {{{{name,"1"_,1},1}}}; //Create a new dimensionless unit
-        };
         parser["dimensionless"_]=[](real value)->Quantity{ return {value}; };
         parser["quantity"_]=[](real value, const Unit& unit)->Quantity{ return {value, copy(unit)}; };
         parser["convert"_]=  [](const Quantity& from, const Unit& to)->Quantity{
             return {from.value*magnitude(from.unit,to), copy(to)};
         };
+        parser["unit"_]=  [](ref<byte> name)->Unit{
+            for(const ReferenceUnit& unit: units) if(unit.name==name) return Unit{{{unit,1}}};
+           error("Unknown unit", name);
+            return {{{{name,"1"_,1},1}}}; //Create a new dimensionless unit
+        };
+        parser["unitMul"_] = [](const Unit& a, const Unit& b)->Unit { return a*b; };
+        parser["unitDiv"_] = [](const Unit& a, const Unit& b)->Unit { return a/b; };
         // S-attributed EBNF grammar for quantity calculus
         //TODO: for(units) rules << {name, {unit: []{ return unit }}};
         parser.generate( //TODO: own file
@@ -165,11 +198,11 @@ struct Calculator {
                                 | Decimal 'p' Integer {value: p Decimal.value Integer.value}
                     Decimal: '-'? [0-9]+ ('.' [0-9]+)? {value: decimal}
                     Integer:  '-'? [0-9]+ {value: decimal}
-                    Unit: ("h"|"min") {unit: unit}
-                          #| Unit Unit {unit: product Unit[0].unit Unit[1].unit}
-                          #| Unit '/' Unit {unit: per Unit[0].unit Unit[1].unit}
+                    Unit: ("s"|"h"|"min"|"days"|"weeks"|"years"|"Hz") {unit: unit}
+                          #| Unit '.' Unit {unit: unitMul Unit[0].unit Unit[1].unit}
+                          #| Unit '/' Unit {unit: unitDiv Unit[0].unit Unit[1].unit}
                                                       )"_);
-                const ref<byte>& input =  "3h in min"_;
+                const ref<byte>& input =  "1/48000Hz"_;
         Node result = parser.parse(input);
         log(input,"=",result.values.at("quantity"_));
     }
