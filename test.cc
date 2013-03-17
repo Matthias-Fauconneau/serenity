@@ -213,12 +213,13 @@ struct Calculator {
                     Integer:  '-'? [0-9]+ {value: decimal}
                     UnitExpr: Unit
                                  | Prefix Unit {unit: prefixUnit Prefix Unit.unit }
-                               #| Unit '.' Unit {unit: unitMul Unit[0].unit Unit[1].unit}
-                               #| Unit '/' Unit {unit: unitDiv Unit[0].unit Unit[1].unit}
+                                 | Unit '/' Unit {unit: unitDiv Unit[0].unit Unit[1].unit}
+                               #| Unit Unit {unit: unitMul Unit[0].unit Unit[1].unit}
                     Unit: ("m"|"L"|"s"|"h"|"min"|"days"|"weeks"|"years"|"Hz"|"b"|"B") {unit: unit}
                     Prefix: ("n"|"μ"|"m"|"K"|"M"|"G"|"Ki"|"Mi"|"Gi")
                                                       )"_);
-        const ref<byte>& input =  "1GiB"_;
+        const ref<byte>& input =  "100Kib/s"_;
+                //const ref<byte>& input =  "1GiB/100Kib/s"_;
         Node result = parser.parse(input);
         log(input,"=",result.values.at("quantity"_));
     }

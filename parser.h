@@ -119,7 +119,7 @@ struct State {
     map<word, int> transitions;
 };
 inline bool operator ==(const State& a, const State& b) { return a.items==b.items; }
-inline string str(const State& state) { return " "_+str(state.items,"\n+"_); }
+inline string str(const State& state) { return " "_+str(state.items,"\n "_); }
 
 struct Node {
     word name;

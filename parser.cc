@@ -276,7 +276,7 @@ void Parser::generate(const ref<byte>& grammar) {
                 if(states[rule.end].transitions.contains(token)) {
                     int a = states[rule.end].transitions[token];
                     if(a<0) error("reduce/reduce conflict",token,rule,states[-a]);
-                    else error("shift/reduce conflict '"_+str(token)+"'\n"_+str(rule)+"\n"_+str(states[rule.end]));
+                    else error("shift/reduce conflict on '"_+str(token)+"' for rule "_+str(rule)+"\nState:\n"_+str(states[rule.end]));
                 }
                 states[rule.end].transitions.insert(token, -i);
             }
