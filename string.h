@@ -76,7 +76,7 @@ template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)
 template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
-string ftoa(double number, int precision=4, int pad=0, int exponent=0);
+string ftoa(double number, int precision=3, int pad=0, int exponent=0);
 inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
