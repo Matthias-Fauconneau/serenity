@@ -238,7 +238,7 @@ void Parser::generate(const ref<byte>& grammar) {
     /// Creates extended grammar
     int i=0; for(State& state: states) {
         for(Item& item: state.items) {
-            if(item.dot==0) { // && item.size() ?
+            if(item.dot==0) {
                 array<word> tokens; int last=i;
                 for(word token: item.rule().tokens) {
                     int t = states.at(last).transitions.at(token);
@@ -252,7 +252,6 @@ void Parser::generate(const ref<byte>& grammar) {
         }
         i++;
     }
-    //rules = move(extended);
 
     /// Compute follow sets before merging
     //TODO: check if there are recursive rules which would fail
@@ -273,12 +272,15 @@ void Parser::generate(const ref<byte>& grammar) {
     /// Adds LALR reductions using rules final state and follow set
     {int i=0; for(Rule& rule: extended) {
             for(word token: rule.followSet) {
+#define GLR 1
+#if !GLR
                 if(states[rule.end].transitions.contains(token)) {
                     int a = states[rule.end].transitions[token];
                     if(a<0) error("reduce/reduce conflict",token,rule,states[-a]);
                     else error("shift/reduce conflict on '"_+str(token)+"' for rule "_+str(rule)+"\nState:\n"_+str(states[rule.end]));
                 }
-                states[rule.end].transitions.insert(token, -i);
+#endif
+                states[rule.end].transitions.insertMulti(token, -i);
             }
             i++;
         }}
@@ -306,30 +308,43 @@ void Parser::generate(const ref<byte>& grammar) {
     }
 }
 
+static constexpr bool verbose = false;
 Node Parser::parse(const ref<byte>& text) {
-    /// LR parser
     array<word> input; for(char c: text) input<< str(c); input<<"end"_;
+    return parse(input);
+}
+Node Parser::parse(const ref<word>& input) {
     array<int> stack; stack<< 0; // Parser stack
     array<int> inputStack; inputStack<< 0; // Input position stack
     array<Node> nodeStack; // Parse tree stack
-    constexpr bool verbose = false;
+
     for(int i=0;;) {
-        if(!isTerminal(input[i])) { log("Invalid token '"_+str(input[i])+"'"_); return input[i]; }
+        word token = input[i];
+        if(!isTerminal(token)) { log("Invalid token '"_+str(token)+"'"_); return Node(""_); }
         const map<word, int>& transitions = states[stack.last()].transitions;
-        if(!transitions.contains(input[i])) { log("Expected {",transitions.keys,"} at ",input.slice(0,i),"|",input.slice(i)); return input[i]; }
-        int action = transitions.at(input[i]);
+        if(!transitions.contains(token)) { log("Expected {",transitions.keys,"} at ",input.slice(0,i),"|",input.slice(i)); return Node(""_); }
+        array<int> actions = transitions.multi(token);
+        if(actions.size!=1) {
+            log(actions,"conflicts on ",token);
+            for(int action: actions) {
+                if(action>0) log("shift",states[action]);
+                if(action<0) log("reduce",extended[-action]);
+            }
+            return Node(""_);
+        }
+        int action = actions.first();
         if(action>0) {
-            if(verbose) log(input[i],"shift",action,/*states[action].items,"\t",*/stack);
+            if(verbose) log(token,"shift",action,/*states[action].items,"\t",*/stack);
             stack << action;
             i++;
             inputStack << i;
         }
         else if(action<0) {
             const Rule& rule=extended[-action];
-            if(verbose) log(input[i],"reduce", -action, rule,"\t",stack);
+            if(verbose) log(token,"reduce", -action, rule,"\t",stack);
             Node node = rule.symbol;
             uint begin = inputStack[inputStack.size-1-rule.size()];
-            node.input = text.slice(begin, i-begin);
+            node.input = str(input.slice(begin, i-begin),""_);
             array<Node> nonterminal;
             for(word token: rule.tokens) if(!isTerminal(token)) nonterminal<< nodeStack.pop();
             if(!rule.attributes && nonterminal.size==1) { // automatically forward all attributes (TODO: partial forward)
@@ -378,6 +393,7 @@ Node Parser::parse(const ref<byte>& text) {
             stack.shrink(stack.size-rule.size());
             inputStack.shrink(inputStack.size-rule.size());
             if(verbose) log("goto",stack.last(),rule.symbol,states[stack.last()].transitions.at(rule.symbol));
+            assert(states[stack.last()].transitions.multi(rule.symbol).size==1);
             stack<< states[stack.last()].transitions.at(rule.symbol);
             inputStack<< i;
         } else break;

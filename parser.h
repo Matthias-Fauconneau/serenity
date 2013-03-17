@@ -10,7 +10,7 @@ template<Type T> struct remove_const { typedef T type; };
 template<Type T> struct remove_const<const T> { typedef T type; };
 #define remove_const(T) typename remove_const<T>::type
 
-/// word is an index in a string table allowing fast move/copy/compare
+/// word is an index in a string table allowing fast move/copy/compare (but slower instanciation)
 extern array<string> pool;
 struct word {
     int id;
@@ -165,6 +165,8 @@ struct Parser {
 
     /// Generates a parser from EBNF \a grammar
     void generate(const ref<byte>& grammar);
-    /// Generates a syntax tree by parsing \a input
+    /// Parses \a text using characters as token (scannerless)
     Node parse(const ref<byte>& input);
+    /// Parses \a input calling semantic actions and generating a syntax tree
+    Node parse(const ref<word>& input);
 };

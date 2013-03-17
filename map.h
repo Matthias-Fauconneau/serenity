@@ -29,6 +29,12 @@ template<Type K, Type V> struct map {
     const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
     V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
 
+    array<V> multi(const K& key) const {
+        array<V> multi;
+        for(auto pair: *this) if(pair.key==key) multi << pair.value;
+        return multi;
+    }
+
     const V& value(const K& key, V&& value) {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : value;
