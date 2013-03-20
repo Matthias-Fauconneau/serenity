@@ -86,7 +86,7 @@ void Record::capture(float* audio, uint audioSize) {
         AVFrame *frame = avcodec_alloc_frame();
         frame->nb_samples = audioSize;
         if(audioSize != 1024) error("Bad frame size");
-        int16* audio16 = allocate64<int16>(audioSize*2);
+        buffer<int16> audio16(audioSize*2);
         for(uint i: range(audioSize*2)) {
             float s = audio[i]*0x1p-16;
             if(s < -(1<<15) || s >= (1<<15) ) error(s);
@@ -98,7 +98,6 @@ void Record::capture(float* audio, uint audioSize) {
         AVPacket pkt={}; av_init_packet(&pkt);
         int gotAudioPacket;
         avcodec_encode_audio2(audioCodec, &pkt, frame, &gotAudioPacket);
-        unallocate(audio16);
         avcodec_free_frame(&frame);
         if (gotAudioPacket) {
             pkt.stream_index = audioStream->index;

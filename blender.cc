@@ -508,10 +508,7 @@ struct BlendView : Widget {
             }
         }
 
-        for(uint i=0; i<models.size;) {
-            Model& model = models[i];
-            if(!model.instances) { models.removeAt(i); continue; } else i++;
-        }
+        models.filter([](const Model& model){return !model.instances;});
 
         quicksort(models); // Sorts by rendering cost (i.e render most instanced object last)
 

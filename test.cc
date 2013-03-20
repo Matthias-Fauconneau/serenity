@@ -1,10 +1,10 @@
 #include "parser.h"
 #include "process.h"
 
-struct GLRTest {
-    GLRTest() {
+struct EarleyTest {
+    EarleyTest() {
         Parser parser;
-        parser.generate(
+        /*parser.generate(
                     R"(
                     Term: Factor
                           | Term '/' Factor
@@ -13,9 +13,17 @@ struct GLRTest {
                     UnitExpr: 'u'
                                  | 'u' '/' 'u'
                     )"_);
-        const ref<byte>& input =  "xu/u"_;
-                //const ref<byte>& input =  "1GiB/100Kib/s"_;
-        Node result = parser.parse(input);
-        log(input,"=",result.values.at("quantity"_));
+        const ref<byte>& input =  "xu/u"_;*/
+
+        parser.generate(
+                            R"(
+                            S: M
+                              | S '+' M
+                            M: T
+                              | M '*' T
+                            T: '1'|'2'|'3'|'4'
+                            )"_);
+        const ref<byte>& input =  "2+3*4"_;
+        parser.parse(input);
     }
 } test;

@@ -12,7 +12,6 @@ enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom
 
 /// Interfaces \a widget as a window on an X11 display server
 struct Window : Socket, Poll {
-    no_copy(Window);
     enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)

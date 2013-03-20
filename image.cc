@@ -7,10 +7,14 @@ Image flip(Image&& image) {
     return move(image);
 }
 
-Image crop(Image&& image, uint x, uint y, uint w, uint h) {
-    x=min(x,image.width); y=min(y,image.height); w=min(w,image.width-x); h=min(h,image.height-y);
-    image.buffer=0;
-    return Image(image.buffer, image.data+y*image.stride+x, w, h, image.stride, image.alpha);
+Image clip(const Image& image, int2 origin, int2 size) {
+    origin=min(origin,image.size()), size=min(size,image.size()-origin);
+    return Image(image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha);
+}
+
+Image crop(Image&& image, int2 origin, int2 size) {
+    origin=min(origin,image.size()), size=min(size,image.size()-origin);
+    return Image(move(image.buffer), image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha);
 }
 
 Image resize(const Image& image, uint width, uint height) {

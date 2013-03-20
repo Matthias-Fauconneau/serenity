@@ -215,19 +215,19 @@ void PDF::open(const ref<byte>& data) {
             auto resources = toDict(xref,move(dict.at("Resources"_)));
             if(resources.contains("Font"_)) for(auto e : toDict(xref,move(resources.at("Font"_)))) {
                 if(fonts.contains(e.key)) continue;
-                fonts[e.key]=&heap<Font>();
                 map<ref<byte>,Variant> fontDict = parse(xref[e.value.integer()]).dict;
                 Variant* descendant = fontDict.find("DescendantFonts"_);
                 if(descendant) fontDict = parse(xref[descendant->type==Variant::Integer?descendant->integer():descendant->list[0].integer()]).dict;
                 if(!fontDict.contains("FontDescriptor"_)) continue;
-                fonts[e.key]->name = move(fontDict.at("BaseFont"_).data);
+                string name = move(fontDict.at("BaseFont"_).data);
                 auto descriptor = parse(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
                 Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
-                if(fontFile) fonts[e.key]->font = ::Font(parse(xref[fontFile->integer()]).data);
+                if(!fontFile) continue;
+                Font& font = fonts.insert(e.key, Font{move(name), ::Font(parse(xref[fontFile->integer()]).data)});
                 Variant* firstChar = fontDict.find("FirstChar"_);
-                if(firstChar) fonts[e.key]->widths.grow(firstChar->integer());
+                if(firstChar) font.widths.grow(firstChar->integer());
                 Variant* widths = fontDict.find("Widths"_);
-                if(widths) for(const Variant& width : widths->list) fonts[e.key]->widths << width.real();
+                if(widths) for(const Variant& width : widths->list) font.widths << width.real();
             }
             if(resources.contains("XObject"_)) {
                 Variant& object = resources.at("XObject"_);
@@ -370,7 +370,7 @@ void PDF::open(const ref<byte>& data) {
                         else if(e.type==Variant::Data) drawText(font,fontSize,spacing,wordSpacing,e.data);
                         else error("Unexpected type",(int)e.type);
                     }
-                    OP2('T','f') font = fonts.at(args[0].data); fontSize=f(1);
+                    OP2('T','f') font = &fonts.at(args[0].data); fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat32(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); //intersect odd even clip
@@ -478,18 +478,18 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
 }
 
 void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data) {
-    if(!font->font.face) return;
-    font->font.setSize(fontSize);
+    if(!font->font->face) return;
+    font->font->setSize(fontSize);
     for(uint8 code : data) {
         if(code==0) continue;
         mat32 Trm = Tm*Cm;
-        uint16 index = font->font.index(code);
+        uint16 index = font->font->index(code);
         vec2 position = vec2(Trm.dx,Trm.dy);
         if(position.y<y1) y1=position.y; if(position.y>y2) y2=position.y; //extend(position); extend(position+Trm.m11*font->font.size(index));
         characters << Character{font, Trm.m11*fontSize, index, position, code};
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size) advance += fontSize*font->widths[code]/1000;
-        else advance += font->font.linearAdvance(index);
+        else advance += font->font->linearAdvance(index);
         Tm = mat32(advance, 0) * Tm;
     }
 }
@@ -535,14 +535,12 @@ void PDF::render(int2 position, int2 size) {
         int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
         if(pos.y<=currentClip.min.y-100) { i++; continue; }
         if(pos.y>=currentClip.max.y+100) break;
-        c.font->font.setSize(scale*c.size);
-        const Glyph& glyph = c.font->font.glyph(c.index); //FIXME: optimize lookup
+        c.font->font->setSize(scale*c.size);
+        const Glyph& glyph = c.font->font->glyph(c.index); //FIXME: optimize lookup
         if(glyph.image) blit(pos+glyph.offset,glyph.image,colors.value(i,black));
         i++;
     }
 
-    static Folder dejavu = existsFolder("dejavu"_,::fonts()) ? Folder("dejavu"_,::fonts()) : Folder("truetype/ttf-dejavu/"_,::fonts());
-    static Font font{string(),array<float>(),::Font(File("DejaVuSans.ttf"_,dejavu),10)};
     for(const pair<vec2,string>& text: annotations) {
         int2 pos = position+int2(text.key*scale/normalizedScale);
         if(pos.y<=currentClip.min.y) continue;

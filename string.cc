@@ -95,13 +95,13 @@ double toDecimal(const ref<byte>& number) {
 
 array<ref<byte>> split(const ref<byte>& str, byte sep) {
     array<ref<byte>> list;
-    auto b=str.begin();
-    auto end=str.end();
+    const byte* b=str.begin();
+    const byte* end=str.end();
     for(;;) {
         auto e = b;
         while(e!=end && *e!=sep) ++e;
         if(b==end) break;
-        list << ref<byte>(b,e);
+        list << ref<byte>(b,e-b);
         if(e==end) break;
         b = e;
         if(b!=end && *b==sep) ++b;

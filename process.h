@@ -63,7 +63,7 @@ struct Semaphore {
         pthread_cond_signal(&condition);
     }
     /// Returns available ressources \a count
-    operator int() { return counter; }
+    operator int() const { return counter; }
 };
 
 /// Poll is a convenient interface to participate in the event loops

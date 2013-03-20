@@ -7,16 +7,17 @@
 
 /// Image shared between several \link Entry Entries\endlink
 struct Favicon {
-    const string host;
-    Image image;
-    array<Image*> users;
-    signal<> imageChanged;
     /// Loads favicon for \a host
     Favicon(string&& host);
     /// Parses HTML link elements to find out favicon location
     void get(const URL& url, Map&& document);
     /// Updates shared users when receiving the real favicon
     void update();
+
+    const string host;
+    Image image;
+    array<Image*> users;
+    signal<> imageChanged;
 };
 
 /// Item with #link to an article
@@ -43,7 +44,7 @@ struct Feeds : VBox, HighlightSelection {
     Map readMap;
     signal<> listChanged;
     signal< const ref<byte>& /*link*/, const ref<byte>& /*title*/, const Image& /*favicon*/ > pageChanged;
-    array<unique<Favicon>> favicons; //store strong references to favicons (weakly referenced by entries)
+    array<unique<Favicon>> favicons; //store strong references to favicons (weakly referenced by requests and entries)
     array<unique<Entry>> entries; // back referenced by favicons for asynchronous load
 
     Feeds();

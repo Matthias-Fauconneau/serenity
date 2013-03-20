@@ -3,13 +3,14 @@
 #include "core.h"
 
 /// Contiguous collection of elements (can hold either a const reference or a mutable heap allocation).
-/// \note Uses move semantics to avoid reference counting when managing an heap allocation
+/// \note like buffer<T> with resize/insert/remove using T constructor/destructor
 template<Type T> struct array {
     T* data=0; /// Pointer to the buffer valid while not reallocated
-    uint size=0; /// Number of elements currently in this array
     uint capacity=0; /// 0: const reference, >0: size of the owned heap allocation
+    uint size=0; /// Number of elements currently in this array
 
-    move_operator(array) { data=o.data, size=o.size, capacity=o.capacity; o.data=0,o.size=o.capacity=0; }
+    move_operator(array)
+    array(array&& o) { data=o.data, size=o.size, capacity=o.capacity; o.data=0,o.size=o.capacity=0; }
 
     /// Default constructs an empty inline array
     array() {}
@@ -41,19 +42,24 @@ template<Type T> struct array {
     explicit operator bool() const { return size; }
     /// Returns a const reference to the elements contained in this array
     operator ref<T>() const { return ref<T>(data,size); }
-    /// Returns a mutable reference to the elements contained in this array
-    explicit operator mutable_ref<T>() { return mutable_ref<T>(data,size); }
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 
+    /// \name Iterators
+    const T* begin() const { return data; }
+    const T* end() const { return data+size; }
+    T* begin() { return data; }
+    T* end() { return data+size; }
+    /// \}
+
     /// Slices a const reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(uint pos, uint size) const { return ref<T>(*this).slice(pos,size); }
+    ref<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
     /// Slices a const reference to elements from \a pos the end of the array
-    ref<T> slice(uint pos) const { return ref<T>(*this).slice(pos); }
+    ref<T> slice(uint pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
     /// Slices a mutable reference to elements from \a pos to \a pos + \a size
-    mutable_ref<T> mutable_slice(uint pos, uint size) { return mutable_ref<T>(*this).slice(pos,size); }
+    memory<T> iterate(uint pos, uint size) { assert(pos+size<=this->size); return {data+pos, data+pos+size}; }
     /// Slices a mutable reference to elements from \a pos the end of the array
-    mutable_ref<T> mutable_slice(uint pos) { return mutable_ref<T>(*this).slice(pos); }
+    memory<T> iterate(uint pos) { assert(pos<=size); return {data+pos, data+size}; }
 
     /// \name Accessors
     const T& at(uint i) const { assert(i<size,i,size); return data[i]; }
@@ -71,13 +77,6 @@ template<Type T> struct array {
     array& operator<<(array<T>&& a) {uint s=size+a.size; reserve(s); copy((byte*)end(),(byte*)a.data,a.size*sizeof(T)); size=s; return *this; }
     array& operator<<(const T& v) { *this<< copy(v); return *this; }
     array& operator<<(const ref<T>& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (data+s+i) T(copy(a[i])); return *this; }
-    /// \}
-
-    /// \name Appends once (if not already contained) operators
-    array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
-    array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
-    array& operator +=(const T& v) { if(!contains(v)) *this<<copy(v); return *this; }
-    array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; }
     /// \}
 
     /// \name Appends once (if not already contained) operators
@@ -107,24 +106,20 @@ template<Type T> struct array {
     T take(int index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value
     T pop() { return take(size-1); }
+
     /// Removes one matching element and returns an index to its successor
-    int removeOne(const T& v) { int i=indexOf(v); if(i>=0) removeAt(i); return i; }
+    template<Type K> int removeOne(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
     /// Removes all matching elements
-    void removeAll(const T& v) { for(uint i=0; i<size;) if(at(i)==v) removeAt(i); else i++; }
+    template<Type K> void removeAll(const K& key) { for(uint i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
+    /// Filters elements matching predicate
+    template<Type F> void filter(F f) { for(uint i=0; i<size;) if(f(at(i))) removeAt(i); else i++; }
 
-    /// \name Iterators
-    const T* begin() const { return data; }
-    const T* end() const { return data+size; }
-    T* begin() { return data; }
-    T* end() { return data+size; }
-    /// \}
-
-    /// Returns index of the first element matching \a value
-    int indexOf(const T& key) const { return ref<T>(*this).indexOf(key); }
-    /// Returns whether this array contains any elements matching \a value
-    bool contains(const T& key) const { return ref<T>(*this).contains(key); }
+    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
+    template<Type K> int indexOf(const K& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
+    /// Returns true if the array contains an occurrence of \a value
+    template<Type K> bool contains(const K& key) const { return indexOf(key)>=0; }
     /// Returns index to the last element less than or equal to \a value using binary search (assuming a sorted array)
-    int binarySearch(const T& key) const {
+    template<Type K> int binarySearch(const K& key) const {
         uint min=0, max=size;
         while(min<max) {
             uint mid = (min+max)/2;

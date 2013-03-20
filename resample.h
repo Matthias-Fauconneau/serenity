@@ -18,13 +18,12 @@ struct Resampler {
     template<bool mix=false> void filter(const float* source, uint sourceSize, float* target, uint targetSize);
 
     explicit operator bool() const { return kernel; }
-    ~Resampler();
 
     static constexpr uint channelCount=2;
     uint sourceRate=0,targetRate=0;
 
-    float* kernel=0; uint N=0;
-    float* buffer[channelCount]={0,0}; uint bufferSize=0;
+    buffer<float> kernel; uint N=0;
+    buffer<float> signal[channelCount]; uint bufferSize=0;
 
     uint writeIndex=0;
     uint integerAdvance=0, fractionalAdvance=0;

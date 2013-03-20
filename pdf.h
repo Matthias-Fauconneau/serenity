@@ -37,10 +37,10 @@ struct PDF : Widget {
 
     struct Font {
         string name;
+        unique<::Font> font;
         array<float> widths;
-        ::Font font;
     };
-    map<ref<byte>, Font*> fonts;
+    map<ref<byte>, Font> fonts;
     struct Character { Font* font; float size; uint16 index; vec2 pos; uint16 code; bool operator <(const Character& o) const{return pos.y<o.pos.y;}};
     array<Character> characters;
     void drawText(Font* font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data);

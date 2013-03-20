@@ -4,12 +4,11 @@
 
 /// Unix file descriptor
 struct Handle {
-    int fd;
+    handle<int> fd;
+    default_move(Handle);
     Handle(int fd):fd(fd){}
-    move_operator(Handle):fd(o.fd){ o.fd=0; }
-    /// Closes the descriptor
     ~Handle();
-    explicit operator bool() { return fd; }
+    operator bool() const { return fd; }
 };
 
 struct Folder;
@@ -33,7 +32,7 @@ enum { IDLE=64 };
 
 /// Handle to an Unix I/O stream
 struct Stream : Handle {
-    Stream(Handle&& fd):Handle(move(fd)){}
+    Stream(int fd):Handle(fd){}
     /// Reads exactly \a size bytes into \a buffer
     void read(void* buffer, uint size);
     /// Reads up to \a size bytes into \a buffer
@@ -60,7 +59,6 @@ struct Stream : Handle {
 
 /// Handle to a socket
 struct Socket : Stream {
-    Socket(Handle&& fd):Stream(move(fd)){}
     enum {PF_LOCAL=1, PF_INET};
     enum {SOCK_STREAM=1, SOCK_DGRAM, O_NONBLOCK=04000};
     Socket(int domain, int type);
@@ -106,16 +104,21 @@ struct Device : File {
 };
 
 /// Managed memory mapping
-struct Map : ref<byte> {
+struct Map {
     enum {Read=1, Write=2};
     enum {Shared=1, Private=2, Anonymous=32};
 
+    handle<byte*> data;
+    uint size=0;
+
+    default_move(Map);
     Map(){}
     Map(const File& file, uint prot=Read);
     Map(const ref<byte>& path, const Folder& at=root(), uint prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, uint prot, uint flags=Shared);
-    move_operator(Map):ref<byte>(o.data,o.size){o.data=0,o.size=0;}
     ~Map();
+
+    operator ref<byte>() { return ref<byte>(data, size); }
 
     /// Locks memory map in RAM
     void lock(uint size=-1) const;

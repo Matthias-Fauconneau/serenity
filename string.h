@@ -85,10 +85,10 @@ template<Type T> string str(const ref<T>& a, const ref<byte> separator=" "_) {
     string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s;
 }
 template<Type T> string str(const array<T>& a, const ref<byte> separator=" "_) { return str(ref<T>(a),separator); }
+template<Type T> string str(const buffer<T>& a, const ref<byte> separator=" "_) { return str(ref<T>(a),separator); }
 template<Type T> string dec(const ref<T>& a, const ref<byte> separator=" "_) {
     string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s;
 }
-//template<Type T> string dec(const array<T>& a, const ref<byte> separator=" "_) { return dec(ref<T>(a),separator); }
 template<Type T> string hex(const ref<T>& a, const ref<byte> separator=" "_) {
     string s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s;
 }

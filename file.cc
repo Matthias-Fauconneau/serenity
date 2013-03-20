@@ -39,7 +39,7 @@ bool existsFolder(const ref<byte>& folder, const Folder& at) { return Handle( op
 
 // Stream
 void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
-int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), fd, buffer, size); }
+int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), (int)fd, buffer, size); }
 array<byte> Stream::read(uint capacity) {
     array<byte> buffer(capacity);
     buffer.size = check( ::read(fd, buffer.data, capacity) );

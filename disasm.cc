@@ -24,9 +24,9 @@ string gpr(uint r, uint size) {
 string xmm(int r, int) { return "xmm"_+str(r); }
 string reg(int r, int size, int sse) { return sse ? xmm(r,size) : gpr(r,size); }
 
-constexpr ref<byte> ops[] = {"add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_};
-constexpr ref<byte> ccs[] = { "o"_,"no"_,"b"_,"ae"_,"e"_,"ne"_,"be"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_};
-constexpr ref<byte> shs[] = {"rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_};
+static constexpr ref<byte> ops[] = {"add"_,"or"_,"adc"_,"sbb"_,"and"_,"sub"_,"not"_,"cmp"_};
+static constexpr ref<byte> ccs[] = { "o"_,"no"_,"b"_,"ae"_,"e"_,"ne"_,"be"_,"a"_,"s"_,"ns"_,"p"_,"np"_,"l"_,"ge"_,"le"_,"g"_};
+static constexpr ref<byte> shs[] = {"rol"_,"ror"_,"rcl"_,"rcr"_,"shl"_,"shr"_,"sal"_,"sar"_};
 
 int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
     s<<'[';
@@ -126,7 +126,7 @@ void disassemble(const ref<byte>& code) {
                 s<< "set"_+ccs[op&0xF]+" "_+ dst;
             }  else if(op==0xAE) { //imul r, r/m
                 string src; int r = modrm(rex,size,c,src);
-                constexpr ref<byte> lookup[] = {"fxsave"_,"fxrstor"_,"ldmxcsr"_,"stmxcsr"_,"xsave"_,"lfence"_,"mfence"_,"sfence"_};
+                static constexpr ref<byte> lookup[] = {"fxsave"_,"fxrstor"_,"ldmxcsr"_,"stmxcsr"_,"xsave"_,"lfence"_,"mfence"_,"sfence"_};
                 s<< lookup[r];
             } else if(op==0xAF) { //imul r, r/m
                 string src; int r = modrm(rex,size,c,src);

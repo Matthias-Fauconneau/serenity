@@ -51,7 +51,7 @@ void MidiScore::drawStaff(int t, int staff, Clef clef) {
         int tone = i*5; if(key<0) tone+=11;
         glyph(int2(position.x+16+48,page(staff,t,staffY(clef,tone)%7).y),key<0?"accidentals.flat"_:"accidentals.sharp"_);
     }
-    constexpr ref<byte> numbers[10] = {"zero"_,"one"_,"two"_,"three"_,"four"_,"five"_,"six"_,"seven"_,"eight"_,"nine"_};
+    static constexpr ref<byte> numbers[10] = {"zero"_,"one"_,"two"_,"three"_,"four"_,"five"_,"six"_,"seven"_,"eight"_,"nine"_};
     glyph(int2(position.x+16+64,page(staff, t, 2*2).y-1),numbers[timeSignature[0]]);
     glyph(int2(position.x+16+64,page(staff, t, 4*2).y-1),numbers[timeSignature[1]]);
 }
@@ -66,14 +66,14 @@ void MidiScore::render(int2 position, int2 size) {
     int lastSystem=-1; uint lastMeasure=0, noteIndex=0;
     this->position=position, this->size=size;
     //Text(str(notes)).render(position,size);
-    array<MidiNote> active[2]; //0 = treble (right hand), 1 = bass (left hand)
+    array<MidiNote> actives[2]; //0 = treble (right hand), 1 = bass (left hand)
     array<MidiNote> quavers[2]; // for quaver linking
     for(uint i: range(notes.size())) {
         uint t = notes.keys[i]*4/ticksPerBeat;
 
         // Removes released notes from active sets
-        for(uint s: range(2)) for(uint i=0;i<active[s].size;) if(active[s][i].start+active[s][i].duration<=t) active[s].removeAt(i); else i++;
-        uint sustain[2] = { active[0].size, active[1].size }; // Remaining notes kept sustained
+        for(array<MidiNote>& active: actives) active.filter([t](const MidiNote& note){return note.start+note.duration<=t;});
+        uint sustain[2] = { actives[0].size, actives[1].size }; // Remaining notes kept sustained
 
         if(int(t/staffTime)>lastSystem) { // Draws system
             lastSystem=t/staffTime;
@@ -88,46 +88,50 @@ void MidiScore::render(int2 position, int2 size) {
             lastMeasure=t/beatsPerMeasure;
         }
 
-        array<MidiNote> current[2]; // new notes to be pressed
+        array<MidiNote> currents[2]; // new notes to be pressed
         for(MidiNote note: notes.values[i]) { //first rough split based on pitch
             int s = note.key>=60; //middle C
-            current[s] << note;
-            active[s] << note;
+            currents[s] << note;
+            actives[s] << note;
         }
-        for(int s: range(2)) { // then balances load on both hand
+        for(uint s: range(2)) { // then balances load on both hand
+            array<MidiNote>& active = actives[s];
+            array<MidiNote>& otherActive = actives[!s];
+            array<MidiNote>& current = currents[s];
+            array<MidiNote>& other = currents[!s];
             while(
-                  current[s] && // any notes to move ?
-                  ((s==0 && current[s].last().key>=52) || (s==1 && current[s].first().key<68)) && // prevent stealing from far notes (TODO: relative to last active)
-                  current[s].size>=current[!s].size && // keep new notes balanced
-                  active[s].size>=active[!s].size && // keep active (sustain+new) notes balanced
-                  (!current[!s] ||
-                   (s==1 && abs(int(current[!s].first().key-current[s].first().key))<=12) || // keep short span on new notes (left)
-                   (s==0 && abs(int(current[!s].last().key-current[s].last().key))<=12) ) && // keep short span on new notes (right)
+                  current && // any notes to move ?
+                  ((s==0 && current.last().key>=52) || (s==1 && current.first().key<68)) && // prevent stealing from far notes (TODO: relative to last active)
+                  current.size>=other.size && // keep new notes balanced
+                  active.size>=otherActive.size && // keep active (sustain+new) notes balanced
+                  (!other ||
+                   (s==1 && abs(int(other.first().key-current.first().key))<=12) || // keep short span on new notes (left)
+                   (s==0 && abs(int(other.last().key-current.last().key))<=12) ) && // keep short span on new notes (right)
                   (!sustain[!s] ||
-                   (s==1 && abs(int(active[!s][0].key-current[s].first().key))<=18) || // keep short span with active notes (left)
-                   (s==0 && abs(int(active[!s][sustain[!s]-1].key-current[s].last().key))<=18) ) && // keep short span with active notes (right)
+                   (s==1 && abs(int(otherActive[0].key-current.first().key))<=18) || // keep short span with active notes (left)
+                   (s==0 && abs(int(otherActive[sustain[!s]-1].key-current.last().key))<=18) ) && // keep short span with active notes (right)
                   (
-                      active[s].size>active[!s].size+1 || // balance active notes
-                      current[s].size>current[!s].size+1 || // balance load
+                      active.size>otherActive.size+1 || // balance active notes
+                      current.size>other.size+1 || // balance load
                       // both new notes and active notes load are balanced
-                      (current[0] && current[1] && s == 0 && abs(int(current[1].first().key-current[1].last().key))<abs(int(current[0].first().key-current[0].last().key))) || // minimize left span
-                      (current[0] && current[1] && s == 1 && abs(int(current[0].first().key-current[0].last().key))<abs(int(current[1].first().key-current[1].last().key))) || // minimize right span
-                      (sustain[s] && sustain[!s] && active[s][sustain[s]-1].start>active[!s][sustain[!s]-1].start) // load least recently used hand
+                      (currents[0] && currents[1] && s == 0 && abs(int(currents[1].first().key-currents[1].last().key))<abs(int(currents[0].first().key-currents[0].last().key))) || // minimize left span
+                      (currents[0] && currents[1] && s == 1 && abs(int(currents[0].first().key-currents[0].last().key))<abs(int(currents[1].first().key-currents[1].last().key))) || // minimize right span
+                      (sustain[s] && sustain[!s] && active[sustain[s]-1].start>otherActive[sustain[!s]-1].start) // load least recently used hand
                       )) {
                 if(!s) {
-                    current[!s].insertAt(0, current[s].pop());
-                    active[!s].insertAt(0, active[s].pop());
+                    other.insertAt(0, current.pop());
+                    actives[!s].insertAt(0, active.pop());
                 } else {
-                    current[!s] << current[s].take(0);
-                    active[!s] << active[s].take(sustain[s]);
+                    other << current.take(0);
+                    actives[!s] << active.take(sustain[s]);
                 }
             }
         }
 
-        for(int s: range(2)) { // finally displays notes on the right staff
+        for(uint s: range(2)) { // finally displays notes on the right staff
             Clef clef = (Clef)s;
             int tailMin=100, tailMax=-100; uint minDuration=-1,maxDuration=0;
-            for(MidiNote note: current[s]) { // draws notes
+            for(MidiNote note: currents[s]) { // draws notes
                 int h = staffY(clef, note.key);
                 for(int i=-2;i>=h;i-=2) drawLedger(s, t, i);
                 for(int i=10;i<=h;i+=2) drawLedger(s, t, i);

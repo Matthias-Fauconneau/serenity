@@ -3442,23 +3442,10 @@ unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, i
   return pImage_data;
 }
 
-unsigned char *decompress_jpeg_image_from_memory(const unsigned char *pSrc_data, int src_data_size, int *width, int *height, int *actual_comps, int req_comps)
-{
-  jpeg_decoder_mem_stream mem_stream(pSrc_data, src_data_size);
-  return decompress_jpeg_image_from_stream(&mem_stream, width, height, actual_comps, req_comps);
-}
-
-unsigned char *decompress_jpeg_image_from_file(const char *pSrc_filename, int *width, int *height, int *actual_comps, int req_comps)
-{
-  jpeg_decoder_file_stream file_stream;
-  if (!file_stream.open(pSrc_filename))
-    return NULL;
-  return decompress_jpeg_image_from_stream(&file_stream, width, height, actual_comps, req_comps);
-}
-
 Image decodeJPEG(const ref<byte>& file) {
     int width, height, depth;
     jpeg_decoder_mem_stream mem_stream((uint8*)file.data, file.size);
-    byte4* data = (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4);
-    return Image(data,data,width,height,width,false);
+    ::buffer<byte4> buffer(
+                (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4), width*height*4, width*height*4);
+    return Image(move(buffer),buffer,width,height,width,false);
 }

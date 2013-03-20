@@ -5,6 +5,7 @@
 #include "image.h"
 #include "file.h"
 #include "map.h"
+struct  FT_FaceRec_;
 
 const Folder& fonts();
 
@@ -17,12 +18,11 @@ struct Glyph {
 /// Freetype wrapper
 struct Font {
     Map keep; array<byte> data;
-    struct FT_FaceRec_*  face=0;
+    handle<FT_FaceRec_*> face;
     float fontSize=0, ascender=0;
     map<uint, map<uint16, Glyph>> cache;
 
-    Font(){}
-    move_operator(Font):keep(move(o.keep)),data(move(o.data)),face(o.face),fontSize(o.fontSize),ascender(o.ascender),cache(move(o.cache)){ o.face=0; }
+    default_move(Font);
     /// Loads font at /a path scaled to /a size pixels high
     Font(const File& file, int size);
     /// Loads font /a data scaled to /a size pixels high

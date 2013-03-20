@@ -196,7 +196,9 @@ struct Taskbar : Socket, Poll {
         if(buffer.size<3) return Image();
         uint w=buffer[0], h=buffer[1];
         if(buffer.size<2+w*h) return Image();
-        return resize(Image(array<byte4>(cast<byte4>(buffer.slice(2,w*h))),w,h,true), 16, 16);
+        Image image((byte4*)buffer,(byte4*)buffer+2,w,h,w,true);
+        buffer.capacity=0;
+        return resize(image, 16, 16);
     }
 
     map<string, uint> cache;
@@ -210,8 +212,14 @@ struct Taskbar : Socket, Poll {
     }
     template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128) {
         {GetProperty r; r.window=window; r.property=Atom(name); r.length=size; send(raw(r));}
-        {GetPropertyReply r=readReply<GetPropertyReply>(); int size=r.length*r.format/8; assert(align(4,size)%sizeof(T)==0);
-                    array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size/sizeof(T)*sizeof(T); if(pad) read(pad); return a; }
+        {GetPropertyReply r=readReply<GetPropertyReply>();
+            int size=r.length*r.format/8; assert(align(4,size)%sizeof(T)==0);
+            array<T> a;
+            if(size) { log("getProperty: read size=",size, sizeof(T), size/sizeof(T)); a=read<T>(size/sizeof(T)); }
+            int pad=align(4,size)-size/sizeof(T)*sizeof(T);
+            if(pad) { log("getProperty: read pad=",pad, align(4,size), size/sizeof(T)*sizeof(T)); read(pad); }
+            return a;
+        }
     }
 
     void raiseTask(uint index) { raise(tasks[index].id); {GrabKey r; r.window=tasks[index].id; r.keycode=escapeCode; send(raw(r));}}

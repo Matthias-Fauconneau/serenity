@@ -91,8 +91,8 @@ map<ref<byte>,ref<byte>> readSettings(const ref<byte>& file) {
 struct Weather : ImageView {
     signal<> contentChanged;
     Weather(){get();}
-    void get() { getURL("http://www.yr.no/place/France/Île-de-France/Orsay/meteogram.png"_, Handler(this, &Weather::load), 60); }
-    void load(const URL&, Map&& file) { image = crop(decodeImage(file), 6, 24, 816, 242); contentChanged(); }
+    void get() { getURL("http://www.yr.no/place/France/Île-de-France/Orsay/meteogram.png"_, {this, &Weather::load}, 60); }
+    void load(const URL&, Map&& file) { image = crop(decodeImage(file), int2(6, 24), int2(816, 242)); contentChanged(); }
     bool mouseEvent(int2, int2, Event event, Button) { if(event==Press) get(); return false; }
 } test;
 
@@ -146,7 +146,7 @@ struct Desktop {
                 if(!existsFile(path)) { warn("Executable not found",exec); continue; }
                 array<string> arguments;  arguments<<string(section(entries["Exec"_],' ',1,-1));
                 for(string& arg: arguments) arg=replace(arg,"\"%c\""_,entries["Name"_]);
-                for(uint i=0; i<arguments.size;) if(arguments[i].contains('%')) arguments.removeAt(i); else i++;
+                arguments.filter([](const string& argument){return argument.contains('%');});
                 shortcuts << Command(move(icon),string(entries["Name"_]),move(path),move(arguments));
             }
         }

@@ -167,7 +167,7 @@ void Window::event() {
                 if(backgroundCenter==backgroundColor) {
                     fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
                 } else { // Oxygen-like radial gradient background
-                    constexpr int radius=256;
+                    const int radius=256;
                     int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
                             a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
                     if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));

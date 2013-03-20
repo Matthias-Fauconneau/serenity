@@ -74,7 +74,7 @@ struct Player {
             ref<byte> album = section(last,'/',0,1);
             ref<byte> title = section(last,'/',1,-1);
             if(existsFolder(album,"Music"_)) {
-                albums.index = folders.indexOf(string(album));
+                albums.index = folders.indexOf(album);
                 array<string> files = Folder(album,"Music"_).list(Recursive|Files);
                 uint i=0; for(;i<files.size;i++) if(files[i]==title) break;
                 for(;i<files.size;i++) queueFile(files[i], album);

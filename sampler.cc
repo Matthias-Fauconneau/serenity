@@ -112,9 +112,9 @@ void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
                 layers.grow(layers.size+1);
                 layer = &layers.last();
                 layer->shift = shift;
-                layer->notes.reserve(128); // Avoid locking (FIXME: heap pointers array)
+                layer->notes.reserve(128);
                 if(shift || rate!=outputRate) {
-                    const uint size = 2048; //1024; // Accurate frequency resolution while keeping reasonnable filter bank size
+                    const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
                     new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate));
                 }
             }
@@ -127,7 +127,7 @@ void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
     assert(reverbMedia.rate == rate);
     reverbSize = reverbMedia.duration;
     N = reverbSize+periodSize;
-    float* stereoFilter = allocate64<float>(2*reverbSize); clear(stereoFilter,2*reverbSize);
+    buffer<float> stereoFilter(2*reverbSize,0.f);
     for(uint i=0;i<reverbSize;) {
         uint read = reverbMedia.read((float2*)(stereoFilter+2*i),min(1u<<16,reverbSize-i));
         i+=read;
@@ -138,8 +138,8 @@ void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
     const float scale = 0x1p6f/sqrt(sum); // Normalizes and scales 24->32bit (-2bit head room)
 
     // Reverses, scales and deinterleaves filter
-    float* filter[2];
-    for(int c=0;c<2;c++) filter[c] = allocate64<float>(N), clear(filter[c],N);
+    buffer<float> filter[2];
+    for(int c=0;c<2;c++) filter[c] = buffer<float>(N,0.f);
     for(uint i: range(reverbSize)) for(int c=0;c<2;c++) filter[c][i] = scale*stereoFilter[2*i+c];
 
     fftwf_init_threads();
@@ -147,21 +147,19 @@ void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
 
     // Transforms reverb filter to frequency domain
     for(int c=0;c<2;c++) {
-        reverbFilter[c] = allocate64<float>(N); clear(reverbFilter[c],N);
-        fftwf_plan p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
+        reverbFilter[c] = buffer<float>(N,0.f);
+        FFTW p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
         fftwf_execute(p);
-        fftwf_destroy_plan(p);
-        unallocate(filter[c]); // Releases time domain filter
         //for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; // Low-pass (some samples are aliased) //FIXME: only on those samples
     }
 
     // Allocates reverb buffer and temporary buffers
-    input = allocate64<float>(N);
+    input = buffer<float>(N);
     for(int c=0;c<2;c++) {
-        reverbBuffer[c] = allocate64<float>(N), clear(reverbBuffer[c],N);
+        reverbBuffer[c] = buffer<float>(N,0.f)
         forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c], input, FFTW_R2HC, FFTW_ESTIMATE);
     }
-    product = allocate64<float>(N);
+    product = buffer<float>(N,0.f);
     backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, FFTW_ESTIMATE);
 #endif
 }
@@ -204,17 +202,11 @@ void Sampler::noteEvent(uint key, uint velocity) {
             note.envelope=s.envelope;
             if(note.sampleSize==16) level*=0x1p8;
             note.level=(float4){level,level,level,level};
-            {Locker lock(noteReadLock);
+            {Locker locker(lock);
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
-                if(layer == 0) { error("Layer not instantiated at initialization",key, s.lokey, s.hikey, s.pitch_keycenter, shift); return; }
-                static uint max=95; if(layer->notes.size>max) log(max=layer->notes.size);
-                if(layer->notes.size==layer->notes.capacity) {
-                    log(layer->notes.size);
-                    Locker lock(noteWriteLock); // Need to lock decoder for reallocation (FIXME: use a list of heap pointer instead)
-                    layer->notes.reserve(layer->notes.size*2);
-                }
+                assert(layer && layer->notes.size<layer->notes.capacity);
                 layer->notes << move(note);
             }
             queue(); //queue background decoder in main thread
@@ -235,13 +227,12 @@ void Note::decode(uint need) {
     }
 }
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
-    if(noteReadLock.tryLock()) { //Quickly cleanup silent notes
-        for(Layer& layer: layers) for(uint j=0; j<layer.notes.size; j++) { Note& note=layer.notes[j];
-            if((note.blockSize==0 && note.readCount<int(2*periodSize)) || extract(note.level,0)<0x1p-23) layer.notes.removeAt(j); else j++;
-        }
-        noteReadLock.unlock();
+    if(lock.tryLock()) { // Cleanup silent notes
+        for(Layer& layer: layers) layer.notes.filter([](const Note& note){
+            return (note.blockSize==0 && note.readCount<int(2*periodSize)) || extract(note.level,0)<0x1p-23;
+        });
+        lock.unlock();
     }
-    Locker lock(noteWriteLock);
     for(;;) {
         Note* note=0; uint minBufferSize=-1;
         for(Layer& layer: layers) for(Note& n: layer.notes) { // find least buffered note
@@ -282,7 +273,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
     float* buffer = (float*)buffer64;
     clear(buffer, size*2);
 
-    {Locker lock(noteReadLock);
+    {Locker locker(lock);
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
                 uint inSize=align(2,layer.resampler.need(size));
@@ -357,17 +348,8 @@ void Sampler::stopRecord() {
     if(record) { record.seek(4); record.write(raw<int32>(36+time)); record=0; }
 }
 
-Sampler::~Sampler() {
-    stopRecord();
 #if REVERB
-    for(uint c=0;c<2;c++) {
-        if(reverbFilter[c]) unallocate(reverbFilter[c]);
-        if(reverbBuffer[c]) unallocate(reverbBuffer[c]);
-        fftwf_destroy_plan(forward[c]);
-    }
-    fftwf_destroy_plan(backward);
-    unallocate(input);
-    unallocate(product);
+Sampler::FFTW::~FFTW() { fftwf_destroy_plan(pointer); }
 #endif
-}
+Sampler::~Sampler() { stopRecord(); }
 constexpr uint Sampler::periodSize;

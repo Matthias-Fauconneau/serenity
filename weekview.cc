@@ -11,7 +11,7 @@ struct WeekViewPrint : Widget {
             const int workWeek=5;
             int w = size.x/workWeek, y=0;
             for(int i=0;i<workWeek;i++) {
-                constexpr ref<byte> days[5]={"Lundi"_,"Mardi"_,"Mercredi"_,"Jeudi"_,"Vendredi"_};
+                static constexpr ref<byte> days[5]={"Lundi"_,"Mardi"_,"Mercredi"_,"Jeudi"_,"Vendredi"_};
                 Text day(string(days[i]),64);
                 y=max(y,day.sizeHint().y);
                 day.render(position+int2(i*w,0),int2(w,0));

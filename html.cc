@@ -3,21 +3,9 @@
 #include "jpeg.h"
 #include "ico.h"
 
-ImageLoader::ImageLoader(URL&& url, Image* target, function<void()>&& imageLoaded, int2 size, uint maximumAge)
-    : target(target), imageLoaded(imageLoaded), size(size) { getURL(move(url), Handler(this, &ImageLoader::load), maximumAge); }
-
-void ImageLoader::load(const URL&, Map&& file) {
-    Image image = decodeImage(file);
-    if(!image) return;
-    if(size) image = resize(image,size.x,size.y);
-    *target = move(image);
-    imageLoaded();
-    free(this);
-}
-
 static array<ref<byte>> paragraphElement, textElement, boldElement, ignoreElement;
 
-void HTML::go(const ref<byte>& url) { this->url=url; getURL(url, Handler(this, &HTML::load), 24*60); }
+void HTML::go(const ref<byte>& url) { this->url=url; getURL(url, {this, &HTML::load}, 24*60); }
 void HTML::load(const URL& url, Map&& document) {
     for(Widget* w: *this) free(w); VBox::clear(); paragraphCount=0;
 
@@ -71,7 +59,7 @@ void HTML::load(const URL& url, Map&& document) {
     parse(url, content);
     flushText();
     flushImages();
-    if(paragraphCount || !count()) contentChanged(); //else ImageLoader will signal
+    if(paragraphCount || !count()) contentChanged(); //else ImageRequest will signal
 }
 
 void HTML::parse(const URL& url, const Element &e) {
@@ -124,17 +112,19 @@ void HTML::parse(const URL& url, const Element &e) {
 void HTML::flushText() {
     string paragraph = simplify(move(text));
     if(!paragraph) return; paragraphCount++;
-    Text& textLayout = heap<Text>(move(paragraph), 16, vec4(0,0,0,1), 640 /*60 characters*/);
+    texts << unique<Text>(move(paragraph), 16, vec4(0,0,0,1), 640 /*60 characters*/);
+    Text& textLayout = texts.last();
     textLayout.linkActivated.connect(this, &HTML::go);
     VBox::operator<<(&textLayout);
 }
 void HTML::flushImages() {
     if(!images) return;
-    UniformGrid<ImageLink>& grid = heap<UniformGrid<ImageLink>>();
+    grids << unique<UniformGrid<ImageLink>>();
+    UniformGrid<ImageLink>& grid = grids.last();
     grid.reserve(images.size);
     for(URL& image: images) {
-        grid<<ImageLink();
-        heap<ImageLoader>(move(image), &grid.last().image, contentChanged);
+        grid << ImageLink();
+        getImage(move(image), &grid.last().image, contentChanged);
         if(linkStack) {
             grid.last().link = copy(linkStack.last());
             grid.last().linkActivated.connect(this, &HTML::go);

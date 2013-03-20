@@ -35,6 +35,7 @@ LIBS_asound = asound
 # LIBS_sampler = fftw3f_threads
 LIBS_spectrogram = fftw3f_threads
 LIBS_stretch = rubberband
+LIBS_algebra = umfpack
 
 INSTALL = $(INSTALL_$(TARGET))
 INSTALL_player = icons/$(TARGET).png $(TARGET).desktop

@@ -76,13 +76,13 @@ Element::Element(TextData& s, bool html) {
 }
 
 ref<byte> Element::attribute(const ref<byte>& attribute) const {
-    assert(attributes.contains(string(attribute)),"attribute", attribute,"not found in",*this);
-    return attributes.at(string(attribute));
+    assert(attributes.contains(attribute),"attribute", attribute,"not found in",*this);
+    return attributes.at(attribute);
 }
 
 ref<byte> Element::operator[](const ref<byte>& attribute) const {
-    if(!attributes.contains(string(attribute))) return ""_;
-    return attributes.at(string(attribute));
+    if(!attributes.contains(attribute)) return ""_;
+    return attributes.at(attribute);
 }
 
 const Element& Element::child(const ref<byte>& name) const {

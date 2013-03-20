@@ -41,8 +41,7 @@ inline string str(const Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycen
 
 /// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {
-    Lock noteReadLock; // Prevent decoder to edit active notes while mixing
-    Lock noteWriteLock; // Prevent input to realloc active notes while decoding
+    Lock lock; // Prevents decoder from removing notes being mixed
     struct Layer {
         float shift;
         array<Note> notes; // Active notes (currently being sampled) in this layer
@@ -53,23 +52,23 @@ struct Sampler : Poll {
 
     uint rate = 0;
     //static constexpr uint periodSize = 128; // same as resampler latency and 1m sound propagation time
-    //static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb)
-    static constexpr uint periodSize = 1024; // maximum compatibility (when latency is not critical)
+    static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb) (TODO: ring buffer)
 
 #if REVERB
     /// Convolution reverb
     bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
     uint reverbSize=0; // Reverb filter size
     uint N=0; // reverbSize+periodSize
-    float* reverbFilter[2]={}; // Convolution reverb filter in frequency-domain
-    float* reverbBuffer[2]={}; // Mixer output in time-domain
+    buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
+    buffer<float> reverbBuffer[2]; // Mixer output in time-domain
 
     //uint reverbIndex=0; //ring buffer index TODO
-    float* input=0; // Buffer to hold transform of reverbBuffer
-    float* product=0; // Buffer to hold multiplication of signal and reverbFilter
+    buffer<float> input=0; // Buffer to hold transform of reverbBuffer
+    buffer<float> product=0; // Buffer to hold multiplication of signal and reverbFilter
 
-    fftwf_plan forward[2]; // FFTW plan to forward transform reverb buffer
-    fftwf_plan backward; // FFTW plan to backward transform product*/
+    struct FFTW : handle<fftwf_plan> { ~FFTW(); };
+    FFTW forward[2]; // FFTW plan to forward transform reverb buffer
+    FFTW backward; // FFTW plan to backward transform product*/
 #endif
 
     /// Emits period time to trigger MIDI file input and update the interface

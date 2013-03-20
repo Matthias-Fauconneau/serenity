@@ -10,16 +10,21 @@ const Folder& fonts() { static Folder folder = "usr/share/fonts"_; return folder
 static FT_Library ft; static int fontCount=0;
 Font::Font(const File& file, int size) : keep(Map(file)) { load(keep,size); }
 Font::Font(array<byte>&& data, int size):data(move(data)){ load(this->data,size); }
-Font::~Font(){ if(face) { FT_Done_Face(face); face=0; fontCount--; assert(fontCount>=0); if(fontCount == 0) { assert(ft); FT_Done_FreeType(ft), ft=0; } } }
+Font::~Font(){
+    if(face) {
+        FT_Done_Face(face); face=0; fontCount--;
+        assert(fontCount>=0); if(fontCount == 0) { assert(ft); FT_Done_FreeType(ft), ft=0; }
+    }
+}
 void Font::load(const ref<byte>& data, int size) {
     if(!ft) {
         FT_Init_FreeType(&ft);
         FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
     }
-    int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Couldn't load font",e,data.data,data.size); return; }
+    int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font"); return; }
     fontCount++;
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size*64,size*64,0,0}; FT_Request_Size(face,&req);
-    ascender=face->size->metrics.ascender*0x1p-6;
+    ascender=((FT_FaceRec*)face)->size->metrics.ascender*0x1p-6;
 }
 void Font::setSize(float size) {
     if(fontSize==size) return; fontSize=size;

@@ -40,14 +40,11 @@ struct Data {
 
 #define big64 __builtin_bswap64
 #define big32 __builtin_bswap32
-#ifndef __clang__
-inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
-#endif
 #define big16 __builtin_bswap16
 
 /// Provides a convenient interface to parse binary inputs
 struct BinaryData : virtual Data {
-    default_move(BinaryData);
+    BinaryData(){} move_operator(BinaryData) BinaryData(BinaryData&&)=default;
     /// Creates a BinaryData interface to an \a array
     BinaryData(array<byte>&& array, bool isBigEndian=false) : Data(move(array)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to a \a reference
@@ -107,11 +104,7 @@ struct BinaryData : virtual Data {
 
 /// Provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-    default_move(TextData);
-    /// Creates a TextData interface to an \a array
-    TextData(array<byte>&& array) : Data(move(array)){}
-    /// Creates a TextData interface to a \a reference
-    explicit TextData(const ref<byte>& reference):Data(reference){}
+    using Data::Data;
 
     /// If input match \a key, advances \a pos by \a key size
     bool match(char key);

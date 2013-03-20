@@ -1,20 +1,8 @@
 #pragma once
-/// \file html.h Asynchronous \link ImageLoader image loader\endlink and HTML layout engine
+/// \file html.h simple HTML layout engine
 #include "http.h"
 #include "xml.h"
 #include "interface.h"
-
-/// Asynchronously load an image, sending a signal if the image was not cached
-struct ImageLoader {
-    ImageLoader(URL&& url, Image* target, function<void()>&& imageLoaded, int2 size=0, uint maximumAge=24*60);
-    /// Reference to target to load (need to stay valid)
-    Image* target;
-    /// function to call on load if the image was not cached.
-    function<void()> imageLoaded;
-    /// Preferred size
-    int2 size;
-    void load(const URL&, Map&&);
-};
 
 /// Simple HTML layout engine
 struct HTML : VBox {
@@ -37,4 +25,6 @@ struct HTML : VBox {
     array<URL> images;
     int paragraphCount;
     array<string> linkStack;
+    array<unique<Text>> texts; //weakly referenced by VBox
+    array<unique<UniformGrid<ImageLink>>> grids; //weakly referenced by VBox
 };

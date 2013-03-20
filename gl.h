@@ -26,14 +26,13 @@ struct GLUniform {
 struct GLShader {
     GLShader(){}
     GLShader(const ref<byte>& source, const ref<byte>& tags=""_);
-    move_operator(GLShader): id(o.id), sampler2D(move(o.sampler2D)) { o.id=0; }
     void compile(uint type, const ref<byte>& source);
     void bind();
     uint attribLocation(const ref<byte>&);
     GLUniform operator[](const ref<byte>&);
     //static uint maxUniformBlockSize();
 
-    uint id=0;
+    handle<uint> id;
     //using pointer comparison (only works with string literals)
     map<string, int> attribLocations;
     map<string, int> uniformLocations;
@@ -49,7 +48,6 @@ enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, 
 
 struct GLVertexBuffer {
     GLVertexBuffer(){}
-    move_operator(GLVertexBuffer): vertexBuffer(o.vertexBuffer),vertexCount(o.vertexCount),vertexSize(o.vertexSize){o.vertexBuffer=0;}
     ~GLVertexBuffer();
 
     void allocate(int vertexCount, int vertexSize);
@@ -62,7 +60,7 @@ struct GLVertexBuffer {
 
     operator bool() const { return vertexBuffer; }
 
-    uint vertexBuffer=0;
+    handle<uint> vertexBuffer;
     uint vertexCount=0;
     uint vertexSize=0;
 };
@@ -70,8 +68,6 @@ struct GLVertexBuffer {
 struct GLIndexBuffer {
     GLIndexBuffer(){}
     GLIndexBuffer(PrimitiveType primitiveType):primitiveType(primitiveType){}
-    move_operator(GLIndexBuffer): primitiveType(o.primitiveType),
-        indexBuffer(o.indexBuffer),indexCount(o.indexCount),primitiveRestart(o.primitiveRestart) {o.indexBuffer=0;}
     ~GLIndexBuffer();
 
     void allocate(int indexCount);
@@ -84,7 +80,7 @@ struct GLIndexBuffer {
     operator bool() { return indexBuffer; }
 
     PrimitiveType primitiveType=Triangle;
-    uint indexBuffer=0;
+    handle<uint> indexBuffer;
     uint indexCount=0;
     uint indexSize=0;
     bool primitiveRestart=false;
@@ -95,30 +91,24 @@ void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1),
 void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord=false);
 void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);
 
-enum Format {
-    sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3,
-    Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
+enum Format { sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3, Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
 struct GLTexture {
-    uint id=0;
+    handle<uint> id;
     uint width=0, height=0;
     uint format;
+
     GLTexture(){}
     GLTexture(int width, int height, uint format=sRGB8, const void* data=0);
     GLTexture(const Image& image, uint format=sRGB8);
-    move_operator(GLTexture):id(o.id),width(o.width),height(o.height){o.id=0;}
     ~GLTexture();
 
     void bind(uint sampler=0) const;
-
     operator bool() const { return id; }
     int2 size() const { return int2(width,height); }
 };
 
 enum { ClearDepth=0x100, ClearColor=0x4000 };
 struct GLFrameBuffer {
-    move_operator(GLFrameBuffer):
-        id(o.id),depthBuffer(o.depthBuffer),colorBuffer(o.colorBuffer),width(o.width),height(o.height),depthTexture(move(o.depthTexture))
-    {o.id=o.depthBuffer=o.colorBuffer=0;}
     GLFrameBuffer(){}
     GLFrameBuffer(GLTexture&& depth);
     GLFrameBuffer(uint width, uint height, uint format=sRGB8, int sampleCount=0);
@@ -130,7 +120,7 @@ struct GLFrameBuffer {
     void blit(uint target);
     void blit(GLTexture&);
 
-    uint id=0, depthBuffer=0, colorBuffer=0;
+    handle<uint> id, depthBuffer, colorBuffer;
     uint width=0, height=0;
     GLTexture depthTexture;
 };

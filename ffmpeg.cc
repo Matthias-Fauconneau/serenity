@@ -60,13 +60,12 @@ uint AudioFile::read(int16* output, uint outputSize) {
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-                    buffer = frame->data[0];
+                    shortBuffer = buffer<int16>(frame->data[0], bufferSize*channels);
                 } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
-                    if(buffer) unallocate(buffer);
-                    buffer = allocate<int16>(bufferSize*channels);
+                    shortBuffer = buffer<int16>(bufferSize*channels);
                     for(uint i : range(bufferSize)) {
-                        ((int16*)buffer)[2*i+0] = ((float*)frame->data[0])[i]*0x1.0p15f;
-                        ((int16*)buffer)[2*i+1] = ((float*)frame->data[1])[i]*0x1.0p15f;
+                        shortBuffer[2*i+0] = ((float*)frame->data[0])[i]*0x1.0p15f;
+                        shortBuffer[2*i+1] = ((float*)frame->data[1])[i]*0x1.0p15f;
                     }
                 } else error("Unknown format");
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
@@ -93,16 +92,15 @@ uint AudioFile::read(float* output, uint outputSize) {
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
-                if(buffer) unallocate(buffer);
-                buffer = allocate<float>(bufferSize*channels);
+                floatBuffer = buffer<float>(bufferSize*channels);
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
                     for(uint i : range(bufferSize*channels)) {
-                        ((float*)buffer)[i] = ((int16*)frame->data[0])[i]*0x1.0p-15;
+                        floatBuffer[i] = ((int16*)frame->data[0])[i]*0x1.0p-15;
                     }
                 } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
                     for(uint i : range(bufferSize)) {
-                        ((float*)buffer)[2*i+0] = ((float*)frame->data[0])[i];
-                        ((float*)buffer)[2*i+1] = ((float*)frame->data[1])[i];
+                        floatBuffer[2*i+0] = ((float*)frame->data[0])[i];
+                        floatBuffer[2*i+1] = ((float*)frame->data[1])[i];
                     }
                 } else error("Unknown format");
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
@@ -110,7 +108,7 @@ uint AudioFile::read(float* output, uint outputSize) {
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, outputSize-readSize);
-        copy(output, ((float*)buffer)+bufferIndex, size*channels);
+        copy(output, floatBuffer+bufferIndex, size*channels);
         bufferSize -= size; bufferIndex += size*channels;
         readSize += size; output+= size*channels;
     }

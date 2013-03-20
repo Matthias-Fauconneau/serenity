@@ -2,7 +2,6 @@
 #include "file.h"
 #include "http.h"
 #include "xml.h"
-#include "html.h"
 #include "interface.h"
 
 ICON(network) ICON(feeds)
@@ -17,7 +16,7 @@ Feeds::Feeds() : readConfig("read"_,config(),ReadWrite|Create|Append), readMap(r
 void Feeds::load() {
     clear(); entries.clear(); favicons.clear();
     entries << unique<Entry>(string(),string(":refresh"_),::resize(feedsIcon(),16,16),string("Feeds"_)); *this << &this->entries.last();
-    for(TextData s=readFile("feeds"_,config());s;) { ref<byte> url=s.line(); if(url[0]!='#') getURL(url, Handler(this, &Feeds::loadFeed), 30); }
+    for(TextData s=readFile("feeds"_,config());s;) { ref<byte> url=s.line(); if(url[0]!='#') getURL(url, {this, &Feeds::loadFeed}, 30); }
 }
 
 bool Feeds::isRead(const ref<byte>& guid, const ref<byte>& link) {
@@ -34,7 +33,7 @@ Favicon::Favicon(string&& host):host(move(host)){
     if(existsFile(cacheFile(url.relative("favicon.ico"_)),cache()))
         image=resize(decodeImage(readFile(cacheFile(url.relative("favicon.ico"_)),cache())),16,16);
     else
-        getURL(move(url), Handler(this, &Favicon::get), 7*24*60);
+        getURL(move(url), {this, &Favicon::get}, 7*24*60);
     if(!image) image = ::resize(networkIcon(),16,16);
 }
 void Favicon::get(const URL& url, Map&& document) {
@@ -44,7 +43,7 @@ void Favicon::get(const URL& url, Map&& document) {
     if(!icon) icon="favicon.ico"_;
     if(url.relative(icon).path!=URL(host).relative("/favicon.ico"_).path)
         symlink(string("../"_+cacheFile(url.relative(icon))), cacheFile(URL(host).relative("favicon.ico"_)),cache());
-    heap<ImageLoader>(url.relative(icon), &image, function<void()>(this, &Favicon::update), int2(16,16), 7*24*60);
+    getImage(url.relative(icon), &image, {this, &Favicon::update}, int2(16,16), 7*24*60);
 }
 void Favicon::update() {
     for(Image* user: users) *user=share(image);

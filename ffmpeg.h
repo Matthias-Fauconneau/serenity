@@ -13,7 +13,8 @@ struct AudioFile {
     struct AVCodecContext* audio=0;
     struct AVFrame* frame=0;
 
-    void* buffer=0;
+    buffer<int16> shortBuffer;
+    buffer<float> floatBuffer;
     uint bufferIndex=0, bufferSize=0;
 
     AudioFile();

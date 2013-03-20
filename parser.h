@@ -11,6 +11,7 @@ template<Type T> struct remove_const<const T> { typedef T type; };
 #define remove_const(T) typename remove_const<T>::type
 
 /// word is an index in a string table allowing fast move/copy/compare (but slower instanciation)
+// rename to symbol ?
 extern array<string> pool;
 struct word {
     int id;
@@ -79,51 +80,33 @@ inline string str(const Attribute& v) { return str(v.name,"= action("_+str(v.inp
 
 struct Rule {
     const word symbol;
-    array<word> tokens;
-    const int original=0, end=0, from=0, to=0; const word extended=""_;
-    array<word> followSet;
+    array<word> symbols;
     array<Attribute> attributes;
     Rule(word symbol):symbol(symbol){}
-    Rule(word symbol, word A):symbol(symbol){tokens<<A;}
-    Rule(word symbol, word A, word B):symbol(symbol){tokens<<A<<B;}
-    Rule(word symbol, array<word>&& tokens):symbol(symbol),tokens(move(tokens)){}
-    Rule(word symbol, array<word>&& tokens, int original, int end, int from, int to, array<Attribute>&& attributes) :
-        symbol(symbol), tokens(move(tokens)), original(original), end(end), from(from), to(to),
-        extended(str(from)+str(symbol)+str(to)), attributes(move(attributes)) {}
-    uint size() const { return tokens.size; }
-    word operator []( int i ) const { return tokens[i]; }
+    Rule(word symbol, word A):symbol(symbol){symbols<<A;}
+    Rule(word symbol, word A, word B):symbol(symbol){symbols<<A<<B;}
+    Rule(word symbol, array<word>&& symbols):symbol(symbol),symbols(move(symbols)){}
+    uint size() const { return symbols.size; }
+    word operator []( int i ) const { return symbols[i]; }
 };
-inline string str(const Rule& r) { return str(r.extended?:r.symbol)+" -> "_+str(r.tokens); }
-inline bool operator==(const Rule& a, const Rule& b) { return a.symbol==b.symbol; }
-
-struct Item {
-    array<Rule>& rules;
-    uint ruleIndex;
-    uint dot;
-    Item(array<Rule>& rules, uint ruleIndex, uint dot):rules(rules),ruleIndex(ruleIndex),dot(dot){ assert(dot<=size()); }
-    const Rule& rule() const { return rules[ruleIndex]; }
-    Rule& rule() { return rules[ruleIndex]; }
-    uint size() const { return rule().size(); }
-    word operator []( int i ) { return rule()[i]; }
-    word expected() const { assert(dot<rule().size()); return rule()[dot]; }
-};
-inline bool operator ==(const Item& a, const Item& b) { return a.ruleIndex==b.ruleIndex && a.dot == b.dot; }
-inline string str(const Item& item) {
-    assert(item.ruleIndex<item.rules.size,item.ruleIndex,item.rules.size);
-    assert(item.dot<=item.size(),item.dot,item.size(),item.rule());
-    return str(item.rule().symbol)+" -> "_+str(item.rule().tokens.slice(0, item.dot))+"  ."_+str(item.rule().tokens.slice(item.dot));
-}
+inline string str(const Rule& r) { return str(r.symbol)+" -> "_+str(r.symbols); }
+inline bool operator==(const Rule& a, const Rule& b) { return a.symbol==b.symbol && a.symbols == b.symbols; }
 
 struct State {
-    array<Item> items;
-    map<word, int> transitions;
+    const Rule& rule;
+    uint current; // current position in rule
+    uint origin; // start of the production in input
+
+    word next() const { assert(current<rule.size()); return rule[current]; }
+    bool operator==(const State& o) const { return rule==o.rule && current==o.current && origin==o.origin; }
 };
-inline bool operator ==(const State& a, const State& b) { return a.items==b.items; }
-inline string str(const State& state) { return " "_+str(state.items,"\n "_); }
+inline string str(const State& o) {
+    return str(o.rule.symbol)+"→"_+str(o.rule.symbols.slice(0, o.current))+"·"_+str(o.rule.symbols.slice(o.current))+","_+str(o.origin);
+}
 
 struct Node {
     word name;
-    array<unique<Node>> children;
+    array<Node*> children;
     map<word, unique<Value>> values;
     ref<byte> input;
     Node(word name):name(name){}
@@ -136,24 +119,12 @@ inline string str(const Node& node) {
 
 struct Parser {
     array<Rule> rules;
-    array<Rule> extended;
-    array<State> states;
     array<word> nonterminal, terminal, used;
 
     bool isTerminal(word w) { return terminal.contains(w); }
     bool isNonTerminal(word w) { return nonterminal.contains(w); }
     /// Parses rule expressions and generate rules from EBNF as needed
     array<word> parseRuleExpression(struct TextData& s);
-    /// Computes item sets
-    void computeItemSet(array<Item>& items, int index);
-    /// Computes transitions
-    void computeTransitions(int current, word token);
-    /// Computes first set
-    map<word, array<word>> firstSets;
-    array<word> first(const word& X);
-    array<word> first(const word& X, const ref<word>& Y);
-    /// Computes follow set
-    array<word> follow(const word& X);
 
     map<word, unique<Action>> actions;
     /// References an action implementation as a dynamic ActionFunction
@@ -163,10 +134,14 @@ struct Parser {
     };
     ActionRef operator[](const ref<byte>& name) { return {this,name}; }
 
-    /// Generates a parser from EBNF \a grammar
+    /// Generates a parser from an EBNF grammar
     void generate(const ref<byte>& grammar);
-    /// Parses \a text using characters as token (scannerless)
-    Node parse(const ref<byte>& input);
+
+    array<array<State>> states;
+
     /// Parses \a input calling semantic actions and generating a syntax tree
-    Node parse(const ref<word>& input);
+    Node parse(const ref<byte>& input);
+
+    array<Node> nodes;
+    void backtrack(uint i);
 };

@@ -50,9 +50,8 @@ array<Event> getEvents(Date query) {
 void Calendar::setActive(Date active) {
     clear(); dates.clear();
     todayIndex=-1; this->active=active;
-    constexpr ref<byte> days[7] = {"Mon"_,"Tue"_,"Wed"_,"Thu"_,"Fri"_,"Sat"_,"Sun"_};
     for(int i=0;i<7;i++) {
-        *this<< string(days[i]);
+        *this<< string(days[i].slice(0,3));
         dates << Date(-1,active.month,active.year, i);
     }
     int first=Date(0, active.month, active.year).weekDay;
@@ -98,14 +97,14 @@ void Events::showEvents(uint index) {
     array< ::Event> events = getEvents(date);
     if(events) {
         text << string(format(Bold)+(index==month.todayIndex?string("Today"_): ::str(date,"dddd, dd"_))+format(Regular)+"\n"_);
-        text << str(events,'\n')+"\n"_;
+        text << str(events,"\n"_)+"\n"_;
     }
     if(index==month.todayIndex) {
         Date date = month.dates[index+1];
         array< ::Event> events = getEvents(date);
         if(events) {
             text << format(Bold)+"Tomorrow"_+format(Regular)+"\n"_;
-            text << str(::getEvents(date),'\n');
+            text << str(::getEvents(date),"\n"_);
         }
     }
     this->events.setText(move(text));

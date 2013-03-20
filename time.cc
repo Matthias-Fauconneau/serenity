@@ -10,6 +10,7 @@ long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.
 long realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000+ts.tv_nsec/1000000; }
 uint64 cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000UL+ts.tv_nsec/1000; }
 
+static bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year=0) {
     if(month==1 && leap(year)) { assert(year!=0); return 29; }
     static constexpr int daysPerMonth[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
@@ -122,7 +123,9 @@ string str(Date date, const ref<byte>& format) {
 Date parse(TextData& s) {
     Date date;
     if(s.match("Today"_)) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
-    else for(int i=0;i<7;i++) if(s.match(str(days[i]))) { date.weekDay=i; break; }
+    else for(int i=0;i<7;i++) if(s.match(days[i])) { date.weekDay=i; goto break_; }
+    else for(int i=0;i<7;i++) if(s.match(days[i].slice(0,3))) { date.weekDay=i; break; }
+    break_:;
     {
         s.whileAny(" ,\t"_);
         int number = s.integer();

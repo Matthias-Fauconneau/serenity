@@ -21,10 +21,10 @@ Image decodeICO(const ref<byte>& file) {
     assert(header.depth==4||header.depth==8||header.depth==24||header.depth==32,header.depth);
     assert(header.compression==0);
 
-    array<byte4> palette;
+    byte4 palette[256];
     if(header.depth<=8) {
         assert(header.colorCount==0 || header.colorCount==(1u<<header.depth),header.colorCount,header.depth);
-        palette = array<byte4>( s.read<byte4>(1<<header.depth) );
+        s.read<byte4>(palette, 1<<header.depth);
         for(int i=0;i<1<<header.depth;i++) palette[i].a=255;
     }
 
@@ -34,8 +34,8 @@ Image decodeICO(const ref<byte>& file) {
 
     Image image(w,h,true);
     byte4* dst = (byte4*)image.data;
-    const byte* src=s.read<byte>(size).data;
-    if(header.depth==32) { copy((byte*)dst,src,size); }
+    const uint8* src = s.read<uint8>(size).data;
+    if(header.depth==32) { copy(dst,(byte4*)src,size); }
     if(header.depth==24) for(uint i: range(w*h)) dst[i] = byte4(src[i*3+0],src[i*3+1],src[i*3+2],255);
     if(header.depth==8) for(uint i: range(w*h)) dst[i] = palette[src[i]];
     if(header.depth==4) {

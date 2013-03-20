@@ -48,7 +48,7 @@ Image decodePNG(const ref<byte>& file) {
     if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { warn("Invalid PNG"); return Image(); }
     array<byte> buffer;
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
-    array<byte4> palette; bool alpha=false;
+    byte4 palette[256]; bool alpha=false;
     for(;;) {
         uint32 size = s.read();
         uint32 tag = s.read<uint32>();
@@ -68,11 +68,11 @@ Image decodePNG(const ref<byte>& file) {
             break;
         } else if(tag == raw<uint32>("PLTE"_)) {
             ref<rgb3> plte = s.read<rgb3>(size/3);
-            palette.reserve(plte.size); palette.size=plte.size;
+            assert(plte.size<=256);
             for(uint i: range(plte.size)) palette[i]=plte[i];
         }  else if(tag == raw<uint32>("tRNS"_)) {
             ref<byte> trns = s.read<byte>(size);
-            assert(trns.size<=palette.size);
+            assert(trns.size<=256);
             for(uint i: range(trns.size)) palette[i].a=trns[i];
             alpha=true;
         } else {
@@ -97,7 +97,8 @@ Image decodePNG(const ref<byte>& file) {
         data = move(bytes);
     }
     if(data.size < height*(1+width*depth)) { warn("Invalid PNG",data.size,height*(1+width*depth),width,height,depth); return Image(); }
-    byte4* image = allocate<byte4>(width*height);
+    Image image(width,height,alpha);
+    byte4* dst = image.data;
     int w=width,h=height;
     const byte* src=data.data;
     for(int i=0;i==0 || (interlace && i<7);i++) {
@@ -114,17 +115,16 @@ Image decodePNG(const ref<byte>& file) {
             w=width/xStride;
             h=height/yStride;
         }
-        if(depth==1) unfilter<luma,1>(image+offset,src,w,h,xStride,yStride);
-        if(depth==2) unfilter<ia,2>(image+offset,src,w,h,xStride,yStride);
-        if(depth==3) unfilter<rgb,3>(image+offset,src,w,h,xStride,yStride);
-        if(depth==4) unfilter<rgba,4>(image+offset,src,w,h,xStride,yStride);
+        if(depth==1) unfilter<luma,1>(dst+offset,src,w,h,xStride,yStride);
+        if(depth==2) unfilter<ia,2>(dst+offset,src,w,h,xStride,yStride);
+        if(depth==3) unfilter<rgb,3>(dst+offset,src,w,h,xStride,yStride);
+        if(depth==4) unfilter<rgba,4>(dst+offset,src,w,h,xStride,yStride);
         src += h*(1+w*depth);
     }
     if(type==3) {
-        assert(palette);
-        for(uint i: range(width*height)) image[i]=palette[image[i][0]];
+        for(uint i: range(width*height)) dst[i]=palette[dst[i][0]];
     }
-    return Image(image,image,width,height,width,alpha);
+    return image;
 }
 
 uint32 crc32(const ref<byte>& data) {

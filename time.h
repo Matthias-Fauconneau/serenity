@@ -48,7 +48,6 @@ enum WeekDay { Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday };
 constexpr ref<byte> days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
 enum Month { January, February, March, April, May, June, July, August, September, October, November, December };
 constexpr ref<byte> months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
-constexpr bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year);
 
 /// Returns current date formatted using \a format string

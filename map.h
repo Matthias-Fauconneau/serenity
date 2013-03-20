@@ -11,7 +11,7 @@ template<Type K, Type V> struct map {
     array<K> keys;
     array<V> values;
 
-    default_move(map);
+    map(){}
     map(const ref<key_value<K,V>>& pairs){
         for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
     }
@@ -24,15 +24,17 @@ template<Type K, Type V> struct map {
     explicit operator bool() const { return keys.size; }
     bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
 
-    bool contains(const K& key) const { return keys.contains(key); }
+    template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
 
-    const V& at(const K& key) const { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
-    V& at(const K& key) { int i = keys.indexOf(key); if(i<0)error("'"_+str(key)+"' not in {"_,keys,"}"_); return values[i];}
-
-    array<V> multi(const K& key) const {
-        array<V> multi;
-        for(auto pair: *this) if(pair.key==key) multi << pair.value;
-        return multi;
+    template<Type KK> const V& at(const KK& key) const {
+        int i = keys.indexOf(key);
+        if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        return values[i];
+    }
+    template<Type KK> V& at(const KK& key) {
+        int i = keys.indexOf(key);
+        if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        return values[i];
     }
 
     const V& value(const K& key, V&& value) {
