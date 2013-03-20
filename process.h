@@ -16,21 +16,24 @@ int pthread_mutex_init(pthread_mutex* mutex, const void* attr);
 int pthread_mutex_trylock(pthread_mutex* mutex);
 int pthread_mutex_lock(pthread_mutex* mutex);
 int pthread_mutex_unlock(pthread_mutex* mutex);
+int pthread_mutex_destroy(pthread_mutex* mutex);
 int pthread_cond_init(pthread_cond* cond, const void* attr);
 int pthread_cond_wait(pthread_cond* cond, pthread_mutex* mutex);
 int pthread_cond_signal(pthread_cond* cond);
+int pthread_cond_destroy(pthread_cond* cond);
 }
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
-struct Lock {
-    pthread_mutex mutex;
-    Lock(){ pthread_mutex_init(&mutex,0); }
+struct Lock : handle<pthread_mutex> {
+    default_move(Lock);
+    Lock() { pthread_mutex_init(&pointer,0); }
+    ~Lock() { pthread_mutex_destroy(&pointer); }
     /// Locks the mutex.
-    inline void lock() { pthread_mutex_lock(&mutex); }
+    inline void lock() { pthread_mutex_lock(&pointer); }
     /// Atomically lock the mutex only if unlocked.
-    inline bool tryLock() { return !pthread_mutex_trylock(&mutex); }
+    inline bool tryLock() { return !pthread_mutex_trylock(&pointer); }
     /// Unlocks the mutex.
-    inline void unlock() { pthread_mutex_unlock(&mutex); }
+    inline void unlock() { pthread_mutex_unlock(&pointer); }
 };
 
 /// Convenience class to automatically unlock a mutex
@@ -40,16 +43,22 @@ struct Locker {
     ~Locker(){lock.unlock();}
 };
 
+struct Condition : handle<pthread_cond> {
+    default_move(Condition);
+    Condition() { pthread_cond_init(&pointer,0); }
+    ~Condition(){ pthread_cond_destroy(&pointer); }
+};
+
 /// A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter
 struct Semaphore {
     Lock mutex;
-    pthread_cond condition;
-    long counter;
+    Condition condition;
+    int counter;
     /// Creates a semaphore with \a count initial ressources
-    Semaphore(int count=0) : counter(count) { pthread_cond_init(&condition,0); }
+    Semaphore(int count=0) : counter(count) {}
     /// Acquires \a count ressources
     inline void acquire(int count) {
-        while(counter<count) pthread_cond_wait(&condition,&mutex.mutex);
+        while(counter<count) pthread_cond_wait(&condition,&mutex);
         counter-=count; assert(counter>=0);
     }
     /// Atomically tries to acquires \a count ressources only if available

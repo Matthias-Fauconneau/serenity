@@ -415,7 +415,7 @@ array<byte> inflate(const ref<byte>& source, bool zlib) {
       pOut_len += dst_buf_size;
       if (status == STATUS_DONE) break;
       new_out_buf_capacity = out_buf_capacity * 2; if (new_out_buf_capacity < 4096) new_out_buf_capacity = 4096;
-      realloc(buffer, new_out_buf_capacity);
+      buffer = (uint8*)realloc(buffer, new_out_buf_capacity);
       out_buf_capacity = new_out_buf_capacity;
     }
     array<byte> data; data.data = (byte*)buffer; data.size=pOut_len; data.capacity=out_buf_capacity; return data;

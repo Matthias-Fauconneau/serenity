@@ -9,6 +9,19 @@ struct Matrix {
     Matrix(){}
     Matrix(uint m, uint n):m(m),n(n),columnPointers(n+1,n+1,0){}
 
+    real operator()(uint i, uint j) const {
+        assert(i<m && j<n);
+        uint index=columnPointers[j];
+        for(; index<columnPointers[j+1]; index++) {
+            uint row = rowIndices[index];
+            if(row >= i) {
+                if(row == i) return values[index];
+                break;
+            }
+        }
+        return 0;
+    }
+
     real& operator()(uint i, uint j) {
         assert(i<m && j<n);
         uint index=columnPointers[j];
@@ -29,6 +42,7 @@ struct Matrix {
     array<uint> rowIndices;
     array<real> values;
 };
+template<> string str(const Matrix& a);
 
 /// Dense vector
 typedef buffer<real> Vector;

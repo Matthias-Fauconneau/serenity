@@ -55,7 +55,6 @@ typedef unsigned int size_t;
 #endif
 namespace std { template<Type T> struct initializer_list { const T* data; size_t size; }; }
 template<Type T> struct ref;
-/// Returns const reference to a static string literal
 inline constexpr ref<byte> operator "" _(const char* data, size_t size);
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
 #define _ // QtCreator doesn't parse custom literal operators (""_)
@@ -172,16 +171,16 @@ template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(s
 
 /// Reference type with move semantics
 template<Type T> struct handle {
-    handle(T pointer=0):pointer(pointer){}
+    handle(T pointer=T()):pointer(pointer){}
     handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
-    handle(handle&& o):pointer(o.pointer){o.pointer=0;}
+    handle(handle&& o):pointer(o.pointer){o.pointer=T();}
 
     operator T() const { return pointer; }
     operator T&() { return pointer; }
     T* operator &() { return &pointer; }
     T operator ->() { return pointer; }
 
-    T pointer=0;
+    T pointer;
 };
 
 // C runtime memory allocation
@@ -190,24 +189,18 @@ extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
 extern "C" void* realloc(void* buffer, size_t size);
 extern "C" void free(void* buffer);
 // Typed memory allocation (without initialization)
-template<Type T> T* allocate(uint size) { assert(size); return (T*)malloc(size*sizeof(T)); }
 template<Type T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
-template<Type T> void reallocate(T*& buffer, int need) { buffer=(T*)realloc((void*)buffer, need*sizeof(T)); }
 
 /// Reference to a fixed capacity heap allocated buffer
 template<Type T> struct buffer {
     buffer(){}
-    buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
-    explicit buffer(const buffer& o):buffer(o.capacity){size=o.size; copy(data,o.data,size);}
-
     buffer(T* data, uint capacity, uint size):data(data),capacity(capacity),size(size){}
     buffer(T* data, uint size):data(data),size(size){}
-
+    buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
     buffer(uint capacity, uint size):data(allocate64<T>(capacity)),capacity(capacity),size(size){}
-    explicit buffer(uint size):data(allocate64<T>(size)),capacity(size),size(size){}
+    explicit buffer(uint size):buffer(size,size){}
 
-    buffer(uint capacity, uint size, const T& value):data(allocate64<T>(capacity)),capacity(capacity),size(size){clear(data,size,value);}
-    buffer(uint size, const T& value):data(allocate64<T>(size)),capacity(size),size(size){clear(data,size,value);}
+    buffer(uint capacity, uint size, const T& value):buffer(capacity,size){clear(data,size,value);}
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     ~buffer(){ if(capacity) free(data); data=0; }
@@ -229,6 +222,7 @@ template<Type T> struct buffer {
     uint capacity=0;
     uint size=0;
 };
+template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity); copy(t.data,o.data,o.size); return t; }
 
 /// Unique reference to an heap allocated value
 template<Type T> struct unique {

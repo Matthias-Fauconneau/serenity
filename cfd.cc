@@ -4,9 +4,9 @@
 #include "display.h"
 
 struct CFDTest : Widget {
-    const uint Mx=32, My=32; // Spatial resolutions
+    const uint Mx=64, My=64; // Spatial resolutions
     const real H=1; // Aspect ratio (y/x)
-    const real dx = 1/Mx, dy = H/My; // Physical resolutions
+    const real dx = 1.0/Mx, dy = H/My; // Physical resolutions
     const uint N = Mx*My; // Total sample count
     UMFPACK LU; // Factorized operator
     Vector b{N}; // Right-hand vector
@@ -44,7 +44,6 @@ struct CFDTest : Widget {
     void render(int2 position, int2 size) {
         Image image = clip(framebuffer,position,size);
         Vector u = LU.solve(b);
-        log(u);
         for(uint y: range(My)) {
             for(uint x: range(Mx)) {
                 uint i = y*Mx+x;

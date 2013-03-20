@@ -26,10 +26,10 @@ template<int unroll> inline void accumulate(float4 accumulators[unroll], const f
         for(uint i: range(unroll)) accumulators[i]+=ptr[i]*ptr[i];
     }
 }
-float Note::sumOfSquares(uint size) {
-    size =size/2; uint index = readIndex/2, capacity = audio.capacity/2; //align to float4
+float sumOfSquares(const FLAC& flac, uint size) {
+    size =size/2; uint index = flac.readIndex/2, capacity = flac.audio.capacity/2; //align to float4
     uint beforeWrap = capacity-index;
-    const float4* buffer = (float4*)audio.data;
+    const float4* buffer = (float4*)flac.audio.data;
     constexpr uint unroll=4; //4*4*4~64bytes: 1 prefetch/line
     float4 accumulators[unroll]={}; //breaks dependency chain to pipeline the unrolled loops
     if(size>beforeWrap) { //wrap
@@ -63,22 +63,21 @@ void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
             if(key=="sample"_) {
                 string path = replace(replace(value,"\\"_,"/"_),".wav"_,".flac"_);
                 sample->map = Map(path,folder);
-                sample->data = Note(sample->map);
+                sample->flac = FLAC(sample->map);
                 if(!existsFile(string(path+".env"_),folder)) {
-                    Note copy = ::copy(sample->data);
+                    FLAC flac(sample->map);
                     array<float> envelope; uint size=0;
-                    while(copy.blockSize!=0) {
+                    while(flac.blockSize!=0) {
                         const uint period=1<<8;
-                        while(copy.blockSize!=0 && size<period) { size+=copy.blockSize; copy.decodeFrame(); }
-                        if(size>=period) { envelope << copy.sumOfSquares(period); copy.readIndex=(copy.readIndex+period)%copy.audio.capacity; size-=period; }
+                        while(flac.blockSize!=0 && size<period) { size+=flac.blockSize; flac.decodeFrame(); }
+                        if(size>=period) { envelope << sumOfSquares(flac, period); flac.readIndex=(flac.readIndex+period)%flac.audio.capacity; size-=period; }
                     }
                     log(string(path+".env"_),envelope.size);
                     writeFile(string(path+".env"_),cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(string(path+".env"_),folder)));
-                sample->data.envelope = sample->envelope;
-                if(!rate) rate=sample->data.rate;
-                else if(rate!=sample->data.rate) error("Sample rate mismatch",rate,sample->data.rate);
+                if(!rate) rate=sample->flac.rate;
+                else if(rate!=sample->flac.rate) error("Sample rate mismatch",rate,sample->flac.rate);
             }
             else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
@@ -101,7 +100,7 @@ void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
     }
 
     for(Sample& s: samples) {
-        s.data.decode(1<<12); // Predecodes 4K (10ms)
+        s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
         //s.map.lock(); // Locks compressed samples in memory (PERM error if unprivileged)
 
         for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
@@ -168,8 +167,8 @@ void Sampler::open(uint outputRate, const ref<byte>& file, const Folder& root) {
 
 float Note::actualLevel(uint size) const {
     const int count = size>>8;
-    if((position>>8)+count>envelope.size) return 0; //fully decayed
-    float sum=0; for(int i=0;i<count;i++) sum+=envelope[(position>>8)+count]; //precomputed sum
+    if((flac.position>>8)+count>envelope.size) return 0; //fully decayed
+    float sum=0; for(int i=0;i<count;i++) sum+=envelope[(flac.position>>8)+count]; //precomputed sum
     return sqrt(sum)/size;
 }
 
@@ -186,21 +185,24 @@ void Sampler::noteEvent(uint key, uint velocity) {
     }
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
+            Note note( ::copy(s.flac) ); // Copy predecoded buffer and corresponding FLAC decoder state
+            note.envelope = s.envelope;
+
             float level;
             if(current) { //rt_decay is unreliable, matching levels works better
-                level = current->actualLevel(1<<14) / s.data.actualLevel(1<<11);
+                level = current->actualLevel(1<<14) / note.actualLevel(1<<11);
                 level *= extract(current->level,0);
                 if(level>8) level=8;
             } else {
                 level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * s.volume;
             }
             if(level<0x1p-15) return;
-            Note note = ::copy(s.data);
+
             if(!current) note.key=key;
             note.step=(float4){1,1,1,1};
             note.releaseTime=s.releaseTime;
             note.envelope=s.envelope;
-            if(note.sampleSize==16) level*=0x1p8;
+            if(note.flac.sampleSize==16) level*=0x1p8;
             note.level=(float4){level,level,level,level};
             {Locker locker(lock);
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
@@ -221,28 +223,28 @@ void Sampler::noteEvent(uint key, uint velocity) {
 /// Background decoder (background thread)
 
 void Note::decode(uint need) {
-    assert(need<=audio.capacity);
-    while(readCount<=int(need) && blockSize && (int)writeCount>=blockSize) {
-        int size=blockSize; writeCount.acquire(size); FLAC::decodeFrame(); readCount.release(size);
+    assert(need<=flac.audio.capacity);
+    while(readCount<=int(need) && flac.blockSize && (int)writeCount>=flac.blockSize) {
+        int size=flac.blockSize; writeCount.acquire(size); flac.decodeFrame(); readCount.release(size);
     }
 }
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(lock.tryLock()) { // Cleanup silent notes
         for(Layer& layer: layers) layer.notes.filter([](const Note& note){
-            return (note.blockSize==0 && note.readCount<int(2*periodSize)) || extract(note.level,0)<0x1p-23;
+            return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)) || extract(note.level,0)<0x1p-23;
         });
         lock.unlock();
     }
     for(;;) {
         Note* note=0; uint minBufferSize=-1;
         for(Layer& layer: layers) for(Note& n: layer.notes) { // find least buffered note
-            if(n.blockSize && n.writeCount>=n.blockSize && n.audio.size<minBufferSize) {
+            if(n.flac.blockSize && n.writeCount>=n.flac.blockSize && n.flac.audio.size<minBufferSize) {
                 note=&n;
-                minBufferSize=n.audio.size;
+                minBufferSize=n.flac.audio.size;
             }
         }
         if(!note) break; //all notes are already fully buffered
-        int size=note->blockSize; note->writeCount.acquire(size); note->decodeFrame(); note->readCount.release(size);
+        int size=note->flac.blockSize; note->writeCount.acquire(size); note->flac.decodeFrame(); note->readCount.release(size);
     }
 
     if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
@@ -251,23 +253,24 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 /// Audio mixer (realtime thread)
 inline void mix(float4& level, float4 step, float4* out, float4* in, uint size) { for(uint i: range(size)) { out[i] += level * in[i]; level*=step; } }
 void Note::read(float4* out, uint size) {
-    if(blockSize==0 && readCount<int(size*2)) { readCount=0; return; } // end of stream
+    if(flac.blockSize==0 && readCount<int(size*2)) { readCount.counter=0; return; } // end of stream
     if(!readCount.tryAcquire(size*2)) {
         log("decoder underrun");
         readCount.acquire(size*2); //ensure decoder follows
     }
-    uint beforeWrap = (audio.capacity-readIndex)/2;
+    uint beforeWrap = (flac.audio.capacity-flac.readIndex)/2;
     if(size>beforeWrap) {
-        mix(level,step,out,(float4*)(audio+readIndex),beforeWrap);
-        mix(level,step,out+beforeWrap,(float4*)(audio+0),size-beforeWrap);
-        readIndex = (size-beforeWrap)*2;
+        mix(level,step,out,(float4*)(flac.audio+flac.readIndex),beforeWrap);
+        mix(level,step,out+beforeWrap,(float4*)(flac.audio+0),size-beforeWrap);
+        flac.readIndex = (size-beforeWrap)*2;
     } else {
-        mix(level,step,out,(float4*)(audio+readIndex),size);
-        readIndex += size*2;
+        mix(level,step,out,(float4*)(flac.audio+flac.readIndex),size);
+        flac.readIndex += size*2;
     }
-    audio.size-=size*2; writeCount.release(size*2); //allow decoder to continue
-    position+=size*2; //keep track of position for release sample level matching
+    flac.audio.size-=size*2; writeCount.release(size*2); //allow decoder to continue
+    flac.position+=size*2; //keep track of position for release sample level matching
 }
+
 uint Sampler::read(int32* output, uint size) { // Audio thread
     float4 buffer64[size*2/4]; // Force alignment
     float* buffer = (float*)buffer64;

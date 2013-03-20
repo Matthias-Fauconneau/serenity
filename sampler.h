@@ -12,13 +12,14 @@
 #endif
 
 typedef float float4 __attribute((vector_size(16)));
-struct Note : FLAC {
-    Note(){}
-    Note(const ref<byte>& data):FLAC(data){}
+struct Note {
+    default_move(Note);
+    Note(FLAC&& flac):flac(move(flac)),writeCount((int)this->flac.audio.capacity){}
+    FLAC flac;
     float4 level; //current note attenuation
     float4 step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
     Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
-    Semaphore writeCount{(int)audio.capacity}; //audio thread release free samples, decoder thread acquires
+    Semaphore writeCount; //audio thread release free samples, decoder thread acquires
     uint16 releaseTime; //to compute step
     uint8 key=0; //to match release sample
     ref<float> envelope; //to level release sample
@@ -33,7 +34,7 @@ struct Note : FLAC {
 };
 
 struct Sample {
-    Map map; Note data; array<float> envelope; //Sample data
+    Map map; FLAC flac; array<float> envelope; //Sample data
     int16 trigger=0; uint16 lovel=0; uint16 hivel=127; uint16 lokey=0; uint16 hikey=127; //Input controls
     int16 pitch_keycenter=60; uint16 releaseTime=0; int16 amp_veltrack=100; float volume=1; //Performance parameters
 };

@@ -1,5 +1,20 @@
 #include "algebra.h"
 
+template<> string str(const Matrix& a) {
+    string s("[ "_);
+    for(uint i: range(a.m)) {
+        if(a.n==1) s<<ftoa(a(i,0),0,0)<<' ';
+        else {
+            for(uint j: range(a.n)) {
+                s<<ftoa(a(i,j),0,0)<<' ';
+            }
+            if(i<a.m-1) s<<"\n  "_;
+        }
+    }
+    s << "]"_;
+    return s;
+}
+
 extern "C" {
 uint umfpack_di_symbolic(uint m, uint n, const uint* columnPointers, const uint* rowIndices, const double* values, void** symbolic,
                          const double* control, double* info);
