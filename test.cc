@@ -27,3 +27,10 @@ struct EarleyTest {
         parser.parse(input);
     }
 } test;
+
+#if 0
+#include "window.h"
+#include "text.h"
+TextInput input("test"_);
+Window window(&input);
+#endif

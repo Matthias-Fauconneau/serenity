@@ -4,9 +4,21 @@
 #include "time.h"
 typedef double real;
 
+/// Dense vector
+struct Vector : buffer<real> {
+    /// Allocates and initializes to zero
+    Vector(uint size):buffer<real>(size,size,0.0){}
+};
+
+Vector operator*(real a, const Vector& b);
+Vector operator+(const Vector& a, const Vector& b);
+Vector operator-(const Vector& a, const Vector& b);
+Vector operator*(const Vector& a, const Vector& b);
+
 /// Sparse matrix using compressed column storage (CCS)
 struct Matrix {
     Matrix(){}
+    Matrix(uint n):m(n),n(n),columns(n,n,array<Element>()){}
     Matrix(uint m, uint n):m(m),n(n),columns(n,n,array<Element>()){}
 
     inline real operator()(uint i, uint j) const {
@@ -32,10 +44,17 @@ struct Matrix {
     };
     array<array<Element>> columns;
 };
-template<> string str(const Matrix& a);
+inline Matrix copy(const Matrix& A) { Matrix t(A.m,A.n); t.columns=copy(A.columns); return t; }
+template<> string str(const Matrix& A);
 
-/// Dense vector
-typedef buffer<real> Vector;
+inline Matrix identity(uint size) { Matrix I(size,size); for(uint i: range(size)) I(i,i)=1; return I; }
+
+//TODO: Expression templates
+Matrix operator*(real a, const Matrix& A);
+Vector operator*(const Matrix& A, const Vector& b);
+Matrix operator+(const Matrix& A, const Matrix& B);
+Matrix operator-(const Matrix& A, const Matrix& B);
+//Matrix operator*(const Matrix& A, const Matrix& B);
 
 struct UMFPACK {
     UMFPACK(){}

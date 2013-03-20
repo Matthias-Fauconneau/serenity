@@ -1,19 +1,80 @@
 #include "algebra.h"
 
-template<> string str(const Matrix& a) {
+Vector operator*(real a, const Vector& b) {
+    Vector t(b.size);
+    for(uint i: range(t.size)) t[i]=a*b[i];
+    return t;
+}
+
+Vector operator+(const Vector& a, const Vector& b) {
+    assert(a.size==b.size); Vector t(a.size);
+    for(uint i: range(t.size)) t[i]=a[i]+b[i];
+    return t;
+}
+
+Vector operator-(const Vector& a, const Vector& b) {
+    assert(a.size==b.size); Vector t(a.size);
+    for(uint i: range(t.size)) t[i]=a[i]-b[i];
+    return t;
+}
+
+Vector operator*(const Vector& a, const Vector& b) {
+    assert(a.size==b.size); Vector t(a.size);
+    for(uint i: range(t.size)) t[i]=a[i]*b[i];
+    return t;
+}
+
+template<> string str(const Matrix& A) {
     string s("[ "_);
-    for(uint i: range(a.m)) {
-        if(a.n==1) s<<ftoa(a(i,0),0,0)<<' ';
+    for(uint i: range(A.m)) {
+        if(A.n==1) s<<ftoa(A(i,0),0,0)<<' ';
         else {
-            for(uint j: range(a.n)) {
-                s<<ftoa(a(i,j),0,0)<<' ';
+            for(uint j: range(A.n)) {
+                s<<ftoa(A(i,j),0,0)<<' ';
             }
-            if(i<a.m-1) s<<"\n  "_;
+            if(i<A.m-1) s<<"\n  "_;
         }
     }
     s << "]"_;
     return s;
 }
+
+Matrix operator*(real a, const Matrix& A) {
+    Matrix t = copy(A);
+    for(array<Matrix::Element>& column: t.columns) for(Matrix::Element& e: column) e.value *= a;
+    return t;
+}
+
+Vector operator*(const Matrix& A, const Vector& b) {
+    Vector t(b.size);
+    for(uint j: range(A.n)) for(const Matrix::Element& e: A.columns[j]) t[e.row] += e.value*b[j]; //t[i] = A[i,j]b[j]
+    return t;
+}
+
+Matrix operator+(const Matrix& A, const Matrix& B) {
+    assert(A.m == B.m && A.n == B.n);
+    Matrix t = copy(A);
+    for(uint j: range(B.n)) for(const Matrix::Element& e: B.columns[j]) t(e.row,j) += e.value;
+    return t;
+}
+
+Matrix operator-(const Matrix& A, const Matrix& B) {
+    assert(A.m == B.m && A.n == B.n);
+    Matrix t = copy(A);
+    for(uint j: range(B.n)) for(const Matrix::Element& e: B.columns[j]) t(e.row,j) -= e.value;
+    return t;
+}
+
+/*Matrix operator*(const Matrix& a, const Matrix& b) {
+    assert(a.n==b.m);
+    Matrix t(a.m,b.n);
+    for(uint i: range(r.m)) for(uint j: range(r.n)) {
+        real sum=0;
+        for(const Element& e: b.columns[j]) sum += a(i,e.row)*e.value; //t[i,j] = a[i,k]*b[k,j]
+        if(sum) t(i,j) = sum;
+    }
+    return t;
+}*/
 
 extern "C" {
 uint umfpack_di_symbolic(uint m, uint n, const uint* columnPointers, const uint* rowIndices, const double* values, void** symbolic,
@@ -42,8 +103,8 @@ UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
     rowIndices = buffer<uint>(nnz);
     values = buffer<real>(nnz);
     uint index=0;
-    for(const array<Matrix::Element>& a: A.columns) {
-        for(const Matrix::Element& e: a) {
+    for(const array<Matrix::Element>& column: A.columns) {
+        for(const Matrix::Element& e: column) {
             rowIndices[index]=e.row;
             values[index]=e.value;
             index++;
