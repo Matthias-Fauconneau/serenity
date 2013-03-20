@@ -215,7 +215,7 @@ uint Text::index() {
         assert(index<text.size);
         return index;
     }
-    uint index = 1; // ' ', '\t' or '\n' immediatly after last character
+    uint index = 1; // ' ', '\t' or '\n' immediately after last character
     uint line=cursor.line;
     while(line>0 && !textLines[line]) line--, index++; //count \n (not included as characters)
     if(textLines[line]) index += textLines[line].last().editIndex;

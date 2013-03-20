@@ -1,46 +1,36 @@
 #pragma once
 /// Numeric linear algebra (matrix operations, linear solver)
 #include "string.h"
-
+#include "time.h"
 typedef double real;
 
 /// Sparse matrix using compressed column storage (CCS)
 struct Matrix {
     Matrix(){}
-    Matrix(uint m, uint n):m(m),n(n),columnPointers(n+1,n+1,0){}
+    Matrix(uint m, uint n):m(m),n(n),columns(n,n,array<Element>()){}
 
-    real operator()(uint i, uint j) const {
+    inline real operator()(uint i, uint j) const {
         assert(i<m && j<n);
-        uint index=columnPointers[j];
-        for(; index<columnPointers[j+1]; index++) {
-            uint row = rowIndices[index];
-            if(row >= i) {
-                if(row == i) return values[index];
-                break;
-            }
-        }
+        const array<Element>& column = columns[j];
+        uint index = column.linearSearch(i);
+        if(index<column.size && column[index].row == i) return column[index].value;
         return 0;
     }
 
-    real& operator()(uint i, uint j) {
+    inline real& operator()(uint i, uint j) {
         assert(i<m && j<n);
-        uint index=columnPointers[j];
-        for(; index<columnPointers[j+1]; index++) {
-            uint row = rowIndices[index];
-            if(row >= i) {
-                if(row == i) return values[index];
-                break;
-            }
-        }
-        for(uint& columnPointer: columnPointers.slice(j+1)) columnPointer++;
-        rowIndices.insertAt(index, i);
-        return values.insertAt(index, 0);
+        array<Element>& column = columns[j];
+        uint index = column.linearSearch(i);
+        if(index<column.size && column[index].row == i) return column[index].value;
+        return column.insertAt(index,{i,0.0}).value;
     }
 
     uint m=0,n=0; /// row and column count
-    buffer<uint> columnPointers;
-    array<uint> rowIndices;
-    array<real> values;
+    struct Element {
+        uint row; real value;
+        bool operator <(uint row) const { return this->row<row; }
+    };
+    array<array<Element>> columns;
 };
 template<> string str(const Matrix& a);
 
@@ -49,12 +39,15 @@ typedef buffer<real> Vector;
 
 struct UMFPACK {
     UMFPACK(){}
-    UMFPACK(Matrix&& A);
+    UMFPACK(const Matrix& A);
 
     Vector solve(const Vector& b);
 
     struct Symbolic : handle<void*> { ~Symbolic(); };
     struct Numeric : handle<void*> { Numeric(){} default_move(Numeric); ~Numeric(); };
-    Matrix A;
+    uint m=0,n=0;
+    buffer<uint> columnPointers;
+    buffer<uint> rowIndices;
+    buffer<real> values;
     Numeric numeric;
 };

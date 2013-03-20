@@ -2,6 +2,7 @@
 #include "algebra.h"
 #include "window.h"
 #include "display.h"
+#include "time.h"
 
 struct CFDTest : Widget {
     const uint Mx=64, My=64; // Spatial resolutions
@@ -24,25 +25,31 @@ struct CFDTest : Widget {
                 }
                 else if(y==0||y==My-1) { // Fixed derivative boundary condition (u'=0)
                     if(y==0) {
-                        A(i,i+0*My) = -3/(2*dx); A(i,i+1*My) = 4/(2*dx); A(i,i+2*My) = -1/(2*dx);
+                        A(i,i+0*My) = -3/(2*dx);
+                        A(i,i+1*My) = 4/(2*dx);
+                        A(i,i+2*My) = -1/(2*dx);
                     } else {
-                        A(i,i+0*My) = 3/(2*dx); A(i,i-1*My) = -4/(2*dx); A(i,i-2*My) = 1/(2*dx);
+                        A(i,i-2*My) = 1/(2*dx);
+                        A(i,i-1*My) = -4/(2*dx);
+                        A(i,i+0*My) = 3/(2*dx);
                     }
                     b[i] = 0; // No flux
                 }
                 else { // Poisson equation on interior points (using 2nd order finite differences)
-                    A(i,i-1) = A(i,i+1) = 1/(dx*dx);
-                    A(i,i-My) = A(i,i+My) = 1/(dy*dy);
+                    A(i,i-My) = 1/(dy*dy);
+                    A(i,i-1) = 1/(dx*dx);
                     A(i,i) = -2*(1/(dx*dx)+1/(dy*dy));
+                    A(i,i+1) = 1/(dx*dx);
+                    A(i,i+My) = 1/(dy*dy);
 
                     b[i] = 0; // No source
                 }
             }
         }
-        LU = UMFPACK(move(A));
+        LU = UMFPACK(A);
     }
     void render(int2 position, int2 size) {
-        Image image = clip(framebuffer,position,size);
+        Image image(Mx, My);
         Vector u = LU.solve(b);
         for(uint y: range(My)) {
             for(uint x: range(Mx)) {
@@ -51,6 +58,7 @@ struct CFDTest : Widget {
                 //image(x,y) = byte4(clip(0, int(-u(i)*0xFF), 0xFF), 0, clip(0, int(u(i)*0xFF), 0xFF), 0xFF); [-1,0,1] -> [blue,black,red]
             }
         }
+        blit(position, resize(image, size.x, size.y));
     }
-    int2 sizeHint() { return int2(Mx, My); }
+    int2 sizeHint() { return int2(16*Mx, 16*My); }
 } test;

@@ -85,6 +85,7 @@ template<Type T> struct array {
 
     /// Inserts an element at \a index
     T& insertAt(int index, T&& e) {
+        assert(index>=0);
         reserve(++size);
         for(int i=size-2;i>=index;i--) copy((byte*)(data+i+1),(const byte*)(data+i),sizeof(T));
         new (data+index) T(move(e));
@@ -92,9 +93,9 @@ template<Type T> struct array {
     }
     /// Inserts a value at \a index
     T& insertAt(int index, const T& v) { return insertAt(index,copy(v)); }
-    /// Inserts an element immediatly after the first lesser value in array
+    /// Inserts immediately before the first element greater than or equal to the argument
     int insertSorted(T&& e) { uint i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
-    /// Inserts a value immediatly after the first lesser value in array
+    /// Inserts immediately before the first element greater than or equal to the argument
     int insertSorted(const T& v) { return insertSorted(copy(v)); }
 
     /// Removes one element at \a index
@@ -115,8 +116,11 @@ template<Type T> struct array {
     template<Type K> int indexOf(const K& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
     template<Type K> bool contains(const K& key) const { return indexOf(key)>=0; }
-    /// Returns index to the last element less than or equal to \a value using binary search (assuming a sorted array)
+    /// Returns index to the first element greater than or equal to \a value using linear search (assuming a sorted array)
+    template<Type K> int linearSearch(const K& key) const { uint i=0; while(i<size && at(i) < key) i++; return i; }
+    /// Returns index to the first element greater than or equal to \a value using binary search (assuming a sorted array)
     template<Type K> int binarySearch(const K& key) const {
+        assert(size);
         uint min=0, max=size;
         while(min<max) {
             uint mid = (min+max)/2;
@@ -138,10 +142,10 @@ template<Type T> array<T> copy(const ref<T>& o) { array<T> copy; copy<<o; return
 template<Type T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; return copy; }
 
 /// Concatenates two arrays
-template<Type T> inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a<<b; return r; }
-template<Type T> inline array<T> operator+(const array<T>& a, const ref<T>& b) { array<T> r; r<<a<<b; return r; }
-template<Type T> inline array<T> operator+(const ref<T>& a, const array<T>& b) { array<T> r; r<<a<<b; return r; }
-template<Type T> inline array<T> operator+(const array<T>& a, const array<T>& b) { array<T> r; r<<a<<b; return r; }
+template<Type T> inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a; r<<b; return r; }
+template<Type T> inline array<T> operator+(const array<T>& a, const ref<T>& b) { array<T> r; r<<a; r<<b; return r; }
+template<Type T> inline array<T> operator+(const ref<T>& a, const array<T>& b) { array<T> r; r<<a; r<<b; return r; }
+template<Type T> inline array<T> operator+(const array<T>& a, const array<T>& b) { array<T> r; r<<a; r<<b; return r; }
 
 /// Replaces in \a array every occurence of \a before with \a after
 template<Type T> array<T> replace(array<T>&& a, const T& before, const T& after) {

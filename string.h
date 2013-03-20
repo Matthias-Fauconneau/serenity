@@ -69,9 +69,9 @@ inline string str(const uint32& n) { return dec(n); }
 inline string str(const int32& n) { return dec(n); }
 inline string str(const unsigned long& n) { return dec(n); }
 inline string str(const long& n) { return dec(n); }
+inline string str(const uint64& n) { return dec(n); }
+inline string str(const int64& n) { return dec(n); }
 inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
-inline string str(const uint64& n) { return hex(n); }
-inline string str(const int64& n) { return hex(n); }
 template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 
@@ -98,8 +98,6 @@ template<Type T> string hex(const ref<T>& a, const ref<byte> separator=" "_) {
 template<Type A, Type... Args> string str(const A& a, const Args&... args) { return str(a)+" "_+str(args...); }
 
 /// Logs to standard output using str(...) serialization
-template<Type... Args> void log(const Args&... args) { log(str(args...)); }
-/// Logs to standard output using str(...) serialization
-template<> inline void log(const string& s) { log((ref<byte>)s); }
+template<Type... Args> void log(const Args&... args) { log<ref<byte>>(str(args...)); }
 /// Logs to standard output using str(...) serialization and terminate all threads
-template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error(str(args...)); }
+template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<ref<byte>>(str(args...)); }
