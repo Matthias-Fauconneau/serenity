@@ -8,19 +8,18 @@
 #include "layout.h"
 #include "keyboard.h"
 #include "spectrogram.h"
-NEED UPDATE
 
 /// Displays information on the played samples
 struct SFZViewer : Widget {
     Thread thread;
-    Sequencer input __(thread);
+    Sequencer input {thread};
     Sampler sampler;
-    AudioOutput audio __({&sampler, &Sampler::read}, 44100, 512, thread);
+    AudioOutput audio {{&sampler, &Sampler::read}, 44100, 512, thread};
 
     Text text;
     Keyboard keyboard;
     VBox layout;
-    Window window __(&layout,int2(0,spectrogram.sizeHint().y+16+16+120+120),"SFZ Viewer"_);
+    Window window {&layout,int2(0,spectrogram.sizeHint().y+16+16+120+120),"SFZ Viewer"_};
 
     int lastVelocity=0;
 

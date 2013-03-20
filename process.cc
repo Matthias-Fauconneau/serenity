@@ -58,7 +58,7 @@ void Thread::run() {
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
-        if(check__( ::poll(pollfds,size,-1) ) != INTR) {
+        if(check( ::poll(pollfds,size,-1) ) != INTR) {
             for(uint i: range(size)) {
                 if(terminate) break;
                 Poll* poll=at(i); int revents=pollfds[i].revents;

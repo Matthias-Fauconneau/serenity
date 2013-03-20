@@ -145,8 +145,7 @@ struct BlendView : Widget {
     vec2 rotation=vec2(PI/3,-PI/3); // current view angles (yaw,pitch)
     float focalLength = 90; // current focal length (in mm for a 36mm sensor)
     const float zoomSpeed = 10; // in mm/click
-    //Window window __(this, int2(1050,590), "BlendView"_);
-    Window window __(this, int2(512,512), "BlendView"_);
+    Window window {this, int2(512,512), "BlendView"_};
 
     // File
     Folder folder;
@@ -217,7 +216,7 @@ struct BlendView : Widget {
             } else for(uint i unused: range(field.count)) {
                 uint64& pointer = (uint64&)data.read<uint64>();
                 if(!pointer) continue;
-                for(const Block& block: blocks.slice(blocks.binarySearch( Block __(pointer) )-1)) {
+                for(const Block& block: blocks.slice(blocks.binarySearch( Block{pointer} )-1)) {
                     if(pointer >= block.begin && pointer < block.end) {
                         pointer += block.delta;
                         if(field.reference>1) { // pointer arrays
@@ -228,7 +227,7 @@ struct BlendView : Widget {
                             for(uint i : range(size)) {
                                 uint64& pointer = array[i];
                                 if(!pointer) continue;
-                                for(const Block& block: blocks.slice(blocks.binarySearch( Block __(pointer) )-1)) {
+                                for(const Block& block: blocks.slice(blocks.binarySearch( Block{pointer} )-1)) {
                                     if(pointer >= block.begin && pointer < block.end) {
                                         pointer += block.delta;
                                         goto found2;
@@ -261,7 +260,7 @@ struct BlendView : Widget {
             const BlockHeader& header = file.read<BlockHeader>();
             ref<byte> identifier(header.identifier,4);
             BinaryData data( file.Data::read(header.size) );
-            blocks << Block __(header.address, header.address+header.size, int64(uint64(data.buffer.buffer.data)-header.address));
+            blocks << Block{header.address, header.address+header.size, int64(uint64(data.buffer.buffer.data)-header.address)};
             if(identifier == "DNA1"_) {
                 data.advance(4); //SDNA
                 data.advance(4); //NAME
@@ -309,12 +308,12 @@ struct BlendView : Widget {
                                 s.match(']');
                             }
                         }
-                        fields << Struct::Field __(type, reference, name, count, 0);
+                        fields << Struct::Field{type, reference, name, count, 0};
                     }
-                    structs << Struct __(name, size, move(fields));
+                    structs << Struct{name, size, move(fields)};
                 }
-                structs << Struct __("char"_,1) << Struct __("short"_,2) << Struct __("int"_,4) << Struct __("uint64_t"_,8)
-                        << Struct __("float"_,4) << Struct __("double"_,8);
+                structs << Struct{"char"_,1} << Struct{"short"_,2} << Struct{"int"_,4} << Struct{"uint64_t"_,8}
+                        << Struct{"float"_,4} << Struct{"double"_,8};
                 for(Struct& s: structs) {
                     for(Struct::Field& f: s.fields) {
                         for(const Struct& match: structs) if(match.name == f.typeName) { f.type = &match; break; }
@@ -372,7 +371,7 @@ struct BlendView : Widget {
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
 
-                model.vertices << Vertex __(position, normal, vec2(0,0));
+                model.vertices << Vertex{position, normal, vec2(0,0)};
                 i++;
             }
 

@@ -64,7 +64,7 @@ struct Delay {
 struct String : Note, Widget {
     uint L; // String length in samples
     Delay delay1,delay2; // Propagating waves
-    LowPass loss __(1./2, 1./2); // 1st order low pass loss filter G(ω) = cos(ωT/2)
+    LowPass loss {1./2, 1./2}; // 1st order low pass loss filter G(ω) = cos(ωT/2)
     uint pickup; // Pick up position in samples
     float zero;
     String(uint rate, uint key, uint velocity) : Note(rate, key, velocity), L(Note::period()/2+1), delay1(L), delay2(L), pickup(L/4) {}
@@ -130,12 +130,12 @@ struct Synthesizer : VBox {
     const float T = 1./rate; //s sampling interval
     const uint M = (2*r - d) / (c*T); //sample count in delay line
     const float g = (1/(2*r)) / (1/d); //dissipation along indirect path (relative to direct path)
-    Delay echo __(M);
+    Delay echo {M};
 #endif
 
     void noteEvent(uint key, uint velocity) {
         if(velocity) {
-            if(!strings.contains(key)) strings.insert(key, String __(rate, key, velocity));
+            if(!strings.contains(key)) strings.insert(key, String{rate, key, velocity});
             strings.at(key).pluck();
             clear(); //DEBUG: show only last visualization
             *this << &strings.at(key);
@@ -177,13 +177,13 @@ struct SynthesizerApp {
     Sequencer input;
     //KeyboardInput input;
     Synthesizer synthesizer;
-    AudioOutput output __({&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024);
+    AudioOutput output {{&synthesizer, &Synthesizer::read}, synthesizer.rate, 1024};
 
-    Spectrogram spectrogram __(16384, output.rate, 32); //~synthesizer.rate/(pitch(22)-pitch(21))
+    Spectrogram spectrogram {16384, output.rate, 32}; //~synthesizer.rate/(pitch(22)-pitch(21))
     Keyboard keyboard;
 
     VBox layout;
-    Window window __(&layout,int2(0,spectrogram.sizeHint().y),"Synthesizer"_);
+    Window window {&layout,int2(0,spectrogram.sizeHint().y),"Synthesizer"_};
 
 
     SynthesizerApp() {

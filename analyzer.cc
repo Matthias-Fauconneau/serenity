@@ -17,32 +17,32 @@
 struct Analyzer {
     static constexpr uint periodSize = 1024; //STFT frame size
     Audio<float> audio = decodeAudio<float>(readFile("/root/Documents/StarCraft 2 - Theme Song.m4a"_));
-    Spectrogram spectrogram __(audio, 1024, 16384);
+    Spectrogram spectrogram {audio, 1024, 16384};
 
     bool playing = true;
     uint position = 0;
     uint duration = audio.data.size / audio.channels / sizeof(float);
 
 #if AUDIO
-    Thread thread __(-20); // Audio thread
-    AudioOutput output __({this, &Analyzer::read}, rate, periodSize, thread);
+    Thread thread {-20}; // Audio thread
+    AudioOutput output {{this, &Analyzer::read}, rate, periodSize, thread};
 #else
     Timer timer;
 #endif
 #if SAMPLER
-    Sequencer input __(thread);
+    Sequencer input {thread};
     Sampler sampler;
 #endif
 
     // Interface
     ICON(play) ICON(pause)
-    Text elapsed __(string("00:00"_));
+    Text elapsed {string("00:00"_)};
     Slider slider;
-    Text remaining __(string("00:00"_));
+    Text remaining {string("00:00"_)};
     HBox toolbar;
     Keyboard keyboard;
     VBox layout;
-    Window window __(&layout,int2(0,spectrogram.sizeHint().y+keyboard.sizeHint().y),"Music Analyzer"_);
+    Window window {&layout,int2(0,spectrogram.sizeHint().y+keyboard.sizeHint().y),"Music Analyzer"_};
 
     Analyzer() {
 
