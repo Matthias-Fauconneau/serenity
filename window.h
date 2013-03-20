@@ -154,7 +154,7 @@ struct Window : Socket, Poll {
     uint16 sequence=-1;
     void send(const ref<byte>& request);
 
-    struct QEvent { uint8 type; XEvent event; } packed;
+    struct QEvent { uint8 type; XEvent event; };
     array<QEvent> eventQueue;
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);

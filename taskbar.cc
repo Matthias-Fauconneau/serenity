@@ -196,7 +196,7 @@ struct Taskbar : Socket, Poll {
         if(buffer.size<3) return Image();
         uint w=buffer[0], h=buffer[1];
         if(buffer.size<2+w*h) return Image();
-        Image image((byte4*)buffer,(byte4*)buffer+2,w,h,w,true);
+        Image image(::buffer<byte4>((byte4*)buffer.data,buffer.capacity,buffer.size),(byte4*)buffer.data+2,w,h,w,true);
         buffer.capacity=0;
         return resize(image, 16, 16);
     }
@@ -250,12 +250,16 @@ struct Taskbar : Socket, Poll {
     uint16 sequence=-1;
     void send(const ref<byte>& request) { write( request); sequence++; }
 
-    struct QEvent { uint8 type; XEvent event; } packed;
+    struct QEvent { uint8 type; XEvent event; };
     array<QEvent> queue;
 
     template<class T> T readReply() {
         for(;;) { uint8 type = read<uint8>();
-            if(type==0){XError e=read<XError>(); if(e.code!=3) window.processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
+            if(type==0) {
+                XError e=read<XError>();
+                if(e.code!=3) window.processEvent(0,(XEvent&)e);
+                if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }
+            }
             else if(type==1) return read<T>();
             else queue << QEvent{type, read<XEvent>()}; //queue events to avoid reentrance
         }

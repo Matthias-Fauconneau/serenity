@@ -7,7 +7,7 @@ static array<ref<byte>> paragraphElement, textElement, boldElement, ignoreElemen
 
 void HTML::go(const ref<byte>& url) { this->url=url; getURL(url, {this, &HTML::load}, 24*60); }
 void HTML::load(const URL& url, Map&& document) {
-    for(Widget* w: *this) free(w); VBox::clear(); paragraphCount=0;
+    VBox::clear(); paragraphCount=0;
 
     Element html = parseHTML(document);
 

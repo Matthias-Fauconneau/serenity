@@ -34,7 +34,6 @@ struct Matrix {
 typedef buffer<real> Vector;
 
 struct UMFPACK {
-    default_move(UMFPACK);
     UMFPACK(){}
     UMFPACK(Matrix&& A);
 

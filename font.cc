@@ -5,7 +5,7 @@
 #include "font.h"
 #include "file.h"
 
-const Folder& fonts() { static Folder folder = "usr/share/fonts"_; return folder; }
+const Folder& fonts() { static Folder folder("usr/share/fonts"_); return folder; }
 
 static FT_Library ft; static int fontCount=0;
 Font::Font(const File& file, int size) : keep(Map(file)) { load(keep,size); }

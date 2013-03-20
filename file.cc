@@ -12,7 +12,7 @@ Handle::~Handle() { if(fd>0) close(fd); }
 
 // Folder
 const Folder& cwd() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
-const Folder& root() { static const Folder root = Folder("/"_,cwd()); return root; }
+const Folder& root() { static const Folder root("/"_,cwd()); return root; }
 Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0666), folder);
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), folder);

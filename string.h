@@ -84,42 +84,22 @@ inline string str(const double& n) { return ftoa(n); }
 template<Type T> string str(const ref<T>& a, const ref<byte> separator=" "_) {
     string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s;
 }
-template<Type T> string str(const array<T>& a, const ref<byte> separator=" "_) { return str(ref<T>(a),separator); }
 template<Type T> string str(const buffer<T>& a, const ref<byte> separator=" "_) { return str(ref<T>(a),separator); }
+template<Type T> string str(const array<T>& a, const ref<byte> separator=" "_) { return str(ref<T>(a),separator); }
 template<Type T> string dec(const ref<T>& a, const ref<byte> separator=" "_) {
     string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s;
 }
 template<Type T> string hex(const ref<T>& a, const ref<byte> separator=" "_) {
     string s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s;
 }
-//template<Type T> string hex(const array<T>& a, const ref<byte> separator=" "_) { return hex(ref<T>(a),separator); }
 
-/// Converts static arrays
-template<Type T, size_t N> string str(const T (&a)[N]) { return str(ref<T>(a,N)); }
-
-/// Expression template to manage recursive concatenation operations
-template<Type A, Type B> struct Cat {
-    const A& a;
-    const B& b;
-    uint size = a.size + b.size;
-    Cat(const A& a, const B& b):a(a),b(b){}
-    void cat(byte*& data) const { a.cat(data); b.cat(data); }
-    operator array<byte>()  const{ array<byte> r(size); r.size=size; byte* data=r.data; cat(data); return r; }
-};
-/// Concatenation operators
-template<Type Aa, Type Ab, Type Ba, Type Bb> Cat<Cat<Aa, Ab>, Cat<Ba, Bb>> operator+(const Cat<Aa, Ab>& a, const Cat<Ba, Bb>& b) { return {a,b}; }
-template<Type Aa, Type Ab> Cat< Cat<Aa, Ab>, ref<byte>> operator+(const Cat<Aa, Ab>& a, const ref<byte>& b) { return {a,b}; }
-inline Cat< ref<byte>, ref<byte>> operator+(const ref<byte>& a, const ref<byte>& b) { return {a,b}; }
-
-/// Forwards concatenation
-template<Type A, Type B> const Cat<A,B>& str(const Cat<A,B>& s) { return s; }
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
 template<Type A, Type... Args> string str(const A& a, const Args&... args) { return str(a)+" "_+str(args...); }
 
 /// Logs to standard output using str(...) serialization
-template<Type... Args> void log(const Args&... args) { log((ref<byte>)string(str(args...))); }
+template<Type... Args> void log(const Args&... args) { log(str(args...)); }
 /// Logs to standard output using str(...) serialization
 template<> inline void log(const string& s) { log((ref<byte>)s); }
 /// Logs to standard output using str(...) serialization and terminate all threads
-template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error((ref<byte>)string(str(args...))); }
+template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error(str(args...)); }

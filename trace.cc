@@ -111,14 +111,14 @@ string demangle(TextData& s, bool function=true) {
 string demangle(const ref<byte>& symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findNearestLine(void* find) {
-    static Map exe = "/proc/self/exe"_;
+    static Map exe("/proc/self/exe"_);
     const byte* elf = exe.data;
     const Ehdr& hdr = *(const Ehdr*)elf;
     ref<Shdr> sections = ref<Shdr>((const Shdr*)(elf+hdr.shoff),hdr.shnum);
     const char* shstrtab = elf+sections[hdr.shstrndx].offset;
     const char* strtab = 0; ref<Sym> symtab; BinaryData debug_line;
     for(const Shdr& s: sections)  {
-        if(str(shstrtab+s.name)==".debug_line"_) debug_line=BinaryData(ref<byte>(elf+s.offset,s.size));
+        if(str(shstrtab+s.name)==".debug_line"_) new (&debug_line) BinaryData(ref<byte>(elf+s.offset,s.size));
         else if(str(shstrtab+s.name)==".strtab"_) strtab=(const char*)elf+s.offset;
         else if(str(shstrtab+s.name)==".symtab"_) symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
@@ -201,7 +201,7 @@ void* return_address(void* fp) { return *((void**)fp-1); }
 #endif
 
 string trace(int skip, void* ip) {
-    void* stack[32]; clear((byte*)stack,sizeof(stack));
+    void* stack[32];
     void* frame = __builtin_frame_address(0);
     int i=0;
     for(;i<32;i++) {

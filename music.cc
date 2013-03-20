@@ -97,7 +97,7 @@ struct KeyboardInput : Widget {
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
-    Folder root = arguments() ? arguments()[0] : "/"_;
+    Folder root {arguments() ? arguments()[0] : "/"_};
     Folder folder{"Sheets"_,root};
     ICON(music)
     VBox layout;

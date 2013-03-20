@@ -12,7 +12,6 @@ struct Image {
     uint width=0, height=0, stride=0;
     bool own=false, alpha=false;
 
-    default_move(Image);
     Image(){}
     Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha) :
         buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha){}

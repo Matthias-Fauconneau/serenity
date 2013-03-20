@@ -68,7 +68,7 @@ struct Semaphore {
 
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {
-    no_copy(Poll);
+    Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete;
     Thread& thread; /// Thread monitoring this pollfd
     /// Poll can be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
     Poll(Thread& thread=mainThread):pollfd{0,0,0},thread(thread){}
@@ -117,7 +117,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
 void exit();
 
 /// Execute binary at \a path with command line arguments \a args
-void execute(const ref<byte>& path, const ref<string>& args=ref<string>(), bool wait=true);
+void execute(const ref<byte>& path, const ref<string>& args={}, bool wait=true);
 
 /// Returns value for environment variable \a name
 string getenv(const ref<byte>& name);

@@ -51,8 +51,8 @@ Image decodePNG(const ref<byte>& file) {
     byte4 palette[256]; bool alpha=false;
     for(;;) {
         uint32 size = s.read();
-        uint32 tag = s.read<uint32>();
-        if(tag == raw<uint32>("IHDR"_)) {
+        ref<byte> tag = s.read<byte>(4);
+        if(tag == "IHDR"_) {
             width = s.read(), height = s.read();
             bitDepth = s.read(); if(bitDepth!=8 && bitDepth != 4){ log("Unsupported PNG depth"_,bitDepth,width,height); return Image(); }
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
@@ -60,17 +60,17 @@ Image decodePNG(const ref<byte>& file) {
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
             interlace = s.read();
-        } else if(tag == raw<uint32>("IDAT"_)) {
+        } else if(tag == "IDAT"_) {
             buffer << s.read<byte>(size);
-        } else if(tag == raw<uint32>("IEND"_)) {
+        } else if(tag == "IEND"_) {
             assert(size==0);
             s.advance(4); //CRC
             break;
-        } else if(tag == raw<uint32>("PLTE"_)) {
+        } else if(tag == "PLTE"_) {
             ref<rgb3> plte = s.read<rgb3>(size/3);
             assert(plte.size<=256);
             for(uint i: range(plte.size)) palette[i]=plte[i];
-        }  else if(tag == raw<uint32>("tRNS"_)) {
+        }  else if(tag == "tRNS"_) {
             ref<byte> trns = s.read<byte>(size);
             assert(trns.size<=256);
             for(uint i: range(trns.size)) palette[i].a=trns[i];

@@ -17,16 +17,11 @@ struct Glyph {
 
 /// Freetype wrapper
 struct Font {
-    Map keep; array<byte> data;
-    handle<FT_FaceRec_*> face;
-    float fontSize=0, ascender=0;
-    map<uint, map<uint16, Glyph>> cache;
-
-    default_move(Font);
     /// Loads font at /a path scaled to /a size pixels high
     Font(const File& file, int size);
     /// Loads font /a data scaled to /a size pixels high
     Font(array<byte>&& data, int size=0);
+    default_move(Font);
     ~Font();
     /// Loads font /a data scaled to /a size pixels high
     void load(const ref<byte>& data, int size);
@@ -50,12 +45,8 @@ struct Font {
     /// Renders glyph \a index with transformation matrix \a xx, xy, yx, yy, dx, dy into \a raster
     void render(struct Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 
-    inline int scaleX(int p);
-    inline int scaleY(int p);
-    inline int scale(int p);
-    inline int unscaleX(int p);
-    inline int unscaleY(int p);
-    inline int unscale(int p);
-    inline void line(Bitmap& raster, int2 p0, int2 p1);
-    inline void curve(Bitmap& raster, int2 p0, int2 p1, int2 p2);
+    Map keep; array<byte> data;
+    handle<FT_FaceRec_*> face;
+    float fontSize=0, ascender=0;
+    map<uint, map<uint16, Glyph>> cache;
 };

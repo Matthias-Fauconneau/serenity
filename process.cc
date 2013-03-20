@@ -23,7 +23,7 @@ void Poll::registerPoll() {
     thread.post();
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
-void Poll::queue() {Locker lock(thread.lock); thread.queue.appendOnce(this); thread.post();}
+void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();}
 
 // Threads
 
@@ -202,5 +202,5 @@ array<ref<byte>> arguments() {
 }
 
 const Folder& home() { static Folder home(getenv("HOME"_)); return home; }
-const Folder& config() { static Folder config=Folder(".config"_,home(),true); return config; }
-const Folder& cache() { static Folder cache=Folder(".cache"_,home(),true); return cache; }
+const Folder& config() { static Folder config(".config"_,home(),true); return config; }
+const Folder& cache() { static Folder cache(".cache"_,home(),true); return cache; }

@@ -1,14 +1,6 @@
 #include "flac.h"
 #include "string.h"
 
-typedef double double2 __attribute((vector_size(16)));
-#if __clang__
-#define extract(vec, i) vec[i]
-#else
-#define extract(vec, i) __builtin_ia32_vec_ext_v2df(vec,i)
-#endif
-enum Round { Even, Down, Up, Zero };
-void setRoundMode(Round round) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r &= ~(0b11<<13); r |= (round&0b11) << 13; asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #define swap64 __builtin_bswap64
 
 void BitReader::setData(const ref<byte>& buffer) { data=buffer.data; bsize=8*buffer.size; index=0; }
@@ -60,6 +52,18 @@ uint BitReader::utf8() {
     else if((code&0b11110000)==0b11100000) { index+=24; return(code&0b01111)<<12|(pointer[1]&0b111111)<<6  |(pointer[2]&0b111111); }
     else if((code&0b11111000)==0b11110000) { index+=32; return(code&0b00111)<<18|(pointer[1]&0b111111)<<12|(pointer[2]&0b111111)<<6|(pointer[3]&0b111111); }
     error("");
+}
+
+typedef double double2 __attribute((vector_size(16)));
+#if __clang__
+#define extract(vec, i) vec[i]
+#else
+#define extract(vec, i) __builtin_ia32_vec_ext_v2df(vec,i)
+#endif
+
+enum Round { Even, Down, Up, Zero };
+void setRoundMode(Round round) {
+    int r; asm volatile("stmxcsr %0":"=m"(*&r)); r &= ~(0b11<<13); r |= (round&0b11) << 13; asm volatile("ldmxcsr %0" : : "m" (*&r));
 }
 
 FLAC::FLAC(const ref<byte>& data) {
@@ -238,7 +242,10 @@ void FLAC::decodeFrame() {
             *signal = sample; signal++; //write out decoded sample //TODO: float
         }
         #define o(n) case n: convolve<n>(predictor,even,odd,signal,end); break;
-        switch((order+1)/2) {o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14)/*fit order<=28 in 14 double2 registers*/o(15)o(16)/*order>28 will spill*/}
+        switch((order+1)/2) {
+                o(1)o(2)o(3)o(4)o(5)o(6)o(7)o(8)o(9)o(10)o(11)o(12)o(13)o(14) // order<=28 fit in 14 double2 registers
+                o(15)o(16) // order>28 will spill
+        }
         #undef o
         int t=rice*rate/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
     }

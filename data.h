@@ -2,6 +2,16 @@
 /// \file data.h Structured data parsers (Data, BinaryData, TextData)
 #include "array.h"
 
+#define big16 __builtin_bswap16
+#define big32 __builtin_bswap32
+#define big64 __builtin_bswap64
+
+/// Reinterpret cast a const reference to another type
+template<Type T, Type O> ref<T> cast(const ref<O>& o) {
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
+}
+
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
@@ -38,13 +48,9 @@ struct Data {
     uint index=0;
 };
 
-#define big64 __builtin_bswap64
-#define big32 __builtin_bswap32
-#define big16 __builtin_bswap16
-
 /// Provides a convenient interface to parse binary inputs
 struct BinaryData : virtual Data {
-    BinaryData(){} move_operator(BinaryData) BinaryData(BinaryData&&)=default;
+    BinaryData(){}
     /// Creates a BinaryData interface to an \a array
     BinaryData(array<byte>&& array, bool isBigEndian=false) : Data(move(array)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to a \a reference
@@ -63,7 +69,7 @@ struct BinaryData : virtual Data {
     ref<byte> untilNull();
 
     /// Reads one raw \a T element
-    template<Type T> const T& read() { const T& t = raw<T>(Data::read(sizeof(T))); return t; }
+    template<Type T> const T& read() { return *(T*)Data::read(sizeof(T)).data; }
     int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
     int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
     int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }

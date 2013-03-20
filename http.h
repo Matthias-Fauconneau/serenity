@@ -14,7 +14,6 @@ struct TCPSocket : Socket {
 
 /// SSL network socket (openssl)
 struct SSLSocket : TCPSocket {
-    default_move(SSLSocket);
     SSLSocket(uint host, uint16 port, bool secure=false);
     ~SSLSocket();
 
@@ -26,7 +25,7 @@ struct SSLSocket : TCPSocket {
 
 /// Implements Data::available using Stream::readUpTo
 template<class T/*: Stream*/> struct DataStream : T, virtual Data {
-    template<Type... Args> DataStream(Args... args):T(args...){} //workaround lack of constructor inheritance support
+    using T::T;
     /// Feeds Data buffer using T::readUpTo
     uint available(uint need) override;
 };

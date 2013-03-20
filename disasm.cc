@@ -54,7 +54,7 @@ int modrm(uint8 rex, int size, const byte*& c, string& s, int sse=0) {
             s<< gpr(rm +(b?8:0),size)<<(i>0?"+"_:"-"_)+hex(abs(i),2<<(mod==1?0:2));
         }
         if(mod == 3) { //reg
-            s=copy(reg(rm +(b?8:0),size,sse));
+            s=reg(rm +(b?8:0),size,sse);
             return r; //avoid []
         }
     }

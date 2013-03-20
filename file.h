@@ -5,8 +5,8 @@
 /// Unix file descriptor
 struct Handle {
     handle<int> fd;
-    default_move(Handle);
     Handle(int fd):fd(fd){}
+    default_move(Handle);
     ~Handle();
     operator bool() const { return fd; }
 };
@@ -108,20 +108,20 @@ struct Map {
     enum {Read=1, Write=2};
     enum {Shared=1, Private=2, Anonymous=32};
 
-    handle<byte*> data;
-    uint size=0;
-
-    default_move(Map);
     Map(){}
     Map(const File& file, uint prot=Read);
     Map(const ref<byte>& path, const Folder& at=root(), uint prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, uint prot, uint flags=Shared);
+    default_move(Map);
     ~Map();
 
     operator ref<byte>() { return ref<byte>(data, size); }
 
     /// Locks memory map in RAM
     void lock(uint size=-1) const;
+
+    handle<byte*> data;
+    uint size=0;
 };
 
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links

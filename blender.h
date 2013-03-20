@@ -61,7 +61,6 @@ struct bAnimVizSettings {
  int path_ac;
 };
 
-
 struct VolumeSettings {
  float density;
  float emission;
@@ -73,9 +72,9 @@ struct VolumeSettings {
  float density_scale;
  float depth_cutoff;
  float asymmetry;
- short stepsize_type;
+ short stepsizeType;
  short shadeflag;
- short shade_type;
+ short shadeType;
  short precache_resolution;
  float stepsize;
  float ms_diff;

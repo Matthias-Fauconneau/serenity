@@ -7,8 +7,8 @@ void MidiFile::open(const ref<byte>& data) { /// parse MIDI header
     s.advance(10);
     uint16 nofChunks = s.read(); ticksPerBeat = s.read();
     for(int i=0; s && i<nofChunks;i++) {
-        uint32 tag = s.read<uint32>(); uint32 length = s.read();
-        if(tag == raw<uint32>("MTrk"_)) {
+        ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
+        if(tag == "MTrk"_) {
             BinaryData track = array<byte>(s.peek(length));
             uint8 c=track.read(); uint t=c&0x7f;
             if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|c;}}}

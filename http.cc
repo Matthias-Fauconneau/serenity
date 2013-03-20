@@ -71,13 +71,13 @@ template<class T> uint DataStream<T>::available(uint need) {
 uint ip(TextData& s) { int a=s.integer(), b=(s.match('.'),s.integer()), c=(s.match('.'),s.integer()), d=(s.match('.'),s.integer()); return (d<<24)|(c<<16)|(b<<8)|a; }
 uint nameserver() { TextData s=readFile("/etc/resolv.conf"_); s.until("nameserver "_); return ip(s); }
 uint resolve(const ref<byte>& host) {
-    static File dnsCache = File("dns"_,cache(),ReadWrite|Create|Append);
+    static File dnsCache("dns"_,cache(),ReadWrite|Create|Append);
     static Map dnsMap = dnsCache;
     uint ip=-1;
     for(TextData s(dnsMap);s;s.line()) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
     bool negativeEntry=false; if(!ip) ip=-1, negativeEntry=true; //return false; //try to resolve negative entries again
     if(ip==uint(-1)) {
-        static UDPSocket dns = UDPSocket(nameserver(), 53);
+        static UDPSocket dns(nameserver(), 53);
         array<byte> query;
         struct Header { uint16 id=big16(currentTime()); uint16 flags=1; uint16 qd=big16(1), an=0, ns=0, ar=0; } packed header;
         query << raw(header);
@@ -226,7 +226,7 @@ void HTTP::header() {
     // Headers
     while(!match("\r\n"_)) {
         ref<byte> key = until(": "_); assert(key,buffer);
-        ref<byte> value=until("\r\n"_);
+        ref<byte> value = until("\r\n"_);
         if(key=="Content-Length"_) contentLength=toInteger(value);
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
         else if((key=="Location"_ && status!=200) || key=="Refresh"_) {
@@ -234,7 +234,7 @@ void HTTP::header() {
             url = url.relative(value);
             uint ip = resolve(url.host);
             if(ip==uint(-1)) { log("Unknown host",url); done(); return; }
-            SSLSocket::operator=(SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_)); Poll::fd=SSLSocket::fd;
+            this->~SSLSocket(); new (this) SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_); Poll::fd=SSLSocket::fd;
             index=0; buffer=array<byte>(); contentLength=chunked=0;
             redirect << file;
             state=Request; events=POLLOUT;
@@ -321,5 +321,5 @@ void ImageRequest::load(const URL&, Map&& file) {
     if(size) image = resize(image,size.x,size.y);
     *target = move(image);
     imageLoaded();
-    free(this);
+    imageRequests.removeAll(this);
 }

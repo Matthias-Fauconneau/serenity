@@ -14,7 +14,7 @@
 typedef float float4 __attribute((vector_size(16)));
 struct Note : FLAC {
     Note(){}
-    Note(const ref<byte>& o):FLAC(o){}
+    Note(const ref<byte>& data):FLAC(data){}
     float4 level; //current note attenuation
     float4 step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
     Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
@@ -93,7 +93,7 @@ struct Sampler : Poll {
     /// Records performance to WAV file
     void startRecord(const ref<byte>& path);
     void stopRecord();
-    File record=0;
+    File record {0};
     signal<float* /*data*/, uint /*size*/> frameReady;
 
     operator bool() const { return samples.size; }

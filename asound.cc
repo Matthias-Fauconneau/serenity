@@ -12,7 +12,7 @@ struct snd_output_t;
 #include <alsa/timer.h>
 #include <alsa/control.h>
 
-AudioOutput::AudioOutput(uint sampleBits, uint rate, uint unused periodSize, Thread& thread) : Poll(0,POLLOUT,thread) {
+AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread) : Poll(0,POLLOUT,thread) {
     check( snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NO_SOFTVOL|SND_PCM_NO_AUTO_RESAMPLE) );
     byte alloca_hw[snd_pcm_hw_params_sizeof()];
     snd_pcm_hw_params_t* hw=(snd_pcm_hw_params_t*)alloca_hw; snd_pcm_hw_params_any(pcm,hw);

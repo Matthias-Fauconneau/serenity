@@ -13,7 +13,7 @@ struct Sequencer : Device, Poll {
     struct Event { int16 time; uint8 key; uint8 vel; Event(int16 time, uint8 key, uint8 vel):time(time),key(key),vel(vel){}};
     array<Event> events;
     int lastTick=0;
-    File record=0;
+    File record {0};
 
     Sequencer(Thread& thread=mainThread);
     void setRecord(bool record);

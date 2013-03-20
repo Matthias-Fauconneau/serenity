@@ -3,15 +3,15 @@
 #include "string.h"
 #include "function.h"
 
+#if __GXX_RTTI
 #include "trace.h"
 #include <typeinfo>
-
 template<Type T> struct remove_const { typedef T type; };
 template<Type T> struct remove_const<const T> { typedef T type; };
-#define remove_const(T) typename remove_const<T>::type
+#endif
 
 /// word is an index in a string table allowing fast move/copy/compare (but slower instanciation)
-// rename to symbol ?
+// rename to symbol ? token ?
 extern array<string> pool;
 struct word {
     int id;
@@ -22,7 +22,7 @@ struct word {
 inline bool operator ==(word a, word b) { return a.id == b.id; }
 inline const string& str(const word& w) { return pool[w.id]; }
 
-/// Dynamically typed value used as arguments to Action (TODO: runtime type checking)
+/// Dynamically typed value used as arguments to Action
 struct Value {
     virtual ~Value() {}
     /// Returns the string representation of the boxed value (for grammar debugging)
@@ -38,7 +38,7 @@ template<Type T> struct ValueT : Value {
     string str() const override { return string(::str(value)); }
 };
 
-/// Dynamically typed function called by parser (TODO: runtime type checking)
+/// Dynamically typed function called by parser
 struct Action { virtual unique<Value> invoke(ref<const Value*>) const=0; };
 /// Unpacks dynamic Value arguments to call the action implementation
 template<Type F> struct ActionFunction;
@@ -49,10 +49,10 @@ template<Type O, Type T, Type... Params> struct ActionFunction<T (O::*)(Params..
     /// Unpacks ref<unique<Value>>
     template<Type A, Type... RemainingArgs, Type... Args> unique<Value> invoke(ref<const Value*> pack, Args&&... args) const {
 #if __GXX_RTTI
-        auto arg = dynamic_cast<const ValueT<remove_const(remove_reference(A))>*>(pack[0]);
+        auto arg = dynamic_cast<const ValueT<Type remove_const<Type remove_reference<A>::type>::type>*>(pack[0]);
         assert(arg, pack[0], demangle(str(typeid(arg).name())), demangle(str(typeid(*pack[0]).name())));
 #else
-        const ValueT<remove_reference(A)>* arg = static_cast<const ValueT<A>*>(pack[0]);
+        const ValueT<Type remove_reference<A>::type>* arg = static_cast<const ValueT<A>*>(pack[0]);
         assert(arg);
 #endif
         return invoke<RemainingArgs...>(pack.slice(1), forward<Args>(args)..., arg->value);

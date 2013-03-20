@@ -50,7 +50,7 @@ struct TextLayout {
     }
 
     TextLayout(const ref<uint>& text, int size, int wrap, Font* font=0):size(size),wrap(wrap) {
-        static Folder dejavu = existsFolder("dejavu"_,fonts()) ? Folder("dejavu"_,fonts()) : Folder("truetype/ttf-dejavu/"_,fonts());
+        static Folder dejavu( existsFolder("dejavu"_,fonts()) ?  "dejavu"_ : "truetype/ttf-dejavu/"_, fonts());
         if(!font) {
             if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("DejaVuSans.ttf"_,dejavu), size));
             font = &defaultSans.at(size);

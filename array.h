@@ -5,13 +5,6 @@
 /// Contiguous collection of elements (can hold either a const reference or a mutable heap allocation).
 /// \note like buffer<T> with resize/insert/remove using T constructor/destructor
 template<Type T> struct array {
-    T* data=0; /// Pointer to the buffer valid while not reallocated
-    uint capacity=0; /// 0: const reference, >0: size of the owned heap allocation
-    uint size=0; /// Number of elements currently in this array
-
-    move_operator(array)
-    array(array&& o) { data=o.data, size=o.size, capacity=o.capacity; o.data=0,o.size=o.capacity=0; }
-
     /// Default constructs an empty inline array
     array() {}
     /// Allocates an uninitialized buffer for \a capacity elements
@@ -23,20 +16,10 @@ template<Type T> struct array {
     /// References \a size elements from const \a data pointer
     array(const T* data, uint size):data((T*)data),size(size){}
     /// If the array own the data, destroys all initialized elements and frees the buffer
-    ~array() { if(capacity) { for(uint i: range(size)) data[i].~T(); unallocate(data); } }
-    /// Allocates enough memory for \a capacity elements
-    void reserve(uint capacity) {
-        if(capacity>this->capacity) {
-            assert(capacity>=size);
-            reallocate<T>(data, this->capacity=capacity); //reallocate heap buffer (copy is done by allocator if necessary)
-        }
-    }
-    /// Resizes the array to \a size and default initialize new elements
-    void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (data+i) T(); }
-    /// Sets the array size to \a size and destroys removed elements
-    void shrink(uint size) { assert(capacity && size<=this->size); for(uint i: range(size,this->size)) at(i).~T(); this->size=size; }
-    /// Removes all elements
-    void clear() { if(size) shrink(0); }
+    ~array() { if(capacity) { for(uint i: range(size)) data[i].~T(); free(data); } data=0; }
+
+    array(array&& o) { data=o.data, size=o.size, capacity=o.capacity; o.data=0,o.size=o.capacity=0; }
+    array& operator=(array&& o){ this->~array(); new (this) array(move(o)); return *this; }
 
     /// Returns true if not empty
     explicit operator bool() const { return size; }
@@ -72,6 +55,20 @@ template<Type T> struct array {
     T& last() { return at(size-1); }
     /// \}
 
+    /// Allocates enough memory for \a capacity elements
+    void reserve(uint capacity) {
+        if(capacity>this->capacity) {
+            assert(capacity>=size);
+            reallocate<T>(data, this->capacity=capacity); //reallocate heap buffer (copy is done by allocator if necessary)
+        }
+    }
+    /// Resizes the array to \a size and default initialize new elements
+    void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (data+i) T(); }
+    /// Sets the array size to \a size and destroys removed elements
+    void shrink(uint size) { assert(capacity && size<=this->size); for(uint i: range(size,this->size)) at(i).~T(); this->size=size; }
+    /// Removes all elements
+    void clear() { if(size) shrink(0); }
+
     /// \name Append operators
     array& operator<<(T&& e) {uint s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
     array& operator<<(array<T>&& a) {uint s=size+a.size; reserve(s); copy((byte*)end(),(byte*)a.data,a.size*sizeof(T)); size=s; return *this; }
@@ -80,10 +77,10 @@ template<Type T> struct array {
     /// \}
 
     /// \name Appends once (if not already contained) operators
-    array& appendOnce(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
-    array& appendOnce(array&& b) { for(T& v: b) appendOnce(move(v)); return *this; }
-    array& appendOnce(const T& v) { if(!contains(v)) *this<<copy(v); return *this; }
-    array& appendOnce(const ref<T>& o) { for(const T& v: o) appendOnce(v); return *this; }
+    array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
+    array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
+    array& operator +=(const T& v) { if(!contains(v)) *this<<copy(v); return *this; }
+    array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; }
     /// \}
 
     /// Inserts an element at \a index
@@ -131,12 +128,20 @@ template<Type T> struct array {
         return min;
     }
 
-    /// Copies elements to \a target and increments pointer
-    void cat(T*& target) const { ::copy(target,data,size); target+=size; }
+    T* data=0; /// Pointer to the buffer valid while not reallocated
+    uint capacity=0; /// 0: const reference, >0: size of the owned heap allocation
+    uint size=0; /// Number of elements currently in this array
 };
 
 /// Copies all elements in a new array
+template<Type T> array<T> copy(const ref<T>& o) { array<T> copy; copy<<o; return copy; }
 template<Type T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; return copy; }
+
+/// Concatenates two arrays
+template<Type T> inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a<<b; return r; }
+template<Type T> inline array<T> operator+(const array<T>& a, const ref<T>& b) { array<T> r; r<<a<<b; return r; }
+template<Type T> inline array<T> operator+(const ref<T>& a, const array<T>& b) { array<T> r; r<<a<<b; return r; }
+template<Type T> inline array<T> operator+(const array<T>& a, const array<T>& b) { array<T> r; r<<a<<b; return r; }
 
 /// Replaces in \a array every occurence of \a before with \a after
 template<Type T> array<T> replace(array<T>&& a, const T& before, const T& after) {

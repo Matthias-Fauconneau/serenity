@@ -59,7 +59,7 @@ GLShader::GLShader(const ref<byte>& source, const ref<byte>& tags) {
             s.whileAny(" \t"_);
             if(identifier && s.match("{\n"_)) { //scope: "[a-z]+ {"
                 if(tags_.contains(identifier)) {
-                    knownTags.appendOnce(identifier);
+                    knownTags += identifier;
                     scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
                 } else { // Skip scope
                     for(uint nest=1; nest;) {

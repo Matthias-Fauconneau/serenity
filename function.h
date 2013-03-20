@@ -47,12 +47,6 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
     virtual R operator()(Args... args) const override { return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
 };
 
-// Predicate
-extern void* enabler;
-template<bool> struct predicate {};
-template<> struct predicate<true> { typedef void* type; };
-#define predicate(E) typename predicate<E>::type& condition = enabler
-
 /// Helps modularization by binding unrelated objects through persistent connections
 template<Type... Args> struct signal {
     array<function<void(Args...)>> delegates;
@@ -63,10 +57,10 @@ template<Type... Args> struct signal {
     /// Connects a function
     void connect(void (*pf)(Args...)) { delegates<< function<void(Args...)>(pf); }
     /// Connects a method
-    template<class C, class B, predicate(__is_base_of(B,C))>
+    template<class C, class B>
     void connect(C* object, void (B::*pmf)(Args...)) { delegates<< function<void(Args...)>(static_cast<B*>(object),pmf); }
     /// Connects a const method
-    template<class C, class B, predicate(__is_base_of(B,C))>
+    template<class C, class B>
     void connect(const C* object, void (B::*pmf)(Args...) const) { delegates<< function<void(Args...)>(static_cast<const B*>(object),pmf); }
     /// Returns whether this signal is connected to any delegate
     explicit operator bool() { return delegates.size; }
