@@ -147,7 +147,6 @@ void Window::event() {
         currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
-        //uint startTime = realTime();
         if(renderer == Raster) {
             if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
                 if(shm) {
@@ -210,7 +209,6 @@ void Window::event() {
             glFinish();
 #endif
         }
-        //log("renderTime",realTime()-startTime,"ms");
         frameReady();
     } else for(;;) {
         readLock.lock();

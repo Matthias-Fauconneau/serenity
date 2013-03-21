@@ -15,10 +15,10 @@ void spy(const Matrix& A) {
 }
 
 struct CFDTest : Widget {
-    const uint Mx=32, My=32, N = Mx*My; // Mesh vertex count
+    const uint Mx=65, My=65, N = Mx*My; // Mesh vertex count
     const real H = 1; // Aspect ratio (y/x)
     const real dx = 1./Mx, dy = H/My; // Spatial resolution
-    const real dt = 1./4096; // Temporal resolution
+    const real dt = 1./16384; // Temporal resolution //TODO: automatic
     const real Ra = 1; // Rayleigh
     const real Pr = 1; // Prandtl
 
@@ -39,7 +39,7 @@ struct CFDTest : Widget {
 
     Window window {this, int2(1024,1024), "CFDTest"_};
     CFDTest() {
-        window.backgroundColor = 0;
+        window.clearBackground = false;
         window.localShortcut(Escape).connect(&exit);
 
         Matrix I = identity(N);
@@ -107,7 +107,7 @@ struct CFDTest : Widget {
             Gt[i] = 1;
             // Right
             BCt(i+Mx-1,i+Mx-1) = 1;
-            Gt[i] = 0;
+            Gt[i+Mx-1] = 0;
         }
 
         // Left-hand side (implicit) of ω,ϕ,T evolution equations
@@ -126,27 +126,35 @@ struct CFDTest : Widget {
         Rt = P + (dt/2)*PD;
 
         // Initial temperature
-        for(uint x: range(Mx)) {
+        /*for(uint x: range(Mx)) {
             for(uint y: range(My)) {
                 uint i = y*Mx+x;
                 Ct[i] = 1-real(x)/Mx;
             }
-        }
+        }*/
     }
-    void subplot(int2 position, int2 size, uint index, uint count, const Vector& field) {
-        Image image(Mx, My);
+    template<uint sqrt> void subplot(int2 position, int2 size, uint index, const Vector& field) {
+        int2 subSize = size/int(sqrt);
+        Image image = clip(framebuffer, position+int2(index%sqrt,index/sqrt)*subSize, subSize);
         real max=0; for(real v: field) max=::max(max, abs(v));
-        for(uint y: range(My)) {
-            for(uint x: range(Mx)) {
-                uint i = y*Mx+x;
-                float v = field[i]/max;
-                uint8 c  = sRGB[ clip<int>(0, round(0xFF* abs(v)), 0xFF) ]; // linear to gamma (sRGB)
-                image(x,y) = v>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-max,0,max] -> [blue,black,red]
+        constexpr uint scale = 1024/64/sqrt;
+        for(uint y: range(My-1)) {
+            for(uint x: range(Mx-1)) {
+                float v00 = field[(y+0)*Mx+(x+0)]/max;
+                float v01 = field[(y+0)*Mx+(x+1)]/max;
+                float v10 = field[(y+1)*Mx+(x+0)]/max;
+                float v11 = field[(y+1)*Mx+(x+1)]/max;
+                for(uint dy: range(scale)) {
+                    for(uint dx: range(scale)) {
+                        float u=dx/float(scale), v=dy/float(scale);
+                        float value = ( v00 * (1-u) + v01 * u) * (1-v)
+                                         + ( v10 * (1-u) + v11 * u) * v;
+                        uint8 c  = sRGB[ clip<int>(0, round(0xFF*abs(value)), 0xFF) ]; // linear to gamma (sRGB)
+                        image(x*scale+dx,y*scale+dy) = value>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-max,0,max] -> [blue,black,red]
+                    }
+                }
             }
         }
-        int sqrt = ceil(::sqrt(count));
-        int2 subSize = size/sqrt;
-        blit(position+int2(index%sqrt,index/sqrt)*subSize, resize(image, subSize.x, subSize.y));
     }
     void render(int2 position, int2 size) {
         // Solves evolution equations
@@ -161,9 +169,11 @@ struct CFDTest : Widget {
         CNLw = (PDX*Cj)*(PDY*Cw)-(PDY*Cj)*(PDX*Cw);
         CNLt  = (PDX*Cj)*(PDY*Ct )-(PDY*Cj)*(PDX*Ct );
 
-        subplot(position, size, 0, 4, Cw);
-        subplot(position, size, 1, 4, Cj);
-        subplot(position, size, 2, 4, Ct);
-        static int t=0; if(t++<256) window.render(); else log("Done");
+        //TODO: legend
+        subplot<2>(position, size, 0, Cw);
+        subplot<2>(position, size, 1, Cj);
+        subplot<2>(position, size, 2, Ct);
+        //TODO: |u|, flow lines
+        static int t=0; if(t++<4096) window.render(); else log("Stopped");
     }
 } test;

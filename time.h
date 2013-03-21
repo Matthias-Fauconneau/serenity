@@ -3,11 +3,12 @@
 #include "data.h"
 #include "process.h"
 #include "function.h"
+#include "string.h"
 
 /// Returns Unix real-time in seconds
 long currentTime();
 /// Returns Unix real-time in milliseconds
-long realTime();
+uint64 realTime();
 /// Returns current thread CPU time in microseconds
 uint64 cpuTime();
 
@@ -20,9 +21,9 @@ struct tsc { uint64 total=0; uint64 tsc; void start(){tsc=rdtsc();} void stop(){
 /// Logs the time spent executing a scope
 struct ScopeTimer {
     ScopeTimer(ref<byte> id):id(id){}
-    ~ScopeTimer(){ log(id,(uint)round((cpuTime()-start)/1000.f),"ms"); }
+    ~ScopeTimer(){ log(id,ftoa((realTime()-start)/1000.f,1),"ms"); }
     ref<byte> id;
-    uint64 start=cpuTime();
+    uint64 start=realTime();
 };
 
 struct Date {
