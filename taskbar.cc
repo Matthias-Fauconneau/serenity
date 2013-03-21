@@ -1,4 +1,4 @@
-/// \file taskbar.cc Persistent panel application and X11 window manager
+/// \file taskbar.cc X11 window manager with integrated window selection panel
 #include "process.h"
 #include "file.h"
 #include "time.h"
@@ -25,7 +25,9 @@ struct Taskbar : Socket, Poll {
         Task(Taskbar* parent, uint id, Image&& icon, string&& text):Linear(Left),Item(move(icon),move(text)),parent(parent),id(id){}
         bool mouseEvent(int2, int2, Event event, Button button) override {
             if(event==Press && button==LeftButton) {
-                if(parent->tasks.index!=uint(-1) && &parent->tasks.active()==this) {SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=displaySize.x; r.h=displaySize.y-16; parent->send(raw(r));}
+                if(parent->tasks.index<parent->tasks.size && &parent->tasks.active()==this) {
+                    SetGeometry r; r.id=id; r.x=0, r.y=16; r.w=displaySize.x; r.h=displaySize.y-16; parent->send(raw(r));
+                }
                 parent->hasFocus=true;
             }
             return false;
@@ -178,7 +180,7 @@ struct Taskbar : Socket, Poll {
         array<uint> type = getProperty<uint>(id,"_NET_WM_WINDOW_TYPE"_);
         if(!type.size) return -1;
         if(type[0]==Atom("_NET_WM_WINDOW_TYPE_DESKTOP"_)) desktop=id;
-        if(type[0]!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_) /*&& type[0]!=Atom("_NET_WM_WINDOW_TYPE_DIALOG"_)*/) return -1;
+        if(type[0]!=Atom("_NET_WM_WINDOW_TYPE_NORMAL"_) && type[0]!=Atom("_NET_WM_WINDOW_TYPE_DIALOG"_)) return -1;
         if(getProperty<uint>(id,"_NET_WM_STATE"_).contains(Atom("_NET_WM_SKIP_TASKBAR"_))) return -1;
         string title = getTitle(id); if(!title) return -1;
         Image icon = getIcon(id);

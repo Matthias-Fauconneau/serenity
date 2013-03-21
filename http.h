@@ -25,7 +25,11 @@ struct SSLSocket : TCPSocket {
 
 /// Implements Data::available using Stream::readUpTo
 template<class T/*: Stream*/> struct DataStream : T, virtual Data {
+#if __clang__
+    template<Type... Args> DataStream(Args... args):T(args...){}
+#else
     using T::T;
+#endif
     /// Feeds Data buffer using T::readUpTo
     uint available(uint need) override;
 };

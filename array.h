@@ -109,20 +109,20 @@ template<Type T> struct array {
     T pop() { return take(size-1); }
 
     /// Removes one matching element and returns an index to its successor
-    int removeOne(const T& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
+    template<Type K> int removeOne(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
     /// Removes all matching elements
-    void removeAll(const T& key) { for(uint i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
+    template<Type K> void removeAll(const K& key) { for(uint i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
     /// Filters elements matching predicate
     template<Type F> void filter(F f) { for(uint i=0; i<size;) if(f(at(i))) removeAt(i); else i++; }
 
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    int indexOf(const T& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
+    template<Type K> int indexOf(const K& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
-    bool contains(const T& key) const { return indexOf(key)>=0; }
+    template<Type K> bool contains(const K& key) const { return indexOf(key)>=0; }
     /// Returns index to the first element greater than or equal to \a value using linear search (assuming a sorted array)
     template<Type K> int linearSearch(const K& key) const { uint i=0; while(i<size && at(i) < key) i++; return i; }
     /// Returns index to the first element greater than or equal to \a value using binary search (assuming a sorted array)
-    int binarySearch(const T& key) const {
+    template<Type K> int binarySearch(const K& key) const {
         uint min=0, max=size;
         while(min<max) {
             uint mid = (min+max)/2;

@@ -3443,7 +3443,7 @@ unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, i
 }
 
 Image decodeJPEG(const ref<byte>& file) {
-    int width, height, depth;
+    int width=0, height=0, depth;
     jpeg_decoder_mem_stream mem_stream((uint8*)file.data, file.size);
     ::buffer<byte4> buffer(
                 (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4), width*height*4, width*height*4);

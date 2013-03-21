@@ -234,7 +234,7 @@ void HTTP::header() {
             url = url.relative(value);
             uint ip = resolve(url.host);
             if(ip==uint(-1)) { log("Unknown host",url); done(); return; }
-            this->~SSLSocket(); new (this) SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_); Poll::fd=SSLSocket::fd;
+            SSLSocket::~SSLSocket(); new (this) SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_); Poll::fd=SSLSocket::fd;
             index=0; buffer=array<byte>(); contentLength=chunked=0;
             redirect << file;
             state=Request; events=POLLOUT;

@@ -104,7 +104,7 @@ record.h
 spectrogram.h
 trace.h
 test.cc
-poisson.cc
+cfd.cc
 parser.cc
 parser.h
 operator_.cc

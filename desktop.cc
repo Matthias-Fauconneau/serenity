@@ -45,7 +45,7 @@ struct Sun {
         real h = GMST - (longitude + alpha)/PI*12; // Solar hour angle [h]
         real w0 = acos(-tan(latitude)*tan(delta))/PI*12*60*60; // Half day length [s]
         real noon = U-mod(h,24)*60*60; // Solar noon in unix time [s]
-        rise=noon-w0, noon=noon, set=noon+w0;
+        rise=noon-w0, this->noon=noon, set=noon+w0;
     }
 } sun(-2.1875*PI/180, 48.6993*PI/180); //Orsay, France
 
