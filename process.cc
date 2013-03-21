@@ -13,7 +13,7 @@
 
 // Log
 void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
-template<> void log(const ref<byte>& buffer) { log_(string(buffer+"\n"_)); }
+template<> void log(const ref<byte>& buffer) { log_(buffer+"\n"_); }
 
 // Poll
 void Poll::registerPoll() {

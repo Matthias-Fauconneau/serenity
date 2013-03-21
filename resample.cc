@@ -26,8 +26,8 @@
    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
    POSSIBILITY OF SUCH DAMAGE.
 */
-#include "resample.h"
 #include "simd.h"
+#include "resample.h"
 
 inline float product(const float* kernel, const float* signal, int len) {
     float4 sum = {0,0,0,0};
@@ -86,7 +86,7 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
 
     // Allocates and clears aligned planar signal buffers
     this->bufferSize = bufferSize = max(bufferSize,sourceRate)+N-1;
-    for(uint i: range(channelCount)) signal[i] = buffer<float>(bufferSize,0.f);
+    for(uint i: range(channelCount)) signal[i] = buffer<float>(bufferSize,bufferSize,0.f);
 
     // Factorize rates if possible to reduce filter bank size
     int factor = gcd(sourceRate,targetRate);

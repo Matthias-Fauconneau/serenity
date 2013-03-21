@@ -8,13 +8,8 @@ template<Type K, Type V> struct pair { K& key; V& value; };
 template<Type K, Type V> struct key_value { K key; V value; };
 /// Associates keys with values
 template<Type K, Type V> struct map {
-    array<K> keys;
-    array<V> values;
-
     map(){}
-    map(const ref<key_value<K,V>>& pairs){
-        for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
-    }
+    map(const ref<key_value<K,V>>& pairs){ for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value; }
     map(const ref<K>& keys, const ref<V>& values):keys(keys),values(values){ assert(keys.size==values.size); }
 
     uint size() const { return keys.size; }
@@ -107,6 +102,9 @@ template<Type K, Type V> struct map {
     };
     iterator begin() { return iterator((K*)keys.begin(),(V*)values.begin()); }
     iterator end() { return iterator((K*)keys.end(),(V*)values.end()); }
+
+    array<K> keys;
+    array<V> values;
 };
 
 template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {

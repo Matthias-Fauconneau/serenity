@@ -31,7 +31,7 @@ struct Data {
     explicit operator bool() { return available(1); }
 
     /// Returns next byte without advancing
-    byte peek() const { assert(index<buffer.size); return buffer[index];}
+    byte peek() const { assert(index<buffer.size, index, buffer.size); return buffer[index];}
     /// Peeks at buffer without advancing
     byte operator[](int i) const { assert(index+i<buffer.size); return buffer[index+i]; }
     /// Returns a reference to the next \a size bytes
@@ -110,7 +110,14 @@ struct BinaryData : virtual Data {
 
 /// Provides a convenient interface to parse text streams
 struct TextData : virtual Data {
+#if __clang__
+    TextData(){}
+    default_move(TextData);
+    TextData(array<byte>&& array) : Data(move(array)){}
+    explicit TextData(const ref<byte>& reference):Data(reference){}
+#else
     using Data::Data;
+#endif
 
     /// If input match \a key, advances \a pos by \a key size
     bool match(char key);

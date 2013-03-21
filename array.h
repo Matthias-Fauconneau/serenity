@@ -18,7 +18,7 @@ template<Type T> struct array {
     /// If the array own the data, destroys all initialized elements and frees the buffer
     ~array() { if(capacity) { for(uint i: range(size)) data[i].~T(); free(data); } data=0; }
 
-    array(array&& o) { data=o.data, size=o.size, capacity=o.capacity; o.data=0,o.size=o.capacity=0; }
+    array(array&& o) { data=o.data, capacity=o.capacity, size=o.size; o.data=0, o.capacity=o.size=0; }
     array& operator=(array&& o){ this->~array(); new (this) array(move(o)); return *this; }
 
     /// Returns true if not empty
@@ -69,8 +69,11 @@ template<Type T> struct array {
     /// Removes all elements
     void clear() { if(size) shrink(0); }
 
+    /// Appends a new element directly on the array (without move)
+    template<Type... Args> void append(Args&&... args) { uint s=size+1; reserve(s); new (end()) T(forward<Args>(args)...); size=s;}
+
     /// \name Append operators
-    array& operator<<(T&& e) {uint s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
+    array& operator<<(T&& e) { uint s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
     array& operator<<(array<T>&& a) {uint s=size+a.size; reserve(s); copy((byte*)end(),(byte*)a.data,a.size*sizeof(T)); size=s; return *this; }
     array& operator<<(const T& v) { *this<< copy(v); return *this; }
     array& operator<<(const ref<T>& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (data+s+i) T(copy(a[i])); return *this; }
@@ -106,21 +109,20 @@ template<Type T> struct array {
     T pop() { return take(size-1); }
 
     /// Removes one matching element and returns an index to its successor
-    template<Type K> int removeOne(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
+    int removeOne(const T& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
     /// Removes all matching elements
-    template<Type K> void removeAll(const K& key) { for(uint i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
+    void removeAll(const T& key) { for(uint i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
     /// Filters elements matching predicate
     template<Type F> void filter(F f) { for(uint i=0; i<size;) if(f(at(i))) removeAt(i); else i++; }
 
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    template<Type K> int indexOf(const K& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
+    int indexOf(const T& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
-    template<Type K> bool contains(const K& key) const { return indexOf(key)>=0; }
+    bool contains(const T& key) const { return indexOf(key)>=0; }
     /// Returns index to the first element greater than or equal to \a value using linear search (assuming a sorted array)
     template<Type K> int linearSearch(const K& key) const { uint i=0; while(i<size && at(i) < key) i++; return i; }
     /// Returns index to the first element greater than or equal to \a value using binary search (assuming a sorted array)
-    template<Type K> int binarySearch(const K& key) const {
-        assert(size);
+    int binarySearch(const T& key) const {
         uint min=0, max=size;
         while(min<max) {
             uint mid = (min+max)/2;
@@ -138,7 +140,6 @@ template<Type T> struct array {
 };
 
 /// Copies all elements in a new array
-template<Type T> array<T> copy(const ref<T>& o) { array<T> copy; copy<<o; return copy; }
 template<Type T> array<T> copy(const array<T>& o) { array<T> copy; copy<<o; return copy; }
 
 /// Concatenates two arrays

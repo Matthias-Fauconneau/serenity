@@ -27,7 +27,11 @@ struct ScrollArea : Widget {
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
 template<class T> struct Scroll : ScrollArea, T {
+#if __clang__
+    template<class... Args> Scroll(Args&&... args):T(forward<Args>(args)...){}
+#else
     using T::T;
+#endif
     /// Returns a reference to \a T::Widget (for ScrollArea implementation)
     Widget& widget() override { return (T&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)

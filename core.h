@@ -105,9 +105,9 @@ template<Type T> struct ref {
     /// Default constructs an empty reference
     constexpr ref() : data(0), size(0) {}
     /// References \a size elements from const \a data pointer
-    constexpr ref(const T* data, size_t size) : data(data), size(size) {}
+    constexpr ref(const T* data, uint size) : data(data), size(size) {}
     /// Converts an std::initializer_list to ref
-    constexpr ref(const std::initializer_list<T>& list) : data(list.data), size(list.size) {}
+    explicit constexpr ref(const std::initializer_list<T>& list) : data(list.data), size(list.size) {}
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
@@ -131,7 +131,7 @@ template<Type T> struct ref {
     bool contains(const T& key) const { return indexOf(key)>=0; }
 
     const T* data;
-    size_t size;
+    uint size;
 };
 
 /// Returns const reference to a static string literal
@@ -156,7 +156,11 @@ inline double exp(double x) { return __builtin_exp(x); }
 inline double ln(double x) { return __builtin_log(x); }
 inline double exp2(double x) { return __builtin_exp2(x); }
 inline double log2(double x) { return __builtin_log2(x); }
+#if __clang__
+inline double exp10(double x) { return exp(x*ln(10)); }
+#else
 inline double exp10(double x) { return __builtin_exp10(x); }
+#endif
 inline double log10(double x) { return __builtin_log10(x); }
 
 // Memory operations
@@ -168,6 +172,11 @@ inline void clear(byte* buffer, uint size) { for(byte& b: memory<byte>(buffer, b
 template<Type T> void clear(T* buffer, uint size, const T& value=T()) { for(T& t: memory<T>(buffer, buffer+size)) new (&t) T(copy(value)); }
 /// Copies values from \a src to \dst
 template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
+
+// C runtime memory allocation
+extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
+extern "C" void* realloc(void* buffer, size_t size);
+extern "C" void free(void* buffer);
 
 /// Reference type with move semantics
 template<Type T> struct handle {
@@ -183,21 +192,13 @@ template<Type T> struct handle {
     T pointer;
 };
 
-// C runtime memory allocation
-extern "C" void* malloc(size_t size);
-extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
-extern "C" void* realloc(void* buffer, size_t size);
-extern "C" void free(void* buffer);
-// Typed memory allocation (without initialization)
-template<Type T> T* allocate64(uint size) { void* buffer; if(posix_memalign(&buffer,64,size*sizeof(T))) error(""); return (T*)buffer; }
-
 /// Reference to a fixed capacity heap allocated buffer
 template<Type T> struct buffer {
     buffer(){}
     buffer(T* data, uint capacity, uint size):data(data),capacity(capacity),size(size){}
     buffer(T* data, uint size):data(data),size(size){}
     buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
-    buffer(uint capacity, uint size):data(allocate64<T>(capacity)),capacity(capacity),size(size){}
+    buffer(uint capacity, uint size):capacity(capacity),size(size){ assert(capacity); posix_memalign((void**)&data,64,capacity*sizeof(T)); }
     explicit buffer(uint size):buffer(size,size){}
 
     buffer(uint capacity, uint size, const T& value):buffer(capacity,size){clear(data,size,value);}
@@ -211,7 +212,7 @@ template<Type T> struct buffer {
     operator ref<T>() const { return ref<T>(data,size); }
     T* begin() const { return data; }
     T* end() const { return data+size; }
-    T& operator[](uint i) { assert(i<size); return (T&)data[i]; }
+    T& operator[](uint i) { assert(i<size, i ,size); return (T&)data[i]; }
 
     /// Slices a mutable reference to elements from \a pos to \a pos + \a size
     memory<T> slice(uint pos, uint size) { assert(pos+size<=this->size); return memory<T>(data+pos, data+pos+size); }
@@ -222,7 +223,7 @@ template<Type T> struct buffer {
     uint capacity=0;
     uint size=0;
 };
-template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity); copy(t.data,o.data,o.size); return t; }
+template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); copy(t.data,o.data,o.size); return t; }
 
 /// Unique reference to an heap allocated value
 template<Type T> struct unique {

@@ -14,7 +14,7 @@
 typedef float float4 __attribute((vector_size(16)));
 struct Note {
     default_move(Note);
-    Note(FLAC&& flac):flac(move(flac)),writeCount((int)this->flac.audio.capacity){}
+    explicit Note(FLAC&& flac):flac(move(flac)),readCount(this->flac.audio.size),writeCount((int)this->flac.audio.capacity-this->flac.audio.size){}
     FLAC flac;
     float4 level; //current note attenuation
     float4 step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
@@ -53,7 +53,8 @@ struct Sampler : Poll {
 
     uint rate = 0;
     //static constexpr uint periodSize = 128; // same as resampler latency and 1m sound propagation time
-    static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb) (TODO: ring buffer)
+    //static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb) (TODO: ring buffer)
+    static constexpr uint periodSize = 1024; // maximum compatibility (when latency is not critical)
 
 #if REVERB
     /// Convolution reverb

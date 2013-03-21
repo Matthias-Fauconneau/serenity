@@ -1,8 +1,7 @@
 PREFIX ?= /usr
 BUILD ?= debug
-#g++-4.8.0-rc20130316
-CC := g++ -pipe -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
-#CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
+# CC := g++ -pipe -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
+CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -DDEBUG -g
 FLAGS_profile = -DPROFILE -g -O3 -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile
 FLAGS_release = -O3

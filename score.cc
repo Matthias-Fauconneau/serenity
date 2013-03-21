@@ -27,6 +27,7 @@ void Score::onPath(const ref<vec2>& p) {
 }
 
 void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int code, int fontIndex) {
+    if(!font) return;
     if(index == 0) {
         pass++;
         if(histogram) { //TODO: OCR

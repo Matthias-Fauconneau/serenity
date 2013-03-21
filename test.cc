@@ -1,3 +1,17 @@
+#include "process.h"
+#include "string.h"
+#include "data.h"
+struct Test {
+    Test() {
+        array<ref<byte>> test;
+        ref<byte> key = "Test"_;
+        log(key);
+        test << key;
+        log(test);
+    }
+} test;
+
+#if 0
 #include "parser.h"
 #include "process.h"
 
@@ -27,7 +41,7 @@ struct EarleyTest {
         parser.parse(input);
     }
 } test;
-
+#endif
 #if 0
 #include "window.h"
 #include "text.h"

@@ -370,7 +370,7 @@ void PDF::open(const ref<byte>& data) {
                         else if(e.type==Variant::Data) drawText(font,fontSize,spacing,wordSpacing,e.data);
                         else error("Unexpected type",(int)e.type);
                     }
-                    OP2('T','f') font = &fonts.at(args[0].data); fontSize=f(1);
+                    OP2('T','f') font = fonts.contains(args[0].data)?&fonts.at(args[0].data):0; fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat32(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); //intersect odd even clip
@@ -478,7 +478,7 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
 }
 
 void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, const ref<byte>& data) {
-    if(!font->font->face) return;
+    if(!font || !font->font->face) return;
     font->font->setSize(fontSize);
     for(uint8 code : data) {
         if(code==0) continue;

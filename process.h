@@ -25,7 +25,6 @@ int pthread_cond_destroy(pthread_cond* cond);
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock : handle<pthread_mutex> {
-    default_move(Lock);
     Lock() { pthread_mutex_init(&pointer,0); }
     ~Lock() { pthread_mutex_destroy(&pointer); }
     /// Locks the mutex.
@@ -44,7 +43,6 @@ struct Locker {
 };
 
 struct Condition : handle<pthread_cond> {
-    default_move(Condition);
     Condition() { pthread_cond_init(&pointer,0); }
     ~Condition(){ pthread_cond_destroy(&pointer); }
 };

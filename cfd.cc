@@ -96,13 +96,13 @@ struct CFDTest : Widget {
             Gt[i] = 1;
             // Right
             BCt(i,i+Mx-1) = 1;
-            Gt[i] = 0; //T1=1, T0=0
+            Gt[i] = 0;
         }
 
         // Left-hand side (implicit) of ω,ϕ,T evolution equations
-        Matrix Lw = I - Pr*dt/2*PD;
+        Matrix Lw = I - (Pr*dt/2)*PD;
         Matrix Lj = (I-P) + PD;
-        Matrix Lt = BCt + P - dt/2*PD;
+        Matrix Lt = BCt + P - (dt/2)*PD;
 
         // LU factorizations of the implicit operators
         this->Lw = UMFPACK(Lw);
@@ -110,9 +110,17 @@ struct CFDTest : Widget {
         this->Lt = UMFPACK(Lt);
 
         // Right-hand side (explicit)
-        Rw = P + Pr*dt/2*PD;
-        Rt = P + dt/2*PD;
+        Rw = P + (Pr*dt/2)*PD;
         Rj = -1*P;
+        Rt = P + (dt/2)*PD;
+
+        // Initial temperature
+        for(uint x: range(Mx)) {
+            for(uint y: range(My)) {
+                uint i = y*Mx+x;
+                Ct[i] = 1-real(x)/Mx;
+            }
+        }
     }
     void subplot(int2 position, int2 size, uint index, uint count, const Vector& field) {
         Image image(Mx, My);
@@ -132,6 +140,7 @@ struct CFDTest : Widget {
         Vector Nt  = Lt .solve(Rt*Ct   + (3*dt/2)*CNLt  - (dt/2)*PNLt  + Gt);
         Vector Nw = Lw.solve(Rw*Cw + (3*dt/2)*CNLw - (dt/2)*PNLw + (dt/2)*Ra*Pr*PDX*(Nt+Ct) + BCw*(2*Cj-Pj));
         Vector Nj   = Lj .solve(Rj*Nw);
+        subplot(position, size, 3, 4, Nt);
         // Update references
         Cw=move(Nw), PNLw=move(CNLw);
         Pj=move(Cj), Cj=move(Nj);
@@ -140,8 +149,8 @@ struct CFDTest : Widget {
         CNLw = (PDX*Cj)*(PDY*Cw)-(PDY*Cj)*(PDX*Cw);
         CNLt  = (PDX*Cj)*(PDY*Ct )-(PDY*Cj)*(PDX*Ct );
 
-        subplot(position, size, 0, 3, Cw);
-        subplot(position, size, 1, 3, Cj);
-        subplot(position, size, 2, 3, Ct);
+        subplot(position, size, 0, 4, Cw);
+        subplot(position, size, 1, 4, Cj);
+        subplot(position, size, 2, 4, Ct);
     }
 } test;

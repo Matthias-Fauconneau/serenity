@@ -152,7 +152,7 @@ struct Music {
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 #endif
 
-        setFocus(&keyboardInput);
+        window.focus = &keyboardInput;
         keyboardInput.noteEvent.connect(&sampler,&Sampler::noteEvent);
         keyboardInput.noteEvent.connect(&score,&Score::noteEvent);
         keyboardInput.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);

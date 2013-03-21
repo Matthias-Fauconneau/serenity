@@ -1,8 +1,7 @@
 #pragma once
 /// \file simd.h SIMD types and intrinsics
-#include "core.h"
-
 #include <xmmintrin.h>
+#include "core.h"
 
 typedef float float2 __attribute((vector_size(8)));
 

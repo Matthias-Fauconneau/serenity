@@ -111,8 +111,8 @@ UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
         }
     }
     Symbolic symbolic;
-    {ScopeTimer t("symbolic"_); umfpack_di_symbolic(m, n, columnPointers, rowIndices, values, &symbolic.pointer, 0, 0); }
-    {ScopeTimer t("numeric"_); umfpack_di_numeric(columnPointers, rowIndices, values, symbolic.pointer, &numeric.pointer, 0, 0); }
+    umfpack_di_symbolic(m, n, columnPointers, rowIndices, values, &symbolic.pointer, 0, 0);
+    umfpack_di_numeric(columnPointers, rowIndices, values, symbolic.pointer, &numeric.pointer, 0, 0);
 }
 
 Vector UMFPACK::solve(const Vector& b) {

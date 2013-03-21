@@ -1,9 +1,9 @@
+#include "simd.h"
 #include "sampler.h"
 #include "data.h"
 #include "file.h"
 #include "flac.h"
 #include "time.h"
-#include "simd.h"
 #include "string.h"
 
 int noteToMIDI(const ref<byte>& value) {
@@ -185,31 +185,32 @@ void Sampler::noteEvent(uint key, uint velocity) {
     }
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
-            Note note( ::copy(s.flac) ); // Copy predecoded buffer and corresponding FLAC decoder state
-            note.envelope = s.envelope;
-
-            float level;
-            if(current) { //rt_decay is unreliable, matching levels works better
-                level = current->actualLevel(1<<14) / note.actualLevel(1<<11);
-                level *= extract(current->level,0);
-                if(level>8) level=8;
-            } else {
-                level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * s.volume;
-            }
-            if(level<0x1p-15) return;
-
-            if(!current) note.key=key;
-            note.step=(float4){1,1,1,1};
-            note.releaseTime=s.releaseTime;
-            note.envelope=s.envelope;
-            if(note.flac.sampleSize==16) level*=0x1p8;
-            note.level=(float4){level,level,level,level};
             {Locker locker(lock);
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
                 assert(layer && layer->notes.size<layer->notes.capacity);
-                layer->notes << move(note);
+
+                layer->notes.append( ::copy(s.flac) ); // Copy predecoded buffer and corresponding FLAC decoder state
+                Note& note = layer->notes.last();
+                note.envelope = s.envelope;
+
+                float level;
+                if(current) { //rt_decay is unreliable, matching levels works better
+                    level = current->actualLevel(1<<14) / note.actualLevel(1<<11);
+                    level *= extract(current->level,0);
+                    if(level>8) level=8;
+                } else {
+                    level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * s.volume;
+                }
+                if(level<0x1p-15) return;
+
+                if(!current) note.key=key;
+                note.step=(float4){1,1,1,1};
+                note.releaseTime=s.releaseTime;
+                note.envelope=s.envelope;
+                if(note.flac.sampleSize==16) level*=0x1p8;
+                note.level=(float4){level,level,level,level};
             }
             queue(); //queue background decoder in main thread
             return;
@@ -222,12 +223,6 @@ void Sampler::noteEvent(uint key, uint velocity) {
 
 /// Background decoder (background thread)
 
-void Note::decode(uint need) {
-    assert(need<=flac.audio.capacity);
-    while(readCount<=int(need) && flac.blockSize && (int)writeCount>=flac.blockSize) {
-        int size=flac.blockSize; writeCount.acquire(size); flac.decodeFrame(); readCount.release(size);
-    }
-}
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(lock.tryLock()) { // Cleanup silent notes
         for(Layer& layer: layers) layer.notes.filter([](const Note& note){
