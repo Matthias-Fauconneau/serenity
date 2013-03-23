@@ -2,6 +2,9 @@
 /// \file data.h Structured data parsers (Data, BinaryData, TextData)
 #include "array.h"
 
+#if __GNUC_MINOR__ < 8
+inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
+#endif
 #define big16 __builtin_bswap16
 #define big32 __builtin_bswap32
 #define big64 __builtin_bswap64
@@ -110,7 +113,7 @@ struct BinaryData : virtual Data {
 
 /// Provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-#if __clang__
+#if __clang__ || __GNUC_MINOR__ < 8
     TextData(){}
     default_move(TextData);
     TextData(array<byte>&& array) : Data(move(array)){}

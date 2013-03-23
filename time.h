@@ -19,12 +19,11 @@ inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)
 struct tsc { uint64 total=0; uint64 tsc; void start(){tsc=rdtsc();} void stop(){total+=rdtsc()-tsc;} operator uint64(){return total;} };
 #endif
 /// Logs the time spent executing a scope
-struct ScopeTimer {
-    ScopeTimer(ref<byte> id):id(id){}
-    ~ScopeTimer(){ log(id,ftoa((realTime()-start)/1000.f,1),"ms"); }
-    ref<byte> id;
-    uint64 start=realTime();
+struct Stopwatch {
+    uint64 start=realTime(), stop=0;
+    string reset(){ if(!stop) stop=realTime(); string s=ftoa((stop-start)/1000.f,1)+"ms"_; start=stop; stop=0; return s; }
 };
+inline string str(Stopwatch s) { return s.reset(); }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

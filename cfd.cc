@@ -15,12 +15,13 @@ void spy(const Matrix& A) {
 }
 
 /// Converts values to colors for visualization;
-template<Type T> byte4 toColor(T value);
+template<Type T> notrace byte4 toColor(T value);
 template<> byte4 toColor(real x) {
-    uint8 c  = sRGB[ clip<int>(0, round(0xFF*abs(x)), 0xFF) ]; // linear to gamma (sRGB)
+    uint8 c  = sRGB.lookup[ clip<int>(0, round(0xFF*abs(x)), 0xFF) ]; // linear to gamma (sRGB)
     return x>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-max,0,max] -> [blue,black,red]
 }
 
+#if norm_angle // Velocity vector visualization
 vec3 HSVtoRGB(real h, real s, real v) {
     real H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
     int i=H;
@@ -33,21 +34,22 @@ vec3 HSVtoRGB(real h, real s, real v) {
     return vec3(0,0,0);
 }
 
-template<> byte4 toColor(Vec2 z) {
-#if norm_angle // Velocity vector visualization
+template<> inline byte4 toColor(Vec2 z) {
     vec3 rgb = HSVtoRGB(atan(z.y, z.x)+PI, 1, norm(z));
     uint8 r = sRGB[ clip<int>(0, round(0xFF*rgb.x), 0xFF) ]; // linear to gamma (sRGB)
     uint8 g = sRGB[ clip<int>(0, round(0xFF*rgb.y), 0xFF) ]; // linear to gamma (sRGB)
     uint8 b = sRGB[ clip<int>(0, round(0xFF*rgb.z), 0xFF) ]; // linear to gamma (sRGB)
     return byte4(b,g,r,0xFF);
-#else
-    /*uint8 r = sRGB[ clip<int>(0, round(0xFF*z.x), 0xFF) ]; // linear to gamma (sRGB)
-    uint8 g = sRGB[ clip<int>(0, round(0xFF*z.y), 0xFF) ]; // linear to gamma (sRGB)*/
-    // Grid
-    uint8 r = sRGB[ int(round(z.x*0x1000))%0x100 ]; // linear to gamma (sRGB)
-    uint8 g = sRGB[ int(round(z.y*0x1000))%0x100 ]; // linear to gamma (sRGB)
-    return byte4(0,g,r,0xFF);
+}
 #endif
+
+template<> byte4 toColor(Vec2 z) {
+    uint8 r = sRGB.lookup[ clip<int>(0, round(0xFF*z.x), 0xFF) ]; // linear to gamma (sRGB)
+    uint8 g = sRGB.lookup[ clip<int>(0, round(0xFF*z.y), 0xFF) ]; // linear to gamma (sRGB)
+    // Grid
+    /*uint8 r = sRGB[ int(round(z.x*0x1000))%0x100 ]; // linear to gamma (sRGB)
+    uint8 g = sRGB[ int(round(z.y*0x1000))%0x100 ]; // linear to gamma (sRGB)*/
+    return byte4(0,g,r,0xFF);
 }
 
 struct CFDTest : Widget {
@@ -205,27 +207,36 @@ struct CFDTest : Widget {
         constexpr uint scale = 1024/64/sqrt;
         for(uint y: range(My-1)) {
             for(uint x: range(Mx-1)) {
+#if 0
                 T v00 = field[(y+0)*Mx+(x+0)]/max;
                 T v01 = field[(y+0)*Mx+(x+1)]/max;
                 T v10 = field[(y+1)*Mx+(x+0)]/max;
                 T v11 = field[(y+1)*Mx+(x+1)]/max;
+                byte4* data = image.data+y*scale*image.stride+x*scale;
                 for(uint dy: range(scale)) {
                     for(uint dx: range(scale)) {
                         real u=real(dx)/scale, v=real(dy)/scale;
-                        image(x*scale+dx,y*scale+dy) = toColor( ( v00 * (1-u) + v01 * u) * (1-v) + ( v10 * (1-u) + v11 * u) * v );
+                        data[dy*image.stride+dx] = toColor( ( v00 * (1-u) + v01 * u) * (1-v) + ( v10 * (1-u) + v11 * u) * v );
                     }
                 }
+#else
+                byte4 nearest = toColor( field[(y+0)*Mx+(x+0)]/max );
+                byte4* data = image.data+y*scale*image.stride+x*scale;
+                for(uint dy: range(scale)) for(uint dx: range(scale)) data[dy*image.stride+dx] = nearest;
+#endif
             }
         }
     }
 
     void render(int2 position, int2 size) {
+        Stopwatch stopwatch;
         // Solves evolution equations
         Vector Nt  = Lt .solve(Rt*Ct   + (3*dt/2)*CNLt  - (dt/2)*PNLt  + Gt);
         Vector Nw = Lw.solve(Rw*Cw + (3*dt/2)*CNLw - (dt/2)*PNLw + (dt/2)*Ra*Pr*PDX*(Nt+Ct) + BCw*(2*Cj-Pj));
         Vector Nj   = Lj .solve(Rj*Nw);
         Vector NTx  = LT .solve(RT*CTx   + (3*dt/2)*CNLTx  - (dt/2)*PNLTx  + GTx);
         Vector NTy  = LT .solve(RT*CTy   + (3*dt/2)*CNLTy  - (dt/2)*PNLTy  + GTy);
+        //log("solve",stopwatch.reset());
 
         // Update references
         Cw=move(Nw), PNLw=move(CNLw);
@@ -243,6 +254,7 @@ struct CFDTest : Widget {
         //buffer<Vec2> U(N); for(uint i: range(N)) U[i]=Vec2(Ux[i],Uy[i]);
         // Advection visualization
         buffer<Vec2> T(N); for(uint i: range(N)) T[i]=Vec2(CTx[i],CTy[i]);
+        //log("advection",stopwatch.reset());
 
         subplot<2>(position, size, 0, Cw,"Vorticity ω"_);
         subplot<2>(position, size, 1, Cj,"Stream function ϕ"_);
@@ -250,6 +262,7 @@ struct CFDTest : Widget {
         //subplot<2>(position, size, 3, U,"Velocity u"_);
         subplot<2>(position, size, 3, T,"Advection"_);
         //TODO: stream lines
+        //log("visualization",stopwatch.reset());
         static int t=0; if(t++<4096) window.render(); else log("Stopped");
     }
 } test;

@@ -37,7 +37,7 @@ struct PDF : Widget {
 
     struct Font {
         string name;
-        unique<::Font> font;
+        unique< ::Font> font;
         array<float> widths;
     };
     map<ref<byte>, Font> fonts;

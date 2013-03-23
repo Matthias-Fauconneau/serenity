@@ -4,6 +4,7 @@
 // Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
+#define notrace __attribute((no_instrument_function))
 /// Less verbose template declarations
 #define Type typename
 /// Declares the default move constructor and move assigmment operator
@@ -203,7 +204,7 @@ template<Type T> struct buffer {
     buffer(T* data, uint capacity, uint size):data(data),capacity(capacity),size(size){}
     buffer(T* data, uint size):data(data),size(size){}
     buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
-    buffer(uint capacity, uint size):capacity(capacity),size(size){ assert(capacity); posix_memalign((void**)&data,64,capacity*sizeof(T)); }
+    buffer(uint capacity, uint size):capacity(capacity),size(size){ assert(capacity); if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
     explicit buffer(uint size):buffer(size,size){}
 
     buffer(uint capacity, uint size, const T& value):buffer(capacity,size){clear(data,size,value);}
