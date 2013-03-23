@@ -14,10 +14,10 @@ uint64 cpuTime();
 
 #if __x86_64__
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
-#endif
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
 struct tsc { uint64 total=0; uint64 tsc; void start(){tsc=rdtsc();} void stop(){total+=rdtsc()-tsc;} operator uint64(){return total;} };
+#endif
 /// Logs the time spent executing a scope
 struct ScopeTimer {
     ScopeTimer(ref<byte> id):id(id){}

@@ -14,7 +14,7 @@ void Keyboard::render(int2 position, int2 size) {
     int y2 = y0+size.y;
     int dx = round(size.x/88.f);
     int margin = (size.x-88*dx)/2;
-    for(int key=0; key<88; key++) {
+    for(uint key=0; key<88; key++) {
         vec4 white = midi.contains(key+21)?red:input.contains(key+21)?blue: ::white;
         int x0 = position.x + margin + key*dx;
         int x1 = x0 + dx;

@@ -5,14 +5,9 @@
 #include "feeds.h"
 
 typedef double real;
-inline real mod(real q, real d) { return __builtin_fmod(q, d); }
-const real PI = 3.14159265358979323846;
-inline real cos(real t) { return __builtin_cos(t); }
-inline real sin(real t) { return __builtin_sin(t); }
 inline real tan(real t) { return __builtin_tan(t); }
 inline real acos(real t) { return __builtin_acos(t); }
 inline real asin(real t) { return __builtin_asin(t); }
-inline real atan(real y, real x) { return __builtin_atan2(y, x); }
 inline real rad(real t) { return t/180*PI; }
 struct Sun {
     Date rise, noon, set;

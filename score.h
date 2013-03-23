@@ -48,8 +48,8 @@ struct Score {
 
     uint chordIndex=-1, noteIndex=0, currentStaff=0; float currentX=0;
     int chordSize=0; //Initial expected set size (to allow missing notes on large chords)
-    map<int,int> active;
-    map<int,int> expected;
+    map<uint,uint> active;
+    map<uint,uint> expected;
     bool editMode=false;
     bool showActive=false; // Toggles whether active notes are highlighted
     bool showExpected=false; // Toggles whether expected notes are highlighted (set on errors, cleared on sucess)

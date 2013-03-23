@@ -201,20 +201,20 @@ void Score::onGlyph(int index, vec2 pos, float size,const ref<byte>& font, int c
             uint i=0; for(;i<staffs.size && pos.y>staffs[i];i++) {}
             if(i>=notes.size) notes.grow(i+1);
             for(int x : notes[i].keys) if(abs(x-pos.x)<16) {
-                if(!notes[i].sorted(x).contains(-pos.y)) notes[i].sorted(x).insertSorted(-pos.y, Note(index,4));
+                if(!notes[i].sorted(x).contains<int>(-pos.y)) notes[i].sorted(x).insertSorted(-pos.y, Note(index,4));
                 goto break_;
             }
             /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
             break_:;
         }
         if(duration<0) return;
-        if(notes[i].sorted(pos.x).contains(-pos.y)) return;
+        if(notes[i].sorted(pos.x).contains<int>(-pos.y)) return;
         if(staffs) {
             float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[min(i,staffs.size-1)]));
             if(nearestStaffCut<20) { // Follow ledgers away from staff limit
                 float max=0; vec2 best=pos;
                 for(vec2 ledger: ledgers) {
-                    float d = length(ledger-pos);
+                    float d = norm(ledger-pos);
                     if(abs(ledger-pos).y>max && d<30) {
                         max=abs(ledger-pos).y, best=ledger;
                     }
@@ -499,7 +499,7 @@ void Score::next() {
 
 void Score::insert() {
     if(editMode) {
-        assert(expected.size()==1 && expected.values[0]==(int)noteIndex);
+        assert(expected.size()==1 && expected.values[0]==noteIndex);
 
         array<MidiNote> notes; //flatten chords for robust synchronization
         uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }
@@ -524,7 +524,7 @@ void Score::insert() {
 
 void Score::remove() {
     if(editMode) {
-        assert(expected.size()==1 && expected.values[0]==(int)noteIndex);
+        assert(expected.size()==1 && expected.values[0]==noteIndex);
 
         array<MidiNote> notes; //flatten chords for robust synchronization
         uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }
@@ -590,7 +590,7 @@ void Score::noteEvent(uint key, uint vel) {
     map<int,vec4> activeNotes;
     if(editMode) {
         if(vel) {
-            assert(expected.size()==1 && expected.values[0]==(int)noteIndex);
+            assert(expected.size()==1 && expected.values[0]==noteIndex);
 
             array<MidiNote> notes; //flatten chords for robust synchronization
             uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }

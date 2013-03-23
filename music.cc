@@ -59,7 +59,7 @@ struct PDFScore : PDF {
         int best=-1; float D=60;
         for(int i: range(positions.size)) {
             vec2 delta = positions[i]-position;
-            float d = length(delta);
+            float d = norm(delta);
             if(d<D) { D=d; if(abs(delta.x)<16) best=i; else best=-1; }
         }
         if(button == LeftButton) {

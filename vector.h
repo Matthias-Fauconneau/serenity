@@ -75,7 +75,8 @@ template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
 inline float sqr(float x) { return x*x; }
 generic float sqr(const vector& a) { return dot(a,a); }
-generic float length(const vector& a) { return sqrt(dot(a,a)); }
+inline double norm(double x) { return abs(x); }
+generic double norm(const vector& a) { return sqrt(dot(a,a)); }
 generic vector normalize(const vector& a){ return a/length(a); }
 
 inline bool isNaN(float x) { return __builtin_isnan(x); }
@@ -89,11 +90,13 @@ generic string str(const vector& v) { string s("("_); for(uint i=0;i<N;i++) { s<
 template<Type T> struct xy { T x,y; };
 /// Integer x,y vector
 typedef vector<xy,int,2> int2;
-/// Floating-point x,y vector
+/// Single precision x,y vector
 typedef vector<xy,float,2> vec2;
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
+/// Double precision x,y vector
+typedef vector<xy,double,2> Vec2;
 
 template<Type T> struct xyz {
     T x,y,z;

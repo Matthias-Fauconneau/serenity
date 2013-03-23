@@ -162,6 +162,11 @@ inline double exp10(double x) { return exp(x*ln(10)); }
 inline double exp10(double x) { return __builtin_exp10(x); }
 #endif
 inline double log10(double x) { return __builtin_log10(x); }
+inline double cos(double t) { return __builtin_cos(t); }
+inline double sin(double t) { return __builtin_sin(t); }
+inline double atan(double y, double x) { return __builtin_atan2(y, x); }
+inline double mod(double q, double d) { return __builtin_fmod(q, d); }
+const double PI = 3.14159265358979323846;
 
 // Memory operations
 // Initializes memory using a constructor (placement new)

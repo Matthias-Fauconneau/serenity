@@ -4,7 +4,7 @@
 
 /// Displays active notes on a keyboard representation
 struct Keyboard : Widget {
-    array<int> midi, input;
+    array<uint> midi, input;
     signal<> contentChanged;
     signal<uint,uint> noteEvent;
     void inputNoteEvent(uint key, uint vel);

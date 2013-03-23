@@ -14,6 +14,33 @@ void spy(const Matrix& A) {
     window.localShortcut(Escape).connect(&exit);
 }
 
+/// Converts values to colors for visualization;
+template<Type T> byte4 toColor(T value);
+template<> byte4 toColor(real x) {
+    uint8 c  = sRGB[ clip<int>(0, round(0xFF*abs(x)), 0xFF) ]; // linear to gamma (sRGB)
+    return x>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-max,0,max] -> [blue,black,red]
+}
+
+vec3 HSVtoRGB(real h, real s, real v) {
+    real H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
+    int i=H;
+    if(i==0) return vec3(C,X,0);
+    if(i==1) return vec3(X,C,0);
+    if(i==2) return vec3(0,C,X);
+    if(i==3) return vec3(0,X,C);
+    if(i==4) return vec3(X,0,C);
+    if(i==5) return vec3(C,0,X);
+    return vec3(0,0,0);
+}
+
+template<> byte4 toColor(Vec2 z) {
+    vec3 rgb = HSVtoRGB(atan(z.y, z.x)+PI, 1, norm(z));
+    uint8 r = sRGB[ clip<int>(0, round(0xFF*rgb.x), 0xFF) ]; // linear to gamma (sRGB)
+    uint8 g = sRGB[ clip<int>(0, round(0xFF*rgb.y), 0xFF) ]; // linear to gamma (sRGB)
+    uint8 b = sRGB[ clip<int>(0, round(0xFF*rgb.z), 0xFF) ]; // linear to gamma (sRGB)
+    return byte4(b,g,r,0xFF);
+}
+
 struct CFDTest : Widget {
     const uint Mx=65, My=65, N = Mx*My; // Mesh vertex count
     const real H = 1; // Aspect ratio (y/x)
@@ -37,7 +64,7 @@ struct CFDTest : Widget {
     Vector PNLw{N}, CNLw{N}; // Previous and current non-linear ω term
     Vector PNLt{N}, CNLt{N}; // Previous and current non-linear T term
 
-    Window window {this, int2(1024,1024), "CFDTest"_};
+    Window window {this, int2(1024,1024+2*16), "CFDTest"_};
     CFDTest() {
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&exit);
@@ -57,10 +84,10 @@ struct CFDTest : Widget {
                     PD(i,i+Mx) = 1/(dy*dy);
 
                     PDX(i,i-1) = -1/(2*dx);
-                    PDX(i,i+1) = -1/(2*dx);
+                    PDX(i,i+1) = 1/(2*dx);
 
                     PDY(i,i-Mx) = -1/(2*dy);
-                    PDY(i,i+Mx) = -1/(2*dy);
+                    PDY(i,i+Mx) = 1/(2*dy);
                 }
             }
         }
@@ -125,37 +152,34 @@ struct CFDTest : Widget {
         Rj = -1*P;
         Rt = P + (dt/2)*PD;
 
-        // Initial temperature
-        /*for(uint x: range(Mx)) {
-            for(uint y: range(My)) {
-                uint i = y*Mx+x;
-                Ct[i] = 1-real(x)/Mx;
-            }
-        }*/
+        // Sets initial temperature to linear gradient (no transient state)
+        //for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = 1-real(x)/Mx;
     }
-    template<uint sqrt> void subplot(int2 position, int2 size, uint index, const Vector& field) {
+
+    template<uint sqrt, Type T> void subplot(int2 position, int2 size, uint index, const buffer<T>& field, const ref<byte>& title) {
         int2 subSize = size/int(sqrt);
-        Image image = clip(framebuffer, position+int2(index%sqrt,index/sqrt)*subSize, subSize);
-        real max=0; for(real v: field) max=::max(max, abs(v));
+        int2 subPosition = position+int2(index%sqrt,index/sqrt)*subSize;
+        real max=0; for(T v: field) max=::max(max, norm(v));
+        fill(subPosition+Rect(subSize.x,16),black);
+        Text(title+"["_+str(max)+"]"_,16,white).render(subPosition,int2(subSize.x,16));
+        Image image = clip(framebuffer, subPosition+int2(0,16), subSize-int2(0,16));
         constexpr uint scale = 1024/64/sqrt;
         for(uint y: range(My-1)) {
             for(uint x: range(Mx-1)) {
-                float v00 = field[(y+0)*Mx+(x+0)]/max;
-                float v01 = field[(y+0)*Mx+(x+1)]/max;
-                float v10 = field[(y+1)*Mx+(x+0)]/max;
-                float v11 = field[(y+1)*Mx+(x+1)]/max;
+                T v00 = field[(y+0)*Mx+(x+0)]/max;
+                T v01 = field[(y+0)*Mx+(x+1)]/max;
+                T v10 = field[(y+1)*Mx+(x+0)]/max;
+                T v11 = field[(y+1)*Mx+(x+1)]/max;
                 for(uint dy: range(scale)) {
                     for(uint dx: range(scale)) {
-                        float u=dx/float(scale), v=dy/float(scale);
-                        float value = ( v00 * (1-u) + v01 * u) * (1-v)
-                                         + ( v10 * (1-u) + v11 * u) * v;
-                        uint8 c  = sRGB[ clip<int>(0, round(0xFF*abs(value)), 0xFF) ]; // linear to gamma (sRGB)
-                        image(x*scale+dx,y*scale+dy) = value>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-max,0,max] -> [blue,black,red]
+                        real u=dx/real(scale), v=dy/real(scale);
+                        image(x*scale+dx,y*scale+dy) = toColor( ( v00 * (1-u) + v01 * u) * (1-v) + ( v10 * (1-u) + v11 * u) * v );
                     }
                 }
             }
         }
     }
+
     void render(int2 position, int2 size) {
         // Solves evolution equations
         Vector Nt  = Lt .solve(Rt*Ct   + (3*dt/2)*CNLt  - (dt/2)*PNLt  + Gt);
@@ -166,14 +190,18 @@ struct CFDTest : Widget {
         Pj=move(Cj), Cj=move(Nj);
         Ct=move(Nt), PNLt=move(CNLt);
         // Computes advection for next step
-        CNLw = (PDX*Cj)*(PDY*Cw)-(PDY*Cj)*(PDX*Cw);
-        CNLt  = (PDX*Cj)*(PDY*Ct )-(PDY*Cj)*(PDX*Ct );
+        Vector Ux = PDY*Cj, Uy=-1*PDX*Cj;
+        CNLw = Ux*(PDX*Cw)+Uy*(PDY*Cw);
+        CNLt  = Ux*(PDX*Ct )+Uy*(PDY*Ct);
+        // Velocity Visualization
+        buffer<Vec2> U(N);
+        for(uint i: range(N)) U[i]=Vec2(Ux[i],Uy[i]);
 
-        //TODO: legend
-        subplot<2>(position, size, 0, Cw);
-        subplot<2>(position, size, 1, Cj);
-        subplot<2>(position, size, 2, Ct);
-        //TODO: |u|, flow lines
+        subplot<2>(position, size, 0, Cw,"Vorticity ω"_);
+        subplot<2>(position, size, 1, Cj,"Flow function ϕ"_);
+        subplot<2>(position, size, 2, Ct,"Temperature T"_);
+        subplot<2>(position, size, 3, U,"Velocity u"_);
+        //TODO: flow lines
         static int t=0; if(t++<4096) window.render(); else log("Stopped");
     }
 } test;
