@@ -34,7 +34,7 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     snd_pcm_sw_params_current(pcm, sw);
     snd_pcm_sw_params_set_avail_min(pcm, sw, this->periodSize);
     snd_pcm_sw_params(pcm,sw);
-    log(this->rate, this->periodSize, periods, bufferSize);
+    log(this->sampleBits, this->rate, this->periodSize, periods, bufferSize);
 }
 void AudioOutput::start() { if(running) return; snd_pcm_poll_descriptors(pcm,this,1); registerPoll(); running=true; }
 void AudioOutput::stop() { if(!running) return; unregisterPoll(); snd_pcm_drain(pcm); running=false; }

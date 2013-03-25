@@ -76,7 +76,7 @@ template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)
 template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
-string ftoa(double number, int precision=3, int pad=0, int exponent=0);
+string ftoa(double number, int precision=1, int pad=0, bool exponent=false);
 inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
@@ -92,6 +92,9 @@ template<Type T> string dec(const ref<T>& a, const ref<byte> separator=" "_) {
 template<Type T> string hex(const ref<T>& a, const ref<byte> separator=" "_) {
     string s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s;
 }
+
+/// Converts static arrays
+template<Type T, size_t N> string str(const T (&a)[N]) { return str(ref<T>(a,N)); }
 
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces

@@ -177,7 +177,7 @@ template<uint base> string itoa(int64 number, int pad) {
 }
 template string itoa<10>(int64,int);
 
-string ftoa(double n, int precision, int pad, int exponent) {
+string ftoa(double n, int precision, int pad, bool exponent) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);

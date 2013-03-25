@@ -75,7 +75,6 @@ Matrix operator-(const Matrix& A, const Matrix& B) {
     }
     return t;
 }*/
-
 extern "C" {
 uint umfpack_di_symbolic(uint m, uint n, const uint* columnPointers, const uint* rowIndices, const double* values, void** symbolic,
                          const double* control, double* info);
@@ -115,8 +114,11 @@ UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
     umfpack_di_numeric(columnPointers, rowIndices, values, symbolic.pointer, &numeric.pointer, 0, 0);
 }
 
+Stopwatch umfpack;
 Vector UMFPACK::solve(const Vector& b) {
     Vector x(m);
+    umfpack.start();
     umfpack_di_solve(UMFPACK_A, columnPointers, rowIndices.data, values, x, b, numeric.pointer, 0, 0);
+    umfpack.stop();
     return x;
 }

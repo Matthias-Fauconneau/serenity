@@ -6,6 +6,7 @@ typedef double real;
 
 /// Dense vector
 struct Vector : buffer<real> {
+    Vector(){}
     /// Allocates and initializes to zero
     Vector(uint size):buffer<real>(size,size,0.0){}
 };

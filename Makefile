@@ -5,7 +5,6 @@ CC := g++ -pipe -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-mi
 FLAGS_debug = -DDEBUG -g
 FLAGS_profile = -DPROFILE -g -O3 -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
 FLAGS_release = -O3
-#-fno-rtti
 CC += -march=native $(FLAGS_$(BUILD))
 FLAGS_font = -I/usr/include/freetype2
 

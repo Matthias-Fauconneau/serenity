@@ -20,8 +20,11 @@ struct tsc { uint64 total=0; uint64 tsc; void start(){tsc=rdtsc();} void stop(){
 #endif
 /// Logs the time spent executing a scope
 struct Stopwatch {
-    uint64 start=realTime(), stop=0;
-    string reset(){ if(!stop) stop=realTime(); string s=ftoa((stop-start)/1000.f,1)+"ms"_; start=stop; stop=0; return s; }
+    uint64 startTime=realTime(), stopTime=0;
+    void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
+    void stop() { if(!stopTime) stopTime=realTime(); }
+    string reset(){ stop(); string s=ftoa((stopTime-startTime)/1000.f,1)+"ms"_; startTime=stopTime; stopTime=0; return s; }
+    operator uint64(){ return (stopTime?:realTime()) - startTime; }
 };
 inline string str(Stopwatch s) { return s.reset(); }
 
