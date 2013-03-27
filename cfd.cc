@@ -4,6 +4,7 @@
 #include "display.h"
 #include "time.h"
 #include "interface.h"
+#include "png.h"
 
 /// Displays A as an image in a new window
 void spy(const Matrix& A) {
@@ -56,13 +57,13 @@ template<> byte4 toColor(Vec2 z) {
 }
 
 struct CFDTest : Widget {
-    static constexpr uint R = 256; // Resolution
+    static constexpr uint R = 128; // Resolution
     static constexpr uint Mx=R+1, My=R+1, N = Mx*My; // Mesh vertex count
+    const real dt = 1./(4*R); // Temporal resolution
     const real H = 1; // Aspect ratio (y/x)
     const real dx = 1./Mx, dy = H/My; // Spatial resolution
-    const real Ra = 1; // Rayleigh
-    const real Pr = 1; // Prandtl
-    real dt; // Temporal resolution
+    const real Ra = 128; // Rayleigh (uL/ν)
+    const real Pr = 1./128; // Prandtl (ν/κ)
 
     Matrix I = identity(N);
     Matrix P{N}, PD{N}, PDX{N}, PDY{N}; // Elementary matrices (interior points projector, Laplacian Δ and partial derivatives ∂x, ∂y)
@@ -146,10 +147,10 @@ struct CFDTest : Widget {
             uint i = y*Mx;
             // Left
             BCt(i+0,i+0) = 1;
-            Gt[i] = 1;
+            Gt[i] = 0;
             // Right
             BCt(i+Mx-1,i+Mx-1) = 1;
-            Gt[i+Mx-1] = 0;
+            Gt[i+Mx-1] = 1;
         }
 
         // Constant boundary condition for texture advection
@@ -171,10 +172,7 @@ struct CFDTest : Widget {
             BCT(i+Mx-1,i+Mx-1) = 1;
             GTx[i+Mx-1] = real(Mx-1)/Mx, GTy[i+Mx-1] = real(y)/My;
         }
-        setTimeStep(1./(4*R*R)); //FIXME: R²
-    }
-    void setTimeStep(real dt) {
-        this->dt = dt;
+
         // Left-hand side (implicit) of ω,ϕ,T evolution equations
         Matrix Lw = I - (Pr*dt/2)*PD;
         Matrix Lj = (I-P) + PD;
@@ -194,7 +192,7 @@ struct CFDTest : Widget {
         RT = P + (0.*dt/2)*PD;
 
         // Sets initial temperature to a linear gradient (no transient state)
-        for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = 1-real(x)/Mx;
+        //for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = real(x)/Mx;
         // Sets initial positions for texture advection
         for(uint x: range(Mx)) for(uint y: range(My)) CTx[y*Mx+x] = real(x)/Mx, CTy[y*Mx+x] = real(y)/My;
     }
@@ -204,7 +202,7 @@ struct CFDTest : Widget {
         int2 subPosition = position+int2(index%sqrt,index/sqrt)*subSize;
         real max=0; for(T v: field) max=::max(max, norm(v));
         fill(subPosition+Rect(subSize.x,16),black);
-        Text(title+"["_+ftoa(max,1,0,true)+"]"_,16,white).render(subPosition,int2(subSize.x,16));
+        Text(title+" (max="_+ftoa(max,1,0,true)+")"_,16,white).render(subPosition,int2(subSize.x,16));
         Image image = clip(framebuffer, subPosition+int2(0,16), subSize-int2(0,16));
         constexpr uint scale = 1024/R/sqrt;
         for(uint y: range(My-1)) {
@@ -232,37 +230,35 @@ struct CFDTest : Widget {
 
     Stopwatch total, update, solve, view;
     void render(int2 position, int2 size) {
-        for(uint unused t: range(1/*256*/)) {
-            // Solves evolution equations
-            solve.start();
-            Vector Nt = Lt .solve(Rt*Ct   + (3*dt/2)*CNLt  - (dt/2)*PNLt  + Gt);
-            Vector Nw=Lw.solve(Rw*Cw + (3*dt/2)*CNLw - (dt/2)*PNLw + (Ra*Pr*dt/2)*(PDX*(Nt+Ct)) + BCw*(2*Cj-Pj));
-            Vector Nj = Lj .solve(Rj*Nw);
+        // Solves evolution equations
+        solve.start();
+        Vector Nt = Lt .solve(Rt*Ct   + (3*dt/2)*CNLt  - (dt/2)*PNLt  + Gt);
+        Vector Nw=Lw.solve(Rw*Cw + (3*dt/2)*CNLw - (dt/2)*PNLw + (Ra*Pr*dt/2)*(PDX*(Nt+Ct)) + BCw*(2*Cj-Pj));
+        Vector Nj = Lj .solve(Rj*Nw);
 #if 1
-            Vector NTx  = LT .solve(RT*CTx   + (3*dt/2)*CNLTx  - (dt/2)*PNLTx  + GTx);
-            Vector NTy  = LT .solve(RT*CTy   + (3*dt/2)*CNLTy  - (dt/2)*PNLTy  + GTy);
+        Vector NTx  = LT .solve(RT*CTx   + (3*dt/2)*CNLTx  - (dt/2)*PNLTx  + GTx);
+        Vector NTy  = LT .solve(RT*CTy   + (3*dt/2)*CNLTy  - (dt/2)*PNLTy  + GTy);
 #else
-            Vector NTx  = LT .solve(RT*CTx   + (3*1./2)*CNLTx  - (1./2)*PNLTx  + GTx);
-            Vector NTy  = LT .solve(RT*CTy   + (3*1./2)*CNLTy  - (1./2)*PNLTy  + GTy);
+        Vector NTx  = LT .solve(RT*CTx   + (3*1./2)*CNLTx  - (1./2)*PNLTx  + GTx);
+        Vector NTy  = LT .solve(RT*CTy   + (3*1./2)*CNLTy  - (1./2)*PNLTy  + GTy);
 #endif
-            solve.stop();
+        solve.stop();
 
-            // Update references
-            update.start();
-            Cw=move(Nw), PNLw=move(CNLw);
-            Pj=move(Cj), Cj=move(Nj);
-            Ct=move(Nt), PNLt=move(CNLt);
-            CTx=move(NTx), PNLTx=move(CNLTx);
-            CTy=move(NTy), PNLTy=move(CNLTy);
+        // Update references
+        update.start();
+        Cw=move(Nw), PNLw=move(CNLw);
+        Pj=move(Cj), Cj=move(Nj);
+        Ct=move(Nt), PNLt=move(CNLt);
+        CTx=move(NTx), PNLTx=move(CNLTx);
+        CTy=move(NTy), PNLTy=move(CNLTy);
 
-            // Computes advection for next step
-            Vector Ux = PDY*Cj, Uy=-1*PDX*Cj;
-            CNLw = Ux*(PDX*Cw)+Uy*(PDY*Cw);
-            CNLt  = Ux*(PDX*Ct )+Uy*(PDY*Ct);
-            CNLTx  = Ux*(PDX*CTx)+Uy*(PDY*CTx);
-            CNLTy  = Ux*(PDX*CTy)+Uy*(PDY*CTy);
-            update.stop();
-        }
+        // Computes advection for next step
+        Vector Ux = PDY*Cj, Uy=-1*PDX*Cj;
+        CNLw = Ux*(PDX*Cw)+Uy*(PDY*Cw);
+        CNLt  = Ux*(PDX*Ct )+Uy*(PDY*Ct);
+        CNLTx  = Ux*(PDX*CTx)+Uy*(PDY*CTx);
+        CNLTy  = Ux*(PDX*CTy)+Uy*(PDY*CTy);
+        update.stop();
 
         view.start();
         subplot<2>(position, size, 0, Cw,"Vorticity ω"_);
@@ -279,9 +275,6 @@ struct CFDTest : Widget {
 
         extern Stopwatch umfpack;
         static uint frameCount=0; frameCount++;
-        /*if(frameCount==256) { //FIXME: transition shouldn't require such a small timestep in the first place
-            log("setTimeStep",1./(R*R)); setTimeStep(1./(R*R)); log("Done");
-        }*/
         if(frameCount%256==0)
             log(frameCount, total/1000/frameCount,"ms/frame", frameCount/(total/1000/1000.),"fps",
                 "update",100.*update/total,
@@ -289,7 +282,8 @@ struct CFDTest : Widget {
                 "view",100.*view/total,
                 "misc"_,100.*int64(total-solve-update-view)/total);
             //log(view/frameCount/1000.,"ms");
-        if(frameCount ==8192) { log("Stop"); return; }
+        if(frameCount%256==0) { log("t=",frameCount*dt); writeFile(str(frameCount*dt)+".png"_,encodePNG(framebuffer),home()); }
+        if(frameCount==2048) { log("Stop"); return; }
         window.render();
     }
 } test;

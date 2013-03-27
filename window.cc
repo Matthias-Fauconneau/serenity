@@ -466,7 +466,7 @@ Image Window::getSnapshot() {
     int shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
     buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
     {Shm::Attach r; r.seg=id+SnapshotSegment; r.shm=shm; send(raw(r));}
-    readReply<Shm::GetImageReply>(({Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment; raw(r); }));
+    {Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment; readReply<Shm::GetImageReply>(raw(r));}
     {Shm::Detach r; r.seg=id+SnapshotSegment; send(raw(r));}
     Image image = copy(buffer);
     for(uint y: range(image.height)) for(uint x: range(image.width)) {byte4& p=image(x,y); p.a=0xFF;}
