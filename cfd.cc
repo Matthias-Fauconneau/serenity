@@ -45,25 +45,35 @@ template<> inline byte4 toColor(Vec2 z) {
 #endif
 
 template<> byte4 toColor(Vec2 z) {
-#if 1
     uint8 r = sRGB[ clip<int>(0, round(0xFF*z.x), 0xFF) ]; // linear to gamma (sRGB)
     uint8 g = sRGB[ clip<int>(0, round(0xFF*z.y), 0xFF) ]; // linear to gamma (sRGB)
-#else
-    // Grid
-    uint8 r = sRGB[ int(round(z.x*0x1000))%0x100 ]; // linear to gamma (sRGB)
-    uint8 g = sRGB[ int(round(z.y*0x1000))%0x100 ]; // linear to gamma (sRGB)
-#endif
     return byte4(0,g,r,0xFF);
 }
 
 struct CFDTest : Widget {
     static constexpr uint R = 128; // Resolution
     static constexpr uint Mx=R+1, My=R+1, N = Mx*My; // Mesh vertex count
-    const real dt = 1./(4*R); // Temporal resolution
-    const real H = 1; // Aspect ratio (y/x)
-    const real dx = 1./Mx, dy = H/My; // Spatial resolution
-    const real Ra = 128; // Rayleigh (uL/ν)
-    const real Pr = 1./128; // Prandtl (ν/κ)
+    const real dx = 1./Mx, dy = 1./My; // Spatial resolution
+
+    const real deltaT = 1; // K Temperature difference ΔT
+#if 1 //air
+    const real beta = 1./300; //K-1 Thermal expansion (gas=1/T)
+    const real eta = 2e-5; //Pa.s=kg/m/s² Dynamic viscosity
+    const real rho = 1.2; //kg/m³ Density
+    const real alpha = 2e-5; //m²/s Thermal diffusivity
+#else //water
+    const real beta = 2e-4; //K-1 Thermal expansion
+    const real eta = 1e-3; //Pa.s=kg/m/s² Dynamic viscosity
+    const real rho = 1e3; //kg/m³ Density
+    const real alpha = 1e-7; //m²/s Thermal diffusivity
+#endif
+    const real vu = eta/rho; //m²/s Kinematic viscosity
+    const real g = 9.8; //m/s² Gravitational acceleration
+    const real L = 0.1; //m Box side length
+
+    const real Pr = vu/alpha; // Prandtl (ν/α)
+    const real Ra = deltaT*beta*g*L*L*L/(vu*alpha); // Rayleigh ΔTβ·gL³/(να)
+    const real dt = 1./(R*sqrt(Ra)); // Temporal resolution
 
     Matrix I = identity(N);
     Matrix P{N}, PD{N}, PDX{N}, PDY{N}; // Elementary matrices (interior points projector, Laplacian Δ and partial derivatives ∂x, ∂y)
@@ -73,8 +83,8 @@ struct CFDTest : Widget {
     Matrix BCw{N}, BCt{N}, BCT{N}; // Boundary conditions
     Vector Gt{N}, GTx{N}, GTy{N}; // Right-hand vectors (BC and source field)
 
-    Vector Pj{N}, Cj{N}; // Previous and current stream function ϕ field
-    Vector Cw{N}; // Current vorticity ω field
+    Vector Pj{N}, Cj{N}; // Previous and current stream function ϕ field (u=∇×ϕ)
+    Vector Cw{N}; // Current vorticity ω field (ω=∇×
     Vector Ct{N}; // Previous temperature T field
     Vector CTx{N}, CTy{N}; // Current texture positions Tx, Ty fields
 
@@ -85,6 +95,7 @@ struct CFDTest : Widget {
 
     Window window {this, int2(1024,1024+2*16), "CFDTest"_};
     CFDTest() {
+        log(Pr,Ra,1/dt);
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&exit);
 
@@ -192,7 +203,7 @@ struct CFDTest : Widget {
         RT = P + (0.*dt/2)*PD;
 
         // Sets initial temperature to a linear gradient (no transient state)
-        //for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = real(x)/Mx;
+        for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = real(x)/Mx;
         // Sets initial positions for texture advection
         for(uint x: range(Mx)) for(uint y: range(My)) CTx[y*Mx+x] = real(x)/Mx, CTy[y*Mx+x] = real(y)/My;
     }
@@ -207,7 +218,7 @@ struct CFDTest : Widget {
         constexpr uint scale = 1024/R/sqrt;
         for(uint y: range(My-1)) {
             for(uint x: range(Mx-1)) {
-#if 1
+#if LINEAR
                 T v00 = field[(y+0)*Mx+(x+0)]/max;
                 T v01 = field[(y+0)*Mx+(x+1)]/max;
                 T v10 = field[(y+1)*Mx+(x+0)]/max;
@@ -235,13 +246,8 @@ struct CFDTest : Widget {
         Vector Nt = Lt .solve(Rt*Ct   + (3*dt/2)*CNLt  - (dt/2)*PNLt  + Gt);
         Vector Nw=Lw.solve(Rw*Cw + (3*dt/2)*CNLw - (dt/2)*PNLw + (Ra*Pr*dt/2)*(PDX*(Nt+Ct)) + BCw*(2*Cj-Pj));
         Vector Nj = Lj .solve(Rj*Nw);
-#if 1
         Vector NTx  = LT .solve(RT*CTx   + (3*dt/2)*CNLTx  - (dt/2)*PNLTx  + GTx);
         Vector NTy  = LT .solve(RT*CTy   + (3*dt/2)*CNLTy  - (dt/2)*PNLTy  + GTy);
-#else
-        Vector NTx  = LT .solve(RT*CTx   + (3*1./2)*CNLTx  - (1./2)*PNLTx  + GTx);
-        Vector NTy  = LT .solve(RT*CTy   + (3*1./2)*CNLTy  - (1./2)*PNLTy  + GTy);
-#endif
         solve.stop();
 
         // Update references
@@ -282,7 +288,9 @@ struct CFDTest : Widget {
                 "view",100.*view/total,
                 "misc"_,100.*int64(total-solve-update-view)/total);
             //log(view/frameCount/1000.,"ms");
-        if(frameCount%256==0) { log("t=",frameCount*dt); writeFile(str(frameCount*dt)+".png"_,encodePNG(framebuffer),home()); }
+        if(frameCount%256==0) {
+            log("t=",utoa(frameCount*dt*1000),"ms");
+            writeFile(utoa(frameCount*dt*1000)+".png"_,encodePNG(framebuffer),home()); }
         if(frameCount==2048) { log("Stop"); return; }
         window.render();
     }

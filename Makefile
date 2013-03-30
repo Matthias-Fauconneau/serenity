@@ -1,12 +1,17 @@
 PREFIX ?= /usr
-BUILD ?= debug
-CC := g++ -pipe -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
-# CC := clang++ -Wno-lambda-extensions -pipe -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
+BUILD ?= release
+ifeq ($(CC),cc)
+ CC = g++ -pipe -march=native
+ # CC = clang++ -Wno-lambda-extensions -march=native
+endif
+FLAGS := -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -DDEBUG -g
 FLAGS_profile = -DPROFILE -g -O3 -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
 FLAGS_release = -O3
-CC += -march=native $(FLAGS_$(BUILD))
-FLAGS_font = -I/usr/include/freetype2
+FLAGS += $(FLAGS_$(BUILD))
+
+SRCS = $(SRCS_$(BUILD))
+SRCS_profile = profile
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -15,24 +20,24 @@ ICONS_player = play pause next
 ICONS_analyzer = play pause
 ICONS_music = music
 ICONS_test = feeds network
+SRCS += $(ICONS:%=icons/%)
 
- SHADERS = display $(SHADERS_$(TARGET))
+# SHADERS = display $(SHADERS_$(TARGET))
 # SHADERS_blender = blender
-
-SRCS = $(SRCS_$(BUILD)) $(ICONS:%=icons/%) $(SHADERS:%=%.glsl)
-SRCS_profile = profile
+# SRCS += $(SHADERS:%=%.glsl)
 
 LIBS_time = rt
 LIBS_process = pthread
+FLAGS_font = -I$(STAGING_DIR)/usr/include/freetype2
 LIBS_font = freetype
 LIBS_http = ssl
-LIBS_gl = X11 GL
+# LIBS_gl = X11 GL
 LIBS_ffmpeg = avformat avcodec
 LIBS_record = swscale avformat avcodec
 LIBS_asound = asound
 # LIBS_sampler = fftw3f_threads
-LIBS_spectrogram = fftw3f_threads
-LIBS_stretch = rubberband
+# LIBS_spectrogram = fftw3f_threads
+# LIBS_stretch = rubberband
 LIBS_algebra = umfpack
 
 INSTALL = $(INSTALL_$(TARGET))
@@ -60,12 +65,12 @@ endif
 
 $(BUILD)/%.d: %.cc
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
+	@$(CC) $(FLAGS) $(FLAGS_$*) -MM -MT $(BUILD)/$*.o -MT $(BUILD)/$*.d $< > $@
 
 $(BUILD)/%.o : %.cc
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
-	@$(CC) $(FLAGS_$*) -c -o $@ $<
+	@$(CC) $(FLAGS) $(FLAGS_$*) -c -o $@ $<
 
 $(BUILD)/%.o: %.png
 	@echo $<
@@ -81,7 +86,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@$(CC) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
+	@$(CC) $(FLAGS) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png
