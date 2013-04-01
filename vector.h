@@ -95,8 +95,6 @@ typedef vector<xy,float,2> vec2;
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
-/// Double precision x,y vector
-typedef vector<xy,double,2> Vec2;
 
 template<Type T> struct xyz {
     T x,y,z;

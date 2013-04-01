@@ -6,21 +6,50 @@
 #include "interface.h"
 #include "png.h"
 
-/// Maps values to colors for visualization;
-template<Type T> byte4 toColor(T value);
 /// Maps [-1,0,1] to [blue,black,red]
-template<> byte4 toColor(real x) {
+byte4 toColor(real x) {
     uint8 c  = sRGB[ clip<int>(0, round(0xFF*abs(x)), 0xFF) ]; // linear to gamma (sRGB)
     return x>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-1,0,1] -> [blue,black,red]
 }
 /// Maps (x,y) to (red,green) intensity
-template<> byte4 toColor(Vec2 z) {
-    uint8 r = sRGB[ clip<int>(0, round(0xFF*z.x), 0xFF) ]; // linear to gamma (sRGB)
-    uint8 g = sRGB[ clip<int>(0, round(0xFF*z.y), 0xFF) ]; // linear to gamma (sRGB)
+byte4 toColor(real x, real y) {
+    uint8 r = sRGB[ clip<int>(0, round(0xFF*x), 0xFF) ]; // linear to gamma (sRGB)
+    uint8 g = sRGB[ clip<int>(0, round(0xFF*y), 0xFF) ]; // linear to gamma (sRGB)
     return byte4(0,g,r,0xFF);
 }
 
-struct CFDTest : Widget {
+/// Converts a field to an sRGB8 image
+Image toImage(const buffer<real>& field, uint Mx, uint My, real max) {
+    assert(field.size==Mx*My);
+    Image image(Mx, My);
+    for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = toColor( field[(y+0)*Mx+(x+0)]/max );
+    return image;
+}
+/// Converts two fields to an sRGB8 image
+Image toImage(const buffer<real>& red, const buffer<real>& green, uint Mx, uint My) {
+    assert(field.size==Mx*My);
+    Image image(Mx, My);
+    for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = toColor( red[(y+0)*Mx+(x+0)], green[(y+0)*Mx+(x+0)] );
+    return image;
+}
+
+/// Displays an image with a label
+void subplot(int2 position, int2 size, uint count, uint index, const Image& image, const ref<byte>& title, real max=1) {
+    int sqrt = ceil(::sqrt(count));
+    int2 subSize = size/sqrt;
+    int2 subPosition = position+int2(index%sqrt,index/sqrt)*subSize;
+    fill(subPosition+Rect(subSize.x,16),black);
+    Text(title+(max!=1?" (max="_+ftoa(max,1,0,true)+")"_:""_),16,white).render(subPosition,int2(subSize.x,16));
+    blit(subPosition+int2(0,16), image, subSize-int2(0,16));
+}
+
+/// Displays a field with a label
+void subplot(int2 position, int2 size, uint count, uint index, const buffer<real>& field, uint Mx, uint My, const ref<byte>& title) {
+    real max=0; for(real v: field) max=::max(max, norm(v));
+    subplot(position, size, count, index, toImage(field, Mx, My, max), title, max);
+}
+
+struct CFD : Widget {
     static constexpr uint R = 128; // Resolution
     static constexpr uint Mx=R+1, My=R+1, N = Mx*My; // Mesh vertex count
     const real dx = 1./Mx, dy = 1./My; // Spatial resolution
@@ -59,8 +88,8 @@ struct CFDTest : Widget {
     Vector PATx{N}, CATx{N}; // Previous and current non-linear advection term for texture positions Tx
     Vector PATy{N}, CATy{N}; // Previous and current non-linear advection term for texture positions Ty
 
-    Window window {this, int2(1024,1024+2*16), "CFDTest"_};
-    CFDTest() {
+    Window window {this, int2(1024,1024+2*16), "CFD"_};
+    CFD() {
         log(Pr,Ra,1/dt,ftoa(t,1,0,true), ftoa(dt*t,1,0,true));
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&exit);
@@ -175,37 +204,6 @@ struct CFDTest : Widget {
         for(uint x: range(Mx)) for(uint y: range(My)) CTx[y*Mx+x] = real(x)/Mx, CTy[y*Mx+x] = real(y)/My;
     }
 
-    template<uint sqrt, Type T> void subplot(int2 position, int2 size, uint index, const buffer<T>& field, const ref<byte>& title) {
-        int2 subSize = size/int(sqrt);
-        int2 subPosition = position+int2(index%sqrt,index/sqrt)*subSize;
-        real max=0; for(T v: field) max=::max(max, norm(v));
-        fill(subPosition+Rect(subSize.x,16),black);
-        Text(title+" (max="_+ftoa(max,1,0,true)+")"_,16,white).render(subPosition,int2(subSize.x,16));
-        Image image = clip(framebuffer, subPosition+int2(0,16), subSize-int2(0,16));
-        constexpr uint scale = 1024/R/sqrt; // Compile-time for loop unrolling
-        for(uint y: range(My-1)) {
-            for(uint x: range(Mx-1)) {
-#if LINEAR
-                T v00 = field[(y+0)*Mx+(x+0)]/max;
-                T v01 = field[(y+0)*Mx+(x+1)]/max;
-                T v10 = field[(y+1)*Mx+(x+0)]/max;
-                T v11 = field[(y+1)*Mx+(x+1)]/max;
-                byte4* data = image.data+y*scale*image.stride+x*scale;
-                for(uint dy: range(scale)) {
-                    for(uint dx: range(scale)) {
-                        real u=real(dx)/scale, v=real(dy)/scale;
-                        data[dy*image.stride+dx] = toColor( ( v00 * (1-u) + v01 * u) * (1-v) + ( v10 * (1-u) + v11 * u) * v );
-                    }
-                }
-#else
-                byte4 nearest = toColor( field[(y+0)*Mx+(x+0)]/max );
-                byte4* data = image.data+y*scale*image.stride+x*scale;
-                for(uint dy: range(scale)) for(uint dx: range(scale)) data[dy*image.stride+dx] = nearest;
-#endif
-            }
-        }
-    }
-
     Stopwatch total, update, view;
     void render(int2 position, int2 size) {
         update.start();
@@ -234,29 +232,23 @@ struct CFDTest : Widget {
         view.start();
         static uint frameCount=0; frameCount++;
         if(frameCount<=2048) { //Shows all fields while in transition state
-            subplot<2>(position, size, 0, Cw,"Vorticity ω"_);
-            subplot<2>(position, size, 1, Cj,"Stream function ϕ"_);
-            subplot<2>(position, size, 2, Ct,"Temperature T"_);
-            // Advection visualization
-            buffer<Vec2> T(N); for(uint i: range(N)) T[i]=Vec2(CTx[i],CTy[i]);
-            subplot<2>(position, size, 3, T,"Advection"_);
+            subplot(position, size, 4, 0, Cw, Mx, My, "Vorticity ω"_);
+            subplot(position, size, 4, 1, Cj, Mx, My, "Stream function ϕ"_);
+            subplot(position, size, 4, 2, Ct, Mx, My, "Temperature T"_);
+            subplot(position, size, 4, 3, toImage(CTx, CTy, Mx, My), "Advection"_);
         } else { // Shows only texture advection in steady state
-            // Advection visualization
-            buffer<Vec2> T(N); for(uint i: range(N)) T[i]=Vec2(CTx[i],CTy[i]);
-            subplot<1>(position, size, 3, T,"Advection"_);
+            blit(position+int2(0,16), toImage(CTx, CTy, Mx, My), size-int2(0,32));
         }
         view.stop();
 
         extern Stopwatch solve;
-        if(frameCount%256==0)
-            log(frameCount, total/1000./frameCount,"ms/frame", frameCount/(total/1000/1000.),"fps", total/1000000./(frameCount*dt*t),"x",
-                "update:",100.*update/total, "(solve:",100.*solve/update, "), view:",100.*view/total);
-            //log(view/frameCount/1000.,"ms");
         if(frameCount%256==0) {
-            log("#",frameCount,"t=",frameCount*dt,"=",int(frameCount*dt*t),"s");
+            log("#"_+str(frameCount), "t =",frameCount*dt,"=",int(frameCount*dt*t),"s\t", //Time
+                total/1000./frameCount,"ms", frameCount/(total/1000/1000.),"fps", total/1000000./(frameCount*dt*t),"x", //Performance
+                "update:",100.*update/total, "(solve:",100.*solve/update, "), view:",100.*view/total); //Profile
             writeFile(itoa(frameCount*dt*t)+".png"_,encodePNG(framebuffer),home());
         }
         if(frameCount==8192) { log("Stop"); return; }
-        window.render();
+        if(frameCount==2048) window.setSize(int2(1024,1024)); else window.render();
     }
-} test;
+} cfd;

@@ -38,6 +38,9 @@ inline void fill(int x1, int y1, int x2, int y2, vec4 color=black) { fill(Rect(i
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
 void blit(int2 target, const Image& source, vec4 color=white);
 
+/// Resizes \a source to \a size and blits at \a target
+void blit(int2 target, const Image& source, int2 size);
+
 /// Draws a thin antialiased line from p1 to p2
 void line(vec2 p1, vec2 p2, vec4 color=black);
 inline void line(int2 p1, int2 p2, vec4 color=black) { line(vec2(p1),vec2(p2),color); }

@@ -51,6 +51,7 @@ Image flip(Image&& image);
 
 /// Returns a copy of the image resized to \a width x \a height
 Image resize(const Image& image, uint width, uint height);
+inline Image resize(const Image& image, int2 size) { return resize(image, size.x, size.y); }
 
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);

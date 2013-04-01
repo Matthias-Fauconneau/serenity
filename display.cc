@@ -67,6 +67,12 @@ void blit(int2 target, const Image& source, vec4 color) {
     }
 }
 
+void bilinear(Image& target, const Image& source);
+void blit(int2 target, const Image& source, int2 size) {
+    Image region = clip(framebuffer, target, size);
+    bilinear(region, source);
+}
+
 inline void plot(int x, int y, float c, bool transpose, int4 invert) {
     if(transpose) swap(x,y);
     if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
