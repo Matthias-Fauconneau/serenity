@@ -1,10 +1,12 @@
 #include "process.h"
+#include "math.h"
 #include "algebra.h"
 #include "window.h"
 #include "display.h"
 #include "time.h"
 #include "interface.h"
 #include "png.h"
+#include "record.h"
 
 /// Maps [-1,0,1] to [blue,black,red]
 byte4 toColor(real x) { return x>0 ? byte4(0,0,sRGB(x),0xFF) : byte4(sRGB(-x),0,0,0xFF); }
@@ -13,7 +15,7 @@ byte4 positiveToColor(real x) {
     constexpr real red=700, green=546, blue=436, C = 2.82;
     constexpr real Cr=1/red, Cg=1/green, Cb=1/blue;
     constexpr real Tr=1/(C*red), Tg=1/(C*green), Tb=1/(C*blue);
-    constexpr real Tm=1/(C*10000), TM=1/(C*100); //500-50000K
+    constexpr real Tm=1/(C*3000), TM=1/(C*190); //1700-27000K
     real T = Tm+x*(TM-Tm);
     const real Ir = Tr*Tr*Tr/(exp(Cr/T)-1);
     const real Ig = Tg*Tg*Tg/(exp(Cg/T)-1);
@@ -21,11 +23,6 @@ byte4 positiveToColor(real x) {
     const real Imax = max(max(Ir,Ig),Ib);
     return byte4(sRGB(Ib/Imax),sRGB(Ig/Imax),sRGB(Ir/Imax), 0xFF);
 }
-/// Maps [0,1] to grayscale intensity
-/*byte4 positiveToColor(real x) {
-    uint8 c = sRGB(x);
-    return byte4(c,c,c, 0xFF);
-}*/
 /// Maps (x,y) to (red,green)
 byte4 toColor(real x, real y) { return byte4(0,sRGB(y),sRGB(x),0xFF); }
 /// Maps (angle,norm) to (hue, saturation/value)
@@ -51,14 +48,12 @@ Image positiveToImage(const buffer<real>& field, uint Mx, uint My, real max=1) {
 }
 /// Converts two fields to an sRGB8 image
 Image toImage(const buffer<real>& red, const buffer<real>& green, uint Mx, uint My) {
-    assert(field.size==Mx*My);
     Image image(Mx, My);
     for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = toColor( red[(y+0)*Mx+(x+0)], green[(y+0)*Mx+(x+0)] );
     return image;
 }
 /// Converts a vector field to an sRGB8 image
 Image vecToImage(const buffer<real>& X, const buffer<real>& Y, uint Mx, uint My, real max) {
-    assert(field.size==Mx*My);
     Image image(Mx, My);
     for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = vecToColor( X[(y+0)*Mx+(x+0)]/max, Y[(y+0)*Mx+(x+0)]/max );
     return image;
@@ -123,9 +118,11 @@ struct CFD : Widget {
     Vector PATx{N}, CATx{N}; // Previous and current non-linear advection term for texture positions Tx
     Vector PATy{N}, CATy{N}; // Previous and current non-linear advection term for texture positions Ty
 
-    Window window {this, int2(1024,1024+2*16), "CFD"_};
+    //Window window {this, int2(1024,1024+2*16), "CFD"_};
+    Window window {this, int2(512,512+2*16), "CFD"_}; //for recording
+    Record record {window.size.x, window.size.y, min(30, int(1/(dt*t))) };
     CFD() {
-        log(Pr,Ra,1/dt,ftoa(dt*t,1,0,true));
+        log(Pr,Ra,1/dt,1/(dt*t));
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&exit);
 
@@ -237,6 +234,7 @@ struct CFD : Widget {
         //for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = real(x)/Mx;
         // Sets initial positions for texture advection
         for(uint x: range(Mx)) for(uint y: range(My)) CTx[y*Mx+x] = real(x)/Mx, CTy[y*Mx+x] = real(y)/My;
+        record.start("Pr="_+itoa(Pr)+",Ra="_+itoa(Ra)+",dt="_+itoa(1/(dt*t)));
     }
 
     Stopwatch total, update, view;
@@ -265,7 +263,6 @@ struct CFD : Widget {
         update.stop();
 
         view.start();
-        static uint frameCount=0; frameCount++;
         //Shows all fields while in transition state
         subplot(position, size, 4, 0, Cw, Mx, My, "Vorticity ω"_);
         subplot(position, size, 4, 1, Ux, Uy, Mx, My, "Velocity u"_);
@@ -273,8 +270,10 @@ struct CFD : Widget {
         subplot(position, size, 4, 3, toImage(CTx, CTy, Mx, My), "Advection"_);
         view.stop();
 
-        extern Stopwatch solve;
+        static uint frameCount=0; frameCount++;
+        if(frameCount%3) record.captureVideoFrame(); //~realtime
         if(frameCount%256==0) {
+            extern Stopwatch solve;
             log("#"_+str(frameCount), "t =",frameCount*dt,"=",int(frameCount*dt*t),"s\t", //Time
                 total/1000./frameCount,"ms", frameCount/(total/1000/1000.),"fps", (frameCount*dt*t)/(total/1000000.),"x", //Performance
                 "update:",100.*update/total, "(solve:",100.*solve/update, "), view:",100.*view/total); //Profile

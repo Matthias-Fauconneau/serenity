@@ -177,6 +177,11 @@ template<uint base> string itoa(int64 number, int pad) {
 }
 template string itoa<10>(int64,int);
 
+inline double exp(double x) { return __builtin_exp(x); }
+inline double ln(double x) { return __builtin_log(x); }
+inline double exp10(double x) { return exp(x*ln(10)); }
+inline double log10(double x) { return __builtin_log10(x); }
+inline double round(double x) { return __builtin_round(x); }
 string ftoa(double n, int precision, int pad, bool exponent) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return string("NaN"_);

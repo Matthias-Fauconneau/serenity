@@ -30,7 +30,7 @@ struct Test {
         const real h = 6.63e-34 /*J.s*/, k = 1.38e-23 /*J/K*/, c=3e8 /*m/s*/;
         // λ = (hc/kx) / T
         //log(ftoa((h*c/k/C) / 1700 * 1e9,2,0,true), ftoa((h*c/k/C) / 27000 * 1e9,2,0,true));
-        log((h*c/k/C) / 10000 * 1e9, (h*c/k/C) / 100 * 1e9);
+        log((h*c/k/C) / 1700 * 1e9, (h*c/k/C) / 27000 * 1e9);
         log(positiveToColor(0));
         log(positiveToColor(1));
     }

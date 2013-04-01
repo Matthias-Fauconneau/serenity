@@ -55,7 +55,6 @@ Matrix operator*(real a, const Matrix& A);
 Vector operator*(const Matrix& A, const Vector& b);
 Matrix operator+(const Matrix& A, const Matrix& B);
 Matrix operator-(const Matrix& A, const Matrix& B);
-//Matrix operator*(const Matrix& A, const Matrix& B);
 
 struct UMFPACK {
     UMFPACK(){}

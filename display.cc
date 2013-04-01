@@ -80,9 +80,10 @@ inline void plot(int x, int y, float c, bool transpose, int4 invert) {
         d=byte4(max<int>(0,d.b-c*invert.b),max<int>(0,d.g-c*invert.g),max<int>(0,d.r-c*invert.r),min<int>(255,d.a+c*invert.a));
     }
 }
+
 inline float fpart(float x) { return x-int(x); }
 inline float rfpart(float x) { return 1 - fpart(x); }
-
+inline float round(float x) { return __builtin_roundf(x); }
 void line(vec2 p1, vec2 p2, vec4 color) {
 #if GL
     if(!softwareRendering) {
@@ -123,4 +124,26 @@ void line(vec2 p1, vec2 p2, vec4 color) {
     }
 }
 
-SRGB sRGB8;
+inline double pow(double x, double y) { return __builtin_pow(x,y); }
+uint8 sRGB_lookup[256];
+void __attribute((constructor)) compute_sRGB_lookup() {
+    for(uint i=0;i<256;i++) {
+        float c = i/255.f;
+        sRGB_lookup[i] = round(255*( c>=0.0031308 ? 1.055*pow(c,1/2.4f)-0.055 : 12.92*c ));
+    }
+}
+
+inline double mod(double q, double d) { return __builtin_fmod(q, d); }
+const double PI = 3.14159265358979323846;
+vec3 HSVtoRGB(float h, float s, float v) {
+    float H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
+    int i=H;
+    if(i==0) return vec3(C,X,0);
+    if(i==1) return vec3(X,C,0);
+    if(i==2) return vec3(0,C,X);
+    if(i==3) return vec3(0,X,C);
+    if(i==4) return vec3(X,0,C);
+    if(i==5) return vec3(C,0,X);
+    return vec3(0,0,0);
+}
+
