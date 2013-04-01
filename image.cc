@@ -72,9 +72,9 @@ void bilinear(Image& target, const Image& source) {
         uint scale = width/sourceWidth;
         if(scale==2) unroll<2>(dst, dstStride, src, stride, sourceWidth, sourceHeight);
         else  if(scale==4) unroll<4>(dst, dstStride, src, stride, sourceWidth, sourceHeight);
-        else if(scale==8) unroll<8>(dst, dstStride, src, stride, sourceWidth, sourceHeight);
-        else error("TODO: slow path", scale, width, sourceWidth);
+        else error("FIXME");
     } else {
+        error("FIXME");
         for(uint y: range(height)) {
             for(uint x: range(width)) {
                 const uint fx = x*256*sourceWidth/width, fy = y*256*sourceHeight/height;

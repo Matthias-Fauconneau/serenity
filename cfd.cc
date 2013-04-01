@@ -7,15 +7,32 @@
 #include "png.h"
 
 /// Maps [-1,0,1] to [blue,black,red]
-byte4 toColor(real x) {
-    uint8 c  = sRGB[ clip<int>(0, round(0xFF*abs(x)), 0xFF) ]; // linear to gamma (sRGB)
-    return x>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-1,0,1] -> [blue,black,red]
+byte4 toColor(real x) { return x>0 ? byte4(0,0,sRGB(x),0xFF) : byte4(sRGB(-x),0,0,0xFF); }
+/// Maps [0,1] to [red,blue] black body radiation
+byte4 positiveToColor(real x) {
+    constexpr real red=700, green=546, blue=436, C = 2.82;
+    constexpr real Cr=1/red, Cg=1/green, Cb=1/blue;
+    constexpr real Tr=1/(C*red), Tg=1/(C*green), Tb=1/(C*blue);
+    constexpr real Tm=1/(C*10000), TM=1/(C*100); //500-50000K
+    real T = Tm+x*(TM-Tm);
+    const real Ir = Tr*Tr*Tr/(exp(Cr/T)-1);
+    const real Ig = Tg*Tg*Tg/(exp(Cg/T)-1);
+    const real Ib = Tb*Tb*Tb/(exp(Cb/T)-1);
+    const real Imax = max(max(Ir,Ig),Ib);
+    return byte4(sRGB(Ib/Imax),sRGB(Ig/Imax),sRGB(Ir/Imax), 0xFF);
 }
-/// Maps (x,y) to (red,green) intensity
-byte4 toColor(real x, real y) {
-    uint8 r = sRGB[ clip<int>(0, round(0xFF*x), 0xFF) ]; // linear to gamma (sRGB)
-    uint8 g = sRGB[ clip<int>(0, round(0xFF*y), 0xFF) ]; // linear to gamma (sRGB)
-    return byte4(0,g,r,0xFF);
+/// Maps [0,1] to grayscale intensity
+/*byte4 positiveToColor(real x) {
+    uint8 c = sRGB(x);
+    return byte4(c,c,c, 0xFF);
+}*/
+/// Maps (x,y) to (red,green)
+byte4 toColor(real x, real y) { return byte4(0,sRGB(y),sRGB(x),0xFF); }
+/// Maps (angle,norm) to (hue, saturation/value)
+byte4 vecToColor(real x, real y) {
+    float norm = sqrt(x*x+y*y);
+    vec3 rgb = HSVtoRGB(atan(y, x)+PI, norm, norm);
+    return byte4(sRGB(rgb[2]), sRGB(rgb[1]), sRGB(rgb[0]), 0xFF);
 }
 
 /// Converts a field to an sRGB8 image
@@ -25,11 +42,25 @@ Image toImage(const buffer<real>& field, uint Mx, uint My, real max) {
     for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = toColor( field[(y+0)*Mx+(x+0)]/max );
     return image;
 }
+/// Converts a positive field to an sRGB8 image
+Image positiveToImage(const buffer<real>& field, uint Mx, uint My, real max=1) {
+    assert(field.size==Mx*My);
+    Image image(Mx, My);
+    for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = positiveToColor( field[(y+0)*Mx+(x+0)]/max );
+    return image;
+}
 /// Converts two fields to an sRGB8 image
 Image toImage(const buffer<real>& red, const buffer<real>& green, uint Mx, uint My) {
     assert(field.size==Mx*My);
     Image image(Mx, My);
     for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = toColor( red[(y+0)*Mx+(x+0)], green[(y+0)*Mx+(x+0)] );
+    return image;
+}
+/// Converts a vector field to an sRGB8 image
+Image vecToImage(const buffer<real>& X, const buffer<real>& Y, uint Mx, uint My, real max) {
+    assert(field.size==Mx*My);
+    Image image(Mx, My);
+    for(uint y: range(My)) for(uint x: range(Mx)) image(x,y) = vecToColor( X[(y+0)*Mx+(x+0)]/max, Y[(y+0)*Mx+(x+0)]/max );
     return image;
 }
 
@@ -42,11 +73,15 @@ void subplot(int2 position, int2 size, uint count, uint index, const Image& imag
     Text(title+(max!=1?" (max="_+ftoa(max,1,0,true)+")"_:""_),16,white).render(subPosition,int2(subSize.x,16));
     blit(subPosition+int2(0,16), image, subSize-int2(0,16));
 }
-
 /// Displays a field with a label
 void subplot(int2 position, int2 size, uint count, uint index, const buffer<real>& field, uint Mx, uint My, const ref<byte>& title) {
     real max=0; for(real v: field) max=::max(max, norm(v));
     subplot(position, size, count, index, toImage(field, Mx, My, max), title, max);
+}
+/// Displays a vector field with a label
+void subplot(int2 position, int2 size, uint count, uint index, const buffer<real>& X, const buffer<real>& Y, uint Mx, uint My, const ref<byte>& title){
+    real max=0; for(uint i: range(Mx*My)) max=::max(max, sqrt(X[i]*X[i]+Y[i]*Y[i]));
+    subplot(position, size, count, index, vecToImage(X, Y, Mx, My, max), title, max);
 }
 
 struct CFD : Widget {
@@ -90,7 +125,7 @@ struct CFD : Widget {
 
     Window window {this, int2(1024,1024+2*16), "CFD"_};
     CFD() {
-        log(Pr,Ra,1/dt,ftoa(t,1,0,true), ftoa(dt*t,1,0,true));
+        log(Pr,Ra,1/dt,ftoa(dt*t,1,0,true));
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&exit);
 
@@ -231,24 +266,21 @@ struct CFD : Widget {
 
         view.start();
         static uint frameCount=0; frameCount++;
-        if(frameCount<=2048) { //Shows all fields while in transition state
-            subplot(position, size, 4, 0, Cw, Mx, My, "Vorticity ω"_);
-            subplot(position, size, 4, 1, Cj, Mx, My, "Stream function ϕ"_);
-            subplot(position, size, 4, 2, Ct, Mx, My, "Temperature T"_);
-            subplot(position, size, 4, 3, toImage(CTx, CTy, Mx, My), "Advection"_);
-        } else { // Shows only texture advection in steady state
-            blit(position+int2(0,16), toImage(CTx, CTy, Mx, My), size-int2(0,32));
-        }
+        //Shows all fields while in transition state
+        subplot(position, size, 4, 0, Cw, Mx, My, "Vorticity ω"_);
+        subplot(position, size, 4, 1, Ux, Uy, Mx, My, "Velocity u"_);
+        subplot(position, size, 4, 2, positiveToImage(Ct, Mx, My), "Temperature T"_);
+        subplot(position, size, 4, 3, toImage(CTx, CTy, Mx, My), "Advection"_);
         view.stop();
 
         extern Stopwatch solve;
         if(frameCount%256==0) {
             log("#"_+str(frameCount), "t =",frameCount*dt,"=",int(frameCount*dt*t),"s\t", //Time
-                total/1000./frameCount,"ms", frameCount/(total/1000/1000.),"fps", total/1000000./(frameCount*dt*t),"x", //Performance
+                total/1000./frameCount,"ms", frameCount/(total/1000/1000.),"fps", (frameCount*dt*t)/(total/1000000.),"x", //Performance
                 "update:",100.*update/total, "(solve:",100.*solve/update, "), view:",100.*view/total); //Profile
             writeFile(itoa(frameCount*dt*t)+".png"_,encodePNG(framebuffer),home());
         }
-        if(frameCount==8192) { log("Stop"); return; }
-        if(frameCount==2048) window.setSize(int2(1024,1024)); else window.render();
+        if(frameCount==2048) { log("Stop"); return; }
+        window.render();
     }
 } cfd;

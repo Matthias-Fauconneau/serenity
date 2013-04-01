@@ -4,11 +4,11 @@
 // functor abstract interface
 template<Type R, Type... Args> struct functor;
 template<Type R, Type... Args> struct functor<R(Args...)> { virtual R operator()(Args... args) const=0; };
-// functor template specialization for lambdas
-template<Type F, Type R, Type... Args> struct lambda;
-template<Type F, Type R, Type... Args> struct lambda<F, R(Args...)> : functor<R(Args...)> {
+// functor template specialization for anonymous functions
+template<Type F, Type R, Type... Args> struct anonymous_function;
+template<Type F, Type R, Type... Args> struct anonymous_function<F, R(Args...)> : functor<R(Args...)> {
     F f;
-    lambda(F f):f(f){}
+    anonymous_function(F f):f(f){}
     virtual R operator()(Args... args) const override { return f(forward<Args>(args)...); }
 };
 // functor template specialization for methods
@@ -32,8 +32,8 @@ template<Type R, Type... Args> struct function;
 template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
     long any[11]; //always store functor inline
     template<Type F> function(F f) {
-        static_assert(sizeof(lambda<F,R(Args...)>)<=sizeof(any),"");
-        new (any) lambda<F,R(Args...)>(f);
+        static_assert(sizeof(anonymous_function<F,R(Args...)>)<=sizeof(any),"");
+        new (any) anonymous_function<F,R(Args...)>(f);
     }
     template<Type O> function(O* object, R (O::*pmf)(Args...)) {
         static_assert(sizeof(method<O,R(Args...)>)<=sizeof(any),"");

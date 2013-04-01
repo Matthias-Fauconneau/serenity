@@ -53,4 +53,20 @@ struct SRGB {
     SRGB() { for(uint i=0;i<256;i++) { uint l = round(255*evaluate(i/255.f)); assert(l<256); lookup[i]=l; } }
     inline uint8 operator [](uint c) { assert(c<256,c); return lookup[c]; }
 };
-extern SRGB sRGB;
+extern SRGB sRGB8;
+
+/// Converts linear float in [0,1] to sRGB
+inline uint sRGB(float x) { return sRGB8[ clip<int>(0, round(0xFF*x), 0xFF) ]; }
+
+/// Converts hue, saturation, value to linear RGB
+inline vec3 HSVtoRGB(float h, float s, float v) {
+    float H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
+    int i=H;
+    if(i==0) return vec3(C,X,0);
+    if(i==1) return vec3(X,C,0);
+    if(i==2) return vec3(0,C,X);
+    if(i==3) return vec3(0,X,C);
+    if(i==4) return vec3(X,0,C);
+    if(i==5) return vec3(C,0,X);
+    return vec3(0,0,0);
+}

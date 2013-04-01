@@ -123,4 +123,4 @@ void line(vec2 p1, vec2 p2, vec4 color) {
     }
 }
 
-SRGB sRGB;
+SRGB sRGB8;

@@ -182,7 +182,7 @@ string ftoa(double n, int precision, int pad, bool exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
-    int e=0; if(exponent) e=round(log10(n)), n /= exp10(e);
+    int e=0; if(exponent || int(n*exp10(precision))==0) e=round(log10(n)), n /= exp10(e);
     uint64 m=1; for(int i=0;i<precision;i++) m*=10;
     double integer=1, fract=__builtin_modf(n, &integer);
     string s;
