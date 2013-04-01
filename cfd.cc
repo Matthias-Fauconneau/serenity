@@ -6,44 +6,14 @@
 #include "interface.h"
 #include "png.h"
 
-/// Displays A as an image in a new window
-void spy(const Matrix& A) {
-    Image image(A.m, A.n);
-    for(uint i: range(A.m)) for(uint j: range(A.n)) image(j,i) = A(i,j) ? 0xFF : 0;
-    static ImageView imageView(move(image));
-    static Window window(&imageView, int2(-1,-1), "Spy"_);
-    window.localShortcut(Escape).connect(&exit);
-}
-
-/// Converts values to colors for visualization;
-template<Type T> notrace byte4 toColor(T value);
+/// Maps values to colors for visualization;
+template<Type T> byte4 toColor(T value);
+/// Maps [-1,0,1] to [blue,black,red]
 template<> byte4 toColor(real x) {
     uint8 c  = sRGB[ clip<int>(0, round(0xFF*abs(x)), 0xFF) ]; // linear to gamma (sRGB)
-    return x>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-max,0,max] -> [blue,black,red]
+    return x>0 ? byte4(0,0,c,0xFF) : byte4(c,0,0,0xFF); //[-1,0,1] -> [blue,black,red]
 }
-
-#if norm_angle // Velocity vector visualization
-vec3 HSVtoRGB(real h, real s, real v) {
-    real H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
-    int i=H;
-    if(i==0) return vec3(C,X,0);
-    if(i==1) return vec3(X,C,0);
-    if(i==2) return vec3(0,C,X);
-    if(i==3) return vec3(0,X,C);
-    if(i==4) return vec3(X,0,C);
-    if(i==5) return vec3(C,0,X);
-    return vec3(0,0,0);
-}
-
-template<> inline byte4 toColor(Vec2 z) {
-    vec3 rgb = HSVtoRGB(atan(z.y, z.x)+PI, 1, norm(z));
-    uint8 r = sRGB[ clip<int>(0, round(0xFF*rgb.x), 0xFF) ]; // linear to gamma (sRGB)
-    uint8 g = sRGB[ clip<int>(0, round(0xFF*rgb.y), 0xFF) ]; // linear to gamma (sRGB)
-    uint8 b = sRGB[ clip<int>(0, round(0xFF*rgb.z), 0xFF) ]; // linear to gamma (sRGB)
-    return byte4(b,g,r,0xFF);
-}
-#endif
-
+/// Maps (x,y) to (red,green) intensity
 template<> byte4 toColor(Vec2 z) {
     uint8 r = sRGB[ clip<int>(0, round(0xFF*z.x), 0xFF) ]; // linear to gamma (sRGB)
     uint8 g = sRGB[ clip<int>(0, round(0xFF*z.y), 0xFF) ]; // linear to gamma (sRGB)
@@ -56,20 +26,16 @@ struct CFDTest : Widget {
     const real dx = 1./Mx, dy = 1./My; // Spatial resolution
 
     const real deltaT = 1; // K Temperature difference ΔT
-#if 1 //air
-    const real beta = 1./300; //K-1 Thermal expansion (gas=1/T)
+
+    const real beta = 1./300; //K-1 Thermal expansion (ideal gas=1/T)
     const real eta = 2e-5; //Pa.s=kg/m/s² Dynamic viscosity
     const real rho = 1.2; //kg/m³ Density
     const real alpha = 2e-5; //m²/s Thermal diffusivity
-#else //water
-    const real beta = 2e-4; //K-1 Thermal expansion
-    const real eta = 1e-3; //Pa.s=kg/m/s² Dynamic viscosity
-    const real rho = 1e3; //kg/m³ Density
-    const real alpha = 1e-7; //m²/s Thermal diffusivity
-#endif
+
     const real vu = eta/rho; //m²/s Kinematic viscosity
     const real g = 9.8; //m/s² Gravitational acceleration
     const real L = 0.1; //m Box side length
+    const real t = L*L/alpha; //s Time unit
 
     const real Pr = vu/alpha; // Prandtl (ν/α)
     const real Ra = deltaT*beta*g*L*L*L/(vu*alpha); // Rayleigh ΔTβ·gL³/(να)
@@ -78,27 +44,28 @@ struct CFDTest : Widget {
     Matrix I = identity(N);
     Matrix P{N}, PD{N}, PDX{N}, PDY{N}; // Elementary matrices (interior points projector, Laplacian Δ and partial derivatives ∂x, ∂y)
 
-    UMFPACK Lw, Lj, Lt, LT; // Factorized left-hand operator (implicit)
-    Matrix Rw{N}, Rj{N}, Rt{N}, RT{N}; // Right-hand operator (explicit)
-    Matrix BCw{N}, BCt{N}, BCT{N}; // Boundary conditions
+    UMFPACK Lt, Lw, Lj, LT; // Factorized left-hand operator (implicit)
     Vector Gt{N}, GTx{N}, GTy{N}; // Right-hand vectors (BC and source field)
+    Matrix Rt{N}, Rw{N}, Rj{N}, RT{N}; // Right-hand operator (explicit)
+    Matrix BCt{N}, BCw{N}, BCT{N}; // Boundary conditions
 
+    Vector Ct{N}; // Current temperature T field
+    Vector Cw{N}; // Current vorticity ω field (ω=∇×u)
     Vector Pj{N}, Cj{N}; // Previous and current stream function ϕ field (u=∇×ϕ)
-    Vector Cw{N}; // Current vorticity ω field (ω=∇×
-    Vector Ct{N}; // Previous temperature T field
     Vector CTx{N}, CTy{N}; // Current texture positions Tx, Ty fields
 
-    Vector PNLw{N}, CNLw{N}; // Previous and current non-linear advection term for vorticity ω
-    Vector PNLt{N}, CNLt{N}; // Previous and current non-linear advection term for temperature T
-    Vector PNLTx{N}, CNLTx{N}; // Previous and current non-linear advection term for texture positions Tx
-    Vector PNLTy{N}, CNLTy{N}; // Previous and current non-linear advection term for texture positions Ty
+    Vector PAt{N}, CAt{N}; // Previous and current non-linear advection term for temperature T
+    Vector PAw{N}, CAw{N}; // Previous and current non-linear advection term for vorticity ω
+    Vector PATx{N}, CATx{N}; // Previous and current non-linear advection term for texture positions Tx
+    Vector PATy{N}, CATy{N}; // Previous and current non-linear advection term for texture positions Ty
 
     Window window {this, int2(1024,1024+2*16), "CFDTest"_};
     CFDTest() {
-        log(Pr,Ra,1/dt);
+        log(Pr,Ra,1/dt,ftoa(t,1,0,true), ftoa(dt*t,1,0,true));
         window.clearBackground = false;
         window.localShortcut(Escape).connect(&exit);
 
+        // Elementary matrices (interior points projector, Laplacian Δ and partial derivatives ∂x, ∂y)
         for(uint x: range(Mx)) {
             for(uint y: range(My)) {
                 uint i = y*Mx+x;
@@ -118,26 +85,6 @@ struct CFDTest : Widget {
                     PDY(i,i+Mx) = 1/(2*dy);
                 }
             }
-        }
-
-        // Thom boundary condition for vorticity ω
-        for(uint x: range(1,Mx-1)) { // Horizontal boundaries
-            uint i = x;
-            // Top
-            BCw(i,i+1*Mx) = -8/(2*dx*dx);
-            BCw(i,i+2*Mx) = 1/(2*dx*dx);
-            // Bottom
-            BCw(i+(My-1)*Mx,i+(My-3)*Mx) = 1/(2*dx*dx);
-            BCw(i+(My-1)*Mx,i+(My-2)*Mx) = -8/(2*dx*dx);
-        }
-        for(uint y: range(My)) { // Vertical boundaries
-            uint i = y*Mx;
-            // Left
-            BCw(i,i+1) = -8/(2*dx*dx);
-            BCw(i,i+2) = 1/(2*dx*dx);
-            // Right
-            BCw(i+Mx-1,i+Mx-3) = 1/(2*dx*dx);
-            BCw(i+Mx-1,i+Mx-2) = -8/(2*dx*dx);
         }
 
         // Boundary condition for temperature T
@@ -164,6 +111,26 @@ struct CFDTest : Widget {
             Gt[i+Mx-1] = 1;
         }
 
+        // Thom boundary condition for vorticity ω
+        for(uint x: range(1,Mx-1)) { // Horizontal boundaries
+            uint i = x;
+            // Top
+            BCw(i,i+1*Mx) = -8/(2*dx*dx);
+            BCw(i,i+2*Mx) = 1/(2*dx*dx);
+            // Bottom
+            BCw(i+(My-1)*Mx,i+(My-3)*Mx) = 1/(2*dx*dx);
+            BCw(i+(My-1)*Mx,i+(My-2)*Mx) = -8/(2*dx*dx);
+        }
+        for(uint y: range(My)) { // Vertical boundaries
+            uint i = y*Mx;
+            // Left
+            BCw(i,i+1) = -8/(2*dx*dx);
+            BCw(i,i+2) = 1/(2*dx*dx);
+            // Right
+            BCw(i+Mx-1,i+Mx-3) = 1/(2*dx*dx);
+            BCw(i+Mx-1,i+Mx-2) = -8/(2*dx*dx);
+        }
+
         // Constant boundary condition for texture advection
         for(uint x: range(1,Mx-1)) { // Horizontal boundaries
             uint i = x;
@@ -184,26 +151,26 @@ struct CFDTest : Widget {
             GTx[i+Mx-1] = real(Mx-1)/Mx, GTy[i+Mx-1] = real(y)/My;
         }
 
-        // Left-hand side (implicit) of ω,ϕ,T evolution equations
+        // Left-hand side (implicit) of temperature T, vorticity ω, stream function ϕ and texture advection T evolution equations
+        Matrix Lt = BCt + P - (dt/2)*PD;
         Matrix Lw = I - (Pr*dt/2)*PD;
         Matrix Lj = (I-P) + PD;
-        Matrix Lt = BCt + P - (dt/2)*PD;
-        Matrix LT = BCT + P - (0.*dt/2)*PD;
+        Matrix LT = BCT + P - (1./R*dt/2)*PD;
 
         // LU factorizations of the implicit operators
+        this->Lt = UMFPACK(Lt);
         this->Lw = UMFPACK(Lw);
         this->Lj = UMFPACK(Lj);
-        this->Lt = UMFPACK(Lt);
         this->LT = UMFPACK(LT);
 
         // Right-hand side (explicit)
+        Rt = P + (dt/2)*PD;
         Rw = P + (Pr*dt/2)*PD;
         Rj = -1*P;
-        Rt = P + (dt/2)*PD;
-        RT = P + (0.*dt/2)*PD;
+        RT = P + (1./R*dt/2)*PD;
 
         // Sets initial temperature to a linear gradient (no transient state)
-        for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = real(x)/Mx;
+        //for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = real(x)/Mx;
         // Sets initial positions for texture advection
         for(uint x: range(Mx)) for(uint y: range(My)) CTx[y*Mx+x] = real(x)/Mx, CTy[y*Mx+x] = real(y)/My;
     }
@@ -215,7 +182,7 @@ struct CFDTest : Widget {
         fill(subPosition+Rect(subSize.x,16),black);
         Text(title+" (max="_+ftoa(max,1,0,true)+")"_,16,white).render(subPosition,int2(subSize.x,16));
         Image image = clip(framebuffer, subPosition+int2(0,16), subSize-int2(0,16));
-        constexpr uint scale = 1024/R/sqrt;
+        constexpr uint scale = 1024/R/sqrt; // Compile-time for loop unrolling
         for(uint y: range(My-1)) {
             for(uint x: range(Mx-1)) {
 #if LINEAR
@@ -239,59 +206,57 @@ struct CFDTest : Widget {
         }
     }
 
-    Stopwatch total, update, solve, view;
+    Stopwatch total, update, view;
     void render(int2 position, int2 size) {
+        update.start();
         // Solves evolution equations
-        solve.start();
-        Vector Nt = Lt .solve(Rt*Ct   + (3*dt/2)*CNLt  - (dt/2)*PNLt  + Gt);
-        Vector Nw=Lw.solve(Rw*Cw + (3*dt/2)*CNLw - (dt/2)*PNLw + (Ra*Pr*dt/2)*(PDX*(Nt+Ct)) + BCw*(2*Cj-Pj));
+        Vector Nt = Lt .solve(Rt*Ct   + (3*dt/2)*CAt  - (dt/2)*PAt  + Gt);
+        Vector Nw=Lw.solve(Rw*Cw + (3*dt/2)*CAw - (dt/2)*PAw + (Ra*Pr*dt/2)*(PDX*(Ct+Nt)) + BCw*(2*Cj-Pj));
         Vector Nj = Lj .solve(Rj*Nw);
-        Vector NTx  = LT .solve(RT*CTx   + (3*dt/2)*CNLTx  - (dt/2)*PNLTx  + GTx);
-        Vector NTy  = LT .solve(RT*CTy   + (3*dt/2)*CNLTy  - (dt/2)*PNLTy  + GTy);
-        solve.stop();
+        Vector NTx  = LT .solve(RT*CTx   + (3*dt/2)*CATx  - (dt/2)*PATx  + GTx);
+        Vector NTy  = LT .solve(RT*CTy   + (3*dt/2)*CATy  - (dt/2)*PATy  + GTy);
 
         // Update references
-        update.start();
-        Cw=move(Nw), PNLw=move(CNLw);
+        Cw=move(Nw), PAw=move(CAw);
         Pj=move(Cj), Cj=move(Nj);
-        Ct=move(Nt), PNLt=move(CNLt);
-        CTx=move(NTx), PNLTx=move(CNLTx);
-        CTy=move(NTy), PNLTy=move(CNLTy);
+        Ct=move(Nt), PAt=move(CAt);
+        CTx=move(NTx), PATx=move(CATx);
+        CTy=move(NTy), PATy=move(CATy);
 
         // Computes advection for next step
         Vector Ux = PDY*Cj, Uy=-1*PDX*Cj;
-        CNLw = Ux*(PDX*Cw)+Uy*(PDY*Cw);
-        CNLt  = Ux*(PDX*Ct )+Uy*(PDY*Ct);
-        CNLTx  = Ux*(PDX*CTx)+Uy*(PDY*CTx);
-        CNLTy  = Ux*(PDX*CTy)+Uy*(PDY*CTy);
+        CAw = Ux*(PDX*Cw)+Uy*(PDY*Cw);
+        CAt  = Ux*(PDX*Ct )+Uy*(PDY*Ct);
+        CATx  = Ux*(PDX*CTx)+Uy*(PDY*CTx);
+        CATy  = Ux*(PDX*CTy)+Uy*(PDY*CTy);
         update.stop();
 
         view.start();
-        subplot<2>(position, size, 0, Cw,"Vorticity ω"_);
-        subplot<2>(position, size, 1, Cj,"Stream function ϕ"_);
-        subplot<2>(position, size, 2, Ct,"Temperature T"_);
-        // Velocity visualization
-        //buffer<Vec2> U(N); for(uint i: range(N)) U[i]=Vec2(Ux[i],Uy[i]);
-        //subplot<2>(position, size, 3, U,"Velocity u"_);
-        // Advection visualization
-        buffer<Vec2> T(N); for(uint i: range(N)) T[i]=Vec2(CTx[i],CTy[i]);
-        subplot<2>(position, size, 3, T,"Advection"_);
-        //TODO: stream lines
+        static uint frameCount=0; frameCount++;
+        if(frameCount<=2048) { //Shows all fields while in transition state
+            subplot<2>(position, size, 0, Cw,"Vorticity ω"_);
+            subplot<2>(position, size, 1, Cj,"Stream function ϕ"_);
+            subplot<2>(position, size, 2, Ct,"Temperature T"_);
+            // Advection visualization
+            buffer<Vec2> T(N); for(uint i: range(N)) T[i]=Vec2(CTx[i],CTy[i]);
+            subplot<2>(position, size, 3, T,"Advection"_);
+        } else { // Shows only texture advection in steady state
+            // Advection visualization
+            buffer<Vec2> T(N); for(uint i: range(N)) T[i]=Vec2(CTx[i],CTy[i]);
+            subplot<1>(position, size, 3, T,"Advection"_);
+        }
         view.stop();
 
-        extern Stopwatch umfpack;
-        static uint frameCount=0; frameCount++;
+        extern Stopwatch solve;
         if(frameCount%256==0)
-            log(frameCount, total/1000/frameCount,"ms/frame", frameCount/(total/1000/1000.),"fps",
-                "update",100.*update/total,
-                "solve",100.*solve/total, "UMF",100.*umfpack/solve,
-                "view",100.*view/total,
-                "misc"_,100.*int64(total-solve-update-view)/total);
+            log(frameCount, total/1000./frameCount,"ms/frame", frameCount/(total/1000/1000.),"fps", total/1000000./(frameCount*dt*t),"x",
+                "update:",100.*update/total, "(solve:",100.*solve/update, "), view:",100.*view/total);
             //log(view/frameCount/1000.,"ms");
         if(frameCount%256==0) {
-            log("t=",utoa(frameCount*dt*1000),"ms");
-            writeFile(utoa(frameCount*dt*1000)+".png"_,encodePNG(framebuffer),home()); }
-        if(frameCount==2048) { log("Stop"); return; }
+            log("#",frameCount,"t=",frameCount*dt,"=",int(frameCount*dt*t),"s");
+            writeFile(itoa(frameCount*dt*t)+".png"_,encodePNG(framebuffer),home());
+        }
+        if(frameCount==8192) { log("Stop"); return; }
         window.render();
     }
 } test;

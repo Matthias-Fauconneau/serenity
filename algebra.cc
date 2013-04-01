@@ -65,16 +65,6 @@ Matrix operator-(const Matrix& A, const Matrix& B) {
     return t;
 }
 
-/*Matrix operator*(const Matrix& a, const Matrix& b) {
-    assert(a.n==b.m);
-    Matrix t(a.m,b.n);
-    for(uint i: range(r.m)) for(uint j: range(r.n)) {
-        real sum=0;
-        for(const Element& e: b.columns[j]) sum += a(i,e.row)*e.value; //t[i,j] = a[i,k]*b[k,j]
-        if(sum) t(i,j) = sum;
-    }
-    return t;
-}*/
 extern "C" {
 uint umfpack_di_symbolic(uint m, uint n, const uint* columnPointers, const uint* rowIndices, const double* values, void** symbolic,
                          const double* control, double* info);
@@ -91,7 +81,6 @@ UMFPACK::Symbolic::~Symbolic(){ umfpack_di_free_symbolic(&pointer); }
 UMFPACK::Numeric::~Numeric(){ umfpack_di_free_numeric(&pointer); }
 
 UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
-    // Converts columns to packed storage
     columnPointers = buffer<uint>(n+1,n+1);
     uint nnz=0;
     for(uint j: range(A.n)) {
@@ -114,11 +103,11 @@ UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
     umfpack_di_numeric(columnPointers, rowIndices, values, symbolic.pointer, &numeric.pointer, 0, 0);
 }
 
-Stopwatch umfpack;
+Stopwatch solve;
 Vector UMFPACK::solve(const Vector& b) {
     Vector x(m);
-    umfpack.start();
+    ::solve.start();
     umfpack_di_solve(UMFPACK_A, columnPointers, rowIndices.data, values, x, b, numeric.pointer, 0, 0);
-    umfpack.stop();
+    ::solve.stop();
     return x;
 }
