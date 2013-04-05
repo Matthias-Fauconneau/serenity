@@ -3,12 +3,8 @@
 #include "window.h"
 #include "calendar.h"
 #include "feeds.h"
+#include "math.h"
 
-typedef double real;
-inline real tan(real t) { return __builtin_tan(t); }
-inline real acos(real t) { return __builtin_acos(t); }
-inline real asin(real t) { return __builtin_asin(t); }
-inline real rad(real t) { return t/180*PI; }
 struct Sun {
     Date rise, noon, set;
     Sun(float longitude, float latitude) {
@@ -85,11 +81,11 @@ map<ref<byte>,ref<byte>> readSettings(const ref<byte>& file) {
 
 struct Weather : ImageView {
     signal<> contentChanged;
-    Weather(){get();}
+    Weather(){ get(); }
     void get() { getURL("http://www.yr.no/place/France/Île-de-France/Orsay/meteogram.png"_, {this, &Weather::load}, 60); }
     void load(const URL&, Map&& file) { image = crop(decodeImage(file), int2(6, 24), int2(816, 242)); contentChanged(); }
     bool mouseEvent(int2, int2, Event event, Button) { if(event==Press) get(); return false; }
-} test;
+};
 
 /// Displays a feed reader, an event calendar and an application launcher (activated by taskbar home button)
 struct Desktop {

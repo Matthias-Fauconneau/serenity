@@ -59,7 +59,9 @@ template<Type T> struct array {
     void reserve(uint capacity) {
         if(capacity>this->capacity) {
             assert(capacity>=size);
-            data=(T*)realloc(data, (this->capacity=capacity)*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+            if(this->capacity) data=(T*)realloc(data, capacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+            else data=(T*)malloc(capacity*sizeof(T)); //
+            this->capacity=capacity;
         }
     }
     /// Resizes the array to \a size and default initialize new elements

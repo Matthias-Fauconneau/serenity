@@ -66,7 +66,7 @@ Element::Element(TextData& s, bool html) {
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
         else if(s.match("</"_)) { if(name==s.until(">"_)) break; } //ignore
-        else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
+        //else if(s.match(string("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
         else if(s.match('<')) children << Element(s,html);
         else {
             string content = unescape(s.whileNot('<'));

@@ -155,6 +155,7 @@ template<Type T> void clear(T* buffer, uint size, const T& value=T()) { for(T& t
 template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
 
 // C runtime memory allocation
+extern "C" void* malloc(size_t size);
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
 extern "C" void* realloc(void* buffer, size_t size);
 extern "C" void free(void* buffer);
@@ -179,7 +180,11 @@ template<Type T> struct buffer {
     buffer(T* data, uint capacity, uint size):data(data),capacity(capacity),size(size){}
     buffer(T* data, uint size):data(data),size(size){}
     buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
-    buffer(uint capacity, uint size):capacity(capacity),size(size){ assert(capacity); if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
+    buffer(uint capacity, uint size):capacity(capacity),size(size){
+        assert(capacity);
+        //if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
+        data = (T*)malloc(capacity*sizeof(T));
+    }
     explicit buffer(uint size):buffer(size,size){}
 
     buffer(uint capacity, uint size, const T& value):buffer(capacity,size){clear(data,size,value);}
@@ -209,9 +214,9 @@ template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.s
 /// Unique reference to an heap allocated value
 template<Type T> struct unique {
     unique(unique&& o):pointer(o.pointer){o.pointer=0;}
-    template<Type... Args> unique(Args&&... args):pointer(new T(forward<Args>(args)...)){}
+    template<Type... Args> unique(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     unique& operator=(unique&& o){ this->~unique(); new (this) unique(move(o)); return *this; }
-    ~unique() { if(pointer) free(pointer); pointer=0; }
+    ~unique() { if(pointer) { pointer->~T(); free(pointer); } pointer=0; }
 
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }

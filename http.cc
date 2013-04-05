@@ -60,7 +60,7 @@ void SSLSocket::write(const ref<byte>& buffer) {
 template<class T> uint DataStream<T>::available(uint need) {
     while(need>Data::available(need) && T::poll()) {
         array<byte> chunk = T::readUpTo(max(4096u,need-Data::available(need)));
-        if(!chunk) { log("Empty chunk",Data::available(need),need); break; }
+        if(!chunk) { error("Empty chunk: already buffered ", Data::available(need), "but need", need); break; }
         buffer << chunk;
     }
     return Data::available(need);
@@ -234,7 +234,9 @@ void HTTP::header() {
             url = url.relative(value);
             uint ip = resolve(url.host);
             if(ip==uint(-1)) { log("Unknown host",url); done(); return; }
-            SSLSocket::~SSLSocket(); new (this) SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_); Poll::fd=SSLSocket::fd;
+            this->SSLSocket::~SSLSocket();
+            new (this) SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_);
+            Poll::fd=SSLSocket::fd;
             index=0; buffer=array<byte>(); contentLength=chunked=0;
             redirect << file;
             state=Request; events=POLLOUT;
@@ -292,7 +294,7 @@ void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge
         }
         headers<< "If-Modified-Since: "_+str(Date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);
     }
-    for(const unique<HTTP>& request: requests) assert(request->url != url, "Duplicate request", url);
+    for(const unique<HTTP>& request: requests) if(request->url == url) warn("Duplicate request", url);
     requests << unique<HTTP>(move(url),handler,move(headers));
 }
 

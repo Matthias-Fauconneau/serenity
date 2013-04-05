@@ -50,8 +50,17 @@ Image crop(Image&& image, int2 origin, int2 size);
 Image flip(Image&& image);
 
 /// Returns a copy of the image resized to \a width x \a height
-Image resize(const Image& image, uint width, uint height);
+Image doResize(const Image& image, uint width, uint height);
+inline Image resize(const Image& image, uint width, uint height) {
+    if(width==image.width && height==image.height) return copy(image);
+    else return doResize(image, width, height);
+}
 inline Image resize(const Image& image, int2 size) { return resize(image, size.x, size.y); }
+
+inline Image resize(Image&& image, uint width, uint height) {
+    if(width==image.width && height==image.height) return move(image);
+    else return doResize(image, width, height);
+}
 
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
