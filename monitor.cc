@@ -46,7 +46,7 @@ struct Monitor : Timer {
         for(int i: range(1,1+coretemp.list(Files).size/5)) {
             string label = File(string("temp"_+dec(i)+"_label"_),coretemp).readUpTo(64);
             int input = toInteger(File(string("temp"_+dec(i)+"_input"_),coretemp).readUpTo(64))/1000;
-            if(input>87) { window.show(); log(trim(label), dec(input)+"°C"_); }
+            if(input>88) { window.show(); log(trim(label), dec(input)+"°C"_); }
             coreList << move(label)  << string(dec(input)+"°C"_);
         }
 

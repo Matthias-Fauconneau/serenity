@@ -1,24 +1,7 @@
 #!/usr/bin/python3
-#
 # Copyright (C) 2009 Alexander Klaser
-# 
-# This piece is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-# 
-# This software has been downloaded from:
+# GPL-2
 # http://lear.inrialpes.fr/people/klaeser/software
-#
 
 import sys
 import os
@@ -36,7 +19,6 @@ regDepSplit = re.compile(r"\s*\\*\s*")
 suffixes = ['.cpp', '.c', '.cc']
 includeDirs = []
 
-
 def parseDepFile(fileName):
 	# read in the dependency file
 	depFile = open(fileName, 'r')
@@ -49,7 +31,6 @@ def parseDepFile(fileName):
 
 	# collect all included files
 	return regDepSplit.split(depStr)
-
 
 def findSourceFile(headerFile):
 	# get the basename without extension
@@ -86,7 +67,6 @@ def findSourceFile(headerFile):
 
 	return None
 
-
 def main(argv):
 	global includeDirs
 
@@ -101,7 +81,6 @@ def main(argv):
 	buildDir = args.pop(0)
 	rootDepFile = args.pop(0)
 	includeDirs = args
-
 
 	# scan all dependency files for files we need to link to
 	# do this recursively starting at the root dependency file

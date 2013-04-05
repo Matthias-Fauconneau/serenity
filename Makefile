@@ -22,22 +22,14 @@ ICONS_music = music
 ICONS_test = feeds network
 SRCS += $(ICONS:%=icons/%)
 
-# SHADERS = display $(SHADERS_$(TARGET))
-# SHADERS_blender = blender
-# SRCS += $(SHADERS:%=%.glsl)
-
 LIBS_time = rt
 LIBS_process = pthread
 FLAGS_font = -I$(STAGING_DIR)/usr/include/freetype2
 LIBS_font = freetype
 LIBS_http = ssl
-# LIBS_gl = X11 GL
 LIBS_ffmpeg = avutil avcodec avformat
 LIBS_record = avutil avcodec avformat swscale
 LIBS_asound = asound
-# LIBS_sampler = fftw3f_threads
-# LIBS_spectrogram = fftw3f_threads
-# LIBS_stretch = rubberband
 LIBS_algebra = umfpack
 
 INSTALL = $(INSTALL_$(TARGET))
@@ -58,6 +50,7 @@ clean:
 
 %.l: %.d
 	@python3 dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
+    #release/dep
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(BUILD)/$(TARGET).l
