@@ -148,9 +148,9 @@ inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Computes the next highest power of 2
 inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
 /// Returns the largest positive integer that divides the numbers without a remainder
-inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
+inline int gcd(uint a, uint b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 /// Simplify a fraction by its greatest common divisor
-inline void simplify(int& a, int& b) { int divisor = gcd(a,b); a/=divisor; b/=divisor; }
+inline void simplify(uint& a, uint& b) { int divisor = gcd(a,b); a/=divisor; b/=divisor; }
 
 // Memory operations
 // Initializes memory using a constructor (placement new)

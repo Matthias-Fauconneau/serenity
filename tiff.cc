@@ -22,25 +22,18 @@ Image decodeTIFF(const ref<byte>& file) {
     assert(tiff);
     uint32 width=0; TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     uint32 height=0; TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
-    uint16 photometric=0; TIFFGetField(tiff, TIFFTAG_PHOTOMETRIC, &photometric);
-    uint16 bitPerSample=1; TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitPerSample);
-    uint16 samplesPerPixel=1; TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
     Image image(width, height);
     TIFFReadRGBAImage(tiff, width, height, (uint32*)image.data); //FIXME: 16bit
     TIFFClose(tiff);
     return image;
 }
 
-Image16 decodeTIFF16(const ref<byte>& file) {
-    BinaryData s (file);
-    TIFF *const tiff = TIFFClientOpen("foo","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
+Tiff16::Tiff16(const ref<byte>& file) : s(file) {
+    tiff = TIFFClientOpen("foo","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
     assert(tiff);
-    uint32 width=0; TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
-    uint32 height=0; TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
-    uint16 photometric=0; TIFFGetField(tiff, TIFFTAG_PHOTOMETRIC, &photometric);
+    TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
+    TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
     uint16 bitPerSample=1; TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitPerSample); assert(bitPerSample==16);
-    Image16 image(width, height);
-    for(uint y: range(height)) TIFFReadScanline(tiff, image.data+y*width, y, 0);
-    TIFFClose(tiff);
-    return image;
 }
+void Tiff16::read(uint16 *target) { for(uint y: range(height)) TIFFReadScanline(tiff, target+y*width, y, 0); }
+Tiff16::~Tiff16() { TIFFClose(tiff); }

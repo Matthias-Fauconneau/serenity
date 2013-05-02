@@ -30,7 +30,7 @@ template<int size> void smooth(Volume16& target, const Volume16& source) {
     uint X = source.x, Y = source.y, Z = source.z;
     // Accumulate along X
     Volume16 tmp(X,Y,Z);
-    //FIXME: Shifts source as needed to ensure enough sums will not overflow
+    //FIXME: Shifts source as needed to ensure sums will not overflow
     smooth<size>(target, source, X,Y,Z);
     smooth<size>(tmp, target, Y,Z,X);
     smooth<size>(target, tmp, Z,X,Y);

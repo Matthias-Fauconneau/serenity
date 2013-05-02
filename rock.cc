@@ -19,8 +19,10 @@ const ref<byte>& str(Pass pass) { return passNames[(uint)pass]; }
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : ImageView {
     Rock(const ref<byte>& path, Pass force) : folder(path), name(section(path,'/',-2,-1)), force(force) {
+        window.localShortcut(Escape).connect(&exit);
+        window.clearBackground = false;
+
         processVolume();
-        window.show();
     }
 
     /// Clears any computed data
@@ -94,8 +96,9 @@ struct Rock : ImageView {
         array<string> slices;
         if(pass==Source) {
             slices = folder.list(Files);
-            const Image image = decodeImage(readFile(slices.first(), folder));
-            target.volume.x = image.width, target.volume.y = image.height, target.volume.z = slices.size, target.volume.sampleSize=2, target.volume.den = 1<<12;
+            Map file (slices.first(), folder);
+            const Tiff16 image (file);
+            target.volume.x = image.width, target.volume.y = image.height, target.volume.z = slices.size, target.volume.sampleSize=2, target.volume.den = 1<<16;
         }
         target.path = name+"."_+str(pass)+"."_+volumeMetadata(target.volume);
         log(target.path);
@@ -107,16 +110,7 @@ struct Rock : ImageView {
         if(pass==Source) {
             uint XY=target.volume.x*target.volume.y;
             uint16* const targetData = (Volume16&)target.volume;
-            //#pragma omp parallel for
-            for(uint z=0; z<slices.size; z++) {
-                const Image16 image = decodeTIFF16(Map(slices[z],folder)); //TODO: 16bit
-                const uint16* const src = image.data;
-                uint16* const dst = targetData + z*XY;
-                uint max=0;
-                for(uint i=0; i<XY; i++) { uint v=src[i]; dst[i] = src[i]; if(v>max) max=v; }
-                target.volume.den = max;
-                log(max);
-            }
+            for(uint z=0; z<slices.size; z++) Tiff16(Map(slices[z],folder)).read(targetData+z*XY);
         }
         return false;
     }
