@@ -146,14 +146,15 @@ Image doResize(const Image& image, uint width, uint height) {
     return target;
 }
 
-#define weak(function) function __attribute((weak)); function
-weak(Image decodePNG(const ref<byte>&)) { error("PNG support not linked"_); }
-weak(Image decodeJPEG(const ref<byte>&)) { error("JPEG support not linked"_); }
-weak(Image decodeICO(const ref<byte>&)) { error("ICO support not linked"_); }
+Image  __attribute((weak)) decodePNG(const ref<byte>&) { error("PNG support not linked"_); }
+Image  __attribute((weak)) decodeJPEG(const ref<byte>&) { error("JPEG support not linked"_); }
+Image  __attribute((weak)) decodeICO(const ref<byte>&) { error("ICO support not linked"_); }
+Image  __attribute((weak)) decodeTIFF(const ref<byte>&) { error("TIFF support not linked"_); }
 
 Image decodeImage(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
+    else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return decodeTIFF(file);
     else { if(file.size) log("Unknown image format"_,hex(file.slice(0,min(file.size,4u)))); return Image(); }
 }

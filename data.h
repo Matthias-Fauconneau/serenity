@@ -131,6 +131,9 @@ struct TextData : virtual Data {
     /// If input match none of \a key, advances \a pos
     bool matchNo(const ref<byte>& any);
 
+    /// Asserts stream matches \a key and advances \a key length bytes
+    void skip(const ref<byte>& key);
+
     /// Advances while input doesn't match \a key. \sa until
     ref<byte> whileNot(char key);
     /// Advances while input match any of \a key

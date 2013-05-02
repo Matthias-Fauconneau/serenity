@@ -143,6 +143,14 @@ template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T
 // Integer operations
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+/// Returns floor(log2(v))
+inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+/// Computes the next highest power of 2
+inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
+/// Returns the largest positive integer that divides the numbers without a remainder
+inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
+/// Simplify a fraction by its greatest common divisor
+inline void simplify(int& a, int& b) { int divisor = gcd(a,b); a/=divisor; b/=divisor; }
 
 // Memory operations
 // Initializes memory using a constructor (placement new)
@@ -177,17 +185,18 @@ template<Type T> struct handle {
 /// Reference to a fixed capacity heap allocated buffer
 template<Type T> struct buffer {
     buffer(){}
-    buffer(T* data, uint capacity, uint size):data(data),capacity(capacity),size(size){}
-    buffer(T* data, uint size):data(data),size(size){}
+    buffer(T* data, uint64 capacity, uint64 size):data(data),capacity(capacity),size(size){}
+    buffer(T* data, uint64 size):data(data),size(size){}
+    explicit buffer(const ref<T>& o):buffer((T*)o.data,(uint64)o.size,(uint64)o.size){}
     buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
-    buffer(uint capacity, uint size):capacity(capacity),size(size){
+    buffer(uint64 capacity, uint64 size):capacity(capacity),size(size){
         assert(capacity);
-        //if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
-        data = (T*)malloc(capacity*sizeof(T));
+        if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
+        //data = (T*)malloc(capacity*sizeof(T));
     }
-    explicit buffer(uint size):buffer(size,size){}
+    explicit buffer(uint64 size):buffer(size,size){}
 
-    buffer(uint capacity, uint size, const T& value):buffer(capacity,size){clear(data,size,value);}
+    buffer(uint64 capacity, uint64 size, const T& value):buffer(capacity,size){clear(data,size,value);}
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     ~buffer(){ if(capacity) free(data); data=0; }
@@ -198,16 +207,16 @@ template<Type T> struct buffer {
     operator ref<T>() const { return ref<T>(data,size); }
     T* begin() const { return data; }
     T* end() const { return data+size; }
-    T& operator[](uint i) { assert(i<size, i ,size); return (T&)data[i]; }
+    T& operator[](uint64 i) { assert(i<size, i ,size); return (T&)data[i]; }
 
     /// Slices a mutable reference to elements from \a pos to \a pos + \a size
-    memory<T> slice(uint pos, uint size) { assert(pos+size<=this->size); return memory<T>(data+pos, data+pos+size); }
+    memory<T> slice(uint64 pos, uint64 size) { assert(pos+size<=this->size); return memory<T>(data+pos, data+pos+size); }
     /// Slices a mutable reference to elements from \a pos the end of the array
-    memory<T> slice(uint pos) { assert(pos<=size); return memory<T>(data+pos, data+size); }
+    memory<T> slice(uint64 pos) { assert(pos<=size); return memory<T>(data+pos, data+size); }
 
     T* data=0;
-    uint capacity=0;
-    uint size=0;
+    uint64 capacity=0;
+    uint64 size=0;
 };
 template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); copy(t.data,o.data,o.size); return t; }
 

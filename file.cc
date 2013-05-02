@@ -7,6 +7,8 @@ static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdent
 struct dirent { long ino, off; short len; char name[]; };
 enum {DT_DIR=4, DT_REG=8};
 
+#include <stdio.h> // renameat
+
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
 
@@ -17,7 +19,7 @@ Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0)
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0666), folder);
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), folder);
 }
-array<string> Folder::list(uint flags) {
+array<string> Folder::list(uint flags) const {
     Folder fd(""_,*this);
     array<string> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
@@ -58,7 +60,8 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
 File::File(const ref<byte>& path, const Folder& at, uint flags):Stream(check(openat(at.fd, strz(path), flags, 0666),path)){}
-int File::size() const { struct stat sb={}; check_(fstat(fd, &sb)); return sb.st_size; }
+uint64 File::size() const { struct stat sb={}; check_(fstat(fd, &sb)); return sb.st_size; }
+void File::resize(uint64 size) { check_(ftruncate(fd, size)); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
@@ -77,10 +80,11 @@ Map::~Map() { if(data) munmap((void*)data,size); }
 void Map::lock(uint size) const { check_(mlock(data, min<size_t>(this->size,size))); }
 
 // File system
-void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at) {
-    assert(target!=name);
-    unlinkat(at.fd,strz(name),0);
-    check_(symlinkat(strz(target),at.fd,strz(name)), name,"->",target);
+void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) { renameat(at,strz(oldName),at,strz(newName)); }
+void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
+    assert(from!=to);
+    unlinkat(at.fd,strz(to),0);
+    check_(symlinkat(strz(from),at.fd,strz(to)), from,"->",to);
 }
 struct stat statFile(const ref<byte>& path, const Folder& at) { struct stat file; check_( fstat(File(path,at).fd, &file) ); return file; }
 long modifiedTime(const ref<byte>& path, const Folder& at) { return statFile(path,at).st_mtime; }

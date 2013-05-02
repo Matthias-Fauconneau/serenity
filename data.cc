@@ -36,6 +36,14 @@ bool TextData::matchNo(const ref<byte>& any) {
     advance(1); return true;
 }
 
+void TextData::skip(const ref<byte>& key) {
+#ifdef DEBUG
+    assert(match(key));
+#else
+    advance(key.size);
+#endif
+}
+
 ref<byte> TextData::whileNot(char key) {
     uint start=index, end;
     for(;;advance(1)) {

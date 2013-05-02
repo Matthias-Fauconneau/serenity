@@ -1,10 +1,10 @@
 PREFIX ?= /usr
 BUILD ?= release
 ifeq ($(CC),cc)
- CC = g++ -pipe -march=native
- # CC = clang++ -Wno-lambda-extensions -march=native
+ CC = /ptmp/gcc-4.8.0/bin/g++ -I/ptmp/include -pipe -march=native -std=c++11
+ # CC = clang++ -Wno-lambda-extensions -march=native -std=c++11
 endif
-FLAGS := -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
+FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -DDEBUG -g
 FLAGS_profile = -DPROFILE -g -O3 -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
 FLAGS_release = -O3
@@ -49,7 +49,7 @@ clean:
 	@rmdir $(BUILD)
 
 %.l: %.d
-	@python3 dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
+	@python dep.py $(BUILD)/$(TARGET) $@ $(BUILD) $< >$@
     #release/dep
 
 ifneq ($(MAKECMDGOALS),clean)

@@ -6,7 +6,9 @@
 #include "time.h"
 #include "interface.h"
 #include "png.h"
+#if RECORD
 #include "record.h"
+#endif
 
 /// Maps [-1,0,1] to [blue,black,red]
 byte4 toColor(real x) { return x>0 ? byte4(0,0,sRGB(x),0xFF) : byte4(sRGB(-x),0,0,0xFF); }
@@ -120,7 +122,9 @@ struct CFD : Widget {
 
     //Window window {this, int2(1024,1024+2*16), "CFD"_};
     Window window {this, int2(512,512+2*16), "CFD"_}; //for recording
+#if RECORD
     Record record {window.size.x, window.size.y, min(30, int(1/(dt*t))) };
+#endif
     CFD() {
         log(Pr,Ra,1/dt,1/(dt*t));
         window.clearBackground = false;
@@ -234,7 +238,9 @@ struct CFD : Widget {
         //for(uint x: range(Mx)) for(uint y: range(My)) Ct[y*Mx+x] = real(x)/Mx;
         // Sets initial positions for texture advection
         for(uint x: range(Mx)) for(uint y: range(My)) CTx[y*Mx+x] = real(x)/Mx, CTy[y*Mx+x] = real(y)/My;
+#if RECORD
         record.start("Pr="_+itoa(Pr)+",Ra="_+itoa(Ra)+",dt="_+itoa(1/(dt*t)));
+#endif
     }
 
     Stopwatch total, update, view;
@@ -271,7 +277,9 @@ struct CFD : Widget {
         view.stop();
 
         static uint frameCount=0; frameCount++;
+#if RECORD
         if(frameCount%3) record.captureVideoFrame(); //~realtime
+#endif
         if(frameCount%256==0) {
             extern Stopwatch solve;
             log("#"_+str(frameCount), "t =",frameCount*dt,"=",int(frameCount*dt*t),"s\t", //Time

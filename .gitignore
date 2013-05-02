@@ -1,6 +1,5 @@
 debug
 profile
-fast
 release
-windows
-serenity.creator.user
+*.creator.user
+*.includes

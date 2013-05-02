@@ -22,7 +22,7 @@ struct Folder : Handle {
     /// Opens \a folder
     Folder(const ref<byte>& folder, const Folder& at=root(), bool create=false);
     /// Lists all files in \a folder
-    array<string> list(uint flags);
+    array<string> list(uint flags) const;
 };
 /// Returns whether this \a folder exists (as a folder)
 bool existsFolder(const ref<byte>& folder, const Folder& at=root());
@@ -73,7 +73,9 @@ struct File : Stream {
     /// If write only, fails if existing
     File(const ref<byte>& path, const Folder& at=root(), uint flags=ReadOnly);
     /// Returns file size
-    int size() const;
+    uint64 size() const;
+    /// Resizes file
+    void resize(uint64 size);
     /// Seeks to \a index
     void seek(int index);
 };
@@ -115,6 +117,7 @@ struct Map {
     default_move(Map);
     ~Map();
 
+    explicit operator bool() { return data; }
     operator ref<byte>() { return ref<byte>(data, size); }
 
     /// Locks memory map in RAM
@@ -124,6 +127,8 @@ struct Map {
     uint size=0;
 };
 
+/// Renames file at \a target to \a name, replacing any existing files or links
+void rename(const ref<byte>& oldName, const ref<byte>& newName, const Folder& at=root());
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=root());
 /// Returns the last modified time for \a path

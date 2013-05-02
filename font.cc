@@ -79,7 +79,7 @@ const Glyph& Font::glyph(uint16 index, int) {
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
         uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x];
         extern uint8 sRGB_lookup[256];
-	uint8 g = sRGB_lookup[rgb[0]];
+        uint8 g = sRGB_lookup[rgb[0]];
         image(x,y) = byte4(g,g,g,rgb[0]);
     }
 #endif
