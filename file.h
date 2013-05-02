@@ -124,11 +124,13 @@ struct Map {
     void lock(uint size=-1) const;
 
     handle<byte*> data;
-    uint size=0;
+    uint64 size=0;
 };
 
 /// Renames file at \a target to \a name, replacing any existing files or links
 void rename(const ref<byte>& oldName, const ref<byte>& newName, const Folder& at=root());
+/// Removes file
+void remove(const ref<byte>& name, const Folder& at=root());
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=root());
 /// Returns the last modified time for \a path

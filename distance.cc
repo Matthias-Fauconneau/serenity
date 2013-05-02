@@ -1,30 +1,31 @@
 #include "distance.h"
+#include "time.h"
 
-template<bool last> void PBEDT(uint32* const target, const uint32* const source, int X, int Y, int Z, uint xStride, uint yStride, uint zStride) {
-    for(int z=0; z<Z; z++) {
+template<bool last> void PBEDT(uint32* const target, const uint32* const source, uint X, uint Y, uint Z, uint xStride, uint yStride, uint zStride) {
+    for(uint z=0; z<Z; z++) {
         const uint32* const sourceZ = source+z*zStride;
         uint32* const targetZ = target+z*zStride;
-        for(int y=0; y<Y; y++) {
-            struct element { int cx, x, sd; } stackBase[X];
-            element* stack=stackBase;
+        for(int64 y=0; y<Y; y++) {
+            struct element { int64 cx, x, sd; } stack[X];
+            uint i=0;
             const uint32* const sourceY = sourceZ+y*yStride;
             uint32* const targetY = targetZ+y*yStride;
             for(int x=0; x<X; x++) {
-                int sd = sourceY[x*xStride];
-                if(sd < 0xFFFF) {
+                int64 sd = sourceY[x*xStride];
+                if(sd < 0xFFFFFFFF) {
                     label:
-                    if(stack > stackBase) {
-                        int cx = (sd > stack->sd) ? (sd-stack->sd) / (2 * (x - stack->x)) : -2;
-                        if(cx == stack->cx) *stack={cx,x,sd};
-                        else if(cx < stack->cx) { stack--; goto label; }
-                        else if(cx < X) *++stack = {cx,x,sd};
-                    } else *++stack = {-1,x,sd};
+                    if(i > 0) {
+                        int64 cx = (sd > stack[i].sd) ? (sd-stack[i].sd) / (2 * (x - stack[i].x)) : -2;
+                        if(cx == stack[i].cx) stack[i]={cx,x,sd};
+                        else if(cx < stack[i].cx) { i--; goto label; }
+                        else if(cx < X) stack[++i] = {cx,x,sd};
+                    } else stack[++i] = {-1,x,sd};
                 }
             }
-            if(stack == stackBase) continue;
-            for(int x=X-1; x>=0; x--) {
-                if(x==stack->cx) stack--;
-                int d = x * (x - 2*stack->x) + stack->sd;
+            if(i == 0) continue;
+            for(int64 x=X-1; x>=0; x--) {
+                if(x==stack[i].cx) i--;
+                int d = x * (x - 2*stack[i].x) + stack[i].sd;
                 targetY[x*xStride] = last ? d : y*y + d;
             }
         }
@@ -33,12 +34,15 @@ template<bool last> void PBEDT(uint32* const target, const uint32* const source,
 
 /// Returns a tiled 32bit distance field volume from a 32bit binary segmented volume
 void distance(Volume32& target, const Volume32& source) {
-    assert(source.sampleSize==sizeof(uint32));
-    assert(target.sampleSize==sizeof(uint32));
-
     uint X = source.x, Y = source.y, Z = source.z;
+    Time time;
     PBEDT<false>(target, source, X,Y,Z, 1,X,X*Y);
-    PBEDT<false>(target, target,  Y,Z,X, X,X*Y,1);
-    PBEDT<true>(target, target,  Z,X,Y, X*Y,1,X);
-    target.num = 1, target.den=target.x;
+    log(time.reset());
+    Volume32 buffer(X,Y,Z);
+    PBEDT<false>(buffer, target,  Y,Z,X, X,X*Y,1);
+    log(time.reset());
+    PBEDT<true>(target, buffer,  Z,X,Y, X*Y,1,X);
+    log(time.reset());
+    target.num = 1, target.den=maximum(target);
+    log((Volume&)source, (Volume&)target);
 }

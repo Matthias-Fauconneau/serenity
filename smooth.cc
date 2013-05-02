@@ -1,16 +1,6 @@
 #include "smooth.h"
 #include "simd.h"
 
-/// Returns maximum of data (for debugging)
-uint maximum(const Volume16& source) {
-    const uint16* const src = source;
-    uint64 size = source.size();
-    v8hi maximum8 = {};
-    for(uint i=0; i<size; i+=8) maximum8 = max(maximum8, loada(src+i));
-    uint16 maximum=0; for(uint i: range(8)) maximum = max(maximum, ((uint16*)&maximum8)[i]);
-    return maximum;
-}
-
 template<uint size, uint shift> void smooth(uint16* const target, const uint16* const source, uint X, uint Y, uint Z) {
     constexpr uint margin = align(4,size)-size; //FIXME
     const uint XY = X*Y;

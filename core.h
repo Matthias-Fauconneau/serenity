@@ -106,7 +106,7 @@ template<Type T> struct ref {
     /// Default constructs an empty reference
     constexpr ref() : data(0), size(0) {}
     /// References \a size elements from const \a data pointer
-    constexpr ref(const T* data, uint size) : data(data), size(size) {}
+    constexpr ref(const T* data, uint64 size) : data(data), size(size) {}
     /// Converts an std::initializer_list to ref
     constexpr ref(const std::initializer_list<T>& list) : data(list.data), size(list.size) {}
 
@@ -132,7 +132,7 @@ template<Type T> struct ref {
     bool contains(const T& key) const { return indexOf(key)>=0; }
 
     const T* data;
-    uint size;
+    uint64 size;
 };
 
 /// Returns const reference to a static string literal

@@ -42,7 +42,7 @@ void Favicon::get(const URL& url, Map&& document) {
     page.xpath("html/head/link"_, [&icon](const Element& e){ if(e["rel"_]=="shortcut icon"_||(!icon && e["rel"_]=="icon"_)) icon=e["href"_]; } );
     if(!icon) icon="favicon.ico"_;
     if(url.relative(icon).path!=URL(host).relative("/favicon.ico"_).path)
-        symlink(string("../"_+cacheFile(url.relative(icon))), cacheFile(URL(host).relative("favicon.ico"_)),cache());
+        symlink(cacheFile(URL(host).relative("favicon.ico"_), string("../"_+cacheFile(url.relative(icon)))),cache());
     getImage(url.relative(icon), &image, {this, &Favicon::update}, int2(16,16), 7*24*60);
 }
 void Favicon::update() {

@@ -26,7 +26,8 @@ struct Volume {
 inline string str(const Volume& volume) {
     return str(volume.x)+"x"_+str(volume.y)+"x"_+str(volume.z)+" "_
             +str(volume.marginX)+"+"_+str(volume.marginY)+"+"_+str(volume.marginZ)+" "_
-            +hex(volume.num)+":"_+hex(volume.den);
+            +hex(volume.num)+":"_+hex(volume.den)+" "_
+            +str(volume.size()*volume.sampleSize/1024/1024)+"MB"_;
 }
 
 struct Volume16 : Volume {
@@ -41,49 +42,17 @@ struct Volume32 : Volume {
     operator uint32*() { return (uint32*)data.data; }
 };
 
-/// Precomputes a lookup table of bit interleaving (Morton aka z-order)
-inline buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) {
-    buffer<uint> lookup(size);
-    for(uint i=0; i<size; i++) { lookup[i]=0; for(uint b=0, bits=i; bits!=0; bits>>=1, b++) { uint bit=bits&1; lookup[i] |= bit << (b*stride+offset); } }
-    return lookup;
-}
+void interleavedLookup(Volume& target);
 
-inline void interleavedLookup(Volume& target) {
-    if(!target.offsetX) target.offsetX = interleavedLookup(target.x,0);
-    if(!target.offsetY) target.offsetY = interleavedLookup(target.y,1);
-    if(!target.offsetZ) target.offsetZ = interleavedLookup(target.z,2);
-}
+/// Returns maximum of data (for debugging)
+uint maximum(const Volume16& source);
+uint maximum(const Volume32& source);
+
+/// Downsamples a volume by averaging 2x2x2 samples
+void downsample(Volume16& target, const Volume16& source);
 
 /// Returns an image of a volume slice
-inline Image slice(const Volume& volume, uint z) {
-    uint X=volume.x, Y=volume.y;
-    uint mX=volume.marginX, mY=volume.marginY;
-    uint imX=X-2*mX, imY=Y-2*mY;
-    Image target(imX,imY);
-    if(volume.sampleSize==2) {
-        const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
-        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
-    } else if(volume.sampleSize==4) {
-        const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
-        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
-    } else error("Unsupported sample size", volume.sampleSize);
-    return target;
-}
+Image slice(const Volume& volume, uint z);
 
-inline float sqrt(float f) { return __builtin_sqrtf(f); }
 /// Returns the square root of an image of a volume slice
-inline Image squareRoot(const Volume& volume, uint z) {
-    uint X=volume.x, Y=volume.y;
-    uint mX=volume.marginX, mY=volume.marginY;
-    uint imX=X-2*mX, imY=Y-2*mY;
-    Image target(imX,imY);
-    float scale = 0x100 * sqrt(float(volume.num) / float(volume.den));
-    if(volume.sampleSize==2) {
-        const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
-        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint8(sqrt(float(source[y*X+x])) * scale);
-    } else if(volume.sampleSize==4) {
-        const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
-        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint8(sqrt(float(source[y*X+x])) * scale);
-    } else error("Unsupported sample size", volume.sampleSize);
-    return target;
-}
+Image squareRoot(const Volume& volume, uint z);

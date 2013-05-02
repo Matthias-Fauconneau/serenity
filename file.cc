@@ -80,10 +80,15 @@ Map::~Map() { if(data) munmap((void*)data,size); }
 void Map::lock(uint size) const { check_(mlock(data, min<size_t>(this->size,size))); }
 
 // File system
-void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) { assert(existsFile(oldName,at)); check_(renameat(at.fd,strz(oldName),at.fd,strz(newName)), oldName, newName); }
+void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) {
+    assert(existsFile(oldName,at), oldName);
+    assert(!existsFile(newName,at), newName);
+    check_(renameat(at.fd,strz(oldName),at.fd,strz(newName)), oldName, newName);
+}
+void remove(const ref<byte> &name, const Folder &at) { check_( unlinkat(at.fd,strz(name),0) ); }
 void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
     assert(from!=to);
-    unlinkat(at.fd,strz(to),0);
+    remove(from,at);
     check_(symlinkat(strz(from),at.fd,strz(to)), from,"->",to);
 }
 struct stat statFile(const ref<byte>& path, const Folder& at) { struct stat file; check_( fstat(File(path,at).fd, &file) ); return file; }

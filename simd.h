@@ -20,6 +20,7 @@ inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
 inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_loaddqu((char*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 inline void storeu(uint32* const ptr, v4si a) { __builtin_ia32_storedqu((char*)ptr, (v16qi)a); }
+inline v4si max(v4si a, v4si b) { return __builtin_ia32_pmaxud128(a,b); }
 //inline v4si cmpgt(v4si a, v4si b) { return __builtin_ia32_pcmpgtd128(a, b); }
 //inline v8hi packus(v4si a, v4si b) { return __builtin_ia32_packusdw128(a,b); }
 //inline v4si blendv(v4si a, v4si b, v4si m) { return (v4si)__builtin_ia32_blendvps((v4sf)a, (v4sf)b, (v4sf)m); }

@@ -97,7 +97,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     setTitle(title);
     setIcon(icon);
     setType(type);
-    if(widget) show(); //asynchronous window are shown by default to avoid race conditions
+    //if(widget) show(); //asynchronous window are shown by default to avoid race conditions ??
     registerPoll();
 
     if(renderer == OpenGL) {

@@ -21,8 +21,8 @@ struct Rock : Widget {
     Rock(const ref<byte>& path, Pass force) : folder(path), name(section(path,'/',-2,-1)), force(force) {
         window.localShortcut(Escape).connect(&exit);
         window.clearBackground = false;
-
         processVolume();
+        window.show();
     }
 
     /// Clears any computed data
@@ -37,18 +37,18 @@ struct Rock : Widget {
         clear();
         assert(name);
         for(string& volume : temporaryFolder.list(Files)) {
+            if(find(volume, ".swap."_)) { remove(volume, temporaryFolder); continue; }
             if(!startsWith(volume, name)) continue;
-            ref<byte> passName = section("."_,-2,-2);
+            ref<byte> passName = section(volume,'.',-3,-2);
             Pass pass = (Pass)passNames.indexOf(passName);
             if(pass > Source && (force==Null || pass < force)) {
                 if(previous>Null) error("Too many intermediate passes stored",previous);
                 previous=current; current=pass;
                 mapVolume(pass);
-                log("Found", passName);
                 swap(source, target);
             }
         }
-        setPass(force != Null ? force : Smooth);
+        setPass(force != Null ? force : Distance);
     }
 
     /// Serializes volume metadata (sample data format)
@@ -75,14 +75,14 @@ struct Rock : Widget {
         volume.num = s.hexadecimal(); s.skip(":"_);
         volume.den = s.hexadecimal();
         assert(volume.num && volume.den, path, volume.num, volume.den);
-        volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo(volume.den/volume.num)))) / 8; // Computes the sample size necessary to represent 1 using the given scale factor
+        volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.den+1)/volume.num)))) / 8; // Computes the sample size necessary to represent 1 using the given scale factor
     }
 
     /// Loads source volume from all images (lexically ordered)
     bool mapVolume(Pass pass) {
         assert(!target.map && !target.volume);
         array<string> files = temporaryFolder.list(Files);
-        if(force == Null || pass < force) for(string& path : files) {
+        for(string& path : files) {
             if(!find(path,"."_+str(pass)+"."_)) continue;
             // Map target file in memory
             target.path = move(path);
@@ -92,7 +92,7 @@ struct Rock : Widget {
             target.volume.data = buffer<byte>(target.map);
             assert( target.volume );
             log("Loading",target.path);
-            return true;
+            return (force == Null || pass < force);
         }
         array<string> slices;
         if(pass==Source) {
@@ -101,13 +101,12 @@ struct Rock : Widget {
             const Tiff16 image (file);
             target.volume.x = image.width, target.volume.y = image.height, target.volume.z = slices.size, target.volume.sampleSize=2, target.volume.den = (1<<16)-1;
         }
-        target.path = name+"."_+str(pass)+"."_+volumeMetadata(target.volume);
-        log("Creating",target.path);
+        target.path = name+".swap."_+volumeMetadata(target.volume);
         File file (target.path, temporaryFolder, Flags(ReadWrite|Create));
-        file.resize( (uint64)target.volume.sampleSize * target.volume.x * target.volume.y * target.volume.z );
+        file.resize( target.volume.size() * target.volume.sampleSize );
         target.map = Map(file, Map::Prot(Map::Read|Map::Write));
         target.volume.data = buffer<byte>(target.map);
-        assert( target.volume.data.size == target.volume.size()*target.volume.sampleSize );
+        assert( target.volume.data.size == target.volume.size()*target.volume.sampleSize, target.volume.data.size/1024/1024, target.volume);
         if(pass==Source) {
             uint XY=target.volume.x*target.volume.y;
             uint16* const targetData = (Volume16&)target.volume;
@@ -129,20 +128,21 @@ struct Rock : Widget {
             while(current<targetPass) {
                 previous = current;
                 current = Pass(int(current)+1);
-                if(current==Source) { mapVolume(Source); ; swap(source, target); }
-                else {
+                if(current==Source) {
+                    mapVolume(Source);
+                    string path = name+".source."_+volumeMetadata(target.volume);
+                    if(this->target.path != path) { rename(this->target.path, path, temporaryFolder); this->target.path=move(path); }
+                    swap(source, target);
+                } else {
                     Volume& target = this->target.volume;
                     Volume& source = this->source.volume;
                     target.x=source.x, target.y=source.y, target.z=source.z, target.marginX = source.marginX, target.marginY = source.marginY, target.marginZ = source.marginZ;
                     target.num=source.num, target.den=source.den, target.sampleSize=passSampleSize[current];
-                    bool diskCache = (uint)current<(uint)passNames.indexOf(arguments().last());
-                    if(!target && diskCache && mapVolume(current)) log(current,"from disk");
+                    if(!target && (force == Null || current < force) && mapVolume(current)) {}
                     else {
-                        if(diskCache) { // Renames target file before processing (invalidate source in case of failure)
-                            log("Computing",current,"into",this->target.path);
-                            string path = name+"."_+str(current)+"."_+volumeMetadata(target);
+                        if(this->target.path) { // Renames target file before processing (invalidate file while processing)
+                            string path = name+".swap."_+volumeMetadata(target);
                             if(this->target.path != path) { // If not created on this pass
-                                log(this->target.path, "->", path);
                                 rename(this->target.path, path, temporaryFolder); // Rename target file to the current pass
                                 this->target.path = move(path);
                             }
@@ -156,10 +156,18 @@ struct Rock : Widget {
 
                         Time time;
                         /* */ if(current==Smooth) {
+#if HD
                             smooth<smoothFilterSize>(target, source);
+#elif LD
+                            Volume16 buffer(source.x/2, source.y/2, source.z/2);
+                            downsample(buffer, source); // 512³
+                            downsample(target, buffer); // 256³
+#else
+                            downsample(target, source); // 512³
+#endif
                         }
                         else if(current==Threshold) {
-                            if(!existsFile(name+".density"_, histogramFolder)) {
+                            if(1 || !existsFile(name+".density"_, histogramFolder)) {
                                 Time time;
                                 writeFile(name+".density"_, str(histogram(source)), histogramFolder);
                                 log("density", time);
@@ -184,13 +192,11 @@ struct Rock : Widget {
                         }
                         log(current, time);
 
-                        if(diskCache) { // Renames target file after processing to reflect any metadata changes
+                        if(this->target.path) { // Renames target file to its real name once data is valid
                             string path = name+"."_+str(current)+"."_+volumeMetadata(target);
-                            if(this->target.path != path) {
-                                log(this->target.path, "->", path);
-                                rename(this->target.path, path, temporaryFolder); // Rename target file to the current pass
-                                this->target.path = move(path);
-                            }
+                            assert(this->target.path != path);
+                            rename(this->target.path, path, temporaryFolder); // Rename target file to the current pass
+                            this->target.path = move(path);
                         }
 
                         if(current==Maximum) {
@@ -214,7 +220,7 @@ struct Rock : Widget {
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
         if(!window.state)
         if(button==WheelDown) setPass((Pass)max((int)Source,current-1));
-        if(button==WheelUp) setPass((Pass)min((int)Maximum,current+1));
+        if(button==WheelUp) setPass((Pass)min((int)Distance,current+1));
         setSlice(float(cursor.x)/(size.x-1));
 #if RENDER
         QPoint delta = ev->pos()-lastPos;
@@ -227,7 +233,9 @@ struct Rock : Widget {
     }
 
     void updateView() {
-        window.setSize(int2(source.volume.x-2*source.volume.marginX,source.volume.y-2*source.volume.marginY));
+        int2 size (source.volume.x-2*source.volume.marginX,source.volume.y-2*source.volume.marginY);
+        while(2*size<displaySize) size *= 2;
+        window.setSize(size);
         window.render();
     }
 
@@ -263,6 +271,7 @@ struct Rock : Widget {
 #endif
         }
 #endif
+        while(2*image.size()<displaySize) image=upsample(image);
         blit(position, image);
     }
 

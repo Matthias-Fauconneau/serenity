@@ -20,3 +20,4 @@ maximum.cc
 histogram.h
 render.h
 render.cc
+volume.cc

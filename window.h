@@ -10,6 +10,8 @@
 enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
               Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
 
+extern int2 displaySize;
+
 /// Interfaces \a widget as a window on an X11 display server
 struct Window : Socket, Poll {
     enum Renderer { Raster, OpenGL };

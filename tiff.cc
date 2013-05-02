@@ -3,8 +3,8 @@
 #include "image.h"
 #include <tiffio.h>
 
-tsize_t tiffRead(BinaryData& s, uint8* buffer, tsize_t size) { s.read<uint8>(buffer, size); return size; }
-tsize_t tiffWrite(BinaryData&, uint8*, tsize_t) { error(""); }
+tsize_t tiffRead(BinaryData& s, byte* buffer, tsize_t size) { copy(buffer, s.buffer.data+s.index, size); s.advance(size); return size; }
+tsize_t tiffWrite(BinaryData&, byte*, tsize_t) { error(""); }
 toff_t tiffSeek(BinaryData& s, toff_t off, int whence) {
     if(whence==SEEK_SET) s.index=off;
     if(whence==SEEK_CUR) s.index+=off;

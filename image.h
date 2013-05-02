@@ -61,6 +61,9 @@ inline Image resize(Image&& image, uint width, uint height) {
     else return doResize(image, width, height);
 }
 
+/// Upsamples an image by duplicating samples
+Image upsample(const Image& source);
+
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 
