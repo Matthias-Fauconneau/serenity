@@ -1,6 +1,7 @@
 #include "process.h"
 #include "data.h"
 #include "time.h"
+#include "tiff.h"
 #include "smooth.h"
 #include "threshold.h"
 #include "histogram.h"
@@ -17,8 +18,9 @@ const ref<byte>& str(Pass pass) { return passNames[(uint)pass]; }
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : ImageView {
-    Rock(const ref<byte>& path, Pass force) : folder(path), name(section(path,'/',-1,-1)), force(force) {
+    Rock(const ref<byte>& path, Pass force) : folder(path), name(section(path,'/',-2,-1)), force(force) {
         processVolume();
+        window.show();
     }
 
     /// Clears any computed data
@@ -31,6 +33,7 @@ struct Rock : ImageView {
     /// Processes a volume
     void processVolume() {
         clear();
+        assert(name);
         for(string& volume : temporaryFolder.list(Files)) {
             if(!startsWith(volume, name)) continue;
             ref<byte> passName = section("."_,-2,-2);
@@ -43,7 +46,7 @@ struct Rock : ImageView {
                 swap(source, target);
             }
         }
-        setPass(Source); //setPass(force != Invalid ? force : Distance);
+        setPass(force != Invalid ? force : Distance);
     }
 
     /// Serializes volume metadata (sample data format)
@@ -57,7 +60,7 @@ struct Rock : ImageView {
 
     /// Parses volume metadata (sample format)
     void parseVolumeMetadata(Volume& volume, const ref<byte>& path) { //FIXME: use parser
-        TextData s ( section(path,'.',-1,-1) );
+        TextData s ( section(path,'.',-2,-1) );
         volume.x = s.integer(); s.skip("x"_);
         volume.y = s.integer(); s.skip("x"_);
         volume.z = s.integer();
@@ -69,6 +72,7 @@ struct Rock : ImageView {
         s.skip("-"_);
         volume.num = s.hexadecimal(); s.skip(":"_);
         volume.den = s.hexadecimal();
+        assert(volume.num && volume.den, path, volume.num, volume.den);
         volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo(volume.den/volume.num)))) / 8; // Computes the sample size necessary to represent 1 using the given scale factor
     }
 
@@ -76,7 +80,7 @@ struct Rock : ImageView {
     bool mapVolume(Pass pass) {
         assert(!target.map && !target.volume);
         array<string> files = temporaryFolder.list(Files);
-        for(string& path : files) {
+        if(pass < force) for(string& path : files) {
             if(!find(path,"."_+str(pass)+"."_)) continue;
             // Map target file in memory
             target.path = move(path);
@@ -90,10 +94,10 @@ struct Rock : ImageView {
         array<string> slices;
         if(pass==Source) {
             slices = folder.list(Files);
-            const Image image = decodeImage(readFile(slices.first()));
+            const Image image = decodeImage(readFile(slices.first(), folder));
             target.volume.x = image.width, target.volume.y = image.height, target.volume.z = slices.size, target.volume.sampleSize=2, target.volume.den = 1<<12;
         }
-        target.path = name+".target"_+volumeMetadata(target.volume);
+        target.path = name+"."_+str(pass)+"."_+volumeMetadata(target.volume);
         log(target.path);
         File file (target.path, temporaryFolder, ReadWrite|Create);
         file.resize( (uint64)target.volume.sampleSize * target.volume.x * target.volume.y * target.volume.z );
@@ -105,10 +109,10 @@ struct Rock : ImageView {
             uint16* const targetData = (Volume16&)target.volume;
             //#pragma omp parallel for
             for(uint z=0; z<slices.size; z++) {
-                const Image image = decodeImage(readFile(slices[z])); //TODO: 16bit
+                const Image image = decodeImage(Map(slices[z],folder)); //TODO: 16bit
                 const byte4* const src = image.data;
                 uint16* const dst = targetData + z*XY;
-                for(uint i=0; i<XY; i++) dst[i] = src[i].a << 4; // Leaves 4bit headroom to convolve up to 16 samples without unpacking
+                for(uint i=0; i<XY; i++) dst[i] = src[i].b << 4; // Leaves 4bit headroom to convolve up to 16 samples without unpacking
             }
         }
         return false;
@@ -186,7 +190,8 @@ struct Rock : ImageView {
     }
 
     /// Shows an image corresponding to the volume slice at Z position \a index
-    bool setSlice(int index) {
+    bool setSlice(uint index) {
+        index = clip(0u, index, source.volume.z-source.volume.marginZ-1);
         if(currentSlice == index) return false;
         currentSlice = index;
         updateView();
@@ -206,7 +211,7 @@ struct Rock : ImageView {
     }
 
     void updateView() {
-        if(currentSlice>=0) {
+        if(currentSlice!=uint(-1)) {
             if(current==Distance) image = squareRoot(source.volume, currentSlice);
             else image = slice(source.volume, currentSlice);
         }
@@ -236,6 +241,7 @@ struct Rock : ImageView {
 #endif
         }
 #endif
+        window.setSize(image.size());
         window.render();
     }
 
@@ -252,10 +258,10 @@ struct Rock : ImageView {
     Pass previous=Invalid;
     Pass current=Invalid;
     Pass force;
-    int currentSlice=0;
+    uint currentSlice=0;
     float densityThreshold=0;
 
-    Window window {this};
+    Window window {this,int2(-1,-1),"Rock"_};
 
 #if RENDER
     int2 lastPos;

@@ -1,7 +1,7 @@
 PREFIX ?= /usr
 BUILD ?= release
 ifeq ($(CC),cc)
- CC = /ptmp/gcc-4.8.0/bin/g++ -I/ptmp/include -pipe -march=native -std=c++11
+ CC = /ptmp/gcc-4.8.0/bin/g++ -I/ptmp/include -L/ptmp/lib -pipe -march=native -std=c++11
  # CC = clang++ -Wno-lambda-extensions -march=native -std=c++11
 endif
 FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
@@ -27,6 +27,7 @@ LIBS_process = pthread
 FLAGS_font = -I$(STAGING_DIR)/usr/include/freetype2
 LIBS_font = freetype
 LIBS_http = ssl
+LIBS_tiff = tiff
 LIBS_ffmpeg = avutil avcodec avformat
 LIBS_record = avutil avcodec avformat swscale
 LIBS_asound = asound

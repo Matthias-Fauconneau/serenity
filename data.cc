@@ -38,7 +38,8 @@ bool TextData::matchNo(const ref<byte>& any) {
 
 void TextData::skip(const ref<byte>& key) {
 #ifdef DEBUG
-    assert(match(key));
+    assert(available(key.size)>=key.size, key, untilEnd(), buffer);
+    assert(match(key), key, read(key.size));
 #else
     advance(key.size);
 #endif

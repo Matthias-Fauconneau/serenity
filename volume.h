@@ -19,7 +19,7 @@ struct Volume {
     buffer<uint> offsetZ;
     uint x=0, y=0, z=0; // Sample count in each dimensions
     uint marginX=0, marginY=0, marginZ=0; // Margins to trim when processing volume
-    int num=0, den=0; // Scale to apply to compute normalized values (data*num/den)
+    int num=1, den=1; // Scale to apply to compute normalized values (data*num/den)
     uint sampleSize=0; // Sample integer size (in bytes)
     bool own=false;
 };
