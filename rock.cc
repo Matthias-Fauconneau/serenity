@@ -11,9 +11,9 @@
 #include "interface.h"
 //#include "render.h"
 
-enum Pass { Invalid=-1, Source, Smooth, Threshold, Distance, Maximum, Undefined };
-static constexpr uint passSampleSize[] = {2,2,4,4,4};
-static ref<ref<byte>> passNames = {"source"_,"smooth"_,"threshold"_,"distance"_,"maximum"_};
+enum Pass { Null, Source, Smooth, Threshold, Distance, Maximum, Undefined };
+static constexpr uint passSampleSize[] = {0,2,2,4,4,4};
+static ref<ref<byte>> passNames = {"null"_, "source"_,"smooth"_,"threshold"_,"distance"_,"maximum"_};
 const ref<byte>& str(Pass pass) { return passNames[(uint)pass]; }
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
@@ -28,7 +28,7 @@ struct Rock : ImageView {
     /// Clears any computed data
     void clear() {
         source = {}; target={};
-        previous = current = Invalid;
+        previous = current = Null;
         densityThreshold = 0;
     }
 
@@ -41,14 +41,14 @@ struct Rock : ImageView {
             ref<byte> passName = section("."_,-2,-2);
             Pass pass = (Pass)passNames.indexOf(passName);
             if(pass > Source && pass < force) {
-                if(previous>=0) error(previous);
+                if(previous>Null) error("Too many intermediate passes stored",previous);
                 previous=current; current=pass;
                 mapVolume(pass);
                 log("Found", passName);
                 swap(source, target);
             }
         }
-        setPass(force != Invalid ? force : Distance);
+        setPass(force > Null ? force : Source);
     }
 
     /// Serializes volume metadata (sample data format)
@@ -86,11 +86,12 @@ struct Rock : ImageView {
             if(!find(path,"."_+str(pass)+"."_)) continue;
             // Map target file in memory
             target.path = move(path);
-            File file = File(target.path, temporaryFolder);
+            File file = File(target.path, temporaryFolder, ReadWrite);
             parseVolumeMetadata(target.volume, target.path);
-            target.map = Map(file, ReadWrite);
+            target.map = Map(file, Map::Prot(Map::Read|Map::Write));
             target.volume.data = buffer<byte>(target.map);
             assert( target.volume );
+            log("Loading",target.path);
             return true;
         }
         array<string> slices;
@@ -98,25 +99,28 @@ struct Rock : ImageView {
             slices = folder.list(Files);
             Map file (slices.first(), folder);
             const Tiff16 image (file);
-            target.volume.x = image.width, target.volume.y = image.height, target.volume.z = slices.size, target.volume.sampleSize=2, target.volume.den = 1<<16;
+            target.volume.x = image.width, target.volume.y = image.height, target.volume.z = slices.size, target.volume.sampleSize=2, target.volume.den = (1<<16)-1;
         }
         target.path = name+"."_+str(pass)+"."_+volumeMetadata(target.volume);
-        log(target.path);
-        File file (target.path, temporaryFolder, ReadWrite|Create);
+        log("Creating",target.path);
+        File file (target.path, temporaryFolder, Flags(ReadWrite|Create));
         file.resize( (uint64)target.volume.sampleSize * target.volume.x * target.volume.y * target.volume.z );
-        target.map = Map(file, ReadWrite);
+        target.map = Map(file, Map::Prot(Map::Read|Map::Write));
         target.volume.data = buffer<byte>(target.map);
-        assert( target.volume );
+        assert( target.volume.data.size == target.volume.size()*target.volume.sampleSize );
         if(pass==Source) {
             uint XY=target.volume.x*target.volume.y;
             uint16* const targetData = (Volume16&)target.volume;
+            Time time;
             for(uint z=0; z<slices.size; z++) Tiff16(Map(slices[z],folder)).read(targetData+z*XY);
+            log(current, time);
         }
         return false;
     }
 
     /// Executes pipeline until target pass
     void setPass(Pass targetPass) {
+        assert(targetPass > Null);
         if(targetPass==current) {}
         else if(targetPass==previous) swap(current,previous), swap(source, target); // Swaps current and previous pass
         else {
@@ -125,7 +129,7 @@ struct Rock : ImageView {
             while(current<targetPass) {
                 previous = current;
                 current = Pass(int(current)+1);
-                if(current==Source) { mapVolume(Source); swap(source, target); }
+                if(current==Source) { mapVolume(Source); ; swap(source, target); }
                 else {
                     Volume& target = this->target.volume;
                     Volume& source = this->source.volume;
@@ -135,35 +139,35 @@ struct Rock : ImageView {
                     if(!target && diskCache && mapVolume(current)) log(current,"from disk");
                     else {
                         if(!target.data) { // Disk cache was disabled
-                            log(current,"in memory");
+                            log("Computing",current,"into memory (Disk cache disabled by user)");
                             assert(!this->target.map && !this->target.path);
-                            target.data = buffer<byte>(target.size());
+                            target.data = buffer<byte>(target.size()*target.sampleSize);
                             assert(target.data);
+                        } else {
+                            log("Computing",current,"into",this->target.path);
                         }
 
-                        log("Computing",current);
-                        {Stopwatch stopwatch;
-
-                            /* */ if(current==Smooth) {
-                                smooth<smoothFilterSize>(target, source);
-                            }
-                            else if(current==Threshold) {
-                                //if(!densityThreshold) densityThreshold = settings.value("densityThreshold", 0).toFloat(); FIXME
-                                if(!densityThreshold) {
-                                    log("Computing density threshold");
-                                    densityThreshold = computeDensityThreshold(source);
-                                    log("threshold =",densityThreshold,"=",densityThreshold*0x100);
-                                    //settings.setValue("densityThreshold", densityThreshold); FIXME
-                                }
-                                threshold(target, source, densityThreshold);
-                            }
-                            else if(current==Distance) {
-                                distance(target, source);
-                            }
-                            else if(current==Maximum) {
-                                maximum(target, source);
-                            }
+                        Time time;
+                        /* */ if(current==Smooth) {
+                            smooth<smoothFilterSize>(target, source);
                         }
+                        else if(current==Threshold) {
+                            //if(!densityThreshold) densityThreshold = settings.value("densityThreshold", 0).toFloat(); FIXME
+                            if(!densityThreshold) {
+                                log("Computing density threshold");
+                                densityThreshold = computeDensityThreshold(source);
+                                log("threshold =",densityThreshold,"=",densityThreshold*0x100);
+                                //settings.setValue("densityThreshold", densityThreshold); FIXME
+                            }
+                            threshold(target, source, densityThreshold);
+                        }
+                        else if(current==Distance) {
+                            distance(target, source);
+                        }
+                        else if(current==Maximum) {
+                            maximum(target, source);
+                        }
+                        log(current, time);
 
                         if(diskCache) {
                             string path = name+"."_+str(current)+volumeMetadata(target);
@@ -208,6 +212,7 @@ struct Rock : ImageView {
     }
 
     void updateView() {
+        assert( source.volume );
         if(currentSlice!=uint(-1)) {
             if(current==Distance) image = squareRoot(source.volume, currentSlice);
             else image = slice(source.volume, currentSlice);
@@ -252,8 +257,8 @@ struct Rock : ImageView {
     struct { Map map; string path; Volume volume; } source, target;
     Volume renderVolume;
 
-    Pass previous=Invalid;
-    Pass current=Invalid;
+    Pass previous=Null;
+    Pass current=Null;
     Pass force;
     uint currentSlice=0;
     float densityThreshold=0;
@@ -264,4 +269,4 @@ struct Rock : ImageView {
     int2 lastPos;
     vec2 rotation = vec2(PI/3,-PI/3); // Current view angles (yaw,pitch)
 #endif
-} app( arguments().first(), (Pass)passNames.indexOf(arguments().last()) );
+} app( arguments().first(), (Pass)max(0,passNames.indexOf(arguments().last())) );

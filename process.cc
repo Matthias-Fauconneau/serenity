@@ -132,7 +132,7 @@ void __attribute((constructor(101))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    //setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);
+    setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);
 }
 
 static int recurse=0;
@@ -188,7 +188,7 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
 }
 
 string getenv(const ref<byte>& name) {
-    for(TextData s = File("proc/self/environ"_).readUpTo(4096);s;) {
+    for(TextData s = File("proc/self/environ"_).readUpTo(8192);s;) {
         ref<byte> key=s.until('='); ref<byte> value=s.until('\0');
         if(key==name) return string(value);
     }

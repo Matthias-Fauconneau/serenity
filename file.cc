@@ -59,7 +59,7 @@ void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
-File::File(const ref<byte>& path, const Folder& at, uint flags):Stream(check(openat(at.fd, strz(path), flags, 0666),path)){}
+File::File(const ref<byte>& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),path)){}
 uint64 File::size() const { struct stat sb={}; check_(fstat(fd, &sb)); return sb.st_size; }
 void File::resize(uint64 size) { check_(ftruncate(fd, size)); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
@@ -71,11 +71,11 @@ array<byte> readFile(const ref<byte>& path, const Folder& at) {
     if(size>1<<24) log(path,"use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_);
     return file.read(size);
 }
-void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at) { File(path,at,WriteOnly|Create|Truncate).write(content); }
+void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
 
 // Map
-Map::Map(const File& file, uint prot) { size=file.size(); data = size?(byte*)check(mmap(0,size,prot,Private,file.fd,0)):0; }
-Map::Map(uint fd, uint offset, uint size, uint prot, uint flags){ this->size=size; data=(byte*)check(mmap(0,size,prot,flags,fd,offset)); }
+Map::Map(const File& file, Prot prot) { size=file.size(); data = size?(byte*)check(mmap(0,size,prot,Shared,file.fd,0)):0; }
+Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){ this->size=size; data=(byte*)check(mmap(0,size,prot,flags,fd,offset)); }
 Map::~Map() { if(data) munmap((void*)data,size); }
 void Map::lock(uint size) const { check_(mlock(data, min<size_t>(this->size,size))); }
 

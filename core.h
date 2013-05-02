@@ -142,9 +142,14 @@ template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T
 
 // Integer operations
 /// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+inline constexpr uint align(uint width, uint offset) { return (offset + (width-1)) & ~(width-1); }
+//inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 /// Returns floor(log2(v))
-inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+inline constexpr uint log2(uint v) { //C++11 constexpr is restricted to single statements functions
+#define o(n) v&(1<<n)?n :
+    return o(31)o(30)o(29)o(28)o(27)o(26)o(25)o(24)o(23)o(22)o(21)o(20)o(19)o(18)o(17)o(16)o(15)o(14)o(13)o(12)o(11)o(10)o(9)o(8)o(7)o(6)o(5)o(4)o(3)o(2)o(1)0;
+}
+//inline constexpr uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Computes the next highest power of 2
 inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
 /// Returns the largest positive integer that divides the numbers without a remainder
@@ -187,12 +192,11 @@ template<Type T> struct buffer {
     buffer(){}
     buffer(T* data, uint64 capacity, uint64 size):data(data),capacity(capacity),size(size){}
     buffer(T* data, uint64 size):data(data),size(size){}
-    explicit buffer(const ref<T>& o):buffer((T*)o.data,(uint64)o.size,(uint64)o.size){}
+    explicit buffer(const ref<T>& o):buffer((T*)o.data,0,(uint64)o.size){}
     buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
     buffer(uint64 capacity, uint64 size):capacity(capacity),size(size){
         assert(capacity);
         if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
-        //data = (T*)malloc(capacity*sizeof(T));
     }
     explicit buffer(uint64 size):buffer(size,size){}
 

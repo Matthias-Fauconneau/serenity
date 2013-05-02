@@ -5,12 +5,12 @@ struct Volume {
     Volume(){}
     Volume(uint sampleSize, uint x, uint y, uint z): data(sampleSize*x*y*z),x(x),y(y),z(z),sampleSize(sampleSize) {}
 
-    uint64 size() { return x*y*z*sampleSize; }
-    operator bool() { assert(data.size==size()); return data; }
+    uint64 size() const { return x*y*z; }
+    operator bool() { return data; }
     operator const struct Volume16&() const { assert(sampleSize==sizeof(uint16)); return (struct Volume16&)*this; }
     operator const struct Volume32&() const { assert(sampleSize==sizeof(uint32)); return (struct Volume32&)*this; }
-    operator struct Volume16&() { assert(sampleSize==sizeof(uint16)); return (struct Volume16&)*this; }
-    operator struct Volume32&() { assert(sampleSize==sizeof(uint32)); return (struct Volume32&)*this; }
+    operator struct Volume16&() { assert(sampleSize==sizeof(uint16)); return *(struct Volume16*)this; }
+    operator struct Volume32&() { assert(sampleSize==sizeof(uint32)); return *(struct Volume32*)this; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
     // Offset lookup tables for bricked volumes
@@ -23,6 +23,11 @@ struct Volume {
     uint sampleSize=0; // Sample integer size (in bytes)
     bool own=false;
 };
+inline string str(const Volume& volume) {
+    return str(volume.x)+"x"_+str(volume.y)+"x"_+str(volume.z)+" "_
+            +str(volume.marginX)+"+"_+str(volume.marginY)+"+"_+str(volume.marginZ)+" "_
+            +hex(volume.num)+":"_+hex(volume.den);
+}
 
 struct Volume16 : Volume {
     Volume16(uint x, uint y, uint z) : Volume(sizeof(uint16),x,y,z) {}

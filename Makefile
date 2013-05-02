@@ -1,13 +1,15 @@
 PREFIX ?= /usr
 BUILD ?= release
 ifeq ($(CC),cc)
- CC = /ptmp/gcc-4.8.0/bin/g++ -I/ptmp/include -L/ptmp/lib -pipe -march=native -std=c++11
+ CC = /ptmp/gcc-4.8.0/bin/g++ -I/ptmp/include -L/ptmp/lib -pipe -march=native -std=c++11 -gdwarf-2
  # CC = clang++ -Wno-lambda-extensions -march=native -std=c++11
 endif
 FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -DDEBUG -g
-FLAGS_profile = -DPROFILE -g -O3 -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
-FLAGS_release = -O3
+#-Og prevents backtrace
+FLAGS_profile = -DPROFILE -g -Ofast -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
+FLAGS_fast = -g -Ofast
+FLAGS_release = -g -Ofast
 FLAGS += $(FLAGS_$(BUILD))
 
 SRCS = $(SRCS_$(BUILD))

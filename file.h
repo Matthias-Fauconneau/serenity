@@ -64,14 +64,14 @@ struct Socket : Stream {
     Socket(int domain, int type);
 };
 
-enum {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, Asynchronous=020000};
+enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, Asynchronous=020000};
 /// Handle to a file
 struct File : Stream {
     File(int fd):Stream(fd){}
     /// Opens \a path
     /// If read only, fails if not existing
     /// If write only, fails if existing
-    File(const ref<byte>& path, const Folder& at=root(), uint flags=ReadOnly);
+    File(const ref<byte>& path, const Folder& at=root(), Flags flags=ReadOnly);
     /// Returns file size
     uint64 size() const;
     /// Resizes file
@@ -92,7 +92,7 @@ template<uint major, uint minor, Type T> struct IOR { typedef T Args; static con
 template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 /// Handle to a device
 struct Device : File {
-    Device(const ref<byte>& path, int flags=ReadWrite):File(path, root(), flags){}
+    Device(const ref<byte>& path, Flags flags=ReadWrite):File(path, root(), flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);
     /// Sends ioctl request with neither input/outputs arguments
@@ -107,13 +107,13 @@ struct Device : File {
 
 /// Managed memory mapping
 struct Map {
-    enum {Read=1, Write=2};
-    enum {Shared=1, Private=2, Anonymous=32};
+    enum Prot {Read=1, Write=2};
+    enum Flags {Shared=1, Private=2, Anonymous=32};
 
     Map(){}
-    Map(const File& file, uint prot=Read);
-    Map(const ref<byte>& path, const Folder& at=root(), uint prot=Read):Map(File(path,at),prot){}
-    Map(uint fd, uint offset, uint size, uint prot, uint flags=Shared);
+    Map(const File& file, Prot prot=Read);
+    Map(const ref<byte>& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
+    Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     default_move(Map);
     ~Map();
 

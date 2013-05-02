@@ -31,7 +31,10 @@ inline v8hi loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_loaddqu
 inline void storea(uint16* const ptr, v8hi a) { *(v8hi*)ptr = a; }
 inline void storeu(uint16* const ptr, v8hi a) { __builtin_ia32_storedqu((char*)ptr, (v16qi)a); }
 
-inline v8hi shiftRight(v8hi a, int imm) { return __builtin_ia32_psrlwi128(a, imm); }
+inline v8hi shiftRight(v8hi a, uint imm) { return __builtin_ia32_psrlwi128(a, imm); }
+
+inline v8hi min(v8hi a, v8hi b) { return __builtin_ia32_pminuw128(a,b); }
+inline v8hi max(v8hi a, v8hi b) { return __builtin_ia32_pmaxuw128(a,b); }
 
 inline v8hi cmpgt(v8hi a, v8hi b) { return __builtin_ia32_pcmpgtw128(a, b); }
 
@@ -130,12 +133,14 @@ inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 //inline v8hi packus(v8si a) { return __builtin_ia32_packusdw128(__builtin_ia32_vextractf128_si256(a,0),__builtin_ia32_vextractf128_si256(a,1)); }
 
 // Constants
+unused const v4si _1i = {1,1,1,1};
+unused const v8hi _0h = {0,0,0,0};
+
 unused const v4sf _1f = float4( 1 );
 unused const v4sf _0f = float4( 0 );
 unused const v4sf _halff = float4( 1./2 );
 unused const v4sf _2f = float4( 2 );
 unused const v4sf _4f = float4( 4 );
-unused const v4si _1i = {1,1,1,1};
 unused const v4sf _0001f = {0, 0, 0, 1};
 unused const v4sf _0101f = {0, 1, 0, 1};
 unused const v4sf _1110f = {1, 1, 1, 0};
