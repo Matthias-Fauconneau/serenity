@@ -11,7 +11,6 @@ void maximum(Volume32& maximum, const Volume32& distance) {
     uint32* const dst = maximum;
     clear(dst, Z*Y*X);
     //TODO: use tiled target, process volume in Z-order
-    //#pragma omp parallel for
     for(int z=1; z<Z-1; z++) {
         for(int y=1; y<Y-1; y++) {
             for(int x=1; x<X-1; x++) {

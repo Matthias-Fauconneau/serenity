@@ -4,7 +4,6 @@
 
 template<Type T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
-typedef vector<bgra,int,4> int4;
 
 struct Image {
     ::buffer<byte4> buffer;

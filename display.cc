@@ -9,6 +9,8 @@ Image framebuffer;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 
+typedef vector<bgra,int,4> int4;
+
 void fill(Rect rect, vec4 color) {
     rect = rect & currentClip;
 #if GL

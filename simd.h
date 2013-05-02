@@ -15,8 +15,15 @@ inline void storeu(long long* const ptr, v2di a) { __builtin_ia32_storedqu((char
 
 // v4si
 
-//inline v4si int4(int i) { return (v4si){i,i,i,i}; }
-inline v8hi packus(v4si a, v4si b) { return __builtin_ia32_packusdw128(a,b); }
+inline v4si int4(int i) { return (v4si){i,i,i,i}; }
+inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
+inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_loaddqu((char*)ptr); }
+inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
+inline void storeu(uint32* const ptr, v4si a) { __builtin_ia32_storedqu((char*)ptr, (v16qi)a); }
+//inline v4si cmpgt(v4si a, v4si b) { return __builtin_ia32_pcmpgtd128(a, b); }
+//inline v8hi packus(v4si a, v4si b) { return __builtin_ia32_packusdw128(a,b); }
+//inline v4si blendv(v4si a, v4si b, v4si m) { return (v4si)__builtin_ia32_blendvps((v4sf)a, (v4sf)b, (v4sf)m); }
+
 #ifdef DEBUG
 #define extracti __builtin_ia32_vec_ext_v4si
 #else
@@ -36,43 +43,43 @@ inline v8hi shiftRight(v8hi a, uint imm) { return __builtin_ia32_psrlwi128(a, im
 inline v8hi min(v8hi a, v8hi b) { return __builtin_ia32_pminuw128(a,b); }
 inline v8hi max(v8hi a, v8hi b) { return __builtin_ia32_pmaxuw128(a,b); }
 
-inline v8hi cmpgt(v8hi a, v8hi b) { return __builtin_ia32_pcmpgtw128(a, b); }
+//inline v8hi cmpgt(v8hi a, v8hi b) { return __builtin_ia32_pcmpgtw128(a, b); }
 
-inline v8hi unpacklo(v8hi a, v8hi b) { return __builtin_ia32_punpcklwd128(a, b); }
-inline v8hi unpackhi(v8hi a, v8hi b) { return __builtin_ia32_punpckhwd128(a, b); }
-inline v4si unpacklo(v4si a, v4si b) { return __builtin_ia32_punpckldq128(a, b); }
-inline v4si unpackhi(v4si a, v4si b) { return __builtin_ia32_punpckhdq128(a, b); }
-inline v2di unpacklo(v2di a, v2di b) { return __builtin_ia32_punpcklqdq128(a, b); }
-inline v2di unpackhi(v2di a, v2di b) { return __builtin_ia32_punpckhqdq128(a, b); }
+inline v4si unpacklo(v8hi a, v8hi b) { return (v4si)__builtin_ia32_punpcklwd128(a, b); }
+inline v4si unpackhi(v8hi a, v8hi b) { return (v4si)__builtin_ia32_punpckhwd128(a, b); }
+inline v2di unpacklo(v4si a, v4si b) { return (v2di)__builtin_ia32_punpckldq128(a, b); }
+inline v2di unpackhi(v4si a, v4si b) { return (v2di)__builtin_ia32_punpckhdq128(a, b); }
+inline v8hi unpacklo(v2di a, v2di b) { return (v8hi)__builtin_ia32_punpcklqdq128(a, b); }
+inline v8hi unpackhi(v2di a, v2di b) { return (v8hi)__builtin_ia32_punpckhqdq128(a, b); }
 
 /// Transposes 8 registers of 8 16bit values
 inline void transpose8(uint16* out, uint stride, v8hi a, v8hi b, v8hi c, v8hi d, v8hi e, v8hi f, v8hi g, v8hi h) {
-    v4si a03b03 = (v4si)unpacklo(a, b);
-    v4si a47b47 = (v4si)unpackhi(a, b);
-    v4si c03d03 = (v4si)unpacklo(c, d);
-    v4si c47d47 = (v4si)unpackhi(c, d);
-    v4si e03f03 = (v4si)unpacklo(e, f);
-    v4si e47f47 = (v4si)unpackhi(e, f);
-    v4si g03h03 = (v4si)unpacklo(g, h);
-    v4si g47h47 = (v4si)unpackhi(g, h);
+    v4si a03b03 = unpacklo(a, b);
+    v4si a47b47 = unpackhi(a, b);
+    v4si c03d03 = unpacklo(c, d);
+    v4si c47d47 = unpackhi(c, d);
+    v4si e03f03 = unpacklo(e, f);
+    v4si e47f47 = unpackhi(e, f);
+    v4si g03h03 = unpacklo(g, h);
+    v4si g47h47 = unpackhi(g, h);
 
-    v2di a01b01c01d01 = (v2di)unpacklo(a03b03, c03d03);
-    v2di a23b23c23d23 = (v2di)unpackhi(a03b03, c03d03);
-    v2di e01f01g01h01 = (v2di)unpacklo(e03f03, g03h03);
-    v2di e23f23g23h23 = (v2di)unpackhi(e03f03, g03h03);
-    v2di a45b45c45d45 = (v2di)unpacklo(a47b47, c47d47);
-    v2di a67b67c67d67 = (v2di)unpackhi(a47b47, c47d47);
-    v2di e45f45g45h45 = (v2di)unpacklo(e47f47, g47h47);
-    v2di e67f67g67h67 = (v2di)unpackhi(e47f47, g47h47);
+    v2di a01b01c01d01 = unpacklo(a03b03, c03d03);
+    v2di a23b23c23d23 = unpackhi(a03b03, c03d03);
+    v2di e01f01g01h01 = unpacklo(e03f03, g03h03);
+    v2di e23f23g23h23 = unpackhi(e03f03, g03h03);
+    v2di a45b45c45d45 = unpacklo(a47b47, c47d47);
+    v2di a67b67c67d67 = unpackhi(a47b47, c47d47);
+    v2di e45f45g45h45 = unpacklo(e47f47, g47h47);
+    v2di e67f67g67h67 = unpackhi(e47f47, g47h47);
 
-    storeu(out+0*stride, (v8hi)unpacklo(a01b01c01d01, e01f01g01h01));
-    storeu(out+1*stride, (v8hi)unpackhi(a01b01c01d01, e01f01g01h01));
-    storeu(out+2*stride, (v8hi)unpacklo(a23b23c23d23, e23f23g23h23));
-    storeu(out+3*stride, (v8hi)unpackhi(a23b23c23d23, e23f23g23h23));
-    storeu(out+4*stride, (v8hi)unpacklo(a45b45c45d45, e45f45g45h45));
-    storeu(out+5*stride, (v8hi)unpackhi(a45b45c45d45, e45f45g45h45));
-    storeu(out+6*stride, (v8hi)unpacklo(a67b67c67d67, e67f67g67h67));
-    storeu(out+7*stride, (v8hi)unpackhi(a67b67c67d67, e67f67g67h67));
+    storeu(out+0*stride, unpacklo(a01b01c01d01, e01f01g01h01));
+    storeu(out+1*stride, unpackhi(a01b01c01d01, e01f01g01h01));
+    storeu(out+2*stride, unpacklo(a23b23c23d23, e23f23g23h23));
+    storeu(out+3*stride, unpackhi(a23b23c23d23, e23f23g23h23));
+    storeu(out+4*stride, unpacklo(a45b45c45d45, e45f45g45h45));
+    storeu(out+5*stride, unpackhi(a45b45c45d45, e45f45g45h45));
+    storeu(out+6*stride, unpacklo(a67b67c67d67, e67f67g67h67));
+    storeu(out+7*stride, unpackhi(a67b67c67d67, e67f67g67h67));
 }
 
 // v16qi
@@ -83,10 +90,10 @@ inline v16qi packus(v8hi a, v8hi b) { return __builtin_ia32_packuswb128(a,b); }
 
 inline v4sf float4(float f) { return (v4sf){f,f,f,f}; }
 
-inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
+//inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
 inline v4sf andnot(v4sf a, v4sf b) { return __builtin_ia32_andnps(a, b); }
 inline v4sf bitXor(v4sf a, v4sf b) { return __builtin_ia32_xorps(a, b); }
-inline v4sf cmpgt(v4sf a, v4sf b) { return __builtin_ia32_cmpgtps(a, b); }
+//inline v4sf cmpgt(v4sf a, v4sf b) { return __builtin_ia32_cmpgtps(a, b); }
 
 const v4sf signBit = (v4sf)(v4si){(int)0x80000000,(int)0x80000000,(int)0x80000000,(int)0x80000000};
 inline v4sf negate(v4sf a) { return bitXor(a,  signBit); }

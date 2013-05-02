@@ -51,7 +51,7 @@ private:
 
     int previousPass;
     int currentPass;
-    int currentSlice;
+    float currentZ; // Normalized (in [0,1])
     float densityThreshold;
 
     QPoint lastPos;

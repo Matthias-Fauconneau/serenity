@@ -57,13 +57,15 @@ inline void interleavedLookup(Volume& target) {
 /// Returns an image of a volume slice
 inline Image slice(const Volume& volume, uint z) {
     uint X=volume.x, Y=volume.y;
-    Image target(X,Y);
+    uint mX=volume.marginX, mY=volume.marginY;
+    uint imX=X-2*mX, imY=Y-2*mY;
+    Image target(imX,imY);
     if(volume.sampleSize==2) {
-        const uint16* const source = (const Volume16&)volume + z*Y*X;
-        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
+        const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
+        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
     } else if(volume.sampleSize==4) {
-        const uint32* const source = (const Volume32&)volume + z*Y*X;
-        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
+        const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
+        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
 }
@@ -72,14 +74,16 @@ inline float sqrt(float f) { return __builtin_sqrtf(f); }
 /// Returns the square root of an image of a volume slice
 inline Image squareRoot(const Volume& volume, uint z) {
     uint X=volume.x, Y=volume.y;
-    Image target(X,Y);
+    uint mX=volume.marginX, mY=volume.marginY;
+    uint imX=X-2*mX, imY=Y-2*mY;
+    Image target(imX,imY);
     float scale = 0x100 * sqrt(float(volume.num) / float(volume.den));
     if(volume.sampleSize==2) {
-        const uint16* const source = (const Volume16&)volume + z*Y*X;
-        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint8(sqrt(float(source[y*X+x])) * scale);
+        const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
+        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint8(sqrt(float(source[y*X+x])) * scale);
     } else if(volume.sampleSize==4) {
-        const uint32* const source = (const Volume32&)volume + z*Y*X;
-        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint8(sqrt(float(source[y*X+x])) * scale);
+        const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
+        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint8(sqrt(float(source[y*X+x])) * scale);
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
 }

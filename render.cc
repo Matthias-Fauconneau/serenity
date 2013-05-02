@@ -6,7 +6,6 @@ void tile(Volume& target, const Volume& source) {
     uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     interleavedLookup(target);
 
-    //#pragma omp parallel for
     for(uint z=0; z<Z; z++) {
         const uint16* const slice = source.data+z*XY;
         for(uint y=0; y<Y; y++) {
@@ -25,7 +24,6 @@ void clip(Volume& target) {
     uint radiusSq=(X/2-marginX)*(X/2-marginX);
     interleavedLookup(target);
 
-    //#pragma omp parallel for
     for(uint z=0; z<Z; z++) {
         for(uint y=0; y<Y; y++) {
             for(uint x=0; x<X; x++) {
@@ -76,7 +74,6 @@ Image render(const Volume& volume, mat3 view) {
     const v4sf rcp_2a = float4(-1./(2*a));
 
     #define tileSize 8
-    //#pragma omp parallel for
     for(int i=0; i<imageX/tileSize*imageY/tileSize; i++) {
         const int tileX = i%(imageX/tileSize), tileY = i/(imageY/tileSize);
         uint* const image = (uint*)target.data+tileY*tileSize*imageX+tileX*tileSize;
@@ -100,7 +97,7 @@ Image render(const Volume& volume, mat3 view) {
             const v4sf sideZ = abs(originZ + sideT * rayZ); // ? z+ ? z-
             const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); //world positions for top bottom +side -side
             const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
-            const v4sf tMask = cmpgt(radiusSqHeight, capSideP);
+            const v4sf tMask = radiusSqHeight > capSideP; //cmpgt(radiusSqHeight, capSideP);
             if(!mask(tMask)) { image[y*imageX+x] = 0; continue; }
             const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
             const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );

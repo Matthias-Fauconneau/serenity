@@ -125,6 +125,7 @@ Image doResize(const Image& image, uint width, uint height) {
         for(uint unused y: range(height)) {
             const byte4* line = src;
             for(uint unused x: range(width)) {
+                typedef vector<bgra,int,4> int4;
                 int4 s=0; //TODO: alpha blending
                 for(uint i: range(scale)) {
                     for(uint j: range(scale)) {

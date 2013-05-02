@@ -12,7 +12,7 @@ uint maximum(const Volume16& source) {
 }
 
 template<uint size, uint shift> void smooth(uint16* const target, const uint16* const source, uint X, uint Y, uint Z) {
-    constexpr uint margin = align(4,size)-size;
+    constexpr uint margin = align(4,size)-size; //FIXME
     const uint XY = X*Y;
     for(uint z=0; z<Z; z++) for(uint x=0; x<X; x+=16) {
         const uint16* const sourceZX = source+z*XY+x;
@@ -54,16 +54,16 @@ template<int size> void smooth(Volume16& target, const Volume16& original) {
         uint shift = usedBits+headBits-16;
         log("Shifting out",shift,"/",usedBits,"least significant bits to compute sum of",size*2+1,"samples without unpacking to 32bit");
         shiftRight(buffer, original, shift);
-        buffer.num = original.num << shift;
-        buffer.den = original.den;
+        buffer.num = original.num;
+        buffer.den = original.den >> shift;
         source=&buffer;
     }
     constexpr uint shift = log2(filterSize);
     smooth<size,shift>(target, *source, X,Y,Z);
     smooth<size,shift>(buffer, target, Y,Z,X);
     smooth<size,0>(target, buffer, Z,X,Y);
-    target.den = source->den * filterSize*filterSize*filterSize;
-    target.num = source->num * (1<<shift)*(1<<shift);
+    target.num = source->num;
+    target.den = (((((source->den * filterSize) >> shift) * filterSize) >> shift) * filterSize);
     simplify(target.den, target.num);
     assert(target.den/target.num<(1<<16), target.den, target.num); // Whole range can be covered with 16bit
     assert(target.den/target.num>=(1<<13)-1, target.den, target.num); // Precision is at least 13bit

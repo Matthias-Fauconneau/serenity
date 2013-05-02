@@ -4,7 +4,6 @@ template<bool last> void PBEDT(uint32* const target, const uint32* const source,
     for(int z=0; z<Z; z++) {
         const uint32* const sourceZ = source+z*zStride;
         uint32* const targetZ = target+z*zStride;
-        //#pragma omp parallel for
         for(int y=0; y<Y; y++) {
             struct element { int cx, x, sd; } stackBase[X];
             element* stack=stackBase;

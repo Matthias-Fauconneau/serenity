@@ -8,7 +8,7 @@ struct Handle {
     Handle(int fd):fd(fd){}
     default_move(Handle);
     ~Handle();
-    operator bool() const { return fd; }
+    explicit operator bool() const { return fd; }
 };
 
 struct Folder;

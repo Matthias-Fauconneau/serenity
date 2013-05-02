@@ -1,7 +1,7 @@
 PREFIX ?= /usr
 BUILD ?= release
 ifeq ($(CC),cc)
- CC = /ptmp/gcc-4.8.0/bin/g++ -I/ptmp/include -L/ptmp/lib -pipe -march=native -std=c++11 -gdwarf-2
+ CC = /ptmp/gcc-4.8.0/bin/g++ -I/ptmp/include -L/ptmp/lib -pipe -march=native -std=c++11
  # CC = clang++ -Wno-lambda-extensions -march=native -std=c++11
 endif
 FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
