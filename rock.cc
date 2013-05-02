@@ -109,10 +109,13 @@ struct Rock : ImageView {
             uint16* const targetData = (Volume16&)target.volume;
             //#pragma omp parallel for
             for(uint z=0; z<slices.size; z++) {
-                const Image image = decodeImage(Map(slices[z],folder)); //TODO: 16bit
-                const byte4* const src = image.data;
+                const Image16 image = decodeTIFF16(Map(slices[z],folder)); //TODO: 16bit
+                const uint16* const src = image.data;
                 uint16* const dst = targetData + z*XY;
-                for(uint i=0; i<XY; i++) dst[i] = src[i].b << 4; // Leaves 4bit headroom to convolve up to 16 samples without unpacking
+                uint max=0;
+                for(uint i=0; i<XY; i++) { uint v=src[i]; dst[i] = src[i]; if(v>max) max=v; }
+                target.volume.den = max;
+                log(max);
             }
         }
         return false;

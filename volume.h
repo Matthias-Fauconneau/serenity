@@ -19,7 +19,7 @@ struct Volume {
     buffer<uint> offsetZ;
     uint x=0, y=0, z=0; // Sample count in each dimensions
     uint marginX=0, marginY=0, marginZ=0; // Margins to trim when processing volume
-    int num=1, den=1; // Scale to apply to compute normalized values (data*num/den)
+    uint num=1, den=1; // Scale to apply to compute normalized values (data*numerator/denominator)
     uint sampleSize=0; // Sample integer size (in bytes)
     bool own=false;
 };
@@ -55,10 +55,10 @@ inline Image slice(const Volume& volume, uint z) {
     Image target(X,Y);
     if(volume.sampleSize==2) {
         const uint16* const source = (const Volume16&)volume + z*Y*X;
-        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint(source[y*X+x]) * (0x100 * volume.num) / volume.den;
+        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
     } else if(volume.sampleSize==4) {
         const uint32* const source = (const Volume32&)volume + z*Y*X;
-        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint(source[y*X+x]) * (0x100 * volume.num) / volume.den;
+        for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
 }
