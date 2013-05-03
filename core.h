@@ -77,6 +77,8 @@ template<> void error(const ref<byte>& message) __attribute((noreturn));
 #define warn log
 #define assert(expr, message...) ({})
 #endif
+/// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
+#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
 
 /// Numeric range
 struct range {

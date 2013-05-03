@@ -24,7 +24,7 @@ struct Time {
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
     string reset(){ stop(); string s=ftoa((stopTime-startTime)/1000000.,1)+"s"_; startTime=stopTime; stopTime=0; return s; }
-    operator uint64(){ return (stopTime?:realTime()) - startTime; }
+    operator uint64(){ return ((stopTime?:realTime()) - startTime)/1000; }
 };
 inline string str(Time s) { return s.reset(); }
 

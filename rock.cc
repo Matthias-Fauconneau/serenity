@@ -12,8 +12,8 @@
 //#include "render.h"
 
 enum Pass { Null, Source, Smooth, Threshold, Distance, Maximum, Undefined };
-static constexpr uint passSampleSize[] = {0,2,2,4,4,4};
-static ref<ref<byte>> passNames = {"null"_, "source"_,"smooth"_,"threshold"_,"distance"_,"maximum"_};
+static constexpr uint passSampleSize[] = {0,2,2,4,4,2};
+static const ref<ref<byte>> passNames = {"null"_, "source"_,"smooth"_,"threshold"_,"distance"_,"maximum"_};
 const ref<byte>& str(Pass pass) { return passNames[(uint)pass]; }
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
@@ -42,13 +42,15 @@ struct Rock : Widget {
             ref<byte> passName = section(volume,'.',-3,-2);
             Pass pass = (Pass)passNames.indexOf(passName);
             if(pass > Source && (force==Null || pass < force)) {
-                if(previous>Null) error("Too many intermediate passes stored",previous);
+                if(previous>pass && current>pass) continue;
+                if(previous>current) swap(current,previous), swap(source, target);
                 previous=current; current=pass;
                 mapVolume(pass);
                 swap(source, target);
             }
         }
-        setPass(force != Null ? force : Distance);
+        if(current>Null) log("Using",source.path,previous>Null?str("and",target.path):""_,"from disk");
+        setPass(force != Null ? force : Maximum);
     }
 
     /// Serializes volume metadata (sample data format)
@@ -91,7 +93,6 @@ struct Rock : Widget {
             target.map = Map(file, Map::Prot(Map::Read|Map::Write));
             target.volume.data = buffer<byte>(target.map);
             assert( target.volume );
-            log("Loading",target.path);
             return (force == Null || pass < force);
         }
         array<string> slices;
@@ -110,8 +111,9 @@ struct Rock : Widget {
         if(pass==Source) {
             uint XY=target.volume.x*target.volume.y;
             uint16* const targetData = (Volume16&)target.volume;
-            Time time;
-            for(uint z=0; z<slices.size; z++) Tiff16(Map(slices[z],folder)).read(targetData+z*XY);
+            Time time; Time report;
+            log("Loading", name);
+            for(uint z=0; z<slices.size; z++) { if(report/1000>1) report.reset(), log(z,"/",slices.size); Tiff16(Map(slices[z],folder)).read(targetData+z*XY); }
             log(current, time);
         }
         return false;
@@ -128,6 +130,7 @@ struct Rock : Widget {
             while(current<targetPass) {
                 previous = current;
                 current = Pass(int(current)+1);
+                if(target.volume.sampleSize != passSampleSize[current]) target = {}; // memory map size mismatch
                 if(current==Source) {
                     mapVolume(Source);
                     string path = name+".source."_+volumeMetadata(target.volume);
@@ -136,7 +139,6 @@ struct Rock : Widget {
                 } else {
                     Volume& target = this->target.volume;
                     Volume& source = this->source.volume;
-                    if(target.sampleSize != passSampleSize[current]) this->target = {}; // memory map size mismatch
                     target.x=source.x, target.y=source.y, target.z=source.z, target.marginX = source.marginX, target.marginY = source.marginY, target.marginZ = source.marginZ;
                     target.num=source.num, target.den=source.den, target.sampleSize=passSampleSize[current];
                     if(!target && (force == Null || current < force) && mapVolume(current)) {}
@@ -160,12 +162,12 @@ struct Rock : Widget {
                             smooth<smoothFilterSize>(target, source);
                         }
                         else if(current==Threshold) {
-                            if(1 || !existsFile(name+".density"_, histogramFolder)) {
+                            if(1 || !existsFile(name+".density.tsv"_, histogramFolder)) {
                                 Time time;
-                                writeFile(name+".density"_, str(histogram(source)), histogramFolder);
+                                writeFile(name+".density.tsv"_, str(histogram(source)), histogramFolder);
                                 log("density", time);
                             }
-                            Histogram density = parseHistogram( readFile(name+".density"_, histogramFolder) );
+                            Histogram density = parseHistogram( readFile(name+".density.tsv"_, histogramFolder) );
                             // Computes density threshold as local (around 0.45=115) minimum of density histogram.
                             uint minimum = -1;
                             for(uint i=115-9; i<=115+9; i++) { //FIXME: find local minimum without these bounds
@@ -189,7 +191,11 @@ struct Rock : Widget {
                             }
                         }
                         else if(current==Maximum) {
-                            maximum(target, source);
+                            Volume tiled(source.sampleSize, source.x, source.y, source.z);
+                            Time time;
+                            tile(tiled, source);
+                            log("tile", time);
+                            maximum(target, tiled);
                         }
                         log(current, time);
 
@@ -201,8 +207,10 @@ struct Rock : Widget {
                         }
 
                         if(current==Maximum) {
-                            log("Computing pore size histogram");
-                            writeFile(name+".radius"_, str(histogram(target)), histogramFolder);
+                            Histogram histogram = sqrtHistogram(target);
+                            histogram[0] = 0; // Clears rock space voxel count to plot with a bigger Y scale
+                            writeFile(name+".radius.tsv"_, str(histogram), histogramFolder);
+                            log("Pore size histogram written to",name+".radius.tsv"_);
                         }
                     }
                     swap(this->source, this->target); // target pass becomes source pass for next iteration
@@ -219,9 +227,8 @@ struct Rock : Widget {
     }
 
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
-        if(!window.state)
         if(button==WheelDown) setPass((Pass)max((int)Source,current-1));
-        if(button==WheelUp) setPass((Pass)min((int)Distance,current+1));
+        if(button==WheelUp) setPass((Pass)min((int)Maximum,current+1));
         setSlice(float(cursor.x)/(size.x-1));
 #if RENDER
         QPoint delta = ev->pos()-lastPos;
@@ -244,7 +251,7 @@ struct Rock : Widget {
         Image image; //FIXME: unnecessary copy
         assert( source.volume );
         uint z = source.volume.marginZ+(source.volume.z-2*source.volume.marginZ-1)*currentSlice;
-        if(current==Distance) image = squareRoot(source.volume, z);
+        if(current==Distance || current==Maximum) image = squareRoot(source.volume, z);
         else image = slice(source.volume, z);
 #if RENDER
         else {

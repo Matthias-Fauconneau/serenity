@@ -1,43 +1,6 @@
 #include "render.h"
 #include "simd.h"
 
-/// Tiles a volume recursively into bricks (using 3D Z ordering)
-void tile(Volume& target, const Volume& source) {
-    uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    interleavedLookup(target);
-
-    for(uint z=0; z<Z; z++) {
-        const uint16* const slice = source.data+z*XY;
-        for(uint y=0; y<Y; y++) {
-            const uint16* const line = slice+y*X;
-            for(uint x=0; x<X; x++) {
-                target.data[target.offsetZ[z]+target.offsetY[y]+target.offsetX[x]] = line[x];
-            }
-        }
-    }
-}
-
-/// Clips volume data to a cylinder and sets zero samples to 1
-void clip(Volume& target) {
-    uint X=target.x, Y=target.y, Z=target.z;
-    uint marginX=target.marginX, marginZ=target.marginZ;
-    uint radiusSq=(X/2-marginX)*(X/2-marginX);
-    interleavedLookup(target);
-
-    for(uint z=0; z<Z; z++) {
-        for(uint y=0; y<Y; y++) {
-            for(uint x=0; x<X; x++) {
-                uint16& value = target.data[target.offsetZ[z]+target.offsetY[y]+target.offsetX[x]];
-                if(z > marginZ && z < Z-marginZ && (x-X/2)*(x-X/2) + (y-Y/2)*(y-Y/2) < radiusSq) {
-                    if(value==0) value=1; // Light attenuation
-                } else {
-                    value = 0; //Clip
-                }
-            }
-        }
-    }
-}
-
 /// Renders a volume by projecting it on the image plane
 Image render(const Volume& volume, mat3 view) {
     // Volume
