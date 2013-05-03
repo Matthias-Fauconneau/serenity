@@ -61,7 +61,7 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 // File
 File::File(const ref<byte>& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),path)){}
 uint64 File::size() const { struct stat sb={}; check_(fstat(fd, &sb)); return sb.st_size; }
-void File::resize(uint64 size) { check_(ftruncate(fd, size)); }
+void File::resize(uint64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
@@ -76,8 +76,9 @@ void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at
 // Map
 Map::Map(const File& file, Prot prot) { size=file.size(); data = size?(byte*)check(mmap(0,size,prot,Shared,file.fd,0)):0; }
 Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){ this->size=size; data=(byte*)check(mmap(0,size,prot,flags,fd,offset)); }
-Map::~Map() { if(data) munmap((void*)data,size); }
+Map::~Map() { unmap(); }
 void Map::lock(uint size) const { check_(mlock(data, min<size_t>(this->size,size))); }
+void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 
 // File system
 void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) {

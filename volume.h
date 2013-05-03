@@ -11,39 +11,32 @@ struct Volume {
     operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32)); return (struct Volume32&)*this; }
     operator struct Volume16&() { assert_(sampleSize==sizeof(uint16)); return *(struct Volume16*)this; }
     operator struct Volume32&() { assert_(sampleSize==sizeof(uint32)); return *(struct Volume32*)this; }
-    void copyMetadata(const Volume& source) { num=source.num, den=source.den; marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; }
+    void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; num=source.num, den=source.den; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
-    // Offset lookup tables for bricked volumes
-    buffer<uint> offsetX;
-    buffer<uint> offsetY;
-    buffer<uint> offsetZ;
+    buffer<uint> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
     uint x=0, y=0, z=0; // Sample count in each dimensions
     uint marginX=0, marginY=0, marginZ=0; // Margins to trim when processing volume
     uint num=1, den=1; // Scale to apply to compute normalized values (data*numerator/denominator)
     uint sampleSize=0; // Sample integer size (in bytes)
-    bool own=false;
 };
-inline string str(const Volume& volume) {
-    return str(volume.x)+"x"_+str(volume.y)+"x"_+str(volume.z)+" "_
-            +str(volume.marginX)+"+"_+str(volume.marginY)+"+"_+str(volume.marginZ)+" "_
-            +hex(volume.num)+":"_+hex(volume.den)+" "_
-            +str(volume.size()*volume.sampleSize/1024/1024)+"MB"_;
-}
+
+/// Serializes volume format (size, margin, range, layout)
+string volumeFormat(const Volume& volume);
+/// Parses volume format (i.e sample format)
+void parseVolumeFormat(Volume& volume, const ref<byte>& path);
 
 struct Volume16 : Volume {
     Volume16(uint x, uint y, uint z) : Volume(sizeof(uint16),x,y,z) {}
     operator const uint16*() const { return (uint16*)data.data; }
     operator uint16*() { return (uint16*)data.data; }
 };
-inline string str(const Volume16& volume) { return str((Volume&)volume); }
 
 struct Volume32 : Volume {
     Volume32(uint x, uint y, uint z): Volume(sizeof(uint32),x,y,z) {}
     operator const uint32*() const { return (uint32*)data.data; }
     operator uint32*() { return (uint32*)data.data; }
 };
-inline string str(const Volume32& volume) { return str((Volume&)volume); }
 
 /// Returns maximum of data
 uint maximum(const Volume16& source);

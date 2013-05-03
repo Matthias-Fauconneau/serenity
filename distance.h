@@ -1,5 +1,5 @@
 #pragma once
 #include "volume.h"
 
-/// Returns a 32bit distance field volume from a 32bit binary segmented volume
-void distance(Volume32& target, const Volume32& source);
+/// Computes one pass of perpendicular bisector distance field algorithm
+template<bool last> void PerpendicularBisectorEuclideanDistanceTransform(Volume32& target, const Volume32& source, uint X, uint Y, uint Z);

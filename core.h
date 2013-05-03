@@ -113,6 +113,8 @@ template<Type T> struct ref {
     constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
     /// Converts an std::initializer_list to ref
     constexpr ref(const std::initializer_list<T>& list) : data(list.data), size(list.size) {}
+    /// Converts a static array to ref
+    template<size_t N> ref(const T (&a)[N]):  ref(a,N) {}
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }

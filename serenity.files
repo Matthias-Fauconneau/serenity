@@ -4,13 +4,13 @@ simd.h
 array.h
 string.h
 file.h
+file.cc
 process.h
 time.h
 image.h
 tiff.cc
 volume.h
 volume.cc
-disasm.cc
 rock.cc
 smooth.h
 smooth.cc

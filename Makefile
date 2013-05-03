@@ -5,11 +5,11 @@ ifeq ($(CC),cc)
  # CC = clang++ -Wno-lambda-extensions -march=native -std=c++11
 endif
 FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
-FLAGS_debug = -DDEBUG -g
+FLAGS_debug = -DDEBUG -g -Og
 #-Og prevents backtrace
 FLAGS_profile = -DPROFILE -g -Ofast -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
-FLAGS_fast = -g -Ofast -funroll-loops -fpeel-loops #distance seems to miscompile without these ricer flags :/
-FLAGS_release = -g -Ofast
+FLAGS_fast = -g -Ofast -funroll-loops -fpeel-loops #distance seems to miscompile without :/
+FLAGS_release = -Ofast
 FLAGS += $(FLAGS_$(BUILD))
 
 SRCS = $(SRCS_$(BUILD))

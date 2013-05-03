@@ -122,6 +122,8 @@ struct Map {
 
     /// Locks memory map in RAM
     void lock(uint size=-1) const;
+    /// Unmaps memory map
+    void unmap();
 
     handle<byte*> data;
     uint64 size=0;

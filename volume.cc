@@ -1,5 +1,31 @@
 #include "volume.h"
 #include "simd.h"
+#include "data.h"
+
+string volumeFormat(const Volume& volume) {
+    string s; s << str(volume.x) << 'x' << str(volume.y) << 'x' << str(volume.z);
+    if(volume.marginX||volume.marginY||volume.marginZ) s << '+' << str(volume.marginX) << '+' << str(volume.marginY) << '+' << str(volume.marginZ);
+    s << '-' << hex(volume.num) << ':' << hex(volume.den);
+    if(volume.offsetX||volume.offsetY||volume.offsetZ) s << "-tiled"_;
+    return s;
+}
+
+void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
+    TextData s ( section(path,'.',-2,-1) );
+    volume.x = s.integer(); s.skip("x"_);
+    volume.y = s.integer(); s.skip("x"_);
+    volume.z = s.integer();
+    if(s.match('+')) {
+        volume.marginX = s.integer(); s.skip("+"_);
+        volume.marginY = s.integer(); s.skip("+"_);
+        volume.marginZ = s.integer();
+    }
+    s.skip("-"_);
+    volume.num = s.hexadecimal(); s.skip(":"_);
+    volume.den = s.hexadecimal();
+    assert(volume.num && volume.den, path, volume.num, volume.den);
+    volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.den+1)/volume.num)))) / 8; // Minimum sample size to encode maximum value (in 2ⁿ bytes)
+}
 
 uint maximum(const Volume16& source) {
     const uint16* const sourceData = source;

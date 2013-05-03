@@ -22,8 +22,8 @@ Histogram histogram(const Volume16& volume) {
             const uint16* sourceY = sourceZ+y*X;
             for(uint x=marginX; x<X-marginX; x++) {
                 if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) >= radiusSq) continue;
-                uint density = sourceY[x]*(0x100*volume.num)/volume.den; // Downscale to 8bit
-                assert(density<0x100);
+                uint density = sourceY[x]*(0xFF*volume.num)/volume.den; // Downscale to 8bit
+                assert(density<0x100, density);
                 histogram[density]++;
             }
         }
