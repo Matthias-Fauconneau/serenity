@@ -23,7 +23,7 @@ struct Time {
     uint64 startTime=realTime(), stopTime=0;
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-    string reset(){ stop(); string s=ftoa((stopTime-startTime)/1000.,1)+"ms"_; startTime=stopTime; stopTime=0; return s; }
+    string reset(){ stop(); string s=ftoa((stopTime-startTime)/1000000.,1)+"s"_; startTime=stopTime; stopTime=0; return s; }
     operator uint64(){ return (stopTime?:realTime()) - startTime; }
 };
 inline string str(Time s) { return s.reset(); }

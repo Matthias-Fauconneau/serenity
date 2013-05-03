@@ -107,6 +107,8 @@ template<Type T> struct ref {
     constexpr ref() : data(0), size(0) {}
     /// References \a size elements from const \a data pointer
     constexpr ref(const T* data, uint64 size) : data(data), size(size) {}
+    /// References \a size elements from const \a data pointer
+    constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
     /// Converts an std::initializer_list to ref
     constexpr ref(const std::initializer_list<T>& list) : data(list.data), size(list.size) {}
 

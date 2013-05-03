@@ -8,7 +8,7 @@ FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initia
 FLAGS_debug = -DDEBUG -g
 #-Og prevents backtrace
 FLAGS_profile = -DPROFILE -g -Ofast -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
-FLAGS_fast = -g -Ofast
+FLAGS_fast = -g -Ofast -funroll-loops -fpeel-loops #distance seems to miscompile without these ricer flags :/
 FLAGS_release = -g -Ofast
 FLAGS += $(FLAGS_$(BUILD))
 

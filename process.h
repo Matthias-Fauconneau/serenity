@@ -2,6 +2,7 @@
 /// \file process.h \link Thread Threaded event loops\endlink, \link Lock synchronization\endlink, execute, process environment and arguments
 #include "array.h"
 #include "file.h"
+#include "function.h"
 
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
@@ -118,6 +119,26 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void run();
     /// Processes one queued task
     void event();
+};
+
+/// Runs a loop in parallel
+template<int N=8> struct parallel {
+    uint iterationCount;
+    function<void(uint)> delegate;
+    uint counter=0;
+    static void* start_routine(parallel* this_) {
+        for(;;) { uint i=__sync_fetch_and_add(&this_->counter,1);
+            if(i>=this_->iterationCount) break;
+            this_->delegate(i);
+        }
+        return 0;
+    }
+    template<class F> parallel(uint iterationCount, F f) : iterationCount(iterationCount), delegate(f) {
+        pthread_t threads[N-1];
+        for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,(void*(*)(void*))start_routine,this);
+        start_routine(this);
+        for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
+    }
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all file-scope objects and exits process.

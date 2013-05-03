@@ -8,6 +8,7 @@ typedef char v16qi __attribute__ ((__vector_size__ (16)));
 typedef float v4sf __attribute__ ((__vector_size__ (16)));
 
 inline void movnt(uint64* const ptr, uint64 v) { return  __builtin_ia32_movntq(ptr,v); }
+inline void sfence() { __builtin_ia32_sfence(); }
 
 // v2di
 
