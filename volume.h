@@ -3,7 +3,7 @@
 
 struct Volume {
     Volume(){}
-    Volume(uint sampleSize, uint x, uint y, uint z): data(sampleSize*x*y*z),x(x),y(y),z(z),sampleSize(sampleSize) {}
+    Volume(uint sampleSize, uint x, uint y, uint z): data((uint64)sampleSize*x*y*z),x(x),y(y),z(z),sampleSize(sampleSize) {}
 
     uint64 size() const { return x*y*z; }
     operator bool() { return data; }
@@ -44,9 +44,12 @@ struct Volume32 : Volume {
 
 void interleavedLookup(Volume& target);
 
-/// Returns maximum of data (for debugging)
+/// Returns maximum of data
 uint maximum(const Volume16& source);
 uint maximum(const Volume32& source);
+
+/// Converts a 32bit volume to 16bit
+void pack(Volume16& target, const Volume32& source);
 
 /// Downsamples a volume by averaging 2x2x2 samples
 void downsample(Volume16& target, const Volume16& source);

@@ -136,6 +136,7 @@ struct Rock : Widget {
                 } else {
                     Volume& target = this->target.volume;
                     Volume& source = this->source.volume;
+                    if(target.sampleSize != passSampleSize[current]) this->target = {}; // memory map size mismatch
                     target.x=source.x, target.y=source.y, target.z=source.z, target.marginX = source.marginX, target.marginY = source.marginY, target.marginZ = source.marginZ;
                     target.num=source.num, target.den=source.den, target.sampleSize=passSampleSize[current];
                     if(!target && (force == Null || current < force) && mapVolume(current)) {}
@@ -156,15 +157,7 @@ struct Rock : Widget {
 
                         Time time;
                         /* */ if(current==Smooth) {
-#if HD
                             smooth<smoothFilterSize>(target, source);
-#elif LD
-                            Volume16 buffer(source.x/2, source.y/2, source.z/2);
-                            downsample(buffer, source); // 512³
-                            downsample(target, buffer); // 256³
-#else
-                            downsample(target, source); // 512³
-#endif
                         }
                         else if(current==Threshold) {
                             if(1 || !existsFile(name+".density"_, histogramFolder)) {
@@ -186,6 +179,14 @@ struct Rock : Widget {
                         }
                         else if(current==Distance) {
                             distance(target, source);
+                            if(target.den/target.num<(1<<16)) { // Packs volume if possible (in-place)
+                                const Volume32& target32 = target;
+                                target.sampleSize = 2;
+                                Time time;
+                                pack(target, target32);
+                                log("pack", time);
+                                if(this->target.path) File(this->target.path, temporaryFolder).resize( target.size() * target.sampleSize );
+                            }
                         }
                         else if(current==Maximum) {
                             maximum(target, source);

@@ -44,14 +44,13 @@ template<bool last> void PBEDT(uint32* const target, const uint32* const source,
 /// Returns a tiled 32bit distance field volume from a 32bit binary segmented volume
 void distance(Volume32& target, const Volume32& source) {
     const uint X = source.x, Y = source.y, Z = source.z;
+    Volume32 buffer(X,Y,Z);
     Time time;
     PBEDT<false>(target, source, X,Y,Z);
-    log(time.reset());
-    Volume32 buffer(X,Y,Z);
+    log("distance X", time.reset());
     PBEDT<false>(buffer, target,  Y,Z,X);
-    log(time.reset());
+    log("distance Y", time.reset());
     PBEDT<true>(target, buffer,  Z,X,Y);
-    log(time.reset());
+    log("distance Z", time.reset());
     target.num = 1, target.den=maximum(target);
-    log((Volume&)source, (Volume&)target);
 }
