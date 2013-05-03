@@ -21,7 +21,7 @@ enum Pass {
     Tile, // Layouts volume in Z-order to improve locality on maximum search
     Maximum // Computes field of nearest local maximum of distance field (i.e field of maximum enclosing sphere radii)
 };
-static constexpr uint passSampleSize[] = {0,2,2,4,4,2}; // Sample size for each pass to correctly allocate necessary space
+static constexpr uint passSampleSize[] = {0,2,2,4,4,4,4,2,2}; // Sample size for each pass to correctly allocate necessary space
 static constexpr ref<byte> passNames[] = {"null"_, "source"_,"smooth"_,"threshold"_,"distancex"_,"distancey"_,"distancez"_,"tile"_,"maximum"_};
 const ref<byte>& str(Pass pass) { return passNames[(uint)pass]; }
 Pass toPass(const ref<byte>& pass) { return (Pass)max(0,ref<ref<byte>>(passNames).indexOf(pass)); }
@@ -30,22 +30,23 @@ Pass toPass(const ref<byte>& pass) { return (Pass)max(0,ref<ref<byte>>(passNames
 struct Rock : Widget {
     Rock(const ref<byte>& path, Pass force) : folder(path), name(section(path,'/',-2,-1)), force(force) {
         assert(name);
-        for(string& path: temporaryFolder.list(Files)) { // Maps intermediate data from any previous run
-            if(find(path, ".swap."_)) { remove(path, temporaryFolder); continue; } // Discards any aborted pass data
+        for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
+            if(find(path, ".null."_)) { remove(path, memoryFolder); continue; } // Cleanup any aborted pass data
             if(!startsWith(path, name)) continue;
             ref<byte> passName = section(path,'.',-3,-2);
             Pass pass = toPass( passName );
             if(force==Null || pass < force) {
                 assert(!previous.pass);
                 swap(previous, current);
-                File file = File(path, temporaryFolder, ReadWrite);
+                current.pass = pass;
+                File file = File(path, memoryFolder, ReadWrite);
+                current.map = Map(file, Map::Prot(Map::Read|Map::Write));
                 Volume& target = current.volume;
                 parseVolumeFormat(target, path);
-                current.map = Map(file, Map::Prot(Map::Read|Map::Write));
                 target.data = buffer<byte>(current.map);
                 assert( target );
                 if(previous.pass>current.pass) swap(previous, current);
-            }
+            } else remove(path, memoryFolder);
         }
         if(previous.pass>Null) log("Using",previous.pass,current.pass>Null?str("and",current.pass):""_,"from disk");
         setPass(force != Null ? force : Maximum);
@@ -59,36 +60,39 @@ struct Rock : Widget {
     void setPass(Pass pass) {
         assert(pass > Null);
         if(pass==current.pass) return;
-        if(pass==previous.pass) { swap(previous, current), updateView(); return; } // Toggles view betwen previous and current passes
+        if(pass==previous.pass) swap(previous, current); // Toggles view betwen previous and current passes
         else {
             if(current.pass<previous.pass) swap(previous, current); // Ensures current pass > previous pass (Reverts any previous toggle)
             if(pass < current.pass) swap(previous, current); // Restarts from previous pass
             if(pass < current.pass) previous=move(current), current.pass=Null; // Restarts from scratch
             while(current.pass<pass) next();
         }
+        updateView();
     }
 
     /// Executes next pass of the pipeline
     void next() {
         string nullPath = name+".null."_+volumeFormat(current.volume);
-        if(previous.pass) rename(name+str(previous.pass)+volumeFormat(current.volume), nullPath); // Invalidates previous file before overwriting it
+        if(previous.pass) rename(name+"."_+str(previous.pass)+"."_+volumeFormat(previous.volume), nullPath, memoryFolder); // Invalidates previous file before overwriting it
         swap(previous, current); // After swap, previous is the source (referencing old current), and current is the target (overwriting old previous) (i.e double buffering)
+        Pass pass = Pass(int(previous.pass)+1);
         Volume& source = previous.volume;
         Volume& target = current.volume;
         target.x=source.x, target.y=source.y, target.z=source.z, target.copyMetadata(source); // Inherit initial format from previous pass
-        target.sampleSize = passSampleSize[current.pass];
+        target.sampleSize = passSampleSize[pass];
+        assert(!existsFile(name+"."_+str(pass)+"."_+volumeFormat(target), memoryFolder));
 
         array<string> slices; // only used by Source pass
-        if(target.data.size != target.size()*target.sampleSize) { // Creates (or resizes) and maps a volume file for the current pass data
+        if(!target || target.data.size != target.size()*target.sampleSize) { // Creates (or resizes) and maps a volume file for the current pass data
             current.map.unmap();
-            if(current.pass==Source) {
+            if(pass==Source) {
                 slices = folder.list(Files);
                 Map file (slices.first(), folder);
                 const Tiff16 image (file);
                 target.x = image.width, target.y = image.height, target.z = slices.size, target.den = (1<<16)-1;
             }
             assert(target.size());
-            File file(nullPath, temporaryFolder, Flags(ReadWrite|Create));
+            File file(nullPath, memoryFolder, Flags(ReadWrite|Create));
             file.resize( target.size() * target.sampleSize );
             current.map = Map(file, Map::Prot(Map::Read|Map::Write));
             target.data = buffer<byte>(current.map);
@@ -96,7 +100,7 @@ struct Rock : Widget {
         assert(target.data.size == target.size()*target.sampleSize);
 
         Time time;
-        if(current.pass==Source) {
+        if(pass==Source) {
             Time time;
             uint XY=target.x*target.y;
             uint16* const targetData = (Volume16&)target;
@@ -105,10 +109,10 @@ struct Rock : Widget {
                 Tiff16(Map(slices[z],folder)).read(targetData+z*XY); // Directly decodes slice images into the volume
             }
         }
-        else if(current.pass==Smooth) { //FIXME: remove anonymous RAM passes
+        else if(pass==Smooth) {
             smooth<smoothFilterSize>(target, source);
         }
-        else if(current.pass==Threshold) {
+        else if(pass==Threshold) {
             if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
                 Time time;
                 writeFile(name+".density.tsv"_, str(histogram(source)), resultFolder);
@@ -116,63 +120,64 @@ struct Rock : Widget {
             }
             Histogram density = parseHistogram( readFile(name+".density.tsv"_, resultFolder) );
             // Use the minimum between the two highest maximum of density histogram as density threshold
-            uint max[2] = {};
+            struct { uint density=0, count=0; } max[2];
             for(uint i=1; i<density.binCount-1; i++) {
-                if(density[i-1] < density[i] && density[i] > density[i+1] && density[i] > max[0]) {
-                    max[0] = density[i];
-                    if(max[0] > max[1]) swap(max[0],max[1]);
+                if(density[i-1] < density[i] && density[i] > density[i+1] && density[i] > max[0].count) {
+                    max[0].density = i, max[0].count = density[i];
+                    if(max[0].count > max[1].count) swap(max[0],max[1]);
                 }
             }
-            float densityThreshold; uint minimum = -1;
-            for(uint i=max[0]; i<max[1]; i++) { //FIXME: compute minimum between two highest maximum
-                if(density[i] < minimum) {
-                    densityThreshold = float(i) / density.binCount;
-                    minimum = density[i];
-                }
+            uint densityThreshold; uint minimum = -1;
+            for(uint i=max[0].density; i<max[1].density; i++) {
+                if(density[i] < minimum) densityThreshold = i, minimum = density[i];
             }
-            log("Using density threshold =",densityThreshold,"("_+str(int(0x100*densityThreshold))+")"_);
-            threshold(target, source, densityThreshold);
+            log("Using threshold",densityThreshold,"between pore at",max[0].density,"and rock at",max[1].density);
+            threshold(target, source, float(densityThreshold) / float(density.binCount));
         }
-        else if(current.pass==DistanceX) {
+        else if(pass==DistanceX) {
             PerpendicularBisectorEuclideanDistanceTransform<false>(target, source, source.x,source.y,source.z);
+            log(maximum((const Volume32&)target));
         }
-        else if(current.pass==DistanceY) {
+        else if(pass==DistanceY) {
             PerpendicularBisectorEuclideanDistanceTransform<false>(target, source,  source.y,source.z,source.x);
+            log(maximum((const Volume32&)target));
         }
-        else if(current.pass==DistanceZ) {
+        else if(pass==DistanceZ) {
             PerpendicularBisectorEuclideanDistanceTransform<true>(target, source,  source.z,source.x,source.y);
             target.num = 1, target.den=maximum((const Volume32&)target);
+            log(maximum((const Volume32&)target));
         }
-        else if(current.pass==Tile) {
+        else if(pass==Tile) {
             tile(target, source);
         }
-        else if(current.pass==Maximum) {
+        else if(pass==Maximum) {
             maximum(target, source);
         }
-        log(current.pass, time);
+        log(pass, time);
 
-        while(target.den/target.num < (1u<<(8*(target.sampleSize/2)))) { // Packs target if needed
+        while(target.den/target.num < (1ul<<(8*(target.sampleSize/2)))) { // Packs target if needed
+            log(target.den, target.num, target.den/target.num, (1ul<<(8*(target.sampleSize/2))));
             const Volume32& target32 = target;
             target.sampleSize /= 2;
             Time time;
             pack(target, target32);
             log("pack", time);
             current.map.unmap();
-            File file(nullPath, temporaryFolder, ReadWrite);
+            File file(nullPath, memoryFolder, ReadWrite);
             file.resize( target.size() * target.sampleSize);
             current.map = Map(file, Map::Prot(Map::Read|Map::Write));
         }
-        assert(target.den/target.num < (1<<(8*target.sampleSize)));
+        assert(target.den/target.num < (1ul<<(8*target.sampleSize)), target.num, target.den, target.den/target.num, 1ul<<(8*target.sampleSize));
 
-        current.pass = Pass(int(previous.pass)+1);
-        string path = name+"."_+str(current.pass)+"."_+volumeFormat(target);
-        rename(nullPath, path, temporaryFolder); // Renames target file to the current pass (once data is valid)
+        current.pass = pass;
+        string path = name+"."_+str(pass)+"."_+volumeFormat(target);
+        rename(nullPath, path, memoryFolder); // Renames target file to the current pass (once data is valid)
 
-        if(current.pass==Source) {
-            writeFile(name+".raw_density.tsv"_, str(histogram(source)), resultFolder);
+        if(pass==Source) {
+            writeFile(name+".raw_density.tsv"_, str(histogram(target)), resultFolder);
         }
-        if(current.pass==Maximum && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
-            Histogram histogram = sqrtHistogram(source);
+        if(pass==Maximum && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
+            Histogram histogram = sqrtHistogram(target);
             histogram[0] = 0; // Clears rock space voxel count to plot with a bigger Y scale
             writeFile(name+".radius.tsv"_, str(histogram), resultFolder);
             log("Pore size histogram written to",name+".radius.tsv"_);
@@ -245,8 +250,8 @@ struct Rock : Widget {
     }
 
     // Settings
-    static constexpr uint smoothFilterSize = 2; // Smooth pass averages samples in a (2×filterSize+1)³ window
-    const Folder temporaryFolder {"dev/shm"_}; // Should be a local or RAM disk large enough to hold up to  2 intermediate passes of volume data (up to 32bit per sample)
+    static constexpr uint smoothFilterSize = 3; // Smooth pass averages samples in a (2×filterSize+1)³ window
+    const Folder memoryFolder {"dev/shm"_}; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate passes of volume data (up to 32bit per sample)
     const Folder resultFolder {"ptmp"_}; // Final results (histograms) are written there
 
     // Arguments
@@ -256,7 +261,7 @@ struct Rock : Widget {
 
     // Variables
     struct PassData {
-        Pass pass;
+        Pass pass = Null;
         Map map;
         Volume volume;
     };
@@ -269,4 +274,4 @@ struct Rock : Widget {
     int2 lastPos;
     vec2 rotation = vec2(PI/3,-PI/3); // Current view angles (yaw,pitch)
 #endif
-} app( arguments()[0], toPass( arguments()[1] ) );
+} app( arguments()[0], toPass( arguments().size>1 ? arguments()[1] : "null" ) );

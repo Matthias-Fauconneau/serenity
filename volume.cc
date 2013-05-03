@@ -176,16 +176,22 @@ Image squareRoot(const Volume& volume, uint z) {
         if(offsetX || offsetY || offsetZ) {
             const uint16* const sourceZ = (const Volume16&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {
-                const uint16* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[offsetX[x]])) * scale));
+                const uint16* const sourceY = sourceZ + offsetY[mY+y];
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
             }
         } else {
-            const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(source[y*X+x])) * scale)); //FIXME: overflow
+            const uint16* const sourceZ = (const Volume16&)volume + z*Y*X + mY*X + mX;
+            for(uint y=0; y<imY; y++) {
+                const uint16* const sourceY = sourceZ + y*X;
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[x])) * scale)); //FIXME: overflow
+            }
         }
     } else if(volume.sampleSize==4) {
-        const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
-        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(source[y*X+x])) * scale)); //FIXME: overflow
+            const uint32* const sourceZ = (const Volume32&)volume + z*Y*X + mY*X + mX;
+            for(uint y=0; y<imY; y++) {
+                const uint32* const sourceY = sourceZ + y*X;
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[x])) * scale)); //FIXME: overflow
+            }
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
 }

@@ -29,5 +29,5 @@ void threshold(Volume32& target, const Volume16& source, float threshold) {
         uint32* const targetY = targetData + y*X;
         for(uint x=0; x<X; x++) targetY[x]=x*x, targetY[(Z-1)*XY+x]=x*x; // Sets front/back faces
     }
-    target.num=1, target.den=target.x*target.x;
+    target.num=1, target.den=(target.x-1)*(target.x-1);
 }

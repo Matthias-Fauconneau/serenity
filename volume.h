@@ -6,7 +6,7 @@ struct Volume {
     Volume(uint sampleSize, uint x, uint y, uint z): data((uint64)sampleSize*x*y*z),x(x),y(y),z(z),sampleSize(sampleSize) {}
 
     uint64 size() const { return x*y*z; }
-    operator bool() { return data; }
+    explicit operator bool() const { return data; }
     operator const struct Volume16&() const { assert_(sampleSize==sizeof(uint16)); return (struct Volume16&)*this; }
     operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32)); return (struct Volume32&)*this; }
     operator struct Volume16&() { assert_(sampleSize==sizeof(uint16)); return *(struct Volume16*)this; }

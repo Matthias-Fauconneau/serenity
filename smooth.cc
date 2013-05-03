@@ -33,31 +33,31 @@ void shiftRight(Volume16& target, const Volume16& source, uint shift) {
 
 /// Denoises a volume using a 3 pass box convolution (max filter size is 2x5+1=15<16)
 template<int size> void smooth(Volume16& target, const Volume16& original) {
+    constexpr int filterSize = 2*size+1;
+    constexpr uint shift = log2(filterSize);
     uint X = original.x, Y = original.y, Z = original.z;
     // Accumulate along X
-    Volume16 buffer(X,Y,Z);
-    int usedBits = log2(nextPowerOfTwo(original.den/original.num)); // Bits used by data
-    constexpr int filterSize = 2*size+1;
-    int headBits = log2(nextPowerOfTwo(filterSize)); // Headroom needed to sum without overflow
+    Volume16 buffer(X,Y,Z); //FIXME
+    uint max = ((((original.den/original.num)*filterSize>>shift)*filterSize)>>shift)*filterSize;
+    uint bits = log2(nextPowerOfTwo(max));
     const Volume16* source = &original;
-    if(usedBits+headBits>16) {
-        uint shift = usedBits+headBits-16;
-        log("Shifting out",shift,"/",usedBits,"least significant bits to compute sum of",size*2+1,"samples without unpacking to 32bit");
+    if(bits>16) {
+        uint shift = bits-16;
+        log("Shifting out",shift,"least significant bits to compute sum of",size*2+1,"samples without unpacking to 32bit");
         shiftRight(buffer, original, shift);
         buffer.num = original.num;
         buffer.den = original.den >> shift;
         source=&buffer;
     }
-    constexpr uint shift = log2(filterSize);
     smooth<size,shift>(target, *source, X,Y,Z);
     smooth<size,shift>(buffer, target, Y,Z,X);
     smooth<size,0>(target, buffer, Z,X,Y);
     target.num = source->num;
-    target.den = (((((source->den * filterSize) >> shift) * filterSize) >> shift) * filterSize);
+    target.den = ((((source->den * filterSize) >> shift) * filterSize) >> shift) * filterSize;
     simplify(target.den, target.num);
-    assert(target.den/target.num<(1<<16), target.den, target.num); // Whole range can be covered with 16bit
-    assert(target.den/target.num>=(1<<13)-1, target.den, target.num); // Precision is at least 13bit
+    assert_(target.den/target.num<(1<<16), target.den); // Whole range can be covered with 16bit
+    assert_(target.den/target.num>=(1<<13)-1, target.den); // Precision is at least 13bit
     target.marginX += align(4,size), target.marginY += align(4,size), target.marginZ += align(4,size); // Trims volume by filter size
 }
 
-template void smooth<2>(Volume16& target, const Volume16& source);
+template void smooth<3>(Volume16& target, const Volume16& source);
