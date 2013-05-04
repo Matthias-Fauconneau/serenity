@@ -39,10 +39,10 @@ struct Rock : Widget {
                 assert(!previous.pass);
                 swap(previous, current);
                 current.pass = pass;
-                File file = File(path, memoryFolder, ReadWrite);
-                current.map = Map(file, Map::Prot(Map::Read|Map::Write));
                 Volume& target = current.volume;
                 parseVolumeFormat(target, path);
+                File file = File(path, memoryFolder, ReadWrite);
+                current.map = Map(file, Map::Prot(Map::Read|Map::Write));
                 target.data = buffer<byte>(current.map);
                 assert( target );
                 if(previous.pass>current.pass) swap(previous, current);
@@ -136,16 +136,13 @@ struct Rock : Widget {
         }
         else if(pass==DistanceX) {
             PerpendicularBisectorEuclideanDistanceTransform<false>(target, source, source.x,source.y,source.z);
-            log(maximum((const Volume32&)target));
         }
         else if(pass==DistanceY) {
             PerpendicularBisectorEuclideanDistanceTransform<false>(target, source,  source.y,source.z,source.x);
-            log(maximum((const Volume32&)target));
         }
         else if(pass==DistanceZ) {
             PerpendicularBisectorEuclideanDistanceTransform<true>(target, source,  source.z,source.x,source.y);
             target.num = 1, target.den=maximum((const Volume32&)target);
-            log(maximum((const Volume32&)target));
         }
         else if(pass==Tile) {
             tile(target, source);
@@ -166,6 +163,7 @@ struct Rock : Widget {
             File file(nullPath, memoryFolder, ReadWrite);
             file.resize( target.size() * target.sampleSize);
             current.map = Map(file, Map::Prot(Map::Read|Map::Write));
+            target.data = buffer<byte>(current.map);
         }
         assert(target.den/target.num < (1ul<<(8*target.sampleSize)), target.num, target.den, target.den/target.num, 1ul<<(8*target.sampleSize));
 
@@ -245,12 +243,11 @@ struct Rock : Widget {
 #endif
         }
 #endif
-        while(2*image.size()<displaySize) image=upsample(image);
         blit(position, image); //FIXME: direct slice->shm
     }
 
     // Settings
-    static constexpr uint smoothFilterSize = 3; // Smooth pass averages samples in a (2×filterSize+1)³ window
+    static constexpr uint smoothFilterSize = 5; // Smooth pass averages samples in a (2×filterSize+1)³ window
     const Folder memoryFolder {"dev/shm"_}; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate passes of volume data (up to 32bit per sample)
     const Folder resultFolder {"ptmp"_}; // Final results (histograms) are written there
 

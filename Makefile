@@ -8,8 +8,7 @@ FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initia
 FLAGS_debug = -DDEBUG -g
 #-Og prevents backtrace
 FLAGS_profile = -DPROFILE -g -Ofast -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
-FLAGS_fast = -g -Ofast
-#-funroll-loops -fpeel-loops
+FLAGS_fast = -g -Ofast -funroll-loops -fpeel-loops
 FLAGS_release = -Ofast
 FLAGS += $(FLAGS_$(BUILD))
 

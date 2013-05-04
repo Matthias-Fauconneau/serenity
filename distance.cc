@@ -7,6 +7,7 @@ template<bool last> void PerpendicularBisectorEuclideanDistanceTransform(Volume3
     uint32* const targetData = target;
     const uint XY = X*Y;
     parallel(Z, [&](uint z) {
+    //for(uint z=0; z<Z; z++) {
         const uint32* const sourceZ = sourceData+z*XY;
         uint32* const targetZ = targetData+z*X;
         constexpr uint unroll = 8; // 2x faster for some reason

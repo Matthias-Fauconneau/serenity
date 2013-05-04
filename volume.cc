@@ -2,6 +2,18 @@
 #include "simd.h"
 #include "data.h"
 
+static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) {
+    buffer<uint> lookup(size);
+    for(uint i=0; i<size; i++) { lookup[i]=0; for(uint b=0, bits=i; bits!=0; bits>>=1, b++) { uint bit=bits&1; lookup[i] |= bit << (b*stride+offset); } }
+    return lookup;
+}
+
+void interleavedLookup(Volume& target) {
+    if(!target.offsetX) target.offsetX = interleavedLookup(target.x,0);
+    if(!target.offsetY) target.offsetY = interleavedLookup(target.y,1);
+    if(!target.offsetZ) target.offsetZ = interleavedLookup(target.z,2);
+}
+
 string volumeFormat(const Volume& volume) {
     string s; s << str(volume.x) << 'x' << str(volume.y) << 'x' << str(volume.z);
     if(volume.marginX||volume.marginY||volume.marginZ) s << '+' << str(volume.marginX) << '+' << str(volume.marginY) << '+' << str(volume.marginZ);
@@ -25,6 +37,7 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
     volume.den = s.hexadecimal();
     assert(volume.num && volume.den, path, volume.num, volume.den);
     volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.den+1)/volume.num)))) / 8; // Minimum sample size to encode maximum value (in 2ⁿ bytes)
+    if(s.match("-tiled"_)) interleavedLookup(volume);
 }
 
 uint maximum(const Volume16& source) {
@@ -51,18 +64,6 @@ void pack(Volume16& target, const Volume32& source) {
     uint64 size = source.size();
     for(uint i=0; i<size; i+=8) storea(targetData+i, packus(loada(sourceData+i),loada(sourceData+i+4)));
     target.num=source.num, target.den=source.den;
-}
-
-static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) {
-    buffer<uint> lookup(size);
-    for(uint i=0; i<size; i++) { lookup[i]=0; for(uint b=0, bits=i; bits!=0; bits>>=1, b++) { uint bit=bits&1; lookup[i] |= bit << (b*stride+offset); } }
-    return lookup;
-}
-
-void interleavedLookup(Volume& target) {
-    if(!target.offsetX) target.offsetX = interleavedLookup(target.x,0);
-    if(!target.offsetY) target.offsetY = interleavedLookup(target.y,1);
-    if(!target.offsetZ) target.offsetZ = interleavedLookup(target.z,2);
 }
 
 void tile(Volume16& target, const Volume16& source) {
@@ -156,9 +157,16 @@ Image slice(const Volume& volume, uint z) {
             for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
         }
     } else if(volume.sampleSize==4) {
-        //TODO: tiled
-        const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
-        for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
+        if(offsetX || offsetY || offsetZ) {
+            const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
+            for(uint y=0; y<imY; y++) {
+                const uint32* const sourceY = sourceZ + offsetY[y];
+                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * (0xFF * volume.num) / volume.den;
+            }
+        } else {
+            const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
+            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
+        }
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
 }
@@ -187,11 +195,19 @@ Image squareRoot(const Volume& volume, uint z) {
             }
         }
     } else if(volume.sampleSize==4) {
+        if(offsetX || offsetY || offsetZ) {
+            const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
+            for(uint y=0; y<imY; y++) {
+                const uint32* const sourceY = sourceZ + offsetY[mY+y];
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
+            }
+        } else {
             const uint32* const sourceZ = (const Volume32&)volume + z*Y*X + mY*X + mX;
             for(uint y=0; y<imY; y++) {
                 const uint32* const sourceY = sourceZ + y*X;
                 for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[x])) * scale)); //FIXME: overflow
             }
+        }
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
 }

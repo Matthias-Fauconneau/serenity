@@ -12,7 +12,7 @@ void maximum(Volume16& target, const Volume16& source) {
     const uint* const offsetX = source.offsetX;
     const uint* const offsetY = source.offsetY;
     const uint* const offsetZ = source.offsetZ;
-    assert(offsetX && offsetY && offsetZ);
+    assert_(offsetX && offsetY && offsetZ);
     uint16* const targetData = target;
     //clear(targetData, Z*Y*X); //if memoize
     //TODO: tiled, Z-order
