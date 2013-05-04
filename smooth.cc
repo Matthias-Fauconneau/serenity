@@ -1,12 +1,21 @@
 #include "smooth.h"
 #include "simd.h"
 
-template<uint size, uint shift> void smooth(uint16* const target, const uint16* const source, uint X, uint Y, uint Z) {
-    constexpr uint margin = align(4,size)-size; //FIXME
+void shiftRight(Volume16& target, const Volume16& source, uint shift) {
+    const uint16* const src = source;
+    uint16* const dst = target;
+    uint64 size = source.size();
+    for(uint i=0; i<size; i+=8) storea(dst+i, shiftRight(loada(src+i), shift));
+}
+
+void smooth(Volume16& target, const Volume16& source, uint X, uint Y, uint Z, uint size, uint shift) {
+    const uint16* const sourceData = source;
+    uint16* const targetData = target;
+    const uint margin = align(4,size)-size;
     const uint XY = X*Y;
     for(uint z=0; z<Z; z++) for(uint x=0; x<X; x+=16) {
-        const uint16* const sourceZX = source+z*XY+x;
-        uint16* const targetXZ = target+x*XY+z*X;
+        const uint16* const sourceZX = sourceData+z*XY+x;
+        uint16* const targetXZ = targetData+x*XY+z*X;
         v8hi sum[2] = {}; //16×16i instructions would need AVX2
         for(uint y=margin; y<2*size+margin; y++) for(uint i=0; i<2; i++) sum[i] += loada(sourceZX+y*X+i*8);
         for(uint y=margin+size; y<Y-size-margin; y+=8) {
@@ -23,41 +32,3 @@ template<uint size, uint shift> void smooth(uint16* const target, const uint16* 
         }
     }
 }
-
-void shiftRight(Volume16& target, const Volume16& source, uint shift) {
-    const uint16* const src = source;
-    uint16* const dst = target;
-    uint64 size = source.size();
-    for(uint i=0; i<size; i+=8) storea(dst+i, shiftRight(loada(src+i), shift));
-}
-
-/// Denoises a volume using a 3 pass box convolution (max filter size is 2x5+1=15<16)
-template<int size> void smooth(Volume16& target, const Volume16& original) {
-    constexpr int filterSize = 2*size+1;
-    constexpr uint shift = log2(filterSize);
-    uint X = original.x, Y = original.y, Z = original.z;
-    // Accumulate along X
-    Volume16 buffer(X,Y,Z); //FIXME
-    uint max = ((((original.den/original.num)*filterSize>>shift)*filterSize)>>shift)*filterSize;
-    uint bits = log2(nextPowerOfTwo(max));
-    const Volume16* source = &original;
-    if(bits>16) {
-        uint shift = bits-16;
-        log("Shifting out",shift,"least significant bits to compute sum of",size*2+1,"samples without unpacking to 32bit");
-        shiftRight(buffer, original, shift);
-        buffer.num = original.num;
-        buffer.den = original.den >> shift;
-        source=&buffer;
-    }
-    smooth<size,shift>(target, *source, X,Y,Z);
-    smooth<size,shift>(buffer, target, Y,Z,X);
-    smooth<size,0>(target, buffer, Z,X,Y);
-    target.num = source->num;
-    target.den = ((((source->den * filterSize) >> shift) * filterSize) >> shift) * filterSize;
-    simplify(target.den, target.num);
-    assert_(target.den/target.num<(1<<16), target.den); // Whole range can be covered with 16bit
-    assert_(target.den/target.num>=(1<<13)-1, target.den); // Precision is at least 13bit
-    target.marginX += align(4,size), target.marginY += align(4,size), target.marginZ += align(4,size); // Trims volume by filter size
-}
-
-template void smooth<8>(Volume16& target, const Volume16& source);

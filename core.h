@@ -147,6 +147,8 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return
 template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
 // Integer operations
+/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
+inline constexpr uint floor(uint width, uint offset) { return offset & ~(width-1); }
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline constexpr uint align(uint width, uint offset) { return (offset + (width-1)) & ~(width-1); }
 //inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }

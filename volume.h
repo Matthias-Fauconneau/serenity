@@ -3,7 +3,6 @@
 
 struct Volume {
     Volume(){}
-    Volume(uint sampleSize, uint x, uint y, uint z): data((uint64)sampleSize*x*y*z),x(x),y(y),z(z),sampleSize(sampleSize) {}
 
     uint64 size() const { return x*y*z; }
     explicit operator bool() const { return data; }
@@ -27,13 +26,11 @@ string volumeFormat(const Volume& volume);
 void parseVolumeFormat(Volume& volume, const ref<byte>& path);
 
 struct Volume16 : Volume {
-    Volume16(uint x, uint y, uint z) : Volume(sizeof(uint16),x,y,z) {}
     operator const uint16*() const { return (uint16*)data.data; }
     operator uint16*() { return (uint16*)data.data; }
 };
 
 struct Volume32 : Volume {
-    Volume32(uint x, uint y, uint z): Volume(sizeof(uint32),x,y,z) {}
     operator const uint32*() const { return (uint32*)data.data; }
     operator uint32*() { return (uint32*)data.data; }
 };

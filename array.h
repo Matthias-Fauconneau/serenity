@@ -60,7 +60,7 @@ template<Type T> struct array {
         if(capacity>this->capacity) {
             assert(capacity>=size);
             if(this->capacity) data=(T*)realloc(data, capacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
-            else data=(T*)malloc(capacity*sizeof(T)); //
+            else data=(T*)malloc(capacity*sizeof(T));
             this->capacity=capacity;
         }
     }

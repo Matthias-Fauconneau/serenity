@@ -7,19 +7,23 @@ template<bool last> void PerpendicularBisectorEuclideanDistanceTransform(Volume3
     uint32* const targetData = target;
     const uint XY = X*Y;
     constexpr uint unroll = 8; // 2x faster for some reason
+    uint margin = (Y-floor(unroll,Y))/2; //FIXME
+    assert_( (Y-floor(unroll,Y))%2 == 0 );
+    log(margin,Y-margin,Y,Y-2*margin,(Y-2*margin)%8);
     struct element { int64 cx, x, sd; };
-    buffer<element> stacks (8*unroll*X);
+    buffer<element> stacks (8*unroll*X); //FIXME: freeing this segfaults for some reason
     element* const stacksData = stacks.data;
-    parallel(Z, [sourceData,targetData,X,XY,Y,stacksData](uint id, uint z) {
+    parallel(Z, [sourceData,targetData,X,XY,Y,margin,stacksData](uint id, uint z) { // crashes for some reason
+    //for(uint z=0; z<Z; z++) { const uint id=0;
         element* const threadStacks = stacksData+id*unroll*X;
         const uint32* const sourceZ = sourceData+z*XY;
         uint32* const targetZ = targetData+z*X;
-        for(int64 y=0; y<Y; y+=unroll) {
-            int stackIndices[unroll]={};
+        for(int64 y=margin; y<Y-margin; y+=unroll) {
+            int stackIndices[unroll];
             for(int64 dy=0; dy<unroll; dy++) {
                 element* const stack = threadStacks+dy*X;
                 const uint32* const sourceY = sourceZ+y*X+dy*X;
-                int& i = stackIndices[dy];
+                int& i = stackIndices[dy]; i=0;
                 for(int x=0; x<X; x++) {
                     int64 sd = sourceY[x];
                     if(sd < 0xFFFFFFFF) {
@@ -46,6 +50,7 @@ template<bool last> void PerpendicularBisectorEuclideanDistanceTransform(Volume3
             }
         }
     });
+    target.marginY += margin;
 }
 
 template void PerpendicularBisectorEuclideanDistanceTransform<false>(Volume32& target, const Volume32& source, uint X, uint Y, uint Z);

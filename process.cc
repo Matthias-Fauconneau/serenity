@@ -106,7 +106,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 #elif __i386
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP];
 #endif
-    if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
+    if(sig==SIGSEGV) log("Segmentation fault"_);
     string s = trace(1,ip);
     if(threads.size>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
@@ -130,7 +130,7 @@ void __attribute((constructor(101))) setup_signals() {
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
     check_(sigaction(SIGFPE, &sa, 0));
     check_(sigaction(SIGABRT, &sa, 0));
-    check_(sigaction(SIGSEGV, &sa, 0));
+    //check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
     setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);

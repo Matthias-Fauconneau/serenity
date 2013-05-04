@@ -13,7 +13,10 @@
 enum Pass {
     Null,  // No data
     Source, // Loads from original image slices
-    Smooth, // Denoises data and filters small pores by averaging samples in a window
+    ShiftRight, // Shifts data to avoid overflows
+    SmoothX, // Denoises data and filters small pores by averaging samples in a window (X pass)
+    SmoothY, // Y pass
+    SmoothZ, // Z pass
     Threshold, // Segments in rock vs pore space by comparing to a fixed threshold (local density minimum around 0.45)
     DistanceX, // Computes field of distance to nearest rock wall (X pass)
     DistanceY, // Y pass
@@ -21,8 +24,8 @@ enum Pass {
     Tile, // Layouts volume in Z-order to improve locality on maximum search
     Maximum // Computes field of nearest local maximum of distance field (i.e field of maximum enclosing sphere radii)
 };
-static constexpr uint passSampleSize[] = {0,2,2,4,4,4,4,2,2}; // Sample size for each pass to correctly allocate necessary space
-static constexpr ref<byte> passNames[] = {"null"_, "source"_,"smooth"_,"threshold"_,"distancex"_,"distancey"_,"distancez"_,"tile"_,"maximum"_};
+static constexpr uint passSampleSize[] = {0,2,2,2,2,2,4,4,4,4,2,2}; // Sample size for each pass to correctly allocate necessary space
+static constexpr ref<byte> passNames[] = {"null"_, "source"_,"shift"_,"smoothx"_,"smoothy"_,"smoothz"_,"threshold"_,"distancex"_,"distancey"_,"distancez"_,"tile"_,"maximum"_};
 const ref<byte>& str(Pass pass) { return passNames[(uint)pass]; }
 Pass toPass(const ref<byte>& pass) { return (Pass)max(0,ref<ref<byte>>(passNames).indexOf(pass)); }
 
@@ -78,7 +81,8 @@ struct Rock : Widget {
         Pass pass = Pass(int(previous.pass)+1);
         Volume& source = previous.volume;
         Volume& target = current.volume;
-        target.x=source.x, target.y=source.y, target.z=source.z, target.copyMetadata(source); // Inherit initial format from previous pass
+        uint X = source.x, Y = source.y, Z = source.z, XY=X*Y;
+        target.x=X, target.y=Y, target.z=Z, target.copyMetadata(source); // Inherit initial format from previous pass
         target.sampleSize = passSampleSize[pass];
         assert(!existsFile(name+"."_+str(pass)+"."_+volumeFormat(target), memoryFolder));
 
@@ -102,15 +106,38 @@ struct Rock : Widget {
         Time time;
         if(pass==Source) {
             Time time;
-            uint XY=target.x*target.y;
             uint16* const targetData = (Volume16&)target;
             for(uint z=0; z<slices.size; z++) {
                 if(time/1000>=2) { log(z,"/",slices.size); time.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
                 Tiff16(Map(slices[z],folder)).read(targetData+z*XY); // Directly decodes slice images into the volume
             }
         }
-        else if(pass==Smooth) {
-            smooth<smoothFilterSize>(target, source);
+        else if(pass==ShiftRight || pass==SmoothX || pass==SmoothY || pass==SmoothZ) {
+            constexpr int sampleCount = 2*filterSize+1;
+            constexpr uint shift = log2(sampleCount);
+            if(pass==ShiftRight) {
+                int max = ((((target.den/target.num)*sampleCount>>shift)*sampleCount)>>shift)*sampleCount;
+                int bits = log2(nextPowerOfTwo(max));
+                int shift = ::max(0,bits-16);
+                if(shift) log("Shifting out",shift,"least significant bits to compute sum of",sampleCount,"samples without unpacking to 32bit");
+                shiftRight(target, source, shift); // Simply copies if shift = 0
+                target.den >>= shift;
+            }
+            else if(pass==SmoothX) {
+                smooth(target, source, X,Y,Z, filterSize, shift);
+                target.den *= sampleCount; target.den >>= shift;
+                target.marginX += align(4, filterSize);
+            }
+            else if(pass==SmoothY) {
+                smooth(target, source, Y,Z,X, filterSize, shift);
+                target.den *= sampleCount; target.den >>= shift;
+                target.marginY += align(4, filterSize);
+            }
+            else if(pass==SmoothZ) {
+                smooth(target, source, Z,X,Y, filterSize, 0);
+                target.den *= sampleCount;
+                target.marginZ += align(4, filterSize);
+            }
         }
         else if(pass==Threshold) {
             if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
@@ -135,13 +162,13 @@ struct Rock : Widget {
             threshold(target, source, float(densityThreshold) / float(density.binCount));
         }
         else if(pass==DistanceX) {
-            PerpendicularBisectorEuclideanDistanceTransform<false>(target, source, source.x,source.y,source.z);
+            PerpendicularBisectorEuclideanDistanceTransform<false>(target, source, X,Y,Z);
         }
         else if(pass==DistanceY) {
-            PerpendicularBisectorEuclideanDistanceTransform<false>(target, source,  source.y,source.z,source.x);
+            PerpendicularBisectorEuclideanDistanceTransform<false>(target, source,  Y,Z,X);
         }
         else if(pass==DistanceZ) {
-            PerpendicularBisectorEuclideanDistanceTransform<true>(target, source,  source.z,source.x,source.y);
+            PerpendicularBisectorEuclideanDistanceTransform<true>(target, source,  Z,X,Y);
             target.num = 1, target.den=maximum((const Volume32&)target);
         }
         else if(pass==Tile) {
@@ -153,7 +180,6 @@ struct Rock : Widget {
         log(pass, time);
 
         while(target.den/target.num < (1ul<<(8*(target.sampleSize/2)))) { // Packs target if needed
-            log(target.den, target.num, target.den/target.num, (1ul<<(8*(target.sampleSize/2))));
             const Volume32& target32 = target;
             target.sampleSize /= 2;
             Time time;
@@ -247,7 +273,7 @@ struct Rock : Widget {
     }
 
     // Settings
-    static constexpr uint smoothFilterSize = 8; // Smooth pass averages samples in a (2×filterSize+1)³ window
+    static constexpr uint filterSize = 8; // Smooth pass averages samples in a (2×filterSize+1)³ window
     const Folder memoryFolder {"dev/shm"_}; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate passes of volume data (up to 32bit per sample)
     const Folder resultFolder {"ptmp"_}; // Final results (histograms) are written there
 

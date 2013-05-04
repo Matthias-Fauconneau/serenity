@@ -1,6 +1,8 @@
 #pragma once
 #include "volume.h"
 
-uint maximum(const Volume16& source);
+/// Shifts all values to the right
+void shiftRight(Volume16& target, const Volume16& source, uint shift);
 
-template<int size> void smooth(Volume16& target, const Volume16& source);
+/// Computes one pass of running average
+void smooth(Volume16& target, const Volume16& source, uint X, uint Y, uint Z, uint size, uint shift);
