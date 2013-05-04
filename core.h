@@ -209,7 +209,7 @@ template<Type T> struct buffer {
     buffer(uint64 capacity, uint64 size, const T& value):buffer(capacity,size){clear(data,size,value);}
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
-    ~buffer(){ if(capacity) free(data); data=0; }
+    ~buffer(){ free(); }
 
     explicit operator bool() const { return data; }
     operator const T*() const { return data; }
@@ -219,6 +219,7 @@ template<Type T> struct buffer {
     T* end() const { return data+size; }
     T& operator[](uint64 i) { assert(i<size, i ,size); return (T&)data[i]; }
 
+    void free() { if(capacity) ::free(data); data=0; capacity=0; size=0; }
     /// Slices a mutable reference to elements from \a pos to \a pos + \a size
     memory<T> slice(uint64 pos, uint64 size) { assert(pos+size<=this->size); return memory<T>(data+pos, data+pos+size); }
     /// Slices a mutable reference to elements from \a pos the end of the array

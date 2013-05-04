@@ -37,7 +37,7 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
     volume.den = s.hexadecimal();
     assert(volume.num && volume.den, path, volume.num, volume.den);
     volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.den+1)/volume.num)))) / 8; // Minimum sample size to encode maximum value (in 2ⁿ bytes)
-    if(s.match("-tiled"_)) interleavedLookup(volume);
+    if(s.match("-tiled"_)) interleavedLookup(volume); else { free(volume.offsetX), free(volume.offsetY), free(volume.offsetZ); }
 }
 
 uint maximum(const Volume16& source) {

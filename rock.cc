@@ -247,7 +247,7 @@ struct Rock : Widget {
     }
 
     // Settings
-    static constexpr uint smoothFilterSize = 5; // Smooth pass averages samples in a (2×filterSize+1)³ window
+    static constexpr uint smoothFilterSize = 8; // Smooth pass averages samples in a (2×filterSize+1)³ window
     const Folder memoryFolder {"dev/shm"_}; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate passes of volume data (up to 32bit per sample)
     const Folder resultFolder {"ptmp"_}; // Final results (histograms) are written there
 

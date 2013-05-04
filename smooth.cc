@@ -60,4 +60,4 @@ template<int size> void smooth(Volume16& target, const Volume16& original) {
     target.marginX += align(4,size), target.marginY += align(4,size), target.marginZ += align(4,size); // Trims volume by filter size
 }
 
-template void smooth<5>(Volume16& target, const Volume16& source);
+template void smooth<8>(Volume16& target, const Volume16& source);

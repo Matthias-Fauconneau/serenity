@@ -3,29 +3,13 @@
 #include "array.h"
 #include "file.h"
 #include "function.h"
+#include <pthread.h>
 
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
 
-extern "C" {
-typedef unsigned long int pthread_t;
-struct pthread_mutex { int lock; uint count; int owner; uint nusers; int kind, spins; void* prev,*next; };
-struct pthread_cond { int lock; uint futex; uint64 total_seq, wakeup_seq, woken_seq; void* mutex; uint nwaiters; uint broadcast_seq; };
-int pthread_create(pthread_t* thread, void* attr, void *(*start_routine)(void*), void* arg);
-int pthread_join(pthread_t thread, void **status);
-int pthread_mutex_init(pthread_mutex* mutex, const void* attr);
-int pthread_mutex_trylock(pthread_mutex* mutex);
-int pthread_mutex_lock(pthread_mutex* mutex);
-int pthread_mutex_unlock(pthread_mutex* mutex);
-int pthread_mutex_destroy(pthread_mutex* mutex);
-int pthread_cond_init(pthread_cond* cond, const void* attr);
-int pthread_cond_wait(pthread_cond* cond, pthread_mutex* mutex);
-int pthread_cond_signal(pthread_cond* cond);
-int pthread_cond_destroy(pthread_cond* cond);
-}
-
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
-struct Lock : handle<pthread_mutex> {
+struct Lock : handle<pthread_mutex_t> {
     Lock() { pthread_mutex_init(&pointer,0); }
     ~Lock() { pthread_mutex_destroy(&pointer); }
     /// Locks the mutex.
@@ -43,7 +27,7 @@ struct Locker {
     ~Locker(){lock.unlock();}
 };
 
-struct Condition : handle<pthread_cond> {
+struct Condition : handle<pthread_cond_t> {
     Condition() { pthread_cond_init(&pointer,0); }
     ~Condition(){ pthread_cond_destroy(&pointer); }
 };
@@ -123,23 +107,29 @@ struct Thread : array<Poll*>, EventFD, Poll {
 
 /// Runs a loop in parallel
 struct parallel {
-    uint counter;
-    uint stop;
-    function<void(uint)> delegate;
-    static void* start_routine(parallel* this_) {
+    uint64 counter;
+    uint64 stop;
+    function<void(uint, uint)> delegate;
+    struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
+    static void* start_routine(thread* t) {
         for(;;) {
-            uint i=__sync_fetch_and_add(&this_->counter,1);
-            if(i>=this_->stop) break;
-            this_->delegate(i);
+            uint64 i=__sync_fetch_and_add(t->counter,1);
+            if(i>=t->stop) break;
+            (*t->delegate)(t->id, i);
         }
         return 0;
     }
     template<class F> parallel(uint start, uint stop, F f) : counter(start), stop(stop), delegate(f) {
         constexpr uint N=8;
-        pthread_t threads[N-1];
-        for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,(void*(*)(void*))start_routine,this);
-        start_routine(this);
-        for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
+        thread threads[N];
+        for(int i=0;i<N;i++) {
+            threads[i].id = i;
+            threads[i].counter = &counter;
+            threads[i].stop = stop;
+            threads[i].delegate = &delegate;
+            pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
+        }
+        for(int i=0;i<N;i++) { void* status; pthread_join(threads[i].pthread,&status); }
     }
     template<class F> parallel(uint stop, F f) : parallel(0,stop,f) {}
 };

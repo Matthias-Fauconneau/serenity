@@ -16,7 +16,7 @@ void maximum(Volume16& target, const Volume16& source) {
     uint16* const targetData = target;
     //clear(targetData, Z*Y*X); //if memoize
     //TODO: tiled, Z-order
-    parallel(marginZ, Z-marginZ, [&](uint z) {
+    parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         uint16* const targetZ = targetData+z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
             uint16* const targetZY = targetZ+y*X;

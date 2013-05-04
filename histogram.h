@@ -54,12 +54,12 @@ Histogram sqrtHistogram(const Volume16& volume) {
 Histogram parseHistogram(const ref<byte>& file) {
     Histogram histogram;
     TextData s (file);
-    for(uint i=0; i<histogram.binCount; i++) s.skip(str(i)), s.skip("\t"_), histogram[i]=s.integer(), s.skip("\n"_);
+    while(s) { uint i=s.integer(); assert(i<histogram.binCount); s.skip("\t"_); histogram[i]=s.integer(); s.skip("\n"_); }
     return histogram;
 }
 
 string str(const Histogram& histogram) {
     string s;
-    for(uint i=0; i<histogram.binCount; i++) s << str(i) << '\t' << str(histogram[i]) << '\n';
+    for(uint i=0; i<histogram.binCount; i++) if(histogram[i]) s << str(i) << '\t' << str(histogram[i]) << '\n';
     return s;
 }
