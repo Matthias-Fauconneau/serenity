@@ -13,8 +13,7 @@ template<bool last> void PerpendicularBisectorEuclideanDistanceTransform(Volume3
     struct element { int64 cx, x, sd; };
     buffer<element> stacks (8*unroll*X); //FIXME: freeing this segfaults for some reason
     element* const stacksData = stacks.data;
-    parallel(Z, [sourceData,targetData,X,XY,Y,margin,stacksData](uint id, uint z) { // crashes for some reason
-    //for(uint z=0; z<Z; z++) { const uint id=0;
+    parallel(Z, [sourceData,targetData,X,XY,Y,margin,stacksData](uint id, uint z) {
         element* const threadStacks = stacksData+id*unroll*X;
         const uint32* const sourceZ = sourceData+z*XY;
         uint32* const targetZ = targetData+z*X;

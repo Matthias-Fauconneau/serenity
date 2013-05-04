@@ -81,8 +81,7 @@ struct Rock : Widget {
         Pass pass = Pass(int(previous.pass)+1);
         Volume& source = previous.volume;
         Volume& target = current.volume;
-        uint X = source.x, Y = source.y, Z = source.z, XY=X*Y;
-        target.x=X, target.y=Y, target.z=Z, target.copyMetadata(source); // Inherit initial format from previous pass
+        target.x=source.x, target.y=source.y, target.z=source.z, target.copyMetadata(source); // Inherit initial format from previous pass
         target.sampleSize = passSampleSize[pass];
         assert(!existsFile(name+"."_+str(pass)+"."_+volumeFormat(target), memoryFolder));
 
@@ -102,6 +101,7 @@ struct Rock : Widget {
             target.data = buffer<byte>(current.map);
         }
         assert(target.data.size == target.size()*target.sampleSize);
+        uint X = target.x, Y = target.y, Z = target.z, XY=X*Y;
 
         Time time;
         if(pass==Source) {
@@ -116,7 +116,7 @@ struct Rock : Widget {
             constexpr int sampleCount = 2*filterSize+1;
             constexpr uint shift = log2(sampleCount);
             if(pass==ShiftRight) {
-                int max = ((((target.den/target.num)*sampleCount>>shift)*sampleCount)>>shift)*sampleCount;
+                int max = (((((target.den/target.num)*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
                 int bits = log2(nextPowerOfTwo(max));
                 int shift = ::max(0,bits-16);
                 if(shift) log("Shifting out",shift,"least significant bits to compute sum of",sampleCount,"samples without unpacking to 32bit");
