@@ -73,6 +73,7 @@ generic vector clip(const vector& min, const vector& x, const vector& max){vecto
 template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
 
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
+inline int sqr(int x) { return x*x; }
 inline float sqr(float x) { return x*x; }
 generic float sqr(const vector& a) { return dot(a,a); }
 inline float norm(float x) { return abs(x); }
@@ -91,6 +92,8 @@ generic string str(const vector& v) { string s("("_); for(uint i=0;i<N;i++) { s<
 template<Type T> struct xy { T x,y; };
 /// Integer x,y vector
 typedef vector<xy,int,2> int2;
+/// Integer x,y vector (16bit)
+typedef vector<xy,uint16,2> short2;
 /// Single precision x,y vector
 typedef vector<xy,float,2> vec2;
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
@@ -103,6 +106,8 @@ template<Type T> struct xyz {
 };
 /// Integer x,y,z vector
 typedef vector<xyz,int,3> int3;
+/// Integer x,y,z vector (16bit)
+typedef vector<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vector<xyz,float,3> vec3;
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }

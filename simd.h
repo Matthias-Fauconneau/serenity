@@ -34,7 +34,7 @@ inline int extracti(v4si a, int index) { return __builtin_ia32_vec_ext_v4si(a, i
 
 // v8hi
 
-//inline v8hi short8(uint16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
+inline v8hi short8(int16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
 inline v8hi loada(const uint16* const ptr) { return *(v8hi*)ptr; }
 inline v8hi loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_loaddqu((char*)ptr); }
 inline void storea(uint16* const ptr, v8hi a) { *(v8hi*)ptr = a; }

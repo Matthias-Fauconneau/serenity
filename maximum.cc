@@ -7,7 +7,7 @@ template<> string str(const v4sf& v) { return "("_+str(extractf(v,0))+", "_+str(
 /// Returns the field of the radii of the maximum sphere enclosing each voxel and fitting within the boundaries
 void maximum(Volume16& target, const Volume16& source) {
     int X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    uint marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    uint marginX=source.marginX+1, marginY=source.marginY+1, marginZ=source.marginZ+1;
     const uint16* const sourceData = source;
     const uint* const offsetX = source.offsetX;
     const uint* const offsetY = source.offsetY;
@@ -75,7 +75,7 @@ void maximum(Volume16& target, const Volume16& source) {
                     {int nd = distance(ox+1,oy,oz); if(nd > max) max=nd, stepX=+1, stepY=0, stepZ=0;}
                     {int nd = distance(ox,oy+1,oz); if(nd > max) max=nd, stepX=0, stepY=+1, stepZ=0;}
                     {int nd = distance(ox,oy,oz+1); if(nd > max) max=nd, stepX=0, stepY=0, stepZ=+1;}
-                    if(max>d) { d=max, ox+=stepX, oy+=stepY, oz+=stepZ; continue; }
+                    //if(max>d) { d=max, ox+=stepX, oy+=stepY, oz+=stepZ; continue; }
                     // 12 edge neighbours
                     {int nd = distance(ox,oy-1,oz-1); if(nd > max) max=nd, stepX=0, stepY=-1, stepZ=-1;}
                     {int nd = distance(ox,oy-1,oz+1); if(nd > max) max=nd, stepX=0, stepY=-1, stepZ=+1;}
@@ -91,7 +91,7 @@ void maximum(Volume16& target, const Volume16& source) {
                     {int nd = distance(ox+1,oy-1,oz); if(nd > max) max=nd, stepX=+1, stepY=-1, stepZ=0;}
                     {int nd = distance(ox-1,oy+1,oz); if(nd > max) max=nd, stepX=-1, stepY=+1, stepZ=0;}
                     {int nd = distance(ox+1,oy+1,oz); if(nd > max) max=nd, stepX=+1, stepY=+1, stepZ=0;}
-                    if(max>d) { d=max, ox+=stepX, oy+=stepY, oz+=stepZ; continue; }
+                    //if(max>d) { d=max, ox+=stepX, oy+=stepY, oz+=stepZ; continue; }
                     // 8 corner neighbours
                     {int nd = distance(ox-1,oy-1,oz-1); if(nd > max) max=nd, stepX=-1, stepY=-1, stepZ=-1;}
                     {int nd = distance(ox+1,oy-1,oz-1); if(nd > max) max=nd, stepX=+1, stepY=-1, stepZ=-1;}
@@ -109,5 +109,5 @@ void maximum(Volume16& target, const Volume16& source) {
             }
         }
     });
-    target.num=source.num, target.den=source.den;
+    target.marginX=marginX, target.marginY=marginY, target.marginZ=marginZ;
 }

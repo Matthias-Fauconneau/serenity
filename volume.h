@@ -6,10 +6,10 @@ struct Volume {
 
     uint64 size() const { return x*y*z; }
     explicit operator bool() const { return data; }
-    operator const struct Volume16&() const { assert_(sampleSize==sizeof(uint16)); return (struct Volume16&)*this; }
-    operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32)); return (struct Volume32&)*this; }
-    operator struct Volume16&() { assert_(sampleSize==sizeof(uint16)); return *(struct Volume16*)this; }
-    operator struct Volume32&() { assert_(sampleSize==sizeof(uint32)); return *(struct Volume32*)this; }
+    operator const struct Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (struct Volume16&)*this; }
+    operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (struct Volume32&)*this; }
+    operator struct Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume16*)this; }
+    operator struct Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(struct Volume32*)this; }
     void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; num=source.num, den=source.den; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
@@ -18,6 +18,7 @@ struct Volume {
     uint marginX=0, marginY=0, marginZ=0; // Margins to trim when processing volume
     uint num=1, den=1; // Scale to apply to compute normalized values (data*numerator/denominator)
     uint sampleSize=0; // Sample integer size (in bytes)
+    bool squared=false; // Whether the sample are a squared magnitude
 };
 
 /// Serializes volume format (size, margin, range, layout)

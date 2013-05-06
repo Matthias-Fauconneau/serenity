@@ -120,6 +120,9 @@ struct parallel {
         return 0;
     }
     template<class F> parallel(uint start, uint stop, F f) : counter(start), stop(stop), delegate(f) {
+#if DEBUG
+        for(uint i : range(start, stop)) f(0, i);
+#else
         constexpr uint N=8;
         thread threads[N];
         for(int i=0;i<N;i++) {
@@ -130,6 +133,7 @@ struct parallel {
             pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
         }
         for(int i=0;i<N;i++) { void* status; pthread_join(threads[i].pthread,&status); }
+#endif
     }
     template<class F> parallel(uint stop, F f) : parallel(0,stop,f) {}
 };
