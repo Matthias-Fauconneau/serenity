@@ -54,6 +54,7 @@ template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume3
         }
     });
     target.marginY += margin; target.squared=true;
+    position.den = X-1; position.squared=false;
 }
 
 template void perpendicularBisectorEuclideanDistanceTransform<false>(Volume32& target, Volume16& position, const Volume32& source, uint X, uint Y, uint Z);

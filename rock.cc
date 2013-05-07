@@ -6,6 +6,7 @@
 #include "histogram.h"
 #include "distance.h"
 #include "maximum.h"
+#include "skeleton.h"
 #include "window.h"
 #include "interface.h"
 //#include "render.h"
@@ -16,6 +17,9 @@ struct Pass {
     Pass(const ref<byte>& input, const ref<byte>& name, uint sampleSize) : Pass(name, sampleSize) { inputs<<input; }
     Pass(const ref<byte>& input, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Pass(input, name, sampleSize) {
         outputs<<Output{output2,sampleSize2}; }
+    Pass(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize) : Pass(name, sampleSize) {
+        inputs<<input1<<input2<<input3;
+    }
 
     ref<byte> name;
     array<ref<byte>> inputs;
@@ -34,8 +38,13 @@ Pass Threshold("smoothz"_,"threshold"_,4); // Segments in rock vs pore space by 
 Pass DistanceX("threshold"_,"distancex"_,4,"positionx"_,2); // Computes field of distance to nearest rock wall (X pass)
 Pass DistanceY("distancex"_,"distancey"_,4,"positiony"_,2); // Y pass
 Pass DistanceZ("distancey"_,"distancez"_,4,"positionz"_,2); // Z pass
+
+#if 0
 Pass Tile("distancez"_,"tile"_,2); // Layouts volume in Z-order to improve locality on maximum search
 Pass Maximum("tile"_,"maximum"_,2); // Computes field of nearest local maximum of distance field (i.e field of maximum enclosing sphere radii)
+#else
+Pass Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Computes integer medial axis skeleton
+#endif
 
 struct VolumeData {
     VolumeData(const ref<byte>& name):name(name){}
@@ -52,7 +61,7 @@ struct Rock : Widget {
         for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
             if(!startsWith(path, name)) continue;
             VolumeData data = section(path,'.',-3,-2);
-            if(!passForOutput(data.name) || volumes.contains(data.name) || force.contains(passForOutput(data.name)->name)) { remove(path, memoryFolder); continue; } // Removes invalid, multiple or forced data
+            if(!passForOutput(data.name) || volumes.contains(data.name) || force.contains(data.name) || force.contains(passForOutput(data.name)->name)) { remove(path, memoryFolder); continue; } // Removes invalid, multiple or forced data
             parseVolumeFormat(data.volume, path);
             File file = File(path, memoryFolder, ReadWrite);
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
@@ -110,7 +119,6 @@ struct Rock : Widget {
             outputs << &volumes.last();
         }
         Volume& target = outputs.first()->volume;
-        Volume* secondary = outputs.size>1 ? &outputs[1]->volume : 0;
         uint X = target.x, Y = target.y, Z = target.z, XY=X*Y;
 
         Time time;
@@ -175,28 +183,34 @@ struct Rock : Widget {
                 threshold(target, source, float(densityThreshold) / float(density.binCount));
             }
             else if(pass==DistanceX) {
-                perpendicularBisectorEuclideanDistanceTransform<false>(target, *secondary, source, X,Y,Z);
+                perpendicularBisectorEuclideanDistanceTransform<false>(target, outputs[1]->volume, source, X,Y,Z);
             }
             else if(pass==DistanceY) {
-                perpendicularBisectorEuclideanDistanceTransform<false>(target, *secondary, source,  Y,Z,X);
+                perpendicularBisectorEuclideanDistanceTransform<false>(target, outputs[1]->volume, source,  Y,Z,X);
             }
             else if(pass==DistanceZ) {
-                perpendicularBisectorEuclideanDistanceTransform<true>(target, *secondary, source,  Z,X,Y);
+                perpendicularBisectorEuclideanDistanceTransform<true>(target, outputs[1]->volume, source,  Z,X,Y);
                 target.num = 1, target.den=maximum((const Volume32&)target);
             }
+#if 0
             else if(pass==Tile) {
                 tile(target, source);
             }
             else if(pass==Maximum) {
                 maximum(target, source);
             }
+#else
+            else if(pass==Skeleton) {
+                integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
+            }
+#endif
             else error("Unimplemented",pass);
         }
         log(pass, time);
 
         for(VolumeData* output: outputs) {
             Volume& target = output->volume;
-            while(target.den/target.num < (1ul<<(8*(target.sampleSize/2)))) { // Packs outputs if needed
+            while(target.den/target.num < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2/*FIXME*/) { // Packs outputs if needed
                 const Volume32& target32 = target;
                 target.sampleSize /= 2;
                 Time time;
@@ -216,12 +230,14 @@ struct Rock : Widget {
         for(const VolumeData* input: inputs) thrash << volumes.take(volumes.indexOf(input->name));
 
         if(pass==Source) writeFile(name+".raw_density.tsv"_, str(histogram(target)), resultFolder);
+#if 0
         if(pass==Maximum && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
             Histogram histogram = sqrtHistogram(target);
             histogram[0] = 0; // Clears rock space voxel count to plot with a bigger Y scale
             writeFile(name+".radius.tsv"_, str(histogram), resultFolder);
             log("Pore size histogram written to",name+".radius.tsv"_);
         }
+#endif
         return &volumes[volumes.indexOf(targetName)];
     }
 

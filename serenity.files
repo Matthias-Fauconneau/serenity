@@ -23,4 +23,5 @@ maximum.cc
 histogram.h
 render.h
 render.cc
-
+skeleton.h
+skeleton.cc
