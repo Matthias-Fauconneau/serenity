@@ -1,15 +1,16 @@
 #include "process.h"
 #include "time.h"
 #include "tiff.h"
+#include "window.h"
+#include "display.h"
+//#include "render.h"
+#include "histogram.h"
 #include "smooth.h"
 #include "threshold.h"
-#include "histogram.h"
 #include "distance.h"
 #include "maximum.h"
 #include "skeleton.h"
-#include "window.h"
-#include "interface.h"
-//#include "render.h"
+#include "rasterize.h"
 
 static array<struct Pass*> passes;
 struct Pass {
@@ -44,6 +45,7 @@ Pass Tile("distancez"_,"tile"_,2); // Layouts volume in Z-order to improve local
 Pass Maximum("tile"_,"maximum"_,2); // Computes field of nearest local maximum of distance field (i.e field of maximum enclosing sphere radii)
 #else
 Pass Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Computes integer medial axis skeleton
+Pass Rasterize("skeleton"_,"rasterize"_,2); // Rasterizes skeleton (maximum spheres)
 #endif
 
 struct VolumeData {
@@ -203,6 +205,9 @@ struct Rock : Widget {
             else if(pass==Skeleton) {
                 integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
             }
+            else if(pass==Rasterize) {
+                rasterize(target, source);
+            }
 #endif
             else error("Unimplemented",pass);
         }
@@ -230,14 +235,13 @@ struct Rock : Widget {
         for(const VolumeData* input: inputs) thrash << volumes.take(volumes.indexOf(input->name));
 
         if(pass==Source) writeFile(name+".raw_density.tsv"_, str(histogram(target)), resultFolder);
-#if 0
-        if(pass==Maximum && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
+        if(pass==Rasterize && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
             Histogram histogram = sqrtHistogram(target);
-            histogram[0] = 0; // Clears rock space voxel count to plot with a bigger Y scale
+            histogram[0] = 0; // Clears foreground voxel count to plot with a bigger Y scale
+            histogram[1] = 0; // Clears backround voxel count to plot with a bigger Y scale
             writeFile(name+".radius.tsv"_, str(histogram), resultFolder);
             log("Pore size histogram written to",name+".radius.tsv"_);
         }
-#endif
         return &volumes[volumes.indexOf(targetName)];
     }
 

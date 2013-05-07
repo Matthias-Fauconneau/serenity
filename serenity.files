@@ -11,6 +11,9 @@ image.h
 tiff.cc
 volume.h
 volume.cc
+histogram.h
+render.h
+render.cc
 rock.cc
 smooth.h
 smooth.cc
@@ -20,8 +23,7 @@ distance.h
 distance.cc
 maximum.h
 maximum.cc
-histogram.h
-render.h
-render.cc
 skeleton.h
 skeleton.cc
+rasterize.h
+rasterize.cc

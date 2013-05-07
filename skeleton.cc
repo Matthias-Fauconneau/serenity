@@ -28,7 +28,7 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
     float norm = sqrt( sqr(xf0-x+xfd-xd) + sqr(yf0-y+yfd-yd) + sqr(zf0-z+zfd-zd) ); \
     if(sqNorm > 1 && sqNorm > 2*inprod + norm + 1.5f) { \
                 int crit = (xf0-xfd)*(xf0-x+xfd-xd) + (yf0-yfd)*(yf0-y+yfd-yd) + (zf0-zfd)*(zf0-z+zfd-zd); \
-                if(crit>=0) skel[0] = 2; if(crit<=0) skel[da] = 2; } })
+                if(crit>=0) skel[0] = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-y); if(crit<=0) skel[da] = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-yd); } })
 
                 if(xf[0]<0xFFFF) {
                     skel[0] = 1;
@@ -43,5 +43,5 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
             }
         }
     }
-    target.num=1, target.den = 2;
+    target.num=1, target.den = maximum(target), target.squared=true;
 }
