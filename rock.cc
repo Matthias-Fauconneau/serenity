@@ -36,16 +36,23 @@ Pass SmoothX ("shift"_,"smoothx"_,2); // Denoises data and filters small pores b
 Pass SmoothY("smoothx"_,"smoothy"_,2);  // Y pass
 Pass SmoothZ("smoothy"_,"smoothz"_,2); // Z pass
 Pass Threshold("smoothz"_,"threshold"_,4); // Segments in rock vs pore space by comparing to a fixed threshold
-Pass DistanceX("threshold"_,"distancex"_,4,"positionx"_,2); // Computes field of distance to nearest rock wall (X pass)
+/*Pass DistanceX("threshold"_,"distancex"_,4,"positionx"_,2); // Computes field of distance to nearest rock wall (X pass)
 Pass DistanceY("distancex"_,"distancey"_,4,"positiony"_,2); // Y pass
-Pass DistanceZ("distancey"_,"distancez"_,4,"positionz"_,2); // Z pass
+Pass DistanceZ("distancey"_,"distancez"_,4,"positionz"_,2); // Z pass*/
+Pass DistanceX("threshold"_,"distancex"_,4); // Computes field of distance to nearest rock wall (X pass)
+Pass DistanceY("distancex"_,"distancey"_,4); // Y pass
+Pass DistanceZ("distancey"_,"distance"_,4); // Z pass
 
 #if 0
-Pass Tile("distancez"_,"tile"_,2); // Layouts volume in Z-order to improve locality on maximum search
+Pass Tile("distance"_,"tile"_,2); // Layouts volume in Z-order to improve locality on maximum search
 Pass Maximum("tile"_,"maximum"_,2); // Computes field of nearest local maximum of distance field (i.e field of maximum enclosing sphere radii)
-#else
+#elif 0
 Pass Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Computes integer medial axis skeleton
 Pass Rasterize("skeleton"_,"rasterize"_,2); // Rasterizes skeleton (maximum spheres)
+#else
+Pass Rasterize("distance"_,"rasterize"_,2); // Rasterizes each distance field voxel as a sphere (with maximum blending)
+Pass Crop("rasterize"_,"crop"_,2); // Copies a small sample from the center of the volume
+Pass ASCII("crop"_,"ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
 #endif
 
 struct VolumeData {
@@ -83,7 +90,7 @@ struct Rock : Widget {
     const VolumeData* getVolume(const ref<byte>& targetName) {
         for(const VolumeData& data: volumes) if(data.name == targetName) return &data;
         const Pass& pass = *passForOutput(targetName);
-        assert(&pass);
+        assert_(&pass, targetName);
         array<const VolumeData*> inputs;
         for(const ref<byte>& input: pass.inputs) inputs << getVolume( input );
 
@@ -185,36 +192,28 @@ struct Rock : Widget {
                 threshold(target, source, float(densityThreshold) / float(density.binCount));
             }
             else if(pass==DistanceX) {
-                perpendicularBisectorEuclideanDistanceTransform<false>(target, outputs[1]->volume, source, X,Y,Z);
+                perpendicularBisectorEuclideanDistanceTransform<false>(target, /*outputs[1]->volume,*/ source, X,Y,Z/*, 1,X,XY*/);
             }
             else if(pass==DistanceY) {
-                perpendicularBisectorEuclideanDistanceTransform<false>(target, outputs[1]->volume, source,  Y,Z,X);
+                perpendicularBisectorEuclideanDistanceTransform<false>(target, /*outputs[1]->volume,*/ source,  Y,Z,X/*, X,XY,1*/);
             }
             else if(pass==DistanceZ) {
-                perpendicularBisectorEuclideanDistanceTransform<true>(target, outputs[1]->volume, source,  Z,X,Y);
+                perpendicularBisectorEuclideanDistanceTransform<true>(target, /*outputs[1]->volume,*/ source,  Z,X,Y/*, XY,1,X*/);
                 target.num = 1, target.den=maximum((const Volume32&)target);
             }
-#if 0
-            else if(pass==Tile) {
-                tile(target, source);
-            }
-            else if(pass==Maximum) {
-                maximum(target, source);
-            }
-#else
-            else if(pass==Skeleton) {
-                integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
-            }
-            else if(pass==Rasterize) {
-                rasterize(target, source);
-            }
-#endif
+            //else if(pass==Tile) tile(target, source);
+            //else if(pass==Maximum) maximum(target, source);
+            //else if(pass==Skeleton) integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
+            else if(pass==Rasterize) rasterize(target, source);
+            else if(pass==Crop) { const int size=64; crop(target, source, source.x/2-size/2, source.y/2-size/2, source.z/2-size/2, source.x/2+size/2, source.y/2+size/2, source.z/2+size/2); }
+            else if(pass==ASCII) toASCII(target, source);
             else error("Unimplemented",pass);
         }
         log(pass, time);
 
         for(VolumeData* output: outputs) {
             Volume& target = output->volume;
+            if(target.sampleSize==20) continue; // Don't try to pack ASCII
             while(target.den/target.num < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2/*FIXME*/) { // Packs outputs if needed
                 const Volume32& target32 = target;
                 target.sampleSize /= 2;
@@ -237,8 +236,7 @@ struct Rock : Widget {
         if(pass==Source) writeFile(name+".raw_density.tsv"_, str(histogram(target)), resultFolder);
         if(pass==Rasterize && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
             Histogram histogram = sqrtHistogram(target);
-            histogram[0] = 0; // Clears foreground voxel count to plot with a bigger Y scale
-            histogram[1] = 0; // Clears backround voxel count to plot with a bigger Y scale
+            histogram[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
             writeFile(name+".radius.tsv"_, str(histogram), resultFolder);
             log("Pore size histogram written to",name+".radius.tsv"_);
         }
@@ -259,15 +257,16 @@ struct Rock : Widget {
     void updateView() {
         assert(current);
         int2 size (current->x-2*current->marginX,current->y-2*current->marginY);
-        while(2*size<displaySize) size *= 2;
+        //while(2*size<displaySize) size *= 2;
         window.setSize(size);
         window.render();
     }
 
     void render(int2 position, int2) {
+        if(current->sampleSize==20) return; // Don't try to display ASCII
         assert(current);
         uint z = current->marginZ+(current->z-2*current->marginZ-1)*currentSlice;
-        Image image = current->squared ? slice(*current, z) : squareRoot(*current, z);
+        Image image = current->squared ? squareRoot(*current, z) : slice(*current, z);
         blit(position, image); //FIXME: direct slice->shm
     }
 

@@ -74,6 +74,7 @@ template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
 
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
 inline int sqr(int x) { return x*x; }
+inline int64 sqr(int64 x) { return x*x; }
 inline float sqr(float x) { return x*x; }
 generic float sqr(const vector& a) { return dot(a,a); }
 inline float norm(float x) { return abs(x); }

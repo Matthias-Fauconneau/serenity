@@ -7,8 +7,8 @@ endif
 FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
 FLAGS_debug = -DDEBUG -g #-Og prevents backtrace
 FLAGS_profile = -DPROFILE -g -Ofast -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,file,process,time,map,trace,profile,vector
-FLAGS_fast = -O3
-FLAGS_release = -Ofast -funroll-loops -fpeel-loops
+FLAGS_fast = -g -Ofast
+FLAGS_release = -Ofast
 FLAGS += $(FLAGS_$(BUILD))
 
 SRCS = $(SRCS_$(BUILD))

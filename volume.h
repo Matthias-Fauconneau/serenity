@@ -49,14 +49,21 @@ void interleavedLookup(Volume& target);
 /// Tiles a volume recursively into bricks (using 3D Z ordering)
 void tile(Volume16& target, const Volume16& source);
 
-/// Clips volume data to a cylinder and sets zero samples to 1
-void clip(Volume16& target);
+/// Copies a cropped version of the volume
+void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, uint x2, uint y2, uint z2);
 
 /// Downsamples a volume by averaging 2x2x2 samples
 void downsample(Volume16& target, const Volume16& source);
+
+/// Converts volume data to ASCII (one voxel per line, explicit coordinates)
+void toASCII(Volume& target, const Volume16& source);
+
+/// Clips volume data to a cylinder and sets zero samples to 1
+void clip(Volume16& target);
 
 /// Returns an image of a volume slice
 Image slice(const Volume& volume, uint z);
 
 /// Returns the square root of an image of a volume slice
 Image squareRoot(const Volume& volume, uint z);
+

@@ -2,10 +2,10 @@
 #include "time.h"
 #include "simd.h"
 
-template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& position, const Volume32& source, uint X, uint Y, uint Z) {
+template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, /*Volume16& position,*/ const Volume32& source, uint X, uint Y, uint Z/*, uint xStride, uint yStride, uint zStride*/) {
     const uint32* const sourceData = source;
     uint32* const targetData = target;
-    uint16* const positionData = position;
+    //uint16* const positionData = position;
     const uint XY = X*Y;
     constexpr uint unroll = 8; // 2x faster for some reason
     uint margin = (Y-floor(unroll,Y))/2;
@@ -14,11 +14,11 @@ template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume3
     static buffer<element> stacks (8*unroll*X);
     assert_(stacks.size == 8*unroll*X);
     element* const stacksData = stacks.data;
-    parallel(Z, [sourceData,targetData,positionData,X,XY,Y,margin,stacksData](uint id, uint z) {
+    parallel(Z, [&](uint id, uint z) {
         element* const threadStacks = stacksData+id*unroll*X;
         const uint32* const sourceZ = sourceData+z*XY;
         uint32* const targetZ = targetData+z*X;
-        uint16* const positionZ = positionData+z*X;
+        //uint16* const positionZ = positionData+z*zStride;
         for(int y=margin; y<Y-margin; y+=unroll) {
             int stackIndices[unroll];
             for(int dy=0; dy<unroll; dy++) {
@@ -38,24 +38,27 @@ template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume3
                     }
                 }
             }
-            uint32* const targetY = targetZ+y;
-            uint16* const positionY = positionZ+y;
+            uint32* const targetZY = targetZ+y;
+            //uint16* const positionZY = positionZ+y*yStride;
             for(int x=X-1; x>=0; x--) {
+                uint32* const targetZYX = targetZY+x*XY;
+                //uint16* const positionZYX = positionZY+x*xStride;
                 for(int dy=0; dy<unroll; dy++) {
                     int& i = stackIndices[dy];
                     const element* const stack = threadStacks+dy*X;
                     if(x==stack[i].cx) i--;
                     assert(i>=0);
                     int d = x * (x - 2*stack[i].x) + stack[i].sd;
-                    targetY[x*XY+dy] = (last ? d : (y+dy)*(y+dy) + d);
-                    positionY[x*XY+dy] = stack[i].x;
+                    if(last){int radius=sqrt(d); assert_(radius<=x && radius<=y+dy && radius<=z && radius<=1024-x && radius<=1024-y-dy && radius<=1024-z, radius, x, y+dy, z);}
+                    targetZYX[dy] = (last ? d : (y+dy)*(y+dy) + d);
+                    //positionZYX[dy*yStride] = stack[i].x;
                 }
             }
         }
     });
     target.marginY += margin; target.squared=true;
-    position.den = X-1; position.squared=false;
+    //position.den = X-1; position.squared=false;
 }
 
-template void perpendicularBisectorEuclideanDistanceTransform<false>(Volume32& target, Volume16& position, const Volume32& source, uint X, uint Y, uint Z);
-template void perpendicularBisectorEuclideanDistanceTransform<true>(Volume32& target, Volume16& position, const Volume32& source, uint X, uint Y, uint Z);
+template void perpendicularBisectorEuclideanDistanceTransform<false>(Volume32& target, /*Volume16& position,*/ const Volume32& source, uint X, uint Y, uint Z/*, uint xStride, uint yStride, uint zStride*/);
+template void perpendicularBisectorEuclideanDistanceTransform<true>(Volume32& target, /*Volume16& position,*/ const Volume32& source, uint X, uint Y, uint Z/*, uint xStride, uint yStride, uint zStride*/);

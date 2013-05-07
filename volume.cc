@@ -19,6 +19,7 @@ string volumeFormat(const Volume& volume) {
     if(volume.marginX||volume.marginY||volume.marginZ) s << '+' << str(volume.marginX) << '+' << str(volume.marginY) << '+' << str(volume.marginZ);
     s << '-' << hex(volume.num) << ':' << hex(volume.den);
     if(volume.offsetX||volume.offsetY||volume.offsetZ) s << "-tiled"_;
+    if(volume.squared) s << "-squared";
     return s;
 }
 
@@ -38,6 +39,7 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
     assert(volume.num && volume.den, path, volume.num, volume.den);
     volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.den+1)/volume.num)))) / 8; // Minimum sample size to encode maximum value (in 2ⁿ bytes)
     if(s.match("-tiled"_)) interleavedLookup(volume); else { free(volume.offsetX), free(volume.offsetY), free(volume.offsetZ); }
+    if(s.match("-squared"_)) volume.squared=true;
 }
 
 uint maximum(const Volume16& source) {
@@ -75,7 +77,6 @@ void tile(Volume16& target, const Volume16& source) {
     const uint* const offsetY = target.offsetY;
     const uint* const offsetZ = target.offsetZ;
 
-
     for(uint z=0; z<Z; z++) {
         const uint16* const sourceZ = sourceData+z*XY;
         uint16* const targetZ = targetData+offsetZ[z];
@@ -87,6 +88,74 @@ void tile(Volume16& target, const Volume16& source) {
         }
     }
     target.copyMetadata(source);
+}
+
+void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, uint x2, uint y2, uint z2) {
+    uint X=x2-x1, Y=y2-y1, Z=z2-z1, XY=X*Y;
+    target.x=X, target.y=Y, target.z=Z;
+    target.marginX=target.marginY=target.marginZ=0; // Assumes crop outside margins
+    assert_(source.offsetX && source.offsetY && source.offsetZ);
+    const uint* const offsetX = source.offsetX;
+    const uint* const offsetY = source.offsetY;
+    const uint* const offsetZ = source.offsetZ;
+    const uint16* const sourceData = source;
+    uint16* const targetData = target;
+    for(uint z=0; z<Z; z++) {
+        const uint16* const sourceZ = sourceData + offsetZ[z1+z];
+        uint16* const targetZ = targetData + z*XY;
+        for(uint y=0; y<Y; y++) {
+            const uint16* const sourceZY = sourceZ + offsetY[y1+y];
+            uint16* const targetZY = targetZ + y*X;
+            for(uint x=0; x<X; x++) targetZY[x]=sourceZY[offsetX[x1+x]];
+        }
+    }
+}
+
+void downsample(Volume16& target, const Volume16& source) {
+    assert(!source.offsetX && !source.offsetY && !source.offsetZ);
+    int X = source.x, Y = source.y, Z = source.z, XY = X*Y;
+    target.x = X/2, target.y = Y/2, target.z = Z/2; target.marginX=source.marginX/2, target.marginY=source.marginZ/2, target.marginX=source.marginZ/2, target.num=source.num, target.den=source.den;
+    const uint16* const sourceData = source;
+    uint16* const targetData = target;
+    for(int z=0; z<Z/2; z++) {
+        const uint16* const sourceZ = sourceData+z*2*XY;
+        uint16* const targetZ = targetData+z*XY/2/2;
+        for(int y=0; y<Y/2; y++) {
+            const uint16* const sourceZY = sourceZ+y*2*X;
+            uint16* const targetZY = targetZ+y*X/2;
+            for(int x=0; x<X/2; x++) {
+                const uint16* const sourceZYX = sourceZY+x*2;
+                targetZY[x] =
+                        (
+                            ( sourceZYX[0*XY+0*X+0] + sourceZYX[0*XY+0*X+1] +
+                        sourceZYX[0*XY+1*X+0] + sourceZYX[0*XY+1*X+1]  )
+                        +
+                        ( sourceZYX[1*XY+0*X+0] + sourceZYX[1*XY+0*X+1] +
+                        sourceZYX[1*XY+1*X+0] + sourceZYX[1*XY+1*X+1]  ) ) / 8;
+            }
+        }
+    }
+}
+
+void toASCII(Volume& target, const Volume16& source) {
+    uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    assert_(!source.offsetX && !source.offsetY && !source.offsetZ);
+    const uint16* const sourceData = source;
+    typedef char line[20];
+    line* const targetData = (line*)target.data.data;
+    for(uint z=0; z<Z; z++) {
+        const uint16* const sourceZ = sourceData + z*XY;
+        line* const targetZ = targetData + z*XY;
+        for(uint y=0; y<Y; y++) {
+            const uint16* const sourceZY = sourceZ + y*X;
+            line* const targetZY = targetZ + y*X;
+            for(uint x=0; x<X; x++) {
+                string s = dec(x,4)+" "_+dec(y,4)+" "_+dec(z,4)+" "_+dec(sourceZY[x],4)+"\n"_; //FIXME: Extremely inefficient but who cares !
+                assert(s.size==20);
+                copy(targetZY[x], s.data, 20);
+            }
+        }
+    }
 }
 
 void clip(Volume16& target) {
@@ -107,31 +176,6 @@ void clip(Volume16& target) {
                 } else {
                     value = 0; //Clip
                 }
-            }
-        }
-    }
-}
-
-void downsample(Volume16& target, const Volume16& source) {
-    int X = source.x, Y = source.y, Z = source.z, XY = X*Y;
-    target.x = X/2, target.y = Y/2, target.z = Z/2; target.num=source.num, target.den=source.den;
-    const uint16* const sourceData = source;
-    uint16* const targetData = target;
-    for(int z=0; z<Z/2; z++) {
-        const uint16* const sourceZ = sourceData+z*2*XY;
-        uint16* const targetZ = targetData+z*XY/2/2;
-        for(int y=0; y<Y/2; y++) {
-            const uint16* const sourceZY = sourceZ+y*2*X;
-            uint16* const targetZY = targetZ+y*X/2;
-            for(int x=0; x<X/2; x++) {
-                const uint16* const sourceZYX = sourceZY+x*2;
-                targetZY[x] =
-                        (
-                            ( sourceZYX[0*XY+0*X+0] + sourceZYX[0*XY+0*X+1] +
-                        sourceZYX[0*XY+1*X+0] + sourceZYX[0*XY+1*X+1]  )
-                        +
-                        ( sourceZYX[1*XY+0*X+0] + sourceZYX[1*XY+0*X+1] +
-                        sourceZYX[1*XY+1*X+0] + sourceZYX[1*XY+1*X+1]  ) ) / 8;
             }
         }
     }
@@ -185,13 +229,13 @@ Image squareRoot(const Volume& volume, uint z) {
             const uint16* const sourceZ = (const Volume16&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {
                 const uint16* const sourceY = sourceZ + offsetY[mY+y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
             }
         } else {
             const uint16* const sourceZ = (const Volume16&)volume + z*Y*X + mY*X + mX;
             for(uint y=0; y<imY; y++) {
                 const uint16* const sourceY = sourceZ + y*X;
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[x])) * scale)); //FIXME: overflow
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[x])) * scale));
             }
         }
     } else if(volume.sampleSize==4) {
@@ -199,13 +243,13 @@ Image squareRoot(const Volume& volume, uint z) {
             const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {
                 const uint32* const sourceY = sourceZ + offsetY[mY+y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
             }
         } else {
             const uint32* const sourceZ = (const Volume32&)volume + z*Y*X + mY*X + mX;
             for(uint y=0; y<imY; y++) {
                 const uint32* const sourceY = sourceZ + y*X;
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<uint>(0xFF,sqrt(float(sourceY[x])) * scale)); //FIXME: overflow
+                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[x])) * scale)); //FIXME: overflow
             }
         }
     } else error("Unsupported sample size", volume.sampleSize);
