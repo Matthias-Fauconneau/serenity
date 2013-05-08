@@ -1,5 +1,6 @@
 #include "rasterize.h"
 #include "process.h"
+#include "time.h"
 
 void rasterize(Volume16& target, const Volume16& source) {
     const uint16* const sourceData = source;
@@ -11,8 +12,9 @@ void rasterize(Volume16& target, const Volume16& source) {
     const uint* const offsetX = target.offsetX;
     const uint* const offsetY = target.offsetY;
     const uint* const offsetZ = target.offsetZ;
+    Time time; Time report;
     parallel(marginZ,Z-marginZ, [&](uint, uint z) {
-        log(z);
+        if(report/1000>=2) { log(z-marginZ,"/", Z-2*marginZ, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); }
         const uint16* const sourceZ = sourceData+z*XY;
         for(int y=marginY; y<Y-marginY; y++) {
             const uint16* const sourceZY = sourceZ+y*X;

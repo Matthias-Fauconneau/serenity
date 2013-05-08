@@ -2,6 +2,7 @@
 #include "map.h"
 #include "time.h"
 #include "trace.h"
+inline float round(float x) { return __builtin_roundf(x); }
 
 /// Traces functions to time their execution times and displays statistics on exit
 struct Profile {
@@ -14,8 +15,8 @@ struct Profile {
     ~Profile() {
         map<Function, void*> sort;
         uint64 total=0;
-        for(auto e: profile) if(e.value.count>9) { sort.insertSortedMulti(e.value, e.key); total+=e.value.time; }
-        for(auto e: sort) if(100.f*e.key.time/total>=1) {
+        for(auto e: profile) if(e.value.count>1/*9*/) { sort.insertSortedMulti(e.value, e.key); total+=e.value.time; }
+        for(auto e: sort) if(100.f*e.key.time/total>=0.5/*1*/) {
             Symbol s = findNearestLine(e.value);
             log(str((uint)round(100.f*e.key.time/total))+"%"_
                 +"\t"_+str(e.key.count)
@@ -24,7 +25,7 @@ struct Profile {
     }
     void enter(void* function) {
         uint64 tsc = rdtsc();
-        //top->time += tsc-top->tsc;
+        top->time += tsc-top->tsc;
         top++;
         *top = Frame{function,0,tsc};
     }
@@ -35,9 +36,9 @@ struct Profile {
         f.count++;
         f.time += top->time;
         top--;
-        //top->tsc = tsc;
+        top->tsc = tsc;
     }
 };
-Profile profile;
+Profile profile __attribute((init_priority(1001)));
 extern "C" void __cyg_profile_func_enter(void* function, void*) { if(function) profile.enter(function); }
 extern "C" void __cyg_profile_func_exit(void*, void*) { profile.exit(); }

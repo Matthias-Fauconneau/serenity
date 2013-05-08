@@ -4,7 +4,6 @@
 // Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define notrace __attribute((no_instrument_function))
 /// Less verbose template declarations
 #define Type typename
 /// Declares the default move constructor and move assigmment operator

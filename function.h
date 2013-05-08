@@ -30,7 +30,7 @@ template<Type O, Type R, Type... Args> struct const_method<O, R(Args...)> : func
 
 template<Type R, Type... Args> struct function;
 template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
-    long any[21]; //always store functor inline
+    long any[22]; //always store functor inline
     template<Type F> function(F f) {
         static_assert(sizeof(anonymous_function<F,R(Args...)>)<=sizeof(any),"");
         new (any) anonymous_function<F,R(Args...)>(f);

@@ -120,7 +120,7 @@ struct parallel {
         return 0;
     }
     template<class F> parallel(uint start, uint stop, F f) : counter(start), stop(stop), delegate(f) {
-#if DEBUG
+#if DEBUG || PROFILE
         for(uint i : range(start, stop)) f(0, i);
 #else
         constexpr uint N=8;

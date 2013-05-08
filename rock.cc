@@ -40,8 +40,9 @@ Operation EmptyX("rock"_,"emptyx"_,4); // Computes distance field to nearest por
 Operation EmptyY("emptyx"_,"emptyy"_,4); // Y pass
 Operation EmptyZ("emptyy"_,"emptyz"_,4); // Z pass
 
-Operation SquareRoot("emptyz"_,"empty"_,1); // Square roots and tiles distance field before using it for empty space skiping during rendering
-Operation Render("maximum"_,"empty"_,"render"_,sizeof(VolumeT::T)); // Square roots and normalizes
+Operation RenderEmpty("emptyz"_,"empty"_,1); // Square roots and tiles distance field before using it for empty space skiping during rendering
+Operation RenderDensity("distance"_,"density"_,1); // Square roots and normalizes distance to use as density values (for opacity and gradient)
+Operation RenderIntensity("maximum"_,"intensity"_,1); // Square roots and normalizes maximum to use as intensity values (for color intensity) (TODO: ambient occlusion)
 
 struct VolumeData {
     VolumeData(const ref<byte>& name):name(name){}
@@ -53,7 +54,7 @@ bool operator ==(const VolumeData& a, const ref<byte>& name) { return a.name == 
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : Widget {
-    Rock(const ref<byte>& path, const ref<byte>& target, const ref<ref<byte>>& force) : folder(path), name(section(path,'/',-2,-1)), renderVolume(target=="render"_) {
+    Rock(const ref<byte>& path, const ref<byte>& target, const ref<ref<byte>>& force) : folder(path), name(section(path,'/',-2,-1)), renderVolume(target=="intensity"_) {
         assert(name);
         for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
             if(!startsWith(path, name)) continue;
@@ -87,10 +88,16 @@ struct Rock : Widget {
             VolumeData data = output.name;
             Volume& volume = data.volume;
             if(!operation.inputs) { // Original source slices format
-                array<string> slices = folder.list(Files);
-                Map file (slices.first(), folder);
-                const Tiff16 image (file);
-                volume.x = image.width, volume.y = image.height, volume.z = slices.size, volume.den = (1<<(8*output.sampleSize))-1;
+                if(folder == "spheres"_) {
+                    volume.x = 1024, volume.y = 1024, volume.z = 1024;
+                } else {
+                    Folder folder(this->folder);
+                    array<string> slices = folder.list(Files);
+                    Map file (slices.first(), folder);
+                    const Tiff16 image (file);
+                    volume.x = image.width, volume.y = image.height, volume.z = slices.size;
+                }
+                volume.den = (1<<(8*output.sampleSize))-1;
             } else { // Inherit initial format from previous operation
                 const Volume& source = inputs.first()->volume;
                 volume.x=source.x, volume.y=source.y, volume.z=source.z, volume.copyMetadata(source);
@@ -120,12 +127,25 @@ struct Rock : Widget {
 
         Time time;
         if(operation==Source) {
-            array<string> slices = folder.list(Files);
-            Time time;
-            uint16* const targetData = (Volume16&)target;
-            for(uint z=0; z<slices.size; z++) {
-                if(time/1000>=2) { log(z,"/",slices.size); time.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
-                Tiff16(Map(slices[z],folder)).read(targetData+z*XY); // Directly decodes slice images into the volume
+            if(this->folder == "spheres"_) {
+                uint16* const targetData = (Volume16&)target;
+                struct Sphere { uint x,y,z,r; } spheres[X];
+                for(uint i: range(1024)) {
+                    for(uint z=0; z<Z; z++) {
+                        if(report/1000>=2) { log(z,"/",slices.size, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
+                        Tiff16(Map(slices[z],folder)).read(targetData+z*XY); // Directly decodes slice images into the volume
+                    }
+                }
+                // TODO: write analytic histogram
+            } else {
+                Folder folder(this->folder);
+                array<string> slices = folder.list(Files);
+                Time report;
+                uint16* const targetData = (Volume16&)target;
+                for(uint z=0; z<slices.size; z++) {
+                    if(report/1000>=2) { log(z,"/",slices.size, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
+                    Tiff16(Map(slices[z],folder)).read(targetData+z*XY); // Directly decodes slice images into the volume
+                }
             }
         } else {
             const Volume& source = inputs.first()->volume;
@@ -195,8 +215,8 @@ struct Rock : Widget {
             else if(operation==Rasterize) rasterize(target, source);
             else if(operation==Crop) { const int size=256; crop(target, source, source.x/2-size/2, source.y/2-size/2, source.z/2-size/2, source.x/2+size/2, source.y/2+size/2, source.z/2+size/2); }
             else if(operation==ASCII) toASCII(target, source);
-            else if(operation==SquareRoot) squareRoot(target, source);
-            else if(operation==Render) ::render(target, source);
+            else if(operation==RenderEmpty) squareRoot(target, source);
+            else if(operation==RenderDensity || operation==RenderIntensity) ::render(target, source);
             else error("Unimplemented",operation);
         }
         log(operation, time);
@@ -221,7 +241,7 @@ struct Rock : Widget {
             rename(name+"."_+output->name, name+"."_+output->name+"."_+volumeFormat(output->volume), memoryFolder); // Renames output files (once data is valid)
         }
         // Recycles all inputs (avoid zeroing new pages)
-        for(const VolumeData* input: inputs) thrash << volumes.take(volumes.indexOf(input->name));
+        if(operation != *operations.last()) for(const VolumeData* input: inputs) thrash << volumes.take(volumes.indexOf(input->name));
 
         if(operation==Source) writeFile(name+".raw_density.tsv"_, str(histogram(target)), resultFolder);
         if(operation==Rasterize && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
@@ -244,7 +264,7 @@ struct Rock : Widget {
             if(!button) return false;
             int2 delta = cursor-lastPos;
             lastPos = cursor;
-            if(event == Press) return true;
+            if(event != Motion) return false;
             rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y); //TODO: warp
             rotation.y= clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
         } else {
@@ -256,25 +276,35 @@ struct Rock : Widget {
 
     void updateView() {
         assert(current);
-        int2 size (current->x-2*current->marginX,current->y-2*current->marginY);
-        window.setSize(size);
-        window.render();
+        int2 size(current->x-2*current->marginX,current->y-2*current->marginY);
+        if(window.size != size) window.setSize(size);
+        else window.render();
     }
 
-    void render(int2 position, int2) {
+    void render(int2 position, int2 size) {
+        static Time wait; uint64 waitTime=wait;
         if(current->sampleSize==20) { exit(); return; } // Don't try to display ASCII
         assert(current);
         uint z = current->marginZ+(current->z-2*current->marginZ-1)*currentSlice;
-        Image image;
-        if(!renderVolume) image = current->squared ? squareRoot(*current, z) : slice(*current, z);
-        else {
+        if(!renderVolume) {
+            Image image = current->squared ? squareRoot(*current, z) : slice(*current, z);
+            blit(position, image);
+        } else {
             mat3 view;
             view.rotateX(rotation.y); // pitch
             view.rotateZ(rotation.x); // yaw
             const Volume& empty = getVolume("empty"_)->volume;
-            image = ::render(*current, empty, view);
+            const Volume& density = getVolume("density"_)->volume;
+            const Volume& intensity = getVolume("intensity"_)->volume;
+            Time time;
+            assert_(position==int2(0) && size == framebuffer.size());
+            ::render(framebuffer, empty, density, intensity, view);
+#if 0
+            log((uint64)time,"ms", waitTime,"ms");
+            window.render(); // Force continuous updates (even when nothing changed)
+            wait.reset();
+#endif
         }
-        blit(position, image);
     }
 
     // Settings
@@ -283,7 +313,7 @@ struct Rock : Widget {
     const Folder resultFolder {"ptmp"_}; // Final results (histograms) are written there
 
     // Arguments
-    Folder folder; // Contains source slice images
+    string folder; // Contains source slice images (or name of a validation case (spheres, cylinders, cones)
     string name; // Used to name intermediate and output files (folder base name)
 
     // Variables

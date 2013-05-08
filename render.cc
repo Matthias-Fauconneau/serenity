@@ -26,50 +26,63 @@ void squareRoot(Volume8& target, const Volume16& source) {
     } );
 }
 
-void render(VolumeT& target, const Volume16& source) {
-    uint X=target.x, Y=target.y, Z=target.z;
-    assert_(source.offsetX && source.offsetY && source.offsetZ);
+void render(Volume8& target, const Volume16& source) {
+    uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
     interleavedLookup(target);
     const uint* const offsetX = target.offsetX;
     const uint* const offsetY = target.offsetY;
     const uint* const offsetZ = target.offsetZ;
-    target.marginX=0, target.marginY=0, target.marginZ=0, target.num = 1, target.den = (1<<(8*sizeof(VolumeT::T)))-1, target.squared=false;
+    target.num = 1, target.den = (1<<8)-1, target.squared=false;
     float scale = target.den * sqrt(float(source.num) / float(source.den));
     const uint16* const sourceData = source;
-    VolumeT::T* const targetData = target;
+    uint8* const targetData = target;
     parallel(Z, [&](uint, uint z) {
-        const uint16* const sourceZ = sourceData + offsetZ[z];
-        VolumeT::T* const targetZ = targetData + offsetZ[z];
-        for(uint y=0; y<Y; y++) {
-            const uint16* const sourceZY = sourceZ + offsetY[y];
-            VolumeT::T* const targetZY = targetZ + offsetY[y];
-            for(uint x=0; x<X; x++) {
-                targetZY[offsetX[x]] = clip<uint>(target.den/sqrt(X/2*X/2+Y/2*Y/2), round(sqrt(float(sourceZY[offsetX[x]]))*scale), target.den);
+        if(source.offsetX || source.offsetY || source.offsetZ) {
+            assert(source.offsetX && source.offsetY && source.offsetZ);
+            const uint16* const sourceZ = sourceData + offsetZ[z];
+            uint8* const targetZ = targetData + offsetZ[z];
+            for(uint y=0; y<Y; y++) {
+                const uint16* const sourceZY = sourceZ + offsetY[y];
+                uint8* const targetZY = targetZ + offsetY[y];
+                for(uint x=0; x<X; x++) {
+                    targetZY[offsetX[x]] = clip<uint>(target.den/sqrt(X/2*X/2+Y/2*Y/2), round(sqrt(float(sourceZY[offsetX[x]]))*scale), target.den);
+                }
+            }
+        } else {
+            assert(!source.offsetX && !source.offsetY && !source.offsetZ);
+            const uint16* const sourceZ = sourceData + z*XY;
+            uint8* const targetZ = targetData + offsetZ[z];
+            for(uint y=0; y<Y; y++) {
+                const uint16* const sourceZY = sourceZ + y*X;
+                uint8* const targetZY = targetZ + offsetY[y];
+                for(uint x=0; x<X; x++) {
+                    targetZY[offsetX[x]] = clip<uint>(target.den/sqrt(X/2*X/2+Y/2*Y/2), round(sqrt(float(sourceZY[x]))*scale), target.den);
+                }
             }
         }
     } );
 }
 
-Image render(const VolumeT& volume,  const Volume8& empty, mat3 view) {
+void render(Image& target, const Volume8& empty, const Volume8& density, const Volume8& intensity, mat3 view) {
     // Volume
-    assert(volume.x==volume.y && volume.y == volume.z);
-    uint stride = volume.x; // Unclipped volume data size
-    uint size = stride-2*volume.marginX; // Clipped volume size
+    assert(empty.x==empty.y && empty.y == empty.z);
+    uint stride = empty.x; // Unclipped volume data size
+    uint size = stride-2*empty.marginX; // Clipped volume size
     const float radius = size/2, halfHeight = size/2; // Cylinder parameters
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
-    const VolumeT::T* const data = volume;
+    const uint8* const densityData = density;
+    const uint8* const intensityData = intensity;
     const uint8* const emptyData = empty;
-    const uint* const offsetX = volume.offsetX + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
-    const uint* const offsetY = volume.offsetY + stride/2;
-    const uint* const offsetZ = volume.offsetZ + stride/2;
+    const uint* const offsetX = empty.offsetX + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
+    const uint* const offsetY = empty.offsetY + stride/2;
+    const uint* const offsetZ = empty.offsetZ + stride/2;
     assert_(offsetX && offsetY && offsetZ);
 
     // Image
-    int imageX = stride, imageY = stride; // Target image size
-    assert(imageX == imageY);
-    Image target(imageX, imageY);
+    int imageX = target.width, imageY = target.height; // Target image size
+    byte4* const imageData = target.data;
 
     // View
     mat3 world = view.inverse().scale(size*sqrt(2)); // Transform normalized view space to world space
@@ -86,9 +99,10 @@ Image render(const VolumeT& volume,  const Volume8& empty, mat3 view) {
     const v4sf rcp_2a = float4(-1./(2*a));
 
     #define tileSize 8
+    assert(imageX%tileSize ==0 && imageY%tileSize ==0, imageX, imageY);
     parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {
         const int tileX = i%(imageX/tileSize), tileY = i/(imageY/tileSize);
-        byte4* const image = target.data+tileY*tileSize*imageX+tileX*tileSize;
+        byte4* const image = imageData+tileY*tileSize*imageX+tileX*tileSize;
         const v4sf tileOrigin = worldOrigin + float4(tileX * tileSize) * viewStepX + float4(tileY * tileSize) * viewStepY;
         for(uint y=0; y<tileSize; y++) for(uint x=0; x<tileSize; x++) {
             const v4sf origin = tileOrigin + float4(x) * viewStepX + float4(y) * viewStepY;
@@ -129,12 +143,12 @@ Image render(const VolumeT& volume,  const Volume8& empty, mat3 view) {
                     const uint vx1 = offsetX[extracti(p1,0)];
                     const uint vy1 = offsetY[extracti(p1,1)];
                     const uint vz1 = offsetZ[extracti(p1,2)];
-                    // Loads samples
-                    const v4si icx0 = {data[vx0 + vy0 + vz0], data[vx0 + vy0 + vz1], data[vx0 + vy1 + vz0], data[vx0 + vy1 + vz1]};
-                    const v4si icx1 = {data[vx1 + vy0 + vz0], data[vx1 + vy0 + vz1], data[vx1 + vy1 + vz0], data[vx1 + vy1 + vz1]};
-                    // Trilinear interpolation
-                    const v4sf cx0 = cvtdq2ps(icx0);
-                    const v4sf cx1 = cvtdq2ps(icx1);
+                    // Loads samples (FIXME: interleave density and intensity)
+                    const v4si icx0_density = {densityData[vx0 + vy0 + vz0], densityData[vx0 + vy0 + vz1], densityData[vx0 + vy1 + vz0], densityData[vx0 + vy1 + vz1]};
+                    const v4si icx1_density = {densityData[vx1 + vy0 + vz0], densityData[vx1 + vy0 + vz1], densityData[vx1 + vy1 + vz0], densityData[vx1 + vy1 + vz1]};
+                    const v4si icx0_intensity = {intensityData[vx0 + vy0 + vz0], intensityData[vx0 + vy0 + vz1], intensityData[vx0 + vy1 + vz0], intensityData[vx0 + vy1 + vz1]};
+                    const v4si icx1_intensity = {intensityData[vx1 + vy0 + vz0], intensityData[vx1 + vy0 + vz1], intensityData[vx1 + vy1 + vz0], intensityData[vx1 + vy1 + vz1]};
+                    // Compute trilinear interpolation coefficients
                     const v4sf pc = position - cvtdq2ps(p0);
                     const v4sf _1mpc = _1f - pc;
                     const v4sf z0011 = shuffle(_1mpc, pc, 2,2,2,2);
@@ -145,11 +159,14 @@ Image render(const VolumeT& volume,  const Volume8& empty, mat3 view) {
                     const v4sf x0011 = shuffle(_1mpc, pc, 0,0,0,0);
                     const v4sf x1111 = shuffle(pc, pc, 0,0,0,0);
                     const v4sf sw_yz = z0101 * y0011;
-                    const v4sf sample = (sizeof(VolumeT::T)==1 ? scaleFrom8bit : scaleFrom16bit) * dot4(sw_yz, x0000*cx0 + x1111*cx1);
-                    // Discrete gradient
+                    // Discrete gradient from density
+                    const v4sf cx0 = cvtdq2ps(icx0_density);
+                    const v4sf cx1 = cvtdq2ps(icx1_density);
                     const v4sf dx = y0011*z0101*(cx0-cx1);
                     const v4sf dy = x0011*z0101*(shuffle(cx0,cx1, 0,1,0,1)-shuffle(cx0,cx1, 2,3,2,3));
                     const v4sf dz = x0011*y0101*(shuffle(cx0,cx1, 0,2,0,2)-shuffle(cx0,cx1, 1,3,1,3));
+                    // Trilinearly interpolated intensity
+                    const v4sf sample = scaleFrom8bit * dot4(sw_yz, x0000*cvtdq2ps(icx0_intensity) + x1111*cvtdq2ps(icx1_intensity));
                     // Surface normal
                     const v4sf dp = transpose(dx, dy, dz, _0001f);
                     const v4sf n = dp * rsqrt(dot3(dp,dp));
@@ -163,10 +180,9 @@ Image render(const VolumeT& volume,  const Volume8& empty, mat3 view) {
             v8hi bgra16 = packus(bgra32, bgra32);
             v16qi bgra8 = packus(bgra16, bgra16);
             uint bgra = extracti((v4si)bgra8, 0);
-            byte4 linear = (byte4&)bgra;
+            const byte4& linear = (byte4&)bgra;
             extern uint8 sRGB_lookup[256];
             image[y*imageX+x] = byte4(sRGB_lookup[linear.b], sRGB_lookup[linear.g], sRGB_lookup[linear.r], 0xFF);
         }
     } );
-    return target;
 }

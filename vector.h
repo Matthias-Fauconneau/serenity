@@ -3,12 +3,16 @@
 #include "string.h"
 #include "simd.h"
 
+template<class T, class U> struct is_same { static constexpr bool value = false; };
+template<class T> struct is_same<T, T> { static constexpr bool value = true; };
+template<Type T> struct bgra { T b,g,r,a; };
+
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, Type T, uint N> struct vector : V<T> {
     static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
-    vector(){}
+    vector(){ static_assert(!is_same<bgra<T>, V<T>>::value,""); }
     /// Initializes all components to the same value \a v
     vector(T v){ for(uint i=0;i<N;i++) at(i)=v; }
     /// Initializes components separately

@@ -373,7 +373,6 @@ void Window::setGeometry(int2 position, int2 size) {
 
 // Keyboard
 Key Window::KeySym(uint8 code, uint8 state) {
-    //GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({GetKeyboardMapping r; r.keycode=code; raw(r);}));
     GetKeyboardMapping req; GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({req.keycode=code; raw(req);}));
     array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
     if(!keysyms) return (Key)0;

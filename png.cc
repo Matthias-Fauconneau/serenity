@@ -48,7 +48,7 @@ Image decodePNG(const ref<byte>& file) {
     if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { warn("Invalid PNG"); return Image(); }
     array<byte> buffer;
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
-    byte4 palette[256]; bool alpha=false;
+    uint palette[256]; bool alpha=false;
     for(;;) {
         uint32 size = s.read();
         ref<byte> tag = s.read<byte>(4);
@@ -69,11 +69,11 @@ Image decodePNG(const ref<byte>& file) {
         } else if(tag == "PLTE"_) {
             ref<rgb3> plte = s.read<rgb3>(size/3);
             assert(plte.size<=256);
-            for(uint i: range(plte.size)) palette[i]=plte[i];
+            for(uint i: range(plte.size)) (byte4&)palette[i]=plte[i];
         }  else if(tag == "tRNS"_) {
             ref<byte> trns = s.read<byte>(size);
             assert(trns.size<=256);
-            for(uint i: range(trns.size)) palette[i].a=trns[i];
+            for(uint i: range(trns.size)) ((byte4&)palette[i]).a=trns[i];
             alpha=true;
         } else {
             s.advance(size);

@@ -93,8 +93,8 @@ void bilinear(Image& target, const Image& source) {
 #else
 //TODO: NEON
 void bilinear(Image& target, const Image& source) {
-    log("bilinear",source.size(),target.size());
-    const uint stride = source.stride, width=source.width-1, height=source.height-1;
+    error("bilinear",source.size(),target.size());
+    /*const uint stride = source.stride, width=source.width-1, height=source.height-1;
     const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
     const byte4* src = source.data; byte4* dst = target.data;
     for(uint y: range(targetHeight)) {
@@ -110,7 +110,7 @@ void bilinear(Image& target, const Image& source) {
             }
             dst[y*targetStride+x] = d;
         }
-    }
+    }*/
 }
 #endif
 
@@ -132,7 +132,8 @@ Image doResize(const Image& image, uint width, uint height) {
                         s+= int4(line[i*image.stride+j]);
                     }
                 }
-                *dst = byte4(s/(scale*scale));
+                s /= scale*scale;
+                *dst = byte4(s);
                 line+=scale, dst++;
             }
             src += scale*image.stride;
