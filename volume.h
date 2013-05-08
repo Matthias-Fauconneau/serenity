@@ -29,18 +29,21 @@ string volumeFormat(const Volume& volume);
 void parseVolumeFormat(Volume& volume, const ref<byte>& path);
 
 struct Volume8 : Volume {
-    operator const uint8*() const { return (uint8*)data.data; }
-    operator uint8*() { return (uint8*)data.data; }
+    typedef uint8 T;
+    operator const T*() const { return (T*)data.data; }
+    operator T*() { return (T*)data.data; }
 };
 
 struct Volume16 : Volume {
-    operator const uint16*() const { return (uint16*)data.data; }
-    operator uint16*() { return (uint16*)data.data; }
+    typedef uint16 T;
+    operator const T*() const { return (T*)data.data; }
+    operator T*() { return (T*)data.data; }
 };
 
 struct Volume32 : Volume {
-    operator const uint32*() const { return (uint32*)data.data; }
-    operator uint32*() { return (uint32*)data.data; }
+    typedef uint32 T;
+    operator const T*() const { return (T*)data.data; }
+    operator T*() { return (T*)data.data; }
 };
 
 /// Returns maximum of data

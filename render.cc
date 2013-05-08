@@ -2,31 +2,31 @@
 #include "process.h"
 #include "simd.h"
 
-void render(Volume8& target, const Volume16& source) {
+void render(VolumeT& target, const Volume16& source) {
     uint X=target.x, Y=target.y, Z=target.z;
     assert_(source.offsetX && source.offsetY && source.offsetZ);
     interleavedLookup(target);
     const uint* const offsetX = target.offsetX;
     const uint* const offsetY = target.offsetY;
     const uint* const offsetZ = target.offsetZ;
-    float scale = 0xFF * sqrt(float(source.num) / float(source.den));
+    target.marginX=0, target.marginY=0, target.marginZ=0, target.num = 1, target.den = (1<<(8*sizeof(VolumeT::T)))-1, target.squared=false;
+    float scale = target.den * sqrt(float(source.num) / float(source.den));
     const uint16* const sourceData = source;
-    uint8* const targetData = target;
+    VolumeT::T* const targetData = target;
     parallel(Z, [&](uint, uint z) {
         const uint16* const sourceZ = sourceData + offsetZ[z];
-        uint8* const targetZ = targetData + offsetZ[z];
+        VolumeT::T* const targetZ = targetData + offsetZ[z];
         for(uint y=0; y<Y; y++) {
             const uint16* const sourceZY = sourceZ + offsetY[y];
-            uint8* const targetZY = targetZ + offsetY[y];
+            VolumeT::T* const targetZY = targetZ + offsetY[y];
             for(uint x=0; x<X; x++) {
-                targetZY[offsetX[x]] = clip<uint>(1, round(sqrt(float(sourceZY[offsetX[x]]))*scale), 0xFF);
+                targetZY[offsetX[x]] = clip<uint>(target.den/sqrt(X/2*X/2+Y/2*Y/2), round(sqrt(float(sourceZY[offsetX[x]]))*scale), target.den);
             }
         }
     } );
-    target.marginX=0, target.marginY=0, target.marginZ=0, target.num = 1, target.den = 0xFF, target.squared=false;
 }
 
-Image render(const Volume8& volume, mat3 view) {
+Image render(const VolumeT& volume, mat3 view) {
     // Volume
     assert(volume.x==volume.y && volume.y == volume.z);
     uint stride = volume.x; // Unclipped volume data size
@@ -35,7 +35,7 @@ Image render(const Volume8& volume, mat3 view) {
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
-    const uint8* const data = volume;
+    const VolumeT::T* const data = volume;
     const uint* const offsetX = volume.offsetX + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint* const offsetY = volume.offsetY + stride/2;
     const uint* const offsetZ = volume.offsetZ + stride/2;
@@ -117,7 +117,7 @@ Image render(const Volume8& volume, mat3 view) {
                 const v4sf x0011 = shuffle(_1mpc, pc, 0,0,0,0);
                 const v4sf x1111 = shuffle(pc, pc, 0,0,0,0);
                 const v4sf sw_yz = z0101 * y0011;
-                const v4sf sample = scaleFrom8bit * dot4(sw_yz, x0000*cx0 + x1111*cx1);
+                const v4sf sample = (sizeof(VolumeT::T)==1 ? scaleFrom8bit : scaleFrom16bit) * dot4(sw_yz, x0000*cx0 + x1111*cx1);
                 // Discrete gradient
                 const v4sf dx = y0011*z0101*(cx0-cx1);
                 const v4sf dy = x0011*z0101*(shuffle(cx0,cx1, 0,1,0,1)-shuffle(cx0,cx1, 2,3,2,3));

@@ -160,4 +160,5 @@ unused const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 unused const v4sf alphaTerm = {FLT_MAX, FLT_MAX, FLT_MAX, /*0.95*/1};
 unused const v4sf scaleTo8bit = float4(0xFF);
 unused const v4sf scaleFrom8bit = float4(1./0xFF);
+unused const v4sf scaleFrom16bit = float4(1./0xFFFF);
 unused const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};

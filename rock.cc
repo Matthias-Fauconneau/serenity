@@ -26,10 +26,6 @@ Operation DistanceZ("distancey"_,"distance"_,4); // Z pass
 #if 1
 Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a sphere (with maximum blending)
 #else
-Operation Tile("distance"_,"tile"_,2); // Layouts volume in Z-order to improve locality on maximum search
-Operation Maximum("tile"_,"maximum"_,2); // Computes field of nearest local maximum of distance field (i.e field of maximum enclosing sphere radii)
-#endif
-#else
 Operation DistanceX("threshold"_,"distancex"_,4,"positionx"_,2); // Computes field of distance to nearest rock wall (X pass)
 Operation DistanceY("distancex"_,"distancey"_,4,"positiony"_,2); // Y pass
 Operation DistanceZ("distancey"_,"distancez"_,4,"positionz"_,2); // Z pass
@@ -38,7 +34,7 @@ Operation Rasterize("skeleton"_,"maximum"_,2); // Rasterizes skeleton (maximum s
 #endif
 Operation Crop("maximum"_,"crop"_,2); // Copies a small sample from the center of the volume
 Operation ASCII("crop"_,"ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
-Operation Render("maximum"_,"render"_,1); // Copies voxels inside inscribed cylinder, set minimum value to 1 (light attenuation for fake ambient occlusion)
+Operation Render("maximum"_,"render"_,sizeof(VolumeT::T)); // Copies voxels inside inscribed cylinder, set minimum value to 1 (light attenuation for fake ambient occlusion)
 
 struct VolumeData {
     VolumeData(const ref<byte>& name):name(name){}
@@ -258,7 +254,7 @@ struct Rock : Widget {
     }
 
     void render(int2 position, int2) {
-        if(current->sampleSize==20) exit(); // Don't try to display ASCII
+        if(current->sampleSize==20) { exit(); return; } // Don't try to display ASCII
         assert(current);
         uint z = current->marginZ+(current->z-2*current->marginZ-1)*currentSlice;
         Image image;

@@ -2,7 +2,7 @@
 #include "time.h"
 #include "simd.h"
 
-template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, /*Volume16& position,*/ const Volume32& source, uint X, uint Y, uint Z/*, uint xStride, uint yStride, uint zStride*/) {
+template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, const Volume32& source, uint X, uint Y, uint Z) {
     const uint32* const sourceData = source;
     uint32* const targetData = target;
     //uint16* const positionData = position;
@@ -60,5 +60,5 @@ template<bool last> void perpendicularBisectorEuclideanDistanceTransform(Volume3
     //position.den = X-1; position.squared=false;
 }
 
-template void perpendicularBisectorEuclideanDistanceTransform<false>(Volume32& target, /*Volume16& position,*/ const Volume32& source, uint X, uint Y, uint Z/*, uint xStride, uint yStride, uint zStride*/);
-template void perpendicularBisectorEuclideanDistanceTransform<true>(Volume32& target, /*Volume16& position,*/ const Volume32& source, uint X, uint Y, uint Z/*, uint xStride, uint yStride, uint zStride*/);
+template void perpendicularBisectorEuclideanDistanceTransform<false>(Volume32& target, const Volume32& source, uint X, uint Y, uint Z);
+template void perpendicularBisectorEuclideanDistanceTransform<true>(Volume32& target, const Volume32& source, uint X, uint Y, uint Z);
