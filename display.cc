@@ -85,7 +85,6 @@ inline void plot(int x, int y, float c, bool transpose, int4 invert) {
 
 inline float fpart(float x) { return x-int(x); }
 inline float rfpart(float x) { return 1 - fpart(x); }
-inline float round(float x) { return __builtin_roundf(x); }
 void line(vec2 p1, vec2 p2, vec4 color) {
 #if GL
     if(!softwareRendering) {

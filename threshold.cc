@@ -2,7 +2,7 @@
 #include "simd.h"
 
 void threshold(Volume32& target, const Volume16& source, float threshold) {
-    v4si scaledThreshold = int4( uint(threshold*(source.den/source.num-1)) );
+    v4si scaledThreshold = set1( uint(threshold*(source.den/source.num-1)) );
     uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     uint32 sqr[X]; for(uint x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
     uint32* const targetData = target;

@@ -158,29 +158,6 @@ void toASCII(Volume& target, const Volume16& source) {
     }
 }
 
-void clip(Volume16& target) {
-    uint X=target.x, Y=target.y, Z=target.z;
-    uint marginX=target.marginX, marginZ=target.marginZ;
-    uint radiusSq=(X/2-marginX)*(X/2-marginX);
-    interleavedLookup(target);
-    const uint* const offsetX = target.offsetX;
-    const uint* const offsetY = target.offsetY;
-    const uint* const offsetZ = target.offsetZ;
-
-    for(uint z=0; z<Z; z++) {
-        for(uint y=0; y<Y; y++) {
-            for(uint x=0; x<X; x++) {
-                uint16& value = target[offsetZ[z]+offsetY[y]+offsetX[x]];
-                if(z > marginZ && z < Z-marginZ && (x-X/2)*(x-X/2) + (y-Y/2)*(y-Y/2) < radiusSq) {
-                    if(value==0) value=1; // Light attenuation
-                } else {
-                    value = 0; //Clip
-                }
-            }
-        }
-    }
-}
-
 Image slice(const Volume& volume, uint z) {
     uint X=volume.x, Y=volume.y;
     uint mX=volume.marginX, mY=volume.marginY;
@@ -189,7 +166,16 @@ Image slice(const Volume& volume, uint z) {
     const uint* const offsetX = volume.offsetX;
     const uint* const offsetY = volume.offsetY;
     const uint* const offsetZ = volume.offsetZ;
-    if(volume.sampleSize==2) {
+    if(volume.sampleSize==1) {
+        if(offsetX || offsetY || offsetZ) {
+            const uint8* const sourceZ = (const Volume8&)volume + offsetZ[z];
+            for(uint y=0; y<imY; y++) {
+                const uint8* const sourceY = sourceZ + offsetY[y];
+                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * (0xFF * volume.num) / volume.den;
+            }
+        }
+    }
+    else if(volume.sampleSize==2) {
         if(offsetX || offsetY || offsetZ) {
             const uint16* const sourceZ = (const Volume16&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {
@@ -200,7 +186,8 @@ Image slice(const Volume& volume, uint z) {
             const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
             for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
         }
-    } else if(volume.sampleSize==4) {
+    }
+    else if(volume.sampleSize==4) {
         if(offsetX || offsetY || offsetZ) {
             const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {

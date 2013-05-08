@@ -16,7 +16,7 @@ inline void storeu(long long* const ptr, v2di a) { __builtin_ia32_storedqu((char
 
 // v4si
 
-inline v4si int4(int i) { return (v4si){i,i,i,i}; }
+inline v4si set1(int i) { return (v4si){i,i,i,i}; }
 inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
 inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_loaddqu((char*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
@@ -92,7 +92,7 @@ inline v16qi packus(v8hi a, v8hi b) { return __builtin_ia32_packuswb128(a,b); }
 
 inline v4sf float4(float f) { return (v4sf){f,f,f,f}; }
 
-//inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
+inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
 inline v4sf andnot(v4sf a, v4sf b) { return __builtin_ia32_andnps(a, b); }
 inline v4sf bitXor(v4sf a, v4sf b) { return __builtin_ia32_xorps(a, b); }
 //inline v4sf cmpgt(v4sf a, v4sf b) { return __builtin_ia32_cmpgtps(a, b); }

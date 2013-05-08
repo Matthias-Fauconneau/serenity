@@ -1,6 +1,7 @@
 #pragma once
 /// \file vector.h Vector types and operations
 #include "string.h"
+#include "simd.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -62,6 +63,8 @@ generic bool operator ==(const vector& u, const vector& v) { for(uint i=0;i<N;i+
 generic bool operator >=(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]<v[i]) return false; return true; }
 generic bool operator >(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
 
+inline float round(float x) { return __builtin_roundf(x); }
+
 generic vector abs(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
 generic vector floor(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=floor(v[i]); return r;  }
 generic vector fract(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=fract(v[i]); return r;  }
@@ -80,7 +83,7 @@ generic float sqr(const vector& a) { return dot(a,a); }
 inline float norm(float x) { return abs(x); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 generic float norm(const vector& a) { return sqrt(dot(a,a)); }
-generic vector normalize(const vector& a){ return a/length(a); }
+generic vector normalize(const vector& a){ return a/norm(a); }
 
 inline bool isNaN(float x) { return __builtin_isnan(x); }
 generic bool isNaN(const vector& v){ for(uint i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
@@ -103,7 +106,8 @@ inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
 
 template<Type T> struct xyz {
     T x,y,z;
-    vector<xy,T,2> xy()const{return vector< ::xy,T,2>(x,y);}
+    vector<xy,T,2> xy() const { return vector< ::xy,T,2>(x,y); }
+    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vector<xyz,int,3> int3;

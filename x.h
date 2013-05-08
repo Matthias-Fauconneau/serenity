@@ -110,7 +110,7 @@ constexpr ref<byte> errors[] = {"BadSeg"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 
-namespace Render {
+namespace XRender {
 enum PICTOP { Clear, Src, Dst, Over };
 struct PictFormInfo { uint format; uint8 type,depth; uint16 direct[8]; uint colormap; };
 struct PictVisual { uint visual, format; };

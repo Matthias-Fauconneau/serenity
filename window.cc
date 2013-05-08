@@ -30,7 +30,7 @@ static void* glContext=0;
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
-namespace Render { int EXT, event, errorBase; } using namespace Render;
+namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 int2 displaySize;
 
 static __thread Window* window; // Current window for Widget event and render methods
@@ -70,7 +70,7 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
 
     {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; string(raw(r)+"RENDER"_+pad(4,r.length));}));
-        Render::EXT=r.major; Render::event=r.firstEvent; Render::errorBase=r.firstError; }
+        XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>(raw(QueryPictFormats()));
         array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
         for(uint unused i: range(r.numScreens)) { PictScreen screen = read<PictScreen>();
@@ -225,14 +225,14 @@ void Window::event() {
 // Events
 void Window::processEvent(uint8 type, const XEvent& event) {
     if(type==0) { const XError& e=(const XError&)event; uint8 code=e.code;
-        if(e.major==Render::EXT) {
-            int reqSize=sizeof(Render::requests)/sizeof(*Render::requests);
-            if(code>=Render::errorBase && code<=Render::errorBase+Render::errorCount) { code-=Render::errorBase;
-                assert(code<sizeof(Render::errors)/sizeof(*Render::errors));
-                log("XError",Render::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+        if(e.major==XRender::EXT) {
+            int reqSize=sizeof(XRender::requests)/sizeof(*XRender::requests);
+            if(code>=XRender::errorBase && code<=XRender::errorBase+XRender::errorCount) { code-=XRender::errorBase;
+                assert(code<sizeof(XRender::errors)/sizeof(*XRender::errors));
+                log("XError",XRender::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(XRender::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Render::requests[e.minor]):dec(e.minor));
+                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(XRender::requests[e.minor]):dec(e.minor));
             }
         } else if(e.major==Shm::EXT) {
             int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
@@ -450,8 +450,8 @@ void Window::setCursor(Cursor cursor, uint window) {
     {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=image.width, r.h=image.height; send(raw(r));}
     {::PutImage r; r.drawable=id+Pixmap; r.context=id+GContext; r.w=image.width, r.h=image.height; r.size+=r.w*r.h;
         send(string(raw(r)+ref<byte>(premultiplied)));}
-    {Render::CreatePicture r; r.picture=id+Picture; r.drawable=id+Pixmap; r.format=format; send(raw(r));}
-    {Render::CreateCursor r; r.cursor=id+XCursor; r.picture=id+Picture; r.x=hotspot.x; r.y=hotspot.y; send(raw(r));}
+    {XRender::CreatePicture r; r.picture=id+Picture; r.drawable=id+Pixmap; r.format=format; send(raw(r));}
+    {XRender::CreateCursor r; r.cursor=id+XCursor; r.picture=id+Picture; r.x=hotspot.x; r.y=hotspot.y; send(raw(r));}
     {SetWindowCursor r; r.window=window?:id; r.cursor=id+XCursor; send(raw(r));}
     {FreeCursor r; r.cursor=id+XCursor; send(raw(r));}
     {FreePicture r; r.picture=id+Picture; send(raw(r));}

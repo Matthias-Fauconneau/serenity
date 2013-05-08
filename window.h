@@ -150,7 +150,7 @@ struct Window : Socket, Poll {
     /// Shared window buffer state
     enum { Idle, Server, Wait } state = Idle;
 
-    /// bgra32 Render PictFormat (for Cursor)
+    /// bgra32 XRender PictFormat (for Cursor)
     uint format=0;
 
     uint16 sequence=-1;

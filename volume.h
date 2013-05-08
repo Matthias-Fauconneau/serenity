@@ -6,8 +6,10 @@ struct Volume {
 
     uint64 size() const { return x*y*z; }
     explicit operator bool() const { return data; }
+    operator const struct Volume8&() const { assert_(sampleSize==sizeof(uint8),sampleSize); return (struct Volume8&)*this; }
     operator const struct Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (struct Volume16&)*this; }
     operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (struct Volume32&)*this; }
+    operator struct Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(struct Volume8*)this; }
     operator struct Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume16*)this; }
     operator struct Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(struct Volume32*)this; }
     void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; num=source.num, den=source.den; squared=source.squared; }
@@ -25,6 +27,11 @@ struct Volume {
 string volumeFormat(const Volume& volume);
 /// Parses volume format (i.e sample format)
 void parseVolumeFormat(Volume& volume, const ref<byte>& path);
+
+struct Volume8 : Volume {
+    operator const uint8*() const { return (uint8*)data.data; }
+    operator uint8*() { return (uint8*)data.data; }
+};
 
 struct Volume16 : Volume {
     operator const uint16*() const { return (uint16*)data.data; }

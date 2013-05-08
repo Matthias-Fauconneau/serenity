@@ -130,10 +130,10 @@ void __attribute((constructor(101))) setup_signals() {
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
     check_(sigaction(SIGFPE, &sa, 0));
     check_(sigaction(SIGABRT, &sa, 0));
-    //check_(sigaction(SIGSEGV, &sa, 0));
+    check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    setExceptions(Invalid|Denormal|DivisionByZero|Overflow|Underflow);
+    setExceptions(/*Invalid| volume renderer takes square roots of negatives*/Denormal|/*DivisionByZero| FIXME: volume renderer divides by zero*//*Overflow| FIXME: volume renderer overflows*/Underflow);
 }
 
 static int recurse=0;

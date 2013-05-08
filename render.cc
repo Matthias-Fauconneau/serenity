@@ -1,32 +1,56 @@
 #include "render.h"
+#include "process.h"
 #include "simd.h"
 
-/// Renders a volume by projecting it on the image plane
-Image render(const Volume& volume, mat3 view) {
+void render(Volume8& target, const Volume16& source) {
+    uint X=target.x, Y=target.y, Z=target.z;
+    assert_(source.offsetX && source.offsetY && source.offsetZ);
+    interleavedLookup(target);
+    const uint* const offsetX = target.offsetX;
+    const uint* const offsetY = target.offsetY;
+    const uint* const offsetZ = target.offsetZ;
+    float scale = 0xFF * sqrt(float(source.num) / float(source.den));
+    const uint16* const sourceData = source;
+    uint8* const targetData = target;
+    parallel(Z, [&](uint, uint z) {
+        const uint16* const sourceZ = sourceData + offsetZ[z];
+        uint8* const targetZ = targetData + offsetZ[z];
+        for(uint y=0; y<Y; y++) {
+            const uint16* const sourceZY = sourceZ + offsetY[y];
+            uint8* const targetZY = targetZ + offsetY[y];
+            for(uint x=0; x<X; x++) {
+                targetZY[offsetX[x]] = clip<uint>(1, round(sqrt(float(sourceZY[offsetX[x]]))*scale), 0xFF);
+            }
+        }
+    } );
+    target.marginX=0, target.marginY=0, target.marginZ=0, target.num = 1, target.den = 0xFF, target.squared=false;
+}
+
+Image render(const Volume8& volume, mat3 view) {
     // Volume
-    Q_ASSERT(volume.x==volume.y && volume.y == volume.z);
+    assert(volume.x==volume.y && volume.y == volume.z);
     uint stride = volume.x; // Unclipped volume data size
     uint size = stride-2*volume.marginX; // Clipped volume size
     const float radius = size/2, halfHeight = size/2; // Cylinder parameters
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
-    const uint16* const data = volume.data;
+    const uint8* const data = volume;
     const uint* const offsetX = volume.offsetX + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint* const offsetY = volume.offsetY + stride/2;
     const uint* const offsetZ = volume.offsetZ + stride/2;
-    Q_ASSERT(offsetX && offsetY && offsetZ);
+    assert_(offsetX && offsetY && offsetZ);
 
     // Image
     int imageX = stride, imageY = stride; // Target image size
-    Q_ASSERT(imageX == imageY);
+    assert(imageX == imageY);
     Image target(imageX, imageY);
 
     // View
-    mat3 world = inverse(view).scale(size*sqrt(2)); // Transform normalized view space to world space
+    mat3 world = view.inverse().scale(size*sqrt(2)); // Transform normalized view space to world space
     vec3 vViewStepX = world * vec3(1./imageX,0,0); v4sf viewStepX = vViewStepX;
     vec3 vViewStepY = world * vec3(0,1./imageY,0); v4sf viewStepY = vViewStepY;
-    const v4sf worldOrigin = world * vec3(0,0,0) - (imageX/2) * vViewStepX - (imageY/2)*vViewStepY;
+    const v4sf worldOrigin = world * vec3(0,0,0) - float(imageX/2)*vViewStepX - float(imageY/2)*vViewStepY;
     vec3 worldRay = normalize( view.transpose() * vec3(0,0,1) );
     const v4sf ray = {worldRay.x, worldRay.y, worldRay.z, 1};
     const v4sf rayZ = float4(worldRay.z);
@@ -37,7 +61,7 @@ Image render(const Volume& volume, mat3 view) {
     const v4sf rcp_2a = float4(-1./(2*a));
 
     #define tileSize 8
-    for(int i=0; i<imageX/tileSize*imageY/tileSize; i++) {
+    parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {
         const int tileX = i%(imageX/tileSize), tileY = i/(imageY/tileSize);
         uint* const image = (uint*)target.data+tileY*tileSize*imageX+tileX*tileSize;
         const v4sf tileOrigin = worldOrigin + float4(tileX * tileSize) * viewStepX + float4(tileY * tileSize) * viewStepY;
@@ -104,13 +128,13 @@ Image render(const Volume& volume, mat3 view) {
                 const v4sf alpha = min(sample, _0001f);
                 accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(sample* _halff*(n+_1110f), alpha); // Blend
                 position = position + ray; // Step
-                if(mask(bitOr(cmpgt(accumulator, alphaTerm), cmpgt(position, texit)))) break; // Check for exit intersection or saturation
+                if(mask(bitOr(accumulator > alphaTerm, position > texit))) break; // Check for exit intersection or saturation
             }
             v4si bgra32 = cvtps2dq(scaleTo8bit * accumulator);
             v8hi bgra16 = packus(bgra32, bgra32);
             v16qi bgra8 = packus(bgra16, bgra16);
             image[y*imageX+x] = extracti((v4si)bgra8, 0);
         }
-    }
+    } );
     return target;
 }
