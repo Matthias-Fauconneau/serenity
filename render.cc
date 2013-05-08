@@ -2,6 +2,30 @@
 #include "process.h"
 #include "simd.h"
 
+void squareRoot(Volume8& target, const Volume16& source) {
+    uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
+    assert_(!source.offsetX && !source.offsetY && !source.offsetZ);
+    interleavedLookup(target);
+    const uint* const offsetX = target.offsetX;
+    const uint* const offsetY = target.offsetY;
+    const uint* const offsetZ = target.offsetZ;
+    target.marginX=0, target.marginY=0, target.marginZ=0, target.num = 1, target.den = sqrt(source.den), target.squared=false;
+    assert_(target.den<0x100);
+    const uint16* const sourceData = source;
+    uint8* const targetData = target;
+    parallel(Z, [&](uint, uint z) {
+        const uint16* const sourceZ = sourceData + z*XY;
+        uint8* const targetZ = targetData + offsetZ[z];
+        for(uint y=0; y<Y; y++) {
+            const uint16* const sourceZY = sourceZ + y*X;
+            uint8* const targetZY = targetZ + offsetY[y];
+            for(uint x=0; x<X; x++) {
+                targetZY[offsetX[x]] = sqrt(float(sourceZY[x]));
+            }
+        }
+    } );
+}
+
 void render(VolumeT& target, const Volume16& source) {
     uint X=target.x, Y=target.y, Z=target.z;
     assert_(source.offsetX && source.offsetY && source.offsetZ);
@@ -26,7 +50,7 @@ void render(VolumeT& target, const Volume16& source) {
     } );
 }
 
-Image render(const VolumeT& volume, mat3 view) {
+Image render(const VolumeT& volume,  const Volume8& empty, mat3 view) {
     // Volume
     assert(volume.x==volume.y && volume.y == volume.z);
     uint stride = volume.x; // Unclipped volume data size
@@ -36,6 +60,7 @@ Image render(const VolumeT& volume, mat3 view) {
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     const VolumeT::T* const data = volume;
+    const uint8* const emptyData = empty;
     const uint* const offsetX = volume.offsetX + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint* const offsetY = volume.offsetY + stride/2;
     const uint* const offsetZ = volume.offsetZ + stride/2;
@@ -63,7 +88,7 @@ Image render(const VolumeT& volume, mat3 view) {
     #define tileSize 8
     parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {
         const int tileX = i%(imageX/tileSize), tileY = i/(imageY/tileSize);
-        uint* const image = (uint*)target.data+tileY*tileSize*imageX+tileX*tileSize;
+        byte4* const image = target.data+tileY*tileSize*imageX+tileX*tileSize;
         const v4sf tileOrigin = worldOrigin + float4(tileX * tileSize) * viewStepX + float4(tileY * tileSize) * viewStepY;
         for(uint y=0; y<tileSize; y++) for(uint x=0; x<tileSize; x++) {
             const v4sf origin = tileOrigin + float4(x) * viewStepX + float4(y) * viewStepY;
@@ -97,43 +122,50 @@ Image render(const VolumeT& volume, mat3 view) {
                 const uint vx0 = offsetX[extracti(p0,0)];
                 const uint vy0 = offsetY[extracti(p0,1)];
                 const uint vz0 = offsetZ[extracti(p0,2)];
-                const v4si p1 = p0 +_1i;
-                const uint vx1 = offsetX[extracti(p1,0)];
-                const uint vy1 = offsetY[extracti(p1,1)];
-                const uint vz1 = offsetZ[extracti(p1,2)];
-                // Loads samples
-                const v4si icx0 = {data[vx0 + vy0 + vz0], data[vx0 + vy0 + vz1], data[vx0 + vy1 + vz0], data[vx0 + vy1 + vz1]};
-                const v4si icx1 = {data[vx1 + vy0 + vz0], data[vx1 + vy0 + vz1], data[vx1 + vy1 + vz0], data[vx1 + vy1 + vz1]};
-                // Trilinear interpolation
-                const v4sf cx0 = cvtdq2ps(icx0);
-                const v4sf cx1 = cvtdq2ps(icx1);
-                const v4sf pc = position - cvtdq2ps(p0);
-                const v4sf _1mpc = _1f - pc;
-                const v4sf z0011 = shuffle(_1mpc, pc, 2,2,2,2);
-                const v4sf z0101 = shuffle(z0011, z0011, 0,2,0,2);
-                const v4sf y0011 = shuffle(_1mpc, pc, 1,1,1,1);
-                const v4sf y0101 = shuffle(y0011, y0011, 0,2,0,2);
-                const v4sf x0000 = shuffle(_1mpc, _1mpc, 0,0,0,0);
-                const v4sf x0011 = shuffle(_1mpc, pc, 0,0,0,0);
-                const v4sf x1111 = shuffle(pc, pc, 0,0,0,0);
-                const v4sf sw_yz = z0101 * y0011;
-                const v4sf sample = (sizeof(VolumeT::T)==1 ? scaleFrom8bit : scaleFrom16bit) * dot4(sw_yz, x0000*cx0 + x1111*cx1);
-                // Discrete gradient
-                const v4sf dx = y0011*z0101*(cx0-cx1);
-                const v4sf dy = x0011*z0101*(shuffle(cx0,cx1, 0,1,0,1)-shuffle(cx0,cx1, 2,3,2,3));
-                const v4sf dz = x0011*y0101*(shuffle(cx0,cx1, 0,2,0,2)-shuffle(cx0,cx1, 1,3,1,3));
-                // Surface normal
-                const v4sf dp = transpose(dx, dy, dz, _0001f);
-                const v4sf n = dp * rsqrt(dot3(dp,dp));
-                const v4sf alpha = min(sample, _0001f);
-                accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(sample* _halff*(n+_1110f), alpha); // Blend
-                position = position + ray; // Step
+                const uint r = emptyData[vx0 + vy0 + vz0];
+                if(r) position = position + cvtdq2ps(set1(r)) * ray; // Step
+                else {
+                    const v4si p1 = p0 +_1i;
+                    const uint vx1 = offsetX[extracti(p1,0)];
+                    const uint vy1 = offsetY[extracti(p1,1)];
+                    const uint vz1 = offsetZ[extracti(p1,2)];
+                    // Loads samples
+                    const v4si icx0 = {data[vx0 + vy0 + vz0], data[vx0 + vy0 + vz1], data[vx0 + vy1 + vz0], data[vx0 + vy1 + vz1]};
+                    const v4si icx1 = {data[vx1 + vy0 + vz0], data[vx1 + vy0 + vz1], data[vx1 + vy1 + vz0], data[vx1 + vy1 + vz1]};
+                    // Trilinear interpolation
+                    const v4sf cx0 = cvtdq2ps(icx0);
+                    const v4sf cx1 = cvtdq2ps(icx1);
+                    const v4sf pc = position - cvtdq2ps(p0);
+                    const v4sf _1mpc = _1f - pc;
+                    const v4sf z0011 = shuffle(_1mpc, pc, 2,2,2,2);
+                    const v4sf z0101 = shuffle(z0011, z0011, 0,2,0,2);
+                    const v4sf y0011 = shuffle(_1mpc, pc, 1,1,1,1);
+                    const v4sf y0101 = shuffle(y0011, y0011, 0,2,0,2);
+                    const v4sf x0000 = shuffle(_1mpc, _1mpc, 0,0,0,0);
+                    const v4sf x0011 = shuffle(_1mpc, pc, 0,0,0,0);
+                    const v4sf x1111 = shuffle(pc, pc, 0,0,0,0);
+                    const v4sf sw_yz = z0101 * y0011;
+                    const v4sf sample = (sizeof(VolumeT::T)==1 ? scaleFrom8bit : scaleFrom16bit) * dot4(sw_yz, x0000*cx0 + x1111*cx1);
+                    // Discrete gradient
+                    const v4sf dx = y0011*z0101*(cx0-cx1);
+                    const v4sf dy = x0011*z0101*(shuffle(cx0,cx1, 0,1,0,1)-shuffle(cx0,cx1, 2,3,2,3));
+                    const v4sf dz = x0011*y0101*(shuffle(cx0,cx1, 0,2,0,2)-shuffle(cx0,cx1, 1,3,1,3));
+                    // Surface normal
+                    const v4sf dp = transpose(dx, dy, dz, _0001f);
+                    const v4sf n = dp * rsqrt(dot3(dp,dp));
+                    const v4sf alpha = min(sample, _0001f);
+                    accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(sample*sample* _halff*(n+_1110f), alpha); // Blend
+                    position = position + ray; // Step
+                }
                 if(mask(bitOr(accumulator > alphaTerm, position > texit))) break; // Check for exit intersection or saturation
             }
             v4si bgra32 = cvtps2dq(scaleTo8bit * accumulator);
             v8hi bgra16 = packus(bgra32, bgra32);
             v16qi bgra8 = packus(bgra16, bgra16);
-            image[y*imageX+x] = extracti((v4si)bgra8, 0);
+            uint bgra = extracti((v4si)bgra8, 0);
+            byte4 linear = (byte4&)bgra;
+            extern uint8 sRGB_lookup[256];
+            image[y*imageX+x] = byte4(sRGB_lookup[linear.b], sRGB_lookup[linear.g], sRGB_lookup[linear.r], 0xFF);
         }
     } );
     return target;

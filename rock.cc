@@ -18,23 +18,30 @@ Operation ShiftRight ("source"_,"shift"_,2); // Shifts data to avoid overflows
 Operation SmoothX("shift"_,"smoothx"_,2); // Denoises data and filters small pores by averaging samples in a window (X pass)
 Operation SmoothY("smoothx"_,"smoothy"_,2);  // Y pass
 Operation SmoothZ("smoothy"_,"smoothz"_,2); // Z pass
-Operation Threshold("smoothz"_,"threshold"_,4); // Segments in rock vs pore space by comparing to a fixed threshold
+Operation Threshold("smoothz"_,"pore"_,4, "rock"_,4); // Segments in rock vs pore space by comparing to a fixed threshold
 #if 1
-Operation DistanceX("threshold"_,"distancex"_,4); // Computes field of distance to nearest rock wall (X pass)
+Operation DistanceX("pore"_,"distancex"_,4); // Computes distance field to nearest rock (X pass)
 Operation DistanceY("distancex"_,"distancey"_,4); // Y pass
 Operation DistanceZ("distancey"_,"distance"_,4); // Z pass
 #if 1
 Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a sphere (with maximum blending)
 #else
-Operation DistanceX("threshold"_,"distancex"_,4,"positionx"_,2); // Computes field of distance to nearest rock wall (X pass)
-Operation DistanceY("distancex"_,"distancey"_,4,"positiony"_,2); // Y pass
-Operation DistanceZ("distancey"_,"distancez"_,4,"positionz"_,2); // Z pass
+Operation FeatureTransformX("threshold"_,"positionx"_,2); // Computes position of nearest rock wall (X pass)
+Operation FeatureTransformY("positionx"_,"positiony"_,2); // Y pass
+Operation FeatureTransformZ("positiony"_,"positionz"_,2); // Z pass
 Operation Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Computes integer medial axis skeleton
 Operation Rasterize("skeleton"_,"maximum"_,2); // Rasterizes skeleton (maximum spheres)
 #endif
+#endif
 Operation Crop("maximum"_,"crop"_,2); // Copies a small sample from the center of the volume
 Operation ASCII("crop"_,"ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
-Operation Render("maximum"_,"render"_,sizeof(VolumeT::T)); // Copies voxels inside inscribed cylinder, set minimum value to 1 (light attenuation for fake ambient occlusion)
+
+Operation EmptyX("rock"_,"emptyx"_,4); // Computes distance field to nearest pore for empty space skipping (X pass)
+Operation EmptyY("emptyx"_,"emptyy"_,4); // Y pass
+Operation EmptyZ("emptyy"_,"emptyz"_,4); // Z pass
+
+Operation SquareRoot("emptyz"_,"empty"_,1); // Square roots and tiles distance field before using it for empty space skiping during rendering
+Operation Render("maximum"_,"empty"_,"render"_,sizeof(VolumeT::T)); // Square roots and normalizes
 
 struct VolumeData {
     VolumeData(const ref<byte>& name):name(name){}
@@ -170,16 +177,16 @@ struct Rock : Widget {
                     if(density[i] < minimum) densityThreshold = i, minimum = density[i];
                 }
                 log("Using threshold",densityThreshold,"between pore at",max[0].density,"and rock at",max[1].density);
-                threshold(target, source, float(densityThreshold) / float(density.binCount));
+                threshold(target, outputs[1]->volume, source, float(densityThreshold) / float(density.binCount));
             }
-            else if(operation==DistanceX) {
-                perpendicularBisectorEuclideanDistanceTransform<false>(target, /*outputs[1]->volume,*/ source, X,Y,Z/*, 1,X,XY*/);
+            else if(operation==DistanceX || operation==EmptyX) {
+                perpendicularBisectorEuclideanDistanceTransform<false>(target, source, X,Y,Z);
             }
-            else if(operation==DistanceY) {
-                perpendicularBisectorEuclideanDistanceTransform<false>(target, /*outputs[1]->volume,*/ source,  Y,Z,X/*, X,XY,1*/);
+            else if(operation==DistanceY || operation==EmptyY) {
+                perpendicularBisectorEuclideanDistanceTransform<false>(target, source, Y,Z,X);
             }
-            else if(operation==DistanceZ) {
-                perpendicularBisectorEuclideanDistanceTransform<true>(target, /*outputs[1]->volume,*/ source,  Z,X,Y/*, XY,1,X*/);
+            else if(operation==DistanceZ || operation==EmptyZ) {
+                perpendicularBisectorEuclideanDistanceTransform<true>(target, source, Z,X,Y);
                 target.num = 1, target.den=maximum((const Volume32&)target);
             }
             //else if(operation==Tile) tile(target, source);
@@ -188,6 +195,7 @@ struct Rock : Widget {
             else if(operation==Rasterize) rasterize(target, source);
             else if(operation==Crop) { const int size=256; crop(target, source, source.x/2-size/2, source.y/2-size/2, source.z/2-size/2, source.x/2+size/2, source.y/2+size/2, source.z/2+size/2); }
             else if(operation==ASCII) toASCII(target, source);
+            else if(operation==SquareRoot) squareRoot(target, source);
             else if(operation==Render) ::render(target, source);
             else error("Unimplemented",operation);
         }
@@ -263,7 +271,8 @@ struct Rock : Widget {
             mat3 view;
             view.rotateX(rotation.y); // pitch
             view.rotateZ(rotation.x); // yaw
-            image = ::render(*current, view);
+            const Volume& empty = getVolume("empty"_)->volume;
+            image = ::render(*current, empty, view);
         }
         blit(position, image);
     }

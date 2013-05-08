@@ -8,8 +8,9 @@ struct Operation {
     Operation(const ref<byte>& input, const ref<byte>& name, uint sampleSize) : Operation(name, sampleSize) { inputs<<input; }
     Operation(const ref<byte>& input, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input, name, sampleSize) {
         outputs<<Output{output2,sampleSize2}; }
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize) : Operation(name, sampleSize) {
-        inputs<<input1<<input2<<input3;
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& name, uint sampleSize) : Operation(input1, name, sampleSize) { inputs<<input2; }
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize) : Operation(input1, input2, name, sampleSize) {
+        inputs<<input3;
     }
 
     ref<byte> name;
