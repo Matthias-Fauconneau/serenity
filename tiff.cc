@@ -36,7 +36,7 @@ Tiff16::Tiff16(const ref<byte>& file) : s(file) {
     uint16 bitPerSample=1; TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitPerSample); assert(bitPerSample==16);
 }
 void Tiff16::read(uint16 *target, uint x0, uint y0, uint w, uint h) {
-    assert(x0+w<width && y0+h<height);
+    assert(x0+w<=width && y0+h<=height, x0, y0, w, h, width, height);
     if(w==width) for(uint y: range(h)) TIFFReadScanline(tiff, target+y*w, y0+y, 0);
     else for(uint y: range(h)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y0+y, 0); copy(target+y*w, buffer+x0, w); }
 }

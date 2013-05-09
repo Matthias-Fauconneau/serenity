@@ -54,7 +54,7 @@ struct Rock : Widget {
     Rock(const ref<ref<byte>>& arguments) {
         ref<byte> target;
         for(const ref<byte>& argument: arguments) {
-            if(argument.contains('=')) { this->arguments[section(argument,'=',0,1)] = section(argument,'=',1,-1); continue; } // Stores generic argument to be parsed in relevant operation
+            if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
             if(!target && operationForOutput(argument)) { target=argument; log("target",target); if(target=="intensity"_) renderVolume=true; continue; }
             if(existsFolder(argument)) {
                 if(!source) { source=argument; log("source",source); name=section(source,'/',-2,-1); continue; }
@@ -105,12 +105,18 @@ struct Rock : Widget {
                     Map file (slices.first(), folder);
                     const Tiff16 image (file);
                     volume.x = image.width, volume.y = image.height, volume.z = slices.size;
+                    maxX = volume.x, maxY = volume.y, maxZ = volume.z;
+                    if(arguments.contains("cylinder"_)) {
+                        auto coordinates = toIntegers(arguments.at("cylinder"_));
+                        int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
+                        minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
+                    }
                     if(arguments.contains("cube"_)) {
                         auto coordinates = toIntegers(arguments.at("cube"_));
-                        int minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
-                        assert_(minX>=0 && minY>=0 && minZ>=0 && minX<maxX && minY<maxY && minZ<maxZ && maxX<=volume.x && maxY<=volume.y && maxZ<=volume.z, coordinates);
-                        volume.x = maxX-minX, volume.y = maxY-minY, volume.z = maxZ-minZ;
+                        minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
                     }
+                    assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=volume.x && maxY<=volume.y && maxZ<=volume.z);
+                    volume.x = maxX-minX, volume.y = maxY-minY, volume.z = maxZ-minZ;
                 }
                 volume.maximum = (1<<(8*output.sampleSize))-1;
             } else { // Inherit initial format from previous operation
@@ -148,12 +154,6 @@ struct Rock : Widget {
             } else {
                 Folder folder(source);
                 Time report;
-                uint minX=0, minY=0, minZ=0, maxX=X, maxY=Y, maxZ=Z;
-                if(arguments.contains("cube"_)) {
-                    auto coordinates = toIntegers(arguments.at("cube"_));
-                    minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
-                    assert(maxX-minX==X && maxY-minY==Y && maxZ-minZ==Z, coordinates, X, Y, Z);
-                }
                 array<string> slices = folder.list(Files);
                 assert_(slices.size>=maxZ);
                 uint16* const targetData = (Volume16&)target;
@@ -335,6 +335,7 @@ struct Rock : Widget {
 
     // Arguments
     ref<byte> source; // Path to folder containing source slice images (or name of a validation case (balls, cylinders, cones))
+    uint minX=0, minY=0, minZ=0, maxX=0, maxY=0, maxZ=0; // Coordinates to crop source volume
     Folder memoryFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
     ref<byte> name; // Used to name intermediate and output files (folder base name)
     uint filterSize = 8; // Smooth operation averages samples in a (2×filterSize+1)³ window

@@ -16,7 +16,7 @@ struct Volume {
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
     buffer<uint> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
-    int x=0, y=0, z=0; // Sample count in each dimensions
+    uint x=0, y=0, z=0; // Sample count in each dimensions
     uint marginX=0, marginY=0, marginZ=0; // Margins to trim when processing volume
     uint maximum=0; // Maximum value (to compute normalized values)
     uint sampleSize=0; // Sample integer size (in bytes)
