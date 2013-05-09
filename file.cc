@@ -8,6 +8,7 @@ struct dirent { long ino, off; short len; char name[]; };
 enum {DT_DIR=4, DT_REG=8};
 
 #include <stdio.h> // renameat
+#include <sys/sendfile.h> //sendfile
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
@@ -54,7 +55,7 @@ array<byte> Stream::readUpTo(uint capacity) {
     return buffer;
 }
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
-void Stream::write(const byte* data, uint size) { int unused wrote=check(::write(fd,data,size)); assert(wrote==(int)size); }
+void Stream::write(const byte* data, uint64 size) { for(uint64 offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), (int)fd, offset, size-offset, size); }
 void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
@@ -81,11 +82,12 @@ void Map::lock(uint size) const { check_(mlock(data, min<size_t>(this->size,size
 void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 
 // File system
-void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) {
-    assert(existsFile(oldName,at), oldName);
-    assert(!existsFile(newName,at), newName);
-    check_(renameat(at.fd,strz(oldName),at.fd,strz(newName)), oldName, newName);
+void rename(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName) {
+    assert(existsFile(oldName,oldAt), oldName);
+    assert(!existsFile(newName,newAt), newName);
+    check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)), oldName, newName);
 }
+void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) { rename(at, oldName, at, newName); }
 void remove(const ref<byte> &name, const Folder &at) { check_( unlinkat(at.fd,strz(name),0) ); }
 void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
     assert(from!=to);
@@ -95,3 +97,8 @@ void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
 struct stat statFile(const ref<byte>& path, const Folder& at) { struct stat file; check_( fstat(File(path,at).fd, &file) ); return file; }
 long modifiedTime(const ref<byte>& path, const Folder& at) { return statFile(path,at).st_mtime; }
 void touchFile(const ref<byte>& path, const Folder& at) { utimensat(at.fd, strz(path), 0, 0); }
+void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName) {
+    File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate));
+    for(uint64 offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
+    assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
+}

@@ -52,19 +52,22 @@ bool operator ==(const VolumeData& a, const ref<byte>& name) { return a.name == 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : Widget {
     Rock(const ref<ref<byte>>& arguments) {
+        // Parses command line arguments
         ref<byte> target;
         for(const ref<byte>& argument: arguments) {
             if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
-            if(!target && operationForOutput(argument)) { target=argument; log("target",target); if(target=="intensity"_) renderVolume=true; continue; }
+            if(!target && operationForOutput(argument)) { target=argument; if(target=="intensity"_) renderVolume=true; continue; }
             if(existsFolder(argument)) {
-                if(!source) { source=argument; log("source",source); name=section(source,'/',-2,-1); continue; }
-                if(!ascii) { ascii=argument; resultFolder = argument; log("ascii",ascii); continue; }
+                if(!source) { source=argument; name=section(source,'/',-2,-1); continue; }
+                if(!result) { result=argument; resultFolder = argument; continue; }
             }
-            if(!ascii) { ascii=argument; resultFolder = section(argument,'/',0,-2); log("ascii",ascii); continue; }
-            error("Invalid command line arguments"_, arguments);
+            if(!result) { result=argument; resultFolder = section(argument,'/',0,-2); continue; }
+            error("Invalid argument"_, argument);
         }
         if(!target) target=operations.last()->name;
+        if(!result) result = "ptmp"_;
         assert(name);
+
         for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
             if(!startsWith(path, name)) continue;
             VolumeData data = section(path,'.',-3,-2);
@@ -76,12 +79,29 @@ struct Rock : Widget {
             assert( data.volume );
             volumes << move(data);
         }
-        current = &getVolume(target)->volume;
-        updateView();
 
-        window.localShortcut(Escape).connect(&exit);
-        window.clearBackground = false;
-        window.show();
+        // Executes all operations
+        current = getVolume(target);
+
+        if(target=="ascii"_) { // Writes result to disk
+            Time time;
+            string volumeName = name+"."_+current->name+"."_+volumeFormat(current->volume);
+#if 0
+            if(existsFolder(result)) copy(memoryFolder, volumeName, resultFolder, volumeName), log(result+"/"_+volumeName, time);
+            else copy(memoryFolder, volumeName, root(), result), log(result, time);
+#else
+            if(existsFolder(result)) writeFile(volumeName, current->volume.data, resultFolder), log(result+"/"_+volumeName, time);
+            else writeFile(result, current->volume.data, root()), log(result, time);
+#endif
+            exit();
+            return;
+        }
+        else { // Displays result
+            window.localShortcut(Escape).connect(&exit);
+            window.clearBackground = false;
+            updateView();
+            window.show();
+        }
     }
 
     /// Computes target volume
@@ -259,7 +279,7 @@ struct Rock : Widget {
 
         for(VolumeData* output: outputs) {
             Volume& target = output->volume;
-            if(target.sampleSize==20) continue; // Don't try to pack ASCII
+            if(target.sampleSize!=20) // Don't try to pack ASCII
             while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2/*FIXME*/) { // Packs outputs if needed
                 const Volume32& target32 = target;
                 target.sampleSize /= 2;
@@ -282,7 +302,8 @@ struct Rock : Widget {
         if(operation==Rasterize && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
             Histogram histogram = sqrtHistogram(target);
             histogram[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
-            writeFile(name+".radius.tsv"_, str(histogram), resultFolder);
+            float scale = toDecimal(arguments.value("resolution"_,"1"));
+            writeFile(name+".radius.tsv"_, str(histogram, scale), resultFolder);
             log("Pore size histogram written to",name+".radius.tsv"_);
         }
         return &volumes[volumes.indexOf(targetName)];
@@ -311,17 +332,18 @@ struct Rock : Widget {
 
     void updateView() {
         assert(current);
-        int2 size(current->x-2*current->marginX,current->y-2*current->marginY);
+        int2 size(current->volume.x-2*current->volume.marginX,current->volume.y-2*current->volume.marginY);
         if(window.size != size) window.setSize(size);
         else window.render();
     }
 
     void render(int2 position, int2 size) {
-        if(current->sampleSize==20) { exit(); return; } // Don't try to display ASCII
         assert(current);
-        uint z = current->marginZ+(current->z-2*current->marginZ-1)*currentSlice;
+        const Volume& source = current->volume;
+        if(source.sampleSize==20) { exit(); return; } // Don't try to display ASCII
+        uint z = source.marginZ+(source.z-2*source.marginZ-1)*currentSlice;
         if(!renderVolume) {
-            Image image = current->squared ? squareRoot(*current, z) : slice(*current, z);
+            Image image = source.squared ? squareRoot(source, z) : slice(source, z);
             blit(position, image);
         } else {
             mat3 view;
@@ -348,13 +370,13 @@ struct Rock : Widget {
     ref<byte> name; // Used to name intermediate and output files (folder base name)
     uint filterSize = 8; // Smooth operation averages samples in a (2×filterSize+1)³ window
     Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
-    ref<byte> ascii; // Path to file (or folder) where ASCII encoded pore size volume is copied
+    ref<byte> result; // Path to file (or folder) where target volume data is copied
     map<ref<byte>,ref<byte>> arguments;
 
     // Variables
     array<unique<VolumeData>> volumes; // Mapped volume with valid data
     array<unique<VolumeData>> thrash; // Mapped volume with valid data, not being needed anymore, ready to be recycled
-    const Volume* current=0;
+    const VolumeData* current=0;
     float currentSlice=0; // Normalized z coordinate of the currently shown slice
     Window window {this,int2(-1,-1),"Rock"_};
 

@@ -52,7 +52,7 @@ struct Stream : Handle {
     /// Polls whether reading would block
     bool poll(int timeout=0);
     /// Writes \a buffer of \a size bytes
-    void write(const byte* data, uint size);
+    void write(const byte* data, uint64 size);
     /// Writes \a buffer
     void write(const ref<byte>& buffer);
 };
@@ -129,7 +129,9 @@ struct Map {
     uint64 size=0;
 };
 
-/// Renames file at \a target to \a name, replacing any existing files or links
+/// Renames a file replacing any existing files or links
+void rename(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);
+/// Renames a file replacing any existing files or links
 void rename(const ref<byte>& oldName, const ref<byte>& newName, const Folder& at=root());
 /// Removes file
 void remove(const ref<byte>& name, const Folder& at=root());
@@ -139,3 +141,5 @@ void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=roo
 long modifiedTime(const ref<byte>& path, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
 void touchFile(const ref<byte>& path, const Folder& at=root());
+/// Copies a file replacing any existing files or links
+void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);

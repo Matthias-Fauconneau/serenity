@@ -54,8 +54,10 @@ Histogram parseHistogram(const ref<byte>& file) {
     return histogram;
 }
 
-string str(const Histogram& histogram) {
+inline float ceil(float x) { return __builtin_ceilf(x); }
+inline float log10(float x) { return __builtin_log10f(x); }
+string str(const Histogram& histogram, float scale=1) {
     string s;
-    for(uint i=0; i<histogram.size; i++) if(histogram[i]) s << str(i) << '\t' << str(histogram[i]) << '\n';
+    for(uint i=0; i<histogram.size; i++) if(histogram[i]) s << ftoa(i*scale,ceil(-log10(scale))) << '\t' << str(histogram[i]) << '\n';
     return s;
 }

@@ -19,7 +19,7 @@ string volumeFormat(const Volume& volume) {
     if(volume.marginX||volume.marginY||volume.marginZ) s << '+' << str(volume.marginX) << '+' << str(volume.marginY) << '+' << str(volume.marginZ);
     s << '-' << hex(volume.maximum);
     if(volume.offsetX||volume.offsetY||volume.offsetZ) s << "-tiled"_;
-    if(volume.squared) s << "-squared";
+    if(volume.squared) s << "-squared"_;
     return s;
 }
 
@@ -136,23 +136,39 @@ void downsample(Volume16& target, const Volume16& source) {
     }
 }
 
+inline void itoa(byte* target, uint n) {
+    uint i=4;
+    do { target[--i]="0123456789"[n%10]; n /= 10; } while( n!=0 );
+    while(i>0) target[--i]=' ';
+}
+
 void toASCII(Volume& target, const Volume16& source) {
     uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    assert_(!source.offsetX && !source.offsetY && !source.offsetZ);
+    assert_(source.offsetX && source.offsetY && source.offsetZ);
+    assert_(!target.offsetX && !target.offsetY && !target.offsetZ);
+    const uint* const offsetX = source.offsetX;
+    const uint* const offsetY = source.offsetY;
+    const uint* const offsetZ = source.offsetZ;
     const uint16* const sourceData = source;
-    typedef char line[20];
-    line* const targetData = (line*)target.data.data;
+    typedef char Line[20];
+    Line* const targetData = (Line*)target.data.data;
 
     for(uint z=0; z<Z; z++) {
-        const uint16* const sourceZ = sourceData + z*XY;
-        line* const targetZ = targetData + z*XY;
+        const uint16* const sourceZ = sourceData + offsetZ[z];
+        Line* const targetZ = targetData + z*XY;
         for(uint y=0; y<Y; y++) {
-            const uint16* const sourceZY = sourceZ + y*X;
-            line* const targetZY = targetZ + y*X;
+            const uint16* const sourceZY = sourceZ + offsetY[y];
+            Line* const targetZY = targetZ + y*X;
             for(uint x=0; x<X; x++) {
-                string s = dec(x,4)+" "_+dec(y,4)+" "_+dec(z,4)+" "_+dec(sourceZY[x],4)+"\n"_; //FIXME: Extremely inefficient but who cares !
-                assert(s.size==20);
-                copy(targetZY[x], s.data, 20);
+                Line& line = targetZY[x];
+                itoa(line, x);
+                line[4]=' ';
+                itoa(line+5, y);
+                line[9]=' ';
+                itoa(line+10,z);
+                line[14]=' ';
+                itoa(line+15,sourceZY[offsetX[x]]);
+                line[19]='\n';
             }
         }
     }
