@@ -2,7 +2,7 @@
 #include "simd.h"
 
 void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float threshold) {
-    v4si scaledThreshold = set1( uint(threshold*(source.den/source.num-1)) );
+    v4si scaledThreshold = set1(threshold*source.maximum);
     uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     uint32 sqr[X]; for(uint x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
     uint32* const poreData = pore;
@@ -35,6 +35,6 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
         uint32* const rockY = rockData + y*X;
         for(uint x=0; x<X; x++) rockY[x]=poreY[x]=x*x, rockY[(Z-1)*XY+x]=poreY[(Z-1)*XY+x]=x*x; // Sets front/back faces
     }
-    pore.num=1, pore.den=(pore.x-1)*(pore.x-1);
-    rock.num=1, rock.den=(rock.x-1)*(rock.x-1);
+    pore.maximum=(pore.x-1)*(pore.x-1);
+    rock.maximum=(rock.x-1)*(rock.x-1);
 }

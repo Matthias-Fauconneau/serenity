@@ -17,7 +17,7 @@ void interleavedLookup(Volume& target) {
 string volumeFormat(const Volume& volume) {
     string s; s << str(volume.x) << 'x' << str(volume.y) << 'x' << str(volume.z);
     if(volume.marginX||volume.marginY||volume.marginZ) s << '+' << str(volume.marginX) << '+' << str(volume.marginY) << '+' << str(volume.marginZ);
-    s << '-' << hex(volume.num) << ':' << hex(volume.den);
+    s << '-' << hex(volume.maximum);
     if(volume.offsetX||volume.offsetY||volume.offsetZ) s << "-tiled"_;
     if(volume.squared) s << "-squared";
     return s;
@@ -34,12 +34,11 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
         volume.marginZ = s.integer();
     }
     s.skip("-"_);
-    volume.num = s.hexadecimal(); s.skip(":"_);
-    volume.den = s.hexadecimal();
-    assert(volume.num && volume.den, path, volume.num, volume.den);
-    volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.den+1)/volume.num)))) / 8; // Minimum sample size to encode maximum value (in 2ⁿ bytes)
+    volume.maximum = s.hexadecimal();
+    volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8; // Minimum sample size to encode maximum value (in 2ⁿ bytes)
     if(s.match("-tiled"_)) interleavedLookup(volume); else { free(volume.offsetX), free(volume.offsetY), free(volume.offsetZ); }
     if(s.match("-squared"_)) volume.squared=true;
+    assert(!s);
 }
 
 uint maximum(const Volume16& source) {
@@ -65,7 +64,7 @@ void pack(Volume16& target, const Volume32& source) {
     uint16* const targetData = target;
     uint64 size = source.size();
     for(uint i=0; i<size; i+=8) storea(targetData+i, packus(loada(sourceData+i),loada(sourceData+i+4)));
-    target.num=source.num, target.den=source.den;
+    target.maximum=source.maximum;
 }
 
 void tile(Volume16& target, const Volume16& source) {
@@ -114,7 +113,7 @@ void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, u
 void downsample(Volume16& target, const Volume16& source) {
     assert(!source.offsetX && !source.offsetY && !source.offsetZ);
     int X = source.x, Y = source.y, Z = source.z, XY = X*Y;
-    target.x = X/2, target.y = Y/2, target.z = Z/2; target.marginX=source.marginX/2, target.marginY=source.marginZ/2, target.marginX=source.marginZ/2, target.num=source.num, target.den=source.den;
+    target.x = X/2, target.y = Y/2, target.z = Z/2; target.marginX=source.marginX/2, target.marginY=source.marginZ/2, target.marginX=source.marginZ/2, target.maximum=source.maximum;
     const uint16* const sourceData = source;
     uint16* const targetData = target;
     for(int z=0; z<Z/2; z++) {
@@ -143,6 +142,7 @@ void toASCII(Volume& target, const Volume16& source) {
     const uint16* const sourceData = source;
     typedef char line[20];
     line* const targetData = (line*)target.data.data;
+
     for(uint z=0; z<Z; z++) {
         const uint16* const sourceZ = sourceData + z*XY;
         line* const targetZ = targetData + z*XY;
@@ -171,7 +171,7 @@ Image slice(const Volume& volume, uint z) {
             const uint8* const sourceZ = (const Volume8&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {
                 const uint8* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * (0xFF * volume.num) / volume.den;
+                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * 0xFF / volume.maximum;
             }
         }
     }
@@ -180,11 +180,11 @@ Image slice(const Volume& volume, uint z) {
             const uint16* const sourceZ = (const Volume16&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {
                 const uint16* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * (0xFF * volume.num) / volume.den;
+                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * 0xFF / volume.maximum;
             }
         } else {
             const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
+            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * 0xFF / volume.maximum;
         }
     }
     else if(volume.sampleSize==4) {
@@ -192,11 +192,11 @@ Image slice(const Volume& volume, uint z) {
             const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
             for(uint y=0; y<imY; y++) {
                 const uint32* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * (0xFF * volume.num) / volume.den;
+                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * 0xFF / volume.maximum;
             }
         } else {
             const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * (0xFF * volume.num) / volume.den;
+            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * 0xFF / volume.maximum;
         }
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
@@ -210,7 +210,7 @@ Image squareRoot(const Volume& volume, uint z) {
     const uint* const offsetX = volume.offsetX;
     const uint* const offsetY = volume.offsetY;
     const uint* const offsetZ = volume.offsetZ;
-    float scale = 0xFF * sqrt(float(volume.num) / float(volume.den));
+    float scale = 0xFF / round(sqrt(volume.maximum));
     if(volume.sampleSize==2) {
         if(offsetX || offsetY || offsetZ) {
             const uint16* const sourceZ = (const Volume16&)volume + offsetZ[z];

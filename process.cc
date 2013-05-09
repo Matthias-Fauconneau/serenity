@@ -147,6 +147,7 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
     }
     log(message);
     {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } }
+    __builtin_trap(); //TODO: detect if running under debugger
     exit_thread(0);
 }
 

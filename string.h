@@ -11,8 +11,6 @@ bool operator <(const ref<byte>& a, const ref<byte>& b);
 /// Returns a reference to the string between the {begin}th and {end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 ref<byte> section(const ref<byte>& str, byte separator, int begin=0, int end=1);
-/// Returns an array of references splitting \a str wherever \a separator occurs
-array<ref<byte>> split(const ref<byte>& str, byte separator=' ');
 /// Returns a reference with heading and trailing whitespace removed
 ref<byte> trim(const ref<byte>& s);
 
@@ -26,7 +24,7 @@ bool find(const ref<byte>& str, const ref<byte>& substring);
 /// Returns true if s contains only [0-9]
 bool isInteger(const ref<byte>& s);
 /// Parses an integer value
-long toInteger(const ref<byte>& str, int base=10);
+int64 toInteger(const ref<byte>& str, int base=10);
 /// Parses a decimal value
 double toDecimal(const ref<byte>& str);
 
@@ -53,6 +51,11 @@ string repeat(const ref<byte>& s, uint times);
 struct stringz : string { operator char*(){return data;}};
 /// Copies the reference and appends a null byte
 stringz strz(const ref<byte>& s);
+
+/// Returns an array of references splitting \a str wherever \a separator occurs
+array<ref<byte>> split(const ref<byte>& str, byte separator=' ');
+/// Parses an array of integer value
+array<int64> toIntegers(const ref<byte>& str, char separator=',', int base=10);
 
 /// Forwards string
 inline const string& str(const string& s) { return s; }
@@ -81,18 +84,11 @@ inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
-/*template<Type T> string str(const ref<T>& a, const ref<byte> separator=" "_) {
-    string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s;
-}
-template<Type T> string str(const buffer<T>& a, const ref<byte> separator=" "_) { return str(ref<T>(a),separator); }
-template<Type T> string str(const array<T>& a, const ref<byte> separator=" "_) { return str(ref<T>(a),separator); }
-template<Type T> string dec(const ref<T>& a, const ref<byte> separator=" "_) {
-    string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s;
-}*/
+template<Type T> string str(const ref<T>& a) { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
+template<Type T> string str(const buffer<T>& a) { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
 template<Type T> string str(const array<T>& a) { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
-template<Type T> string hex(const ref<T>& a, const ref<byte> separator=" "_) {
-    string s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s;
-}
+template<Type T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<Type T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s; }
 
 /// Converts static arrays
 template<Type T, size_t N> string str(const T (&a)[N]) { return str(ref<T>(a,N)); }

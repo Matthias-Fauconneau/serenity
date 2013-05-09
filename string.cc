@@ -52,7 +52,7 @@ bool isInteger(const ref<byte>& s) {
     if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
 }
 
-long toInteger(const ref<byte>& number, int base) {
+int64 toInteger(const ref<byte>& number, int base) {
     assert(base>=2 && base<=16);
     assert(number);
     int sign=1;
@@ -90,24 +90,7 @@ double toDecimal(const ref<byte>& number) {
     return sign*significand/exponent;
 }
 
-
 /// string
-
-array<ref<byte>> split(const ref<byte>& str, byte sep) {
-    array<ref<byte>> list;
-    const byte* b=str.begin();
-    const byte* end=str.end();
-    for(;;) {
-        auto e = b;
-        while(e!=end && *e!=sep) ++e;
-        if(b==end) break;
-        list << ref<byte>(b,e-b);
-        if(e==end) break;
-        b = e;
-        if(b!=end && *b==sep) ++b;
-    }
-    return list;
-}
 
 string join(const ref<string>& list, const ref<byte>& separator) {
     string str;
@@ -147,6 +130,26 @@ string repeat(const ref<byte>& s, uint times) {
 }
 
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return r; }
+
+/// array<ref<byte>>
+
+array<ref<byte>> split(const ref<byte>& str, byte separator) {
+    array<ref<byte>> list;
+    const byte* b=str.begin();
+    const byte* end=str.end();
+    for(;;) {
+        auto e = b;
+        while(e!=end && *e!=separator) ++e;
+        if(b==end) break;
+        list << ref<byte>(b,e-b);
+        if(e==end) break;
+        b = e;
+        if(b!=end && *b==separator) ++b;
+    }
+    return list;
+}
+
+array<int64> toIntegers(const ref<byte>& str, char separator, int base) { return apply<int64>(split(str,separator), [base](const ref<byte>& s) { return toInteger(s,base); }); }
 
 /// Number conversions
 

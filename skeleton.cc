@@ -58,5 +58,5 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
             }
         }
     } //);
-    target.num=1, target.den = maximum(target), target.squared=true;
+    target.maximum = maximum(target), target.squared=true;
 }

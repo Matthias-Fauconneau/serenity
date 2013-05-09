@@ -12,13 +12,13 @@ struct Volume {
     operator struct Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(struct Volume8*)this; }
     operator struct Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume16*)this; }
     operator struct Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(struct Volume32*)this; }
-    void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; num=source.num, den=source.den; squared=source.squared; }
+    void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; maximum=source.maximum; squared=source.squared; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
     buffer<uint> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
-    uint x=0, y=0, z=0; // Sample count in each dimensions
+    int x=0, y=0, z=0; // Sample count in each dimensions
     uint marginX=0, marginY=0, marginZ=0; // Margins to trim when processing volume
-    uint num=1, den=1; // Scale to apply to compute normalized values (data*numerator/denominator)
+    uint maximum=0; // Maximum value (to compute normalized values)
     uint sampleSize=0; // Sample integer size (in bytes)
     bool squared=false; // Whether the sample are a squared magnitude
 };

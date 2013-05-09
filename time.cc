@@ -6,6 +6,8 @@
 #include <time.h>
 #include <sys/timerfd.h>
 
+Random random;
+
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
 uint64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000ul+ts.tv_nsec/1000; }
 uint64 cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000ul+ts.tv_nsec/1000; }

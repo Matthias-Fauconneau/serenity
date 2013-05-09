@@ -155,5 +155,13 @@ template<Type T> array<T> replace(array<T>&& a, const T& before, const T& after)
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 
+/// Returns an array of the application of a function to every elements of a reference
+template<class O, class T, class F> array<O> apply(const ref<T>& a, F function) {
+        array<O> r; for(const T& e: a) r << function(e); return r;
+}
+template<class O, class T, class F> array<O> apply(const array<T>& a, F function) {
+        array<O> r; for(const T& e: a) r << function(e); return r;
+}
+
 /// string is an array of bytes
 typedef array<byte> string;
