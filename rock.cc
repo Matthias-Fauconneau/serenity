@@ -193,39 +193,47 @@ struct Rock : Widget {
                 }
             }
             else if(operation==Threshold) {
-                if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
-                    Time time;
-                    Histogram density = histogram(source);
-                    log("density", time.reset());
-                    {Histogram smoothDensity (density.size, density.size);
-                        int filterSize=density.size/0x100; // Box smooth histogram
-                        log(filterSize);
-                        for(uint i=filterSize; i<density.size-filterSize; i++) {
-                            uint sum=0;
-                            for(int di=-filterSize; di<+filterSize; di++) sum+=density[i+di];
-                            smoothDensity[i] = sum/(2*filterSize);
+                float densityThreshold=0;
+                if(arguments.contains("threshold"_)) {
+                    densityThreshold = toDecimal(arguments.at("threshold"_));
+                    while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
+                }
+                if(!densityThreshold) {
+                    if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
+                        Time time;
+                        Histogram density = histogram(source);
+                        log("density", time.reset());
+                        {Histogram smoothDensity (density.size, density.size);
+                            int filterSize=density.size/0x100; // Box smooth histogram
+                            log(filterSize);
+                            for(uint i=filterSize; i<density.size-filterSize; i++) {
+                                uint sum=0;
+                                for(int di=-filterSize; di<+filterSize; di++) sum+=density[i+di];
+                                smoothDensity[i] = sum/(2*filterSize);
+                            }
+                            density = move(smoothDensity);
+                            log("smooth", time.reset());
                         }
-                        density = move(smoothDensity);
-                        log("smooth", time.reset());
+                        writeFile(name+".density.tsv"_, str(density), resultFolder);
+                        log("write", time.reset());
                     }
-                    writeFile(name+".density.tsv"_, str(density), resultFolder);
-                    log("write", time.reset());
-                }
-                Histogram density = parseHistogram( readFile(name+".density.tsv"_, resultFolder) );
-                // Use the minimum between the two highest maximum of density histogram as density threshold
-                struct { uint density=0, count=0; } max[2];
-                for(uint i=1; i<density.size-1; i++) {
-                    if(density[i-1] < density[i] && density[i] > density[i+1] && density[i] > max[0].count) {
-                        max[0].density = i, max[0].count = density[i];
-                        if(max[0].count > max[1].count) swap(max[0],max[1]);
+                    Histogram density = parseHistogram( readFile(name+".density.tsv"_, resultFolder) );
+                    // Use the minimum between the two highest maximum of density histogram as density threshold
+                    struct { uint density=0, count=0; } max[2];
+                    for(uint i=1; i<density.size-1; i++) {
+                        if(density[i-1] < density[i] && density[i] > density[i+1] && density[i] > max[0].count) {
+                            max[0].density = i, max[0].count = density[i];
+                            if(max[0].count > max[1].count) swap(max[0],max[1]);
+                        }
                     }
-                }
-                uint densityThreshold=0; uint minimum = -1;
-                for(uint i=max[0].density; i<max[1].density; i++) {
-                    if(density[i] < minimum) densityThreshold = i, minimum = density[i];
-                }
-                log("Using threshold",float(densityThreshold)/float(density.size),"between pore at",float(max[0].density)/float(density.size),"and rock at",float(max[1].density)/float(density.size));
-                threshold(target, outputs[1]->volume, source, float(densityThreshold) / float(density.size));
+                    uint threshold=0; uint minimum = -1;
+                    for(uint i=max[0].density; i<max[1].density; i++) {
+                        if(density[i] < minimum) threshold = i, minimum = density[i];
+                    }
+                    densityThreshold = float(threshold) / float(density.size);
+                    log("Automatic threshold", densityThreshold, "between pore at", float(max[0].density)/float(density.size), "and rock at", float(max[1].density)/float(density.size));
+                } else log("Manual threshold", densityThreshold);
+                threshold(target, outputs[1]->volume, source, densityThreshold);
             }
             else if(operation==DistanceX || operation==EmptyX) {
                 perpendicularBisectorEuclideanDistanceTransform<false>(target, source, X,Y,Z);
