@@ -19,5 +19,6 @@ struct Operation {
 };
 const ref<byte>& str(const Operation& operation) { return operation.name; }
 bool operator==(const Operation& a, const Operation& b) { return a.name == b.name; }
+bool operator==(const Operation::Output& a, const ref<byte>& b) { return a.name == b; }
 const Operation* operationForOutput(const ref<byte>& name) { for(Operation* operation: operations) for(const Operation::Output& output: operation->outputs) if(output.name==name) return operation; return 0; }
 

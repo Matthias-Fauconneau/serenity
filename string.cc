@@ -190,13 +190,15 @@ string ftoa(double n, int precision, int pad, bool exponent) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) return string("∞"_);
     if(n==-__builtin_inff()) return string("-∞"_);
-    int e=0; if(n && (exponent || int(n*exp10(precision))==0)) e=round(log10(n)), n /= exp10(e);
-    uint64 m=1; for(int i=0;i<precision;i++) m*=10;
-    double integer=1, fract=__builtin_modf(n, &integer);
+    int e=0; if(n && (exponent /*|| int(n*exp10(precision))==0*/)) e=round(log10(n)), n /= exp10(e);
     string s;
     if(sign) s<<'-';
-    s << utoa(integer,pad);
-    if(precision) s <<'.'<< utoa<10>(round(fract*exp10(precision)),precision);
+    if(precision) {
+        double integer=1, fract=__builtin_modf(n, &integer);
+        uint decimal = round(fract*exp10(precision));
+        if(decimal==(uint)exp10(precision)) integer++, decimal=0; // Rounds to ceiling integer
+        s<<utoa(integer,pad)<<'.'<< utoa<10>(decimal,precision);
+    } else s<<utoa(round(n));
     if(e) s<<'e'<<itoa<10>(e);
     return move(s);
 }

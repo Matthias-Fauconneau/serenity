@@ -14,7 +14,7 @@ void rasterize(Volume16& target, const Volume16& source) {
     const uint* const offsetZ = target.offsetZ;
     Time time; Time report;
     parallel(marginZ,Z-marginZ, [&](uint, uint z) {
-        if(report/1000>=5) { log(z-marginZ,"/", Z-2*marginZ, (z*XY/1024/1024)/(time/1000), "MS/s"); report.reset(); }
+        if(report/1000>=10) { log(z-marginZ,"/", Z-2*marginZ, (z*XY/1024/1024)/(time/1000), "MS/s"); report.reset(); }
         const uint16* const sourceZ = sourceData+z*XY;
         for(int y=marginY; y<Y-marginY; y++) {
             const uint16* const sourceZY = sourceZ+y*X;

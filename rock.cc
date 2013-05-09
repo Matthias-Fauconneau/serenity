@@ -53,25 +53,33 @@ bool operator ==(const VolumeData& a, const ref<byte>& name) { return a.name == 
 struct Rock : Widget {
     Rock(const ref<ref<byte>>& arguments) {
         // Parses command line arguments
-        ref<byte> target;
+        ref<byte> target; array<ref<byte>> force;
         for(const ref<byte>& argument: arguments) {
             if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
-            if(!target && operationForOutput(argument)) { target=argument; if(target=="intensity"_) renderVolume=true; continue; }
+            if(operationForOutput(argument)) { // Parses target (or intermediate data to be removed)
+                force << argument;
+                if(!target) target=argument;
+                continue;
+            }
+            if(!source && argument=="balls"_) { source=argument, name=argument; continue; }
             if(existsFolder(argument)) {
-                if(!source) { source=argument; name=section(source,'/',-2,-1); continue; }
+                if(!source) { source=argument; name=source.contains('/')?section(source,'/',-2,-1):source; continue; }
                 if(!result) { result=argument; resultFolder = argument; continue; }
             }
             if(!result) { result=argument; resultFolder = section(argument,'/',0,-2); continue; }
             error("Invalid argument"_, argument);
         }
-        if(!target) target=operations.last()->name;
         if(!result) result = "ptmp"_;
+        if(!target) target=operations.last()->name;
+        if(target=="intensity"_) renderVolume=true;
         assert(name);
 
         for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
             if(!startsWith(path, name)) continue;
             VolumeData data = section(path,'.',-3,-2);
-            if(!operationForOutput(data.name) || volumes.contains(data.name) || target==data.name) { remove(path, memoryFolder); continue; } // Removes invalid, multiple or target data
+            bool remove = !operationForOutput(data.name) || volumes.contains(data.name);
+            for(ref<byte> name: force) if(operationForOutput(name)->outputs.contains(data.name)) remove=true;
+            if(remove) { ::remove(path, memoryFolder); continue; } // Removes invalid, multiple or to be removed data
             parseVolumeFormat(data.volume, path);
             File file = File(path, memoryFolder, ReadWrite);
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
@@ -169,7 +177,7 @@ struct Rock : Widget {
         Time time;
         if(operation==Source) {
             if(name == "balls"_) {
-                randomBalls(target);
+                randomBalls(target, 2*filterSize+1);
                 // TODO: write analytic histogram
             } else {
                 Folder folder(source);
@@ -222,34 +230,32 @@ struct Rock : Widget {
                     if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
                         Time time;
                         Histogram density = histogram(source);
-                        log("density", time.reset());
+                        log("density", time);
                         {Histogram smoothDensity (density.size, density.size);
                             int filterSize=density.size/0x100; // Box smooth histogram
-                            log(filterSize);
-                            for(uint i=filterSize; i<density.size-filterSize; i++) {
-                                uint sum=0;
-                                for(int di=-filterSize; di<+filterSize; di++) sum+=density[i+di];
+                            for(int i=0; i<(int)density.size; i++) {
+                                uint64 sum=0;
+                                for(int di=-filterSize; di<+filterSize; di++) sum+=density[clip<int>(0,i+di,density.size-1)];
                                 smoothDensity[i] = sum/(2*filterSize);
                             }
                             density = move(smoothDensity);
-                            log("smooth", time.reset());
                         }
                         writeFile(name+".density.tsv"_, str(density), resultFolder);
-                        log("write", time.reset());
                     }
                     Histogram density = parseHistogram( readFile(name+".density.tsv"_, resultFolder) );
-                    // Use the minimum between the two highest maximum of density histogram as density threshold
-                    struct { uint density=0, count=0; } max[2];
+                    // Use the value half way between the two highest maximum of density histogram as density threshold
+                    struct { uint density, count; } max[2] = {{0,density.first()},{density.size-1,density.last()}};
                     for(uint i=1; i<density.size-1; i++) {
                         if(density[i-1] < density[i] && density[i] > density[i+1] && density[i] > max[0].count) {
                             max[0].density = i, max[0].count = density[i];
                             if(max[0].count > max[1].count) swap(max[0],max[1]);
                         }
                     }
-                    uint threshold=0; uint minimum = -1;
+                    /*uint threshold=0; uint minimum = -1;
                     for(uint i=max[0].density; i<max[1].density; i++) {
                         if(density[i] < minimum) threshold = i, minimum = density[i];
-                    }
+                    }*/
+                    uint threshold = (max[0].density+max[1].density)/2; // Half way between the two highest maximum of density histogram as density threshold
                     densityThreshold = float(threshold) / float(density.size);
                     log("Automatic threshold", densityThreshold, "between pore at", float(max[0].density)/float(density.size), "and rock at", float(max[1].density)/float(density.size));
                 } else log("Manual threshold", densityThreshold);

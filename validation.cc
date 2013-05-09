@@ -1,15 +1,16 @@
 #include "validation.h"
 #include "time.h"
 
-void randomBalls(Volume16& target) {
+void randomBalls(Volume16& target, float minimalDistance) {
     const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
+    Random random;
     struct Ball { int3 position; uint radius; };
     array<Ball> balls;
-    for(uint unused i: range(1024)) {
+    while(balls.size<1024) {
         uint radius = 1+random%(min(X-1, min(Y-1, Z-1))/2-1);
         Ball a = {int3(radius+random%(X-2*radius), radius+random%(Y-2*radius), radius+random%(Z-2*radius)), radius}; // Random candidate ball
         assert(a.position>=int3(radius) && a.position<int3(X,Y,Z)-int3(radius));
-        for(Ball b: balls) if(norm(a.position-b.position)<a.radius+b.radius) goto break_; // Discards candidates intersecting any other ball
+        for(Ball b: balls) if(a.radius+minimalDistance+b.radius>norm(a.position-b.position)) goto break_; // Discards candidates intersecting any other ball
         /*else*/ balls << a;
         break_: ;
     }

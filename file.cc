@@ -88,7 +88,7 @@ void rename(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, 
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)), oldName, newName);
 }
 void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) { rename(at, oldName, at, newName); }
-void remove(const ref<byte> &name, const Folder &at) { check_( unlinkat(at.fd,strz(name),0) ); }
+void remove(const ref<byte> &name, const Folder &at) { check_( unlinkat(at.fd,strz(name),0), name); }
 void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
     assert(from!=to);
     remove(from,at);

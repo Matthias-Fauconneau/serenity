@@ -90,4 +90,3 @@ struct Random {
     operator uint64() { return next(); }
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };
-extern Random random;
