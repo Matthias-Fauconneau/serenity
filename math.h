@@ -1,10 +1,6 @@
 #pragma once
 typedef double real;
 
-/*inline float floor(float x) { return __builtin_floorf(x); }
-inline float round(float x) { return __builtin_roundf(x); }
-inline float ceil(float x) { return __builtin_ceilf(x); }*/
-
 inline real floor(real x) { return __builtin_floor(x); }
 inline real round(real x) { return __builtin_round(x); }
 inline real ceil(real x) { return __builtin_ceil(x); }

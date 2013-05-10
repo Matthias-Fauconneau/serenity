@@ -14,8 +14,7 @@ void maximum(Volume16& target, const Volume16& source) {
     const uint* const offsetZ = source.offsetZ;
     assert_(offsetX && offsetY && offsetZ);
     uint16* const targetData = target;
-    //clear(targetData, Z*Y*X); //if memoize
-    //TODO: tiled, Z-order
+    clear(targetData, Z*Y*X); //if memoize //TODO: tiled target, Z-order
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         uint16* const targetZ = targetData+z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
@@ -23,12 +22,12 @@ void maximum(Volume16& target, const Volume16& source) {
             for(uint x=marginX; x<X-marginX; x++) {
                 int currentD=data[offsetX[x]+offsetY[y]+offsetZ[z]];
                 if(currentD) for(int currentX = x, currentY = y, currentZ = z;;) { // Ascent distance field until reaching a local maximum
-                    //{uint16 max = targetData[oz*XY+oy*X+ox]; if(max) { targetData[z*XY+y*X+x] = max; break; }} // Reuse already computed paths //FIXME: break result ?!
+                    {int nextD = targetData[currentZ*XY+currentY*X+currentX]; if(nextD) { currentD=nextD; break; }} // Reuse already computed paths //FIXME: break result ?!
                     int nextD=currentD, nextX=0, nextY=0, nextZ=0;
                     for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) {
                         int stepX=currentX+dx, stepY=currentY+dy, stepZ=currentZ+dz;
                         int d = data[offsetX[stepX]+offsetY[stepY]+offsetZ[stepZ]];
-                        if(d > nextD /*&& uint(stepX)<X-marginX && uint(stepY)<Y-marginY && uint(stepZ)<Z-marginZ*/) nextD=d, nextX=stepX, nextY=stepY, nextZ=stepZ;
+                        if(d > nextD) nextD=d, nextX=stepX, nextY=stepY, nextZ=stepZ;
                     }
                     if(nextD==currentD) break;
                     currentD=nextD, currentX=nextX, currentY=nextY, currentZ=nextZ;

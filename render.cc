@@ -9,7 +9,7 @@ void squareRoot(Volume8& target, const Volume16& source) {
     const uint* const offsetX = target.offsetX;
     const uint* const offsetY = target.offsetY;
     const uint* const offsetZ = target.offsetZ;
-    target.marginX=0, target.marginY=0, target.marginZ=0, target.maximum = round(sqrt(source.maximum)), target.squared=false;
+    target.marginX=0, target.marginY=0, target.marginZ=0, target.maximum = round(sqrt((float)source.maximum)), target.squared=false;
     assert_(target.maximum<0x100);
     const uint16* const sourceData = source;
     uint8* const targetData = target;
@@ -85,7 +85,7 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
     byte4* const imageData = target.data;
 
     // View
-    mat3 world = view.inverse().scale(size*sqrt(2)); // Transform normalized view space to world space
+    mat3 world = view.inverse().scale(size*sqrt(2.)); // Transform normalized view space to world space
     vec3 vViewStepX = world * vec3(1./imageX,0,0); v4sf viewStepX = vViewStepX;
     vec3 vViewStepY = world * vec3(0,1./imageY,0); v4sf viewStepY = vViewStepY;
     const v4sf worldOrigin = world * vec3(0,0,0) - float(imageX/2)*vViewStepX - float(imageY/2)*vViewStepY;

@@ -133,7 +133,13 @@ void __attribute((constructor(1002))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    setExceptions(/*Invalid| volume renderer takes square roots of negatives*/Denormal|/*DivisionByZero| FIXME: volume renderer divides by zero*//*Overflow| FIXME: volume renderer overflows*/Underflow);
+    setExceptions(
+                //Invalid | volume renderer takes square roots of negatives
+                Denormal
+                //DivisionByZero| FIXME: volume renderer divides by zero
+                //Overflow| FIXME: volume renderer overflows
+                //Underflow FIXME: exp in gaussian for rock threshold underflows
+                );
 }
 
 static int recurse=0;

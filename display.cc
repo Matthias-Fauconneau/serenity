@@ -67,6 +67,7 @@ void blit(int2 target, const Image& source, vec4 unused color) {
     } else {
         for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
             framebuffer(x,y) = source(x-target.x,y-target.y);
+            framebuffer(x,y).a = 0xFF;
         }
     }
 }
