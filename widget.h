@@ -29,7 +29,7 @@ struct Widget {
     /// Mouse event type
     enum Event { Press, Release, Motion, Enter, Leave };
     /// Mouse buttons
-    enum Button { None, LeftButton, MiddleButton, RightButton, WheelDown, WheelUp };
+    enum Button { None, LeftButton, MiddleButton, RightButton, WheelUp, WheelDown };
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root Window#widget
     /// \return Whether the mouse event was accepted

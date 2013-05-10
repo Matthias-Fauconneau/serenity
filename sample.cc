@@ -5,16 +5,14 @@ Sample histogram(const Volume16& volume, bool cylinder) {
     uint X=volume.x, Y=volume.y, Z=volume.z, XY=X*Y;
     uint marginX=volume.marginX, marginY=volume.marginY, marginZ=volume.marginZ;
     assert(X==Y && marginX==marginY);
-    uint radiusSq=(X/2-marginX)*(X/2-marginX);
+    uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
     Sample histogram (volume.maximum+1, volume.maximum+1, 0);
     for(uint z=marginZ; z<Z-marginZ; z++) {
         const uint16* sourceZ = volume+z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
             const uint16* sourceY = sourceZ+y*X;
             for(uint x=marginX; x<X-marginX; x++) {
-                if(cylinder && (x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) >= radiusSq) continue; // Clips to cylinder
-                uint data = sourceY[x];
-                histogram[data]++;
+                if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[sourceY[x]]++;
             }
         }
     }
@@ -25,7 +23,7 @@ Sample sqrtHistogram(const Volume16& volume, bool cylinder) {
     uint X=volume.x, Y=volume.y, Z=volume.z, XY=X*Y;
     uint marginX=volume.marginX, marginY=volume.marginY, marginZ=volume.marginZ;
     assert(X==Y && marginX==marginY);
-    uint radiusSq=(X/2-marginX)*(X/2-marginX);
+    uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
     uint maximum = round(sqrt(volume.maximum))+1;
     Sample histogram (maximum, maximum, 0);
     for(uint z=marginZ; z<Z-marginZ; z++) {
@@ -33,10 +31,7 @@ Sample sqrtHistogram(const Volume16& volume, bool cylinder) {
         for(uint y=marginY; y<Y-marginY; y++) {
             const uint16* sourceY = sourceZ+y*X;
             for(uint x=marginX; x<X-marginX; x++) {
-                if(cylinder && (x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) >= radiusSq) continue; // Clips to cylinder
-                uint radius = round(sqrt(sourceY[x]));
-                assert(sourceY[x]<=volume.maximum, sourceY[x], volume.maximum);
-                histogram[radius]++;
+                if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[round(sqrt(sourceY[x]))]++;
             }
         }
     }
@@ -63,7 +58,7 @@ Lorentz estimateLorentz(const Sample& sample) {
     int y0 = sample[x0];
     int l0=0; for(int x=x0; x>=0; x--) if(sample[x]<=y0/2) { l0=x; break; } // Left half maximum
     int r0=sample.size; for(int x=x0; x<(int)sample.size; x++) if(sample[x]<=y0/2) { r0=x; break; } // Right half maximum
-    lorentz.position = (x0+(l0+r0)/2)/2; // Averages postion between sample maximum and estimation from half maximums
+    lorentz.position = max(x0, (l0+r0)/2); // Position estimated from half maximum is probably more accurate
     lorentz.scale = (r0-l0)/2; // half-width at half-maximum (HWHM)
     lorentz.height = y0;
     return lorentz;

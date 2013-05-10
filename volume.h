@@ -13,7 +13,7 @@ struct Volume {
     operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (struct Volume32&)*this; }
     operator struct Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(struct Volume8*)this; }
     operator struct Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume16*)this; }
-    operator struct Volume24&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume24*)this; }
+    operator struct Volume24&() { assert_(sampleSize==sizeof(bgr),sampleSize); return *(struct Volume24*)this; }
     operator struct Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(struct Volume32*)this; }
     void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; maximum=source.maximum; squared=source.squared; }
 
@@ -79,10 +79,7 @@ void downsample(Volume16& target, const Volume16& source);
 void toASCII(Volume& target, const Volume16& source);
 
 /// Returns an image of a volume slice
-Image slice(const Volume& volume, uint z);
-
-/// Returns the square root of an image of a volume slice
-Image squareRoot(const Volume& volume, uint z);
+Image slice(const Volume& volume, uint z, bool cylinder=false);
 
 /// Maps intensity to either red or green channel depending on binary classification
-void colorize(Volume24& target, const Volume16& binary, const Volume16& intensity);
+void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity);

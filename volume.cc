@@ -1,5 +1,6 @@
 #include "volume.h"
 #include "simd.h"
+#include "process.h"
 #include "data.h"
 
 static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) {
@@ -188,123 +189,46 @@ void toASCII(Volume& target, const Volume16& source) {
     }
 }
 
-Image slice(const Volume& volume, uint z) {
-    uint X=volume.x, Y=volume.y;
-    uint mX=volume.marginX, mY=volume.marginY;
-    uint imX=X-2*mX, imY=Y-2*mY;
-    Image target(imX,imY);
-    const uint* const offsetX = volume.offsetX;
-    const uint* const offsetY = volume.offsetY;
-    const uint* const offsetZ = volume.offsetZ;
-    if(volume.sampleSize==1) {
-        if(offsetX || offsetY || offsetZ) {
-            const uint8* const sourceZ = (const Volume8&)volume + offsetZ[z];
-            for(uint y=0; y<imY; y++) {
-                const uint8* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * 0xFF / volume.maximum;
-            }
+Image slice(const Volume& volume, uint z, bool cylinder) { //FIXME: factor
+    uint X=volume.x, Y=volume.y, XY=X*Y;
+    Image target(X,Y);
+    assert(X==Y && marginX==marginY);
+    uint radiusSq = cylinder ? (X/2-volume.marginX)*(X/2-volume.marginX) : -1;
+    const uint* const offsetX = volume.offsetX, *offsetY = volume.offsetY, *offsetZ = volume.offsetZ;
+    for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
+        uint source = 0;
+        if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) {
+            uint offset = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+            if(volume.sampleSize==1) source = ((byte*)volume.data.data)[offset];
+            if(volume.sampleSize==2) source = ((byte*)volume.data.data)[offset];
+            if(volume.sampleSize==3) { target(x,y) = ((bgr*)volume.data.data)[offset]; continue; }
+            if(volume.sampleSize==4) source = ((byte*)volume.data.data)[offset];
         }
+        target(x,y) = volume.squared ? round(sqrt(source)) * 0xFF / round(sqrt(volume.maximum)) : source * 0xFF / volume.maximum;
     }
-    else if(volume.sampleSize==2) {
-        if(offsetX || offsetY || offsetZ) {
-            const uint16* const sourceZ = (const Volume16&)volume + offsetZ[z];
-            for(uint y=0; y<imY; y++) {
-                const uint16* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * 0xFF / volume.maximum;
-            }
-        } else {
-            const uint16* const source = (const Volume16&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * 0xFF / volume.maximum;
-        }
-    }
-    else if(volume.sampleSize==3) {
-        if(offsetX || offsetY || offsetZ) {
-            const bgr* const sourceZ = (const Volume24&)volume + offsetZ[z];
-            for(uint y=0; y<imY; y++) {
-                const bgr* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = sourceY[offsetX[x]];
-            }
-        } else {
-            const bgr* const source = (const Volume24&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = source[y*X+x];
-        }
-    }
-    else if(volume.sampleSize==4) {
-        if(offsetX || offsetY || offsetZ) {
-            const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
-            for(uint y=0; y<imY; y++) {
-                const uint32* const sourceY = sourceZ + offsetY[y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint(sourceY[offsetX[x]]) * 0xFF / volume.maximum;
-            }
-        } else {
-            const uint32* const source = (const Volume32&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * 0xFF / volume.maximum;
-        }
-    } else error("Unsupported sample size", volume.sampleSize);
     return target;
 }
 
-Image squareRoot(const Volume& volume, uint z) {
-    uint X=volume.x, Y=volume.y;
-    uint mX=volume.marginX, mY=volume.marginY;
-    uint imX=X-2*mX, imY=Y-2*mY;
-    Image target(imX,imY);
-    const uint* const offsetX = volume.offsetX;
-    const uint* const offsetY = volume.offsetY;
-    const uint* const offsetZ = volume.offsetZ;
-    float scale = 0xFF / round(sqrt(volume.maximum));
-    if(volume.sampleSize==2) {
-        if(offsetX || offsetY || offsetZ) {
-            const uint16* const sourceZ = (const Volume16&)volume + offsetZ[z];
-            for(uint y=0; y<imY; y++) {
-                const uint16* const sourceY = sourceZ + offsetY[mY+y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
-            }
-        } else {
-            const uint16* const sourceZ = (const Volume16&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) {
-                const uint16* const sourceY = sourceZ + y*X;
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[x])) * scale));
-            }
-        }
-    } else if(volume.sampleSize==4) {
-        if(offsetX || offsetY || offsetZ) {
-            const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
-            for(uint y=0; y<imY; y++) {
-                const uint32* const sourceY = sourceZ + offsetY[mY+y];
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[offsetX[mX+x]])) * scale));
-            }
-        } else {
-            const uint32* const sourceZ = (const Volume32&)volume + z*Y*X + mY*X + mX;
-            for(uint y=0; y<imY; y++) {
-                const uint32* const sourceY = sourceZ + y*X;
-                for(uint x=0; x<imX; x++) target(x,y) = uint8(min<float>(0xFF,sqrt(float(sourceY[x])) * scale)); //FIXME: overflow
-            }
-        }
-    } else error("Unsupported sample size", volume.sampleSize);
-    return target;
-}
-
-void colorize(Volume24& target, const Volume16& binary, const Volume16& intensity) {
+void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
     assert(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
     int X = binary.x, Y = binary.y, Z = binary.z, XY = X*Y;
-    const uint16* const binaryData = binary;
+    const uint32* const binaryData = binary;
     const uint16* const intensityData = intensity;
     const uint maximum = intensity.maximum;
     bgr* const targetData = target;
-    for(int z=0; z<Z; z++) {
-        const uint16* const binaryZ = binaryData+z*XY;
+    parallel(Z, [&](uint, uint z) {
+        const uint32* const binaryZ = binaryData+z*XY;
         const uint16* const intensityZ = intensityData+z*XY;
         bgr* const targetZ = targetData+z*XY;
         for(int y=0; y<Y; y++) {
-            const uint16* const binaryZY = binaryZ+y*X;
+            const uint32* const binaryZY = binaryZ+y*X;
             const uint16* const intensityZY = intensityZ+y*X;
             bgr* const targetZY = targetZ+y*X;
             for(int x=0; x<X; x++) {
                 uint8 c = 0xFF*intensityZY[x]/maximum;
-                targetZY[x] = binaryZY[x]==0xFFFF ? bgr{0,c,0} : bgr{0,0,c};
+                targetZY[x] = binaryZY[x]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
             }
         }
-    }
+    });
     target.maximum=0xFF;
 }
