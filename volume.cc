@@ -189,22 +189,23 @@ void toASCII(Volume& target, const Volume16& source) {
     }
 }
 
-Image slice(const Volume& volume, uint z, bool cylinder) { //FIXME: factor
-    uint X=volume.x, Y=volume.y, XY=X*Y;
+Image slice(const Volume& volume, uint z, bool cylinder) {
+    int X=volume.x, Y=volume.y, XY=X*Y;
     Image target(X,Y);
-    assert(X==Y && marginX==marginY);
+    assert(X==Y && volume.marginX==volume.marginY);
     uint radiusSq = cylinder ? (X/2-volume.marginX)*(X/2-volume.marginX) : -1;
     const uint* const offsetX = volume.offsetX, *offsetY = volume.offsetY, *offsetZ = volume.offsetZ;
-    for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
+    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
+        if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) > radiusSq) { target(x,y) = byte4(0,0,0,0x80); continue; }
         uint source = 0;
-        if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) {
-            uint offset = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
-            if(volume.sampleSize==1) source = ((byte*)volume.data.data)[offset];
-            if(volume.sampleSize==2) source = ((byte*)volume.data.data)[offset];
-            if(volume.sampleSize==3) { target(x,y) = ((bgr*)volume.data.data)[offset]; continue; }
-            if(volume.sampleSize==4) source = ((byte*)volume.data.data)[offset];
-        }
-        target(x,y) = volume.squared ? round(sqrt(source)) * 0xFF / round(sqrt(volume.maximum)) : source * 0xFF / volume.maximum;
+        uint offset = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+        if(volume.sampleSize==1) source = ((byte*)volume.data.data)[offset];
+        else if(volume.sampleSize==2) source = ((uint16*)volume.data.data)[offset];
+        else if(volume.sampleSize==3) { target(x,y) = ((bgr*)volume.data.data)[offset]; continue; }
+        else if(volume.sampleSize==4) source = ((uint32*)volume.data.data)[offset];
+        else error(volume.sampleSize);
+        uint intensity = volume.squared ? round(sqrt(source)) * 0xFF / round(sqrt(volume.maximum)) : source * 0xFF / volume.maximum;
+        target(x,y) = byte4(intensity, intensity, intensity, 0xFF);
     }
     return target;
 }

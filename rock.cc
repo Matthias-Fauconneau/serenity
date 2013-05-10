@@ -23,12 +23,12 @@ Operation Threshold("smooth"_,"pore"_,4, "rock"_,4); // Segments in rock vs pore
 Operation DistanceX("pore"_,"distancex"_,4); // Computes distance field to nearest rock (X pass)
 Operation DistanceY("distancex"_,"distancey"_,4); // Y pass
 Operation DistanceZ("distancey"_,"distance"_,4); // Z pass
-#if 1
+
 Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
-#else
+
 Operation Tile("distance"_,"tiled_distance"_,2); // Search nearest local maximum of distance field (i.e maximum enclosing sphere)
-Operation Maximum("tiled_distance"_,"maximum"_,2); // Search nearest local maximum of distance field (i.e maximum enclosing sphere)
-#endif
+Operation Maximum("tiled_distance"_,"walk"_,2); // Search nearest local maximum of distance field (i.e maximum enclosing sphere)
+
 #else
 Operation FeatureTransformX("threshold"_,"positionx"_,2); // Computes position of nearest rock wall (X pass)
 Operation FeatureTransformY("positionx"_,"positiony"_,2); // Y pass
@@ -82,7 +82,7 @@ struct Rock : Widget {
         if(!target) target=operations.last()->name;
         if(target!="ascii") {
             if(this->arguments.contains("selection"_)) selection = split(this->arguments.at("selection"_),',');
-            if(!selection) selection<<"source"_<<"colorize"_<<"distance"_<<"maximum"_;
+            if(!selection) selection<<"source"_<<"colorize"_<<"distance"_;
             if(!selection.contains(target)) selection<<target;
         }
         if(target=="intensity"_) renderVolume=true;
@@ -115,12 +115,11 @@ struct Rock : Widget {
             if(selection) current = getVolume(selection.last());
             else { exit(); return; }
         }
-        else { // Displays result
-            window.localShortcut(Escape).connect(&exit);
-            window.clearBackground = false;
-            updateView();
-            window.show();
-        }
+        // Displays result
+        window.localShortcut(Escape).connect(&exit);
+        window.clearBackground = false;
+        updateView();
+        window.show();
     }
     ~Rock() {
         for(const string& path: memoryFolder.list(Files)) { // Cleanups intermediate data
@@ -259,7 +258,7 @@ struct Rock : Widget {
                     Sample density = parseSample( readFile(name+".density.tsv"_, resultFolder) );
 
                     // Crude peak mixture estimation (Works somewhat for well separated peaks, proper way would be to use expectation maximization)
-                    bool plot=false;
+                    bool plot=true;
                     Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
                     if(plot) writeFile(name+".rock.tsv"_, toASCII(sample(rock,density.size)), resultFolder);
                     Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
@@ -284,8 +283,8 @@ struct Rock : Widget {
                 perpendicularBisectorEuclideanDistanceTransform<true>(target, source, X,Y,Z);
                 target.maximum=maximum((const Volume32&)target);
             }
-            //else if(operation==Tile) tile(target, source);
-            //else if(operation==Maximum) maximum(target, source);
+            else if(operation==Tile) tile(target, source);
+            else if(operation==Maximum) maximum(target, source);
             //else if(operation==Skeleton) integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
             else if(operation==Rasterize) rasterize(target, source);
             //else if(operation==Crop) { const int size=256; crop(target, source, source.x/2-size/2, source.y/2-size/2, source.z/2-size/2, source.x/2+size/2, source.y/2+size/2, source.z/2+size/2); }
@@ -318,7 +317,7 @@ struct Rock : Widget {
             string outputName = name+"."_+output->name;
             rename(outputName, outputName+"."_+volumeFormat(output->volume), memoryFolder); // Renames output files (once data is valid)
 
-            if(output->name=="maximum"_ && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
+            if((output->name=="maximum"_ || output->name=="walk"_) && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
                 Time time;
                 Sample histogram = sqrtHistogram(output->volume, cylinder);
                 histogram[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
