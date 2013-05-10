@@ -1,5 +1,6 @@
 #pragma once
 #include "image.h"
+struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } } packed;
 
 struct Volume {
     Volume(){}
@@ -8,9 +9,11 @@ struct Volume {
     explicit operator bool() const { return data; }
     operator const struct Volume8&() const { assert_(sampleSize==sizeof(uint8),sampleSize); return (struct Volume8&)*this; }
     operator const struct Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (struct Volume16&)*this; }
+    operator const struct Volume24&() const { assert_(sampleSize==sizeof(bgr),sampleSize); return (struct Volume24&)*this; }
     operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (struct Volume32&)*this; }
     operator struct Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(struct Volume8*)this; }
     operator struct Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume16*)this; }
+    operator struct Volume24&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume24*)this; }
     operator struct Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(struct Volume32*)this; }
     void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; maximum=source.maximum; squared=source.squared; }
 
@@ -37,6 +40,12 @@ struct Volume8 : Volume {
 
 struct Volume16 : Volume {
     typedef uint16 T;
+    operator const T*() const { return (T*)data.data; }
+    operator T*() { return (T*)data.data; }
+};
+
+struct Volume24 : Volume {
+    typedef bgr T;
     operator const T*() const { return (T*)data.data; }
     operator T*() { return (T*)data.data; }
 };
@@ -69,12 +78,11 @@ void downsample(Volume16& target, const Volume16& source);
 /// Converts volume data to ASCII (one voxel per line, explicit coordinates)
 void toASCII(Volume& target, const Volume16& source);
 
-/// Clips volume data to a cylinder and sets zero samples to 1
-void clip(Volume16& target);
-
 /// Returns an image of a volume slice
 Image slice(const Volume& volume, uint z);
 
 /// Returns the square root of an image of a volume slice
 Image squareRoot(const Volume& volume, uint z);
 
+/// Maps intensity to either red or green channel depending on binary classification
+void colorize(Volume24& target, const Volume16& binary, const Volume16& intensity);

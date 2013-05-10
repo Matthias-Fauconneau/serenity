@@ -47,5 +47,9 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
             rockY[(Z-marginZ-1)*XY+x]=poreY[(Z-marginZ-1)*XY+x]=x*x; // Sets back face
         }
     }
-    pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;
+#if DEBUG
+    pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;  // for the assert
+#else
+    pore.maximum=(pore.x-1)*(pore.x-1), rock.maximum=(rock.x-1)*(rock.x-1); // for visualization
+#endif
 }

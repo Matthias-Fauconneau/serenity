@@ -3,12 +3,11 @@
 #include "tiff.h"
 #include "window.h"
 #include "display.h"
-#include "histogram.h"
+#include "sample.h"
 #include "render.h"
 #include "operation.h"
 #include "validation.h"
 #include "smooth.h"
-#include "math.h"
 #include "threshold.h"
 #include "distance.h"
 #include "rasterize.h"
@@ -34,6 +33,8 @@ Operation FeatureTransformZ("positiony"_,"positionz"_,2); // Z pass
 Operation Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Computes integer medial axis skeleton
 Operation Rasterize("skeleton"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
 #endif
+
+Operation Colorize("pore"_,"source"_,"colorize"_,3); // Maps intensity to either red or green channel depending on binary classification
 
 Operation EmptyX("rock"_,"emptyx"_,4); // Computes distance field to nearest pore for empty space skipping (X pass)
 Operation EmptyY("emptyx"_,"emptyy"_,4); // Y pass
@@ -192,7 +193,7 @@ struct Rock : Widget {
         if(operation==Source) {
             if(name == "balls"_) {
                 array<Ball> balls = randomBalls(target, 2*filterSize+1);
-                Histogram analytic;
+                Sample analytic;
                 for(Ball ball : balls) { if(ball.radius>=analytic.size) analytic.grow(ball.radius+1); analytic[ball.radius] += 4./3*PI*ball.radius*ball.radius*ball.radius; }
                 writeFile(name+".analytic.tsv"_, str(analytic), resultFolder);
             } else {
@@ -238,29 +239,31 @@ struct Rock : Widget {
                 if(!densityThreshold) {
                     if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
                         Time time;
-                        Histogram density = histogram(source,  cylinder);
+                        Sample density = histogram(source,  cylinder);
                         if(existsFolder(this->source)) density[0]=density[density.size-1]=0; // Clipping makes the minimum and maximum value most frequent
                         log("density", time);
-                        writeFile(name+".density.tsv"_, str(density), resultFolder);
+                        writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
                     }
-                    Histogram density = parseHistogram( readFile(name+".density.tsv"_, resultFolder) );
-                    int x0=0; for(uint x=0; x<density.size; x++) if(density[x]>density[x0]) x0=x; // Rock density is the global maximum (highest peak)
-                    uint y0 = density[x0];
-                    // Crude gaussian mixture estimation (proper way would be to use expectation maximization)
-                    int leftHalfMaximum=0; for(int x=x0; x>=0; x--) if(density[x]<=y0/2) { leftHalfMaximum=x; break; }
-                    int rightHalfMaximum=density.size; for(int x=x0; x<(int)density.size; x++) if(density[x]<=y0/2) { rightHalfMaximum=x; break; }
-                    int FWMH = rightHalfMaximum-leftHalfMaximum; // Full width at half maximum
-                    real sigma = FWMH/sqrt(2*ln(2)); //FWMH = √(2ln2)σ
-                    for(int x=0; x<(int)density.size; x++) density[x] = round(max(0., density[x] - y0*exp(-2*(x-x0)/sigma*(x-x0)/sigma))); // Substracts first estimated gaussian: g(x) = exp(-(x-x0)²/2σ²)) / (σ√(2π))
-                    int x1=0; for(uint x=0; x<density.size; x++) if(density[x]>density[x1]) x1=x; // Pore density is now the new global maximum (was second peak)
-                    //uint threshold=0; uint minimum = -1; for(uint i=max[0].density; i<max[1].density; i++) if(density[i] < minimum) threshold = i, minimum = density[i]; // Minimum between two highest peaks
-                    uint threshold = (x0+x1)/2; // Half way between two highest peaks
+                    Sample density = parseSample( readFile(name+".density.tsv"_, resultFolder) );
+
+                    // Crude peak mixture estimation (Works somewhat for well separated peaks, proper way would be to use expectation maximization)
+
+                    Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
+                    //writeFile(name+".rock.tsv"_, toASCII(sample(rock,density.size),1./density.size), resultFolder);
+                    Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
+                    Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
+                    //writeFile(name+".pore.tsv"_, toASCII(sample(pore,density.size),1./density.size), resultFolder);
+
+                    Sample notpore = density - sample(pore, density.size);
+                    uint threshold=0; for(uint i=pore.position; i<rock.position; i++) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
                     densityThreshold = float(threshold) / float(density.size);
-                    log("Automatic threshold", densityThreshold, "between pore at", float(x1)/float(density.size), "and rock at", float(x0)/float(density.size));
+                    log("Automatic threshold", threshold, densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
                 } else log("Manual threshold", densityThreshold);
                 threshold(target, outputs[1]->volume, source, densityThreshold);
             }
-            else if(operation==DistanceX || operation==EmptyX) {
+            else if(operation==Colorize) {
+                colorize(target, source, inputs[1]->volume);
+            } else if(operation==DistanceX || operation==EmptyX) {
                 perpendicularBisectorEuclideanDistanceTransform<false>(target, source, X,Y,Z);
             }
             else if(operation==DistanceY || operation==EmptyY) {
@@ -306,10 +309,10 @@ struct Rock : Widget {
 
             if(output->name=="maximum"_ && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
                 Time time;
-                Histogram histogram = sqrtHistogram(output->volume, cylinder);
+                Sample histogram = sqrtHistogram(output->volume, cylinder);
                 histogram[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
                 float scale = toDecimal(arguments.value("resolution"_,"1"_));
-                writeFile(outputName+".tsv"_, str(histogram, scale), resultFolder);
+                writeFile(outputName+".tsv"_, toASCII(histogram, scale), resultFolder);
                 log("√histogram", output->name, time);
             }
         }
@@ -384,7 +387,7 @@ struct Rock : Widget {
     bool cylinder = false; // Whether to clip histograms computation to the inscribed cylinder
     Folder memoryFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
     ref<byte> name; // Used to name intermediate and output files (folder base name)
-    uint filterSize = 0; // Smooth operation averages samples in a (2×filterSize+1)³ window
+    uint filterSize = 4; // Smooth operation averages samples in a (2×filterSize+1)³ window
     Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
     ref<byte> result; // Path to file (or folder) where target volume data is copied
     map<ref<byte>,ref<byte>> arguments;

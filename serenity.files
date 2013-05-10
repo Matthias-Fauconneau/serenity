@@ -11,8 +11,8 @@ image.h
 tiff.cc
 volume.h
 volume.cc
-histogram.h
-histogram.cc
+sample.h
+sample.cc
 render.h
 render.cc
 rock.cc

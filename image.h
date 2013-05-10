@@ -2,7 +2,7 @@
 /// \file image.h Image container and operations
 #include "vector.h"
 
-//template<Type T> struct bgra { T b,g,r,a; };
+template<Type T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 
 struct Image {

@@ -217,6 +217,18 @@ Image slice(const Volume& volume, uint z) {
             for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = uint(source[y*X+x]) * 0xFF / volume.maximum;
         }
     }
+    else if(volume.sampleSize==3) {
+        if(offsetX || offsetY || offsetZ) {
+            const bgr* const sourceZ = (const Volume24&)volume + offsetZ[z];
+            for(uint y=0; y<imY; y++) {
+                const bgr* const sourceY = sourceZ + offsetY[y];
+                for(uint x=0; x<imX; x++) target(x,y) = sourceY[offsetX[x]];
+            }
+        } else {
+            const bgr* const source = (const Volume24&)volume + z*Y*X + mY*X + mX;
+            for(uint y=0; y<imY; y++) for(uint x=0; x<imX; x++) target(x,y) = source[y*X+x];
+        }
+    }
     else if(volume.sampleSize==4) {
         if(offsetX || offsetY || offsetZ) {
             const uint32* const sourceZ = (const Volume32&)volume + offsetZ[z];
@@ -271,4 +283,28 @@ Image squareRoot(const Volume& volume, uint z) {
         }
     } else error("Unsupported sample size", volume.sampleSize);
     return target;
+}
+
+void colorize(Volume24& target, const Volume16& binary, const Volume16& intensity) {
+    assert(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
+    int X = binary.x, Y = binary.y, Z = binary.z, XY = X*Y;
+    const uint16* const binaryData = binary;
+    const uint16* const intensityData = intensity;
+    const uint maximum = intensity.maximum;
+    bgr* const targetData = target;
+    for(int z=0; z<Z; z++) {
+        const uint16* const binaryZ = binaryData+z*XY;
+        const uint16* const intensityZ = intensityData+z*XY;
+        bgr* const targetZ = targetData+z*XY;
+        for(int y=0; y<Y; y++) {
+            const uint16* const binaryZY = binaryZ+y*X;
+            const uint16* const intensityZY = intensityZ+y*X;
+            bgr* const targetZY = targetZ+y*X;
+            for(int x=0; x<X; x++) {
+                uint8 c = 0xFF*intensityZY[x]/maximum;
+                targetZY[x] = binaryZY[x]==0xFFFF ? bgr{0,c,0} : bgr{0,0,c};
+            }
+        }
+    }
+    target.maximum=0xFF;
 }
