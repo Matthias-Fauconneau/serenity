@@ -35,7 +35,6 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
     }
     s.skip("-"_);
     volume.maximum = s.hexadecimal();
-    volume.sampleSize = align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8; // Minimum sample size to encode maximum value (in 2ⁿ bytes)
     if(s.match("-tiled"_)) interleavedLookup(volume); else { free(volume.offsetX), free(volume.offsetY), free(volume.offsetZ); }
     if(s.match("-squared"_)) volume.squared=true;
     assert(!s);
@@ -43,18 +42,33 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
 
 uint maximum(const Volume16& source) {
     const uint16* const sourceData = source;
-    uint64 size = source.size();
-    v8hi maximum8 = {};
-    for(uint i=0; i<size; i+=8) maximum8 = max(maximum8, loada(sourceData+i));
+    const uint X=source.x, Y=source.y, Z=source.z, XY = X*Y;
+    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    v8hi maximum8 = {0,0,0,0,0,0,0,0};
+    for(uint z=marginZ; z<Z-marginZ; z++) {
+        const uint16* const sourceZ = sourceData + z*XY;
+        for(uint y=marginY; y<Y-marginY; y++) {
+            const uint16* const sourceZY = sourceZ + y*X;
+            for(uint x=align(8,marginX); x<floor(8,X-marginX); x+=8) maximum8 = max(maximum8, loada(sourceZY+x));
+        }
+    }
     uint16 maximum=0; for(uint i: range(8)) maximum = max(maximum, ((uint16*)&maximum8)[i]);
     return maximum;
 }
 
 uint maximum(const Volume32& source) {
     const uint32* const sourceData = source;
-    uint64 size = source.size();
-    v4si maximum4 = {};
-    for(uint i=0; i<size; i+=8) maximum4 = max(maximum4, loada(sourceData+i));
+    const uint X=source.x, Y=source.y, Z=source.z, XY = X*Y;
+    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    assert((X-2*marginX)%4==0 && marginX%4==0);
+    v4si maximum4 = {0,0,0,0};
+    for(uint z=marginZ; z<Z-marginZ; z++) {
+        const uint32* const sourceZ = sourceData + z*XY;
+        for(uint y=marginY; y<Y-marginY; y++) {
+            const uint32* const sourceZY = sourceZ + y*X;
+            for(uint x=marginX; x<X-marginX; x+=4) maximum4 = max(maximum4, loada(sourceZY+x));
+        }
+    }
     uint32 maximum=0; for(uint i: range(4)) maximum = max(maximum, ((uint32*)&maximum4)[i]);
     return maximum;
 }

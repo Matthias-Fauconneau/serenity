@@ -129,7 +129,7 @@ string repeat(const ref<byte>& s, uint times) {
     string r; for(uint unused i: range(times)) r<<s; return r;
 }
 
-stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size); r<<s<<0; return r; }
+stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
 
 /// array<ref<byte>>
 

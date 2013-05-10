@@ -94,14 +94,6 @@ struct range {
     uint start, stop;
 };
 
-/// Mutable memory range
-template<Type T> struct memory {
-    memory(T* start, T* stop) : start(start), stop(stop) {}
-    T* begin() const { return start; }
-    T* end() const { return stop; }
-    T* start; T* stop;
-};
-
 /// Const memory range
 template<Type T> struct ref {
     /// Default constructs an empty reference
@@ -140,6 +132,15 @@ template<Type T> struct ref {
     uint64 size;
 };
 
+/// Mutable memory range
+template<Type T> struct memory {
+    /// References \a size elements from const \a data pointer
+    constexpr memory(T* data, uint64 size) : data(data), size(size) {}
+    T& operator [](uint i) { assert(i<size, i, size); return data[i]; }
+    T* data;
+    uint64 size;
+};
+
 /// Returns const reference to a static string literal
 inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return ref<byte>(data,size); }
 /// Returns const reference to memory used by \a t
@@ -147,16 +148,11 @@ template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T
 
 // Integer operations
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
-inline constexpr uint floor(uint width, uint offset) { return offset & ~(width-1); }
+inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
 /// Aligns \a offset to \a width (only for power of two \a width)
-inline constexpr uint align(uint width, uint offset) { return (offset + (width-1)) & ~(width-1); }
-//inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 /// Returns floor(log2(v))
-inline constexpr uint log2(uint v) { //C++11 constexpr is restricted to single statements functions
-#define o(n) v&(1<<n)?n :
-    return o(31)o(30)o(29)o(28)o(27)o(26)o(25)o(24)o(23)o(22)o(21)o(20)o(19)o(18)o(17)o(16)o(15)o(14)o(13)o(12)o(11)o(10)o(9)o(8)o(7)o(6)o(5)o(4)o(3)o(2)o(1)0;
-}
-//inline constexpr uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Computes the next highest power of 2
 inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
 /// Returns the largest positive integer that divides the numbers without a remainder
@@ -168,9 +164,9 @@ inline void simplify(uint& a, uint& b) { int divisor = gcd(a,b); a/=divisor; b/=
 // Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) { return p; }
 /// Initializes raw memory to zero
-inline void clear(byte* buffer, uint size) { for(byte& b: memory<byte>(buffer, buffer+size)) b=0; }
+inline void clear(byte* buffer, uint size) { for(uint i: range(size)) buffer[i]=0; }
 /// Initializes memory to \a value
-template<Type T> void clear(T* buffer, uint size, const T& value=T()) { for(T& t: memory<T>(buffer, buffer+size)) new (&t) T(copy(value)); }
+template<Type T> void clear(T* buffer, uint size, const T& value=T()) { for(uint i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \dst
 template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
 

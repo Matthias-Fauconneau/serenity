@@ -25,6 +25,7 @@ struct Volume {
 
 /// Serializes volume format (size, margin, range, layout)
 string volumeFormat(const Volume& volume);
+inline string str(const Volume& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
 void parseVolumeFormat(Volume& volume, const ref<byte>& path);
 

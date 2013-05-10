@@ -5,9 +5,9 @@ ifeq ($(CC),cc)
  # CC = clang++ -Wno-lambda-extensions -march=native -std=c++11
 endif
 FLAGS := -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers
-FLAGS_debug = -DDEBUG -g #-Og prevents backtrace
+FLAGS_debug = -DDEBUG -g
 FLAGS_profile = -DPROFILE -g -Ofast -finstrument-functions -finstrument-functions-exclude-file-list=core,array,string,time,map,trace,profile,vector,simd
-FLAGS_fast = -g -Ofast
+FLAGS_fast = -g -Og
 FLAGS_release = -Ofast
 FLAGS += $(FLAGS_$(BUILD))
 

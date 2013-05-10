@@ -67,7 +67,9 @@ generic bool operator ==(const vector& u, const vector& v) { for(uint i=0;i<N;i+
 generic bool operator >=(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]<v[i]) return false; return true; }
 generic bool operator >(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
 
+inline float floor(float x) { return __builtin_floorf(x); }
 inline float round(float x) { return __builtin_roundf(x); }
+inline float ceil(float x) { return __builtin_ceilf(x); }
 
 generic vector abs(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
 generic vector floor(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=floor(v[i]); return r;  }
@@ -80,9 +82,7 @@ generic vector clip(const vector& min, const vector& x, const vector& max){vecto
 template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
 
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
-inline int sqr(int x) { return x*x; }
-inline int64 sqr(int64 x) { return x*x; }
-inline float sqr(float x) { return x*x; }
+template<Type T> inline T sqr(const T& x) { return x*x; }
 generic float sqr(const vector& a) { return dot(a,a); }
 inline float norm(float x) { return abs(x); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }

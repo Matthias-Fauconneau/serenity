@@ -1,16 +1,17 @@
 #include "validation.h"
 #include "time.h"
 
-void randomBalls(Volume16& target, float minimalDistance) {
+array<Ball> randomBalls(Volume16& target, int minimalDistance, int maximumRadius) {
     const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
     Random random;
-    struct Ball { int3 position; uint radius; };
+
     array<Ball> balls;
-    while(balls.size<1024) {
-        uint radius = 1+random%(min(X-1, min(Y-1, Z-1))/2-1);
-        Ball a = {int3(radius+random%(X-2*radius), radius+random%(Y-2*radius), radius+random%(Z-2*radius)), radius}; // Random candidate ball
+    while(balls.size<(uint)min(X,min(Y, Z))/8) {
+        uint radius = 1+random%(min(maximumRadius, min(X-1, min(Y-1, Z-1))/2-minimalDistance)-1);
+        uint margin = minimalDistance+radius;
+        Ball a = {int3(margin+random%(X-2*margin), margin+random%(Y-2*margin), margin+random%(Z-2*margin)), radius}; // Random candidate ball
         assert(a.position>=int3(radius) && a.position<int3(X,Y,Z)-int3(radius));
-        for(Ball b: balls) if(a.radius+minimalDistance+b.radius>norm(a.position-b.position)) goto break_; // Discards candidates intersecting any other ball
+        for(Ball b: balls) if(sqr(a.radius+minimalDistance+b.radius)>sqr(a.position-b.position)) goto break_; // Discards candidates intersecting any other ball
         /*else*/ balls << a;
         break_: ;
     }
@@ -30,4 +31,5 @@ void randomBalls(Volume16& target, float minimalDistance) {
             }
         }
     } );
+    return balls;
 }

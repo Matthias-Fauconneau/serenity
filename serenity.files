@@ -12,6 +12,7 @@ tiff.cc
 volume.h
 volume.cc
 histogram.h
+histogram.cc
 render.h
 render.cc
 rock.cc
@@ -21,6 +22,8 @@ threshold.h
 threshold.cc
 distance.h
 distance.cc
+maximum.h
+maximum.cc
 rasterize.h
 rasterize.cc
 validation.h

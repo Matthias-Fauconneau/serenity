@@ -11,6 +11,7 @@
 #include "threshold.h"
 #include "distance.h"
 #include "rasterize.h"
+#include "maximum.h"
 
 Operation Source("source"_,2); // Loads from original image slices
 Operation ShiftRight ("source"_,"shift"_,2); // Shifts data to avoid overflows
@@ -22,7 +23,9 @@ Operation Threshold("smooth"_,"pore"_,4, "rock"_,4); // Segments in rock vs pore
 Operation DistanceX("pore"_,"distancex"_,4); // Computes distance field to nearest rock (X pass)
 Operation DistanceY("distancex"_,"distancey"_,4); // Y pass
 Operation DistanceZ("distancey"_,"distance"_,4); // Z pass
-Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
+//Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
+Operation Tile("distance"_,"tiled_distance"_,2); // Search nearest local maximum of distance field (i.e maximum enclosing sphere)
+Operation Maximum("tiled_distance"_,"maximum"_,2); // Search nearest local maximum of distance field (i.e maximum enclosing sphere)
 #else
 Operation FeatureTransformX("threshold"_,"positionx"_,2); // Computes position of nearest rock wall (X pass)
 Operation FeatureTransformY("positionx"_,"positiony"_,2); // Y pass
@@ -72,7 +75,7 @@ struct Rock : Widget {
         if(!result) result = "ptmp"_;
         if(!target) target=operations.last()->name;
         if(target=="intensity"_) renderVolume=true;
-        assert(name);
+        assert_(name);
 
         for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
             if(!startsWith(path, name)) continue;
@@ -84,7 +87,8 @@ struct Rock : Widget {
             File file = File(path, memoryFolder, ReadWrite);
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
             data.volume.data = buffer<byte>(data.map);
-            assert( data.volume );
+            data.volume.sampleSize = data.volume.data.size / data.volume.size();
+            assert(data.volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((data.volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
             volumes << move(data);
         }
 
@@ -94,13 +98,8 @@ struct Rock : Widget {
         if(target=="ascii"_) { // Writes result to disk
             Time time;
             string volumeName = name+"."_+current->name+"."_+volumeFormat(current->volume);
-#if 0
-            if(existsFolder(result)) copy(memoryFolder, volumeName, resultFolder, volumeName), log(result+"/"_+volumeName, time);
-            else copy(memoryFolder, volumeName, root(), result), log(result, time);
-#else
             if(existsFolder(result)) writeFile(volumeName, current->volume.data, resultFolder), log(result+"/"_+volumeName, time);
             else writeFile(result, current->volume.data, root()), log(result, time);
-#endif
             exit();
             return;
         }
@@ -109,6 +108,13 @@ struct Rock : Widget {
             window.clearBackground = false;
             updateView();
             window.show();
+        }
+    }
+    ~Rock() {
+        for(const string& path: memoryFolder.list(Files)) { // Cleanups intermediate data
+            if(!startsWith(path, name)) continue;
+            ref<byte> name = section(path,'.',-3,-2);
+            if(!operationForOutput(name) || thrash.contains(name)) { ::remove(path, memoryFolder); continue; } // Removes invalid or thrashed data
         }
     }
 
@@ -126,7 +132,7 @@ struct Rock : Widget {
             Volume& volume = data.volume;
             if(!operation.inputs) { // Original source slices format
                 if(name == "balls"_) {
-                    volume.x = 1024, volume.y = 1024, volume.z = 1024;
+                    volume.x = 512, volume.y = 512, volume.z = 512;
                 } else {
                     Folder folder(source);
                     array<string> slices = folder.list(Files);
@@ -153,14 +159,20 @@ struct Rock : Widget {
             }
             volume.sampleSize = output.sampleSize;
             assert(volume.size() * volume.sampleSize);
-            assert(!existsFile(name+"."_+output.name+"."_+volumeFormat(volume), memoryFolder), output.name); // Would have been loaded
-            for(uint i: range(thrash.size)) { // Tries to recycle pages (avoid zeroing)
-                const VolumeData& data = thrash[i];
-                string path = name+"."_+data.name+"."_+volumeFormat(data.volume);
-                assert_(existsFile(path, memoryFolder), path);
-                rename(path, name+"."_+output.name, memoryFolder);
-                thrash.removeAt(i);
-                break;
+            if(volumes.contains(output.name)) {
+                rename(name+"."_+output.name+"."_+volumeFormat(volumes[volumes.indexOf(output.name)]->volume), name+"."_+output.name, memoryFolder);
+                volumes.removeAll(output.name);
+                continue;
+            } else {
+                assert(!existsFile(name+"."_+output.name+"."_+volumeFormat(volume), memoryFolder));
+                for(uint i: range(thrash.size)) { // Tries to recycle pages (avoid zeroing)
+                    const VolumeData& data = thrash[i];
+                    string path = name+"."_+data.name+"."_+volumeFormat(data.volume);
+                    assert_(existsFile(path, memoryFolder), path);
+                    rename(path, name+"."_+output.name, memoryFolder);
+                    thrash.removeAt(i);
+                    break;
+                }
             }
             // Creates (or resizes) and maps a volume file for the current operation data
             File file(name+"."_+output.name, memoryFolder, Flags(ReadWrite|Create));
@@ -177,8 +189,10 @@ struct Rock : Widget {
         Time time;
         if(operation==Source) {
             if(name == "balls"_) {
-                randomBalls(target, 2*filterSize+1);
-                // TODO: write analytic histogram
+                array<Ball> balls = randomBalls(target, 2*filterSize+1);
+                Histogram analytic;
+                for(Ball ball : balls) { if(ball.radius>=analytic.size) analytic.grow(ball.radius+1); analytic[ball.radius] += 4./3*PI*ball.radius*ball.radius*ball.radius; }
+                writeFile(name+".analytic.tsv"_, str(analytic), resultFolder);
             } else {
                 Folder folder(source);
                 Time report;
@@ -192,32 +206,25 @@ struct Rock : Widget {
             }
         } else {
             const Volume& source = inputs.first()->volume;
-
             if(operation==ShiftRight || operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
                 int sampleCount = 2*filterSize+1;
                 uint shift = log2(sampleCount);
                 if(operation==ShiftRight) {
                     int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
                     int bits = log2(nextPowerOfTwo(max));
-                    int shift = ::max(0,bits-16);
-                    if(shift) log("Shifting out",shift,"least significant bits to compute sum of",sampleCount,"samples without unpacking to 32bit");
-                    shiftRight(target, source, shift); // Simply copies if shift = 0
-                    target.maximum >>= shift;
-                }
-                else if(operation==SmoothX) {
-                    smooth(target, source, X,Y,Z, filterSize, shift);
-                    target.maximum *= sampleCount; target.maximum >>= shift;
-                    target.marginX += align(4, filterSize);
-                }
-                else if(operation==SmoothY) {
-                    smooth(target, source, Y,Z,X, filterSize, shift);
-                    target.maximum *= sampleCount; target.maximum >>= shift;
-                    target.marginY += align(4, filterSize);
-                }
-                else if(operation==SmoothZ) {
-                    smooth(target, source, Z,X,Y, filterSize, 0);
+                    int headroomShift = ::max(0,bits-16);
+                    if(headroomShift) log("Shifting out",headroomShift,"least significant bits to compute sum of",sampleCount,"samples without unpacking to 32bit");
+                    shiftRight(target, source, headroomShift); // Simply copies if shift = 0
+                    target.maximum >>= headroomShift;
+                } else if(operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
                     target.maximum *= sampleCount;
-                    target.marginZ += align(4, filterSize);
+                    if(operation==SmoothZ) shift=0; // not necessary
+                    smooth(target, source, X,Y,Z, filterSize, shift);
+                    target.maximum >>= shift;
+                    int margin = target.marginY + align(4, filterSize);
+                    target.marginY = target.marginZ;
+                    target.marginZ = target.marginX;
+                    target.marginX = margin;
                 }
             }
             else if(operation==Threshold) {
@@ -227,7 +234,7 @@ struct Rock : Widget {
                     while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
                 }
                 if(!densityThreshold) {
-                    if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
+                    //if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
                         Time time;
                         Histogram density = histogram(source);
                         log("density", time);
@@ -240,9 +247,9 @@ struct Rock : Widget {
                             }
                             density = move(smoothDensity);
                         }
-                        writeFile(name+".density.tsv"_, str(density), resultFolder);
+                        /*writeFile(name+".density.tsv"_, str(density), resultFolder);
                     }
-                    Histogram density = parseHistogram( readFile(name+".density.tsv"_, resultFolder) );
+                    Histogram density = parseHistogram( readFile(name+".density.tsv"_, resultFolder) );*/
                     // Use the value half way between the two highest maximum of density histogram as density threshold
                     struct { uint density, count; } max[2] = {{0,density.first()},{density.size-1,density.last()}};
                     for(uint i=1; i<density.size-1; i++) {
@@ -271,10 +278,10 @@ struct Rock : Widget {
                 perpendicularBisectorEuclideanDistanceTransform<true>(target, source, Z,X,Y);
                 target.maximum=maximum((const Volume32&)target);
             }
-            //else if(operation==Tile) tile(target, source);
-            //else if(operation==Maximum) maximum(target, source);
+            else if(operation==Tile) tile(target, source);
+            else if(operation==Maximum) maximum(target, source);
             //else if(operation==Skeleton) integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
-            else if(operation==Rasterize) rasterize(target, source);
+            //else if(operation==Rasterize) rasterize(target, source);
             //else if(operation==Crop) { const int size=256; crop(target, source, source.x/2-size/2, source.y/2-size/2, source.z/2-size/2, source.x/2+size/2, source.y/2+size/2, source.z/2+size/2); }
             else if(operation==ASCII) toASCII(target, source);
             else if(operation==RenderEmpty) squareRoot(target, source);
@@ -282,10 +289,12 @@ struct Rock : Widget {
             else error("Unimplemented",operation);
         }
         log(operation, time);
+        if(target.sampleSize==2) assert(maximum((const Volume16&)target)<=target.maximum, operation, target, maximum((const Volume16&)target), target.maximum);
+        if(target.sampleSize==4) assert(maximum((const Volume32&)target)<=target.maximum, operation, target, maximum((const Volume32&)target), target.maximum);
 
         for(VolumeData* output: outputs) {
             Volume& target = output->volume;
-            if(target.sampleSize!=20) // Don't try to pack ASCII
+            if(output->name=="distance"_) // Only packs after distance pass (FIXME: make all operations generic)
             while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2/*FIXME*/) { // Packs outputs if needed
                 const Volume32& target32 = target;
                 target.sampleSize /= 2;
@@ -300,18 +309,21 @@ struct Rock : Widget {
             }
             assert(target.maximum< (1ul<<(8*target.sampleSize)));
 
-            rename(name+"."_+output->name, name+"."_+output->name+"."_+volumeFormat(output->volume), memoryFolder); // Renames output files (once data is valid)
+            string outputName = name+"."_+output->name;
+            rename(outputName, outputName+"."_+volumeFormat(output->volume), memoryFolder); // Renames output files (once data is valid)
+
+            if(output->name=="maximum"_ && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
+                Time time;
+                Histogram histogram = sqrtHistogram(output->volume);
+                histogram[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
+                float scale = toDecimal(arguments.value("resolution"_,"1"_));
+                writeFile(outputName+".tsv"_, str(histogram, scale), resultFolder);
+                log("√histogram", output->name, time);
+            }
         }
         // Recycles all inputs (avoid zeroing new pages) (FIXME: prevent recycling of inputs also being used by other pending operations)
         if(operation != *operations.last()) for(const VolumeData* input: inputs) thrash << volumes.take(volumes.indexOf(input->name));
 
-        if(operation==Rasterize && (1 || !existsFile(name+".radius.tsv"_, resultFolder))) {
-            Histogram histogram = sqrtHistogram(target);
-            histogram[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
-            float scale = toDecimal(arguments.value("resolution"_,"1"));
-            writeFile(name+".radius.tsv"_, str(histogram, scale), resultFolder);
-            log("Pore size histogram written to",name+".radius.tsv"_);
-        }
         return &volumes[volumes.indexOf(targetName)];
     }
 
@@ -322,6 +334,9 @@ struct Rock : Widget {
     }
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+        const ref<ref<byte>> selection = {"source"_,"distance"_,"maximum"_};
+        if(button==WheelDown) { current = getVolume(selection[max<int>(0,selection.indexOf(current->name)-1)]); updateView(); return true; }
+        if(button==WheelUp) { current = getVolume(selection[min<int>(selection.size-1,selection.indexOf(current->name)+1)]); updateView(); return true; }
         if(renderVolume) {
             if(!button) return false;
             int2 delta = cursor-lastPos;
@@ -339,6 +354,7 @@ struct Rock : Widget {
     void updateView() {
         assert(current);
         int2 size(current->volume.x-2*current->volume.marginX,current->volume.y-2*current->volume.marginY);
+        while(2*size<displaySize) size *= 2;
         if(window.size != size) window.setSize(size);
         else window.render();
     }
@@ -350,6 +366,7 @@ struct Rock : Widget {
         uint z = source.marginZ+(source.z-2*source.marginZ-1)*currentSlice;
         if(!renderVolume) {
             Image image = source.squared ? squareRoot(source, z) : slice(source, z);
+            while(2*image.size()<=size) image=upsample(image);
             blit(position, image);
         } else {
             mat3 view;
@@ -374,7 +391,7 @@ struct Rock : Widget {
     uint minX=0, minY=0, minZ=0, maxX=0, maxY=0, maxZ=0; // Coordinates to crop source volume
     Folder memoryFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
     ref<byte> name; // Used to name intermediate and output files (folder base name)
-    uint filterSize = 8; // Smooth operation averages samples in a (2×filterSize+1)³ window
+    uint filterSize = 0; // Smooth operation averages samples in a (2×filterSize+1)³ window
     Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
     ref<byte> result; // Path to file (or folder) where target volume data is copied
     map<ref<byte>,ref<byte>> arguments;

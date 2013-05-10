@@ -39,10 +39,6 @@ template<Type T> struct array {
     ref<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
     /// Slices a const reference to elements from \a pos the end of the array
     ref<T> slice(uint pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
-    /// Slices a mutable reference to elements from \a pos to \a pos + \a size
-    memory<T> iterate(uint pos, uint size) { assert(pos+size<=this->size); return {data+pos, data+pos+size}; }
-    /// Slices a mutable reference to elements from \a pos the end of the array
-    memory<T> iterate(uint pos) { assert(pos<=size); return {data+pos, data+size}; }
 
     /// \name Accessors
     const T& at(uint i) const { assert(i<size,i,size); return data[i]; }

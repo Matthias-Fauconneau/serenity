@@ -7,7 +7,7 @@ inline float round(float x) { return __builtin_roundf(x); }
 /// Traces functions to time their execution times and displays statistics on exit
 struct Profile {
     struct Frame { void* function; uint64 time; uint64 tsc; };
-    Frame stack[16] = {Frame{0,0,rdtsc()}};
+    Frame stack[32] = {Frame{0,0,rdtsc()}};
     Frame* top = stack;
     struct Function { uint time=0,count=0; bool operator<(const Function& o)const{return time<o.time;} };
     map<void*, Function> profile;

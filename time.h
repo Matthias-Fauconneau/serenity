@@ -77,9 +77,9 @@ struct Timer : Poll {
 
 /// Generates a sequence of uniformly distributed pseudo-random 64bit integers
 struct Random {
-    uint64 sz,sw;
-    uint64 z,w;
-    Random() { seed(); reset(); }
+    uint sz=1,sw=1;
+    uint z,w;
+    Random() { /*seed();*/ reset(); }
     void seed() { sz=rdtsc(); sw=rdtsc(); }
     void reset() { z=sz; w=sw; }
     uint64 next() {
