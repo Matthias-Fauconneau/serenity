@@ -2,8 +2,6 @@
 #include "process.h"
 #include "simd.h"
 
-template<> string str(const v4sf& v) { return "("_+str(extractf(v,0))+", "_+str(extractf(v,1))+", "_+str(extractf(v,2))+", "_+str(extractf(v,3))+")"_; }
-
 /// Returns the field of the radii of the maximum sphere enclosing each voxel and fitting within the boundaries
 void maximum(Volume16& target, const Volume16& source) {
     uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
@@ -14,27 +12,47 @@ void maximum(Volume16& target, const Volume16& source) {
     const uint* const offsetZ = source.offsetZ;
     assert_(offsetX && offsetY && offsetZ);
     uint16* const targetData = target;
-    clear(targetData, Z*Y*X); //if memoize //TODO: tiled target, Z-order
+    clear(targetData, Z*Y*X); //TODO: tiled target, Z-order
+    int maxStack=0; uint maxList=0;
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
+    //for(uint z : range(marginZ, Z-marginZ)) {
         uint16* const targetZ = targetData+z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
             uint16* const targetZY = targetZ+y*X;
             for(uint x=marginX; x<X-marginX; x++) {
-                int currentD=data[offsetX[x]+offsetY[y]+offsetZ[z]];
-                if(currentD) for(int currentX = x, currentY = y, currentZ = z;;) { // Ascent distance field until reaching a local maximum
-                    {int nextD = targetData[currentZ*XY+currentY*X+currentX]; if(nextD) { currentD=nextD; break; }} // Reuse already computed paths //FIXME: break result ?!
-                    int nextD=currentD, nextX=0, nextY=0, nextZ=0;
-                    for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) {
-                        int stepX=currentX+dx, stepY=currentY+dy, stepZ=currentZ+dz;
-                        int d = data[offsetX[stepX]+offsetY[stepY]+offsetZ[stepZ]];
-                        if(d > nextD) nextD=d, nextX=stepX, nextY=stepY, nextZ=stepZ;
+                uint maximumD=data[offsetX[x]+offsetY[y]+offsetZ[z]];
+                uint16& target = targetZY[x];
+                if(!maximumD || target) continue;
+                struct { uint x,y,z,d; } stack[256]; // Used to follow multiple equal paths
+                struct { uint x,y,z,d; } list[512]; uint listSize=0; // Remember visited points to be written after successful walk
+                stack[0] = {x,y,z,maximumD};
+                for(int i=0; i>=0; i--) { // Depth-first search distance field for local maximum
+                    uint x=stack[i].x, y=stack[i].y, z=stack[i].z, d=stack[i].d;
+                    if(d >= maximumD) { // Might not be maximum anymore
+                        for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) {
+                            uint nx=x+dx, ny=y+dy, nz=z+dz;
+                            uint d = data[offsetX[nx]+offsetY[ny]+offsetZ[nz]];
+                            if(d >= maximumD) {
+                                maximumD=d;
+                                uint16& target = targetData[nz*XY+ny*X+nx];
+                                if(target==0xFFFF) continue; // Already visited on this walk
+                                if(target!=0) { if(target>maximumD) maximumD=target; continue; } // Already visited on a previous walk
+                                target=0xFFFF;
+                                assert_(i<256);
+                                stack[i++]={nx,ny,nz,d};
+                                maxStack=max(maxStack, i);
+                                assert(listSize<512);
+                                list[listSize++]={nx,ny,nz,d};
+                                maxList = max(maxList, listSize);
+                            }
+                        }
                     }
-                    if(nextD==currentD) break;
-                    currentD=nextD, currentX=nextX, currentY=nextY, currentZ=nextZ;
                 }
-                targetZY[x] = currentD;
+                for(uint i=0; i<listSize; i++) targetData[list[i].z*XY+list[i].y*X+list[i].x] = maximumD;
+                target = maximumD;
             }
         }
     });
+    assert_(maxStack<256, maxList<512);
     target.marginX=marginX, target.marginY=marginY, target.marginZ=marginZ;
 }
