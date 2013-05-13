@@ -10,6 +10,7 @@
 #include "smooth.h"
 #include "threshold.h"
 #include "distance.h"
+#include "skeleton.h"
 #include "rasterize.h"
 #include "maximum.h"
 
@@ -19,23 +20,13 @@ Operation SmoothX("shift"_,"smoothx"_,2); // Denoises data and filters small por
 Operation SmoothY("smoothx"_,"smoothy"_,2);  // Y pass
 Operation SmoothZ("smoothy"_,"smooth"_,2); // Z pass
 Operation Threshold("smooth"_,"pore"_,4, "rock"_,4); // Segments in rock vs pore space by comparing to a fixed threshold
-#if 1
-Operation DistanceX("pore"_,"distancex"_,4); // Computes distance field to nearest rock (X pass)
-Operation DistanceY("distancex"_,"distancey"_,4); // Y pass
-Operation DistanceZ("distancey"_,"distance"_,4); // Z pass
-
-Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
-
-Operation Tile("distance"_,"tiled_distance"_,2); // Search nearest local maximum of distance field (i.e maximum enclosing sphere)
-Operation Maximum("tiled_distance"_,"walk"_,2); // Search nearest local maximum of distance field (i.e maximum enclosing sphere)
-
-#else
-Operation FeatureTransformX("threshold"_,"positionx"_,2); // Computes position of nearest rock wall (X pass)
-Operation FeatureTransformY("positionx"_,"positiony"_,2); // Y pass
-Operation FeatureTransformZ("positiony"_,"positionz"_,2); // Z pass
+Operation DistanceX("pore"_,"distancex"_,4,"positionxx"_,2); // Computes distance field to nearest rock (X pass)
+Operation DistanceY("distancex"_,"positionxx"_,"distancey"_,4,"positionyx"_,2,"positionyy"_,2); // Y pass
+Operation DistanceZ("distancey"_,"positionyx"_,"positionyy"_,"distance"_,4,"positionx"_,2,"positiony"_,2,"positionz"_,2); // Z pass
+//Operation Interleave("positionx"_,"positiony"_,"positionz"_,"position"_,6);
+//Operation Tile("distance"_,"tiled_distance"_,2); //TODO: tile positions for faster skeleton
 Operation Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Computes integer medial axis skeleton
-Operation Rasterize("skeleton"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
-#endif
+Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
 
 Operation Colorize("pore"_,"source"_,"colorize"_,3); // Maps intensity to either red or green channel depending on binary classification
 
@@ -122,11 +113,13 @@ struct Rock : Widget {
         window.show();
     }
     ~Rock() {
+#if 0
         for(const string& path: memoryFolder.list(Files)) { // Cleanups intermediate data
             if(!startsWith(path, name)) continue;
             ref<byte> name = section(path,'.',-3,-2);
             if(!operationForOutput(name) || trash.contains(name)) { ::remove(path, memoryFolder); continue; } // Removes invalid or trashed data
         }
+#endif
     }
 
     /// Computes target volume
@@ -135,7 +128,7 @@ struct Rock : Widget {
         const Operation& operation = *operationForOutput(targetName);
         assert_(&operation, targetName);
         array<const VolumeData*> inputs;
-        for(const ref<byte>& input: operation.inputs) inputs << getVolume( input );
+        for(const ref<byte>& input: operation.inputs) { assert(input != targetName, input, targetName); inputs << getVolume( input ); }
 
         array<VolumeData*> outputs;
         for(const Operation::Output& output: operation.outputs) {
@@ -276,18 +269,20 @@ struct Rock : Widget {
             }
             else if(operation==Colorize) {
                 colorize(target, source, inputs[1]->volume);
-            } else if(operation==DistanceX || operation==EmptyX || operation==DistanceY || operation==EmptyY) {
-                perpendicularBisectorEuclideanDistanceTransform<false>(target, source, X,Y,Z);
+            }
+            else if(operation==DistanceX || operation==EmptyX) {
+                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, source, X,Y,Z);
+            }
+            else if(operation==DistanceY || operation==EmptyY) {
+                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, source, inputs[1]->volume, X,Y,Z);
             }
             else if(operation==DistanceZ || operation==EmptyZ) {
-                perpendicularBisectorEuclideanDistanceTransform<true>(target, source, X,Y,Z);
+                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, outputs[3]->volume, source, inputs[1]->volume, inputs[2]->volume, X,Y,Z);
                 target.maximum=maximum((const Volume32&)target);
             }
-            else if(operation==Tile) tile(target, source);
-            else if(operation==Maximum) maximum(target, source);
-            //else if(operation==Skeleton) integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
+            //else if(operation==Tile) tile(target, source);
+            else if(operation==Skeleton) integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
             else if(operation==Rasterize) rasterize(target, source);
-            //else if(operation==Crop) { const int size=256; crop(target, source, source.x/2-size/2, source.y/2-size/2, source.z/2-size/2, source.x/2+size/2, source.y/2+size/2, source.z/2+size/2); }
             else if(operation==ASCII) toASCII(target, source);
             else if(operation==RenderEmpty) squareRoot(target, source);
             else if(operation==RenderDensity || operation==RenderIntensity) ::render(target, source);

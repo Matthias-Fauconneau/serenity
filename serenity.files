@@ -22,8 +22,8 @@ threshold.h
 threshold.cc
 distance.h
 distance.cc
-maximum.h
-maximum.cc
+skeleton.h
+skeleton.cc
 rasterize.h
 rasterize.cc
 validation.h

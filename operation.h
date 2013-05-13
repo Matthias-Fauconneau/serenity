@@ -4,14 +4,20 @@
 static array<struct Operation*> operations;
 /// Depends on named inputs to compute named outputs of a given sample size
 struct Operation {
+    // FIXME: factor
     Operation(const ref<byte>& name, uint sampleSize) : name(name) { outputs<<Output{name,sampleSize}; operations << this; }
     Operation(const ref<byte>& input, const ref<byte>& name, uint sampleSize) : Operation(name, sampleSize) { inputs<<input; }
-    Operation(const ref<byte>& input, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input, name, sampleSize) {
-        outputs<<Output{output2,sampleSize2}; }
+    Operation(const ref<byte>& input, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input, name, sampleSize) { outputs<<Output{output2,sampleSize2}; }
+
     Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& name, uint sampleSize) : Operation(input1, name, sampleSize) { inputs<<input2; }
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize) : Operation(input1, input2, name, sampleSize) {
-        inputs<<input3;
-    }
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input1, name, sampleSize, output2, sampleSize2) { inputs<<input2; }
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2, const ref<byte>& output3, uint sampleSize3) : Operation(input1, input2, name, sampleSize, output2, sampleSize2) { outputs<<Output{output3,sampleSize3}; }
+
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize) : Operation(input1, input2, name, sampleSize) { inputs<<input3; }
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input1, input2, name, sampleSize, output2, sampleSize2) { inputs<<input3; }
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2, const ref<byte>& output3, uint sampleSize3) : Operation(input1, input2, name, sampleSize, output2, sampleSize2, output3, sampleSize3) { inputs<<input3; }
+    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2, const ref<byte>& output3, uint sampleSize3, const ref<byte>& output4, uint sampleSize4) : Operation(input1, input2, input3, name, sampleSize, output2, sampleSize2, output3, sampleSize3) { outputs<<Output{output4,sampleSize4}; }
+
 
     ref<byte> name;
     array<ref<byte>> inputs;
