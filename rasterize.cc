@@ -12,13 +12,14 @@ void rasterize(Volume16& target, const Volume16& source) {
     const uint* const offsetX = target.offsetX;
     const uint* const offsetY = target.offsetY;
     const uint* const offsetZ = target.offsetZ;
+    assert_(offsetX && offsetY && offsetZ);
     Time time; Time report;
-    parallel(marginZ,Z-marginZ, [&](uint, uint z) { // 2x faster :/
+    parallel(marginZ,Z-marginZ, [&](uint, uint z) {
         if(report/1000>=4) { log(z-marginZ,"/", Z-2*marginZ, (z*XY/1024./1024.)/(time/1000.), "MS/s"); report.reset(); }
         for(int y=marginY; y<Y-marginY; y++) {
             for(int x=marginX; x<X-marginX; x++) {
                 uint16 sqRadius = sourceData[offsetZ[z]+offsetY[y]+offsetX[x]];
-                if(sqRadius==0) continue; // background (rock)
+                if(sqRadius<=1) continue; // 0: background (rock) or 1: foreground (pore), >1: skeleton
                 int radius = ceil(sqrt(sqRadius));
                 for(int dz=-radius; dz<=radius; dz++) {
                     uint16* const targetZ= targetData + offsetZ[z+dz];

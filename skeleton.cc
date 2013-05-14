@@ -22,8 +22,8 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
     uint16* const targetData = target;
     const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
     int marginX=target.marginX, marginY=target.marginY, marginZ=target.marginZ;
-    for(int z=marginZ; z<Z-marginZ; z++) {
-    //parallel(1, Z-1, [&](uint, uint z) {
+    //for(int z=marginZ; z<Z-marginZ; z++) {
+    parallel(marginZ, Z-marginZ, [&](uint, uint z) { //FIXME: will conflict
         const uint16* const xPositionZ = xPositionData+z*XY;
         const uint16* const yPositionZ = yPositionData+z*XY;
         const uint16* const zPositionZ = zPositionData+z*XY;
@@ -40,12 +40,6 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
                 uint16* const skel = targetZY+x;
 
                 if(xf[0]<0xFFFF) {
-                    int sqRadius = sqr(xf[0]-x) + sqr(yf[0]-y) + sqr(zf[0]-z);
-                    int radius = sqrt(sqRadius);
-                    assert_(radius<=x && radius<=y && radius<=z && radius<=1024-x && radius<=1024-y && radius<=1024-z, radius, sqRadius, x,y,z);
-                }
-
-                if(xf[0]<0xFFFF) {
                     skel[0] = 1;
                     if(xf[-1]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, -1,0,0, -1);
                     if(xf[-X]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,-1,0, -X);
@@ -57,6 +51,6 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
                 }
             }
         }
-    } //);
+    } );
     target.maximum = maximum(target), target.squared=true;
 }

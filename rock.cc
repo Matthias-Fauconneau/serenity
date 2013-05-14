@@ -6,7 +6,7 @@
 #include "sample.h"
 #include "render.h"
 #include "operation.h"
-#include "validation.h"
+#include "primitive.h"
 #include "smooth.h"
 #include "threshold.h"
 #include "distance.h"
@@ -23,10 +23,10 @@ Operation Threshold("smooth"_,"pore"_,4, "rock"_,4); // Segments in rock vs pore
 Operation DistanceX("pore"_,"distancex"_,4,"positionxx"_,2); // Computes distance field to nearest rock (X pass)
 Operation DistanceY("distancex"_,"positionxx"_,"distancey"_,4,"positionyx"_,2,"positionyy"_,2); // Y pass
 Operation DistanceZ("distancey"_,"positionyx"_,"positionyy"_,"distance"_,4,"positionx"_,2,"positiony"_,2,"positionz"_,2); // Z pass
-//Operation Interleave("positionx"_,"positiony"_,"positionz"_,"position"_,6);
-//Operation Tile("distance"_,"tiled_distance"_,2); //TODO: tile positions for faster skeleton
+//Operation Interleave("positionx"_,"positiony"_,"positionz"_,"position"_,6); //TODO: tile and interleave positions for faster skeleton
 Operation Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Computes integer medial axis skeleton
-Operation Rasterize("distance"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
+Operation Tile("skeleton"_,"tiled_skeleton"_,2);
+Operation Rasterize("tiled_skeleton"_,"maximum"_,2); // Rasterizes each distance field voxel as a ball (with maximum blending)
 
 Operation Colorize("pore"_,"source"_,"colorize"_,3); // Maps intensity to either red or green channel depending on binary classification
 
@@ -61,7 +61,7 @@ struct Rock : Widget {
                 if(!target) target=argument;
                 continue;
             }
-            if(!source && argument=="balls"_) { source=argument, name=argument; continue; }
+            if(!source && argument=="validation"_) { source=argument, name=argument; continue; }
             if(existsFolder(argument)) {
                 if(!source) { source=argument; name=source.contains('/')?section(source,'/',-2,-1):source; continue; }
                 if(!result) { result=argument; resultFolder = argument; continue; }
@@ -135,7 +135,7 @@ struct Rock : Widget {
             VolumeData data = output.name;
             Volume& volume = data.volume;
             if(!operation.inputs) { // Original source slices format
-                if(name == "balls"_) {
+                if(name=="validation"_) {
                     volume.x = 512, volume.y = 512, volume.z = 512;
                 } else {
                     Folder folder(source);
@@ -195,11 +195,17 @@ struct Rock : Widget {
 
         Time time;
         if(operation==Source) {
-            if(name == "balls"_) {
-                array<Ball> balls = randomBalls(target, 2*filterSize+1);
+            if(name == "validation"_) {
+                array<Primitive> primitives = randomPrimitives(X,Y,Z, 2*filterSize+1);
+                rasterize(target, primitives);
                 Sample analytic;
-                for(Ball ball : balls) { if(ball.radius>=analytic.size) analytic.grow(ball.radius+1); analytic[ball.radius] += 4./3*PI*ball.radius*ball.radius*ball.radius; }
-                writeFile(name+".analytic.tsv"_, str(analytic), resultFolder);
+                for(Primitive p : primitives) {
+                    assert(p.type == Primitive::Sphere);
+                    assert(p.radius==round(p.radius)); // Integer radius
+                    if(p.radius>=analytic.size) analytic.grow(p.radius+1);
+                    analytic[p.radius] += 4./3*PI*pow(p.radius,3);
+                }
+                writeFile(name+".analytic.tsv"_, toASCII(analytic), resultFolder);
             } else {
                 Folder folder(source);
                 Time report;
@@ -280,7 +286,7 @@ struct Rock : Widget {
                 perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, outputs[3]->volume, source, inputs[1]->volume, inputs[2]->volume, X,Y,Z);
                 target.maximum=maximum((const Volume32&)target);
             }
-            //else if(operation==Tile) tile(target, source);
+            else if(operation==Tile) tile(target, source);
             else if(operation==Skeleton) integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
             else if(operation==Rasterize) rasterize(target, source);
             else if(operation==ASCII) toASCII(target, source);
@@ -391,7 +397,7 @@ struct Rock : Widget {
     }
 
     // Arguments
-    ref<byte> source; // Path to folder containing source slice images (or name of a validation case (balls, cylinders, cones))
+    ref<byte> source; // Path to folder containing source slice images (or the special token "validation")
     uint minX=0, minY=0, minZ=0, maxX=0, maxY=0, maxZ=0; // Coordinates to crop source volume
     bool cylinder = false; // Whether to clip histograms computation and slice rendering to the inscribed cylinder
     Folder memoryFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
