@@ -26,5 +26,5 @@ skeleton.h
 skeleton.cc
 rasterize.h
 rasterize.cc
-primitive.h
-primitive.cc
+capsule.h
+capsule.cc

@@ -46,14 +46,17 @@ uint maximum(const Volume16& source) {
     const uint X=source.x, Y=source.y, Z=source.z, XY = X*Y;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     v8hi maximum8 = {0,0,0,0,0,0,0,0};
-    for(uint z=marginZ; z<Z-marginZ; z++) {
+    uint16 maximum=0;
+    parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         const uint16* const sourceZ = sourceData + z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
             const uint16* const sourceZY = sourceZ + y*X;
-            for(uint x=align(8,marginX); x<floor(8,X-marginX); x+=8) maximum8 = max(maximum8, loada(sourceZY+x));
+            for(uint x=marginX; x<align(8,marginX); x++) maximum = max(maximum, sourceZY[x]); // Processes from margin to next aligned position
+            for(uint x=align(8,marginX); x<floor(8,X-marginX); x+=8) maximum8 = max(maximum8, loada(sourceZY+x)); // Processes using SIMD (8x speedup)
+            for(uint x=floor(8,X-marginX); x<X-marginX; x++) maximum = max(maximum, sourceZY[x]); // Processes from last aligned position to margin
         }
-    }
-    uint16 maximum=0; for(uint i: range(8)) maximum = max(maximum, ((uint16*)&maximum8)[i]);
+    } );
+    for(uint i: range(8)) maximum = max(maximum, ((uint16*)&maximum8)[i]);
     return maximum;
 }
 
@@ -189,23 +192,27 @@ void toASCII(Volume& target, const Volume16& source) {
     }
 }
 
-Image slice(const Volume& volume, uint z, bool cylinder) {
-    int X=volume.x, Y=volume.y, XY=X*Y;
+Image slice(const Volume& source, int z, bool cylinder) {
+    int X=source.x, Y=source.y, XY=X*Y;
     Image target(X,Y);
-    assert(X==Y && volume.marginX==volume.marginY);
-    uint radiusSq = cylinder ? (X/2-volume.marginX)*(X/2-volume.marginX) : -1;
-    const uint* const offsetX = volume.offsetX, *offsetY = volume.offsetY, *offsetZ = volume.offsetZ;
+    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    assert(X==Y && marginX==marginY);
+    uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
         if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) > radiusSq) { target(x,y) = byte4(0,0,0,0x80); continue; }
-        uint source = 0;
+        uint value = 0;
         uint offset = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
-        if(volume.sampleSize==1) source = ((byte*)volume.data.data)[offset];
-        else if(volume.sampleSize==2) source = ((uint16*)volume.data.data)[offset];
-        else if(volume.sampleSize==3) { target(x,y) = ((bgr*)volume.data.data)[offset]; continue; }
-        else if(volume.sampleSize==4) source = ((uint32*)volume.data.data)[offset];
-        else error(volume.sampleSize);
-        uint intensity = volume.squared ? round(sqrt(source)) * 0xFF / round(sqrt(volume.maximum)) : source * 0xFF / volume.maximum;
-        target(x,y) = byte4(intensity, intensity, intensity, 0xFF);
+        if(source.sampleSize==1) value = ((byte*)source.data.data)[offset];
+        else if(source.sampleSize==2) value = ((uint16*)source.data.data)[offset];
+        else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[offset]; continue; } //FIXME: sRGB
+        else if(source.sampleSize==4) value = ((uint32*)source.data.data)[offset];
+        else error(source.sampleSize);
+        uint linear8 = source.squared ? round(sqrt(value)) / round(sqrt(source.maximum)) * 0xFF : value * 0xFF / source.maximum;
+        assert_(linear8<0x100 || x<marginX || y<marginY || z<marginZ, linear8, value, source.maximum, x, y, z);
+        extern uint8 sRGB_lookup[256];
+        uint sRGB8 = sRGB_lookup[linear8];
+        target(x,y) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;
 }

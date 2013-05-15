@@ -79,7 +79,7 @@ void downsample(Volume16& target, const Volume16& source);
 void toASCII(Volume& target, const Volume16& source);
 
 /// Returns an image of a volume slice
-Image slice(const Volume& volume, uint z, bool cylinder=false);
+Image slice(const Volume& volume, int z, bool cylinder=false);
 
 /// Maps intensity to either red or green channel depending on binary classification
 void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity);

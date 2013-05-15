@@ -24,8 +24,8 @@ Sample sqrtHistogram(const Volume16& volume, bool cylinder) {
     uint marginX=volume.marginX, marginY=volume.marginY, marginZ=volume.marginZ;
     assert(X==Y && marginX==marginY);
     uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
-    uint maximum = round(sqrt(volume.maximum))+1;
-    Sample histogram (maximum, maximum, 0);
+    uint maximum = round(sqrt(volume.maximum));
+    Sample histogram (maximum+1, maximum+1, 0);
     for(uint z=marginZ; z<Z-marginZ; z++) {
         const uint16* sourceZ = volume+z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {

@@ -6,7 +6,7 @@
 #include "sample.h"
 #include "render.h"
 #include "operation.h"
-#include "primitive.h"
+#include "capsule.h"
 #include "smooth.h"
 #include "threshold.h"
 #include "distance.h"
@@ -57,8 +57,8 @@ struct Rock : Widget {
         for(const ref<byte>& argument: arguments) {
             if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
             if(operationForOutput(argument)) { // Parses target (or intermediate data to be removed)
-                force << argument;
                 if(!target) target=argument;
+                else force << argument;
                 continue;
             }
             if(!source && argument=="validation"_) { source=argument, name=argument; continue; }
@@ -73,7 +73,7 @@ struct Rock : Widget {
         if(!target) target=operations.last()->name;
         if(target!="ascii") {
             if(this->arguments.contains("selection"_)) selection = split(this->arguments.at("selection"_),',');
-            if(!selection) selection<<"source"_<<"colorize"_<<"distance"_;
+            if(!selection) selection<<"source"_<<"smooth"_<<"colorize"_<<"distance"_ << "skeleton"_ << "maximum"_;
             if(!selection.contains(target)) selection<<target;
         }
         if(target=="intensity"_) renderVolume=true;
@@ -196,14 +196,12 @@ struct Rock : Widget {
         Time time;
         if(operation==Source) {
             if(name == "validation"_) {
-                array<Primitive> primitives = randomPrimitives(X,Y,Z, 2*filterSize+1);
-                rasterize(target, primitives);
+                array<Capsule> capsules = randomCapsules(X,Y,Z, 2*filterSize+1, 0);
+                rasterize(target, capsules);
                 Sample analytic;
-                for(Primitive p : primitives) {
-                    assert(p.type == Primitive::Sphere);
-                    assert(p.radius==round(p.radius)); // Integer radius
+                for(Capsule p : capsules) {
                     if(p.radius>=analytic.size) analytic.grow(p.radius+1);
-                    analytic[p.radius] += 4./3*PI*pow(p.radius,3);
+                    analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
                 }
                 writeFile(name+".analytic.tsv"_, toASCII(analytic), resultFolder);
             } else {
@@ -247,17 +245,14 @@ struct Rock : Widget {
                     while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
                 }
                 if(!densityThreshold) {
-                    if(1 || !existsFile(name+".density.tsv"_, resultFolder)) { // Computes density histogram of smoothed volume
-                        Time time;
-                        Sample density = histogram(source,  cylinder);
-                        if(existsFolder(this->source)) density[0]=density[density.size-1]=0; // Clipping makes the minimum and maximum value most frequent
-                        log("density", time);
-                        writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
-                    }
-                    Sample density = parseSample( readFile(name+".density.tsv"_, resultFolder) );
+                    Time time;
+                    Sample density = histogram(source,  cylinder);
+                    log("density", time);
+                    //if(name != "validation"_) density[0]=density[density.size-1]=0; // Clipping makes the minimum and maximum value most frequent
+                    //writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
 
                     // Crude peak mixture estimation (Works somewhat for well separated peaks, proper way would be to use expectation maximization)
-                    bool plot=true;
+                    bool plot=false;
                     Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
                     if(plot) writeFile(name+".rock.tsv"_, toASCII(sample(rock,density.size)), resultFolder);
                     Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
@@ -268,6 +263,7 @@ struct Rock : Widget {
                     Sample notpore = density - sample(pore, density.size);
                     if(plot) writeFile(name+".notpore.tsv"_, toASCII(notpore), resultFolder);
                     uint threshold=0; for(uint i=pore.position; i<rock.position; i++) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
+                    if(name=="validation"_) threshold = (pore.position+rock.position)/2; //FIXME: make validation values lorentz peaks
                     densityThreshold = float(threshold) / float(density.size);
                     log("Automatic threshold", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
                 } else log("Manual threshold", densityThreshold);
@@ -346,8 +342,8 @@ struct Rock : Widget {
             updateView();
             return true;
         }
+        if(!button) return false;
         if(renderVolume) {
-            if(!button) return false;
             int2 delta = cursor-lastPos;
             lastPos = cursor;
             if(event != Motion) return false;
@@ -402,7 +398,7 @@ struct Rock : Widget {
     bool cylinder = false; // Whether to clip histograms computation and slice rendering to the inscribed cylinder
     Folder memoryFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
     ref<byte> name; // Used to name intermediate and output files (folder base name)
-    uint filterSize = 2; // Smooth operation averages samples in a (2×filterSize+1)³ window
+    uint filterSize = 0; // Smooth operation averages samples in a (2×filterSize+1)³ window
     Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
     ref<byte> result; // Path to file (or folder) where target volume data is copied
     array<ref<byte>> selection; // Data selection for reviewing (mouse wheel selection) (also prevent recycling)
@@ -412,7 +408,7 @@ struct Rock : Widget {
     array<unique<VolumeData>> volumes; // Mapped volume with valid data
     array<unique<VolumeData>> trash; // Mapped volume with valid data, not being needed anymore, ready to be recycled
     const VolumeData* current=0;
-    float currentSlice=0; // Normalized z coordinate of the currently shown slice
+    float currentSlice = 1./2; // Normalized z coordinate of the currently shown slice
     Window window {this,int2(-1,-1),"Rock"_};
 
     bool renderVolume = false;

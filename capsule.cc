@@ -1,0 +1,70 @@
+#include "capsule.h"
+#include "time.h"
+
+float sqrDistance(Capsule A, Capsule B) {
+	vec3 u = A.b - A.a, v = B.b - B.a, w = A.a - B.a;
+	float a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
+    float D = a*c - b*b;
+	float sc, sN, sD = D; // sc = sN / sD, default sD = D >= 0
+	float tc, tN, tD = D; // tc = tN / tD, default tD = D >= 0
+	if(D < __FLT_EPSILON__) sN=0, sD=1, tN=e, tD=c; // the lines are almost parallel, force using point P0 on segment A to prevent possible division by 0.0 later
+    else { // get the closest points on the infinite lines
+		sN = (b*e - c*d), tN = (a*e - b*d);
+		if(sN < 0) sN = 0, tN = e, tD = c;  // sc < 0 => the s=0 edge is visible
+        else if (sN > sD) sN = sD, tN = e + b, tD = c; // sc > 1 => the s=1 edge is visible
+    }
+    if(tN < 0) { // tc < 0 => the t=0 edge is visible
+        tN = 0;
+        if(-d < 0) sN = 0; else if (-d > a) sN = sD; else sN = -d, sD = a; // recompute sc for this edge
+    }
+    else if (tN > tD) { // tc > 1 => the t=1 edge is visible
+        tN = tD;
+        if ((-d + b) < 0) sN = 0; else if ((-d + b) > a) sN = sD; else sN = (-d + b), sD = a; // recompute sc for this edge
+    }
+    sc = (abs(sN) < __FLT_EPSILON__ ? 0.0 : sN / sD), tc = (abs(tN) < __FLT_EPSILON__ ? 0.0 : tN / tD); // finally do the division to get sc and tc
+    vec3 dP = w + (sc * u) - (tc * v);  // get the difference of the two closest points = A(sc) - B(tc)
+    return sqr( dP ); // return the closest distance
+}
+
+array<Capsule> randomCapsules(float X, float Y, float Z, float minimalDistance, float maximumLength, float maximumRadius) {
+    maximumRadius = min(maximumRadius, min(X-1, min(Y-1, Z-1))/2-minimalDistance);
+    Random random;
+    array<Capsule> capsules;
+    while(capsules.size<(uint)min(X,min(Y, Z))) {
+        float radius = 1+random()*(maximumRadius-1);
+        radius = round(radius);
+        float margin = minimalDistance+radius;
+        vec3 ends[2]; for(vec3& end: ends) end = vec3(margin+random()*(X-1-2*margin), margin+random()*(Y-1-2*margin), margin+random()*(Z-1-2*margin));
+        float length = random()*maximumLength;
+        vec3 origin=(ends[0]+ends[1])/2.f, axis=normalize(ends[1]-ends[0]);
+        Capsule a = {origin-length/2*axis, origin+length/2*axis, radius};
+        if(norm(a.b-a.a)>maximumLength) continue;
+        for(Capsule b: capsules) if(sqr(a.radius+minimalDistance+b.radius)>sqrDistance(a,b)) goto break_; // Discards candidates intersecting any other capsule
+        /*else*/ capsules << a;
+        break_: ;
+    }
+    return capsules;
+}
+
+void rasterize(Volume16& target, const array<Capsule>& capsules) {
+    const int X=target.x, Y=target.y, XY = X*Y;
+    uint16* const targetData = target;
+    clear<uint16>(targetData, target.size(), target.maximum); // Sets target to maximum value
+    parallel(capsules.size, [&](uint, uint i) {
+        Capsule p=capsules[i]; vec3 a=p.a, b=p.b;
+        vec3 min = ::min(a,b)-vec3(p.radius), max = ::max(a,b)+vec3(p.radius); // Bounding box
+        float length = norm(b-a), sqRadius=p.radius*p.radius;
+        for(int z=floor(min.z); z<ceil(max.z); z++) {
+            uint16* const targetZ= targetData + z*XY;
+            for(int y=floor(min.y); y<ceil(max.y); y++) {
+                uint16* const targetZY= targetZ + y*X;
+                for(int x=floor(min.x); x<ceil(max.x); x++) {
+                    uint16* const targetZYX= targetZY + x;
+                    vec3 P = vec3(x,y,z);
+                    float l = dot(P-a, normalize(b-a));
+                    if((0 < l && l < length && sqr(P-(a+l*normalize(b-a))) <= sqRadius) || sqr(P-a)<=sqRadius || sqr(P-b)<=sqRadius) targetZYX[0] = 0;
+                }
+            }
+        }
+    } );
+}
