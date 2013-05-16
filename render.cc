@@ -124,7 +124,7 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
             const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); //world positions for top bottom +side -side
             const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
             const v4sf tMask = radiusSqHeight > capSideP; //cmpgt(radiusSqHeight, capSideP);
-            if(!mask(tMask)) { image[y*imageX+x] = 0; continue; }
+            if(!mask(tMask)) { image[y*imageX+x] = byte4(0,0,0,0xFF); continue; }
             const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
             const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
             const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax

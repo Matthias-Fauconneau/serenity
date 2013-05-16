@@ -192,10 +192,16 @@ void toASCII(Volume& target, const Volume16& source) {
     }
 }
 
+Image slice(const Volume& source, float normalizedZ, bool cylinder) {
+    uint z = source.marginZ+(source.z-2*source.marginZ-1)*normalizedZ;
+    assert(z >= source.marginZ && z<source.z-source.marginZ);
+    return slice(source, (int)z, cylinder);
+}
+
 Image slice(const Volume& source, int z, bool cylinder) {
     int X=source.x, Y=source.y, XY=X*Y;
     Image target(X,Y);
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    int unused marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     assert(X==Y && marginX==marginY);
     uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
@@ -209,7 +215,8 @@ Image slice(const Volume& source, int z, bool cylinder) {
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[offset];
         else error(source.sampleSize);
         uint linear8 = source.squared ? round(sqrt(value)) / round(sqrt(source.maximum)) * 0xFF : value * 0xFF / source.maximum;
-        assert_(linear8<0x100 || x<marginX || y<marginY || z<marginZ, linear8, value, source.maximum, x, y, z);
+        assert(linear8<0x100 || x<marginX || y<marginY || z<marginZ, linear8, value, source.maximum, x, y, z);
+        linear8 = min<uint>(0xFF, linear8); //FIXME
         extern uint8 sRGB_lookup[256];
         uint sRGB8 = sRGB_lookup[linear8];
         target(x,y) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);

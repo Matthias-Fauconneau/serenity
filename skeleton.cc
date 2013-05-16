@@ -10,8 +10,8 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     float norm = sqrt( sqr(dx0d) + sqr(dy0d) + sqr(dz0d) );
     if(sqNorm > 1 && sqNorm > 2*inprod + norm + 1.5f) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
-        if(crit>=0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); assert_(r<0x10000); skel[0] = r; }
-        if(crit<=0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); assert_(r<0x10000); skel[da] = r; }
+        if(crit>0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); assert(r<0x10000); skel[0] = r; }
+        if(crit<0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); assert(r<0x10000); skel[da] = r; }
     }
 }
 

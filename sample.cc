@@ -87,6 +87,6 @@ float intersect(const Lorentz& A, const Lorentz& B) {
 }
 Sample operator-(const Sample& A, const Sample& B) {
     uint N=A.size; assert(B.size==N); Sample R(N,N);
-    for(uint i: range(N)) R[i]=max(0, A[i]-B[i]);
+    for(uint i: range(N)) R[i]=max(0ll, A[i]-B[i]);
     return R;
 }

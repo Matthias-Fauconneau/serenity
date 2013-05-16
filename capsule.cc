@@ -26,20 +26,22 @@ float sqrDistance(Capsule A, Capsule B) {
     return sqr( dP ); // return the closest distance
 }
 
-array<Capsule> randomCapsules(float X, float Y, float Z, float minimalDistance, float maximumLength, float maximumRadius) {
-    maximumRadius = min(maximumRadius, min(X-1, min(Y-1, Z-1))/2-minimalDistance);
+array<Capsule> randomCapsules(float X, float Y, float Z, float minimumDistance, float maximumLength, float maximumRadius) {
+    maximumRadius = min(maximumRadius, min(X-1, min(Y-1, Z-1))/2-minimumDistance);
     Random random;
     array<Capsule> capsules;
     while(capsules.size<(uint)min(X,min(Y, Z))) {
         float radius = 1+random()*(maximumRadius-1);
         radius = round(radius);
-        float margin = minimalDistance+radius;
+        float margin = minimumDistance+radius;
         vec3 ends[2]; for(vec3& end: ends) end = vec3(margin+random()*(X-1-2*margin), margin+random()*(Y-1-2*margin), margin+random()*(Z-1-2*margin));
         float length = random()*maximumLength;
-        vec3 origin=(ends[0]+ends[1])/2.f, axis=normalize(ends[1]-ends[0]);
-        Capsule a = {origin-length/2*axis, origin+length/2*axis, radius};
+        vec3 origin=(ends[0]+ends[1])/2.f, axis=ends[1]-ends[0];
+        float scale = length/norm(axis);
+        if(scale>1) continue; // Might not fit cube
+        Capsule a = {origin-scale/2*axis, origin+scale/2*axis, radius};
         if(norm(a.b-a.a)>maximumLength) continue;
-        for(Capsule b: capsules) if(sqr(a.radius+minimalDistance+b.radius)>sqrDistance(a,b)) goto break_; // Discards candidates intersecting any other capsule
+        for(Capsule b: capsules) if(sqr(a.radius+minimumDistance+b.radius)>sqrDistance(a,b)) goto break_; // Discards candidates intersecting any other capsule
         /*else*/ capsules << a;
         break_: ;
     }
@@ -47,7 +49,7 @@ array<Capsule> randomCapsules(float X, float Y, float Z, float minimalDistance, 
 }
 
 void rasterize(Volume16& target, const array<Capsule>& capsules) {
-    const int X=target.x, Y=target.y, XY = X*Y;
+    const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
     uint16* const targetData = target;
     clear<uint16>(targetData, target.size(), target.maximum); // Sets target to maximum value
     parallel(capsules.size, [&](uint, uint i) {
@@ -55,10 +57,13 @@ void rasterize(Volume16& target, const array<Capsule>& capsules) {
         vec3 min = ::min(a,b)-vec3(p.radius), max = ::max(a,b)+vec3(p.radius); // Bounding box
         float length = norm(b-a), sqRadius=p.radius*p.radius;
         for(int z=floor(min.z); z<ceil(max.z); z++) {
+            assert_(z>=0 && z<Z, z);
             uint16* const targetZ= targetData + z*XY;
             for(int y=floor(min.y); y<ceil(max.y); y++) {
+                assert_(y>=0 && y<Y);
                 uint16* const targetZY= targetZ + y*X;
                 for(int x=floor(min.x); x<ceil(max.x); x++) {
+                    assert_(z>=0 && z<X);
                     uint16* const targetZYX= targetZY + x;
                     vec3 P = vec3(x,y,z);
                     float l = dot(P-a, normalize(b-a));

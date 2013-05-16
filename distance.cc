@@ -50,7 +50,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
                     int& i = stackIndices[dy];
                     memory<element> stack (stacks+dy*stackSize, stackSize);
                     if(x==stack[i].cx) i--;
-                    assert_(i>=0);
+                    assert(i>=0);
                     int sx = stack[i].x;
                     int d = x * (x - 2*sx) + stack[i].sd;
                     targetZYX[dy] = (y+dy)*(y+dy) + d;

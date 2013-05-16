@@ -2,7 +2,7 @@
 #include "volume.h"
 
 /// Sample of a positive distribution
-typedef array<int> Sample;
+typedef array<int64> Sample;
 
 /// Computes histogram of values (without normalizing)
 Sample histogram(const Volume16& volume, bool cylinder=false);

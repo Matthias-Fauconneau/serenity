@@ -21,7 +21,7 @@ void rasterize(Volume16& target, const Volume16& source) {
                 int sqRadius = sourceData[offsetZ[z]+offsetY[y]+offsetX[x]];
                 if(sqRadius<=1) continue; // 0: background (rock) or 1: foreground (pore), >1: skeleton
                 int radius = ceil(sqrt(sqRadius));
-                assert_(radius<=x && radius<=y && radius<=int(z) && radius<=X-1-x && radius<=Y-1-y && radius<=Z-1-int(z));
+                assert_(radius<=x && radius<=y && radius<=int(z) && radius<X-x && radius<Y-y && radius<Z-int(z));
                 for(int dz=-radius; dz<=radius; dz++) {
                     uint16* const targetZ= targetData + offsetZ[z+dz];
                     for(int dy=-radius; dy<=radius; dy++) {
