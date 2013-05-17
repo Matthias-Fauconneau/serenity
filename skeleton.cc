@@ -11,8 +11,12 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
     float norm = sqrt( sqDistance );
     if(sqNorm > 2*inprod + norm + 1.5f) {
-#else //Constant + Linear pruning seems to work perfectly (for capsule validation case at least)
+#elif CONSTANT_LINEAR_PRUNING //Constant + Linear pruning works perfectly for capsule validation case
     if(sqNorm > 2 && sqNorm > sqDistance) {
+#else
+    int inprod = - dx*x0d - dy*y0d - dz*z0d;
+    float norm = sqrt( sqDistance );
+    if(sqNorm > 2 && sqNorm > sqDistance && sqNorm >  2*inprod + norm + 1.5f) { // Rasterization being much slower prune using all methods
 #endif
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
         if(crit>=0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); assert(r<0x10000); skel[0] = r; }
@@ -46,7 +50,7 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
                 uint16* const skel = targetZY+x;
 
                 if(xf[0]<0xFFFF) {
-                    skel[0] = 1;
+                    //skel[0] = 0/*1*/; //FIXME: only clear margins
                     if(xf[-1]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, -1,0,0, -1);
                     if(xf[-(int)X]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,-1,0, -X);
                     if(xf[-(int)XY]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,0,-1, -XY);
