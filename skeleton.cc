@@ -5,11 +5,15 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     int xf0=xf[0], yf0=yf[0], zf0=zf[0], xfd=xf[da], yfd=yf[da], zfd=zf[da], xd=x+dx, yd=y+dy, zd=z+dz;
     int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd;
     int sqNorm = sqr(x0d) + sqr(y0d) + sqr(z0d);
-    int inprod = - dx*x0d - dy*y0d - dz*z0d;
     int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd;
-    float norm = sqrt( sqr(dx0d) + sqr(dy0d) + sqr(dz0d) );
-    const int lambda = 3; /*Constant pruning parameter: √(1/slope) < λ < minimum throat radius*/
-    if(sqNorm > lambda*lambda && sqNorm > 2*inprod + norm + 1.5f) {
+    int sqDistance = sqr(dx0d) + sqr(dy0d) + sqr(dz0d);
+#if SQUARE_ROOT_PRUNING //Supposed to work better but doesn't prune enough
+    int inprod = - dx*x0d - dy*y0d - dz*z0d;
+    float norm = sqrt( sqDistance );
+    if(sqNorm > 2*inprod + norm + 1.5f) {
+#else //Constant + Linear pruning seems to work perfectly (for capsule validation case at least)
+    if(sqNorm > 2 && sqNorm > sqDistance) {
+#endif
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
         if(crit>=0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); assert(r<0x10000); skel[0] = r; }
         if(crit<=0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); assert(r<0x10000); skel[da] = r; }

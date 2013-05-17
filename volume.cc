@@ -47,7 +47,8 @@ uint maximum(const Volume16& source) {
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     v8hi maximum8 = {0,0,0,0,0,0,0,0};
     uint16 maximum=0;
-    parallel(marginZ, Z-marginZ, [&](uint, uint z) {
+    //parallel(marginZ, Z-marginZ, [&](uint, uint z) {
+    for(uint z : range(marginZ, Z-marginZ)) {
         const uint16* const sourceZ = sourceData + z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
             const uint16* const sourceZY = sourceZ + y*X;
@@ -55,7 +56,7 @@ uint maximum(const Volume16& source) {
             for(uint x=align(8,marginX); x<floor(8,X-marginX); x+=8) maximum8 = max(maximum8, loada(sourceZY+x)); // Processes using SIMD (8x speedup)
             for(uint x=floor(8,X-marginX); x<X-marginX; x++) maximum = max(maximum, sourceZY[x]); // Processes from last aligned position to margin
         }
-    } );
+    } //);
     for(uint i: range(8)) maximum = max(maximum, ((uint16*)&maximum8)[i]);
     return maximum;
 }
@@ -215,7 +216,7 @@ Image slice(const Volume& source, int z, bool cylinder) {
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[offset];
         else error(source.sampleSize);
         uint linear8 = source.squared ? round(sqrt(value)) / round(sqrt(source.maximum)) * 0xFF : value * 0xFF / source.maximum;
-        assert(linear8<0x100 || x<marginX || y<marginY || z<marginZ, linear8, value, source.maximum, x, y, z);
+        //assert(linear8<0x100 || x<marginX || y<marginY || z<marginZ, linear8, value, source.maximum, x, y, z);
         linear8 = min<uint>(0xFF, linear8); //FIXME
         extern uint8 sRGB_lookup[256];
         uint sRGB8 = sRGB_lookup[linear8];

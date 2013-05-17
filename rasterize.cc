@@ -14,14 +14,15 @@ void rasterize(Volume16& target, const Volume16& source) {
     const uint* const offsetZ = target.offsetZ;
     assert_(offsetX && offsetY && offsetZ);
     Time time; Time report;
-    parallel(marginZ,Z-marginZ, [&](uint, uint z) {
+    //parallel(marginZ,Z-marginZ, [&](uint, uint z) {
+    for(uint z : range(marginZ, Z-marginZ)) {
         if(report/1000>=4) { log(z-marginZ,"/", Z-2*marginZ, (z*XY/1024./1024.)/(time/1000.), "MS/s"); report.reset(); }
         for(int y=marginY; y<Y-marginY; y++) {
             for(int x=marginX; x<X-marginX; x++) {
                 int sqRadius = sourceData[offsetZ[z]+offsetY[y]+offsetX[x]];
                 if(sqRadius<=1) continue; // 0: background (rock) or 1: foreground (pore), >1: skeleton
                 int radius = ceil(sqrt(sqRadius));
-                assert_(radius<=x && radius<=y && radius<=int(z) && radius<X-x && radius<Y-y && radius<Z-int(z));
+                assert_(radius<=x && radius<=y && radius<=int(z) && radius<X-1-x && radius<Y-1-y && radius<Z-1-int(z));
                 for(int dz=-radius; dz<=radius; dz++) {
                     uint16* const targetZ= targetData + offsetZ[z+dz];
                     for(int dy=-radius; dy<=radius; dy++) {
@@ -36,7 +37,7 @@ void rasterize(Volume16& target, const Volume16& source) {
                 }
             }
         }
-    });
+    }//);
     target.squared = true;
     assert_(target.maximum == source.maximum);
 }
