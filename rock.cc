@@ -109,8 +109,9 @@ struct Rock : Widget {
             else { exit(); return; }
         }
         // Displays result
-        window.localShortcut(Escape).connect(&exit);
+        window.localShortcut(Key('r')).connect(this, &Rock::refresh);
         window.localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
+        window.localShortcut(Escape).connect(&exit);
         window.clearBackground = false;
         updateView();
         window.show();
@@ -286,7 +287,7 @@ struct Rock : Widget {
                         if(variance > maximum) maximum=variance, threshold = t;
                         variances[t] = variance;
                     }
-                    for(uint t: range(density.size)) interclass[t]=variances[t]*totalMaximum/maximum; //scale like density
+                    for(uint t: range(density.size)) interclass[t]=variances[t]*totalMaximum/maximum; // Scales to plot over density
                     writeFile("interclass.tsv"_,toASCII(interclass), resultFolder);
                     densityThreshold = float(threshold) / float(density.size);
                     log("Automatic threshold", threshold, densityThreshold);
@@ -352,6 +353,15 @@ struct Rock : Widget {
         if(operation != *operations.last()) for(const VolumeData* input: inputs) if(!selection.contains(input->name)) trash << volumes.take(volumes.indexOf(input->name));
 
         return &volumes[volumes.indexOf(targetName)];
+    }
+
+    void refresh() {
+        remove(name+"."_+current->name+"."_+volumeFormat(current->volume), memoryFolder);
+        string target = copy(current->name);
+        int unused index = volumes.removeOne(current);
+        assert_(index>=0);
+        current = getVolume(target);
+        updateView();
     }
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) {

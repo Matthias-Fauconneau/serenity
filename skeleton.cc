@@ -8,10 +8,11 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
     int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd;
     float norm = sqrt( sqr(dx0d) + sqr(dy0d) + sqr(dz0d) );
-    if(sqNorm > 1 && sqNorm > 2*inprod + norm + 1.5f) {
+    const int lambda = 3; /*Constant pruning parameter: √(1/slope) < λ < minimum throat radius*/
+    if(sqNorm > lambda*lambda && sqNorm > 2*inprod + norm + 1.5f) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
-        if(crit>0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); assert(r<0x10000); skel[0] = r; }
-        if(crit<0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); assert(r<0x10000); skel[da] = r; }
+        if(crit>=0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); assert(r<0x10000); skel[0] = r; }
+        if(crit<=0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); assert(r<0x10000); skel[da] = r; }
     }
 }
 
