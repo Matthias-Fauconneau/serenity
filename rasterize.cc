@@ -13,14 +13,14 @@ void rasterize(Volume16& target, const Volume16& source) {
     const uint* const offsetY = target.offsetY;
     const uint* const offsetZ = target.offsetZ;
     assert_(offsetX && offsetY && offsetZ);
-    Time time; Time report; Lock reportLock;
-    parallel(marginZ,Z-marginZ, [&](uint, uint z) {
-        if(report/1000>=4 && reportLock.tryLock()) { log(z-marginZ,"/", Z-2*marginZ, (z*XY/1024./1024.)/(time/1000.), "MS/s"); report.reset(); reportLock.unlock();}
+    Time time; Time report;
+    parallel(marginZ,Z-marginZ, [&](uint id, uint z) { //FIXME: Z-order
+        if(id==0 && report/1000>=4) log(z-marginZ,"/", Z-2*marginZ, (z*XY/1024./1024.)/(time/1000.), "MS/s"), report.reset();
         for(int y=marginY; y<Y-marginY; y++) {
             for(int x=marginX; x<X-marginX; x++) {
                 int sqRadius = sourceData[offsetZ[z]+offsetY[y]+offsetX[x]];
-                if(!sqRadius) continue; // 0: background (rock) or 1: foreground (pore), >1: skeleton
-                int radius = ceil(sqrt(sqRadius));
+                if(!sqRadius) continue;
+                int radius = ceil(sqrt(sqRadius)); //+1 ? Would be duct tape to hide any discretization artifacts
                 assert(radius<=x && radius<=y && radius<=int(z) && radius<X-1-x && radius<Y-1-y && radius<Z-1-int(z));
                 for(int dz=-radius; dz<=radius; dz++) {
                     uint16* const targetZ= targetData + offsetZ[z+dz];

@@ -187,7 +187,7 @@ struct Music {
         window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
         sampler.frameReady.connect(&record,&Record::capture);
 #endif
-        window.localShortcut(Key('y')).connect([this]{ if(layout.removeOne(&keyboard)==-1) layout<<&keyboard; window.focus = &keyboardInput;});
+        window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; window.focus = &keyboardInput;});
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);

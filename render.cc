@@ -29,9 +29,7 @@ void squareRoot(Volume8& target, const Volume16& source) {
 void render(Volume8& target, const Volume16& source) {
     uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
     interleavedLookup(target);
-    const uint* const offsetX = target.offsetX;
-    const uint* const offsetY = target.offsetY;
-    const uint* const offsetZ = target.offsetZ;
+    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     target.maximum = 0xFF, target.squared=false;
     float scale = float(target.maximum) / sqrt(float(source.maximum));
     const uint16* const sourceData = source;

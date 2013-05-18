@@ -14,10 +14,11 @@
 #include "skeleton.h"
 #include "rasterize.h"
 #include "maximum.h"
+#include "trim.h"
 
 Operation Source("source"_,2); // Loads from original image slices
 Operation ShiftRight ("source"_,"shift"_,2); // Shifts data to avoid overflows
-Operation SmoothX("shift"_,"smoothx"_,2); // Denoises data and filters small pores by averaging samples in a window (X pass)
+Operation SmoothX("shift"_,"smoothx"_,2); // Denoises data and filters smallest pores by averaging samples in a window (X pass)
 Operation SmoothY("smoothx"_,"smoothy"_,2);  // Y pass
 Operation SmoothZ("smoothy"_,"smooth"_,2); // Z pass
 Operation Threshold("smooth"_,"pore"_,4, "rock"_,4); // Segments between either rock or pore space by comparing density against a uniform threshold
@@ -29,6 +30,8 @@ Operation Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Kee
 Operation Tile("skeleton"_,"tiled_skeleton"_,2);
 Operation Rasterize("tiled_skeleton"_,"maximum"_,2); // Rasterizes a ball around each skeleton voxel assigning the radius of the largest enclosing sphere to all voxels
 
+Operation Trim("pore"_,"maximum"_,"trim"_,2); // Trims the maximum balls to fit the pore space
+
 Operation Colorize("pore"_,"source"_,"colorize"_,3); // Maps intensity to either red or green channel depending on binary classification
 
 Operation EmptyX("rock"_,"emptyx"_,4,"epositionx"_,2); // Computes distance field to nearest pore for empty space skipping (X pass)
@@ -39,14 +42,14 @@ Operation RenderDensity("distance"_,"density"_,1); // Square roots and normalize
 //Operation RenderDensity("skeleton"_,"density"_,1); // Square roots and normalizes distance to use as density values (for opacity and gradient)
 Operation RenderIntensity("maximum"_,"intensity"_,1); // Square roots and normalizes maximum to use as intensity values (for color intensity)
 
-Operation ASCII("maximum"_,"ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
+Operation SourceASCII("source"_,"source_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
+Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
 
 struct VolumeData {
-    VolumeData(const ref<byte>& name):name(name){}
+    explicit VolumeData(const ref<byte>& name):name(name){}
     string name;
     Map map;
     Volume volume;
-    //uint referenceCount=0; //TODO: Counts how many operations need this volume (allows memory to be recycled when no operations need the data anymore)
 };
 template<> string str(const VolumeData& a) { return copy(a.name); }
 bool operator ==(const VolumeData& a, const ref<byte>& name) { return a.name == name; }
@@ -84,7 +87,7 @@ struct Rock : Widget {
 
         for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
             if(!startsWith(path, name)) continue;
-            VolumeData data = section(path,'.',-3,-2);
+            VolumeData data (section(path,'.',-3,-2));
             bool remove = !operationForOutput(data.name) || volumes.contains(data.name);
             for(ref<byte> name: force) if(operationForOutput(name)->outputs.contains(data.name)) remove=true;
             if(remove) { ::remove(path, memoryFolder); continue; } // Removes invalid, multiple or to be removed data
@@ -94,7 +97,7 @@ struct Rock : Widget {
             data.volume.data = buffer<byte>(data.map);
             data.volume.sampleSize = data.volume.data.size / data.volume.size();
             assert(data.volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((data.volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
-            volumes << move(data);
+            volumes << shared<VolumeData>(move(data));
         }
 
         // Executes all operations
@@ -108,6 +111,7 @@ struct Rock : Widget {
             if(selection) current = getVolume(selection.last());
             else { exit(); return; }
         }
+        if(arguments.contains("exit"_)) { exit(); return; }
         // Displays result
         window.localShortcut(Key('r')).connect(this, &Rock::refresh);
         window.localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
@@ -117,26 +121,20 @@ struct Rock : Widget {
         window.show();
     }
     ~Rock() {
-#if 0
-        for(const string& path: memoryFolder.list(Files)) { // Cleanups intermediate data
-            if(!startsWith(path, name)) continue;
-            ref<byte> name = section(path,'.',-3,-2);
-            if(!operationForOutput(name) || trash.contains(name)) { ::remove(path, memoryFolder); continue; } // Removes invalid or trashed data
-        }
-#endif
+        //for(const string& path: memoryFolder.list(Files)) if(startsWith(path, name)) ::remove(path, memoryFolder); // Cleanups intermediate data
     }
 
     /// Computes target volume
-    const VolumeData* getVolume(const ref<byte>& targetName) {
-        for(const VolumeData& data: volumes) if(data.name == targetName) return &data;
+    shared<VolumeData> getVolume(const ref<byte>& targetName) {
+        for(const shared<VolumeData>& data: volumes) if(data->name == targetName) return share( data );
         const Operation& operation = *operationForOutput(targetName);
         assert_(&operation, targetName);
-        array<const VolumeData*> inputs;
+        array<shared<VolumeData>> inputs;
         for(const ref<byte>& input: operation.inputs) { assert(input != targetName, input, targetName); inputs << getVolume( input ); }
 
-        array<VolumeData*> outputs;
+        array<shared<VolumeData>> outputs;
         for(const Operation::Output& output: operation.outputs) {
-            VolumeData data = output.name;
+            VolumeData data (output.name);
             Volume& volume = data.volume;
             if(!operation.inputs) { // Original source slices format
                 if(name=="validation"_) {
@@ -161,7 +159,7 @@ struct Rock : Widget {
                     volume.x = maxX-minX, volume.y = maxY-minY, volume.z = maxZ-minZ;
                 }
                 volume.maximum = (1<<(8*output.sampleSize))-1;
-            } else { // Inherit initial format from previous operation
+            } else { // Inherits initial format from previous operation
                 const Volume& source = inputs.first()->volume;
                 volume.x=source.x, volume.y=source.y, volume.z=source.z, volume.copyMetadata(source);
             }
@@ -169,19 +167,18 @@ struct Rock : Widget {
             assert(volume.size() * volume.sampleSize);
             if(volumes.contains(output.name)) {
                 rename(name+"."_+output.name+"."_+volumeFormat(volumes[volumes.indexOf(output.name)]->volume), name+"."_+output.name, memoryFolder);
-                volumes.removeAll(output.name);
-            } else if(trash.contains(output.name)) {
-                rename(name+"."_+output.name+"."_+volumeFormat(trash[trash.indexOf(output.name)]->volume), name+"."_+output.name, memoryFolder);
-                trash.removeAll(output.name);
+                volumes.remove(output.name);
             } else {
                 assert(!existsFile(name+"."_+output.name+"."_+volumeFormat(volume), memoryFolder), output.name, volumes);
-                for(uint i: range(trash.size)) { // Tries to recycle pages (avoid zeroing)
-                    const VolumeData& data = trash[i];
-                    string path = name+"."_+data.name+"."_+volumeFormat(data.volume);
-                    assert_(existsFile(path, memoryFolder), path);
-                    rename(path, name+"."_+output.name, memoryFolder);
-                    trash.removeAt(i);
-                    break;
+                for(uint i: range(volumes.size)) { // Tries to recycle pages (avoid zeroing)
+                    const shared<VolumeData>& volume = volumes[i];
+                    if(volume.refCount()==1 && !selection.contains(volume->name)) { // Recycles unused volumes (when only reference is from volumes list)
+                        string path = name+"."_+volume->name+"."_+volumeFormat(volume->volume);
+                        assert_(existsFile(path, memoryFolder), path);
+                        rename(path, name+"."_+output.name, memoryFolder);
+                        volumes.removeAt(i);
+                        break;
+                    }
                 }
             }
             // Creates (or resizes) and maps a volume file for the current operation data
@@ -190,8 +187,8 @@ struct Rock : Widget {
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
             volume.data = buffer<byte>(data.map);
             assert(volume && volume.data.size == volume.size()*volume.sampleSize);
-            volumes << move(data);
-            outputs << &volumes.last();
+            volumes << shared<VolumeData>(move(data));
+            outputs << share( volumes.last() );
         }
         assert_(outputs);
         Volume& target = outputs.first()->volume;
@@ -222,22 +219,22 @@ struct Rock : Widget {
         } else {
             const Volume& source = inputs.first()->volume;
             if(operation==ShiftRight || operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
-                uint filterSize = arguments.contains("smooth"_) ? toInteger(arguments.at("smooth"_)) : name=="validation"_ ? 0 : 1; // Smooth operation averages samples in a (2×filterSize+1)³ window
-                uint sampleCount = 2*filterSize+1;
+                uint kernelSize = arguments.contains("smooth"_) ? toInteger(arguments.at("smooth"_)) : name=="validation"_ ? 0 : 1; // Smooth operation averages samples in a (2×kernelSize+1)³ window
+                uint sampleCount = 2*kernelSize+1;
                 uint shift = log2(sampleCount);
                 if(operation==ShiftRight) {
                     int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
                     int bits = log2(nextPowerOfTwo(max));
                     int headroomShift = ::max(0,bits-16);
-                    if(headroomShift) log("Shifting out",headroomShift,"least significant bits to compute sum of",sampleCount,"samples without unpacking to 32bit");
+                    //if(headroomShift) log("Shifting out",headroomShift,"least significant bits to compute sum of",sampleCount,"samples without unpacking to 32bit");
                     shiftRight(target, source, headroomShift); // Simply copies if shift = 0
                     target.maximum >>= headroomShift;
                 } else if(operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
                     target.maximum *= sampleCount;
                     if(operation==SmoothZ) shift=0; // not necessary
-                    smooth(target, source, X,Y,Z, filterSize, shift);
+                    smooth(target, source, X,Y,Z, kernelSize, shift);
                     target.maximum >>= shift;
-                    int margin = target.marginY + align(4, filterSize);
+                    int margin = target.marginY + align(4, kernelSize);
                     target.marginY = target.marginZ;
                     target.marginZ = target.marginX;
                     target.marginX = margin;
@@ -253,10 +250,10 @@ struct Rock : Widget {
                     Time time;
                     Sample density = histogram(source,  cylinder);
                     log("density", time);
-                    //writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
+                    bool plot = false;
+                    if(plot) writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
                     if(name != "validation"_) density[0]=density[density.size-1]=0; // Ignores clipped values
 #if 1 // Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
-                    bool plot=false;
                     Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
                     if(plot) writeFile(name+".rock.tsv"_, toASCII(sample(rock,density.size)), resultFolder);
                     Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
@@ -309,9 +306,13 @@ struct Rock : Widget {
                 target.maximum=maximum((const Volume32&)target);
             }
             else if(operation==Tile) tile(target, source);
-            else if(operation==Skeleton) integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume);
+            else if(operation==Skeleton) {
+                uint minimalSqRadius = arguments.contains("minimalRadius"_) ? sqr(toInteger(arguments.at("minimalRadius"_))) : 2;
+                integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume, minimalSqRadius);
+            }
             else if(operation==Rasterize) rasterize(target, source);
-            else if(operation==ASCII) toASCII(target, source);
+            else if(operation==Trim) trim(target, inputs[0]->volume, inputs[1]->volume);
+            else if(operation==SourceASCII || operation==MaximumASCII) toASCII(target, source);
             else if(operation==RenderEmpty) squareRoot(target, source);
             else if(operation==RenderDensity || operation==RenderIntensity) ::render(target, source);
             else error("Unimplemented",operation);
@@ -320,7 +321,7 @@ struct Rock : Widget {
         if(target.sampleSize==2) assert(maximum((const Volume16&)target)<=target.maximum, operation, target, maximum((const Volume16&)target), target.maximum);
         if(target.sampleSize==4) assert(maximum((const Volume32&)target)<=target.maximum, operation, target, maximum((const Volume32&)target), target.maximum);
 
-        for(VolumeData* output: outputs) {
+        for(shared<VolumeData>& output: outputs) {
             Volume& target = output->volume;
             if(output->name=="distance"_ || output->name=="emptyz"_) // Only packs after distance (or empty) pass (FIXME: make all operations generic)
             while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2/*FIXME*/) { // Packs outputs if needed
@@ -340,25 +341,23 @@ struct Rock : Widget {
             string outputName = name+"."_+output->name;
             rename(outputName, outputName+"."_+volumeFormat(output->volume), memoryFolder); // Renames output files (once data is valid)
 
-            if((output->name=="maximum"_ || output->name=="walk"_) && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
+            if((output->name=="maximum"_ || output->name=="trim"_) && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
                 Time time;
-                Sample histogram = sqrtHistogram(output->volume, cylinder);
-                histogram[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
+                Sample squaredMaximum = histogram(output->volume, cylinder);
+                squaredMaximum[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
                 float scale = toDecimal(arguments.value("resolution"_,"1"_));
-                writeFile(outputName+".tsv"_, toASCII(histogram, scale), resultFolder);
+                writeFile(outputName+".tsv"_, toASCII(squaredMaximum, false, true, scale), resultFolder);
                 log("√histogram", output->name, time);
             }
         }
-        // Recycles all inputs (avoid zeroing new pages) (FIXME: prevent recycling of inputs also being used by other pending operations)
-        if(operation != *operations.last()) for(const VolumeData* input: inputs) if(!selection.contains(input->name)) trash << volumes.take(volumes.indexOf(input->name));
 
-        return &volumes[volumes.indexOf(targetName)];
+        return share( volumes[volumes.indexOf(targetName)] );
     }
 
     void refresh() {
         remove(name+"."_+current->name+"."_+volumeFormat(current->volume), memoryFolder);
         string target = copy(current->name);
-        int unused index = volumes.removeOne(current);
+        int unused index = volumes.remove(current);
         assert_(index>=0);
         current = getVolume(target);
         updateView();
@@ -392,6 +391,7 @@ struct Rock : Widget {
         while(2*size<displaySize) size *= 2;
         if(window.size != size) window.setSize(size);
         else window.render();
+        window.setTitle(current->name);
     }
 
     void render(int2 position, int2 size) {
@@ -438,9 +438,8 @@ struct Rock : Widget {
     map<ref<byte>,ref<byte>> arguments;
 
     // Variables
-    array<unique<VolumeData>> volumes; // Mapped volume with valid data
-    array<unique<VolumeData>> trash; // Mapped volume with valid data, not being needed anymore, ready to be recycled
-    const VolumeData* current = 0;
+    array<shared<VolumeData>> volumes; // Mapped volume with valid data
+    shared<VolumeData> current  {"null"_};
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     Window window {this,int2(-1,-1),"Rock"_};
 

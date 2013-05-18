@@ -6,10 +6,10 @@
 
 // X
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, const Volume32& source, int X, int Y, int Z) {
+    clearMargins(target);
     const uint32* const sourceData = source;
     uint32* const targetData = target;
     uint16* const xPositionData = positionX;
-    clear(targetData, Z*Y*X); //FIXME: clear only margins
     const uint XY = X*Y;
     constexpr uint unroll = 8;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
@@ -21,7 +21,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
         uint16* const xPositionZ = xPositionData+z*X;
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
-            element stacks[unroll*stackSize]; //64K
+            element stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
                 memory<element> stack (stacks+dy*stackSize, stackSize);
@@ -65,12 +65,12 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 
 // Y
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, const Volume32& source, const Volume16& sourceX, int X, int Y, int Z) {
+    clearMargins(target);
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     uint32* const targetData = target;
     uint16* const xPositionData = positionX;
     uint16* const yPositionData = positionY;
-    clear(targetData, Z*Y*X); //FIXME: clear only margins
     const uint XY = X*Y;
     constexpr uint unroll = 8;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
@@ -84,7 +84,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
         uint16* const yPositionZ = yPositionData+z*X;
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
-            element stacks[unroll*stackSize]; //64K
+            element stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
                 memory<element> stack (stacks+dy*stackSize, stackSize);
@@ -133,6 +133,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 
 // Z
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, Volume16& positionZ, const Volume32& source, const Volume16& sourceX, const Volume16& sourceY, int X, int Y, int Z) {
+    clearMargins(target);
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     const uint16* const ySourceData = sourceY;
@@ -140,7 +141,6 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
     uint16* const xPositionData = positionX;
     uint16* const yPositionData = positionY;
     uint16* const zPositionData = positionZ;
-    clear(targetData, Z*Y*X); //FIXME: clear only margins
     const uint XY = X*Y;
     constexpr uint unroll = 8;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
@@ -156,7 +156,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
         uint16* const zPositionZ = zPositionData+z*X;
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
-            element stacks[unroll*stackSize]; //64K
+            element stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
                 memory<element> stack (stacks+dy*stackSize, stackSize);

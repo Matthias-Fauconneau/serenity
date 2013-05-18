@@ -19,25 +19,6 @@ Sample histogram(const Volume16& volume, bool cylinder) {
     return histogram;
 }
 
-Sample sqrtHistogram(const Volume16& volume, bool cylinder) {
-    uint X=volume.x, Y=volume.y, Z=volume.z, XY=X*Y;
-    uint marginX=volume.marginX, marginY=volume.marginY, marginZ=volume.marginZ;
-    assert(X==Y && marginX==marginY);
-    uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
-    uint maximum = round(sqrt(volume.maximum));
-    Sample histogram (maximum+1, maximum+1, 0);
-    for(uint z=marginZ; z<Z-marginZ; z++) {
-        const uint16* sourceZ = volume+z*XY;
-        for(uint y=marginY; y<Y-marginY; y++) {
-            const uint16* sourceY = sourceZ+y*X;
-            for(uint x=marginX; x<X-marginX; x++) {
-                if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[round(sqrt(sourceY[x]))]++;
-            }
-        }
-    }
-    return histogram;
-}
-
 Sample parseSample(const ref<byte>& file) {
     Sample sample;
     TextData s (file);
@@ -46,9 +27,9 @@ Sample parseSample(const ref<byte>& file) {
 }
 
 inline float log10(float x) { return __builtin_log10f(x); }
-string toASCII(const Sample& sample, float scale) {
+string toASCII(const Sample& sample, bool zeroes, bool squared, float scale) {
     string s;
-    for(uint i=0; i<sample.size; i++) s << ftoa(i*scale,ceil(-log10(scale))) << '\t' << str(sample[i]) << '\n';
+    for(uint i=0; i<sample.size; i++) if(zeroes || sample[i]) s << ftoa((squared?sqrt(i):float(i))*scale,3) << '\t' << str(sample[i]) << '\n';
     return s;
 }
 

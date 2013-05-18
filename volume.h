@@ -32,29 +32,14 @@ inline string str(const Volume& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
 void parseVolumeFormat(Volume& volume, const ref<byte>& path);
 
-struct Volume8 : Volume {
-    typedef uint8 T;
+template<Type T> struct VolumeT : Volume {
     operator const T*() const { return (T*)data.data; }
     operator T*() { return (T*)data.data; }
 };
-
-struct Volume16 : Volume {
-    typedef uint16 T;
-    operator const T*() const { return (T*)data.data; }
-    operator T*() { return (T*)data.data; }
-};
-
-struct Volume24 : Volume {
-    typedef bgr T;
-    operator const T*() const { return (T*)data.data; }
-    operator T*() { return (T*)data.data; }
-};
-
-struct Volume32 : Volume {
-    typedef uint32 T;
-    operator const T*() const { return (T*)data.data; }
-    operator T*() { return (T*)data.data; }
-};
+struct Volume8 : VolumeT<uint8> {};
+struct Volume16 : VolumeT<uint16> {};
+struct Volume24 : VolumeT<bgr> {};
+struct Volume32 : VolumeT<uint32> {};
 
 /// Returns maximum of data
 uint maximum(const Volume16& source);
@@ -69,6 +54,9 @@ void interleavedLookup(Volume& target);
 /// Tiles a volume recursively into bricks (using 3D Z ordering)
 void tile(Volume16& target, const Volume16& source);
 
+/// Clears volume margins
+template<Type T> void clearMargins(VolumeT<T>& target, uint value=0);
+
 /// Copies a cropped version of the volume
 void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, uint x2, uint y2, uint z2);
 
@@ -76,7 +64,7 @@ void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, u
 void downsample(Volume16& target, const Volume16& source);
 
 /// Converts volume data to ASCII (one voxel per line, explicit coordinates)
-void toASCII(Volume& target, const Volume16& source);
+void toASCII(Volume& target, const Volume& source);
 
 /// Returns an image of a volume slice
 Image slice(const Volume& volume, float z, bool cylinder=false);

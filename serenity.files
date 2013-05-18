@@ -11,6 +11,8 @@ image.h
 tiff.cc
 volume.h
 volume.cc
+capsule.h
+capsule.cc
 sample.h
 sample.cc
 render.h
@@ -26,5 +28,5 @@ skeleton.h
 skeleton.cc
 rasterize.h
 rasterize.cc
-capsule.h
-capsule.cc
+trim.h
+trim.cc

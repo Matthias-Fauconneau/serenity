@@ -4,15 +4,12 @@
 /// Sample of a positive distribution
 typedef array<int64> Sample;
 
-/// Computes histogram of values (without normalizing)
+/// Computes histogram of values
 Sample histogram(const Volume16& volume, bool cylinder=false);
-
-/// Computes histogram of square roots (without normalizing)
-Sample sqrtHistogram(const Volume16& volume, bool cylinder=false);
 
 Sample parseSample(const ref<byte>& file);
 
-string toASCII(const Sample& sample, float scale=1);
+string toASCII(const Sample& sample, bool zeroes=false, bool squared=false, float scale=1);
 
 /// Lorentz distribution 1/(1+x²)
 struct Lorentz {

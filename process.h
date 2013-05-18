@@ -138,7 +138,7 @@ struct parallel {
     template<class F> parallel(uint stop, F f) : parallel(0,stop,f) {}
 };
 
-/// Flags all threads to terminate as soon as they return to event loop, destroys all file-scope objects and exits process.
+/// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
 void exit();
 
 /// Execute binary at \a path with command line arguments \a args

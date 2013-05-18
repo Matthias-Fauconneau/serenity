@@ -231,7 +231,7 @@ template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.s
 /// Unique reference to an heap allocated value
 template<Type T> struct unique {
     unique(unique&& o):pointer(o.pointer){o.pointer=0;}
-    template<Type... Args> unique(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
+    template<Type... Args> explicit unique(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     unique& operator=(unique&& o){ this->~unique(); new (this) unique(move(o)); return *this; }
     ~unique() { if(pointer) { pointer->~T(); free(pointer); } pointer=0; }
 
@@ -239,12 +239,31 @@ template<Type T> struct unique {
     operator const T&() const { return *pointer; }
     T* operator ->() { return pointer; }
     const T* operator ->() const { return pointer; }
-    T* operator &() { return pointer; }
-    const T* operator &() const { return pointer; }
     explicit operator bool() { return pointer; }
-    bool operator !() const { return !pointer; }
-    bool operator ==(const T* pointer) const { return this->pointer==pointer; }
+    bool operator ==(const unique<T>& o) const { return pointer==o.pointer; }
 
     T* pointer;
 };
 template<Type T> unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.pointer)); }
+
+/// Reference to a reference counted heap allocated value
+/// \note Move semantics are still used whenever adequate (sharing is explicit)
+template<Type T> struct shared {
+    shared(shared&& o):pointer(o.pointer){o.pointer=0;}
+    template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T)+sizeof(int))) T(forward<Args>(args)...)){ refCount()=1; }
+    shared& operator=(shared&& o){ this->~shared(); new (this) shared(move(o)); return *this; }
+    explicit shared(const shared<T>& o):pointer(o.pointer){ refCount()++; }
+    ~shared() { if(pointer && --refCount()==0) { pointer->~T(); free(pointer); } pointer=0; }
+
+    operator T&() { return *pointer; }
+    operator const T&() const { return *pointer; }
+    T* operator ->() { return pointer; }
+    const T* operator ->() const { return pointer; }
+    explicit operator bool() { return pointer; }
+    bool operator ==(const shared<T>& o) const { return pointer==o.pointer; }
+
+    T* pointer;
+    int& refCount() const { return *(int*)(pointer+1); }
+};
+template<Type T> shared<T> copy(const shared<T>& o) { return shared<T>(copy(*o.pointer)); }
+template<Type T> shared<T> share(const shared<T>& o) { return shared<T>(o); }

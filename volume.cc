@@ -91,9 +91,7 @@ void tile(Volume16& target, const Volume16& source) {
     const uint16* const sourceData = source;
     interleavedLookup(target);
     uint16* const targetData = target;
-    const uint* const offsetX = target.offsetX;
-    const uint* const offsetY = target.offsetY;
-    const uint* const offsetZ = target.offsetZ;
+    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
 
     for(uint z=0; z<Z; z++) {
         const uint16* const sourceZ = sourceData+z*XY;
@@ -108,14 +106,42 @@ void tile(Volume16& target, const Volume16& source) {
     target.copyMetadata(source);
 }
 
+template<Type T> void clearMargins(VolumeT<T>& target, uint value) {
+    uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
+    int marginX=target.marginX, marginY=target.marginY, marginZ=target.marginZ;
+    T* const targetData = target;
+    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    for(uint z=marginZ; z<Z-marginZ; z++) {
+        T* const targetZ = targetData + (offsetZ ? offsetZ[z] : z*XY);
+        for(uint y=marginY; y<Y-marginY; y++) {
+            T* const targetZY = targetZ + (offsetY ? offsetY[y] : y*X);
+            targetZY[offsetX ? offsetX[marginX] : marginX] = value;
+            targetZY[offsetX ? offsetX[X-marginX-1] : X-marginX-1] = value;
+        }
+        for(uint x=marginX; x<X-marginX; x++) {
+            T* const targetZX = targetZ + (offsetX ? offsetX[x] : x);
+            targetZX[offsetY ? offsetY[marginY] : marginY*X] = value;
+            targetZX[offsetY ? offsetY[Y-marginY-1] : (Y-marginY-1)*X] = value;
+        }
+    }
+    for(uint y=marginY; y<Y-marginY; y++) {
+        T* const targetY = targetData + (offsetY ? offsetY[y] : y*X);
+        for(uint x=marginX; x<X-marginX; x++) {
+            T* const targetYX = targetY + (offsetX ? offsetX[x] : x);
+            targetYX[offsetZ ? offsetZ[marginZ] : marginZ*XY] = value;
+            targetYX[offsetZ ? offsetZ[Z-marginZ-1] : (Z-marginZ-1)*XY] = value;
+        }
+    }
+}
+template void clearMargins<uint16>(VolumeT<uint16>& target, uint value);
+template void clearMargins<uint32>(VolumeT<uint32>& target, uint value);
+
 void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, uint x2, uint y2, uint z2) {
     uint X=x2-x1, Y=y2-y1, Z=z2-z1, XY=X*Y;
     target.x=X, target.y=Y, target.z=Z;
     target.marginX=target.marginY=target.marginZ=0; // Assumes crop outside margins
     assert_(source.offsetX && source.offsetY && source.offsetZ);
-    const uint* const offsetX = source.offsetX;
-    const uint* const offsetY = source.offsetY;
-    const uint* const offsetZ = source.offsetZ;
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     const uint16* const sourceData = source;
     uint16* const targetData = target;
     for(uint z=0; z<Z; z++) {
@@ -156,29 +182,34 @@ void downsample(Volume16& target, const Volume16& source) {
 }
 
 inline void itoa(byte* target, uint n) {
+    assert(n<1000);
     uint i=4;
     do { target[--i]="0123456789"[n%10]; n /= 10; } while( n!=0 );
     while(i>0) target[--i]=' ';
 }
 
-void toASCII(Volume& target, const Volume16& source) {
+void toASCII(Volume& target, const Volume& source) {
     uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    assert_(source.offsetX && source.offsetY && source.offsetZ);
+    uint marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     assert_(!target.offsetX && !target.offsetY && !target.offsetZ);
-    const uint* const offsetX = source.offsetX;
-    const uint* const offsetY = source.offsetY;
-    const uint* const offsetZ = source.offsetZ;
-    const uint16* const sourceData = source;
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     typedef char Line[20];
     Line* const targetData = (Line*)target.data.data;
-
     for(uint z=0; z<Z; z++) {
-        const uint16* const sourceZ = sourceData + offsetZ[z];
         Line* const targetZ = targetData + z*XY;
         for(uint y=0; y<Y; y++) {
-            const uint16* const sourceZY = sourceZ + offsetY[y];
             Line* const targetZY = targetZ + y*X;
             for(uint x=0; x<X; x++) {
+                uint value = 0;
+                if(x >= marginX && x<X-marginX && y >= marginY && y<Y-marginY && z >= marginZ && z<Z-marginZ) {
+                    uint offset = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+                    if(source.sampleSize==1) value = ((byte*)source.data.data)[offset];
+                    else if(source.sampleSize==2) value = ((uint16*)source.data.data)[offset];
+                    else if(source.sampleSize==4) value = ((uint32*)source.data.data)[offset];
+                    else error(source.sampleSize);
+                    assert(value <= source.maximum, value, source.maximum);
+                }
+
                 Line& line = targetZY[x];
                 itoa(line, x);
                 line[4]=' ';
@@ -186,7 +217,7 @@ void toASCII(Volume& target, const Volume16& source) {
                 line[9]=' ';
                 itoa(line+10,z);
                 line[14]=' ';
-                itoa(line+15,sourceZY[offsetX[x]]);
+                itoa(line+15, min<uint>(0xFF, value * 0xFF / source.maximum)); //FIXME
                 line[19]='\n';
             }
         }
