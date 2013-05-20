@@ -2,6 +2,10 @@
 #include "process.h"
 #include "time.h"
 
+#include "rasterize.h"
+#include "process.h"
+#include "time.h"
+
 void rasterize(Volume16& target, const Volume16& source) {
     const uint16* const sourceData = source;
     uint16* const targetData = target;
@@ -20,7 +24,7 @@ void rasterize(Volume16& target, const Volume16& source) {
             for(int x=marginX; x<X-marginX; x++) {
                 int sqRadius = sourceData[offsetZ[z]+offsetY[y]+offsetX[x]];
                 if(!sqRadius) continue;
-                int radius = ceil(sqrt(sqRadius)); //+1 ? Would be duct tape to hide any discretization artifacts
+                int radius = ceil(sqrt(sqRadius));
                 assert(radius<=x && radius<=y && radius<=int(z) && radius<X-1-x && radius<Y-1-y && radius<Z-1-int(z));
                 for(int dz=-radius; dz<=radius; dz++) {
                     uint16* const targetZ= targetData + offsetZ[z+dz];
@@ -28,7 +32,8 @@ void rasterize(Volume16& target, const Volume16& source) {
                         uint16* const targetZY= targetZ + offsetY[y+dy];
                         for(int dx=-radius; dx<=radius; dx++) {
                             uint16* const targetZYX= targetZY + offsetX[x+dx];
-                            if(dx*dx+dy*dy+dz*dz<=sqRadius) { // Rasterizes ball
+                            if(dx*dx+dy*dy+dz*dz<sqRadius) { // Rasterizes ball
+                                //uint unused r = sourceData[offsetZ[z+dz]+offsetY[y+dy]+offsetX[x+dx]]; assert_(r, r, x,y,z, dx,dy,dz, dx*dx+dy*dy+dz*dz,sqRadius);
                                 while(sqRadius > (int)(targetZYX[0]) && !__sync_bool_compare_and_swap(targetZYX, targetZYX[0], sqRadius)); // Stores maximum radius (thread-safe)
                             }
                         }

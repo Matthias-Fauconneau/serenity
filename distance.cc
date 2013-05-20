@@ -5,23 +5,22 @@
 // FIXME: try to factor these
 
 // X
-void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, const Volume32& source, int X, int Y, int Z) {
+void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, const Volume32& source) {
     clearMargins(target);
+    const int X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     const uint32* const sourceData = source;
     uint32* const targetData = target;
     uint16* const xPositionData = positionX;
-    const uint XY = X*Y;
-    constexpr uint unroll = 8;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
-    assert_((Y-2*marginY)%unroll == 0);
-    struct element { uint sd; int16 cx, x; };
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         const uint32* const sourceZ = sourceData+z*XY;
         uint32* const targetZ = targetData+z*X;
         uint16* const xPositionZ = xPositionData+z*X;
+        constexpr uint unroll = 8;
+        assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
-            element stacks[unroll*stackSize];
+            struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
                 memory<element> stack (stacks+dy*stackSize, stackSize);
@@ -43,7 +42,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             }
             uint32* const targetZY = targetZ+y;
             uint16* const xPositionZY = xPositionZ+y;
-            for(int x=X-1; x>=0; x--) {
+            for(int x=X-marginX-1; x>=marginX; x--) {
                 uint32* const targetZYX = targetZY+x*XY;
                 uint16* const xPositionZYX = xPositionZY+x*XY;
                 for(uint dy=0; dy<unroll; dy++) {
@@ -64,27 +63,26 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 }
 
 // Y
-void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, const Volume32& source, const Volume16& sourceX, int X, int Y, int Z) {
+void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, const Volume32& source, const Volume16& sourceX) {
     clearMargins(target);
+    const int X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     uint32* const targetData = target;
     uint16* const xPositionData = positionX;
     uint16* const yPositionData = positionY;
-    const uint XY = X*Y;
-    constexpr uint unroll = 8;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
-    assert_((Y-2*marginY)%unroll == 0);
-    struct element { uint sd; int16 cx, x; };
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         const uint32* const sourceZ = sourceData+z*XY;
         const uint16* const xSourceZ = xSourceData+z*XY;
         uint32* const targetZ = targetData+z*X;
         uint16* const xPositionZ = xPositionData+z*X;
         uint16* const yPositionZ = yPositionData+z*X;
+        constexpr uint unroll = 8;
+        assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
-            element stacks[unroll*stackSize];
+            struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
                 memory<element> stack (stacks+dy*stackSize, stackSize);
@@ -108,7 +106,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             uint32* const targetZY = targetZ+y;
             uint16* const xPositionZY = xPositionZ+y;
             uint16* const yPositionZY = yPositionZ+y;
-            for(int x=X-1; x>=0; x--) {
+            for(int x=X-marginX-1; x>=marginX; x--) {
                 uint32* const targetZYX = targetZY+x*XY;
                 uint16* const xPositionZYX = xPositionZY+x*XY;
                 uint16* const yPositionZYX = yPositionZY+x*XY;
@@ -132,8 +130,10 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 }
 
 // Z
-void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, Volume16& positionZ, const Volume32& source, const Volume16& sourceX, const Volume16& sourceY, int X, int Y, int Z) {
+void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, Volume16& positionZ, const Volume32& source, const Volume16& sourceX, const Volume16& sourceY) {
     clearMargins(target);
+    const int X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     const uint16* const ySourceData = sourceY;
@@ -141,11 +141,6 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
     uint16* const xPositionData = positionX;
     uint16* const yPositionData = positionY;
     uint16* const zPositionData = positionZ;
-    const uint XY = X*Y;
-    constexpr uint unroll = 8;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
-    assert_((Y-2*marginY)%unroll == 0);
-    struct element { uint sd; int16 cx, x; };
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         const uint32* const sourceZ = sourceData+z*XY;
         const uint16* const xSourceZ = xSourceData+z*XY;
@@ -154,9 +149,11 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
         uint16* const xPositionZ = xPositionData+z*X;
         uint16* const yPositionZ = yPositionData+z*X;
         uint16* const zPositionZ = zPositionData+z*X;
+        constexpr uint unroll = 8;
+        assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
-            element stacks[unroll*stackSize];
+            struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
                 memory<element> stack (stacks+dy*stackSize, stackSize);
@@ -182,7 +179,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             uint16* const xPositionZY = xPositionZ+y;
             uint16* const yPositionZY = yPositionZ+y;
             uint16* const zPositionZY = zPositionZ+y;
-            for(int x=X-1; x>=0; x--) {
+            for(int x=X-1-marginX; x>=marginX; x--) {
                 uint32* const targetZYX = targetZY+x*XY;
                 uint16* const xPositionZYX = xPositionZY+x*XY;
                 uint16* const yPositionZYX = yPositionZY+x*XY;
@@ -193,8 +190,8 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
                     if(x==stack[i].cx) i--;
                     assert_(i>=0);
                     int sx = stack[i].x;
-                    int d = x * (x - 2*sx) + stack[i].sd;
-                    targetZYX[dy] = d;
+                    int sqRadius = x * (x - 2*sx) + stack[i].sd;
+                    targetZYX[dy] = sqRadius;
                     xPositionZYX[dy] = xSourceZY[dy*X + sx];
                     yPositionZYX[dy] = ySourceZY[dy*X + sx];
                     zPositionZYX[dy] = sx;
@@ -202,6 +199,34 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             }
         }
     });
+#if 1 // Validation
+    parallel(marginZ, Z-marginZ, [&](uint, uint z) {
+        for(int y: range(marginY, Y-marginY)) {
+            for(int x: range(marginX, X-marginX)) {
+                int sqRadius = targetData[z*XY+y*X+x];
+                if(!sqRadius) assert(sourceData[y*XY+x*X+z]==0xFFFFFFFF);
+                if(sqRadius > 1 && sqRadius<=3) {
+                    int radius = ceil(sqrt(sqRadius));
+                    const uint32* const sourceO = sourceData+y*XY+x*X+z;
+                    for(int dz=-radius; dz<=radius; dz++) {
+                        const uint32* const sourceZ = sourceO+dz;
+                        for(int dy=-radius; dy<=radius; dy++) {
+                            const uint32* const sourceZY = sourceZ+dy*XY;
+                            for(int dx=-radius; dx<=radius; dx++) {
+                                if(dx*dx+dy*dy+dz*dz<sqRadius) {
+                                    int distancey = sourceZY[dx*X];
+                                    int r = targetData[(int(z)+dz)*XY+(y+dy)*X+(x+dx)];
+                                    assert_(distancey!=(int(z)+dz)*(int(z)+dz), marginX, marginY, marginZ, x,y,z, dx,dy,dz,dx*dx+dy*dy+dz*dz,sqRadius);
+                                    assert_(r, marginX, marginY, marginZ, x,y,z, dx,dy,dz,dx*dx+dy*dy+dz*dz,sqRadius);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+#endif
     target.squared=true;
     positionX.squared=false, positionX.maximum=X-1;
     positionY.squared=false, positionY.maximum=Y-1;

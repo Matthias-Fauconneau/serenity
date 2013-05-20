@@ -28,5 +28,5 @@ skeleton.h
 skeleton.cc
 rasterize.h
 rasterize.cc
-trim.h
-trim.cc
+validate.h
+validate.cc

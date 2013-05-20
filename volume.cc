@@ -2,6 +2,7 @@
 #include "simd.h"
 #include "process.h"
 #include "data.h"
+#include "time.h"
 
 static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) {
     buffer<uint> lookup(size);
@@ -42,8 +43,9 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
 }
 
 uint maximum(const Volume16& source) {
+    Time time;
     const uint16* const sourceData = source;
-    const uint X=source.x, Y=source.y, Z=source.z, XY = X*Y;
+    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     v8hi maximum8 = {0,0,0,0,0,0,0,0};
     uint16 maximum=0;
@@ -58,12 +60,14 @@ uint maximum(const Volume16& source) {
         }
     } //);
     for(uint i: range(8)) maximum = max(maximum, ((uint16*)&maximum8)[i]);
+    log("maximum16",time);
     return maximum;
 }
 
 uint maximum(const Volume32& source) {
+    Time time;
     const uint32* const sourceData = source;
-    const uint X=source.x, Y=source.y, Z=source.z, XY = X*Y;
+    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     assert((X-2*marginX)%4==0 && marginX%4==0);
     v4si maximum4 = {0,0,0,0};
@@ -75,6 +79,7 @@ uint maximum(const Volume32& source) {
         }
     }
     uint32 maximum=0; for(uint i: range(4)) maximum = max(maximum, ((uint32*)&maximum4)[i]);
+    log("maximum32",time);
     return maximum;
 }
 
@@ -87,7 +92,7 @@ void pack(Volume16& target, const Volume32& source) {
 }
 
 void tile(Volume16& target, const Volume16& source) {
-    uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     const uint16* const sourceData = source;
     interleavedLookup(target);
     uint16* const targetData = target;
@@ -107,31 +112,59 @@ void tile(Volume16& target, const Volume16& source) {
 }
 
 template<Type T> void clearMargins(VolumeT<T>& target, uint value) {
-    uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
+    Time time;
+    const uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
     int marginX=target.marginX, marginY=target.marginY, marginZ=target.marginZ;
     T* const targetData = target;
-    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-    for(uint z=marginZ; z<Z-marginZ; z++) {
-        T* const targetZ = targetData + (offsetZ ? offsetZ[z] : z*XY);
-        for(uint y=marginY; y<Y-marginY; y++) {
-            T* const targetZY = targetZ + (offsetY ? offsetY[y] : y*X);
-            targetZY[offsetX ? offsetX[marginX] : marginX] = value;
-            targetZY[offsetX ? offsetX[X-marginX-1] : X-marginX-1] = value;
+    if(target.offsetX || target.offsetY || target.offsetZ) {
+        const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+        assert(offsetX && offsetY && offsetZ);
+        for(uint z=0; z<Z; z++) {
+            T* const targetZ = targetData + offsetZ[z];
+            for(uint y=0; y<Y; y++) {
+                T* const targetZY = targetZ + offsetY[y];
+                for(uint x=0; x<=marginX; x++) targetZY[offsetX[x]] = value;
+                for(uint x=X-marginX; x<X; x++) targetZY[offsetX[x]] = value;
+            }
+            for(uint x=0; x<X; x++) {
+                T* const targetZX = targetZ + offsetX[x];
+                for(uint y=0; y<=marginY; y++) targetZX[offsetY[y]] = value;
+                for(uint y=Y-marginY; y<Y; y++) targetZX[offsetY[y]] = value;
+            }
         }
-        for(uint x=marginX; x<X-marginX; x++) {
-            T* const targetZX = targetZ + (offsetX ? offsetX[x] : x);
-            targetZX[offsetY ? offsetY[marginY] : marginY*X] = value;
-            targetZX[offsetY ? offsetY[Y-marginY-1] : (Y-marginY-1)*X] = value;
+        for(uint y=0; y<Y; y++) {
+            T* const targetY = targetData + offsetY[y];
+            for(uint x=0; x<X; x++) {
+                T* const targetYX = targetY + offsetX[x];
+                for(uint z=0; z<=marginZ; z++) targetYX[z] = value;
+                for(uint z=Z-marginZ; z<Z; z++) targetYX[z] = value;
+            }
         }
     }
-    for(uint y=marginY; y<Y-marginY; y++) {
-        T* const targetY = targetData + (offsetY ? offsetY[y] : y*X);
-        for(uint x=marginX; x<X-marginX; x++) {
-            T* const targetYX = targetY + (offsetX ? offsetX[x] : x);
-            targetYX[offsetZ ? offsetZ[marginZ] : marginZ*XY] = value;
-            targetYX[offsetZ ? offsetZ[Z-marginZ-1] : (Z-marginZ-1)*XY] = value;
+    else {
+        for(uint z=0; z<Z; z++) {
+            T* const targetZ = targetData + z*XY;
+            for(uint y=0; y<Y; y++) {
+                T* const targetZY = targetZ + y*X;
+                for(uint x=0; x<=marginX; x++) targetZY[x] = value;
+                for(uint x=X-marginX; x<X; x++) targetZY[x] = value;
+            }
+            for(uint x=0; x<X; x++) {
+                T* const targetZX = targetZ + x;
+                for(uint y=0; y<=marginY; y++) targetZX[y*X] = value;
+                for(uint y=Y-marginY; y<Y; y++) targetZX[y*X] = value;
+            }
+        }
+        for(uint y=0; y<Y; y++) {
+            T* const targetY = targetData + y*X;
+            for(uint x=0; x<X; x++) {
+                T* const targetYX = targetY + x;
+                for(uint z=0; z<=marginZ; z++) targetYX[z*XY] = value;
+                for(uint z=Z-marginZ; z<Z; z++) targetYX[(Z-marginZ-1)*XY] = value;
+            }
         }
     }
+    log("clear",time); //FIXME
 }
 template void clearMargins<uint16>(VolumeT<uint16>& target, uint value);
 template void clearMargins<uint32>(VolumeT<uint32>& target, uint value);
@@ -226,7 +259,7 @@ void toASCII(Volume& target, const Volume& source) {
 
 Image slice(const Volume& source, float normalizedZ, bool cylinder) {
     uint z = source.marginZ+(source.z-2*source.marginZ-1)*normalizedZ;
-    assert(z >= source.marginZ && z<source.z-source.marginZ);
+    assert_(z >= source.marginZ && z<source.z-source.marginZ);
     return slice(source, (int)z, cylinder);
 }
 

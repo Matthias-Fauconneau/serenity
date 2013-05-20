@@ -26,30 +26,30 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
         }
     });
     // Sets boundary voxels to ensures threshold volume is closed (non-zero borders) to avoid null/full rows in distance search
-    int marginX=floor(4,source.marginX), marginY=floor(4,source.marginY), marginZ=floor(4,source.marginZ);
+    uint marginX=align(4,min(1u,source.marginX))+1, marginY=align(4,min(1u,source.marginY))+1, marginZ=align(4,min(1u,source.marginZ))+1;
     for(uint z=marginZ; z<Z-marginZ; z++) {
         uint32* const poreZ = poreData + z*XY;
         uint32* const rockZ = rockData + z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
-            rockZ[y*X+marginX]=poreZ[y*X+marginX]=marginX*marginX; // Sets right face
-            rockZ[y*X+X-marginX-1]=poreZ[y*X+X-marginX-1]=(X-marginX-1)*(X-marginX-1); // Sets left face
+            for(uint x=0; x<=marginX; x++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets right face
+            for(uint x=X-marginX; x<Z; x++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets left face
         }
         for(uint x=marginX; x<X-marginX; x++) {
-            rockZ[marginY*X+x]=poreZ[marginY*X+x]=x*x; // Sets top face
-            rockZ[(Y-marginY-1)*X+x]=poreZ[(Y-marginY-1)*X+x]=x*x; // Sets bottom face
+            for(uint y=0; y<=marginY; y++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets top face
+            for(uint y=Y-marginY; y<Z; y++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets bottom face
         }
     }
     for(uint y=marginY; y<Y-marginY; y++) {
         uint32* const poreY = poreData + y*X;
         uint32* const rockY = rockData + y*X;
         for(uint x=marginX; x<X-marginX; x++) {
-            rockY[marginZ*XY+x]=poreY[marginZ*XY+x]=x*x; // Sets front face
-            rockY[(Z-marginZ-1)*XY+x]=poreY[(Z-marginZ-1)*XY+x]=x*x; // Sets back face
+            for(uint z=0; z<=marginZ; z++) rockY[z*XY+x]=poreY[z*XY+x]=x*x; // Sets front face
+            for(uint z=Z-marginZ; z<Z; z++) rockY[z*XY+x]=poreY[z*XY+x]=x*x; // Sets back face
         }
     }
-    pore.marginX=marginX, pore.marginY=marginY, pore.marginZ=marginZ;
-    rock.marginX=marginX, rock.marginY=marginY, rock.marginZ=marginZ;
-#if DEBUG
+    pore.marginX=marginX-1, pore.marginY=marginY-1, pore.marginZ=marginZ-1;
+    rock.marginX=marginX-1, rock.marginY=marginY-1, rock.marginZ=marginZ-1;
+#if 1
     pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;  // for the assert
 #else
     pore.maximum=(pore.x-1)*(pore.x-1), rock.maximum=(rock.x-1)*(rock.x-1); // for visualization

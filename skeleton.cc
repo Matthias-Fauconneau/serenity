@@ -1,23 +1,21 @@
 #include "skeleton.h"
 #include "process.h"
 
-inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqRadius=2) {
-    int xf0=xf[0], yf0=yf[0], zf0=zf[0], xfd=xf[da], yfd=yf[da], zfd=zf[da], xd=x+dx, yd=y+dy, zd=z+dz;
-    int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd;
-    int sqNorm = sqr(x0d) + sqr(y0d) + sqr(z0d);
-    int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd;
+inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqRadius) {
+    int xf0=xf[0], yf0=yf[0], zf0=zf[0]; // First feature point
+    int xfd=xf[da], yfd=yf[da], zfd=zf[da]; // Second feature point
+    int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd; // Vector between feature points
+    int sqNorm = sqr(x0d) + sqr(y0d) + sqr(z0d); // Squared distance between feature points
+    int xd=x+dx, yd=y+dy, zd=z+dz; // Second origin point
+    int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd; // Bisector (vector bisecting
     int sqDistance = sqr(dx0d) + sqr(dy0d) + sqr(dz0d);
-#if SQUARE_ROOT_PRUNING //Supposed to work better but doesn't prune enough
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
     float norm = sqrt( sqDistance );
-    if(sqNorm > 2*inprod + norm + 1.5f) {
-#elif CONSTANT_LINEAR_PRUNING //Constant + Linear pruning works perfectly for capsule validation case
-    if(sqNorm > 2 && sqNorm > sqDistance) {
-#else
-    int inprod = - dx*x0d - dy*y0d - dz*z0d;
-    float norm = sqrt( sqDistance );
-    if(sqNorm > minimalSqRadius && sqNorm > sqDistance && sqNorm >  2*inprod + norm + 1.5f) { // Rasterization being much slower prune using all methods
-#endif
+    // Prune using all methods (as rasterization is the bottleneck)
+    if( sqNorm > minimalSqRadius &&  // Constant pruning: feature point far enough apart (may filter small features)
+         sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 53° (may cut corners, effective when sqDistance > sqNorm > sqRadius)
+         sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
+            ) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
         if(crit>=0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); assert(r<0x10000); skel[0] = r; }
         if(crit<=0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); assert(r<0x10000); skel[da] = r; }
@@ -25,6 +23,7 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
 }
 
 void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume16& positionY, const Volume16& positionZ, int minimalSqRadius) {
+    assert_(minimalSqRadius>=3);
     const uint16* const xPositionData = positionX;
     const uint16* const yPositionData = positionY;
     const uint16* const zPositionData = positionZ;

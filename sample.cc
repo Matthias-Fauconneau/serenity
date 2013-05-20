@@ -1,18 +1,33 @@
 #include "sample.h"
 #include "data.h"
 
-Sample histogram(const Volume16& volume, bool cylinder) {
-    uint X=volume.x, Y=volume.y, Z=volume.z, XY=X*Y;
-    uint marginX=volume.marginX, marginY=volume.marginY, marginZ=volume.marginZ;
+Sample histogram(const Volume16& source, bool cylinder) {
+    uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    uint marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     assert(X==Y && marginX==marginY);
     uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
-    Sample histogram (volume.maximum+1, volume.maximum+1, 0);
-    for(uint z=marginZ; z<Z-marginZ; z++) {
-        const uint16* sourceZ = volume+z*XY;
-        for(uint y=marginY; y<Y-marginY; y++) {
-            const uint16* sourceY = sourceZ+y*X;
-            for(uint x=marginX; x<X-marginX; x++) {
-                if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[sourceY[x]]++;
+    Sample histogram (source.maximum+1, source.maximum+1, 0);
+    if(source.offsetX || source.offsetY || source.offsetZ) {
+        const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+        assert(offsetX && offsetY && offsetZ);
+        for(uint z=marginZ; z<Z-marginZ; z++) {
+            const uint16* sourceZ = source+offsetZ[z];
+            for(uint y=marginY; y<Y-marginY; y++) {
+                const uint16* sourceZY = sourceZ+offsetY[y];
+                for(uint x=marginX; x<X-marginX; x++) {
+                    if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[sourceZY[offsetX[x]]]++;
+                }
+            }
+        }
+    }
+    else {
+        for(uint z=marginZ; z<Z-marginZ; z++) {
+            const uint16* sourceZ = source+z*XY;
+            for(uint y=marginY; y<Y-marginY; y++) {
+                const uint16* sourceY = sourceZ+y*X;
+                for(uint x=marginX; x<X-marginX; x++) {
+                    if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[sourceY[x]]++;
+                }
             }
         }
     }

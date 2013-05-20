@@ -9,10 +9,10 @@ void shiftRight(Volume16& target, const Volume16& source, uint shift) {
     for(uint i=0; i<size; i+=8) storea(dst+i, shiftRight(loada(src+i), shift));
 }
 
-void smooth(Volume16& target, const Volume16& source, uint X, uint Y, uint Z, uint size, uint shift) {
+void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
     const uint16* const sourceData = source;
     uint16* const targetData = target;
-    const uint XY = X*Y;
+    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     assert(X%16==0);
     const uint margin = align(4,size)-size;
     parallel(Z, [&](uint, uint z){

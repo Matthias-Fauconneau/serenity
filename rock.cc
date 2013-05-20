@@ -14,7 +14,7 @@
 #include "skeleton.h"
 #include "rasterize.h"
 #include "maximum.h"
-#include "trim.h"
+#include "validate.h"
 
 Operation Source("source"_,2); // Loads from original image slices
 Operation ShiftRight ("source"_,"shift"_,2); // Shifts data to avoid overflows
@@ -27,10 +27,14 @@ Operation DistanceY("distancex"_,"positionxx"_,"distancey"_,4,"positionyx"_,2,"p
 Operation DistanceZ("distancey"_,"positionyx"_,"positionyy"_,"distance"_,4,"positionx"_,2,"positiony"_,2,"positionz"_,2); // Z pass
 //Operation Interleave("positionx"_,"positiony"_,"positionz"_,"position"_,6); //TODO: tile and interleave positions for faster skeleton
 Operation Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
+#if 1
 Operation Tile("skeleton"_,"tiled_skeleton"_,2);
 Operation Rasterize("tiled_skeleton"_,"maximum"_,2); // Rasterizes a ball around each skeleton voxel assigning the radius of the largest enclosing sphere to all voxels
-
-Operation Trim("pore"_,"maximum"_,"trim"_,2); // Trims the maximum balls to fit the pore space
+#else //DEBUG: Validates skeleton approximation
+Operation Tile("distance"_,"tiled_distance"_,2);
+Operation Rasterize("tiled_distance"_,"maximum"_,2); // Rasterizes a ball around each skeleton voxel assigning the radius of the largest enclosing sphere to all voxels
+#endif
+Operation Validate("pore"_,"maximum"_,"validate"_,2); // Validates the maximum balls result and helps visualizes filter effects
 
 Operation Colorize("pore"_,"source"_,"colorize"_,3); // Maps intensity to either red or green channel depending on binary classification
 
@@ -169,7 +173,7 @@ struct Rock : Widget {
                 rename(name+"."_+output.name+"."_+volumeFormat(volumes[volumes.indexOf(output.name)]->volume), name+"."_+output.name, memoryFolder);
                 volumes.remove(output.name);
             } else {
-                assert(!existsFile(name+"."_+output.name+"."_+volumeFormat(volume), memoryFolder), output.name, volumes);
+                assert(!existsFile(name+"."_+output.name+"."_+volumeFormat(volume), memoryFolder), output.name);
                 for(uint i: range(volumes.size)) { // Tries to recycle pages (avoid zeroing)
                     const shared<VolumeData>& volume = volumes[i];
                     if(volume.refCount()==1 && !selection.contains(volume->name)) { // Recycles unused volumes (when only reference is from volumes list)
@@ -232,7 +236,7 @@ struct Rock : Widget {
                 } else if(operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
                     target.maximum *= sampleCount;
                     if(operation==SmoothZ) shift=0; // not necessary
-                    smooth(target, source, X,Y,Z, kernelSize, shift);
+                    smooth(target, source, kernelSize, shift);
                     target.maximum >>= shift;
                     int margin = target.marginY + align(4, kernelSize);
                     target.marginY = target.marginZ;
@@ -296,22 +300,22 @@ struct Rock : Widget {
                 colorize(target, source, inputs[1]->volume);
             }
             else if(operation==DistanceX || operation==EmptyX) {
-                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, source, X,Y,Z);
+                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, source);
             }
             else if(operation==DistanceY || operation==EmptyY) {
-                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, source, inputs[1]->volume, X,Y,Z);
+                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, source, inputs[1]->volume);
             }
             else if(operation==DistanceZ || operation==EmptyZ) {
-                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, outputs[3]->volume, source, inputs[1]->volume, inputs[2]->volume, X,Y,Z);
+                perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, outputs[3]->volume, source, inputs[1]->volume, inputs[2]->volume);
                 target.maximum=maximum((const Volume32&)target);
             }
             else if(operation==Tile) tile(target, source);
             else if(operation==Skeleton) {
-                uint minimalSqRadius = arguments.contains("minimalRadius"_) ? sqr(toInteger(arguments.at("minimalRadius"_))) : 2;
+                uint minimalSqRadius = arguments.contains("minimalRadius"_) ? sqr(toInteger(arguments.at("minimalRadius"_))) : 3;
                 integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume, minimalSqRadius);
             }
             else if(operation==Rasterize) rasterize(target, source);
-            else if(operation==Trim) trim(target, inputs[0]->volume, inputs[1]->volume);
+            else if(operation==Validate) validate(target, inputs[0]->volume, inputs[1]->volume);
             else if(operation==SourceASCII || operation==MaximumASCII) toASCII(target, source);
             else if(operation==RenderEmpty) squareRoot(target, source);
             else if(operation==RenderDensity || operation==RenderIntensity) ::render(target, source);
@@ -324,7 +328,7 @@ struct Rock : Widget {
         for(shared<VolumeData>& output: outputs) {
             Volume& target = output->volume;
             if(output->name=="distance"_ || output->name=="emptyz"_) // Only packs after distance (or empty) pass (FIXME: make all operations generic)
-            while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2/*FIXME*/) { // Packs outputs if needed
+            while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2) { // Packs outputs if needed
                 const Volume32& target32 = target;
                 target.sampleSize /= 2;
                 Time time;
@@ -341,7 +345,7 @@ struct Rock : Widget {
             string outputName = name+"."_+output->name;
             rename(outputName, outputName+"."_+volumeFormat(output->volume), memoryFolder); // Renames output files (once data is valid)
 
-            if((output->name=="maximum"_ || output->name=="trim"_) && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
+            if((output->name=="maximum"_) && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
                 Time time;
                 Sample squaredMaximum = histogram(output->volume, cylinder);
                 squaredMaximum[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
@@ -386,6 +390,7 @@ struct Rock : Widget {
     }
 
     void updateView() {
+        window.setTitle(current->name+"*"_);
         assert(current);
         int2 size(current->volume.x,current->volume.y);
         while(2*size<displaySize) size *= 2;

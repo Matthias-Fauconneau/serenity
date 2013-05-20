@@ -5,4 +5,4 @@
 void shiftRight(Volume16& target, const Volume16& source, uint shift);
 
 /// Computes one pass of running average
-void smooth(Volume16& target, const Volume16& source, uint X, uint Y, uint Z, uint size, uint shift);
+void smooth(Volume16& target, const Volume16& source, uint size, uint shift);
