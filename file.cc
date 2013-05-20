@@ -8,7 +8,8 @@ struct dirent { long ino, off; short len; char name[]; };
 enum {DT_DIR=4, DT_REG=8};
 
 #include <stdio.h> // renameat
-#include <sys/sendfile.h> //sendfile
+#include <sys/sendfile.h>
+#include <sys/statvfs.h>
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
@@ -102,3 +103,6 @@ void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, co
     for(uint64 offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
     assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
 }
+
+uint64 freeSpace(const File& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
+uint64 freeSpace(const ref<byte>& path, const Folder& at) { return freeSpace(File(path,at)); }

@@ -187,7 +187,12 @@ struct Rock : Widget {
             }
             // Creates (or resizes) and maps a volume file for the current operation data
             File file(name+"."_+output.name, memoryFolder, Flags(ReadWrite|Create));
-            file.resize( volume.size() * volume.sampleSize );
+            uint64 newSize = volume.size() * volume.sampleSize;
+            uint64 need = newSize - file.size();
+            if(need > freeSpace(file)) {
+                error("Not enough space, delete data");
+            }
+            file.resize( newSize );
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
             volume.data = buffer<byte>(data.map);
             assert(volume && volume.data.size == volume.size()*volume.sampleSize);

@@ -43,13 +43,11 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
 }
 
 uint maximum(const Volume16& source) {
-    Time time;
     const uint16* const sourceData = source;
     const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     v8hi maximum8 = {0,0,0,0,0,0,0,0};
     uint16 maximum=0;
-    //parallel(marginZ, Z-marginZ, [&](uint, uint z) {
     for(uint z : range(marginZ, Z-marginZ)) {
         const uint16* const sourceZ = sourceData + z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
@@ -58,14 +56,12 @@ uint maximum(const Volume16& source) {
             for(uint x=align(8,marginX); x<floor(8,X-marginX); x+=8) maximum8 = max(maximum8, loada(sourceZY+x)); // Processes using SIMD (8x speedup)
             for(uint x=floor(8,X-marginX); x<X-marginX; x++) maximum = max(maximum, sourceZY[x]); // Processes from last aligned position to margin
         }
-    } //);
+    }
     for(uint i: range(8)) maximum = max(maximum, ((uint16*)&maximum8)[i]);
-    log("maximum16",time);
     return maximum;
 }
 
 uint maximum(const Volume32& source) {
-    Time time;
     const uint32* const sourceData = source;
     const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
     int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
@@ -79,7 +75,6 @@ uint maximum(const Volume32& source) {
         }
     }
     uint32 maximum=0; for(uint i: range(4)) maximum = max(maximum, ((uint32*)&maximum4)[i]);
-    log("maximum32",time);
     return maximum;
 }
 

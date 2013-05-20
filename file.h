@@ -143,3 +143,8 @@ long modifiedTime(const ref<byte>& path, const Folder& at=root());
 void touchFile(const ref<byte>& path, const Folder& at=root());
 /// Copies a file replacing any existing files or links
 void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);
+
+/// Returns available free space in bytes for the file system containing \a file
+uint64 freeSpace(const File& file);
+/// Returns available free space in bytes for the file system containing \a path
+uint64 freeSpace(const ref<byte>& path, const Folder& at=root());
