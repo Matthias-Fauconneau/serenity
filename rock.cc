@@ -50,13 +50,31 @@ Operation SourceASCII("source"_,"source_ascii"_,20); // Converts to ASCII (one v
 Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
 
 struct VolumeData {
-    explicit VolumeData(const ref<byte>& name):name(name){}
+    VolumeData(const Folder& folder, const ref<byte>& name):folder(folder), name(name){}
+    const Folder& folder;
     string name;
     Map map;
     Volume volume;
 };
 template<> string str(const VolumeData& a) { return copy(a.name); }
 bool operator ==(const VolumeData& a, const ref<byte>& name) { return a.name == name; }
+
+struct SharedVolume : shared<VolumeData> {
+    using shared::shared; default_move(SharedVolume);
+    ~SharedVolume() {
+        if(pointer && refCount()==2) { // Flags volume files as unused when refCount goes down to 1 (i.e. only listed in volumes)
+            string path = pointer->name+"."_+volumeFormat(pointer->volume);
+            rename(path, path+"-unused"_,pointer->folder);
+        }
+    }
+};
+SharedVolume share(const SharedVolume& o) {
+    if(o.refCount()==1) { // Flags volume files as used when refCount goes up to 2
+        string path = o->name+"."_+volumeFormat(o->volume);
+        rename(path+"-unused"_, path,o->folder);
+    }
+    return SharedVolume((const shared<VolumeData>&)o);
+}
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : Widget {
@@ -87,21 +105,22 @@ struct Rock : Widget {
         }
         if(target=="intensity"_) renderVolume=true;
         cylinder = arguments.contains("cylinder"_) || (existsFolder(source) && !arguments.contains("cube"_));
+        storageFolder = Folder(name, baseStorageFolder, true);
         assert_(name);
 
-        for(const string& path: memoryFolder.list(Files)) { // Maps intermediate data from any previous run
-            if(!startsWith(path, name)) continue;
-            VolumeData data (section(path,'.',-3,-2));
+        for(const string& path: storageFolder.list(Files)) { // Maps intermediate data from any previous run
+            VolumeData data (storageFolder, section(path,'.',-3,-2));
             bool remove = !operationForOutput(data.name) || volumes.contains(data.name);
             for(ref<byte> name: force) if(operationForOutput(name)->outputs.contains(data.name)) remove=true;
-            if(remove) { ::remove(path, memoryFolder); continue; } // Removes invalid, multiple or to be removed data
+            if(remove) { ::remove(path, storageFolder); continue; } // Removes invalid, multiple or to be removed data
             parseVolumeFormat(data.volume, path);
-            File file = File(path, memoryFolder, ReadWrite);
+            File file = File(path, storageFolder, ReadWrite);
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
             data.volume.data = buffer<byte>(data.map);
             data.volume.sampleSize = data.volume.data.size / data.volume.size();
             assert(data.volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((data.volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
-            volumes << shared<VolumeData>(move(data));
+            volumes << SharedVolume(move(data));
+            if(!endsWith(path,"-unused"_)) rename(path, path+"-unused"_, storageFolder); // All volumes are initially unused
         }
 
         // Executes all operations
@@ -109,13 +128,13 @@ struct Rock : Widget {
 
         if(target=="ascii"_) { // Writes result to disk
             Time time;
-            string volumeName = name+"."_+current->name+"."_+volumeFormat(current->volume);
+            string volumeName = current->name+"."_+volumeFormat(current->volume);
             if(existsFolder(result)) writeFile(volumeName, current->volume.data, resultFolder), log(result+"/"_+volumeName, time);
             else writeFile(result, current->volume.data, root()), log(result, time);
             if(selection) current = getVolume(selection.last());
             else { exit(); return; }
         }
-        if(arguments.contains("exit"_)) { exit(); return; }
+        if(this->arguments.value("view"_,"1"_)!="0"_) { exit(); return; }
         // Displays result
         window.localShortcut(Key('r')).connect(this, &Rock::refresh);
         window.localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
@@ -125,20 +144,25 @@ struct Rock : Widget {
         window.show();
     }
     ~Rock() {
-        //for(const string& path: memoryFolder.list(Files)) if(startsWith(path, name)) ::remove(path, memoryFolder); // Cleanups intermediate data
+        if(arguments.value("clean"_,"0"_)!="0"_) {
+            for(const string& path: storageFolder.list(Files)) ::remove(path, storageFolder); // Cleanups intermediate data
+            remove(storageFolder);
+        }
     }
 
     /// Computes target volume
-    shared<VolumeData> getVolume(const ref<byte>& targetName) {
-        for(const shared<VolumeData>& data: volumes) if(data->name == targetName) return share( data );
+    SharedVolume getVolume(const ref<byte>& targetName) {
+        for(const SharedVolume& data: volumes) {
+            if(data->name == targetName) return share( data );
+        }
         const Operation& operation = *operationForOutput(targetName);
         assert_(&operation, targetName);
-        array<shared<VolumeData>> inputs;
+        array<SharedVolume> inputs;
         for(const ref<byte>& input: operation.inputs) { assert(input != targetName, input, targetName); inputs << getVolume( input ); }
 
-        array<shared<VolumeData>> outputs;
+        array<SharedVolume> outputs;
         for(const Operation::Output& output: operation.outputs) {
-            VolumeData data (output.name);
+            VolumeData data (storageFolder, output.name);
             Volume& volume = data.volume;
             if(!operation.inputs) { // Original source slices format
                 if(name=="validation"_) {
@@ -169,35 +193,46 @@ struct Rock : Widget {
             }
             volume.sampleSize = output.sampleSize;
             assert(volume.size() * volume.sampleSize);
-            if(volumes.contains(output.name)) {
-                rename(name+"."_+output.name+"."_+volumeFormat(volumes[volumes.indexOf(output.name)]->volume), name+"."_+output.name, memoryFolder);
+            if(volumes.contains(output.name)) { // Reuses same volume
+                rename(output.name+"."_+volumeFormat(volumes[volumes.indexOf(output.name)]->volume), output.name, storageFolder);
                 volumes.remove(output.name);
             } else {
-                assert(!existsFile(name+"."_+output.name+"."_+volumeFormat(volume), memoryFolder), output.name);
+                assert(!existsFile(output.name+"."_+volumeFormat(volume), storageFolder), output.name);
                 for(uint i: range(volumes.size)) { // Tries to recycle pages (avoid zeroing)
-                    const shared<VolumeData>& volume = volumes[i];
+                    const SharedVolume& volume = volumes[i];
                     if(volume.refCount()==1 && !selection.contains(volume->name)) { // Recycles unused volumes (when only reference is from volumes list)
-                        string path = name+"."_+volume->name+"."_+volumeFormat(volume->volume);
-                        assert_(existsFile(path, memoryFolder), path);
-                        rename(path, name+"."_+output.name, memoryFolder);
+                        string path = volume->name+"."_+volumeFormat(volume->volume)+"-unused"_;
+                        assert_(existsFile(path, storageFolder), targetName, path);
+                        rename(path, output.name, storageFolder);
                         volumes.removeAt(i);
                         break;
                     }
                 }
             }
             // Creates (or resizes) and maps a volume file for the current operation data
-            File file(name+"."_+output.name, memoryFolder, Flags(ReadWrite|Create));
-            uint64 newSize = volume.size() * volume.sampleSize;
-            uint64 need = newSize - file.size();
-            if(need > freeSpace(file)) {
-                error("Not enough space, delete data");
+            File file(output.name, storageFolder, Flags(ReadWrite|Create));
+            int64 newSize = volume.size() * volume.sampleSize;
+            int64 need = newSize - file.size();
+            while(need > (int64)freeSpace(file)) { // Cleanup data from other cases
+                long minimum=currentTime()+1; string oldest;
+                for(string& path: baseStorageFolder.list(Files|Recursive)) {
+                    if(find(path,"-unused"_)) {
+                        long atime = modifiedTime(path, baseStorageFolder);
+                        if(atime < minimum) minimum=atime, oldest=move(path);
+                    }
+                }
+                if(!oldest) error("Not enough space available");
+                if((int64)(freeSpace(file) + File(oldest,baseStorageFolder).size()) >= need) { // Recycles instead of removing
+                    ::rename(baseStorageFolder, oldest, storageFolder, output.name);
+                    break;
+                }
+                ::remove(oldest, baseStorageFolder); // Removes if need to recycle more than one file
             }
             file.resize( newSize );
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
             volume.data = buffer<byte>(data.map);
             assert(volume && volume.data.size == volume.size()*volume.sampleSize);
-            volumes << shared<VolumeData>(move(data));
-            outputs << share( volumes.last() );
+            outputs << SharedVolume(move(data));
         }
         assert_(outputs);
         Volume& target = outputs.first()->volume;
@@ -235,7 +270,6 @@ struct Rock : Widget {
                     int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
                     int bits = log2(nextPowerOfTwo(max));
                     int headroomShift = ::max(0,bits-16);
-                    //if(headroomShift) log("Shifting out",headroomShift,"least significant bits to compute sum of",sampleCount,"samples without unpacking to 32bit");
                     shiftRight(target, source, headroomShift); // Simply copies if shift = 0
                     target.maximum >>= headroomShift;
                 } else if(operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
@@ -327,10 +361,13 @@ struct Rock : Widget {
             else error("Unimplemented",operation);
         }
         log(operation, time);
+
+        inputs.clear(); // Mark unused inputs
+
         if(target.sampleSize==2) assert(maximum((const Volume16&)target)<=target.maximum, operation, target, maximum((const Volume16&)target), target.maximum);
         if(target.sampleSize==4) assert(maximum((const Volume32&)target)<=target.maximum, operation, target, maximum((const Volume32&)target), target.maximum);
 
-        for(shared<VolumeData>& output: outputs) {
+        for(SharedVolume& output: outputs) {
             Volume& target = output->volume;
             if(output->name=="distance"_ || output->name=="emptyz"_) // Only packs after distance (or empty) pass (FIXME: make all operations generic)
             while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2) { // Packs outputs if needed
@@ -340,31 +377,32 @@ struct Rock : Widget {
                 pack(target, target32);
                 log("pack", time);
                 output->map.unmap();
-                File file(name+"."_+output->name, memoryFolder, ReadWrite);
+                File file(output->name, storageFolder, ReadWrite);
                 file.resize( target.size() * target.sampleSize);
                 output->map = Map(file, Map::Prot(Map::Read|Map::Write));
                 target.data = buffer<byte>(output->map);
             }
             assert(target.maximum< (1ul<<(8*target.sampleSize)));
 
-            string outputName = name+"."_+output->name;
-            rename(outputName, outputName+"."_+volumeFormat(output->volume), memoryFolder); // Renames output files (once data is valid)
+            rename(output->name, output->name+"."_+volumeFormat(output->volume)+"-unused"_, storageFolder); // Renames output files (once data is valid) (initially unused)
 
-            if((output->name=="maximum"_) && (1 || !existsFile(outputName+".tsv"_, resultFolder))) {
+            if((output->name=="maximum"_) && (1 || !existsFile(name+"maximum.tsv"_, resultFolder))) {
                 Time time;
                 Sample squaredMaximum = histogram(output->volume, cylinder);
                 squaredMaximum[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
                 float scale = toDecimal(arguments.value("resolution"_,"1"_));
-                writeFile(outputName+".tsv"_, toASCII(squaredMaximum, false, true, scale), resultFolder);
+                writeFile(name+"maximum.tsv"_, toASCII(squaredMaximum, false, true, scale), resultFolder);
                 log("√histogram", output->name, time);
             }
+
+            volumes << move(output); // Moves output to available volumes list
         }
 
         return share( volumes[volumes.indexOf(targetName)] );
     }
 
     void refresh() {
-        remove(name+"."_+current->name+"."_+volumeFormat(current->volume), memoryFolder);
+        remove(name+"."_+current->name+"."_+volumeFormat(current->volume), storageFolder);
         string target = copy(current->name);
         int unused index = volumes.remove(current);
         assert_(index>=0);
@@ -440,16 +478,17 @@ struct Rock : Widget {
     ref<byte> source; // Path to folder containing source slice images (or the special token "validation")
     uint minX=0, minY=0, minZ=0, maxX=0, maxY=0, maxZ=0; // Coordinates to crop source volume
     bool cylinder = false; // Whether to clip histograms computation and slice rendering to the inscribed cylinder
-    Folder memoryFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
+    Folder baseStorageFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
     ref<byte> name; // Used to name intermediate and output files (folder base name)
+    Folder storageFolder = ""_; // Holds intermediate operations data (=baseStorageFolder/name)
     Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
     ref<byte> result; // Path to file (or folder) where target volume data is copied
     array<ref<byte>> selection; // Data selection for reviewing (mouse wheel selection) (also prevent recycling)
     map<ref<byte>,ref<byte>> arguments;
 
     // Variables
-    array<shared<VolumeData>> volumes; // Mapped volume with valid data
-    shared<VolumeData> current  {"null"_};
+    array<SharedVolume> volumes; // Mapped volume with valid data
+    SharedVolume current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     Window window {this,int2(-1,-1),"Rock"_};
 

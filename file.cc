@@ -18,8 +18,8 @@ Handle::~Handle() { if(fd>0) close(fd); }
 const Folder& cwd() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
 const Folder& root() { static const Folder root("/"_,cwd()); return root; }
 Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0){
-    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0666), folder);
-    fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), folder);
+    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), folder);
+    fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_, at.fd.pointer);
 }
 array<string> Folder::list(uint flags) const {
     Folder fd(""_,*this);
@@ -89,7 +89,8 @@ void rename(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, 
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)), oldName, newName);
 }
 void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) { rename(at, oldName, at, newName); }
-void remove(const ref<byte> &name, const Folder &at) { check_( unlinkat(at.fd,strz(name),0), name); }
+void remove(const ref<byte>& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
+void remove(const Folder& folder) { check_( unlinkat(folder.fd,".",AT_REMOVEDIR)); }
 void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
     assert(from!=to);
     remove(from,at);
@@ -97,6 +98,7 @@ void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
 }
 struct stat statFile(const ref<byte>& path, const Folder& at) { struct stat file; check_( fstat(File(path,at).fd, &file) ); return file; }
 long modifiedTime(const ref<byte>& path, const Folder& at) { return statFile(path,at).st_mtime; }
+long accessTime(const ref<byte>& path, const Folder& at) { return statFile(path,at).st_atime; }
 void touchFile(const ref<byte>& path, const Folder& at) { utimensat(at.fd, strz(path), 0, 0); }
 void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate));

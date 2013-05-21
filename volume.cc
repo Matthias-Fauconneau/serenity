@@ -39,6 +39,7 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
     volume.maximum = s.hexadecimal();
     if(s.match("-tiled"_)) interleavedLookup(volume); else { free(volume.offsetX), free(volume.offsetY), free(volume.offsetZ); }
     if(s.match("-squared"_)) volume.squared=true;
+    s.match("-unused"_);
     assert(!s);
 }
 

@@ -135,10 +135,14 @@ void rename(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, 
 void rename(const ref<byte>& oldName, const ref<byte>& newName, const Folder& at=root());
 /// Removes file
 void remove(const ref<byte>& name, const Folder& at=root());
+/// Removes folder
+void remove(const Folder& folder);
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=root());
-/// Returns the last modified time for \a path
+/// Returns the last modified Unix timestamp for \a path
 long modifiedTime(const ref<byte>& path, const Folder& at=root());
+/// Returns the last access Unix timestamp for \a path
+long accessTime(const ref<byte>& path, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
 void touchFile(const ref<byte>& path, const Folder& at=root());
 /// Copies a file replacing any existing files or links

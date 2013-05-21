@@ -17,7 +17,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
         uint32* const targetZ = targetData+z*X;
         uint16* const xPositionZ = xPositionData+z*X;
         constexpr uint unroll = 8;
-        assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
+        //assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
             struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
@@ -79,7 +79,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
         uint16* const xPositionZ = xPositionData+z*X;
         uint16* const yPositionZ = yPositionData+z*X;
         constexpr uint unroll = 8;
-        assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
+        //assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
             struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
@@ -150,7 +150,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
         uint16* const yPositionZ = yPositionData+z*X;
         uint16* const zPositionZ = zPositionData+z*X;
         constexpr uint unroll = 8;
-        assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
+        //assert(marginX && marginY && marginZ && (Y-2*marginY)%unroll == 0);
         for(int y=marginY; y<Y-marginY; y+=unroll) {
             const uint stackSize = X;
             struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
@@ -199,12 +199,12 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             }
         }
     });
-#if 1 // Validation
+#if 0 // Validation
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         for(int y: range(marginY, Y-marginY)) {
             for(int x: range(marginX, X-marginX)) {
                 int sqRadius = targetData[z*XY+y*X+x];
-                if(!sqRadius) assert(sourceData[y*XY+x*X+z]==0xFFFFFFFF);
+                //if(!sqRadius) assert(sourceData[y*XY+x*X+z]==0xFFFFFFFF);
                 if(sqRadius > 1 && sqRadius<=3) {
                     int radius = ceil(sqrt(sqRadius));
                     const uint32* const sourceO = sourceData+y*XY+x*X+z;

@@ -249,11 +249,12 @@ template<Type T> unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.p
 /// Reference to a reference counted heap allocated value
 /// \note Move semantics are still used whenever adequate (sharing is explicit)
 template<Type T> struct shared {
+    explicit shared():pointer(0){}
     shared(shared&& o):pointer(o.pointer){o.pointer=0;}
     template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T)+sizeof(int))) T(forward<Args>(args)...)){ refCount()=1; }
     shared& operator=(shared&& o){ this->~shared(); new (this) shared(move(o)); return *this; }
     explicit shared(const shared<T>& o):pointer(o.pointer){ refCount()++; }
-    ~shared() { if(pointer && --refCount()==0) { pointer->~T(); free(pointer); } pointer=0; }
+    virtual ~shared() { if(pointer && --refCount()==0) { pointer->~T(); free(pointer); } pointer=0; }
 
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }
