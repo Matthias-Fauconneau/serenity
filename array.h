@@ -115,7 +115,7 @@ template<Type T> struct array {
     /// Filters elements matching predicate
     template<Type F> void filter(F f) { for(uint i=0; i<size;) if(f(at(i))) removeAt(i); else i++; }
 
-    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
+    /// Returns the index of the first occurence of \a key. Returns -1 if \a key could not be found.
     template<Type K> int indexOf(const K& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
     template<Type K> bool contains(const K& key) const { return indexOf(key)>=0; }
@@ -133,6 +133,8 @@ template<Type T> struct array {
         assert(min == max /*&& at(min) == key*/);
         return min;
     }
+    /// Returns a pointer to the first occurrence of \a key. Returns 0 if \a key could not be found.
+    template<Type K> T* find(const K& key) { int i = indexOf(key); return i>=0 ? &at(i) : 0; }
 
     T* data=0; /// Pointer to the buffer valid while not reallocated
     uint capacity=0; /// 0: const reference, >0: size of the owned heap allocation

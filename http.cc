@@ -286,10 +286,11 @@ void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge
     if(url.authorization) headers<< "Authorization: Basic "_+url.authorization;
     // Check if cached
     if(existsFile(file,cache())) {
-        long modified = modifiedTime(file,cache());
+        File file (cacheFile(url), cache());
+        long modified = file.modifiedTime();
         if(currentTime()-modified < maximumAge*60) {
             log("Cached", url);
-            handler(url,Map(file,cache()));
+            handler(url,Map(file));
             return;
         }
         headers<< "If-Modified-Since: "_+str(Date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_);

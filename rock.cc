@@ -25,34 +25,26 @@ Operation Threshold("smooth"_,"pore"_,4, "rock"_,4); // Segments between either 
 Operation DistanceX("pore"_,"distancex"_,4,"positionxx"_,2); // Computes distance field to nearest rock wall (X pass)
 Operation DistanceY("distancex"_,"positionxx"_,"distancey"_,4,"positionyx"_,2,"positionyy"_,2); // Y pass
 Operation DistanceZ("distancey"_,"positionyx"_,"positionyy"_,"distance"_,4,"positionx"_,2,"positiony"_,2,"positionz"_,2); // Z pass
-//Operation Interleave("positionx"_,"positiony"_,"positionz"_,"position"_,6); //TODO: tile and interleave positions for faster skeleton
 Operation Skeleton("positionx"_,"positiony"_,"positionz"_,"skeleton"_,2); // Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
-#if 1
 Operation Tile("skeleton"_,"tiled_skeleton"_,2);
 Operation Rasterize("tiled_skeleton"_,"maximum"_,2); // Rasterizes a ball around each skeleton voxel assigning the radius of the largest enclosing sphere to all voxels
-#else //DEBUG: Validates skeleton approximation
-Operation Tile("distance"_,"tiled_distance"_,2);
-Operation Rasterize("tiled_distance"_,"maximum"_,2); // Rasterizes a ball around each skeleton voxel assigning the radius of the largest enclosing sphere to all voxels
-#endif
+
 Operation Validate("pore"_,"maximum"_,"validate"_,2); // Validates the maximum balls result and helps visualizes filter effects
-
 Operation Colorize("pore"_,"source"_,"colorize"_,3); // Maps intensity to either red or green channel depending on binary classification
-
 Operation EmptyX("rock"_,"emptyx"_,4,"epositionx"_,2); // Computes distance field to nearest pore for empty space skipping (X pass)
 Operation EmptyY("emptyx"_,"epositionx"_,"emptyy"_,4,"epositionyx"_,2,"epositionyy"_,2); // Y pass
 Operation EmptyZ("emptyy"_,"epositionyx"_,"epositionyy"_,"emptyz"_,4,"epositionx"_,2,"epositiony"_,2,"epositionz"_,2); // Z pass
 Operation RenderEmpty("emptyz"_,"empty"_,1); // Square roots and tiles distance field before using it for empty space skiping during rendering
 Operation RenderDensity("distance"_,"density"_,1); // Square roots and normalizes distance to use as density values (for opacity and gradient)
-//Operation RenderDensity("skeleton"_,"density"_,1); // Square roots and normalizes distance to use as density values (for opacity and gradient)
 Operation RenderIntensity("maximum"_,"intensity"_,1); // Square roots and normalizes maximum to use as intensity values (for color intensity)
-
 Operation SourceASCII("source"_,"source_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
 Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
 
 struct VolumeData {
-    VolumeData(const Folder& folder, const ref<byte>& name):folder(folder), name(name){}
+    VolumeData(const Folder& folder, const ref<byte>& name, long modifiedTime):folder(folder), name(name),modifiedTime(modifiedTime){}
     const Folder& folder;
     string name;
+    long modifiedTime;
     Map map;
     Volume volume;
 };
@@ -80,12 +72,12 @@ SharedVolume share(const SharedVolume& o) {
 struct Rock : Widget {
     Rock(const ref<ref<byte>>& arguments) {
         // Parses command line arguments
-        ref<byte> target; array<ref<byte>> force;
+        ref<byte> target; array<ref<byte>> flushedData;
         for(const ref<byte>& argument: arguments) {
             if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
             if(operationForOutput(argument)) { // Parses target (or intermediate data to be removed)
                 if(!target) target=argument;
-                else force << argument;
+                else flushedData << argument;
                 continue;
             }
             if(!source && argument=="validation"_) { source=argument, name=argument; continue; }
@@ -109,12 +101,13 @@ struct Rock : Widget {
         assert_(name);
 
         for(const string& path: storageFolder.list(Files)) { // Maps intermediate data from any previous run
-            VolumeData data (storageFolder, section(path,'.',-3,-2));
-            bool remove = !operationForOutput(data.name) || volumes.contains(data.name);
-            for(ref<byte> name: force) if(operationForOutput(name)->outputs.contains(data.name)) remove=true;
-            if(remove) { ::remove(path, storageFolder); continue; } // Removes invalid, multiple or to be removed data
-            parseVolumeFormat(data.volume, path);
+            ref<byte> name = section(path,'.',-3,-2);
+            bool remove = !operationForOutput(name) || volumes.contains(name);
+            for(ref<byte> flush: flushedData) if(operationForOutput(flush)->outputs.contains(name)) remove=true;
+            if(remove) { ::remove(path, storageFolder); continue; } // Removes invalid, multiple or flushed data
             File file = File(path, storageFolder, ReadWrite);
+            VolumeData data (storageFolder, name, file.modifiedTime());
+            parseVolumeFormat(data.volume, path);
             data.map = Map(file, Map::Prot(Map::Read|Map::Write));
             data.volume.data = buffer<byte>(data.map);
             data.volume.sampleSize = data.volume.data.size / data.volume.size();
@@ -150,19 +143,31 @@ struct Rock : Widget {
         }
     }
 
-    /// Computes target volume
-    SharedVolume getVolume(const ref<byte>& targetName) {
-        for(const SharedVolume& data: volumes) {
-            if(data->name == targetName) return share( data );
-        }
+    /// Recursively verifies inputs are older than target, and no parameters were changed
+    bool needEvaluation(const ref<byte>& targetName, long modifiedTime) {
         const Operation& operation = *operationForOutput(targetName);
         assert_(&operation, targetName);
+
+        SharedVolume* data = volumes.find(operation.name);
+        if(data && (*data)->modifiedTime > modifiedTime) return false;
+        for(const ref<byte>& input: operation.inputs) if(needEvaluation(input, modifiedTime)) return true;
+        return false;
+    }
+
+    /// Computes target volume
+    SharedVolume getVolume(const ref<byte>& targetName) {
+        const Operation& operation = *operationForOutput(targetName);
+        assert_(&operation, targetName);
+
+        SharedVolume* data = volumes.find(targetName);
+        if(data && !needEvaluation(targetName, (*data)->modifiedTime)) return share( *data );
+
         array<SharedVolume> inputs;
-        for(const ref<byte>& input: operation.inputs) { assert(input != targetName, input, targetName); inputs << getVolume( input ); }
+        for(const ref<byte>& input: operation.inputs) inputs << getVolume( input );
 
         array<SharedVolume> outputs;
         for(const Operation::Output& output: operation.outputs) {
-            VolumeData data (storageFolder, output.name);
+            VolumeData data (storageFolder, output.name, currentTime());
             Volume& volume = data.volume;
             if(!operation.inputs) { // Original source slices format
                 if(name=="validation"_) {
@@ -217,7 +222,7 @@ struct Rock : Widget {
                 long minimum=currentTime()+1; string oldest;
                 for(string& path: baseStorageFolder.list(Files|Recursive)) {
                     if(find(path,"-unused"_)) {
-                        long atime = modifiedTime(path, baseStorageFolder);
+                        long atime = File(path, baseStorageFolder).accessTime();
                         if(atime < minimum) minimum=atime, oldest=move(path);
                     }
                 }

@@ -72,8 +72,15 @@ struct File : Stream {
     /// If read only, fails if not existing
     /// If write only, fails if existing
     File(const ref<byte>& path, const Folder& at=root(), Flags flags=ReadOnly);
+    /// Returns file properties
+    struct stat stat() const;
     /// Returns file size
     uint64 size() const;
+    /// Returns the last access Unix timestamp for \a path
+    long accessTime() const;
+    /// Returns the last modified Unix timestamp for \a path
+    long modifiedTime() const;
+
     /// Resizes file
     void resize(uint64 size);
     /// Seeks to \a index
@@ -139,10 +146,6 @@ void remove(const ref<byte>& name, const Folder& at=root());
 void remove(const Folder& folder);
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=root());
-/// Returns the last modified Unix timestamp for \a path
-long modifiedTime(const ref<byte>& path, const Folder& at=root());
-/// Returns the last access Unix timestamp for \a path
-long accessTime(const ref<byte>& path, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
 void touchFile(const ref<byte>& path, const Folder& at=root());
 /// Copies a file replacing any existing files or links
