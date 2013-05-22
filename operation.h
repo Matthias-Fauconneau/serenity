@@ -44,11 +44,11 @@ template<> inline string str(const Variant& o) { return copy((const string&)o); 
 
 /// Intermediate result
 struct Result : shareable {
-    Result(const ref<byte>& name, long timestamp, const ref<byte>& metadata, array<byte>&& data) : name(name), timestamp(timestamp), metadata(metadata), data(move(data)) {}
+    Result(const ref<byte>& name, long timestamp, const ref<byte>& metadata, buffer<byte>&& data) : name(name), timestamp(timestamp), metadata(metadata), data(move(data)) { assert(this->data.size); }
     string name;
     long timestamp; //TODO: hash
     string metadata; //FIXME: allow Operation to construct derived result
-    array<byte> data;
+    buffer<byte> data;
 };
 inline bool operator==(const Result& a, const ref<byte>& b) { return a.name == b; }
 template<> inline string str(const Result& o) { return copy(o.name); }

@@ -1,9 +1,9 @@
 source = Source
 shift = ShiftRight source
-#smoothx = Smooth shift
-#smoothy = Smooth smoothx
-#smooth = Smooth smoothy shift=0
-#pore rock = Threshold smooth
+smoothx = Smooth shift
+smoothy = Smooth smoothx
+smooth = Smooth smoothy #FIXME: shift=0
+pore rock = Threshold smooth
 #distancex positionxx = DistanceX pore
 #distancey positionyx positionyy = DistanceY distancex positionxx
 #distance positionx positiony positionz = DistanceZ distancey positionyx positionyy

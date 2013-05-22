@@ -11,7 +11,10 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
         s.skip();
         rule.operation = s.word();
         s.whileAny(" \t\r"_);
-        for(;!s.match('\n'); s.whileAny(" \t\r"_)) rule.inputs << s.word();
+        for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
+            if(s.match('#')) { s.whileNot('\n'); continue; }
+            rule.inputs << s.word();
+        }
         rules << move(rule);
     }
 
@@ -34,12 +37,15 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
     }
     assert(name);
     storageFolder = Folder(name, baseStorageFolder, true);
+    this->arguments.insert("name"_, name);
+
     // Maps intermediate results from file system
     for(const string& path: storageFolder.list(Files)) {
         ref<byte> name = section(path,'.');
         assert_(!results.contains(name));
         if(!ruleForOutput(name) || !section(path,'.',1,2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
         File file = File(path, storageFolder, ReadWrite);
+        assert(file.size());
         results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
 }
@@ -60,7 +66,7 @@ bool Process::sameSince(const ref<byte>& target, long queryTime) {
     const Rule& rule = *ruleForOutput(target);
     assert_(&rule, target);
 
-    shared<Result>* result = results.find(target);
+    const shared<Result>* result = results.find(target);
     if(result) {
         long time = (*result)->timestamp;
         if(time > queryTime) return false; // Target changed since query
@@ -72,14 +78,14 @@ bool Process::sameSince(const ref<byte>& target, long queryTime) {
 }
 
 shared<Result> Process::getVolume(const ref<byte>& target) {
-    shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp)) return share( *result );
+    const shared<Result>* result = results.find(target);
+    if(result && sameSince(target, (*result)->timestamp)) { assert((*result)->data.size); return share( *result ); }
     error("Anonymous process manager unimplemented"_);
 }
 
 shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
-    shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp)) return share( *result );
+    const shared<Result>* result = results.find(target);
+    if(result && sameSince(target, (*result)->timestamp)) { assert((*result)->data.size); return share( *result ); }
 
     const Rule& rule = *ruleForOutput(target);
     assert_(&rule, target);

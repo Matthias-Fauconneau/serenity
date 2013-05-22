@@ -32,7 +32,7 @@ struct Process {
 
 struct ResultFile : Result {
     ResultFile(const ref<byte>& name, long timestamp, const ref<byte>& metadata, const Folder& folder, Map&& map, const ref<byte>& path)
-        : Result(name,timestamp,metadata, array<byte>(map.data,map.size)), folder(folder), map(move(map)), oldName(path?:name+"."_+metadata+".1"_) {}
+        : Result(name,timestamp,metadata, buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), oldName(path?:name+"."_+metadata+".1"_) { assert(this->map.size); }
     void rename() {
         if(!oldName) return;
         string newName = name+"."_+metadata+"."_+str(userCount);

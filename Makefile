@@ -15,7 +15,8 @@ SRCS = $(SRCS_$(BUILD))
 SRCS_profile = profile
 
 SRCS += $(SRCS_$(TARGET))
-SRCS_rock = tiff source smooth rock.txt #FIXME: parse  module dependencies
+#SRCS_rock = tiff source smooth threshold rock.txt #FIXME: parse module dependencies
+SRCS_rock = rock.txt #FIXME: parse module dependencies
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button

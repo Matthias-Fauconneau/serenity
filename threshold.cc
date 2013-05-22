@@ -1,7 +1,10 @@
-#include "threshold.h"
-#include "simd.h"
+#include "volume-operation.h"
+#include "sample.h"
+#include "time.h"
 #include "thread.h"
+#include "simd.h"
 
+/// Segments by setting values over a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
 void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float threshold) {
     v4si scaledThreshold = set1(threshold*source.maximum);
     uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
@@ -49,9 +52,68 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
     }
     pore.marginX=marginX-1, pore.marginY=marginY-1, pore.marginZ=marginZ-1;
     rock.marginX=marginX-1, rock.marginY=marginY-1, rock.marginZ=marginZ-1;
-#if 1
+#if DEBUG
     pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;  // for the assert
 #else
     pore.maximum=(pore.x-1)*(pore.x-1), rock.maximum=(rock.x-1)*(rock.x-1); // for visualization
 #endif
 }
+
+class(Threshold, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return 4; }
+    void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
+        const Volume& source = inputs[0];
+        float densityThreshold=0;
+        if(args.contains("threshold"_)) {
+            densityThreshold = toDecimal(args.at("threshold"_));
+            while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
+        }
+        if(!densityThreshold) {
+            Time time;
+            Sample density = histogram(source,  args.contains("cylinder"_));
+            log("density", time);
+            bool plot = false;
+            ref<byte> name = args.at("name"_);
+            Folder resultFolder (args.at("resultFolder"_));
+            if(plot) writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
+            if(name != "validation"_) density[0]=density[density.size-1]=0; // Ignores clipped values
+#if 1 // Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
+            Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
+            if(plot) writeFile(name+".rock.tsv"_, toASCII(sample(rock,density.size)), resultFolder);
+            Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
+            if(plot) writeFile(name+".notrock.tsv"_, toASCII(notrock), resultFolder);
+            Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
+            pore.height = density[pore.position]; // Use peak height from total data (estimating on not-rock yields too low estimate because rock is estimated so wide its tail overlaps pore peak)
+            if(plot) writeFile(name+".pore.tsv"_, toASCII(sample(pore,density.size)), resultFolder);
+            Sample notpore = density - sample(pore, density.size);
+            if(plot) writeFile(name+".notpore.tsv"_, toASCII(notpore), resultFolder);
+            uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
+            if(name=="validation"_) threshold = (pore.position+rock.position)/2; // Validation threshold cannot be estimated with this model
+            densityThreshold = float(threshold) / float(density.size);
+            log("Automatic threshold", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
+#else // Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
+            uint threshold=0; double maximum=0;
+            uint64 totalCount=0, totalSum=0; double totalMaximum=0;
+            for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t], totalMaximum=max(totalMaximum, double(density[t]));
+            uint64 backgroundCount=0, backgroundSum=0;
+            Sample interclass (density.size, density.size, 0);
+            double variances[density.size];
+            for(uint64 t: range(density.size)) {
+                backgroundCount += density[t];
+                if(backgroundCount == 0) continue;
+                backgroundSum += t*density[t];
+                uint64 foregroundCount = totalCount - backgroundCount, foregroundSum = totalSum - backgroundSum;
+                if(foregroundCount == 0) break;
+                double variance = double(foregroundCount)*double(backgroundCount)*sqr(double(foregroundSum)/double(foregroundCount) - double(backgroundSum)/double(backgroundCount));
+                if(variance > maximum) maximum=variance, threshold = t;
+                variances[t] = variance;
+            }
+            for(uint t: range(density.size)) interclass[t]=variances[t]*totalMaximum/maximum; // Scales to plot over density
+            writeFile("interclass.tsv"_,toASCII(interclass), resultFolder);
+            densityThreshold = float(threshold) / float(density.size);
+            log("Automatic threshold", threshold, densityThreshold);
+#endif
+        } else log("Manual threshold", densityThreshold);
+        threshold(outputs[0], outputs[1], source, densityThreshold);
+    }
+};

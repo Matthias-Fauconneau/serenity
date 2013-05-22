@@ -6,9 +6,9 @@
 inline Volume toVolume(const Result& result) {
     Volume volume;
     parseVolumeFormat(volume, result.metadata);
-    volume.data = buffer<byte>(result.data);
+    volume.data = buffer<byte>(ref<byte>(result.data));
     volume.sampleSize = volume.data.size / volume.size();
-    assert(volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
+    assert(volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8, volume.sampleSize, volume.data.size); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
     return volume;
 }
 
@@ -27,7 +27,7 @@ struct VolumeOperation : virtual Operation {
         for(uint index: range(outputs.size)) {
             Volume volume;
             volume.sampleSize = outputSampleSize(index);
-            volume.data = buffer<byte>(outputs[index]->data);
+            volume.data = buffer<byte>(ref<byte>(outputs[index]->data));
             if(inputVolumes) { // Inherits initial metadata from previous operation
                 const Volume& source = inputVolumes.first();
                 volume.x=source.x, volume.y=source.y, volume.z=source.z, volume.copyMetadata(source);

@@ -7,40 +7,10 @@
 //#include "render.h"
 #include "png.h"
 
-//FIXME: parse module dependencies
+//FIXME: parse module dependencies without these dummy headers
 #include "source.h"
 #include "smooth.h"
-
-/*Volume& target = output->volume;
-if(output->name=="distance"_ || output->name=="emptyz"_) // Only packs after distance (or empty) pass (FIXME: make all operations generic)
-    while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2) { // Packs outputs if needed
-        const Volume32& target32 = target;
-        target.sampleSize /= 2;
-        Time time;
-        pack(target, target32);
-        log("pack", time);
-        output->map.unmap();
-        File file(output->name, storageFolder, ReadWrite);
-        file.resize( target.size() * target.sampleSize);
-        output->map = Map(file, Map::Prot(Map::Read|Map::Write));
-        target.data = buffer<byte>(output->map);
-    }
-assert(target.maximum< (1ul<<(8*target.sampleSize)));
-
-if((output->name=="maximum"_) && (1 || !existsFile(name+"maximum.tsv"_, resultFolder))) {
-    Time time;
-    Sample squaredMaximum = histogram(output->volume, cylinder);
-    squaredMaximum[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
-    float scale = toDecimal(args.value("resolution"_,"1"_));
-    writeFile(name+"maximum.tsv"_, toASCII(squaredMaximum, false, true, scale), resultFolder);
-    log("√histogram", output->name, time);
-}*/
-
-
-
-//Validation
-//volume.x = 512, volume.y = 512, volume.z = 512;
-
+#include "threshold.h"
 
 /*Operation SmoothX("shift"_,"smoothx"_,2); // Denoises data and filters smallest pores by averaging samples in a window (X pass)
 Operation SmoothY("smoothx"_,"smoothy"_,2);  // Y pass
@@ -63,75 +33,37 @@ Operation RenderDensity("distance"_,"density"_,1); // Square roots and normalize
 Operation RenderIntensity("maximum"_,"intensity"_,1); // Square roots and normalizes maximum to use as intensity values (for color intensity)
 Operation SourceASCII("source"_,"source_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
 Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)*/
+
 #if 0
+// Pack
+Volume& target = output->volume;
+if(output->name=="distance"_ || output->name=="emptyz"_) // Only packs after distance (or empty) pass (FIXME: make all operations generic)
+    while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2) { // Packs outputs if needed
+        const Volume32& target32 = target;
+        target.sampleSize /= 2;
+        Time time;
+        pack(target, target32);
+        log("pack", time);
+        output->map.unmap();
+        File file(output->name, storageFolder, ReadWrite);
+        file.resize( target.size() * target.sampleSize);
+        output->map = Map(file, Map::Prot(Map::Read|Map::Write));
+        target.data = buffer<byte>(output->map);
+    }
+assert(target.maximum< (1ul<<(8*target.sampleSize)));
 
-        if(rule==ShiftRight || rule==SmoothX || rule==SmoothY || rule==SmoothZ) {
-    // Smooth operation averages samples in a (2×kernelSize+1)³ window
-
-            } else if(operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
-                target.maximum *= sampleCount;
-                if(operation==SmoothZ) shift=0; // not necessary
-                smooth(target, source, kernelSize, shift);
-                target.maximum >>= shift;
-                int margin = target.marginY + align(4, kernelSize);
-                target.marginY = target.marginZ;
-                target.marginZ = target.marginX;
-                target.marginX = margin;
-            }
-        }
-
+// Histogram
+if((output->name=="maximum"_) && (1 || !existsFile(name+"maximum.tsv"_, resultFolder))) {
+    Time time;
+    Sample squaredMaximum = histogram(output->volume, cylinder);
+    squaredMaximum[0] = 0; // Clears background (rock) voxel count to plot with a bigger Y scale
+    float scale = toDecimal(args.value("resolution"_,"1"_));
+    writeFile(name+"maximum.tsv"_, toASCII(squaredMaximum, false, true, scale), resultFolder);
+    log("√histogram", output->name, time);
+}
 
         else if(operation==Threshold) {
-            float densityThreshold=0;
-            if(arguments.contains("threshold"_)) {
-                densityThreshold = toDecimal(arguments.at("threshold"_));
-                while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
-            }
-            if(!densityThreshold) {
-                Time time;
-                Sample density = histogram(source,  cylinder);
-                log("density", time);
-                bool plot = false;
-                if(plot) writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
-                if(name != "validation"_) density[0]=density[density.size-1]=0; // Ignores clipped values
-#if 1 // Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
-                Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
-                if(plot) writeFile(name+".rock.tsv"_, toASCII(sample(rock,density.size)), resultFolder);
-                Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
-                if(plot) writeFile(name+".notrock.tsv"_, toASCII(notrock), resultFolder);
-                Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
-                pore.height = density[pore.position]; // Use peak height from total data (estimating on not-rock yields too low estimate because rock is estimated so wide its tail overlaps pore peak)
-                if(plot) writeFile(name+".pore.tsv"_, toASCII(sample(pore,density.size)), resultFolder);
-                Sample notpore = density - sample(pore, density.size);
-                if(plot) writeFile(name+".notpore.tsv"_, toASCII(notpore), resultFolder);
-                uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
-                if(name=="validation"_) threshold = (pore.position+rock.position)/2; // Validation threshold cannot be estimated with this model
-                densityThreshold = float(threshold) / float(density.size);
-                log("Automatic threshold", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
-#else // Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
-                uint threshold=0; double maximum=0;
-                uint64 totalCount=0, totalSum=0; double totalMaximum=0;
-                for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t], totalMaximum=max(totalMaximum, double(density[t]));
-                uint64 backgroundCount=0, backgroundSum=0;
-                Sample interclass (density.size, density.size, 0);
-                double variances[density.size];
-                for(uint64 t: range(density.size)) {
-                    backgroundCount += density[t];
-                    if(backgroundCount == 0) continue;
-                    backgroundSum += t*density[t];
-                    uint64 foregroundCount = totalCount - backgroundCount, foregroundSum = totalSum - backgroundSum;
-                    if(foregroundCount == 0) break;
-                    double variance = double(foregroundCount)*double(backgroundCount)*sqr(double(foregroundSum)/double(foregroundCount) - double(backgroundSum)/double(backgroundCount));
-                    if(variance > maximum) maximum=variance, threshold = t;
-                    variances[t] = variance;
-                }
-                for(uint t: range(density.size)) interclass[t]=variances[t]*totalMaximum/maximum; // Scales to plot over density
-                writeFile("interclass.tsv"_,toASCII(interclass), resultFolder);
-                densityThreshold = float(threshold) / float(density.size);
-                log("Automatic threshold", threshold, densityThreshold);
-#endif
-            } else log("Manual threshold", densityThreshold);
-            threshold(target, outputs[1]->volume, source, densityThreshold);
+
         }
 
         else if(operation==Colorize) {
@@ -160,6 +92,7 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
 
     //Validation
 #include "capsule.h"
+//volume.x = 512, volume.y = 512, volume.z = 512;
         else if(operation==Validate) validate(target, inputs[0]->volume, inputs[1]->volume);
                 array<Capsule> capsules = randomCapsules(X,Y,Z, 1);
                 rasterize(target, capsules);
@@ -179,6 +112,9 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
 struct Rock : PersistentProcess, Widget {
     TEXT(rock); // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
+        ref<byte> source; // Path to folder containing source slice images (or the special token "validation")
+        ref<byte> resultFolder = "ptmp"_; // Folder where histograms are written
+        ref<byte> result; // Path to file (or folder) where target volume data is copied
         for(const ref<byte>& argument: args) {
             if(argument.contains('=') || ruleForOutput(argument)) continue;
             if(!name) name=argument;
@@ -193,14 +129,17 @@ struct Rock : PersistentProcess, Widget {
         else source=arguments.at("source"_); // or default to validation ?
 
         // Configures default arguments
-        if(!result) result = "ptmp"_;
+        if(!arguments.contains("cube"_) && !arguments.contains("cylinder"_)) // Clip histograms computation and slice rendering to the full inscribed cylinder by default
+            arguments.insert("cylinder"_,""_); //FIXME: not for validation
+        if(!arguments.contains("kernelSize"_)) arguments.insert("kernelSize"_, 1);
         if(target!="ascii") {
             if(arguments.contains("selection"_)) selection = split(arguments.at("selection"_),',');
             if(!selection) selection<<"source"_<<"smooth"_<<"colorize"_<<"distance"_ << "skeleton"_ << "maximum"_;
             if(!selection.contains(target)) selection<<target;
         }
-        if(!arguments.contains("kernelSize"_)) arguments.insert("kernelSize"_, 1);
         //if(target=="intensity"_) renderVolume=true;
+        if(!result) result = resultFolder = "ptmp"_;
+        arguments.insert("resultFolder"_,resultFolder);
 
         // Executes all operations
         current = getVolume(target);
@@ -287,9 +226,7 @@ struct Rock : PersistentProcess, Widget {
         } else
 #endif
         {
-            // Whether to clip histograms computation and slice rendering to the inscribed cylinder
-            bool cylinder = arguments.contains("cylinder"_) || (existsFolder(source) && !arguments.contains("cube"_));
-            Image image = slice(volume, sliceZ, cylinder);
+            Image image = slice(volume, sliceZ, arguments.contains("cylinder"_));
             while(2*image.size()<=size) image=upsample(image);
             blit(position, image);
         }
@@ -301,9 +238,6 @@ struct Rock : PersistentProcess, Widget {
         log(path);
     }
 
-    ref<byte> source; // Path to folder containing source slice images (or the special token "validation")
-    Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
-    ref<byte> result; // Path to file (or folder) where target volume data is copied
     array<ref<byte>> selection; // Data selection for reviewing (mouse wheel selection) (also prevent recycling)
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice

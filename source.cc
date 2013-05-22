@@ -15,7 +15,7 @@ class(Source, Operation), virtual VolumeOperation {
         Map file (slices.first(), folder);
         const Tiff16 image (file);
         minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
-        if(args.contains("cylinder"_)) {
+        if(args.contains("cylinder"_) && args.at("cylinder"_)!=""_) {
             auto coordinates = toIntegers(args.at("cylinder"_));
             int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
             minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
