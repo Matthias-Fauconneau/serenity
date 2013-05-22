@@ -149,10 +149,10 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return
 template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
 /// Declares a script embedded in the binary
-#define TEXT(name) \
-extern char _binary_ ## name ##_txt_start[]; \
-extern char _binary_ ## name ##_txt_end[]; \
-static ref<byte> name (_binary_ ## name ##_txt_start,_binary_ ## name ##_txt_end);
+#define TEXT(name) static ref<byte> name() { \
+    extern char _binary_ ## name ##_txt_start[], _binary_ ## name ##_txt_end[]; \
+    return ref<byte>(_binary_ ## name ##_txt_start,_binary_ ## name ##_txt_end); \
+}
 
 // Integer operations
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
@@ -238,7 +238,8 @@ template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.s
 
 /// Unique reference to an heap allocated value
 template<Type T> struct unique {
-    unique(unique&& o):pointer(o.pointer){o.pointer=0;}
+    //unique(unique&& o):pointer(o.pointer){o.pointer=0;}
+    template<Type D> unique(unique<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
     template<Type... Args> explicit unique(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     unique& operator=(unique&& o){ this->~unique(); new (this) unique(move(o)); return *this; }
     ~unique() { if(pointer) { pointer->~T(); free(pointer); } pointer=0; }
@@ -263,7 +264,7 @@ template<Type T> struct shared {
     template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     shared& operator=(shared&& o){ this->~shared(); new (this) shared(move(o)); return *this; }
     explicit shared(const shared<T>& o):pointer(o.pointer){ pointer->addUser(); }
-    ~shared() { if(pointer && pointer->removeUser()==0) { pointer->~T(); free(pointer); } pointer=0; }
+    ~shared() { if(!pointer) return; assert(pointer->userCount); if(pointer->removeUser()==0) { pointer->~T(); free(pointer); } pointer=0; }
 
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }
@@ -276,10 +277,3 @@ template<Type T> struct shared {
 };
 template<Type T> shared<T> copy(const shared<T>& o) { return shared<T>(copy(*o.pointer)); }
 template<Type T> shared<T> share(const shared<T>& o) { return shared<T>(o); }
-
-/// Reference counter to be inherited by shared objects
-struct shareable {
-    uint userCount = 1;
-    virtual void addUser() { ++userCount; }
-    virtual uint removeUser() { return --userCount; }
-};

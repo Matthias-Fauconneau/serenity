@@ -31,10 +31,14 @@ struct Process {
 };
 
 struct ResultFile : Result {
-    ResultFile(const ref<byte>& name, long timestamp, const ref<byte>& metadata, const Folder& folder, Map&& map, const ref<byte>& path=""_)
+    ResultFile(const ref<byte>& name, long timestamp, const ref<byte>& metadata, const Folder& folder, Map&& map, const ref<byte>& path)
         : Result(name,timestamp,metadata, array<byte>(map.data,map.size)), folder(folder), map(move(map)), oldName(path?:name+"."_+metadata+".1"_) {}
-    void rename() { if(!oldName) return; string newName = name+"."_+metadata+"."_+str(userCount); ::rename(oldName, newName, folder); oldName=move(newName); }
-    void addUser() override { userCount++; rename(); }
+    void rename() {
+        if(!oldName) return;
+        string newName = name+"."_+metadata+"."_+str(userCount);
+        if(oldName!=newName) { ::rename(oldName, newName, folder); oldName=move(newName); }
+    }
+    void addUser() override { ++userCount; rename(); }
     uint removeUser() override { --userCount; rename(); return userCount; }
 
     const Folder& folder;

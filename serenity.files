@@ -21,7 +21,6 @@ sample.h
 sample.cc
 render.h
 render.cc
-smooth.h
 smooth.cc
 threshold.h
 threshold.cc
@@ -35,3 +34,7 @@ validate.h
 validate.cc
 rock.txt
 rock.cc
+source.cc
+volume-operation.h
+source.h
+smooth.h

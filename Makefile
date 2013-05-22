@@ -15,7 +15,7 @@ SRCS = $(SRCS_$(BUILD))
 SRCS_profile = profile
 
 SRCS += $(SRCS_$(TARGET))
-SRCS_rock = rock.txt #source.cc ...
+SRCS_rock = tiff source smooth rock.txt #FIXME: parse  module dependencies
 
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
@@ -84,7 +84,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	@$(CC) $(FLAGS) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
+	$(CC) $(FLAGS) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png

@@ -27,12 +27,12 @@ void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();
 
 // Threads
 
-// Handle for the main thread (group leader)
-Thread mainThread __attribute((init_priority(1005))) (20);
 // Lock access to thread list
-static Lock threadsLock __attribute((init_priority(1003)));
+static Lock threadsLock __attribute((init_priority(103)));
 // Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
-static array<Thread*> threads __attribute((init_priority(1004)));
+static array<Thread*> threads __attribute((init_priority(104)));
+// Handle for the main thread (group leader)
+Thread mainThread __attribute((init_priority(105))) (20);
 
 void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
 int exit_group(int status) { return syscall(SYS_exit_group, status); }
@@ -123,7 +123,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
 void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #endif
-void __attribute((constructor(1002))) setup_signals() {
+void __attribute((constructor(102))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recursive calls
     //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}

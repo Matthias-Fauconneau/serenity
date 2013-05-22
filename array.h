@@ -72,7 +72,8 @@ template<Type T> struct array {
 
     /// \name Append operators
     array& operator<<(T&& e) { uint s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
-    array& operator<<(array<T>&& a) {uint s=size+a.size; reserve(s); copy((byte*)end(),(byte*)a.data,a.size*sizeof(T)); size=s; return *this; }
+    //array& operator<<(array<T>&& a) {uint s=size+a.size; reserve(s); copy((byte*)end(),(byte*)a.data,a.size*sizeof(T)); size=s; return *this; }
+    array& operator<<(array<T>&& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (data+s+i) T(move(a[i])); return *this; }
     array& operator<<(const T& v) { *this<< copy(v); return *this; }
     array& operator<<(const ref<T>& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (data+s+i) T(copy(a[i])); return *this; }
     /// \}

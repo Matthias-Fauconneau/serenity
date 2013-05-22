@@ -1,53 +1,15 @@
 #include "thread.h"
 #include "process.h"
+#include "volume-operation.h"
 #include "time.h"
-#include "tiff.h"
 #include "window.h"
 #include "display.h"
-#include "sample.h"
-#include "render.h"
-#include "capsule.h"
+//#include "render.h"
 #include "png.h"
 
-Volume toVolume(const Result& result) {
-    Volume volume;
-    parseVolumeFormat(volume, result.metadata);
-    volume.data = buffer<byte>(result.data);
-    volume.sampleSize = volume.data.size / volume.size();
-    assert(volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
-    return volume;
-}
-
-/// Convenience class to help define volume operations
-struct VolumeOperation : virtual Operation {
-    virtual ref<int> outputSampleSize() abstract;
-    uint64 outputSize(map<ref<byte>, Variant>&, const ref<shared<Result>>& inputs, uint index) override { return toVolume(inputs[0]).size() * outputSampleSize()[index]; }
-    virtual void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) abstract;
-    void execute(map<ref<byte>, Variant>& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
-        array<Volume> inputVolumes = apply<Volume>(inputs, toVolume);
-        array<Volume> outputVolumes;
-        for(uint index: range(outputs.size)) {
-            Volume volume;
-            volume.sampleSize = outputSampleSize()[index];
-            volume.data = buffer<byte>(outputs[index]->data);
-            if(inputVolumes) { // Inherits initial metadata from previous operation
-                const Volume& source = inputVolumes.first();
-                volume.x=source.x, volume.y=source.y, volume.z=source.z, volume.copyMetadata(source);
-                assert(volume.sampleSize * volume.size() == volume.data.size);
-            }
-            outputVolumes << move( volume );
-        }
-        execute(args, outputVolumes, inputVolumes);
-        for(uint index: range(outputs.size)) {
-            Result& result = outputs[index];
-            Volume& output = outputVolumes[index];
-            result.metadata = volumeFormat(output);
-            if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, output, maximum((const Volume16&)output), output.maximum);
-            if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, output, maximum((const Volume32&)output), output.maximum);
-        }
-    }
-};
-
+//FIXME: parse module dependencies
+#include "source.h"
+#include "smooth.h"
 
 /*Volume& target = output->volume;
 if(output->name=="distance"_ || output->name=="emptyz"_) // Only packs after distance (or empty) pass (FIXME: make all operations generic)
@@ -74,59 +36,11 @@ if((output->name=="maximum"_) && (1 || !existsFile(name+"maximum.tsv"_, resultFo
     log("√histogram", output->name, time);
 }*/
 
-/// Loads from original image slices
-class(Source, Operation), virtual VolumeOperation {
-    uint minX, minY, minZ, maxX, maxY, maxZ;
 
-    ref<int> outputSampleSize() override { return {2}; }
-
-    uint64 outputSize(map<ref<byte>, Variant>& args, const ref<shared<Result>>&, uint) override {
-        Folder folder(args.at("source"_));
-        array<string> slices = folder.list(Files);
-        assert(slices, args.at("source"_));
-        Map file (slices.first(), folder);
-        const Tiff16 image (file);
-        minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
-        if(args.contains("cylinder"_)) {
-            auto coordinates = toIntegers(args.at("cylinder"_));
-            int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
-            minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
-        }
-        if(args.contains("cube"_)) {
-            auto coordinates = toIntegers(args.at("cube"_));
-            minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
-        }
-        assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=image.width && maxY<=image.height && maxZ<=slices.size);
-        return (maxX-minX)*(maxY-minY)*(maxZ-minZ)*outputSampleSize()[0];
-    }
-
-    void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
-        Folder folder(args.at("source"_));
-        array<string> slices = folder.list(Files);
-
-        Volume& volume = outputs.first();
-        volume.x = maxX-minX, volume.y = maxY-minY, volume.z = maxZ-minZ;
-        volume.maximum = (1<<volume.sampleSize)-1;
-        uint X = volume.x, Y = volume.y, Z = volume.z, XY=X*Y;
-        Time time; Time report;
-        uint16* const targetData = (Volume16&)outputs.first();
-        for(uint z=0; z<Z; z++) {
-            if(report/1000>=2) { log(z,"/",Z, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
-            Tiff16(Map(slices[minZ+z],folder)).read(targetData+z*XY, minX, minY, maxX-minX, maxY-minY); // Directly decodes slice images into the volume
-        }
-    }
-};
 
 //Validation
 //volume.x = 512, volume.y = 512, volume.z = 512;
 
-/*#include "smooth.h"
-/// Shifts data to avoid overflows
-class(ShiftRight, Operation), virtual Pass<uint16, uint16> {
-    void execute(Volume& target, const Volume& source, map<ref<byte>, Variant>& args) {
-        shiftRight(target, source, args.at("shift"_));
-    }
-};*/
 
 /*Operation SmoothX("shift"_,"smoothx"_,2); // Denoises data and filters smallest pores by averaging samples in a window (X pass)
 Operation SmoothY("smoothx"_,"smoothy"_,2);  // Y pass
@@ -152,15 +66,8 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
 #if 0
 
         if(rule==ShiftRight || rule==SmoothX || rule==SmoothY || rule==SmoothZ) {
-            uint kernelSize = arguments.contains("smooth"_) ? toInteger(arguments.at("smooth"_)) : name=="validation"_ ? 0 : 1; // Smooth operation averages samples in a (2×kernelSize+1)³ window
-            uint sampleCount = 2*kernelSize+1;
-            uint shift = log2(sampleCount);
-            if(rule==ShiftRight) {
-                int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
-                int bits = log2(nextPowerOfTwo(max));
-                int headroomShift = ::max(0,bits-16);
-                shiftRight(target, source, headroomShift); // Simply copies if shift = 0
-                target.maximum >>= headroomShift;
+    // Smooth operation averages samples in a (2×kernelSize+1)³ window
+
             } else if(operation==SmoothX || operation==SmoothY || operation==SmoothZ) {
                 target.maximum *= sampleCount;
                 if(operation==SmoothZ) shift=0; // not necessary
@@ -251,8 +158,9 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
 
         else if(operation==Rasterize) rasterize(target, source);
 
-        else if(operation==Validate) validate(target, inputs[0]->volume, inputs[1]->volume);
     //Validation
+#include "capsule.h"
+        else if(operation==Validate) validate(target, inputs[0]->volume, inputs[1]->volume);
                 array<Capsule> capsules = randomCapsules(X,Y,Z, 1);
                 rasterize(target, capsules);
                 Sample analytic;
@@ -267,11 +175,10 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
         else if(operation==RenderDensity || operation==RenderIntensity) ::render(target, source);
 #endif
 
-TEXT(rock); // Rock process definition (embedded in binary)
-
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : PersistentProcess, Widget {
-    Rock(const ref<ref<byte>>& args) : PersistentProcess(rock, args) {
+    TEXT(rock); // Rock process definition (embedded in binary)
+    Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
         for(const ref<byte>& argument: args) {
             if(argument.contains('=') || ruleForOutput(argument)) continue;
             if(!name) name=argument;
@@ -292,7 +199,8 @@ struct Rock : PersistentProcess, Widget {
             if(!selection) selection<<"source"_<<"smooth"_<<"colorize"_<<"distance"_ << "skeleton"_ << "maximum"_;
             if(!selection.contains(target)) selection<<target;
         }
-        if(target=="intensity"_) renderVolume=true;
+        if(!arguments.contains("kernelSize"_)) arguments.insert("kernelSize"_, 1);
+        //if(target=="intensity"_) renderVolume=true;
 
         // Executes all operations
         current = getVolume(target);
@@ -304,7 +212,7 @@ struct Rock : PersistentProcess, Widget {
             if(selection) current = getVolume(selection.last());
             else { exit(); return; }
         }
-        if(arguments.value("view"_,"1"_)!="0"_) { exit(); return; }
+        if(arguments.value("view"_,"1"_)=="0"_) { exit(); return; }
         // Displays result
         window.localShortcut(Key('r')).connect(this, &Rock::refresh);
         window.localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
@@ -320,7 +228,7 @@ struct Rock : PersistentProcess, Widget {
         updateView();
     }
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+    bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
         if(button==WheelDown||button==WheelUp) {
             int index = clip<int>(0,selection.indexOf(current->name)+(button==WheelUp?1:-1),selection.size-1);
             current = getVolume(selection[index]);
@@ -328,13 +236,16 @@ struct Rock : PersistentProcess, Widget {
             return true;
         }
         if(!button) return false;
+#if RENDER
         if(renderVolume) {
             int2 delta = cursor-lastPos;
             lastPos = cursor;
             if(event != Motion) return false;
             rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
             rotation.y= clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
-        } else {
+        }
+#endif
+        else {
             float z = clip(0.f, float(cursor.x)/(size.x-1), 1.f);
             if(sliceZ != z) { sliceZ = z; updateView(); }
         }
@@ -357,13 +268,8 @@ struct Rock : PersistentProcess, Widget {
         assert(current);
         Volume volume = toVolume(current);
         if(volume.sampleSize==20) { exit(); return; } // Don't try to display ASCII
-        if(!renderVolume) {
-            // Whether to clip histograms computation and slice rendering to the inscribed cylinder
-            bool cylinder = arguments.contains("cylinder"_) || (existsFolder(source) && !arguments.contains("cube"_));
-            Image image = slice(volume, sliceZ, cylinder);
-            while(2*image.size()<=size) image=upsample(image);
-            blit(position, image);
-        } else {
+#if RENDER
+        if(renderVolume) {
             mat3 view;
             view.rotateX(rotation.y); // pitch
             view.rotateZ(rotation.x); // yaw
@@ -373,11 +279,19 @@ struct Rock : PersistentProcess, Widget {
             Time time;
             assert_(position==int2(0) && size == framebuffer.size());
             ::render(framebuffer, toVolume(empty), toVolume(density), toVolume(intensity), view);
-#if 0
+#if PROFILE
             log((uint64)time,"ms");
             window.render(); // Force continuous updates (even when nothing changed)
             wait.reset();
 #endif
+        } else
+#endif
+        {
+            // Whether to clip histograms computation and slice rendering to the inscribed cylinder
+            bool cylinder = arguments.contains("cylinder"_) || (existsFolder(source) && !arguments.contains("cube"_));
+            Image image = slice(volume, sliceZ, cylinder);
+            while(2*image.size()<=size) image=upsample(image);
+            blit(position, image);
         }
     }
 
@@ -395,7 +309,9 @@ struct Rock : PersistentProcess, Widget {
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     Window window {this,int2(-1,-1),"Rock"_};
 
+#if RENDER
     bool renderVolume = false;
     int2 lastPos;
     vec2 rotation = vec2(PI/3,-PI/3); // Current view angles (yaw,pitch)
-} app( arguments() );
+#endif
+} app ( arguments() );

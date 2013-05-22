@@ -1,5 +1,5 @@
 source = Source
-#shift = ShiftRight source
+shift = ShiftRight source
 #smoothx = Smooth shift
 #smoothy = Smooth smoothx
 #smooth = Smooth smoothy shift=0

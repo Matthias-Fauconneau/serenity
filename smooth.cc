@@ -1,7 +1,8 @@
-#include "smooth.h"
+#include "volume-operation.h"
 #include "thread.h"
 #include "simd.h"
 
+/// Shifts all values to the right
 void shiftRight(Volume16& target, const Volume16& source, uint shift) {
     const uint16* const src = source;
     uint16* const dst = target;
@@ -9,6 +10,19 @@ void shiftRight(Volume16& target, const Volume16& source, uint shift) {
     for(uint i=0; i<size; i+=8) storea(dst+i, shiftRight(loada(src+i), shift));
 }
 
+/// Shifts data before summing to avoid overflow
+class(ShiftRight, Operation), virtual VolumePass<uint16, uint16> {
+    void execute(map<ref<byte>, Variant>& args, Volume16& target, const Volume16& source) override {
+        int kernelSize = toInteger(args.at("kernelSize"_)), sampleCount = 2*kernelSize+1, shift = log2(sampleCount);
+        int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
+        int bits = log2(nextPowerOfTwo(max));
+        int headroomShift = ::max(0,bits-16);
+        shiftRight(target, source, headroomShift);
+        target.maximum >>= headroomShift;
+    }
+};
+
+/// Computes one pass of running average
 void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
     const uint16* const sourceData = source;
     uint16* const targetData = target;

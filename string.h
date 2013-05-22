@@ -77,6 +77,7 @@ inline string str(const int64& n) { return dec(n); }
 inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
+template<Type T> string str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
 string ftoa(double number, int precision=2, int pad=0, bool exponent=false);

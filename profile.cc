@@ -39,6 +39,6 @@ struct Profile {
         top->tsc = tsc;
     }
 };
-Profile profile __attribute((init_priority(1001)));
+Profile profile __attribute((init_priority(101)));
 extern "C" void __cyg_profile_func_enter(void* function, void*) { if(function) profile.enter(function); }
 extern "C" void __cyg_profile_func_exit(void*, void*) { profile.exit(); }

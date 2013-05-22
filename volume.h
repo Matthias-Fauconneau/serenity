@@ -1,20 +1,26 @@
 #pragma once
 #include "image.h"
+
+template<Type T> struct VolumeT;
+typedef VolumeT<uint8> Volume8;
+typedef VolumeT<uint16> Volume16;
 struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } } packed;
+typedef VolumeT<bgr> Volume24;
+typedef VolumeT<uint32> Volume32;
 
 struct Volume {
     Volume(){}
 
     uint64 size() const { return x*y*z; }
     explicit operator bool() const { return data; }
-    operator const struct Volume8&() const { assert_(sampleSize==sizeof(uint8),sampleSize); return (struct Volume8&)*this; }
-    operator const struct Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (struct Volume16&)*this; }
-    operator const struct Volume24&() const { assert_(sampleSize==sizeof(bgr),sampleSize); return (struct Volume24&)*this; }
-    operator const struct Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (struct Volume32&)*this; }
-    operator struct Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(struct Volume8*)this; }
-    operator struct Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(struct Volume16*)this; }
-    operator struct Volume24&() { assert_(sampleSize==sizeof(bgr),sampleSize); return *(struct Volume24*)this; }
-    operator struct Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(struct Volume32*)this; }
+    operator const Volume8&() const { assert_(sampleSize==sizeof(uint8),sampleSize); return (Volume8&)*this; }
+    operator const Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (Volume16&)*this; }
+    operator const Volume24&() const { assert_(sampleSize==sizeof(bgr),sampleSize); return (Volume24&)*this; }
+    operator const Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (Volume32&)*this; }
+    operator Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(Volume8*)this; }
+    operator Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(Volume16*)this; }
+    operator Volume24&() { assert_(sampleSize==sizeof(bgr),sampleSize); return *(Volume24*)this; }
+    operator Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(Volume32*)this; }
     void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; maximum=source.maximum; squared=source.squared; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
@@ -26,20 +32,16 @@ struct Volume {
     bool squared=false; // Whether the sample are a squared magnitude
 };
 
+template<Type T> struct VolumeT : Volume {
+    operator const T*() const { return (T*)data.data; }
+    operator T*() { return (T*)data.data; }
+};
+
 /// Serializes volume format (size, margin, range, layout)
 string volumeFormat(const Volume& volume);
 inline string str(const Volume& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
 void parseVolumeFormat(Volume& volume, const ref<byte>& format);
-
-template<Type T> struct VolumeT : Volume {
-    operator const T*() const { return (T*)data.data; }
-    operator T*() { return (T*)data.data; }
-};
-struct Volume8 : VolumeT<uint8> {};
-struct Volume16 : VolumeT<uint16> {};
-struct Volume24 : VolumeT<bgr> {};
-struct Volume32 : VolumeT<uint32> {};
 
 /// Returns maximum of data
 uint maximum(const Volume16& source);
