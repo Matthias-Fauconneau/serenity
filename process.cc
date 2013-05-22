@@ -10,7 +10,7 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
         for(;!s.match('='); s.skip()) rule.outputs << s.word();
         s.skip();
         rule.operation = s.word();
-        for(;!s.match('='); s.skip()) rule.inputs << s.word();
+        for(;!s.match('\n'); s.whileAny(" \t\r"_)) rule.inputs << s.word();
         rules << move(rule);
     }
 
@@ -25,8 +25,10 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
 PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<byte>>& arguments) : Process(definition, arguments) {
     for(const ref<byte>& argument: arguments) {
         if(argument.contains('=') || ruleForOutput(argument)) continue;
-        if(!name) name=argument; continue;
+        if(!name) name=argument;
+        if(existsFolder(argument)) name=argument.contains('/')?section(argument,'/',-2,-1):argument;
     }
+    assert(name);
     storageFolder = Folder(name, baseStorageFolder, true);
     // Maps intermediate results from file system
     for(const string& path: storageFolder.list(Files)) {
@@ -34,7 +36,7 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
         assert_(!results.contains(name));
         if(!ruleForOutput(name)) { ::remove(path, storageFolder); continue; } // Removes invalid data
         File file = File(path, storageFolder, ReadWrite);
-        results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)));
+        results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
 }
 
@@ -91,7 +93,7 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
         }
         // Creates (or resizes) and maps an output result file
         int64 outputSize = operation.outputSize(arguments, inputs, index);
-        while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(output, storageFolder)) {
+        while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
             long minimum=currentTime()+1; string oldest;
             for(string& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                 uint userCount = toInteger(section(path,'.',-2,-1));

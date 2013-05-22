@@ -155,7 +155,7 @@ struct TextData : virtual Data {
     ref<byte> line();
     /// Reads one possibly escaped character
     char character();
-    /// Reads a word [a-zA-Z<special>]*
+    /// Reads a word [a-zA-Z<special>]+
     ref<byte> word(const ref<byte>& special=""_);
     /// Reads a identifier [a-zA-Z0-9<special>]*
     ref<byte> identifier(const ref<byte>& special=""_);

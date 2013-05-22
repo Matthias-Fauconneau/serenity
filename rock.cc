@@ -9,27 +9,46 @@
 #include "capsule.h"
 #include "png.h"
 
-#if 0
-///
-struct VolumeOperation : Operation {
-    uint64 outputSize(map<ref<byte>, Variant>& args, const ref<shared<Result>>& inputs, uint index) override {
-};
-} else { // Inherits initial format from previous rule
-    const Volume& source = inputs.first()->volume;
-    volume.x=source.x, volume.y=source.y, volume.z=source.z, volume.copyMetadata(source);
-    volume.maximum = (1<<sampleSize)-1;
+Volume toVolume(const Result& result) {
+    Volume volume;
+    parseVolumeFormat(volume, result.metadata);
+    volume.data = buffer<byte>(result.data);
+    volume.sampleSize = volume.data.size / volume.size();
+    assert(volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
+    return volume;
 }
-/*data.volume.data = buffer<byte>(data.map);
-data.volume.sampleSize = data.volume.data.size / data.volume.size();
-assert(data.volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((data.volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)*/
-/*Volume& volume = data.volume;
-volume.sampleSize = output.sampleSize;
-assert(volume.size() * volume.sampleSize);*/
-//volume.size() * volume.sampleSize;
-/*volume.data = buffer<byte>(data.map);
-assert(volume && volume.data.size == volume.size()*volume.sampleSize);*/
-/*if(target.sampleSize==2) assert(maximum((const Volume16&)target)<=target.maximum, rule, target, maximum((const Volume16&)target), target.maximum);
-if(target.sampleSize==4) assert(maximum((const Volume32&)target)<=target.maximum, rule, target, maximum((const Volume32&)target), target.maximum);*/
+
+/// Convenience class to help define volume operations
+struct VolumeOperation : virtual Operation {
+    virtual ref<int> outputSampleSize() abstract;
+    uint64 outputSize(map<ref<byte>, Variant>&, const ref<shared<Result>>& inputs, uint index) override { return toVolume(inputs[0]).size() * outputSampleSize()[index]; }
+    virtual void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) abstract;
+    void execute(map<ref<byte>, Variant>& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
+        array<Volume> inputVolumes = apply<Volume>(inputs, toVolume);
+        array<Volume> outputVolumes;
+        for(uint index: range(outputs.size)) {
+            Volume volume;
+            volume.sampleSize = outputSampleSize()[index];
+            volume.data = buffer<byte>(outputs[index]->data);
+            if(inputVolumes) { // Inherits initial metadata from previous operation
+                const Volume& source = inputVolumes.first();
+                volume.x=source.x, volume.y=source.y, volume.z=source.z, volume.copyMetadata(source);
+                assert(volume.sampleSize * volume.size() == volume.data.size);
+            }
+            outputVolumes << move( volume );
+        }
+        execute(args, outputVolumes, inputVolumes);
+        for(uint index: range(outputs.size)) {
+            Result& result = outputs[index];
+            Volume& output = outputVolumes[index];
+            result.metadata = volumeFormat(output);
+            if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, output, maximum((const Volume16&)output), output.maximum);
+            if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, output, maximum((const Volume32&)output), output.maximum);
+        }
+    }
+};
+
+
 /*Volume& target = output->volume;
 if(output->name=="distance"_ || output->name=="emptyz"_) // Only packs after distance (or empty) pass (FIXME: make all operations generic)
     while(target.maximum < (1ul<<(8*(target.sampleSize/2))) && target.sampleSize>2) { // Packs outputs if needed
@@ -55,20 +74,19 @@ if((output->name=="maximum"_) && (1 || !existsFile(name+"maximum.tsv"_, resultFo
     log("√histogram", output->name, time);
 }*/
 
-#endif
-
 /// Loads from original image slices
-class(Source, Operation) {
-    array<string> slices;
-    Volume volume;
-    uint64 outputSize(map<ref<byte>, Variant>& args, const ref<shared<Result>>& inputs, uint index) override {
-        assert(!inputs && index==0);
+class(Source, Operation), virtual VolumeOperation {
+    uint minX, minY, minZ, maxX, maxY, maxZ;
+
+    ref<int> outputSampleSize() override { return {2}; }
+
+    uint64 outputSize(map<ref<byte>, Variant>& args, const ref<shared<Result>>&, uint) override {
         Folder folder(args.at("source"_));
-        slices = folder.list(Files);
+        array<string> slices = folder.list(Files);
+        assert(slices, args.at("source"_));
         Map file (slices.first(), folder);
         const Tiff16 image (file);
-        volume.x = image.width, volume.y = image.height, volume.z = slices.size;
-        uint minX=0, minY=0, minZ=0, maxX = volume.x, maxY = volume.y, maxZ = volume.z;
+        minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
         if(args.contains("cylinder"_)) {
             auto coordinates = toIntegers(args.at("cylinder"_));
             int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
@@ -78,20 +96,20 @@ class(Source, Operation) {
             auto coordinates = toIntegers(args.at("cube"_));
             minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
         }
-        assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=volume.x && maxY<=volume.y && maxZ<=volume.z);
-        volume.x = maxX-minX, volume.y = maxY-minY, volume.z = maxZ-minZ;
-        args.insert("minX"_,minX), args.insert("minY"_,minY), args.insert("minZ"_,minZ), args.insert("maxX"_,maxX), args.insert("maxY"_,maxY), args.insert("maxZ"_,maxZ);
-        volume.maximum = (1<<16)-1;
+        assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=image.width && maxY<=image.height && maxZ<=slices.size);
+        return (maxX-minX)*(maxY-minY)*(maxZ-minZ)*outputSampleSize()[0];
     }
 
-    void execute(ref<Volume*> outputs, ref<const Volume *>, map<ref<byte>, Variant>& args) {
-        Volume16& target = *outputs[0]; uint X = target.x, Y = target.y, Z = target.z, XY=X*Y;
-        Folder folder ( args.at("folder"_) ); // Contains source slice images
-        int minX=args.at("minX"_), minY=args.at("minY"_), minZ=args.at("minZ"_), maxX=args.at("maxX"_), maxY=args.at("minY"_), maxZ=args.at("maxZ"_); // Coordinates to crop source volume
-        Time time; Time report;
+    void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
+        Folder folder(args.at("source"_));
         array<string> slices = folder.list(Files);
-        assert_((int)slices.size>=maxZ);
-        uint16* const targetData = (Volume16&)target;
+
+        Volume& volume = outputs.first();
+        volume.x = maxX-minX, volume.y = maxY-minY, volume.z = maxZ-minZ;
+        volume.maximum = (1<<volume.sampleSize)-1;
+        uint X = volume.x, Y = volume.y, Z = volume.z, XY=X*Y;
+        Time time; Time report;
+        uint16* const targetData = (Volume16&)outputs.first();
         for(uint z=0; z<Z; z++) {
             if(report/1000>=2) { log(z,"/",Z, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
             Tiff16(Map(slices[minZ+z],folder)).read(targetData+z*XY, minX, minY, maxX-minX, maxY-minY); // Directly decodes slice images into the volume
@@ -102,13 +120,13 @@ class(Source, Operation) {
 //Validation
 //volume.x = 512, volume.y = 512, volume.z = 512;
 
-#include "smooth.h"
+/*#include "smooth.h"
 /// Shifts data to avoid overflows
 class(ShiftRight, Operation), virtual Pass<uint16, uint16> {
     void execute(Volume& target, const Volume& source, map<ref<byte>, Variant>& args) {
         shiftRight(target, source, args.at("shift"_));
     }
-};
+};*/
 
 /*Operation SmoothX("shift"_,"smoothx"_,2); // Denoises data and filters smallest pores by averaging samples in a window (X pass)
 Operation SmoothY("smoothx"_,"smoothy"_,2);  // Y pass
@@ -132,29 +150,7 @@ Operation RenderIntensity("maximum"_,"intensity"_,1); // Square roots and normal
 Operation SourceASCII("source"_,"source_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)
 Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (one voxel per line, explicit coordinates)*/
 #if 0
-    if(rule==Source) {
-        if(name == "validation"_) {
-            array<Capsule> capsules = randomCapsules(X,Y,Z, 1);
-            rasterize(target, capsules);
-            Sample analytic;
-            for(Capsule p : capsules) {
-                if(p.radius>=analytic.size) analytic.grow(p.radius+1);
-                analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
-            }
-            writeFile(name+".analytic.tsv"_, toASCII(analytic), resultFolder);
-        } else {
-            Folder folder(source);
-            Time report;
-            array<string> slices = folder.list(Files);
-            assert_(slices.size>=maxZ);
-            uint16* const targetData = (Volume16&)target;
-            for(uint z=0; z<Z; z++) {
-                if(report/1000>=2) { log(z,"/",Z, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
-                Tiff16(Map(slices[minZ+z],folder)).read(targetData+z*XY, minX, minY, maxX-minX, maxY-minY); // Directly decodes slice images into the volume
-            }
-        }
-    } else {
-        const Volume& source = inputs.first()->volume;
+
         if(rule==ShiftRight || rule==SmoothX || rule==SmoothY || rule==SmoothZ) {
             uint kernelSize = arguments.contains("smooth"_) ? toInteger(arguments.at("smooth"_)) : name=="validation"_ ? 0 : 1; // Smooth operation averages samples in a (2×kernelSize+1)³ window
             uint sampleCount = 2*kernelSize+1;
@@ -176,6 +172,8 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
                 target.marginX = margin;
             }
         }
+
+
         else if(operation==Threshold) {
             float densityThreshold=0;
             if(arguments.contains("threshold"_)) {
@@ -228,9 +226,11 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
             } else log("Manual threshold", densityThreshold);
             threshold(target, outputs[1]->volume, source, densityThreshold);
         }
+
         else if(operation==Colorize) {
             colorize(target, source, inputs[1]->volume);
         }
+
         else if(operation==DistanceX || operation==EmptyX) {
             perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, source);
         }
@@ -241,26 +241,40 @@ Operation MaximumASCII("maximum"_,"maximum_ascii"_,20); // Converts to ASCII (on
             perpendicularBisectorEuclideanDistanceTransform(target, outputs[1]->volume, outputs[2]->volume, outputs[3]->volume, source, inputs[1]->volume, inputs[2]->volume);
             target.maximum=maximum((const Volume32&)target);
         }
+
         else if(operation==Tile) tile(target, source);
+
         else if(operation==Skeleton) {
             uint minimalSqRadius = arguments.contains("minimalRadius"_) ? sqr(toInteger(arguments.at("minimalRadius"_))) : 3;
             integerMedialAxis(target, inputs[0]->volume, inputs[1]->volume, inputs[2]->volume, minimalSqRadius);
         }
+
         else if(operation==Rasterize) rasterize(target, source);
+
         else if(operation==Validate) validate(target, inputs[0]->volume, inputs[1]->volume);
+    //Validation
+                array<Capsule> capsules = randomCapsules(X,Y,Z, 1);
+                rasterize(target, capsules);
+                Sample analytic;
+                for(Capsule p : capsules) {
+                    if(p.radius>=analytic.size) analytic.grow(p.radius+1);
+                    analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
+                }
+                writeFile(name+".analytic.tsv"_, toASCII(analytic), resultFolder);
+
         else if(operation==SourceASCII || operation==MaximumASCII) toASCII(target, source);
         else if(operation==RenderEmpty) squareRoot(target, source);
         else if(operation==RenderDensity || operation==RenderIntensity) ::render(target, source);
-        else error("Unimplemented",operation);
-    }
 #endif
+
+TEXT(rock); // Rock process definition (embedded in binary)
+
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : PersistentProcess, Widget {
-    TEXT(rock); // Process script (embedded in binary)
-    Rock(const ref<ref<byte>>& arguments) : PersistentProcess(rock, arguments) {
-        for(const ref<byte>& argument: arguments) {
+    Rock(const ref<ref<byte>>& args) : PersistentProcess(rock, args) {
+        for(const ref<byte>& argument: args) {
             if(argument.contains('=') || ruleForOutput(argument)) continue;
-            if(!name) name=argument; continue;
+            if(!name) name=argument;
             if(existsFolder(argument)) {
                 if(!source) { source=argument; name=source.contains('/')?section(source,'/',-2,-1):source; continue; }
                 if(!result) { result=argument; resultFolder = argument; continue; }
@@ -268,29 +282,29 @@ struct Rock : PersistentProcess, Widget {
             if(!result) { result=argument; resultFolder = section(argument,'/',0,-2); continue; }
             error("Invalid argument"_, argument);
         }
-        if(!result) result = "ptmp"_;
+        if(source) arguments.insert("source"_,source);
+        else source=arguments.at("source"_); // or default to validation ?
 
         // Configures default arguments
+        if(!result) result = "ptmp"_;
         if(target!="ascii") {
-            if(this->args.contains("selection"_)) selection = split(this->args.at("selection"_),',');
+            if(arguments.contains("selection"_)) selection = split(arguments.at("selection"_),',');
             if(!selection) selection<<"source"_<<"smooth"_<<"colorize"_<<"distance"_ << "skeleton"_ << "maximum"_;
             if(!selection.contains(target)) selection<<target;
         }
         if(target=="intensity"_) renderVolume=true;
-        cylinder = arguments.contains("cylinder"_) || (existsFolder(source) && !arguments.contains("cube"_));
 
         // Executes all operations
         current = getVolume(target);
 
         if(target=="ascii"_) { // Writes result to disk
             Time time;
-            string volumeName = current->name+"."_+volumeFormat(current->volume);
-            if(existsFolder(result)) writeFile(volumeName, current->volume.data, resultFolder), log(result+"/"_+volumeName, time);
-            else writeFile(result, current->volume.data, root()), log(result, time);
+            if(existsFolder(result)) writeFile(current->name+"."_+current->metadata, current->data, resultFolder), log(result+"/"_+current->name+"."_+current->metadata, time);
+            else writeFile(result, current->data, root()), log(result, time);
             if(selection) current = getVolume(selection.last());
             else { exit(); return; }
         }
-        if(this->args.value("view"_,"1"_)!="0"_) { exit(); return; }
+        if(arguments.value("view"_,"1"_)!="0"_) { exit(); return; }
         // Displays result
         window.localShortcut(Key('r')).connect(this, &Rock::refresh);
         window.localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
@@ -301,11 +315,8 @@ struct Rock : PersistentProcess, Widget {
     }
 
     void refresh() {
-        remove(name+"."_+current->name+"."_+volumeFormat(current->volume), storageFolder);
-        string target = copy(current->name);
-        int unused index = volumes.remove(current);
-        assert_(index>=0);
-        current = getVolume(target);
+        current->timestamp = 0;
+        current = getVolume(current->name);
         updateView();
     }
 
@@ -334,7 +345,8 @@ struct Rock : PersistentProcess, Widget {
     void updateView() {
         window.setTitle(current->name+"*"_);
         assert(current);
-        int2 size(current->volume.x,current->volume.y);
+        Volume volume = toVolume(current);
+        int2 size(volume.x, volume.y);
         while(2*size<displaySize) size *= 2;
         if(window.size != size) window.setSize(size);
         else window.render();
@@ -343,22 +355,24 @@ struct Rock : PersistentProcess, Widget {
 
     void render(int2 position, int2 size) {
         assert(current);
-        const Volume& source = current->volume;
-        if(source.sampleSize==20) { exit(); return; } // Don't try to display ASCII
+        Volume volume = toVolume(current);
+        if(volume.sampleSize==20) { exit(); return; } // Don't try to display ASCII
         if(!renderVolume) {
-            Image image = slice(source, sliceZ, cylinder);
+            // Whether to clip histograms computation and slice rendering to the inscribed cylinder
+            bool cylinder = arguments.contains("cylinder"_) || (existsFolder(source) && !arguments.contains("cube"_));
+            Image image = slice(volume, sliceZ, cylinder);
             while(2*image.size()<=size) image=upsample(image);
             blit(position, image);
         } else {
             mat3 view;
             view.rotateX(rotation.y); // pitch
             view.rotateZ(rotation.x); // yaw
-            const Volume& empty = getVolume("empty"_)->volume;
-            const Volume& density = getVolume("density"_)->volume;
-            const Volume& intensity = getVolume("intensity"_)->volume;
+            shared<Result> empty = getVolume("empty"_);
+            shared<Result> density = getVolume("density"_);
+            shared<Result> intensity = getVolume("intensity"_);
             Time time;
             assert_(position==int2(0) && size == framebuffer.size());
-            ::render(framebuffer, empty, density, intensity, view);
+            ::render(framebuffer, toVolume(empty), toVolume(density), toVolume(intensity), view);
 #if 0
             log((uint64)time,"ms");
             window.render(); // Force continuous updates (even when nothing changed)
@@ -368,17 +382,16 @@ struct Rock : PersistentProcess, Widget {
     }
 
     void saveSlice() {
-        string path = name+"."_+current->name+"."_+volumeFormat(current->volume)+".png"_;
-        writeFile(path, encodePNG(slice(current->volume,sliceZ)), home());
+        string path = name+"."_+current->name+"."_+current->metadata+".png"_;
+        writeFile(path, encodePNG(slice(toVolume(current),sliceZ)), home());
         log(path);
     }
 
-    //ref<byte> source; // Path to folder containing source slice images (or the special token "validation")
-    //Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
-    //ref<byte> result; // Path to file (or folder) where target volume data is copied
-    //bool cylinder = false; // Whether to clip histograms computation and slice rendering to the inscribed cylinder
-    //array<ref<byte>> selection; // Data selection for reviewing (mouse wheel selection) (also prevent recycling)
-    SharedData current;
+    ref<byte> source; // Path to folder containing source slice images (or the special token "validation")
+    Folder resultFolder = "ptmp"_; // Folder where smoothed density and pore size histograms are written
+    ref<byte> result; // Path to file (or folder) where target volume data is copied
+    array<ref<byte>> selection; // Data selection for reviewing (mouse wheel selection) (also prevent recycling)
+    shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     Window window {this,int2(-1,-1),"Rock"_};
 

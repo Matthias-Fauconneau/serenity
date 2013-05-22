@@ -258,7 +258,7 @@ template<Type T> unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.p
 /// \note the shared type must implement a reference counter (e.g. by inheriting shareable)
 /// \note Move semantics are still used whenever adequate (sharing is explicit)
 template<Type T> struct shared {
-    //explicit shared():pointer(0){}
+    explicit shared():pointer(0){}
     template<Type D> shared(shared<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
     template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     shared& operator=(shared&& o){ this->~shared(); new (this) shared(move(o)); return *this; }

@@ -152,6 +152,6 @@ void touchFile(const ref<byte>& path, const Folder& at=root());
 void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);
 
 /// Returns available free space in bytes for the file system containing \a file
-int64 freeSpace(const File& file);
+int64 freeSpace(const Handle& file);
 /// Returns available free space in bytes for the file system containing \a path
 int64 freeSpace(const ref<byte>& path, const Folder& at=root());

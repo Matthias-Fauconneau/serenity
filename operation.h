@@ -9,7 +9,7 @@
 /// Abstract factory pattern (allows construction of class by names)
 template <class I> struct Interface {
     struct AbstractFactory {
-        virtual I& constructNewInstance();
+        virtual I& constructNewInstance() abstract;
     };
     static map<ref<byte>, AbstractFactory*> factories;
     template <class C> struct Factory : AbstractFactory {
@@ -32,24 +32,25 @@ struct Variant : string {
     Variant(int integer):string(dec(integer)){}
     operator int() { return toInteger(*this); }
 };
+template<> inline string str(const Variant& o) { return copy((const string&)o); }
 
 /// Intermediate result
 struct Result : shareable {
-    Result(const ref<byte>& name, long timestamp, const ref<byte>& metadata) : name(name), timestamp(timestamp), metadata(metadata) {}
+    Result(const ref<byte>& name, long timestamp, const ref<byte>& metadata, array<byte>&& data) : name(name), timestamp(timestamp), metadata(metadata), data(move(data)) {}
     string name;
     long timestamp; //TODO: hash
-    string metadata;
+    string metadata; //FIXME: allow Operation to construct derived result
     array<byte> data;
 };
-bool operator==(const Result& a, const ref<byte>& b) { return a.name == b; }
-template<> string str(const Result& o) { return copy(o.name); }
+inline bool operator==(const Result& a, const ref<byte>& b) { return a.name == b; }
+template<> inline string str(const Result& o) { return copy(o.name); }
 
  /// Executes an operation using inputs to compute outputs (of given sample sizes)
 struct Operation {
     /// Returns the desired intermediate data size in bytes for each outputs
     virtual uint64 outputSize(map<ref<byte>, Variant>& args, const ref<shared<Result>>& inputs, uint index) abstract;
     /// Executes the operation using inputs to compute outputs
-    virtual void execute(map<ref<byte>, Variant>& args, const ref<shared<Result>>& outputs, const ref<shared<Result>>& inputs) abstract;
+    virtual void execute(map<ref<byte>, Variant>& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) abstract;
 };
 
 /// Convenience class to define a single input, single output operation

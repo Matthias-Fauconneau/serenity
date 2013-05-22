@@ -95,8 +95,8 @@ void rename(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, 
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)), oldName, newName);
 }
 void rename(const ref<byte>& oldName,const ref<byte>& newName, const Folder& at) { rename(at, oldName, at, newName); }
-void remove(const ref<byte>& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
-void remove(const Folder& folder) { check_( unlinkat(folder.fd,".",AT_REMOVEDIR)); }
+void remove(const ref<byte>& name, const Folder& at) { error(name); check_( unlinkat(at.fd,strz(name),0), name); }
+void remove(const Folder& folder) { error(""); check_( unlinkat(folder.fd,".",AT_REMOVEDIR)); }
 void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
     assert(from!=to);
     remove(from,at);
@@ -109,5 +109,5 @@ void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, co
     assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
 }
 
-int64 freeSpace(const File& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
+int64 freeSpace(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
 int64 freeSpace(const ref<byte>& path, const Folder& at) { return freeSpace(File(path,at)); }
