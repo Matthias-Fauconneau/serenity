@@ -15,11 +15,7 @@ inline Volume toVolume(const Result& result) {
 /// Convenience class to help define volume operations
 struct VolumeOperation : virtual Operation {
     virtual uint outputSampleSize(uint index) abstract;
-    uint64 outputSize(map<ref<byte>, Variant>&, const ref<shared<Result>>& inputs, uint index) override {
-        uint64 outputSize = toVolume(inputs[0]).size() * outputSampleSize(index);
-        assert_(outputSize<=(1ll<<32), toVolume(inputs[0]), toVolume(inputs[0]).size(), outputSampleSize(index));
-        return outputSize; //toVolume(inputs[0]).size() * outputSampleSize(index);
-    }
+    uint64 outputSize(map<ref<byte>, Variant>&, const ref<shared<Result>>& inputs, uint index) override {  return toVolume(inputs[0]).size() * outputSampleSize(index); }
     virtual void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) abstract;
     void execute(map<ref<byte>, Variant>& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
         array<Volume> inputVolumes = apply<Volume>(inputs, toVolume);
@@ -41,13 +37,14 @@ struct VolumeOperation : virtual Operation {
             if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, output, maximum((const Volume16&)output), output.maximum);
             if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, output, maximum((const Volume32&)output), output.maximum);
             outputs[index]->metadata = volumeFormat(output);
+            outputs[index]->data.size = output.data.size;
         }
     }
 };
 
 /// Convenience class to define a single input, single output volume operation
-template<Type I, Type O> struct VolumePass : virtual VolumeOperation {
+template<Type O> struct VolumePass : virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(O); }
-    virtual void execute(map<ref<byte>, Variant>& args, VolumeT<O>& target, const VolumeT<I>& source) abstract;
+    virtual void execute(map<ref<byte>, Variant>& args, VolumeT<O>& target, const Volume& source) abstract;
     virtual void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
 };

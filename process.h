@@ -32,18 +32,18 @@ struct Process {
 
 struct ResultFile : Result {
     ResultFile(const ref<byte>& name, long timestamp, const ref<byte>& metadata, const Folder& folder, Map&& map, const ref<byte>& path)
-        : Result(name,timestamp,metadata, buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), oldName(path?:name+"."_+metadata+".1"_) { assert(this->map.size); }
+        : Result(name,timestamp,metadata, buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), fileName(path?:name+"."_+metadata+".1"_) { assert(this->map.size); }
     void rename() {
-        if(!oldName) return;
+        if(!fileName) return;
         string newName = name+"."_+metadata+"."_+str(userCount);
-        if(oldName!=newName) { ::rename(oldName, newName, folder); oldName=move(newName); }
+        if(fileName!=newName) { ::rename(fileName, newName, folder); fileName=move(newName); }
     }
     void addUser() override { ++userCount; rename(); }
     uint removeUser() override { --userCount; rename(); return userCount; }
 
     const Folder& folder;
     Map map;
-    string oldName;
+    string fileName;
 };
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes

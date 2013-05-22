@@ -142,25 +142,26 @@ void __attribute((constructor(102))) setup_signals() {
                 );
 }
 
-static int recurse=0;
 template<> void __attribute((noreturn)) error(const ref<byte>& message) {
-    if(recurse==0) {
-        recurse++;
+    static bool reentrant = false;
+    if(!reentrant) { // Avoid hangs if tracing errors
+        reentrant = true;
         traceAllThreads();
         string s = trace(1,0);
         if(threads.size>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
-        recurse--;
+        reentrant = false;
     }
     log(message);
-    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } }
-    __builtin_trap(); //TODO: detect if running under debugger
-    exit_thread(0);
+    exit(); // Signals all threads to terminate
+    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } } // Removes this thread from list
+    //__builtin_trap(); //TODO: detect if running under debugger
+    exit_thread(0); // Exits this thread
 }
 
 // Entry point
 int main() {
     mainThread.run();
-    exit(); // Signals termination to all threads
+    exit(); // Signals all threads to terminate
     for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
     return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }

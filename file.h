@@ -111,14 +111,14 @@ struct Device : File {
     /// Sends ioctl request with \a reference argument
     template<Type IOWR> int iowr(typename IOWR::Args& reference) { return ioctl(IOWR::iowr, &reference); }
 };
-
+#include <sys/mman.h>
 /// Managed memory mapping
 struct Map {
     enum Prot {Read=1, Write=2};
-    enum Flags {Shared=1, Private=2, Anonymous=32};
+    enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
 
     Map(){}
-    Map(const File& file, Prot prot=Read);
+    Map(const File& file, Prot prot=Read, Flags flags=Shared);
     Map(const ref<byte>& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     default_move(Map);

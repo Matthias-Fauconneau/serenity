@@ -1,7 +1,8 @@
-#include "validate.h"
+#include "volume-operation.h"
 #include "thread.h"
 #include "time.h"
 
+/// Validates maximum balls results and helps visualizes filter effects
 void validate(Volume16& target, const Volume32& pore, const Volume16& maximum) {
     const uint32* const poreData = pore;
     const uint16* const maximumData = maximum;
@@ -24,3 +25,8 @@ void validate(Volume16& target, const Volume32& pore, const Volume16& maximum) {
     } );
     target.squared=true, target.maximum=maximum.maximum;
 }
+
+class(Validate, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return 2; }
+    void execute(map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override { validate(outputs[0], inputs[0], inputs[1]); }
+};

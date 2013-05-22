@@ -7,6 +7,8 @@ typedef VolumeT<uint16> Volume16;
 struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } } packed;
 typedef VolumeT<bgr> Volume24;
 typedef VolumeT<uint32> Volume32;
+typedef char Line[20];
+typedef VolumeT<Line> VolumeASCII;
 
 struct Volume {
     Volume(){}
@@ -17,10 +19,12 @@ struct Volume {
     operator const Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (Volume16&)*this; }
     operator const Volume24&() const { assert_(sampleSize==sizeof(bgr),sampleSize); return (Volume24&)*this; }
     operator const Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (Volume32&)*this; }
+    operator const VolumeASCII&() const { assert_(sampleSize==sizeof(Line),sampleSize); return (VolumeASCII&)*this; }
     operator Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(Volume8*)this; }
     operator Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(Volume16*)this; }
     operator Volume24&() { assert_(sampleSize==sizeof(bgr),sampleSize); return *(Volume24*)this; }
     operator Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(Volume32*)this; }
+    operator VolumeASCII&() { assert_(sampleSize==sizeof(Line),sampleSize); return *(VolumeASCII*)this; }
     void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; maximum=source.maximum; squared=source.squared; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples

@@ -11,8 +11,8 @@ void shiftRight(Volume16& target, const Volume16& source, uint shift) {
 }
 
 /// Shifts data before summing to avoid overflow
-class(ShiftRight, Operation), virtual VolumePass<uint16, uint16> {
-    void execute(map<ref<byte>, Variant>& args, Volume16& target, const Volume16& source) override {
+class(ShiftRight, Operation), virtual VolumePass<uint16> {
+    void execute(map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
         int kernelSize = toInteger(args.at("kernelSize"_)), sampleCount = 2*kernelSize+1, shift = log2(sampleCount);
         int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
         int bits = log2(nextPowerOfTwo(max));
@@ -53,12 +53,12 @@ void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
     } );
 }
 
-/// Computes one pass of running average
-class(Smooth, Operation), virtual VolumePass<uint16, uint16> {
-    void execute(map<ref<byte>, Variant>& args, Volume16& target, const Volume16& source) override {
+/// Denoises data by averaging samples in a window
+class(Smooth, Operation), virtual VolumePass<uint16> {
+    void execute(map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
         int kernelSize = toInteger(args.at("kernelSize"_)), sampleCount = 2*kernelSize+1, shift = log2(sampleCount);
         target.maximum *= sampleCount;
-        //if(operation==SmoothZ) shift=0; // not necessary
+        //if(operation==SmoothZ) shift=0; //FIXME: not necessary
         smooth(target, source, kernelSize, shift);
         target.maximum >>= shift;
         int margin = target.marginY + align(4, kernelSize);

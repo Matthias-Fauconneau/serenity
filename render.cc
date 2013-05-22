@@ -2,36 +2,13 @@
 #include "thread.h"
 #include "simd.h"
 
-void squareRoot(Volume8& target, const Volume16& source) {
-    uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
-    assert_(!source.offsetX && !source.offsetY && !source.offsetZ);
-    interleavedLookup(target);
-    const uint* const offsetX = target.offsetX;
-    const uint* const offsetY = target.offsetY;
-    const uint* const offsetZ = target.offsetZ;
-    target.marginX=0, target.marginY=0, target.marginZ=0, target.maximum = round(sqrt((float)source.maximum)), target.squared=false;
-    assert_(target.maximum<0x100);
-    const uint16* const sourceData = source;
-    uint8* const targetData = target;
-    parallel(Z, [&](uint, uint z) {
-        const uint16* const sourceZ = sourceData + z*XY;
-        uint8* const targetZ = targetData + offsetZ[z];
-        for(uint y=0; y<Y; y++) {
-            const uint16* const sourceZY = sourceZ + y*X;
-            uint8* const targetZY = targetZ + offsetY[y];
-            for(uint x=0; x<X; x++) {
-                targetZY[offsetX[x]] = round(sqrt(float(sourceZY[x])));
-            }
-        }
-    } );
-}
-
-void render(Volume8& target, const Volume16& source) {
+void squareRoot(Volume8& target, const Volume16& source, bool normalize) {
     uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
     interleavedLookup(target);
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-    target.maximum = 0xFF, target.squared=false;
-    float scale = float(target.maximum) / sqrt(float(source.maximum));
+    target.maximum = normalize ? 0xFF : round(sqrt((float)source.maximum)), target.squared=false;
+    assert_(target.maximum<0x100);
+
     const uint16* const sourceData = source;
     uint8* const targetData = target;
     parallel(Z, [&](uint, uint z) {
@@ -43,7 +20,9 @@ void render(Volume8& target, const Volume16& source) {
                 const uint16* const sourceZY = sourceZ + offsetY[y];
                 uint8* const targetZY = targetZ + offsetY[y];
                 for(uint x=0; x<X; x++) {
-                    targetZY[offsetX[x]] = min((uint)round(sqrt(float(sourceZY[offsetX[x]]))*scale), target.maximum);
+                    uint value = round(sqrt(float(sourceZY[offsetX[x]])));
+                    if(normalize) value = value * 0xFF / target.maximum;
+                    targetZY[offsetX[x]] = value;
                 }
             }
         } else {
@@ -54,7 +33,9 @@ void render(Volume8& target, const Volume16& source) {
                 const uint16* const sourceZY = sourceZ + y*X;
                 uint8* const targetZY = targetZ + offsetY[y];
                 for(uint x=0; x<X; x++) {
-                    targetZY[offsetX[x]] = min((uint)round(sqrt(float(sourceZY[x]))*scale), target.maximum);
+                    uint value = round(sqrt(float(sourceZY[x])));
+                    if(normalize) value = value * 0xFF / target.maximum;
+                    targetZY[offsetX[x]] = value;
                 }
             }
         }

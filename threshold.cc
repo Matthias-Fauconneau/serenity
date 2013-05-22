@@ -59,6 +59,7 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
 #endif
 }
 
+/// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Threshold, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return 4; }
     void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
@@ -116,4 +117,34 @@ class(Threshold, Operation), virtual VolumeOperation {
         } else log("Manual threshold", densityThreshold);
         threshold(outputs[0], outputs[1], source, densityThreshold);
     }
+};
+
+/// Maps intensity to either red or green channel depending on binary classification
+void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
+    assert(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
+    int X = binary.x, Y = binary.y, Z = binary.z, XY = X*Y;
+    const uint32* const binaryData = binary;
+    const uint16* const intensityData = intensity;
+    const uint maximum = intensity.maximum;
+    bgr* const targetData = target;
+    parallel(Z, [&](uint, uint z) {
+        const uint32* const binaryZ = binaryData+z*XY;
+        const uint16* const intensityZ = intensityData+z*XY;
+        bgr* const targetZ = targetData+z*XY;
+        for(int y=0; y<Y; y++) {
+            const uint32* const binaryZY = binaryZ+y*X;
+            const uint16* const intensityZY = intensityZ+y*X;
+            bgr* const targetZY = targetZ+y*X;
+            for(int x=0; x<X; x++) {
+                uint8 c = 0xFF*intensityZY[x]/maximum;
+                targetZY[x] = binaryZY[x]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
+            }
+        }
+    });
+    target.maximum=0xFF;
+}
+
+class(Colorize, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return 3; }
+    void execute(map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override { colorize(outputs[0], inputs[0], inputs[1]); }
 };

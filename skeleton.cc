@@ -1,4 +1,4 @@
-#include "skeleton.h"
+#include "volume-operation.h"
 #include "thread.h"
 
 inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqRadius) {
@@ -22,6 +22,7 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     }
 }
 
+/// Computes integer medial axis
 void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume16& positionY, const Volume16& positionZ, int minimalSqRadius) {
     assert_(minimalSqRadius>=3);
     const uint16* const xPositionData = positionX;
@@ -30,8 +31,8 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
     uint16* const targetData = target;
     const uint X=target.x, Y=target.y, Z=target.z, XY = X*Y;
     uint marginX=max(1u,target.marginX), marginY=max(1u,target.marginY), marginZ=max(1u,target.marginZ);
-    for(uint z=marginZ; z<Z-marginZ; z++) {
-    //parallel(marginZ, Z-marginZ, [&](uint, uint z) { //FIXME: conflicts
+    //for(uint z=marginZ; z<Z-marginZ; z++) {
+    parallel(marginZ, Z-marginZ, [&](uint, uint z) { //FIXME: conflicts
         const uint16* const xPositionZ = xPositionData+z*XY;
         const uint16* const yPositionZ = yPositionData+z*XY;
         const uint16* const zPositionZ = zPositionData+z*XY;
@@ -54,7 +55,16 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
                 }
             }
         }
-    }//);
+    });
     target.marginX = marginX, target.marginY = marginY, target.marginZ = marginZ;
     target.maximum = maximum(target), target.squared=true;
 }
+
+/// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
+class(Skeleton, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint index) override { int sizes[]={2}; return sizes[index]; }
+    void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
+        uint minimalSqRadius = args.contains("minimalRadius"_) ? sqr(toInteger(args.at("minimalRadius"_))) : 3;
+        integerMedialAxis(outputs[0],inputs[0],inputs[1],inputs[2], minimalSqRadius);
+    }
+};

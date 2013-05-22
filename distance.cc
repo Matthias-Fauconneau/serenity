@@ -1,4 +1,4 @@
-#include "distance.h"
+#include "volume-operation.h"
 #include "time.h"
 #include "simd.h"
 
@@ -199,36 +199,42 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             }
         }
     });
-#if 0 // Validation
-    parallel(marginZ, Z-marginZ, [&](uint, uint z) {
-        for(int y: range(marginY, Y-marginY)) {
-            for(int x: range(marginX, X-marginX)) {
-                int sqRadius = targetData[z*XY+y*X+x];
-                //if(!sqRadius) assert(sourceData[y*XY+x*X+z]==0xFFFFFFFF);
-                if(sqRadius > 1 && sqRadius<=3) {
-                    int radius = ceil(sqrt(sqRadius));
-                    const uint32* const sourceO = sourceData+y*XY+x*X+z;
-                    for(int dz=-radius; dz<=radius; dz++) {
-                        const uint32* const sourceZ = sourceO+dz;
-                        for(int dy=-radius; dy<=radius; dy++) {
-                            const uint32* const sourceZY = sourceZ+dy*XY;
-                            for(int dx=-radius; dx<=radius; dx++) {
-                                if(dx*dx+dy*dy+dz*dz<sqRadius) {
-                                    int distancey = sourceZY[dx*X];
-                                    int r = targetData[(int(z)+dz)*XY+(y+dy)*X+(x+dx)];
-                                    assert_(distancey!=(int(z)+dz)*(int(z)+dz), marginX, marginY, marginZ, x,y,z, dx,dy,dz,dx*dx+dy*dy+dz*dz,sqRadius);
-                                    assert_(r, marginX, marginY, marginZ, x,y,z, dx,dy,dz,dx*dx+dy*dy+dz*dz,sqRadius);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    });
-#endif
     target.squared=true;
     positionX.squared=false, positionX.maximum=X-1;
     positionY.squared=false, positionY.maximum=Y-1;
     positionZ.squared=false, positionZ.maximum=Z-1;
 }
+
+/// Computes distance field to nearest background (X pass)
+class(DistanceX, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint index) override { int sizes[]={4, 2}; return sizes[index]; }
+    void execute(map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+        perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],inputs[0]);
+    }
+};
+
+/// Computes distance field to nearest background (Y pass)
+class(DistanceY, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2}; return sizes[index]; }
+    void execute(map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+        perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],inputs[0],inputs[1]);
+    }
+};
+
+/// Computes distance field to nearest background (Y pass)
+class(DistanceZ, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2, 2}; return sizes[index]; }
+    void execute(map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+        perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],outputs[3],inputs[0],inputs[1],inputs[2]);
+        Volume& target = outputs[0];
+        target.maximum=maximum((const Volume32&)target);
+        if(target.maximum < (1ul<<(8*(target.sampleSize/2)))) { // Packs outputs if needed
+            const Volume32& target32 = target;
+            target.sampleSize /= 2;
+            target.data.size /= 2;
+            Time time;
+            pack(target, target32);
+            log("pack", time);
+        }
+    }
+};

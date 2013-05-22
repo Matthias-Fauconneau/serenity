@@ -1,11 +1,9 @@
-#include "rasterize.h"
+#include "volume-operation.h"
+#include "sample.h"
 #include "thread.h"
 #include "time.h"
 
-#include "rasterize.h"
-#include "thread.h"
-#include "time.h"
-
+/// Rasterizes each distance field voxel as a ball (with maximum blending)
 void rasterize(Volume16& target, const Volume16& source) {
     const uint16* const sourceData = source;
     uint16* const targetData = target;
@@ -45,3 +43,19 @@ void rasterize(Volume16& target, const Volume16& source) {
     target.squared = true;
     assert_(target.maximum == source.maximum);
 }
+
+/// Rasterizes each distance field voxel as a ball (with maximum blending)
+class(Rasterize, Operation), virtual VolumePass<uint16> {
+    void execute(map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
+        rasterize(target, source);
+        // Computes histogram of maximal ball radii
+        ref<byte> name = args.at("name"_);
+        Folder resultFolder (args.at("resultFolder"_));
+        Time time;
+        Sample squaredMaximum = histogram(target, args.contains("cylinder"_));
+        squaredMaximum[0] = 0; // Clears background voxel count to plot with a bigger Y scale
+        float scale = toDecimal(args.value("resolution"_,"1"_));
+        writeFile(name+".maximum.tsv"_, toASCII(squaredMaximum, false, true, scale), resultFolder);
+        log("√histogram", name, time);
+    }
+};

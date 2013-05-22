@@ -7,13 +7,13 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
     for(TextData s(definition); s; s.skip()) {
         if(s.match('#')) { s.until('\n'); continue; }
         Rule rule;
-        for(;!s.match('='); s.skip()) rule.outputs << s.word();
+        for(;!s.match('='); s.skip()) rule.outputs << s.word("_-"_);
         s.skip();
         rule.operation = s.word();
         s.whileAny(" \t\r"_);
         for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
             if(s.match('#')) { s.whileNot('\n'); continue; }
-            rule.inputs << s.word();
+            rule.inputs << s.word("_-"_);
         }
         rules << move(rule);
     }
@@ -100,38 +100,56 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
 
         if(results.contains(output)) { // Reuses same volume
             shared<ResultFile> result = results.take(results.indexOf(output));
-            rename(move(result->oldName), output, storageFolder);
+            rename(move(result->fileName), output, storageFolder);
         }
         // Creates (or resizes) and maps an output result file
         int64 outputSize = operation->outputSize(arguments, inputs, index);
         while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
             long minimum=currentTime()+1; string oldest;
             for(string& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
+                if(!path.contains('.') || !isInteger(section(path,'.',-2,-1))) continue; // Not a process data
                 uint userCount = toInteger(section(path,'.',-2,-1));
                 if(userCount > 1) continue;
                 long timestamp = File(path, baseStorageFolder).accessTime();
                 if(timestamp < minimum) minimum=timestamp, oldest=move(path);
             }
             if(!oldest) error("Not enough space available");
-            if(section(oldest,'/')==name) results.remove( section(section(oldest,'/',1,-1),'.') );
-            if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(output, storageFolder)) {
-                ::remove(oldest, baseStorageFolder); // Removes if need to recycle more than one file
+            if(section(oldest,'/')==name) {
+                ref<byte> resultName = section(section(oldest,'/',1,-1),'.');
+                shared<Result>& result = *results.find(resultName);
+                assert(&result && result->userCount==1);
+                results.remove( result );
+                oldest = section(oldest,'.',0,-2)+".0"_; //FIXME: store reference counter using filesystem attributes or metadata file instead of abusing name ?
+            }
+            if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
+                ::remove(oldest, baseStorageFolder);
                 continue;
             }
-            // Renames last discarded file instead of removing (avoids page zeroing)
-            ::rename(baseStorageFolder, oldest, storageFolder, output);
+            ::rename(baseStorageFolder, oldest, storageFolder, output); // Renames last discarded file instead of removing (avoids page zeroing)
             break;
         }
 
         File file(output, storageFolder, Flags(ReadWrite|Create));
         file.resize( outputSize );
-        outputs << shared<ResultFile>(output, currentTime(), ""_, storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), output);
+        outputs << shared<ResultFile>(output, currentTime(), ""_, storageFolder, Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|Map::Populate)), output);
     }
     assert_(outputs);
 
     Time time;
     operation->execute(arguments, outputs, inputs);
     log(rule, time);
+
+    for(shared<Result>& output : outputs) {
+        ResultFile& result = *dynamic_cast<ResultFile*>(output.pointer);
+        if(result.map.size != result.data.size) {
+            assert(result.map.size > result.data.size);
+            result.map.unmap();
+            File file(result.fileName, result.folder, ReadWrite);
+            file.resize(result.data.size);
+            result.map = Map(file, Map::Prot(Map::Read|Map::Write));
+            result.data = buffer<byte>(result.map);
+        }
+    }
 
     results << move(outputs);
     return share( *results.find(target) );

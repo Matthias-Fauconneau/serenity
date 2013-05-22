@@ -2,7 +2,6 @@
 #include "simd.h"
 #include "thread.h"
 #include "data.h"
-#include "time.h"
 
 static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) {
     buffer<uint> lookup(size);
@@ -107,7 +106,6 @@ void tile(Volume16& target, const Volume16& source) {
 }
 
 template<Type T> void clearMargins(VolumeT<T>& target, uint value) {
-    Time time;
     const uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
     int marginX=target.marginX, marginY=target.marginY, marginZ=target.marginZ;
     T* const targetData = target;
@@ -159,7 +157,6 @@ template<Type T> void clearMargins(VolumeT<T>& target, uint value) {
             }
         }
     }
-    log("clear",time); //FIXME
 }
 template void clearMargins<uint16>(VolumeT<uint16>& target, uint value);
 template void clearMargins<uint32>(VolumeT<uint32>& target, uint value);
@@ -221,7 +218,6 @@ void toASCII(Volume& target, const Volume& source) {
     uint marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
     assert_(!target.offsetX && !target.offsetY && !target.offsetZ);
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    typedef char Line[20];
     Line* const targetData = (Line*)target.data.data;
     for(uint z=0; z<Z; z++) {
         Line* const targetZ = targetData + z*XY;
@@ -282,28 +278,4 @@ Image slice(const Volume& source, int z, bool cylinder) {
         target(x,y) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;
-}
-
-void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
-    assert(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
-    int X = binary.x, Y = binary.y, Z = binary.z, XY = X*Y;
-    const uint32* const binaryData = binary;
-    const uint16* const intensityData = intensity;
-    const uint maximum = intensity.maximum;
-    bgr* const targetData = target;
-    parallel(Z, [&](uint, uint z) {
-        const uint32* const binaryZ = binaryData+z*XY;
-        const uint16* const intensityZ = intensityData+z*XY;
-        bgr* const targetZ = targetData+z*XY;
-        for(int y=0; y<Y; y++) {
-            const uint32* const binaryZY = binaryZ+y*X;
-            const uint16* const intensityZY = intensityZ+y*X;
-            bgr* const targetZY = targetZ+y*X;
-            for(int x=0; x<X; x++) {
-                uint8 c = 0xFF*intensityZY[x]/maximum;
-                targetZY[x] = binaryZY[x]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
-            }
-        }
-    });
-    target.maximum=0xFF;
 }
