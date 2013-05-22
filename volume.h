@@ -30,7 +30,7 @@ struct Volume {
 string volumeFormat(const Volume& volume);
 inline string str(const Volume& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
-void parseVolumeFormat(Volume& volume, const ref<byte>& path);
+void parseVolumeFormat(Volume& volume, const ref<byte>& format);
 
 template<Type T> struct VolumeT : Volume {
     operator const T*() const { return (T*)data.data; }

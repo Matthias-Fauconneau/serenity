@@ -1,6 +1,6 @@
 #include "threshold.h"
 #include "simd.h"
-#include "process.h"
+#include "thread.h"
 
 void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float threshold) {
     v4si scaledThreshold = set1(threshold*source.maximum);

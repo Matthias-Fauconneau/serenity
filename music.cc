@@ -1,5 +1,5 @@
 /// \file music.cc Keyboard (piano) practice application
-#include "process.h"
+#include "thread.h"
 #include "file.h"
 
 #include "sequencer.h"

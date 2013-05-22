@@ -1,4 +1,4 @@
-#include "process.h"
+#include "thread.h"
 #include "math.h"
 #include "algebra.h"
 #include "window.h"

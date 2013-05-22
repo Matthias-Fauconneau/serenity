@@ -1,5 +1,5 @@
 #include "smooth.h"
-#include "process.h"
+#include "thread.h"
 #include "simd.h"
 
 void shiftRight(Volume16& target, const Volume16& source, uint shift) {

@@ -6,6 +6,8 @@
 #define packed __attribute((packed))
 /// Less verbose template declarations
 #define Type typename
+/// Nicer abstract declaration
+#define abstract =0
 /// Declares the default move constructor and move assigmment operator
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
 
@@ -146,6 +148,12 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return
 /// Returns const reference to memory used by \a t
 template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
+/// Declares a script embedded in the binary
+#define TEXT(name) \
+extern char _binary_ ## name ##_txt_start[]; \
+extern char _binary_ ## name ##_txt_end[]; \
+static ref<byte> name (_binary_ ## name ##_txt_start,_binary_ ## name ##_txt_end);
+
 // Integer operations
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
 inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
@@ -246,15 +254,16 @@ template<Type T> struct unique {
 };
 template<Type T> unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.pointer)); }
 
-/// Reference to a reference counted heap allocated value
+/// Reference to a shared heap allocated value managed using a reference counter
+/// \note the shared type must implement a reference counter (e.g. by inheriting shareable)
 /// \note Move semantics are still used whenever adequate (sharing is explicit)
 template<Type T> struct shared {
-    explicit shared():pointer(0){}
-    shared(shared&& o):pointer(o.pointer){o.pointer=0;}
-    template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T)+sizeof(int))) T(forward<Args>(args)...)){ refCount()=1; }
+    //explicit shared():pointer(0){}
+    template<Type D> shared(shared<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
+    template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     shared& operator=(shared&& o){ this->~shared(); new (this) shared(move(o)); return *this; }
-    explicit shared(const shared<T>& o):pointer(o.pointer){ refCount()++; }
-    virtual ~shared() { if(pointer && --refCount()==0) { pointer->~T(); free(pointer); } pointer=0; }
+    explicit shared(const shared<T>& o):pointer(o.pointer){ pointer->addUser(); }
+    ~shared() { if(pointer && pointer->removeUser()==0) { pointer->~T(); free(pointer); } pointer=0; }
 
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }
@@ -264,7 +273,13 @@ template<Type T> struct shared {
     bool operator ==(const shared<T>& o) const { return pointer==o.pointer; }
 
     T* pointer;
-    int& refCount() const { return *(int*)(pointer+1); }
 };
 template<Type T> shared<T> copy(const shared<T>& o) { return shared<T>(copy(*o.pointer)); }
 template<Type T> shared<T> share(const shared<T>& o) { return shared<T>(o); }
+
+/// Reference counter to be inherited by shared objects
+struct shareable {
+    uint userCount = 1;
+    virtual void addUser() { ++userCount; }
+    virtual uint removeUser() { return --userCount; }
+};

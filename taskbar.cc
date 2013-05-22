@@ -1,5 +1,5 @@
 /// \file taskbar.cc X11 window manager with integrated window selection panel
-#include "process.h"
+#include "thread.h"
 #include "file.h"
 #include "time.h"
 #include "linux.h"

@@ -1,5 +1,5 @@
 #pragma once
-#include "process.h"
+#include "thread.h"
 
 /// Generic audio decoder (using ffmpeg)
 struct AudioFile {

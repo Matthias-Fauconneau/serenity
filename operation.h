@@ -1,30 +1,60 @@
 #pragma once
+/// \file operation.h Abstract interface for operations run by a process manager
 #include "array.h"
+#include "map.h"
+#include "string.h"
+#include "file.h"
+#include <typeinfo>
 
-static array<struct Operation*> operations;
-/// Depends on named inputs to compute named outputs of a given sample size
-struct Operation {
-    // FIXME: factor
-    Operation(const ref<byte>& name, uint sampleSize) : name(name) { outputs<<Output{name,sampleSize}; operations << this; }
-    Operation(const ref<byte>& input, const ref<byte>& name, uint sampleSize) : Operation(name, sampleSize) { inputs<<input; }
-    Operation(const ref<byte>& input, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input, name, sampleSize) { outputs<<Output{output2,sampleSize2}; }
-
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& name, uint sampleSize) : Operation(input1, name, sampleSize) { inputs<<input2; }
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input1, name, sampleSize, output2, sampleSize2) { inputs<<input2; }
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2, const ref<byte>& output3, uint sampleSize3) : Operation(input1, input2, name, sampleSize, output2, sampleSize2) { outputs<<Output{output3,sampleSize3}; }
-
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize) : Operation(input1, input2, name, sampleSize) { inputs<<input3; }
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2) : Operation(input1, input2, name, sampleSize, output2, sampleSize2) { inputs<<input3; }
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2, const ref<byte>& output3, uint sampleSize3) : Operation(input1, input2, name, sampleSize, output2, sampleSize2, output3, sampleSize3) { inputs<<input3; }
-    Operation(const ref<byte>& input1, const ref<byte>& input2, const ref<byte>& input3, const ref<byte>& name, uint sampleSize, const ref<byte>& output2, uint sampleSize2, const ref<byte>& output3, uint sampleSize3, const ref<byte>& output4, uint sampleSize4) : Operation(input1, input2, input3, name, sampleSize, output2, sampleSize2, output3, sampleSize3) { outputs<<Output{output4,sampleSize4}; }
-
-
-    ref<byte> name;
-    array<ref<byte>> inputs;
-    struct Output { ref<byte> name; uint sampleSize; }; array<Output> outputs;
+/// Abstract factory pattern (allows construction of class by names)
+template <class I> struct Interface {
+    struct AbstractFactory {
+        virtual I& constructNewInstance();
+    };
+    static map<ref<byte>, AbstractFactory*> factories;
+    template <class C> struct Factory : AbstractFactory {
+        I& constructNewInstance() override { return *(new C()); }
+        Factory() { factories.insert(str(typeid(C).name()+1), this); }
+        static Factory registerFactory;
+    };
+    static I& instance(const ref<byte>& name) { return factories.at(name)->constructNewInstance(); }
 };
-const ref<byte>& str(const Operation& operation) { return operation.name; }
-bool operator==(const Operation& a, const Operation& b) { return a.name == b.name; }
-bool operator==(const Operation::Output& a, const ref<byte>& b) { return a.name == b; }
-const Operation* operationForOutput(const ref<byte>& name) { for(Operation* operation: operations) for(const Operation::Output& output: operation->outputs) if(output.name==name) return operation; return 0; }
+template <class I> map<ref<byte>,typename Interface<I>::AbstractFactory*> Interface<I>::factories;
+template <class I> template <class C> typename Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory;
+#define class(C,I) \
+    struct C; \
+    template struct Interface<I>::Factory<C>; \
+    struct C : virtual I
 
+/// Dynamic-typed value
+struct Variant : string {
+    Variant(const ref<byte>& s) : string(s) {}
+    Variant(int integer):string(dec(integer)){}
+    operator int() { return toInteger(*this); }
+};
+
+/// Intermediate result
+struct Result : shareable {
+    Result(const ref<byte>& name, long timestamp, const ref<byte>& metadata) : name(name), timestamp(timestamp), metadata(metadata) {}
+    string name;
+    long timestamp; //TODO: hash
+    string metadata;
+    array<byte> data;
+};
+bool operator==(const Result& a, const ref<byte>& b) { return a.name == b; }
+template<> string str(const Result& o) { return copy(o.name); }
+
+ /// Executes an operation using inputs to compute outputs (of given sample sizes)
+struct Operation {
+    /// Returns the desired intermediate data size in bytes for each outputs
+    virtual uint64 outputSize(map<ref<byte>, Variant>& args, const ref<shared<Result>>& inputs, uint index) abstract;
+    /// Executes the operation using inputs to compute outputs
+    virtual void execute(map<ref<byte>, Variant>& args, const ref<shared<Result>>& outputs, const ref<shared<Result>>& inputs) abstract;
+};
+
+/// Convenience class to define a single input, single output operation
+template<Type I, Type O> struct Pass : virtual Operation {
+    virtual uint64 outputSize(ref<const Result*> inputs, uint index) abstract;
+    virtual void execute(Result& target, const Result& source, map<ref<byte>, Variant>& args) abstract;
+    virtual void execute(ref<Result*> outputs, ref<const Result*> inputs, map<ref<byte>, Variant>& args) override { execute(*outputs[0], *inputs[0], args); }
+};

@@ -1,6 +1,6 @@
 #pragma once
 /// \file window.h X11 window display and input
-#include "process.h"
+#include "thread.h"
 #include "function.h"
 #include "image.h"
 #include "map.h"

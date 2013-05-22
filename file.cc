@@ -63,10 +63,10 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 // File
 File::File(const ref<byte>& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),path)){}
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
-uint64 File::size() const { return stat().st_size; }
+int64 File::size() const { return stat().st_size; }
 long File::accessTime() const { return stat().st_atime; }
 long File::modifiedTime() const { return stat().st_mtime; }
-void File::resize(uint64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
+void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
@@ -109,5 +109,5 @@ void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, co
     assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
 }
 
-uint64 freeSpace(const File& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
-uint64 freeSpace(const ref<byte>& path, const Folder& at) { return freeSpace(File(path,at)); }
+int64 freeSpace(const File& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
+int64 freeSpace(const ref<byte>& path, const Folder& at) { return freeSpace(File(path,at)); }

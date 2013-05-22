@@ -75,14 +75,14 @@ struct File : Stream {
     /// Returns file properties
     struct stat stat() const;
     /// Returns file size
-    uint64 size() const;
+    int64 size() const;
     /// Returns the last access Unix timestamp for \a path
     long accessTime() const;
     /// Returns the last modified Unix timestamp for \a path
     long modifiedTime() const;
 
     /// Resizes file
-    void resize(uint64 size);
+    void resize(int64 size);
     /// Seeks to \a index
     void seek(int index);
 };
@@ -152,6 +152,6 @@ void touchFile(const ref<byte>& path, const Folder& at=root());
 void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);
 
 /// Returns available free space in bytes for the file system containing \a file
-uint64 freeSpace(const File& file);
+int64 freeSpace(const File& file);
 /// Returns available free space in bytes for the file system containing \a path
-uint64 freeSpace(const ref<byte>& path, const Folder& at=root());
+int64 freeSpace(const ref<byte>& path, const Folder& at=root());

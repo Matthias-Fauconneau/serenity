@@ -1,5 +1,5 @@
 #include "parser.h"
-#include "process.h"
+#include "thread.h"
 #include "utf8.h"
 
 typedef double real;

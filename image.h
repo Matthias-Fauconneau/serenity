@@ -67,7 +67,7 @@ Image upsample(const Image& source);
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 
-/// Declare a small .png icon embedded in the binary, accessible at runtime as an Image (lazily decoded)
+/// Declares a small .png icon embedded in the binary, accessible at runtime as an Image (lazily decoded)
 /// \note an icon with the same name must be linked by the build system
 ///       'ld -r -b binary -o name.o name.png' can be used to embed a file in the binary
 #define ICON(name) \

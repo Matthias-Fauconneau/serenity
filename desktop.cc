@@ -1,5 +1,5 @@
 /// \file desktop.cc Background shell application
-#include "process.h"
+#include "thread.h"
 #include "window.h"
 #include "calendar.h"
 #include "feeds.h"

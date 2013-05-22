@@ -1,6 +1,6 @@
 #pragma once
 /// \file sequencer.h ALSA MIDI input interface
-#include "process.h"
+#include "thread.h"
 #include "function.h"
 
 /// MIDI input through ALSA rawmidi interface

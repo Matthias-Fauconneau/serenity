@@ -5,10 +5,14 @@ array.h
 string.h
 file.h
 file.cc
-process.h
+thread.h
+thread.cc
 time.h
 image.h
 tiff.cc
+operation.h
+process.h
+process.cc
 volume.h
 volume.cc
 capsule.h
@@ -17,7 +21,6 @@ sample.h
 sample.cc
 render.h
 render.cc
-rock.cc
 smooth.h
 smooth.cc
 threshold.h
@@ -30,3 +33,5 @@ rasterize.h
 rasterize.cc
 validate.h
 validate.cc
+rock.txt
+rock.cc

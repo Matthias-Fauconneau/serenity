@@ -1,5 +1,5 @@
 #include "validate.h"
-#include "process.h"
+#include "thread.h"
 #include "time.h"
 
 void validate(Volume16& target, const Volume32& pore, const Volume16& maximum) {

@@ -1,4 +1,4 @@
-#include "process.h"
+#include "thread.h"
 #include "sequencer.h"
 #include "sampler.h"
 #include "ffmpeg.h"

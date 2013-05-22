@@ -1,6 +1,6 @@
 #pragma once
 /// \file asound.h ALSA PCM output interface
-#include "process.h"
+#include "thread.h"
 #include "function.h"
 
 /// Audio output through ALSA PCM interface

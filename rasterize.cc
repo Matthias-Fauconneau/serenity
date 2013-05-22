@@ -1,9 +1,9 @@
 #include "rasterize.h"
-#include "process.h"
+#include "thread.h"
 #include "time.h"
 
 #include "rasterize.h"
-#include "process.h"
+#include "thread.h"
 #include "time.h"
 
 void rasterize(Volume16& target, const Volume16& source) {

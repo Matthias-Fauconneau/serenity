@@ -14,6 +14,9 @@ FLAGS += $(FLAGS_$(BUILD))
 SRCS = $(SRCS_$(BUILD))
 SRCS_profile = profile
 
+SRCS += $(SRCS_$(TARGET))
+SRCS_rock = rock.txt #source.cc ...
+
 ICONS = arrow horizontal vertical fdiagonal bdiagonal move text $(ICONS_$(TARGET))
 ICONS_taskbar = button
 ICONS_desktop = feeds network shutdown
@@ -72,7 +75,7 @@ $(BUILD)/%.o: %.png
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<
 
-$(BUILD)/%.glsl.o: %.glsl
+$(BUILD)/%.txt.o: %.txt
 	@echo $<
 	@test -e $(dir $@) || mkdir -p $(dir $@)
 	@ld -r -b binary -o $@ $<

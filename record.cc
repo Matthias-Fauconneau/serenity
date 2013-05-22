@@ -1,5 +1,5 @@
 #include "record.h"
-#include "process.h"
+#include "thread.h"
 #include "string.h"
 #include "display.h"
 

@@ -1,6 +1,6 @@
 #include "volume.h"
 #include "simd.h"
-#include "process.h"
+#include "thread.h"
 #include "data.h"
 #include "time.h"
 
@@ -25,8 +25,8 @@ string volumeFormat(const Volume& volume) {
     return s;
 }
 
-void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
-    TextData s ( section(path,'.',-2,-1) );
+void parseVolumeFormat(Volume& volume, const ref<byte>& format) {
+    TextData s (format);
     volume.x = s.integer(); s.skip("x"_);
     volume.y = s.integer(); s.skip("x"_);
     volume.z = s.integer();
@@ -39,7 +39,6 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& path) {
     volume.maximum = s.hexadecimal();
     if(s.match("-tiled"_)) interleavedLookup(volume); else { free(volume.offsetX), free(volume.offsetY), free(volume.offsetZ); }
     if(s.match("-squared"_)) volume.squared=true;
-    s.match("-unused"_);
     assert(!s);
 }
 

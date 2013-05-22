@@ -4,7 +4,7 @@
 #include "file.h"
 #include "resample.h"
 #include "flac.h"
-#include "process.h"
+#include "thread.h"
 #include "map.h"
 #define REVERB 0
 #if REVERB

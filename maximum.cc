@@ -1,5 +1,5 @@
 #include "maximum.h"
-#include "process.h"
+#include "thread.h"
 #include "simd.h"
 
 /// Returns the field of the radii of the maximum sphere enclosing each voxel and fitting within the boundaries

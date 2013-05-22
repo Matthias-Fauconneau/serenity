@@ -1,5 +1,5 @@
 #include "render.h"
-#include "process.h"
+#include "thread.h"
 #include "simd.h"
 
 void squareRoot(Volume8& target, const Volume16& source) {

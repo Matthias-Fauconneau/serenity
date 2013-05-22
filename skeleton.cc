@@ -1,5 +1,5 @@
 #include "skeleton.h"
-#include "process.h"
+#include "thread.h"
 
 inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqRadius) {
     int xf0=xf[0], yf0=yf[0], zf0=zf[0]; // First feature point

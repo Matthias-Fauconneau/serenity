@@ -1,4 +1,4 @@
-#include "process.h"
+#include "thread.h"
 #include "window.h"
 #include "display.h"
 #include "sequencer.h"
