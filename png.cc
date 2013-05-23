@@ -1,6 +1,6 @@
 #include "png.h"
-#include "inflate.h"
 #include "data.h"
+#include "deflate.h"
 
 template<Type T> struct rgba { T r,g,b,a; operator byte4() const { return byte4 {b,g,r,a}; } };
 template<Type T> struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255}; } };
@@ -158,20 +158,27 @@ array<byte> filter(const Image& image) {
     return data;
 }
 
+#if 0
+array<byte> deflate(array<byte> data) {
+    array<byte> zlib;
+    zlib << "\x78\x01"_; //zlib header: method=8, window=7, check=0, level=1
+    for(uint i=0; i<data.size;) {
+        uint16 len = min(data.size-i,65535u), nlen = ~len;
+        zlib << (i+len==data.size) << raw(len) << raw(nlen) << data.slice(i,len);
+        i+=len;
+    }
+    zlib<< raw(big32(adler32(data)));
+    return zlib;
+}
+#endif
+
 array<byte> encodePNG(const Image& image) {
     array<byte> file = string("\x89PNG\r\n\x1A\n"_);
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
     array<byte> IHDR = "IHDR"_+raw(ihdr);
     file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
 
-    array<byte> IDAT = "IDAT"_+"\x78\x01"_; //zlib header: method=8, window=7, check=0, level=1
-    array<byte> data = filter(image);
-    for(uint i=0; i<data.size;) {
-        uint16 len = min(data.size-i,65535u), nlen = ~len;
-        IDAT << (i+len==data.size) << raw(len) << raw(nlen) << data.slice(i,len);
-        i+=len;
-    }
-    IDAT<< raw(big32(adler32(data)));
+    array<byte> IDAT = "IDAT"_+deflate(filter(image));
     file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
 
     file<<raw(big32(0))<<"IEND"_<<raw(big32(crc32("IEND"_)));

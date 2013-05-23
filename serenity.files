@@ -10,6 +10,8 @@ thread.cc
 time.h
 image.h
 tiff.cc
+deflate.h
+deflate.cc
 operation.h
 process.h
 process.cc

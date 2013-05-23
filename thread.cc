@@ -154,7 +154,7 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
     log(message);
     exit(); // Signals all threads to terminate
     {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } } // Removes this thread from list
-    //__builtin_trap(); //TODO: detect if running under debugger
+    __builtin_trap(); //TODO: detect if running under debugger
     exit_thread(0); // Exits this thread
 }
 

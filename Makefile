@@ -85,7 +85,7 @@ $(BUILD)/$(TARGET): $(SRCS:%=$(BUILD)/%.o)
 	$(eval LIBS= $(filter %.o, $^))
 	$(eval LIBS= $(LIBS:$(BUILD)/%.o=LIBS_%))
 	$(eval LIBS= $(LIBS:%=$$(%)))
-	$(CC) $(FLAGS) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
+	@$(CC) $(FLAGS) $(filter %.o, $^) $(LIBS:%=-l%) -o $(BUILD)/$(TARGET)
 	@echo $(BUILD)/$(TARGET)
 
 install_icons/%.png: icons/%.png

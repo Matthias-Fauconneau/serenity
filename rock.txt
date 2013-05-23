@@ -1,8 +1,9 @@
 source = Source
+capsules = Capsules
 shift = ShiftRight source
 smoothx = Smooth shift
 smoothxy = Smooth smoothx
-smooth = Smooth smoothxy #FIXME: shift=0
+smooth = Smooth smoothxy shift=0
 pore rock = Threshold smooth
 colorize = Colorize pore source
 distancex positionxx = DistanceX pore

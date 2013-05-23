@@ -16,7 +16,7 @@ struct Process {
     Process(const ref<byte>& definition, const ref<ref<byte>>& arguments);
 
     /// Returns the Rule to evaluate in order to produce \a target
-    const Rule* ruleForOutput(const ref<byte>& target);
+    Rule* ruleForOutput(const ref<byte>& target);
 
     /// Recursively verifies \a target output is the same since \a queryTime
     bool sameSince(const ref<byte>& target, long queryTime);
@@ -31,11 +31,11 @@ struct Process {
 };
 
 struct ResultFile : Result {
-    ResultFile(const ref<byte>& name, long timestamp, const ref<byte>& metadata, const Folder& folder, Map&& map, const ref<byte>& path)
-        : Result(name,timestamp,metadata, buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), fileName(path?:name+"."_+metadata+".1"_) { assert(this->map.size); }
+    ResultFile(const ref<byte>& name, long timestamp, const ref<byte>& parameters, const ref<byte>& metadata, const Folder& folder, Map&& map, const ref<byte>& path)
+        : Result(name,timestamp,parameters,metadata, buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), fileName(path?:name+"."_+parameters+"."_+metadata+".1"_) {}
     void rename() {
         if(!fileName) return;
-        string newName = name+"."_+metadata+"."_+str(userCount);
+        string newName = name+"."_+arguments+"."_+metadata+"."_+str(userCount);
         if(fileName!=newName) { ::rename(fileName, newName, folder); fileName=move(newName); }
     }
     void addUser() override { ++userCount; rename(); }

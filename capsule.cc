@@ -1,5 +1,11 @@
 #include "capsule.h"
+#include "volume-operation.h"
+#include "sample.h"
 #include "time.h"
+#include "math.h"
+
+struct Capsule { vec3 a, b; float radius; };
+template<> inline string str(const Capsule& o) { return str(o.a,o.b,o.radius); }
 
 float sqrDistance(Capsule A, Capsule B) {
 	vec3 u = A.b - A.a, v = B.b - B.a, w = A.a - B.a;
@@ -26,6 +32,7 @@ float sqrDistance(Capsule A, Capsule B) {
     return sqr( dP ); // return the closest distance
 }
 
+/// Returns a list of random capsules inside the cube [X,Y,Z] separated from a given minimal distance and with a given maximal length and radius
 array<Capsule> randomCapsules(float X, float Y, float Z, float minimumDistance, float maximumLength, float maximumRadius) {
     maximumRadius = min(maximumRadius, min(X-1, min(Y-1, Z-1))/2-minimumDistance);
     Random random;
@@ -48,6 +55,7 @@ array<Capsule> randomCapsules(float X, float Y, float Z, float minimumDistance, 
     return capsules;
 }
 
+/// Rasterizes capsules inside a volume (voxels outside any surface are assigned the maximum value, voxels inside any surface are assigned zero)
 void rasterize(Volume16& target, const array<Capsule>& capsules) {
     const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
     uint16* const targetData = target;
@@ -73,3 +81,20 @@ void rasterize(Volume16& target, const array<Capsule>& capsules) {
         }
     } );
 }
+
+class(Capsules, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return 2; }
+    uint64 outputSize(const map<ref<byte>, Variant>&, const ref<shared<Result>>&, uint) override { return 512*512*512*outputSampleSize(0); }
+    void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
+        Volume& target = outputs.first();
+        target.x = 512, target.y = 512, target.z = 512, target.maximum = (1<<(target.sampleSize*8))-1;
+        array<Capsule> capsules = randomCapsules(target.x,target.y,target.z, 1, 255, 255);
+        rasterize(target, capsules);
+        Sample analytic;
+        for(Capsule p : capsules) {
+            if(p.radius>=analytic.size) analytic.grow(p.radius+1);
+            analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
+        }
+        writeFile(args.at("name"_)+".analytic.tsv"_, toASCII(analytic), Folder(args.at("resultFolder"_)));
+    }
+};

@@ -46,7 +46,7 @@ void rasterize(Volume16& target, const Volume16& source) {
 
 /// Rasterizes each distance field voxel as a ball (with maximum blending)
 class(Rasterize, Operation), virtual VolumePass<uint16> {
-    void execute(map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
+    void execute(const map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
         rasterize(target, source);
         // Computes histogram of maximal ball radii
         ref<byte> name = args.at("name"_);

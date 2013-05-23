@@ -61,8 +61,9 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
 
 /// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Threshold, Operation), virtual VolumeOperation {
+    ref<ref<byte>> parameters() const override { return {"threshold"_}; }
     uint outputSampleSize(uint) override { return 4; }
-    void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
         const Volume& source = inputs[0];
         float densityThreshold=0;
         if(args.contains("threshold"_)) {
@@ -146,5 +147,5 @@ void colorize(Volume24& target, const Volume32& binary, const Volume16& intensit
 
 class(Colorize, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return 3; }
-    void execute(map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override { colorize(outputs[0], inputs[0], inputs[1]); }
+    void execute(const map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override { colorize(outputs[0], inputs[0], inputs[1]); }
 };

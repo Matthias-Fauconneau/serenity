@@ -2,6 +2,18 @@
 #include "data.h"
 #include "time.h"
 
+string relevantArguments(const unique<Operation>& operation, const map<ref<byte>, Variant>& arguments) {
+    string relevantArguments;
+    for(const ref<byte>& parameter: operation->parameters()) if(arguments.contains(parameter)) {
+        if(relevantArguments) relevantArguments<<','; relevantArguments<<parameter<<copy(arguments.at(parameter));
+    }
+    return relevantArguments;
+}
+string relevantArguments(const Rule& rule, const map<ref<byte>, Variant>& globalArguments) {
+    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
+    return relevantArguments(operation, globalArguments<<rule.arguments);
+}
+
 Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
     // Parses process definition
     for(TextData s(definition); s; s.skip()) {
@@ -13,12 +25,14 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
         s.whileAny(" \t\r"_);
         for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
             if(s.match('#')) { s.whileNot('\n'); continue; }
-            rule.inputs << s.word("_-"_);
+            ref<byte> word = s.word("_-"_);
+            if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
+            else rule.inputs << word;
         }
         rules << move(rule);
     }
 
-    // Parses targets and arguments
+    // Parses targets and global arguments
     for(const ref<byte>& argument: arguments) {
         if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), (Variant)section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
         if(ruleForOutput(argument) && !target) target=argument;
@@ -35,7 +49,7 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
         if(!name) name=argument;
         if(existsFolder(argument)) name=argument.contains('/')?section(argument,'/',-2,-1):argument;
     }
-    assert(name);
+    assert_(name, arguments);
     storageFolder = Folder(name, baseStorageFolder, true);
     this->arguments.insert("name"_, name);
 
@@ -43,10 +57,10 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
     for(const string& path: storageFolder.list(Files)) {
         ref<byte> name = section(path,'.');
         assert_(!results.contains(name));
-        if(!ruleForOutput(name) || !section(path,'.',1,2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
+        if(!ruleForOutput(name) || !section(path,'.',-3,-2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
         File file = File(path, storageFolder, ReadWrite);
         assert(file.size());
-        results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
+        results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-4,-3), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
 }
 
@@ -58,18 +72,18 @@ PersistentProcess::~PersistentProcess() {
     }
 }
 
-const Rule* Process::ruleForOutput(const ref<byte>& target) {
-    for(const Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return &rule; return 0;
+Rule* Process::ruleForOutput(const ref<byte>& target) {
+    for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return &rule; return 0;
 }
 
 bool Process::sameSince(const ref<byte>& target, long queryTime) {
     const Rule& rule = *ruleForOutput(target);
     assert_(&rule, target);
 
-    const shared<Result>* result = results.find(target);
-    if(result) {
-        long time = (*result)->timestamp;
-        if(time > queryTime) return false; // Target changed since query
+    const shared<Result>& result = *results.find(target);
+    if(&result) {
+        long time = result->timestamp;
+        if(time > queryTime || result->arguments != relevantArguments(rule,arguments)) return false; // Target changed since query
         queryTime = time;
     }
     // Verify inputs didnt change since last evaluation (or query if discarded), in which case target will need to be regenerated
@@ -100,7 +114,8 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
 
         if(results.contains(output)) { // Reuses same volume
             shared<ResultFile> result = results.take(results.indexOf(output));
-            rename(move(result->fileName), output, storageFolder);
+            string fileName = move(result->fileName); result->fileName.clear();
+            rename(fileName, output, storageFolder);
         }
         // Creates (or resizes) and maps an output result file
         int64 outputSize = operation->outputSize(arguments, inputs, index);
@@ -116,10 +131,8 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
             if(!oldest) error("Not enough space available");
             if(section(oldest,'/')==name) {
                 ref<byte> resultName = section(section(oldest,'/',1,-1),'.');
-                shared<Result>& result = *results.find(resultName);
-                assert(&result && result->userCount==1);
-                results.remove( result );
-                oldest = section(oldest,'.',0,-2)+".0"_; //FIXME: store reference counter using filesystem attributes or metadata file instead of abusing name ?
+                shared<ResultFile> result = results.take(results.indexOf(resultName));
+                result->fileName.clear(); // Prevent rename
             }
             if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
                 ::remove(oldest, baseStorageFolder);
@@ -131,26 +144,28 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
 
         File file(output, storageFolder, Flags(ReadWrite|Create));
         file.resize( outputSize );
-        outputs << shared<ResultFile>(output, currentTime(), ""_, storageFolder, Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|Map::Populate)), output);
+        outputs << shared<ResultFile>(output, currentTime(),""_, ""_, storageFolder, Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|Map::Populate)), output);
     }
     assert_(outputs);
 
+
     Time time;
-    operation->execute(arguments, outputs, inputs);
+    auto args = arguments<<rule.arguments;
+    operation->execute(args, outputs, inputs);
     log(rule, time);
 
     for(shared<Result>& output : outputs) {
-        ResultFile& result = *dynamic_cast<ResultFile*>(output.pointer);
-        if(result.map.size != result.data.size) {
-            assert(result.map.size > result.data.size);
-            result.map.unmap();
-            File file(result.fileName, result.folder, ReadWrite);
-            file.resize(result.data.size);
-            result.map = Map(file, Map::Prot(Map::Read|Map::Write));
-            result.data = buffer<byte>(result.map);
+        shared<ResultFile> result = move(output);
+        result->arguments = relevantArguments(operation, args);
+        if(result->map.size != result->data.size) {
+            assert(result->map.size > result->data.size);
+            result->map.unmap();
+            File file(result->fileName, result->folder, ReadWrite);
+            file.resize(result->data.size);
+            result->map = Map(file, Map::Prot(Map::Read|Map::Write));
+            result->data = buffer<byte>(result->map);
         }
+        results << move(result);
     }
-
-    results << move(outputs);
     return share( *results.find(target) );
 }

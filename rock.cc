@@ -9,56 +9,38 @@
 
 //FIXME: parse module dependencies without these dummy headers
 #include "source.h"
+#include "capsule.h"
 #include "smooth.h"
 #include "threshold.h"
 #include "distance.h"
 #include "skeleton.h"
 #include "rasterize.h"
-class(Tile, Operation), virtual VolumePass<uint16> { void execute(map<ref<byte>, Variant>&, Volume16& target, const Volume& source) override {  tile(target, source); } };
+class(Tile, Operation), virtual VolumePass<uint16> { void execute(const map<ref<byte>, Variant>&, Volume16& target, const Volume& source) override {  tile(target, source); } };
 #include "validate.h"
-class(SquareRoot, Operation), virtual VolumePass<uint8> { void execute(map<ref<byte>, Variant>&, Volume8& target, const Volume& source) override { squareRoot(target, source); } };
-class(ToASCII, Operation), virtual VolumePass<Line> { void execute(map<ref<byte>, Variant>&, VolumeT<Line>& target, const Volume& source) override { toASCII(target, source); } };
-
-#if 0
-//Validation
-#include "capsule.h"
-//volume.x = 512, volume.y = 512, volume.z = 512;
-else if(operation==Validate) validate(target, inputs[0]->volume, inputs[1]->volume);
-array<Capsule> capsules = randomCapsules(X,Y,Z, 1);
-rasterize(target, capsules);
-Sample analytic;
-for(Capsule p : capsules) {
-    if(p.radius>=analytic.size) analytic.grow(p.radius+1);
-    analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
-}
-writeFile(name+".analytic.tsv"_, toASCII(analytic), resultFolder);
-
-else if(operation==SourceASCII || operation==MaximumASCII) toASCII(target, source);
-#endif
+class(SquareRoot, Operation), virtual VolumePass<uint8> { void execute(const map<ref<byte>, Variant>&, Volume8& target, const Volume& source) override { squareRoot(target, source); } };
+class(ToASCII, Operation), virtual VolumePass<Line> { void execute(const map<ref<byte>, Variant>&, VolumeT<Line>& target, const Volume& source) override { toASCII(target, source); } };
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : PersistentProcess, Widget {
-    TEXT(rock); // Rock process definition (embedded in binary)
+    TEXT(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
-        ref<byte> source; // Path to folder containing source slice images (or the special token "validation")
         ref<byte> resultFolder = "ptmp"_; // Folder where histograms are written
-        ref<byte> result; // Path to file (or folder) where target volume data is copied
+        ref<byte> result; // Path to file (or folder) where target volume data is copied (only for ASCII export)
         for(const ref<byte>& argument: args) {
             if(argument.contains('=') || ruleForOutput(argument)) continue;
-            if(!name) name=argument;
-            if(existsFolder(argument)) {
-                if(!source) { source=argument; name=source.contains('/')?section(source,'/',-2,-1):source; continue; }
-                if(!result) { result=argument; resultFolder = argument; continue; }
-            }
-            if(!result) { result=argument; resultFolder = section(argument,'/',0,-2); continue; }
+            if(!arguments.contains("source"_) && (existsFolder(argument) || argument=="validation"_)) { arguments.insert("source"_,argument); continue; }
+            if(!result) { result=argument; resultFolder = existsFolder(argument)?argument:section(argument,'/',0,-2); continue; }
             error("Invalid argument"_, argument);
         }
-        if(source) arguments.insert("source"_,source);
-        else source=arguments.at("source"_); // or default to validation ?
+        if(arguments.at("source"_)=="validation"_) {
+            ruleForOutput("source"_)->operation = "Capsules"_;
+            ruleForOutput("pore"_)->inputs=array<ref<byte>>({"source"_}); // Skip smooth
+        }
+        assert_(name);
 
         // Configures default arguments
-        if(!arguments.contains("cube"_) && !arguments.contains("cylinder"_)) // Clip histograms computation and slice rendering to the full inscribed cylinder by default
-            arguments.insert("cylinder"_,""_); //FIXME: not for validation
+        if(!arguments.contains("cube"_) && !arguments.contains("cylinder"_) && arguments.at("source"_)!="validation"_)
+            arguments.insert("cylinder"_,""_); // Clip histograms computation and slice rendering to the full inscribed cylinder by default
         if(!arguments.contains("kernelSize"_)) arguments.insert("kernelSize"_, 1);
         if(target!="ascii") {
             if(arguments.contains("selection"_)) selection = split(arguments.at("selection"_),',');

@@ -6,9 +6,9 @@
 class(Source, Operation), virtual VolumeOperation {
     uint minX, minY, minZ, maxX, maxY, maxZ;
 
+    ref<ref<byte>> parameters() const override { return {"cylinder"_,"cube"_}; }
     uint outputSampleSize(uint) override { return 2; }
-
-    uint64 outputSize(map<ref<byte>, Variant>& args, const ref<shared<Result>>&, uint) override {
+    uint64 outputSize(const map<ref<byte>, Variant>& args, const ref<shared<Result>>&, uint) override {
         Folder folder(args.at("source"_));
         array<string> slices = folder.list(Files);
         assert(slices, args.at("source"_));
@@ -28,14 +28,14 @@ class(Source, Operation), virtual VolumeOperation {
         return (maxX-minX)*(maxY-minY)*(maxZ-minZ)*outputSampleSize(0);
     }
 
-    void execute(map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
+    void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
         Folder folder(args.at("source"_));
         array<string> slices = folder.list(Files);
 
-        Volume& volume = outputs.first();
-        volume.x = maxX-minX, volume.y = maxY-minY, volume.z = maxZ-minZ;
-        volume.maximum = (1<<(volume.sampleSize*8))-1;
-        uint X = volume.x, Y = volume.y, Z = volume.z, XY=X*Y;
+        Volume& target = outputs.first();
+        target.x = maxX-minX, target.y = maxY-minY, target.z = maxZ-minZ;
+        target.maximum = (1<<(target.sampleSize*8))-1;
+        uint X = target.x, Y = target.y, Z = target.z, XY=X*Y;
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
         for(uint z=0; z<Z; z++) {

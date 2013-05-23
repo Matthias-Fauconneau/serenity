@@ -1,7 +1,7 @@
 #include "pdf.h"
 #include "file.h"
 #include "font.h"
-#include "inflate.h"
+#include "deflate.h"
 #include "display.h"
 #include "text.h" //annotations
 
