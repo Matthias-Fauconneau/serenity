@@ -7,8 +7,8 @@ void validate(Volume16& target, const Volume32& pore, const Volume16& maximum) {
     const uint32* const poreData = pore;
     const uint16* const maximumData = maximum;
     uint16* const targetData = target;
-    const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
-    int marginX=target.marginX, marginY=target.marginY, marginZ=target.marginZ;
+    const int X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
+    int marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
     assert_(!pore.offsetX && !pore.offsetY && !pore.offsetZ);
     const uint* const offsetX = maximum.offsetX, *offsetY = maximum.offsetY, *offsetZ = maximum.offsetZ;
     assert_(offsetX && offsetY && offsetZ);

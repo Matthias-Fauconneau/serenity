@@ -172,9 +172,9 @@ inline void simplify(uint& a, uint& b) { int divisor = gcd(a,b); a/=divisor; b/=
 // Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) { return p; }
 /// Initializes raw memory to zero
-inline void clear(byte* buffer, uint size) { for(uint i: range(size)) buffer[i]=0; }
+inline void clear(byte* buffer, uint64 size) { for(uint i: range(size)) buffer[i]=0; }
 /// Initializes memory to \a value
-template<Type T> void clear(T* buffer, uint size, const T& value=T()) { for(uint i: range(size)) new (&buffer[i]) T(copy(value)); }
+template<Type T> void clear(T* buffer, uint64 size, const T& value=T()) { for(uint i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \dst
 template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
 
@@ -248,7 +248,8 @@ template<Type T> struct unique {
     operator const T&() const { return *pointer; }
     T* operator ->() { return pointer; }
     const T* operator ->() const { return pointer; }
-    explicit operator bool() { return pointer; }
+    explicit operator bool() const { return pointer; }
+    bool operator !() const { return !pointer; }
     bool operator ==(const unique<T>& o) const { return pointer==o.pointer; }
 
     T* pointer;
@@ -270,7 +271,8 @@ template<Type T> struct shared {
     operator const T&() const { return *pointer; }
     T* operator ->() { return pointer; }
     const T* operator ->() const { return pointer; }
-    explicit operator bool() { return pointer; }
+    explicit operator bool() const { return pointer; }
+    bool operator !() const { return !pointer; }
     bool operator ==(const shared<T>& o) const { return pointer==o.pointer; }
 
     T* pointer;

@@ -7,14 +7,11 @@
 void rasterize(Volume16& target, const Volume16& source) {
     const uint16* const sourceData = source;
     uint16* const targetData = target;
-    const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
-    int marginX=target.marginX, marginY=target.marginY, marginZ=target.marginZ;
-    clear(targetData, X*Y*Z);
+    const int X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
+    int marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
+    clear(targetData, target.size());
     interleavedLookup(target);
-    const uint* const offsetX = target.offsetX;
-    const uint* const offsetY = target.offsetY;
-    const uint* const offsetZ = target.offsetZ;
-    assert_(offsetX && offsetY && offsetZ);
+    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     Time time; Time report;
     parallel(marginZ,Z-marginZ, [&](uint id, uint z) { //FIXME: Z-order
         if(id==0 && report/1000>=4) log(z-marginZ,"/", Z-2*marginZ, (z*XY/1024./1024.)/(time/1000.), "MS/s"), report.reset();
@@ -45,17 +42,14 @@ void rasterize(Volume16& target, const Volume16& source) {
 }
 
 /// Rasterizes each distance field voxel as a ball (with maximum blending)
-class(Rasterize, Operation), virtual VolumePass<uint16> {
-    void execute(const map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
-        rasterize(target, source);
-        // Computes histogram of maximal ball radii
-        ref<byte> name = args.at("name"_);
-        Folder resultFolder (args.at("resultFolder"_));
-        Time time;
-        Sample squaredMaximum = histogram(target, args.contains("cylinder"_));
+class(Rasterize, Operation), virtual VolumePass<uint16> { void execute(const map<ref<byte>, Variant>&, Volume16& target, const Volume& source) override { rasterize(target, source); } };
+
+/// Computes histogram of maximal ball radii (i.e. pore size distribution)
+class(sqrtHistogram, Operation), virtual VolumeInput {
+    void execute(const map<ref<byte>, Variant>& args, const ref<byte>& name, const Volume& source) override {
+        Sample squaredMaximum = histogram(source, args.contains("cylinder"_));
         squaredMaximum[0] = 0; // Clears background voxel count to plot with a bigger Y scale
         float scale = toDecimal(args.value("resolution"_,"1"_));
-        writeFile(name+".maximum.tsv"_, toASCII(squaredMaximum, false, true, scale), resultFolder);
-        log("√histogram", name, time);
+        writeFile(args.at("name"_)+"."_+name+".tsv"_, toASCII(squaredMaximum, false, true, scale), args.at("resultFolder"_));
     }
 };

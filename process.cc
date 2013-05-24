@@ -3,9 +3,10 @@
 #include "time.h"
 
 string relevantArguments(const unique<Operation>& operation, const map<ref<byte>, Variant>& arguments) {
+    assert_(operation);
     string relevantArguments;
     for(const ref<byte>& parameter: operation->parameters()) if(arguments.contains(parameter)) {
-        if(relevantArguments) relevantArguments<<','; relevantArguments<<parameter<<copy(arguments.at(parameter));
+        if(relevantArguments) relevantArguments<<','; relevantArguments<<parameter<<'='<<copy(arguments.at(parameter));
     }
     return relevantArguments;
 }
@@ -35,12 +36,38 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
     // Parses targets and global arguments
     for(const ref<byte>& argument: arguments) {
         if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), (Variant)section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
-        if(ruleForOutput(argument) && !target) target=argument;
+        if(ruleForOutput(argument)) targets << argument;
     }
-    if(!target) {
+    if(!targets) {
         assert(rules && rules.last().outputs, rules);
-        target=rules.last().outputs.last();
+        targets << rules.last().outputs.last();
     }
+}
+
+Rule* Process::ruleForOutput(const ref<byte>& target) {
+    for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return &rule; return 0;
+}
+
+bool Process::sameSince(const ref<byte>& target, long queryTime) {
+    const Rule& rule = *ruleForOutput(target);
+    assert_(&rule, target);
+
+    const shared<Result>& result = *results.find(target);
+    if(&result) {
+        long time = result->timestamp;
+        unique<Operation> operation = Interface<Operation>::instance(rule.operation);
+        if(time > queryTime || result->arguments != relevantArguments(rule,arguments)) return false; // Target changed since query
+        queryTime = time;
+    }
+    // Verify inputs didnt change since last evaluation (or query if discarded), in which case target will need to be regenerated
+    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime)) return false;
+    return true;
+}
+
+shared<Result> Process::getVolume(const ref<byte>& target) {
+    const shared<Result>* result = results.find(target);
+    if(result && sameSince(target, (*result)->timestamp)) { assert((*result)->data.size); return share( *result ); }
+    error("Anonymous process manager unimplemented"_);
 }
 
 PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<byte>>& arguments) : Process(definition, arguments) {
@@ -59,47 +86,22 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
         assert_(!results.contains(name));
         if(!ruleForOutput(name) || !section(path,'.',-3,-2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
         File file = File(path, storageFolder, ReadWrite);
-        assert(file.size());
         results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-4,-3), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
 }
 
 PersistentProcess::~PersistentProcess() {
     results.clear();
+    targetResults.clear();
     if(arguments.value("clean"_,"0"_)!="0"_) {
-        for(const string& path: storageFolder.list(Files)) ::remove(path, storageFolder); // Cleanups intermediate data
+        for(const string& path: storageFolder.list(Files)) ::remove(path, storageFolder); // Cleanups all intermediate results
         remove(storageFolder);
     }
 }
 
-Rule* Process::ruleForOutput(const ref<byte>& target) {
-    for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return &rule; return 0;
-}
-
-bool Process::sameSince(const ref<byte>& target, long queryTime) {
-    const Rule& rule = *ruleForOutput(target);
-    assert_(&rule, target);
-
-    const shared<Result>& result = *results.find(target);
-    if(&result) {
-        long time = result->timestamp;
-        if(time > queryTime || result->arguments != relevantArguments(rule,arguments)) return false; // Target changed since query
-        queryTime = time;
-    }
-    // Verify inputs didnt change since last evaluation (or query if discarded), in which case target will need to be regenerated
-    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime)) return false;
-    return true;
-}
-
-shared<Result> Process::getVolume(const ref<byte>& target) {
-    const shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp)) { assert((*result)->data.size); return share( *result ); }
-    error("Anonymous process manager unimplemented"_);
-}
-
 shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
     const shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp)) { assert((*result)->data.size); return share( *result ); }
+    if(result && sameSince(target, (*result)->timestamp)) return share( *result );
 
     const Rule& rule = *ruleForOutput(target);
     assert_(&rule, target);

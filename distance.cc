@@ -7,8 +7,8 @@
 // X
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, const Volume32& source) {
     clearMargins(target);
-    const int X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint32* const sourceData = source;
     uint32* const targetData = target;
     uint16* const xPositionData = positionX;
@@ -65,8 +65,8 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 // Y
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, const Volume32& source, const Volume16& sourceX) {
     clearMargins(target);
-    const int X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     uint32* const targetData = target;
@@ -132,8 +132,8 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 // Z
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, Volume16& positionZ, const Volume32& source, const Volume16& sourceX, const Volume16& sourceY) {
     clearMargins(target);
-    const int X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     const uint16* const ySourceData = sourceY;

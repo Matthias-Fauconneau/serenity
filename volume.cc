@@ -3,21 +3,27 @@
 #include "thread.h"
 #include "data.h"
 
-static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) {
-    buffer<uint> lookup(size);
-    for(uint i=0; i<size; i++) { lookup[i]=0; for(uint b=0, bits=i; bits!=0; bits>>=1, b++) { uint bit=bits&1; lookup[i] |= bit << (b*stride+offset); } }
-    return lookup;
-}
+/// Interleaves bits
+static uint interleave(uint bits, uint offset, uint stride=3) { uint interleavedBits=0; for(uint b=0; bits!=0; bits>>=1, b++) interleavedBits |= (bits&1) << (b*stride+offset); return interleavedBits; }
+/// Interleaves 3 coordinates
+uint zOrder(int3 coordinates) { return interleave(coordinates.x, 0)|interleave(coordinates.y, 1)|interleave(coordinates.z, 2); }
+/// Generates lookup tables of interleaved bits
+static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) { buffer<uint> lookup(size); for(uint i=0; i<size; i++) { lookup[i]=interleave(i,offset,stride); } return lookup; }
+
+/// Pack interleaved bits
+static uint pack(uint bits, uint offset, uint stride=3) { uint packedBits=0; bits>>=offset; for(uint b=0; bits!=0; bits>>=stride, b++) packedBits |= (bits&1) << b; return packedBits; }
+/// Uninterleaves 3 coordinates
+int3 zOrder(uint index) { return int3(pack(index,0),pack(index,1),pack(index,2)); }
 
 void interleavedLookup(Volume& target) {
-    if(!target.offsetX) target.offsetX = interleavedLookup(target.x,0);
-    if(!target.offsetY) target.offsetY = interleavedLookup(target.y,1);
-    if(!target.offsetZ) target.offsetZ = interleavedLookup(target.z,2);
+    if(!target.offsetX) target.offsetX = interleavedLookup(target.sampleCount.x,0);
+    if(!target.offsetY) target.offsetY = interleavedLookup(target.sampleCount.y,1);
+    if(!target.offsetZ) target.offsetZ = interleavedLookup(target.sampleCount.z,2);
 }
 
 string volumeFormat(const Volume& volume) {
-    string s; s << str(volume.x) << 'x' << str(volume.y) << 'x' << str(volume.z);
-    if(volume.marginX||volume.marginY||volume.marginZ) s << '+' << str(volume.marginX) << '+' << str(volume.marginY) << '+' << str(volume.marginZ);
+    string s; s << str(volume.sampleCount.x) << 'x' << str(volume.sampleCount.y) << 'x' << str(volume.sampleCount.z);
+    if(volume.margin) s << '+' << str(volume.margin.x) << '+' << str(volume.margin.y) << '+' << str(volume.margin.z);
     s << '-' << hex(volume.maximum);
     if(volume.offsetX||volume.offsetY||volume.offsetZ) s << "-tiled"_;
     if(volume.squared) s << "-squared"_;
@@ -26,13 +32,13 @@ string volumeFormat(const Volume& volume) {
 
 void parseVolumeFormat(Volume& volume, const ref<byte>& format) {
     TextData s (format);
-    volume.x = s.integer(); s.skip("x"_);
-    volume.y = s.integer(); s.skip("x"_);
-    volume.z = s.integer();
+    volume.sampleCount.x = s.integer(); s.skip("x"_);
+    volume.sampleCount.y = s.integer(); s.skip("x"_);
+    volume.sampleCount.z = s.integer();
     if(s.match('+')) {
-        volume.marginX = s.integer(); s.skip("+"_);
-        volume.marginY = s.integer(); s.skip("+"_);
-        volume.marginZ = s.integer();
+        volume.margin.x = s.integer(); s.skip("+"_);
+        volume.margin.y = s.integer(); s.skip("+"_);
+        volume.margin.z = s.integer();
     }
     s.skip("-"_);
     volume.maximum = s.hexadecimal();
@@ -43,8 +49,8 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& format) {
 
 uint maximum(const Volume16& source) {
     const uint16* const sourceData = source;
-    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     v8hi maximum8 = {0,0,0,0,0,0,0,0};
     uint16 maximum=0;
     for(uint z : range(marginZ, Z-marginZ)) {
@@ -62,8 +68,8 @@ uint maximum(const Volume16& source) {
 
 uint maximum(const Volume32& source) {
     const uint32* const sourceData = source;
-    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    int marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     assert((X-2*marginX)%4==0 && marginX%4==0);
     v4si maximum4 = {0,0,0,0};
     for(uint z=marginZ; z<Z-marginZ; z++) {
@@ -86,7 +92,7 @@ void pack(Volume16& target, const Volume32& source) {
 }
 
 void tile(Volume16& target, const Volume16& source) {
-    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const uint16* const sourceData = source;
     interleavedLookup(target);
     uint16* const targetData = target;
@@ -106,8 +112,8 @@ void tile(Volume16& target, const Volume16& source) {
 }
 
 template<Type T> void clearMargins(VolumeT<T>& target, uint value) {
-    const uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
-    int marginX=target.marginX, marginY=target.marginY, marginZ=target.marginZ;
+    const uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY=X*Y;
+    int marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
     T* const targetData = target;
     if(target.offsetX || target.offsetY || target.offsetZ) {
         const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
@@ -161,10 +167,11 @@ template<Type T> void clearMargins(VolumeT<T>& target, uint value) {
 template void clearMargins<uint16>(VolumeT<uint16>& target, uint value);
 template void clearMargins<uint32>(VolumeT<uint32>& target, uint value);
 
+#if 0
 void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, uint x2, uint y2, uint z2) {
     uint X=x2-x1, Y=y2-y1, Z=z2-z1, XY=X*Y;
-    target.x=X, target.y=Y, target.z=Z;
-    target.marginX=target.marginY=target.marginZ=0; // Assumes crop outside margins
+    target.sampleCount.x=X, target.sampleCount.y=Y, target.sampleCount.z=Z;
+    target.margin.x=target.margin.y=target.margin.z=0; // Assumes crop outside margins
     assert_(source.offsetX && source.offsetY && source.offsetZ);
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     const uint16* const sourceData = source;
@@ -179,11 +186,14 @@ void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, u
         }
     }
 }
-
+#endif
+#if 0
 void downsample(Volume16& target, const Volume16& source) {
     assert(!source.offsetX && !source.offsetY && !source.offsetZ);
-    int X = source.x, Y = source.y, Z = source.z, XY = X*Y;
-    target.x = X/2, target.y = Y/2, target.z = Z/2; target.marginX=source.marginX/2, target.marginY=source.marginZ/2, target.marginX=source.marginZ/2, target.maximum=source.maximum;
+    int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;
+    target.sampleCount = source.sampleCount/2;
+    target.margin = source.margin/2;
+    target.maximum=source.maximum;
     const uint16* const sourceData = source;
     uint16* const targetData = target;
     for(int z=0; z<Z/2; z++) {
@@ -205,73 +215,32 @@ void downsample(Volume16& target, const Volume16& source) {
         }
     }
 }
-
-inline void itoa(byte* target, uint n) {
-    assert(n<1000);
-    uint i=4;
-    do { target[--i]="0123456789"[n%10]; n /= 10; } while( n!=0 );
-    while(i>0) target[--i]=' ';
-}
-
-void toASCII(Volume& target, const Volume& source) {
-    uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    uint marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
-    assert_(!target.offsetX && !target.offsetY && !target.offsetZ);
-    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    Line* const targetData = (Line*)target.data.data;
-    for(uint z=0; z<Z; z++) {
-        Line* const targetZ = targetData + z*XY;
-        for(uint y=0; y<Y; y++) {
-            Line* const targetZY = targetZ + y*X;
-            for(uint x=0; x<X; x++) {
-                uint value = 0;
-                if(x >= marginX && x<X-marginX && y >= marginY && y<Y-marginY && z >= marginZ && z<Z-marginZ) {
-                    uint offset = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
-                    if(source.sampleSize==1) value = ((byte*)source.data.data)[offset];
-                    else if(source.sampleSize==2) value = ((uint16*)source.data.data)[offset];
-                    else if(source.sampleSize==4) value = ((uint32*)source.data.data)[offset];
-                    else error(source.sampleSize);
-                    assert(value <= source.maximum, value, source.maximum);
-                }
-
-                Line& line = targetZY[x];
-                itoa(line, x);
-                line[4]=' ';
-                itoa(line+5, y);
-                line[9]=' ';
-                itoa(line+10,z);
-                line[14]=' ';
-                itoa(line+15, min<uint>(0xFF, value * 0xFF / source.maximum)); //FIXME
-                line[19]='\n';
-            }
-        }
-    }
-}
+#endif
 
 Image slice(const Volume& source, float normalizedZ, bool cylinder) {
-    uint z = source.marginZ+(source.z-2*source.marginZ-1)*normalizedZ;
-    assert_(z >= source.marginZ && z<source.z-source.marginZ);
-    return slice(source, (int)z, cylinder);
+    int z = source.margin.z+(source.sampleCount.z-2*source.margin.z-1)*normalizedZ;
+    assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
+    return slice(source, z, cylinder);
 }
 
 Image slice(const Volume& source, int z, bool cylinder) {
-    int X=source.x, Y=source.y, XY=X*Y;
+    int X=source.sampleCount.x, Y=source.sampleCount.y, XY=X*Y;
     Image target(X,Y);
-    int unused marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
+    int unused marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     assert(X==Y && marginX==marginY);
     uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
-        if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) > radiusSq) { target(x,y) = byte4(0,0,0,0x80); continue; }
+        if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) > radiusSq) { target(x,y) = byte4(0,0,0,0); continue; }
         uint value = 0;
-        uint offset = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
-        if(source.sampleSize==1) value = ((byte*)source.data.data)[offset];
-        else if(source.sampleSize==2) value = ((uint16*)source.data.data)[offset];
-        else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[offset]; continue; } //FIXME: sRGB
-        else if(source.sampleSize==4) value = ((uint32*)source.data.data)[offset];
+        uint index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+        if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
+        else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
+        else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
+        else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
         else error(source.sampleSize);
-        uint linear8 = source.squared ? round(sqrt(value)) / round(sqrt(source.maximum)) * 0xFF : value * 0xFF / source.maximum;
-        //assert(linear8<0x100 || x<marginX || y<marginY || z<marginZ, linear8, value, source.maximum, x, y, z);
+        uint linear8 = source.squared ? round(sqrt(value)) * 0xFF / round(sqrt(source.maximum)) : value * 0xFF / source.maximum;
+        assert(linear8<0x100 || x<marginX || y<marginY || (int)z<marginZ, linear8, value, source.maximum, x, y, z);
         linear8 = min<uint>(0xFF, linear8); //FIXME
         extern uint8 sRGB_lookup[256];
         uint sRGB8 = sRGB_lookup[linear8];

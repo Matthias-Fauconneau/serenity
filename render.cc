@@ -3,7 +3,7 @@
 #include "simd.h"
 
 void squareRoot(Volume8& target, const Volume16& source, bool normalize) {
-    uint X=target.x, Y=target.y, Z=target.z, XY=X*Y;
+    uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY=X*Y;
     interleavedLookup(target);
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     target.maximum = normalize ? 0xFF : round(sqrt((float)source.maximum)), target.squared=false;
@@ -44,9 +44,8 @@ void squareRoot(Volume8& target, const Volume16& source, bool normalize) {
 
 void render(Image& target, const Volume8& empty, const Volume8& density, const Volume8& intensity, mat3 view) {
     // Volume
-    assert(empty.x==empty.y && empty.y == empty.z);
-    uint stride = empty.x; // Unclipped volume data size
-    uint size = stride-2*empty.marginX; // Clipped volume size
+    uint stride = empty.sampleCount.x; // Unclipped volume data size
+    uint size = stride-2*empty.margin.x; // Clipped volume size
     const float radius = size/2, halfHeight = size/2; // Cylinder parameters
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};

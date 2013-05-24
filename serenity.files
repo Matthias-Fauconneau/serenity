@@ -1,17 +1,6 @@
 Makefile
-core.h
-simd.h
-array.h
-string.h
-file.h
-file.cc
-thread.h
-thread.cc
-time.h
-image.h
+build.cc
 tiff.cc
-deflate.h
-deflate.cc
 operation.h
 process.h
 process.cc
@@ -40,3 +29,8 @@ source.cc
 volume-operation.h
 source.h
 smooth.h
+
+export.h
+export.cc
+floodfill.h
+floodfill.cc

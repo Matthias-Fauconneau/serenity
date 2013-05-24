@@ -135,11 +135,11 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTRAP, &sa, 0));
     setExceptions(
                 //Invalid | volume renderer takes square roots of negatives
-                Denormal
-                //DivisionByZero| FIXME: volume renderer divides by zero
-                //Overflow| FIXME: volume renderer overflows
-                //Underflow FIXME: exp in gaussian for rock threshold underflows
-                );
+                //Denormal | Dividing by Otsu's method variance
+                //DivisionByZero | volume renderer divides by zero
+                //Overflow | volume renderer overflows
+                //Underflow | Dividing by Otsu's method variance ?
+                0);
 }
 
 template<> void __attribute((noreturn)) error(const ref<byte>& message) {

@@ -32,16 +32,16 @@ float sqrDistance(Capsule A, Capsule B) {
     return sqr( dP ); // return the closest distance
 }
 
-/// Returns a list of random capsules inside the cube [X,Y,Z] separated from a given minimal distance and with a given maximal length and radius
-array<Capsule> randomCapsules(float X, float Y, float Z, float minimumDistance, float maximumLength, float maximumRadius) {
-    maximumRadius = min(maximumRadius, min(X-1, min(Y-1, Z-1))/2-minimumDistance);
+/// Returns a list of random capsules inside a cube [0, size] separated from a given minimal distance and with a given maximal length and radius
+array<Capsule> randomCapsules(vec3 size, float minimumDistance, float maximumLength, float maximumRadius) {
+    maximumRadius = min(maximumRadius, min(size.x, min(size.y, size.z))/2-minimumDistance);
     Random random;
     array<Capsule> capsules;
-    while(capsules.size<(uint)min(X,min(Y, Z))) {
+    while(capsules.size<maximumRadius) {
         float radius = 1+random()*(maximumRadius-1);
         radius = round(radius);
-        float margin = minimumDistance+radius;
-        vec3 ends[2]; for(vec3& end: ends) end = vec3(margin+random()*(X-1-2*margin), margin+random()*(Y-1-2*margin), margin+random()*(Z-1-2*margin));
+        vec3 margin = minimumDistance+radius;
+        vec3 ends[2]; for(vec3& end: ends) end = margin+vec3(random(),random(),random())*(size - 2.f*margin);
         float length = random()*maximumLength;
         vec3 origin=(ends[0]+ends[1])/2.f, axis=ends[1]-ends[0];
         float scale = length/norm(axis);
@@ -57,9 +57,9 @@ array<Capsule> randomCapsules(float X, float Y, float Z, float minimumDistance, 
 
 /// Rasterizes capsules inside a volume (voxels outside any surface are assigned the maximum value, voxels inside any surface are assigned zero)
 void rasterize(Volume16& target, const array<Capsule>& capsules) {
-    const int X=target.x, Y=target.y, Z=target.z, XY = X*Y;
+    const int X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
     uint16* const targetData = target;
-    clear<uint16>(targetData, target.size(), target.maximum); // Sets target to maximum value
+    clear(targetData, target.size(), (uint16)target.maximum); // Sets target to maximum value
     parallel(capsules.size, [&](uint, uint i) {
         Capsule p=capsules[i]; vec3 a=p.a, b=p.b;
         vec3 min = ::min(a,b)-vec3(p.radius), max = ::max(a,b)+vec3(p.radius); // Bounding box
@@ -87,14 +87,15 @@ class(Capsules, Operation), virtual VolumeOperation {
     uint64 outputSize(const map<ref<byte>, Variant>&, const ref<shared<Result>>&, uint) override { return 512*512*512*outputSampleSize(0); }
     void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
         Volume& target = outputs.first();
-        target.x = 512, target.y = 512, target.z = 512, target.maximum = (1<<(target.sampleSize*8))-1;
-        array<Capsule> capsules = randomCapsules(target.x,target.y,target.z, 1, 255, 255);
+        target.sampleCount = 512;
+        target.maximum = (1<<(target.sampleSize*8))-1;
+        array<Capsule> capsules = randomCapsules(vec3(target.sampleCount), 1, 255, 255);
         rasterize(target, capsules);
         Sample analytic;
         for(Capsule p : capsules) {
             if(p.radius>=analytic.size) analytic.grow(p.radius+1);
             analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
         }
-        writeFile(args.at("name"_)+".analytic.tsv"_, toASCII(analytic), Folder(args.at("resultFolder"_)));
+        writeFile(args.at("name"_)+".analytic.tsv"_, toASCII(analytic), args.at("resultFolder"_));
     }
 };

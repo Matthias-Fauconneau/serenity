@@ -26,7 +26,7 @@ struct VolumeOperation : virtual Operation {
             volume.data = buffer<byte>(ref<byte>(outputs[index]->data));
             if(inputVolumes) { // Inherits initial metadata from previous operation
                 const Volume& source = inputVolumes.first();
-                volume.x=source.x, volume.y=source.y, volume.z=source.z, volume.copyMetadata(source);
+                volume.sampleCount=source.sampleCount; volume.copyMetadata(source);
                 assert(volume.sampleSize * volume.size() == volume.data.size);
             }
             outputVolumes << move( volume );
@@ -47,4 +47,13 @@ template<Type O> struct VolumePass : virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(O); }
     virtual void execute(const map<ref<byte>, Variant>& args, VolumeT<O>& target, const Volume& source) abstract;
     virtual void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
+};
+#define PASS(name, type, function) \
+    class(name, Operation), virtual VolumePass<type> { void execute(const map<ref<byte>, Variant>&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
+
+/// Convenience class to define a single input, no output volume operation
+struct VolumeInput : virtual Operation {
+    uint64 outputSize(const map<ref<byte>, Variant>&, const ref<shared<Result>>&, uint) override { return 0; }
+    virtual void execute(const map<ref<byte>, Variant>& args, const ref<byte>& name, const Volume& source) abstract;
+    virtual void execute(const map<ref<byte>, Variant>& args, array<shared<Result>>&, const ref<shared<Result>>& inputs) override { execute(args, inputs[0]->name, toVolume(inputs[0])); }
 };

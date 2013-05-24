@@ -129,7 +129,7 @@ void line(vec2 p1, vec2 p2, vec4 color) {
 
 inline double pow(double x, double y) { return __builtin_pow(x,y); }
 uint8 sRGB_lookup[256];
-void __attribute((constructor)) compute_sRGB_lookup() {
+void __attribute((constructor(10000))) compute_sRGB_lookup() {
     for(uint i=0;i<256;i++) {
         float c = i/255.f;
         sRGB_lookup[i] = round(255*( c>=0.0031308 ? 1.055*pow(c,1/2.4f)-0.055 : 12.92*c ));

@@ -25,9 +25,10 @@ struct Process {
     virtual shared<Result> getVolume(const ref<byte>& target);
 
     array<Rule> rules; // Production rules
-    ref<byte> target; // Desired final result
+    array<ref<byte>> targets; // Target results to compute
     map<ref<byte>, Variant> arguments; // User given arguments
-    array<shared<Result>> results; // Generated intermediate data
+    array<shared<Result>> results; // Generated intermediate (and target) data
+    array<shared<Result>> targetResults; // Generated target data
 };
 
 struct ResultFile : Result {

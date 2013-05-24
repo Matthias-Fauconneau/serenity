@@ -36,12 +36,14 @@ template <class I> template <class C> typename Interface<I>::template Factory<C>
 
 /// Dynamic-typed value
 struct Variant : string {
+    Variant(string&& s) : string(move(s)) {}
     Variant(const ref<byte>& s) : string(s) {}
     Variant(int integer) : string(dec(integer)){}
     operator int() const { return toInteger(*this); }
     operator const string&() const { return *this; }
+    template<Type T> operator T() const { return T((const string&)*this); } // Enables implicit conversion to any compatible type
 };
-template<> inline Variant copy(const Variant& o) { return Variant((ref<byte>)o); }
+template<> inline Variant copy(const Variant& o) { return copy((const string&)o); }
 template<> inline string str(const Variant& o) { return copy((const string&)o); }
 
 /// Intermediate result

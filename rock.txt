@@ -11,9 +11,12 @@ distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
 skeleton = Skeleton positionx positiony positionz
 tiledSkeleton = Tile skeleton
-maximum = Rasterize tiledSkeleton
+connectedSkeleton = FloodFill tiledSkeleton
+unconnectedMaximum = Rasterize tiledSkeleton
+connectedMaximum = Rasterize connectedSkeleton
+unconnected = sqrtHistogram unconnectedMaximum
+connected = sqrtHistogram connectedMaximum
 
-validate = Validate pore maximum
 #emptyx epositionx = DistanceX rock
 #emptyy epositiontx epositiony = DistanceY emptyx epositionx
 #emptyz epositionx epositiony epositionz = DistanceZ emptyy epositionyx epositionyy
@@ -22,3 +25,13 @@ validate = Validate pore maximum
 #intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
 #sourceASCII = ToASCII source
 #maximumASCII = ToASCII maximum
+
+sourcePNG = ToPNG source
+smoothPNG = ToPNG smooth
+colorizePNG = ToPNG colorize
+distancePNG = ToPNG distance
+skeletonPNG = ToPNG skeleton
+maximumPNG = ToPNG maximum
+
+#Last target is the default
+validate = Validate pore maximum

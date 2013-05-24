@@ -29,8 +29,8 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
     const uint16* const yPositionData = positionY;
     const uint16* const zPositionData = positionZ;
     uint16* const targetData = target;
-    const uint X=target.x, Y=target.y, Z=target.z, XY = X*Y;
-    uint marginX=max(1u,target.marginX), marginY=max(1u,target.marginY), marginZ=max(1u,target.marginZ);
+    const uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
+    uint marginX=max(1,target.margin.x), marginY=max(1,target.margin.y), marginZ=max(1,target.margin.z);
     //for(uint z=marginZ; z<Z-marginZ; z++) {
     parallel(marginZ, Z-marginZ, [&](uint, uint z) { //FIXME: conflicts
         const uint16* const xPositionZ = xPositionData+z*XY;
@@ -56,7 +56,7 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
             }
         }
     });
-    target.marginX = marginX, target.marginY = marginY, target.marginZ = marginZ;
+    target.margin.x = marginX, target.margin.y = marginY, target.margin.z = marginZ;
     target.maximum = maximum(target), target.squared=true;
 }
 

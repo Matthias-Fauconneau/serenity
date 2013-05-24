@@ -27,7 +27,7 @@ class(ShiftRight, Operation), virtual VolumePass<uint16> {
 void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
     const uint16* const sourceData = source;
     uint16* const targetData = target;
-    const uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     assert(X%16==0);
     const uint margin = align(4,size)-size;
     parallel(Z, [&](uint, uint z){
@@ -62,9 +62,9 @@ class(Smooth, Operation), virtual VolumePass<uint16> {
         target.maximum *= sampleCount;
         smooth(target, source, kernelSize, shift);
         target.maximum >>= shift;
-        int margin = target.marginY + align(4, kernelSize);
-        target.marginY = target.marginZ;
-        target.marginZ = target.marginX;
-        target.marginX = margin;
+        int margin = target.margin.y + align(4, kernelSize);
+        target.margin.y = target.margin.z;
+        target.margin.z = target.margin.x;
+        target.margin.x = margin;
     }
 };

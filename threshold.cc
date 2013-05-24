@@ -7,7 +7,7 @@
 /// Segments by setting values over a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
 void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float threshold) {
     v4si scaledThreshold = set1(threshold*source.maximum);
-    uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
+    uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     assert(X%8==0);
     uint32 sqr[X]; for(uint x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
     uint32* const poreData = pore;
@@ -29,7 +29,7 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
         }
     });
     // Sets boundary voxels to ensures threshold volume is closed (non-zero borders) to avoid null/full rows in distance search
-    uint marginX=align(4,min(1u,source.marginX))+1, marginY=align(4,min(1u,source.marginY))+1, marginZ=align(4,min(1u,source.marginZ))+1;
+    uint marginX=align(4,min(1,source.margin.x))+1, marginY=align(4,min(1,source.margin.y))+1, marginZ=align(4,min(1,source.margin.z))+1;
     for(uint z=marginZ; z<Z-marginZ; z++) {
         uint32* const poreZ = poreData + z*XY;
         uint32* const rockZ = rockData + z*XY;
@@ -50,12 +50,12 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
             for(uint z=Z-marginZ; z<Z; z++) rockY[z*XY+x]=poreY[z*XY+x]=x*x; // Sets back face
         }
     }
-    pore.marginX=marginX-1, pore.marginY=marginY-1, pore.marginZ=marginZ-1;
-    rock.marginX=marginX-1, rock.marginY=marginY-1, rock.marginZ=marginZ-1;
+    pore.margin.x=marginX-1, pore.margin.y=marginY-1, pore.margin.z=marginZ-1;
+    rock.margin.x=marginX-1, rock.margin.y=marginY-1, rock.margin.z=marginZ-1;
 #if DEBUG
     pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;  // for the assert
 #else
-    pore.maximum=(pore.x-1)*(pore.x-1), rock.maximum=(rock.x-1)*(rock.x-1); // for visualization
+    pore.maximum=(pore.sampleCount.x-1)*(pore.sampleCount.x-1), rock.maximum=(rock.sampleCount.x-1)*(rock.sampleCount.x-1); // for visualization
 #endif
 }
 
@@ -72,14 +72,14 @@ class(Threshold, Operation), virtual VolumeOperation {
         }
         if(!densityThreshold) {
             Time time;
-            Sample density = histogram(source,  args.contains("cylinder"_));
+            Sample density = histogram(source,  args.contains("cylinder"_)); //FIXME: histogram the unsmoothed data
             log("density", time);
             bool plot = false;
             ref<byte> name = args.at("name"_);
-            Folder resultFolder (args.at("resultFolder"_));
+            Folder resultFolder = args.at("resultFolder"_);
             if(plot) writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
             if(name != "validation"_) density[0]=density[density.size-1]=0; // Ignores clipped values
-#if 1 // Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
+#if 0 // Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
             Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
             if(plot) writeFile(name+".rock.tsv"_, toASCII(sample(rock,density.size)), resultFolder);
             Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
@@ -111,9 +111,9 @@ class(Threshold, Operation), virtual VolumeOperation {
                 variances[t] = variance;
             }
             for(uint t: range(density.size)) interclass[t]=variances[t]*totalMaximum/maximum; // Scales to plot over density
-            writeFile("interclass.tsv"_,toASCII(interclass), resultFolder);
+            if(plot) writeFile("interclass.tsv"_,toASCII(interclass), resultFolder);
             densityThreshold = float(threshold) / float(density.size);
-            log("Automatic threshold", threshold, densityThreshold);
+            log("Automatic threshold", densityThreshold);
 #endif
         } else log("Manual threshold", densityThreshold);
         threshold(outputs[0], outputs[1], source, densityThreshold);
@@ -123,7 +123,7 @@ class(Threshold, Operation), virtual VolumeOperation {
 /// Maps intensity to either red or green channel depending on binary classification
 void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
     assert(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
-    int X = binary.x, Y = binary.y, Z = binary.z, XY = X*Y;
+    int X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z, XY = X*Y;
     const uint32* const binaryData = binary;
     const uint16* const intensityData = intensity;
     const uint maximum = intensity.maximum;

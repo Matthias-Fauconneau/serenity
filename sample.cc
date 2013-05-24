@@ -2,31 +2,38 @@
 #include "data.h"
 
 Sample histogram(const Volume16& source, bool cylinder) {
-    uint X=source.x, Y=source.y, Z=source.z, XY=X*Y;
-    uint marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ;
-    assert(X==Y && marginX==marginY);
-    uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
+    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    assert_(X==Y && marginX==marginY, source.sampleCount, source.margin);
+    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     Sample histogram (source.maximum+1, source.maximum+1, 0);
     if(source.offsetX || source.offsetY || source.offsetZ) {
         const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-        assert(offsetX && offsetY && offsetZ);
-        for(uint z=marginZ; z<Z-marginZ; z++) {
+        for(int z=marginZ; z<Z-marginZ; z++) {
             const uint16* sourceZ = source+offsetZ[z];
-            for(uint y=marginY; y<Y-marginY; y++) {
+            for(int y=marginY; y<Y-marginY; y++) {
                 const uint16* sourceZY = sourceZ+offsetY[y];
-                for(uint x=marginX; x<X-marginX; x++) {
-                    if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[sourceZY[offsetX[x]]]++;
+                for(int x=marginX; x<X-marginX; x++) {
+                    if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq) {
+                        uint sample = sourceZY[offsetX[x]];
+                        assert_(sample <= source.maximum);
+                        histogram[sample]++;
+                    }
                 }
             }
         }
     }
     else {
-        for(uint z=marginZ; z<Z-marginZ; z++) {
+        for(int z=marginZ; z<Z-marginZ; z++) {
             const uint16* sourceZ = source+z*XY;
-            for(uint y=marginY; y<Y-marginY; y++) {
-                const uint16* sourceY = sourceZ+y*X;
-                for(uint x=marginX; x<X-marginX; x++) {
-                    if((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2) <= radiusSq) histogram[sourceY[x]]++;
+            for(int y=marginY; y<Y-marginY; y++) {
+                const uint16* sourceZY = sourceZ+y*X;
+                for(int x=marginX; x<X-marginX; x++) {
+                    if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq) {
+                        uint sample = sourceZY[x];
+                        assert_(sample <= source.maximum);
+                        histogram[sample]++;
+                    }
                 }
             }
         }
@@ -65,7 +72,7 @@ Sample sample(const Lorentz& lorentz, uint size) {
     for(int x=0; x<(int)size; x++) sample[x] = lorentz[x];
     return sample;
 }
-
+#if 0
 float intersect(const Lorentz& A, const Lorentz& B) {
     float x0=A.position, x1=B.position, y0=A.height, y1=B.height, s0=A.scale, s1=B.scale;
     float b = s0*s0*y0*x1-s1*s1*y1*x0;
@@ -81,6 +88,7 @@ float intersect(const Lorentz& A, const Lorentz& B) {
     log(b+d, b-d, (b+d)/n, (b-d)/n);
     error(x0,(b-d)/n, (x0+x1)/2, x1);
 }
+#endif
 Sample operator-(const Sample& A, const Sample& B) {
     uint N=A.size; assert(B.size==N); Sample R(N,N);
     for(uint i: range(N)) R[i]=max(0ll, A[i]-B[i]);

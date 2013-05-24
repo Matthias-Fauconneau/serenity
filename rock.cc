@@ -14,17 +14,18 @@
 #include "threshold.h"
 #include "distance.h"
 #include "skeleton.h"
-#include "rasterize.h"
 class(Tile, Operation), virtual VolumePass<uint16> { void execute(const map<ref<byte>, Variant>&, Volume16& target, const Volume& source) override {  tile(target, source); } };
+#include "floodfill.h"
+#include "rasterize.h"
 #include "validate.h"
 class(SquareRoot, Operation), virtual VolumePass<uint8> { void execute(const map<ref<byte>, Variant>&, Volume8& target, const Volume& source) override { squareRoot(target, source); } };
-class(ToASCII, Operation), virtual VolumePass<Line> { void execute(const map<ref<byte>, Variant>&, VolumeT<Line>& target, const Volume& source) override { toASCII(target, source); } };
+#include "export.h"
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : PersistentProcess, Widget {
     TEXT(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
-        ref<byte> resultFolder = "ptmp"_; // Folder where histograms are written
+        ref<byte> resultFolder = "dev/shm"_; // Folder where histograms are written
         ref<byte> result; // Path to file (or folder) where target volume data is copied (only for ASCII export)
         for(const ref<byte>& argument: args) {
             if(argument.contains('=') || ruleForOutput(argument)) continue;
@@ -42,26 +43,19 @@ struct Rock : PersistentProcess, Widget {
         if(!arguments.contains("cube"_) && !arguments.contains("cylinder"_) && arguments.at("source"_)!="validation"_)
             arguments.insert("cylinder"_,""_); // Clip histograms computation and slice rendering to the full inscribed cylinder by default
         if(!arguments.contains("kernelSize"_)) arguments.insert("kernelSize"_, 1);
-        if(target!="ascii") {
-            if(arguments.contains("selection"_)) selection = split(arguments.at("selection"_),',');
-            if(!selection) selection<<"source"_<<"smooth"_<<"colorize"_<<"distance"_ << "skeleton"_ << "maximum"_;
-            if(!selection.contains(target)) selection<<target;
-        }
-        if(target=="intensity"_) renderVolume=true;
-        if(!result) result = resultFolder = "ptmp"_;
+        if(!result) result = resultFolder = "dev/shm"_;
         arguments.insert("resultFolder"_,resultFolder);
 
-        // Executes all operations
-        current = getVolume(target);
+        // Executes all operations to generate each target
+        for(const ref<byte>& target: targets) targetResults << getVolume(target);
+        current = share(targetResults.last());
 
-        if(target=="ascii"_) { // Writes result to disk
+        if(current->name=="ascii"_) { // Writes result to disk
             Time time;
             if(existsFolder(result)) writeFile(current->name+"."_+current->metadata, current->data, resultFolder), log(result+"/"_+current->name+"."_+current->metadata, time);
             else writeFile(result, current->data, root()), log(result, time);
-            if(selection) current = getVolume(selection.last());
-            else { exit(); return; }
         }
-        if(arguments.value("view"_,"1"_)=="0"_) { exit(); return; }
+        if(current->data.size==0 || current->name=="ascii"_ || arguments.value("view"_,"1"_)=="0"_) { exit(); return; }
         // Displays result
         window.localShortcut(Key('r')).connect(this, &Rock::refresh);
         window.localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
@@ -79,20 +73,22 @@ struct Rock : PersistentProcess, Widget {
 
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
         if(button==WheelDown||button==WheelUp) {
-            int index = clip<int>(0,selection.indexOf(current->name)+(button==WheelUp?1:-1),selection.size-1);
-            current = getVolume(selection[index]);
+            array<ref<byte>> volumes;
+            for(const shared<Result>& target: targetResults) if(target->data.size) volumes << target->name;
+            int index = clip<int>(0,volumes.indexOf(current->name)+(button==WheelUp?1:-1),volumes.size-1);
+            current = share(*targetResults.find(volumes[index]));
             updateView();
             return true;
         }
         if(!button) return false;
-        if(renderVolume) {
+        /*if(renderVolume) {
             int2 delta = cursor-lastPos;
             lastPos = cursor;
             if(event != Motion) return false;
             rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
             rotation.y= clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
-        }
-        else {
+        } else*/
+        {
             float z = clip(0.f, float(cursor.x)/(size.x-1), 1.f);
             if(sliceZ != z) { sliceZ = z; updateView(); }
         }
@@ -104,7 +100,7 @@ struct Rock : PersistentProcess, Widget {
         window.setTitle(current->name+"*"_);
         assert(current);
         Volume volume = toVolume(current);
-        int2 size(volume.x, volume.y);
+        int2 size = volume.sampleCount.xy();
         while(2*size<displaySize) size *= 2;
         if(window.size != size) window.setSize(size);
         else window.render();
@@ -140,11 +136,10 @@ struct Rock : PersistentProcess, Widget {
 
     void saveSlice() {
         string path = name+"."_+current->name+"."_+current->metadata+".png"_;
-        writeFile(path, encodePNG(slice(toVolume(current),sliceZ)), home());
+        writeFile(path, encodePNG(slice(toVolume(current),sliceZ,arguments.contains("cylinder"_))), home());
         log(path);
     }
 
-    array<ref<byte>> selection; // Data selection for reviewing (mouse wheel selection) (also prevent recycling)
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     Window window {this,int2(-1,-1),"Rock"_};

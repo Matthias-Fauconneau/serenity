@@ -1,6 +1,11 @@
 #pragma once
 #include "image.h"
 
+/// Returns coordinates for the given Z-order curve index
+int3 zOrder(uint index);
+/// Returns Z-order curve index for the given coordinates
+uint zOrder(int3 coordinates);
+
 template<Type T> struct VolumeT;
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
@@ -13,7 +18,7 @@ typedef VolumeT<Line> VolumeASCII;
 struct Volume {
     Volume(){}
 
-    uint64 size() const { return x*y*z; }
+    uint64 size() const { return sampleCount.x*sampleCount.y*sampleCount.z; }
     explicit operator bool() const { return data; }
     operator const Volume8&() const { assert_(sampleSize==sizeof(uint8),sampleSize); return (Volume8&)*this; }
     operator const Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (Volume16&)*this; }
@@ -25,12 +30,13 @@ struct Volume {
     operator Volume24&() { assert_(sampleSize==sizeof(bgr),sampleSize); return *(Volume24*)this; }
     operator Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(Volume32*)this; }
     operator VolumeASCII&() { assert_(sampleSize==sizeof(Line),sampleSize); return *(VolumeASCII*)this; }
-    void copyMetadata(const Volume& source) { marginX=source.marginX, marginY=source.marginY, marginZ=source.marginZ; maximum=source.maximum; squared=source.squared; }
+    void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; }
+    bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
     buffer<uint> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
-    uint x=0, y=0, z=0; // Sample count in each dimensions
-    uint marginX=0, marginY=0, marginZ=0; // Margins to trim when processing volume
+    int3 sampleCount = 0; // Sample counts (along each dimensions)
+    int3 margin = 0; // Margins to ignore when processing volume (for each dimensions)
     uint maximum=0; // Maximum value (to compute normalized values)
     uint sampleSize=0; // Sample integer size (in bytes)
     bool squared=false; // Whether the sample are a squared magnitude
