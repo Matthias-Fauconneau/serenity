@@ -132,7 +132,7 @@ struct parallel {
             threads[i].delegate = &delegate;
             pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
         }
-        for(int i=0;i<N;i++) { void* status; pthread_join(threads[i].pthread,&status); }
+        for(int i=0;i<N;i++) { uint64 status=-1; pthread_join(threads[i].pthread,(void**)&status); assert_(status==0); }
 #endif
     }
     template<class F> parallel(uint stop, F f) : parallel(0,stop,f) {}

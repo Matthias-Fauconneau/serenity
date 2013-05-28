@@ -37,7 +37,7 @@ struct Rock : PersistentProcess, Widget {
             ruleForOutput("source"_)->operation = "Capsules"_;
             ruleForOutput("pore"_)->inputs=array<ref<byte>>({"source"_}); // Skip smooth
         }
-        assert_(name);
+        assert_(name, "Usage: rock <source folder containing volume slices> [target] [key=value]*");
 
         // Configures default arguments
         if(!arguments.contains("cube"_) && !arguments.contains("cylinder"_) && arguments.at("source"_)!="validation"_)
