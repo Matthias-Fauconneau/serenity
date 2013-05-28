@@ -146,7 +146,7 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
 
         File file(output, storageFolder, Flags(ReadWrite|Create));
         file.resize( outputSize );
-        outputs << shared<ResultFile>(output, currentTime(),""_, ""_, storageFolder, Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|Map::Populate)), output);
+        outputs << shared<ResultFile>(output, currentTime(),""_, ""_, storageFolder, Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate))), output);
     }
     assert_(outputs);
 
@@ -167,6 +167,7 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
             result->map = Map(file, Map::Prot(Map::Read|Map::Write));
             result->data = buffer<byte>(result->map);
         }
+        if(!result->data) touchFile(result->fileName, result->folder); // Explicitly updates timestamp files
         results << move(result);
     }
     return share( *results.find(target) );

@@ -10,12 +10,17 @@ distancex positionxx = DistanceX pore
 distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
 skeleton = Skeleton positionx positiony positionz
-tiledSkeleton = Tile skeleton
-connectedSkeleton = FloodFill tiledSkeleton
-unconnectedMaximum = Rasterize tiledSkeleton
-connectedMaximum = Rasterize connectedSkeleton
-unconnected = sqrtHistogram unconnectedMaximum
-connected = sqrtHistogram connectedMaximum
+#skeleton_histogram = SqrtHistogram skeleton
+skeleton_unconnected = Tile skeleton
+skeleton_connected = FloodFill skeleton_unconnected
+bins_unconnected = Bin skeleton_unconnected
+unconnected = Rasterize bins_unconnected
+bins_connected = Bin skeleton_connected
+connected = Rasterize bins_connected
+
+# Computes histogram of maximal ball radii (i.e. pore size distribution)
+#histogram_unconnected = SqrtHistogram unconnected
+histogram_connected = SqrtHistogram connected
 
 #emptyx epositionx = DistanceX rock
 #emptyy epositiontx epositiony = DistanceY emptyx epositionx

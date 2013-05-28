@@ -78,10 +78,10 @@ generic vector clip(const vector& min, const vector& x, const vector& max){vecto
 template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
 
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
-template<Type T> inline T sqr(const T& x) { return x*x; }
+template<Type T> inline constexpr T sqr(const T& x) { return x*x; }
 generic float sqr(const vector& a) { return dot(a,a); }
 inline float norm(float x) { return abs(x); }
-inline float sqrt(float f) { return __builtin_sqrtf(f); }
+inline constexpr float sqrt(float f) { return __builtin_sqrtf(f); }
 generic float norm(const vector& a) { return sqrt(dot(a,a)); }
 generic vector normalize(const vector& a){ return a/norm(a); }
 

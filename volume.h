@@ -20,16 +20,8 @@ struct Volume {
 
     uint64 size() const { return sampleCount.x*sampleCount.y*sampleCount.z; }
     explicit operator bool() const { return data; }
-    operator const Volume8&() const { assert_(sampleSize==sizeof(uint8),sampleSize); return (Volume8&)*this; }
-    operator const Volume16&() const { assert_(sampleSize==sizeof(uint16),sampleSize); return (Volume16&)*this; }
-    operator const Volume24&() const { assert_(sampleSize==sizeof(bgr),sampleSize); return (Volume24&)*this; }
-    operator const Volume32&() const { assert_(sampleSize==sizeof(uint32),sampleSize); return (Volume32&)*this; }
-    operator const VolumeASCII&() const { assert_(sampleSize==sizeof(Line),sampleSize); return (VolumeASCII&)*this; }
-    operator Volume8&() { assert_(sampleSize==sizeof(uint8),sampleSize); return *(Volume8*)this; }
-    operator Volume16&() { assert_(sampleSize==sizeof(uint16),sampleSize); return *(Volume16*)this; }
-    operator Volume24&() { assert_(sampleSize==sizeof(bgr),sampleSize); return *(Volume24*)this; }
-    operator Volume32&() { assert_(sampleSize==sizeof(uint32),sampleSize); return *(Volume32*)this; }
-    operator VolumeASCII&() { assert_(sampleSize==sizeof(Line),sampleSize); return *(VolumeASCII*)this; }
+    template<Type T> operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize); return *(const VolumeT<T>*)this; }
+    template<Type T> operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize); return *(VolumeT<T>*)this; }
     void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; }
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
 

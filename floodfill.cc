@@ -10,7 +10,7 @@ void floodFill(Volume16& target, const Volume16& source) {
     clear(targetData, target.size());
     interleavedLookup(target);
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-    buffer<short3> stackBuffer(1<<25); //32MB
+    buffer<short3> stackBuffer(1<<25); // 32MiB
     short3* const stack = stackBuffer;
     uint stackSize=0;
     stack[stackSize++] = short3(zOrder(index)); // Pushes initial seed
@@ -28,5 +28,4 @@ void floodFill(Volume16& target, const Volume16& source) {
         }
     }
 }
-
-class(FloodFill, Operation), virtual VolumePass<uint16> { void execute(const map<ref<byte>, Variant>&, VolumeT<uint16>& target, const Volume& source) override { floodFill(target, source); } };
+PASS(FloodFill, uint16, floodFill);

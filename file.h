@@ -76,9 +76,9 @@ struct File : Stream {
     struct stat stat() const;
     /// Returns file size
     int64 size() const;
-    /// Returns the last access Unix timestamp for \a path
+    /// Returns the last access Unix timestamp
     long accessTime() const;
-    /// Returns the last modified Unix timestamp for \a path
+    /// Returns the last modified Unix timestamp
     long modifiedTime() const;
 
     /// Resizes file

@@ -1,7 +1,19 @@
 #include "volume-operation.h"
+#include "sample.h"
 #include "time.h"
 #include "png.h"
 
+/// Computes histogram (with square rooted x values)
+class(SqrtHistogram, Operation), virtual VolumeInput {
+    void execute(const map<ref<byte>, Variant>& args, const ref<byte>& name, const Volume& source) override {
+        Sample squaredMaximum = histogram(source, args.contains("cylinder"_));
+        squaredMaximum[0] = 0; // Clears background voxel count to plot with a bigger Y scale
+        float scale = toDecimal(args.value("resolution"_,"1"_));
+        writeFile(args.at("name"_)+"."_+name+".tsv"_, toASCII(sqrtHistogram(squaredMaximum), false, false, scale), args.at("resultFolder"_));
+    }
+};
+
+/// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeInput {
     void execute(const map<ref<byte>, Variant>& args, const ref<byte>& name, const Volume& volume) override {
         Folder folder = Folder(args.at("name"_)+"."_+name+".png"_, args.at("resultFolder"_), true);
@@ -21,6 +33,7 @@ inline void itoa(byte* target, uint n) {
     while(i>0) target[--i]=' ';
 }
 
+/// Exports volume to ASCII for interoperability
 void toASCII(Volume& target, const Volume& source) {
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
@@ -49,7 +62,7 @@ void toASCII(Volume& target, const Volume& source) {
                 line[9]=' ';
                 itoa(line+10,z);
                 line[14]=' ';
-                itoa(line+15, min<uint>(0xFF, value * 0xFF / source.maximum)); //FIXME
+                itoa(line+15, value);
                 line[19]='\n';
             }
         }

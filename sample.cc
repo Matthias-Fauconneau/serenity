@@ -1,6 +1,32 @@
 #include "sample.h"
 #include "data.h"
 
+Sample operator-(const Sample& A, const Sample& B) {
+    uint N=A.size; assert(B.size==N); Sample R(N,N);
+    for(uint i: range(N)) R[i]=max(0ll, A[i]-B[i]);
+    return R;
+}
+
+Sample sqrtHistogram(const Sample& A) {
+    uint N=round(sqrt(A.size-1))+1; Sample R(N,N,0);
+    for(uint i: range(A.size)) R[round(sqrt(i))] += A[i];
+    return R;
+}
+
+Sample parseSample(const ref<byte>& file) {
+    Sample sample;
+    TextData s (file);
+    while(s) { uint i=s.integer(); sample.grow(i+1); s.skip("\t"_); sample[i]=s.integer(); s.skip("\n"_); }
+    return sample;
+}
+
+inline float log10(float x) { return __builtin_log10f(x); }
+string toASCII(const Sample& sample, bool zeroes, bool squared, float scale) {
+    string s;
+    for(uint i=0; i<sample.size; i++) if(zeroes || sample[i]) s << ftoa((squared?sqrt(i):float(i))*scale,3) << '\t' << str(sample[i]) << '\n';
+    return s;
+}
+
 Sample histogram(const Volume16& source, bool cylinder) {
     int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
@@ -41,20 +67,6 @@ Sample histogram(const Volume16& source, bool cylinder) {
     return histogram;
 }
 
-Sample parseSample(const ref<byte>& file) {
-    Sample sample;
-    TextData s (file);
-    while(s) { uint i=s.integer(); sample.grow(i+1); s.skip("\t"_); sample[i]=s.integer(); s.skip("\n"_); }
-    return sample;
-}
-
-inline float log10(float x) { return __builtin_log10f(x); }
-string toASCII(const Sample& sample, bool zeroes, bool squared, float scale) {
-    string s;
-    for(uint i=0; i<sample.size; i++) if(zeroes || sample[i]) s << ftoa((squared?sqrt(i):float(i))*scale,3) << '\t' << str(sample[i]) << '\n';
-    return s;
-}
-
 Lorentz estimateLorentz(const Sample& sample) {
     Lorentz lorentz;
     int x0=0; for(uint x=0; x<sample.size; x++) if(sample[x]>sample[x0]) x0=x;
@@ -72,6 +84,7 @@ Sample sample(const Lorentz& lorentz, uint size) {
     for(int x=0; x<(int)size; x++) sample[x] = lorentz[x];
     return sample;
 }
+
 #if 0
 float intersect(const Lorentz& A, const Lorentz& B) {
     float x0=A.position, x1=B.position, y0=A.height, y1=B.height, s0=A.scale, s1=B.scale;
@@ -89,8 +102,3 @@ float intersect(const Lorentz& A, const Lorentz& B) {
     error(x0,(b-d)/n, (x0+x1)/2, x1);
 }
 #endif
-Sample operator-(const Sample& A, const Sample& B) {
-    uint N=A.size; assert(B.size==N); Sample R(N,N);
-    for(uint i: range(N)) R[i]=max(0ll, A[i]-B[i]);
-    return R;
-}

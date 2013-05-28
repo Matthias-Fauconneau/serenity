@@ -14,11 +14,11 @@
 #include "threshold.h"
 #include "distance.h"
 #include "skeleton.h"
-class(Tile, Operation), virtual VolumePass<uint16> { void execute(const map<ref<byte>, Variant>&, Volume16& target, const Volume& source) override {  tile(target, source); } };
+PASS(Tile, uint16, tile);
 #include "floodfill.h"
 #include "rasterize.h"
 #include "validate.h"
-class(SquareRoot, Operation), virtual VolumePass<uint8> { void execute(const map<ref<byte>, Variant>&, Volume8& target, const Volume& source) override { squareRoot(target, source); } };
+PASS(SquareRoot, uint16, squareRoot);
 #include "export.h"
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
@@ -48,7 +48,7 @@ struct Rock : PersistentProcess, Widget {
 
         // Executes all operations to generate each target
         for(const ref<byte>& target: targets) targetResults << getVolume(target);
-        current = share(targetResults.last());
+        for(const shared<Result>& target: targetResults) if(target->data.size) { current = share( target ); break; }
 
         if(current->name=="ascii"_) { // Writes result to disk
             Time time;
