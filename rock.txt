@@ -29,14 +29,14 @@ histogram_connected = SqrtHistogram connected
 #density = SquareRoot distance # Square roots and normalizes (FIXME) distance to use as density values (for opacity and gradient)
 #intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
 #sourceASCII = ToASCII source
-#maximumASCII = ToASCII maximum
+maximumASCII = ToASCII connected
 
-sourcePNG = ToPNG source
-smoothPNG = ToPNG smooth
-colorizePNG = ToPNG colorize
-distancePNG = ToPNG distance
-skeletonPNG = ToPNG skeleton
-maximumPNG = ToPNG maximum
+#sourcePNG = ToPNG source
+#smoothPNG = ToPNG smooth
+#colorizePNG = ToPNG colorize
+#distancePNG = ToPNG distance
+#skeletonPNG = ToPNG skeleton
+#maximumPNG = ToPNG connected
 
 #Last target is the default
-validate = Validate pore maximum
+#validate = Validate pore maximum

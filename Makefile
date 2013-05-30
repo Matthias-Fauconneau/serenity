@@ -28,7 +28,7 @@ ICONS_test = feeds network
 SRCS += $(ICONS:%=icons/%)
 
 LIBS_time = rt
-LIBS_process = pthread
+LIBS_thread = pthread
 FLAGS_font = -I$(STAGING_DIR)/usr/include/freetype2
 LIBS_font = freetype
 LIBS_http = ssl

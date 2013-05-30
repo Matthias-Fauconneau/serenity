@@ -7,9 +7,9 @@ struct Test {
     Test() {
         Date start(10,April,2013), now = currentTime(), end(21,August,2013);
         uint since = now - start, until = end - now, total = since+until;
-        log(since/60/60/24, until/60/60/24, total/60/60/24, 100.0*since/total, 100.0*until/total, 100.0*(24*60*60)/total);
-        log(Date(start + 1*total/2));
-        log(Date(start + 1*total/3), Date(start + 2*total/3));
+        log("Elapsed:",since/60/60/24,"days", "["_+str(100.0*since/total)+"%]"_, "\tRemaining:",until/60/60/24,"days", "["_+str(100.0*until/total)+"%]"_,"\tTotal:",total/60/60/24,"days");
+        log("Half",Date(start + 1*total/2));
+        log("1/3", Date(start + 1*total/3), "\t2/3", Date(start + 2*total/3));
     }
 } test;
 #endif

@@ -208,7 +208,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 /// Computes distance field to nearest background (X pass)
 class(DistanceX, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2}; return sizes[index]; }
-    void execute(const map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const Dict&, array<Volume>& outputs, const ref<Volume>& inputs) override {
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],inputs[0]);
     }
 };
@@ -216,7 +216,7 @@ class(DistanceX, Operation), virtual VolumeOperation {
 /// Computes distance field to nearest background (Y pass)
 class(DistanceY, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2}; return sizes[index]; }
-    void execute(const map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const Dict&, array<Volume>& outputs, const ref<Volume>& inputs) override {
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],inputs[0],inputs[1]);
     }
 };
@@ -224,7 +224,7 @@ class(DistanceY, Operation), virtual VolumeOperation {
 /// Computes distance field to nearest background (Y pass)
 class(DistanceZ, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2, 2}; return sizes[index]; }
-    void execute(const map<ref<byte>, Variant>&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const Dict&, array<Volume>& outputs, const ref<Volume>& inputs) override {
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],outputs[3],inputs[0],inputs[1],inputs[2]);
         Volume& target = outputs[0];
         target.maximum=maximum((const Volume32&)target);
@@ -234,7 +234,7 @@ class(DistanceZ, Operation), virtual VolumeOperation {
             target.data.size /= 2;
             Time time;
             pack(target, target32);
-            log("pack", time);
+            log("Pack", time);
         }
     }
 };

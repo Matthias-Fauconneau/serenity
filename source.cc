@@ -8,7 +8,7 @@ class(Source, Operation), virtual VolumeOperation {
 
     ref<ref<byte>> parameters() const override { static auto p = {"cylinder"_,"cube"_}; return p; }
     uint outputSampleSize(uint) override { return 2; }
-    uint64 outputSize(const map<ref<byte>, Variant>& args, const ref<shared<Result>>&, uint) override {
+    uint64 outputSize(const Dict& args, const ref<shared<Result>>&, uint) override {
         Folder folder = args.at("source"_);
         array<string> slices = folder.list(Files);
         assert(slices, args.at("source"_));
@@ -28,7 +28,7 @@ class(Source, Operation), virtual VolumeOperation {
         return (maxX-minX)*(maxY-minY)*(maxZ-minZ)*outputSampleSize(0);
     }
 
-    void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
+    void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>&) {
         Folder folder = args.at("source"_);
         array<string> slices = folder.list(Files);
 

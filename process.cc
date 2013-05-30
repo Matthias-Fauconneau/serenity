@@ -2,20 +2,7 @@
 #include "data.h"
 #include "time.h"
 
-string relevantArguments(const unique<Operation>& operation, const map<ref<byte>, Variant>& arguments) {
-    assert_(operation);
-    string relevantArguments;
-    for(const ref<byte>& parameter: operation->parameters()) if(arguments.contains(parameter)) {
-        if(relevantArguments) relevantArguments<<','; relevantArguments<<parameter<<'='<<copy(arguments.at(parameter));
-    }
-    return relevantArguments;
-}
-string relevantArguments(const Rule& rule, const map<ref<byte>, Variant>& globalArguments) {
-    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
-    return relevantArguments(operation, globalArguments<<rule.arguments);
-}
-
-Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
+Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
     // Parses process definition
     for(TextData s(definition); s; s.skip()) {
         if(s.match('#')) { s.until('\n'); continue; }
@@ -34,9 +21,22 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
     }
 
     // Parses targets and global arguments
-    for(const ref<byte>& argument: arguments) {
-        if(argument.contains('=')) { this->arguments.insert(section(argument,'=',0,1), (Variant)section(argument,'=',1,-1)); continue; } // Stores generic argument to be parsed in relevant operation
-        if(ruleForOutput(argument)) targets << argument;
+    for(const ref<byte>& argument: args) {
+        if(argument.contains('=')) { // Stores generic argument to be parsed in relevant operation
+            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
+            /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
+                assert(!arguments.contains(key));
+                sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
+            } else {*/
+            if(sweeps.contains(key) || arguments.contains(key)) {
+                if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
+                sweeps.at(key) << value;
+            } else {
+                arguments.insert(key, (Variant)value);
+            }
+            continue;
+        }
+        if(&ruleForOutput(argument)) targets << argument;
     }
     if(!targets) {
         assert(rules && rules.last().outputs, rules);
@@ -44,35 +44,51 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& arguments) {
     }
 }
 
-Rule* Process::ruleForOutput(const ref<byte>& target) {
-    for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return &rule; return 0;
+Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
+
+Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
+    Dict relevant;
+    for(const ref<byte>& input: rule.inputs) {
+        for(auto arg: relevantArguments(ruleForOutput(input), arguments)) {
+            if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
+            else if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key)) relevant.insert(arg.key, arg.value);
+        }
+    }
+    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
+    assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
+    Dict local = copy(arguments); local << rule.arguments; // not inherited
+    for(const ref<byte>& parameter: operation->parameters()) if(local.contains(parameter)) {
+        if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
+        else if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter)) relevant.insert(parameter, local.at(parameter));
+    }
+    return relevant;
 }
 
-bool Process::sameSince(const ref<byte>& target, long queryTime) {
-    const Rule& rule = *ruleForOutput(target);
-    assert_(&rule, target);
+bool Process::sameSince(const ref<byte>& target, long queryTime, const Dict& arguments) {
+    const Rule& rule = ruleForOutput(target);
+    assert_(&rule, "No rule generating '"_+str(target)+"'"_,"in",rules);
 
     const shared<Result>& result = *results.find(target);
     if(&result) {
         long time = result->timestamp;
         unique<Operation> operation = Interface<Operation>::instance(rule.operation);
-        if(time > queryTime || result->arguments != relevantArguments(rule,arguments)) return false; // Target changed since query
+        if(time > queryTime || result->arguments != toASCII(relevantArguments(rule,arguments))) return false; // Target changed since query (FIXME: compare maps and not their ASCII representation)
         queryTime = time;
     }
     // Verify inputs didnt change since last evaluation (or query if discarded), in which case target will need to be regenerated
-    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime)) return false;
+    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false;
     return true;
 }
 
-shared<Result> Process::getVolume(const ref<byte>& target) {
+shared<Result> Process::getVolume(const ref<byte>& target, const Dict& arguments) {
     const shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp)) { assert((*result)->data.size); return share( *result ); }
+    if(result && sameSince(target, (*result)->timestamp, arguments)) { assert((*result)->data.size); return share( *result ); }
     error("Anonymous process manager unimplemented"_);
 }
 
 PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<byte>>& arguments) : Process(definition, arguments) {
     for(const ref<byte>& argument: arguments) {
-        if(argument.contains('=') || ruleForOutput(argument)) continue;
+        if(argument.contains('=') || &ruleForOutput(argument)) continue;
         if(!name) name=argument;
         if(existsFolder(argument)) name=argument.contains('/')?section(argument,'/',-2,-1):argument;
     }
@@ -84,7 +100,7 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
     for(const string& path: storageFolder.list(Files)) {
         ref<byte> name = section(path,'.');
         assert_(!results.contains(name));
-        if(!ruleForOutput(name) || !section(path,'.',-3,-2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
+        if(!&ruleForOutput(name) || !section(path,'.',-3,-2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
         File file = File(path, storageFolder, ReadWrite);
         results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-4,-3), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
@@ -99,16 +115,17 @@ PersistentProcess::~PersistentProcess() {
     }
 }
 
-shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
+shared<Result> PersistentProcess::getVolume(const ref<byte>& target, const Dict& arguments) {
     const shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp)) return share( *result );
+    if(result && sameSince(target, (*result)->timestamp, arguments)) return share( *result );
 
-    const Rule& rule = *ruleForOutput(target);
+    const Rule& rule = ruleForOutput(target);
     assert_(&rule, target);
     unique<Operation> operation = Interface<Operation>::instance(rule.operation);
 
     array<shared<Result>> inputs;
-    for(const ref<byte>& input: rule.inputs) inputs << getVolume( input );
+    for(const ref<byte>& input: rule.inputs) inputs << getVolume(input, arguments);
+    for(const shared<Result>& input: inputs) touchFile(((ResultFile*)input.pointer)->fileName, ((ResultFile*)input.pointer)->folder, false); // Updates last access time for correct LRU cache behavior
 
     array<shared<Result>> outputs;
     for(uint index: range(rule.outputs.size)) {
@@ -130,11 +147,11 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
                 long timestamp = File(path, baseStorageFolder).accessTime();
                 if(timestamp < minimum) minimum=timestamp, oldest=move(path);
             }
-            if(!oldest) error("Not enough space available");
+            if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
             if(section(oldest,'/')==name) {
                 ref<byte> resultName = section(section(oldest,'/',1,-1),'.');
                 shared<ResultFile> result = results.take(results.indexOf(resultName));
-                result->fileName.clear(); // Prevent rename
+                result->fileName.clear(); // Prevents rename
             }
             if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
                 ::remove(oldest, baseStorageFolder);
@@ -150,15 +167,13 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
     }
     assert_(outputs);
 
-
     Time time;
-    auto args = arguments<<rule.arguments;
-    operation->execute(args, outputs, inputs);
-    log(rule, time);
+    operation->execute(arguments<<rule.arguments, outputs, inputs);
+    log(rule,'\t',toASCII(relevantArguments(rule, arguments)),'\t',time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
-        result->arguments = relevantArguments(operation, args);
+        result->arguments = toASCII(relevantArguments(rule, arguments));
         if(result->map.size != result->data.size) {
             assert(result->map.size > result->data.size);
             result->map.unmap();
@@ -167,8 +182,32 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target) {
             result->map = Map(file, Map::Prot(Map::Read|Map::Write));
             result->data = buffer<byte>(result->map);
         }
-        if(!result->data) touchFile(result->fileName, result->folder); // Explicitly updates timestamp files
+        if(!result->data) touchFile(result->fileName, result->folder, true); // Explicitly sets dummy timestamp files last modified time for correct dependency update
         results << move(result);
     }
     return share( *results.find(target) );
+}
+
+
+void Process::execute() {
+    for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
+    execute(sweeps, arguments);
+}
+void Process::execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
+    if(sweeps) {
+        auto remaining = copy(sweeps);
+        auto args = copy(arguments);
+        ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
+        assert(!args.contains(parameter));
+        for(Variant& value: remaining.take(parameter)) {
+            args.insert(parameter, move(value));
+            execute(remaining, args);
+            args.remove(parameter);
+        }
+    } else { // Actually generates targets when sweeps have been explicited
+        for(const ref<byte>& target: targets) {
+            log(target, relevantArguments(ruleForOutput(target), arguments), results);
+            targetResults << getVolume(target, arguments);
+        }
+    }
 }

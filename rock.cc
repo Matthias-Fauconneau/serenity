@@ -28,46 +28,46 @@ struct Rock : PersistentProcess, Widget {
         ref<byte> resultFolder = "dev/shm"_; // Folder where histograms are written
         ref<byte> result; // Path to file (or folder) where target volume data is copied (only for ASCII export)
         for(const ref<byte>& argument: args) {
-            if(argument.contains('=') || ruleForOutput(argument)) continue;
+            if(argument.contains('=') || &ruleForOutput(argument)) continue;
             if(!arguments.contains("source"_) && (existsFolder(argument) || argument=="validation"_)) { arguments.insert("source"_,argument); continue; }
             if(!result) { result=argument; resultFolder = existsFolder(argument)?argument:section(argument,'/',0,-2); continue; }
             error("Invalid argument"_, argument);
         }
         if(arguments.at("source"_)=="validation"_) {
-            ruleForOutput("source"_)->operation = "Capsules"_;
-            ruleForOutput("pore"_)->inputs=array<ref<byte>>({"source"_}); // Skip smooth
+            ruleForOutput("source"_).operation = "Capsules"_;
+            ruleForOutput("pore"_).inputs=array<ref<byte>>({"source"_}); // Skip smooth
         }
         assert_(name, "Usage: rock <source folder containing volume slices> [target] [key=value]*");
 
         // Configures default arguments
-        if(!arguments.contains("cube"_) && !arguments.contains("cylinder"_) && arguments.at("source"_)!="validation"_)
-            arguments.insert("cylinder"_,""_); // Clip histograms computation and slice rendering to the full inscribed cylinder by default
-        if(!arguments.contains("kernelSize"_)) arguments.insert("kernelSize"_, 1);
+        if(!arguments.contains("cube"_) && arguments.at("source"_)!="validation"_) defaultArguments.insert("cylinder"_,""_); // Clips histograms and slice rendering to the inscribed cylinder
+        defaultArguments.insert("kernelSize"_,"1"_);
         if(!result) result = resultFolder = "dev/shm"_;
         arguments.insert("resultFolder"_,resultFolder);
 
-        // Executes all operations to generate each target
-        for(const ref<byte>& target: targets) targetResults << getVolume(target);
+        execute();
         for(const shared<Result>& target: targetResults) if(target->data.size) { current = share( target ); break; }
+        assert_(current);
 
-        if(current->name=="ascii"_) { // Writes result to disk
+        if(result!="dev/shm"_) { // Copies result to disk
             Time time;
             if(existsFolder(result)) writeFile(current->name+"."_+current->metadata, current->data, resultFolder), log(result+"/"_+current->name+"."_+current->metadata, time);
             else writeFile(result, current->data, root()), log(result, time);
         }
-        if(current->data.size==0 || current->name=="ascii"_ || arguments.value("view"_,"1"_)=="0"_) { exit(); return; }
+        if(current->data.size==0 || current->name=="ascii"_ || arguments.value("view"_,"0"_)=="0"_) { exit(); return; }
         // Displays result
-        window.localShortcut(Key('r')).connect(this, &Rock::refresh);
-        window.localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
-        window.localShortcut(Escape).connect(&exit);
-        window.clearBackground = false;
+        window = unique<Window>(this,int2(-1,-1),"Rock"_);
+        window->localShortcut(Key('r')).connect(this, &Rock::refresh);
+        window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
+        window->localShortcut(Escape).connect(&exit);
+        window->clearBackground = false;
         updateView();
-        window.show();
+        window->show();
     }
 
     void refresh() {
         current->timestamp = 0;
-        current = getVolume(current->name);
+        current = getVolume(current->name, arguments);
         updateView();
     }
 
@@ -97,14 +97,14 @@ struct Rock : PersistentProcess, Widget {
     }
 
     void updateView() {
-        window.setTitle(current->name+"*"_);
+        window->setTitle(current->name+"*"_);
         assert(current);
         Volume volume = toVolume(current);
         int2 size = volume.sampleCount.xy();
         while(2*size<displaySize) size *= 2;
-        if(window.size != size) window.setSize(size);
-        else window.render();
-        window.setTitle(current->name);
+        if(window->size != size) window->setSize(size);
+        else window->render();
+        window->setTitle(current->name);
     }
 
     void render(int2 position, int2 size) {
@@ -115,15 +115,15 @@ struct Rock : PersistentProcess, Widget {
             mat3 view;
             view.rotateX(rotation.y); // pitch
             view.rotateZ(rotation.x); // yaw
-            shared<Result> empty = getVolume("empty"_);
-            shared<Result> density = getVolume("density"_);
-            shared<Result> intensity = getVolume("intensity"_);
+            shared<Result> empty = getVolume("empty"_, arguments);
+            shared<Result> density = getVolume("density"_, arguments);
+            shared<Result> intensity = getVolume("intensity"_, arguments);
             Time time;
             assert_(position==int2(0) && size == framebuffer.size());
             ::render(framebuffer, toVolume(empty), toVolume(density), toVolume(intensity), view);
 #if PROFILE
             log((uint64)time,"ms");
-            window.render(); // Force continuous updates (even when nothing changed)
+            window->render(); // Force continuous updates (even when nothing changed)
             wait.reset();
 #endif
         } else
@@ -142,7 +142,7 @@ struct Rock : PersistentProcess, Widget {
 
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
-    Window window {this,int2(-1,-1),"Rock"_};
+    unique<Window> window {unique<Window>::null()};
 
     bool renderVolume = false;
     int2 lastPos;

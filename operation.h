@@ -45,6 +45,8 @@ struct Variant : string {
 };
 template<> inline Variant copy(const Variant& o) { return copy((const string&)o); }
 template<> inline string str(const Variant& o) { return copy((const string&)o); }
+/// Associative array of variants
+typedef map<ref<byte>, Variant> Dict;
 
 /// Intermediate result
 struct Result : shareable {
@@ -52,8 +54,8 @@ struct Result : shareable {
         : name(name), timestamp(timestamp), arguments(arguments), metadata(metadata), data(move(data)) {}
     string name;
     long timestamp; //TODO: hash
-    string arguments;
-    string metadata; //FIXME: allow Operation to construct derived result
+    string arguments; // Relevant arguments (FIXME: parse and store as Dict)
+    string metadata; // Operation generated metadata (FIXME: allow Operation to construct derived result |or| store as Dict)
     buffer<byte> data;
 };
 inline bool operator==(const Result& a, const ref<byte>& b) { return a.name == b; }
@@ -64,7 +66,7 @@ struct Operation {
     /// Returns which parameters affects this operation output
     virtual ref<ref<byte>> parameters() const { return {}; }
     /// Returns the desired intermediate data size in bytes for each outputs
-    virtual uint64 outputSize(const map<ref<byte>, Variant>& args, const ref<shared<Result>>& inputs, uint index) abstract;
+    virtual uint64 outputSize(const Dict& args, const ref<shared<Result>>& inputs, uint index) abstract;
     /// Executes the operation using inputs to compute outputs
-    virtual void execute(const map<ref<byte>, Variant>& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) abstract;
+    virtual void execute(const Dict& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) abstract;
 };

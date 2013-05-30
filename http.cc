@@ -210,7 +210,7 @@ void HTTP::header() {
     if(status==200||status==301||status==302) {}
     else if(status==304) { //Not Modified
         assert(existsFile(file,cache()));
-        touchFile(file,cache());
+        touchFile(file, cache(), true);
         log("Not Modified",url);
         state = Handle;
         return;

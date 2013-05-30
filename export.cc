@@ -5,7 +5,7 @@
 
 /// Computes histogram (with square rooted x values)
 class(SqrtHistogram, Operation), virtual VolumeInput {
-    void execute(const map<ref<byte>, Variant>& args, const ref<byte>& name, const Volume& source) override {
+    void execute(const Dict& args, const ref<byte>& name, const Volume& source) override {
         Sample squaredMaximum = histogram(source, args.contains("cylinder"_));
         squaredMaximum[0] = 0; // Clears background voxel count to plot with a bigger Y scale
         float scale = toDecimal(args.value("resolution"_,"1"_));
@@ -15,7 +15,7 @@ class(SqrtHistogram, Operation), virtual VolumeInput {
 
 /// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeInput {
-    void execute(const map<ref<byte>, Variant>& args, const ref<byte>& name, const Volume& volume) override {
+    void execute(const Dict& args, const ref<byte>& name, const Volume& volume) override {
         Folder folder = Folder(args.at("name"_)+"."_+name+".png"_, args.at("resultFolder"_), true);
         uint marginZ = volume.margin.z;
         Time time; Time report;

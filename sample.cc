@@ -1,6 +1,8 @@
 #include "sample.h"
 #include "data.h"
 
+uint64 sum(const Sample& A) { uint64 sum=0; for(uint i: range(A.size)) sum+=A[i]; return sum; }
+
 Sample operator-(const Sample& A, const Sample& B) {
     uint N=A.size; assert(B.size==N); Sample R(N,N);
     for(uint i: range(N)) R[i]=max(0ll, A[i]-B[i]);
@@ -16,7 +18,7 @@ Sample sqrtHistogram(const Sample& A) {
 Sample parseSample(const ref<byte>& file) {
     Sample sample;
     TextData s (file);
-    while(s) { uint i=s.integer(); sample.grow(i+1); s.skip("\t"_); sample[i]=s.integer(); s.skip("\n"_); }
+    while(s) { float f=s.decimal(); assert(f==float(int(f))); int i=f; sample.grow(i+1); s.skip("\t"_); sample[i]=s.integer(); s.skip("\n"_); }
     return sample;
 }
 

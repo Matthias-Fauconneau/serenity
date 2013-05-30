@@ -84,8 +84,8 @@ void rasterize(Volume16& target, const array<Capsule>& capsules) {
 
 class(Capsules, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return 2; }
-    uint64 outputSize(const map<ref<byte>, Variant>&, const ref<shared<Result>>&, uint) override { return 512*512*512*outputSampleSize(0); }
-    void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>&) {
+    uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 512*512*512*outputSampleSize(0); }
+    void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>&) {
         Volume& target = outputs.first();
         target.sampleCount = 512;
         target.maximum = (1<<(target.sampleSize*8))-1;

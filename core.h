@@ -238,6 +238,8 @@ template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.s
 
 /// Unique reference to an heap allocated value
 template<Type T> struct unique {
+    struct null {};
+    explicit unique(null):pointer(0){}
     //unique(unique&& o):pointer(o.pointer){o.pointer=0;}
     template<Type D> unique(unique<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
     template<Type... Args> explicit unique(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}

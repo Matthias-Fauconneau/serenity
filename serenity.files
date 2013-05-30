@@ -34,3 +34,4 @@ export.h
 export.cc
 floodfill.h
 floodfill.cc
+script.cc

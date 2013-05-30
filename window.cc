@@ -42,7 +42,7 @@ void setCursor(Rect region, Cursor cursor) { assert(window); return window->setC
 
 Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, Renderer renderer)
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
-    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1);
+    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;

@@ -12,8 +12,8 @@ void shiftRight(Volume16& target, const Volume16& source, uint shift) {
 
 /// Shifts data before summing to avoid overflow
 class(ShiftRight, Operation), virtual VolumePass<uint16> {
-    ref<ref<byte>> parameters() const override { return {"kernelSize"_}; }
-    void execute(const map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
+    ref<ref<byte>> parameters() const override { static auto p={"kernelSize"_}; return p; }
+    void execute(const Dict& args, Volume16& target, const Volume& source) override {
         int kernelSize = toInteger(args.at("kernelSize"_)), sampleCount = 2*kernelSize+1, shift = log2(sampleCount);
         int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
         int bits = log2(nextPowerOfTwo(max));
@@ -56,8 +56,8 @@ void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
 
 /// Denoises data by averaging samples in a window
 class(Smooth, Operation), virtual VolumePass<uint16> {
-    ref<ref<byte>> parameters() const override { return {"kernelSize"_}; }
-    void execute(const map<ref<byte>, Variant>& args, Volume16& target, const Volume& source) override {
+    ref<ref<byte>> parameters() const override { static auto p={"kernelSize"_}; return p; }
+    void execute(const Dict& args, Volume16& target, const Volume& source) override {
         int kernelSize = toInteger(args.at("kernelSize"_)), sampleCount = 2*kernelSize+1, shift = args.value("shift"_,log2(sampleCount));
         target.maximum *= sampleCount;
         smooth(target, source, kernelSize, shift);

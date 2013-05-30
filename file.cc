@@ -102,7 +102,7 @@ void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
     remove(from,at);
     check_(symlinkat(strz(from),at.fd,strz(to)), from,"->",to);
 }
-void touchFile(const ref<byte>& path, const Folder& at) { utimensat(at.fd, strz(path), 0, 0); }
+void touchFile(const ref<byte>& path, const Folder& at, bool setModified) { timespec times[]={{}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; utimensat(at.fd, strz(path), times, 0); }
 void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate));
     for(uint64 offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);

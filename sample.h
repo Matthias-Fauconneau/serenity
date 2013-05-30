@@ -4,11 +4,14 @@
 /// Finite discrete integer-valued distribution (represented by its samples)
 typedef array<int64> Sample;
 
-/// Square roots X axis
-Sample sqrtHistogram(const Sample& A);
+/// Sums all samples
+uint64 sum(const Sample& A);
 
 /// Substracts two samples clipping to zero
 Sample operator-(const Sample& A, const Sample& B);
+
+/// Square roots and round X coordinates summing all sample falling in the same bin
+Sample sqrtHistogram(const Sample& A);
 
 Sample parseSample(const ref<byte>& file);
 

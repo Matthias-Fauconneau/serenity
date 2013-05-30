@@ -147,7 +147,7 @@ void remove(const Folder& folder);
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
-void touchFile(const ref<byte>& path, const Folder& at=root());
+void touchFile(const ref<byte>& path, const Folder& at=root(), bool setModified=false);
 /// Copies a file replacing any existing files or links
 void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);
 

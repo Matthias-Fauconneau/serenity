@@ -15,9 +15,9 @@ inline Volume toVolume(const Result& result) {
 /// Convenience class to help define volume operations
 struct VolumeOperation : virtual Operation {
     virtual uint outputSampleSize(uint index) abstract;
-    uint64 outputSize(const map<ref<byte>, Variant>&, const ref<shared<Result>>& inputs, uint index) override {  return toVolume(inputs[0]).size() * outputSampleSize(index); }
-    virtual void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) abstract;
-    void execute(const map<ref<byte>, Variant>& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
+    uint64 outputSize(const Dict&, const ref<shared<Result>>& inputs, uint index) override {  return toVolume(inputs[0]).size() * outputSampleSize(index); }
+    virtual void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) abstract;
+    void execute(const Dict& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
         array<Volume> inputVolumes = apply<Volume>(inputs, toVolume);
         array<Volume> outputVolumes;
         for(uint index: range(outputs.size)) {
@@ -45,15 +45,15 @@ struct VolumeOperation : virtual Operation {
 /// Convenience class to define a single input, single output volume operation
 template<Type O> struct VolumePass : virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(O); }
-    virtual void execute(const map<ref<byte>, Variant>& args, VolumeT<O>& target, const Volume& source) abstract;
-    virtual void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
+    virtual void execute(const Dict& args, VolumeT<O>& target, const Volume& source) abstract;
+    virtual void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
 };
 #define PASS(name, type, function) \
-    class(name, Operation), virtual VolumePass<type> { void execute(const map<ref<byte>, Variant>&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
+    class(name, Operation), virtual VolumePass<type> { void execute(const Dict&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
 
 /// Convenience class to define a single input, no output volume operation
 struct VolumeInput : virtual Operation {
-    uint64 outputSize(const map<ref<byte>, Variant>&, const ref<shared<Result>>&, uint) override { return 0; }
-    virtual void execute(const map<ref<byte>, Variant>& args, const ref<byte>& name, const Volume& source) abstract;
-    virtual void execute(const map<ref<byte>, Variant>& args, array<shared<Result>>&, const ref<shared<Result>>& inputs) override { execute(args, inputs[0]->name, toVolume(inputs[0])); }
+    uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 0; }
+    virtual void execute(const Dict& args, const ref<byte>& name, const Volume& source) abstract;
+    virtual void execute(const Dict& args, array<shared<Result>>&, const ref<shared<Result>>& inputs) override { execute(args, inputs[0]->name+"."_+inputs[0]->arguments, toVolume(inputs[0])); }
 };

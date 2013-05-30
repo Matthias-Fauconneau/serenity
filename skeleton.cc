@@ -1,7 +1,7 @@
 #include "volume-operation.h"
 #include "thread.h"
 
-inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqRadius) {
+inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqDiameter) {
     int xf0=xf[0], yf0=yf[0], zf0=zf[0]; // First feature point
     int xfd=xf[da], yfd=yf[da], zfd=zf[da]; // Second feature point
     int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd; // Vector between feature points
@@ -12,7 +12,7 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
     float norm = sqrt( sqDistance );
     // Prune using all methods (as rasterization is the bottleneck)
-    if( sqNorm > minimalSqRadius &&  // Constant pruning: feature point far enough apart (may filter small features)
+    if( sqNorm > minimalSqDiameter &&  // Constant pruning: feature point far enough apart (may filter small features)
          sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 53° (may cut corners, effective when sqDistance > sqNorm > sqRadius)
          sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
             ) {
@@ -62,10 +62,10 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
 
 /// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
 class(Skeleton, Operation), virtual VolumeOperation {
-    ref<ref<byte>> parameters() const override { return {"minimalRadius"_}; }
+    ref<ref<byte>> parameters() const override { static auto p={"minimalDiameter"_}; return p; }
     uint outputSampleSize(uint index) override { int sizes[]={2}; return sizes[index]; }
-    void execute(const map<ref<byte>, Variant>& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
-        uint minimalSqRadius = args.contains("minimalRadius"_) ? sqr(toInteger(args.at("minimalRadius"_))) : 3;
+    void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
+        uint minimalSqRadius = args.contains("minimalDiameter"_) ? sqr(toInteger(args.at("minimalDiameter"_))) : 3;
         integerMedialAxis(outputs[0],inputs[0],inputs[1],inputs[2], minimalSqRadius);
     }
 };
