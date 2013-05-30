@@ -42,7 +42,7 @@ void parseVolumeFormat(Volume& volume, const ref<byte>& format) {
     }
     s.skip("-"_);
     volume.maximum = s.hexadecimal();
-    if(s.match("-tiled"_)) interleavedLookup(volume); else { free(volume.offsetX), free(volume.offsetY), free(volume.offsetZ); }
+    if(s.match("-tiled"_)) interleavedLookup(volume); else { volume.offsetX=buffer<uint>(), volume.offsetY=buffer<uint>(), volume.offsetZ=buffer<uint>(); }
     if(s.match("-squared"_)) volume.squared=true;
     assert(!s);
 }
@@ -70,16 +70,18 @@ uint maximum(const Volume32& source) {
     const uint32* const sourceData = source;
     const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    assert((X-2*marginX)%4==0 && marginX%4==0);
     v4si maximum4 = {0,0,0,0};
+    uint32 maximum=0;
     for(uint z=marginZ; z<Z-marginZ; z++) {
         const uint32* const sourceZ = sourceData + z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
             const uint32* const sourceZY = sourceZ + y*X;
-            for(uint x=marginX; x<X-marginX; x+=4) maximum4 = max(maximum4, loada(sourceZY+x));
+            for(uint x=marginX; x<align(4,marginX); x++) maximum = max(maximum, sourceZY[x]); // Processes from margin to next aligned position
+            for(uint x=align(4,marginX); x<floor(4,X-marginX); x+=4) maximum4 = max(maximum4, loada(sourceZY+x)); // Processes using SIMD (4x speedup)
+            for(uint x=floor(4,X-marginX); x<X-marginX; x++) maximum = max(maximum, sourceZY[x]); // Processes from last aligned position to margin
         }
     }
-    uint32 maximum=0; for(uint i: range(4)) maximum = max(maximum, ((uint32*)&maximum4)[i]);
+    for(uint i: range(4)) maximum = max(maximum, ((uint32*)&maximum4)[i]);
     return maximum;
 }
 
@@ -111,61 +113,35 @@ void tile(Volume16& target, const Volume16& source) {
     target.copyMetadata(source);
 }
 
-template<Type T> void clearMargins(VolumeT<T>& target, uint value) {
+template<Type T> void setBorders(VolumeT<T>& target) {
     const uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY=X*Y;
     int marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
     T* const targetData = target;
-    if(target.offsetX || target.offsetY || target.offsetZ) {
-        const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-        assert(offsetX && offsetY && offsetZ);
-        for(uint z=0; z<Z; z++) {
-            T* const targetZ = targetData + offsetZ[z];
-            for(uint y=0; y<Y; y++) {
-                T* const targetZY = targetZ + offsetY[y];
-                for(uint x=0; x<=marginX; x++) targetZY[offsetX[x]] = value;
-                for(uint x=X-marginX; x<X; x++) targetZY[offsetX[x]] = value;
-            }
-            for(uint x=0; x<X; x++) {
-                T* const targetZX = targetZ + offsetX[x];
-                for(uint y=0; y<=marginY; y++) targetZX[offsetY[y]] = value;
-                for(uint y=Y-marginY; y<Y; y++) targetZX[offsetY[y]] = value;
-            }
-        }
+    assert(!target.offsetX && !target.offsetY && !target.offsetZ);
+    for(uint z=0; z<Z; z++) {
+        T* const targetZ = targetData + z*XY;
         for(uint y=0; y<Y; y++) {
-            T* const targetY = targetData + offsetY[y];
-            for(uint x=0; x<X; x++) {
-                T* const targetYX = targetY + offsetX[x];
-                for(uint z=0; z<=marginZ; z++) targetYX[z] = value;
-                for(uint z=Z-marginZ; z<Z; z++) targetYX[z] = value;
-            }
+            T* const targetZY = targetZ + y*X;
+            for(uint x=0; x<=marginX; x++) targetZY[x] = x*x;
+            for(uint x=X-marginX; x<X; x++) targetZY[x] = x*x;
+        }
+        for(uint x=0; x<X; x++) {
+            T* const targetZX = targetZ + x;
+            for(uint y=0; y<=marginY; y++) targetZX[y*X] = x*x;
+            for(uint y=Y-marginY; y<Y; y++) targetZX[y*X] = x*x;
         }
     }
-    else {
-        for(uint z=0; z<Z; z++) {
-            T* const targetZ = targetData + z*XY;
-            for(uint y=0; y<Y; y++) {
-                T* const targetZY = targetZ + y*X;
-                for(uint x=0; x<=marginX; x++) targetZY[x] = value;
-                for(uint x=X-marginX; x<X; x++) targetZY[x] = value;
-            }
-            for(uint x=0; x<X; x++) {
-                T* const targetZX = targetZ + x;
-                for(uint y=0; y<=marginY; y++) targetZX[y*X] = value;
-                for(uint y=Y-marginY; y<Y; y++) targetZX[y*X] = value;
-            }
-        }
-        for(uint y=0; y<Y; y++) {
-            T* const targetY = targetData + y*X;
-            for(uint x=0; x<X; x++) {
-                T* const targetYX = targetY + x;
-                for(uint z=0; z<=marginZ; z++) targetYX[z*XY] = value;
-                for(uint z=Z-marginZ; z<Z; z++) targetYX[(Z-marginZ-1)*XY] = value;
-            }
+    for(uint y=0; y<Y; y++) {
+        T* const targetY = targetData + y*X;
+        for(uint x=0; x<X; x++) {
+            T* const targetYX = targetY + x;
+            for(uint z=0; z<=marginZ; z++) targetYX[z*XY] = x*x;
+            for(uint z=Z-marginZ; z<Z; z++) targetYX[(Z-marginZ-1)*XY] = x*x;
         }
     }
 }
-template void clearMargins<uint16>(VolumeT<uint16>& target, uint value);
-template void clearMargins<uint32>(VolumeT<uint32>& target, uint value);
+
+template void setBorders<uint32>(VolumeT<uint32>& target);
 
 #if 0
 void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, uint x2, uint y2, uint z2) {
@@ -227,7 +203,7 @@ Image slice(const Volume& source, int z, bool cylinder) {
     int X=source.sampleCount.x, Y=source.sampleCount.y, XY=X*Y;
     Image target(X,Y);
     int unused marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    assert(X==Y && marginX==marginY);
+    //assert(X==Y && marginX==marginY);
     uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {

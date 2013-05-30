@@ -18,7 +18,7 @@ void tiffUnmap(thandle_t, tdata_t , toff_t) {}
 
 Image decodeTIFF(const ref<byte>& file) {
     BinaryData s (file);
-    TIFF *const tiff = TIFFClientOpen("foo","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
+    TIFF *const tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
     assert(tiff);
     uint32 width=0; TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     uint32 height=0; TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
@@ -29,7 +29,7 @@ Image decodeTIFF(const ref<byte>& file) {
 }
 
 Tiff16::Tiff16(const ref<byte>& file) : s(file) {
-    tiff = TIFFClientOpen("foo","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
+    tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
     assert(tiff);
     TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
@@ -38,6 +38,9 @@ Tiff16::Tiff16(const ref<byte>& file) : s(file) {
 void Tiff16::read(uint16 *target, uint x0, uint y0, uint w, uint h) {
     assert(x0+w<=width && y0+h<=height, x0, y0, w, h, width, height);
     if(w==width) for(uint y: range(h)) TIFFReadScanline(tiff, target+y*w, y0+y, 0);
-    else for(uint y: range(h)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y0+y, 0); copy(target+y*w, buffer+x0, w); }
+    else {
+        for(uint y: range(y0)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y, 0); } // Reads sequentially to avoid "Compression algorithm does not support random access" errors.
+        for(uint y: range(h)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y0+y, 0); copy(target+y*w, buffer+x0, w); }
+    }
 }
 Tiff16::~Tiff16() { TIFFClose(tiff); }

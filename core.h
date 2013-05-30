@@ -198,41 +198,63 @@ template<Type T> struct handle {
     T pointer;
 };
 
-/// Reference to a fixed capacity heap allocated buffer
+/// Reference to a fixed capacity memory region (either an heap allocation managed by this object or a reference to memory managed by another object)
 template<Type T> struct buffer {
+    /// Default constructs an empty buffer
     buffer(){}
-    buffer(T* data, uint64 capacity, uint64 size):data(data),capacity(capacity),size(size){}
+    //buffer(T* data, uint64 capacity, uint64 size):data(data),capacity(capacity),size(size){}
+    /// References \a size elements from \a data pointer
     buffer(T* data, uint64 size):data(data),size(size){}
-    explicit buffer(const ref<T>& o):buffer((T*)o.data,0,(uint64)o.size){}
-    buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.capacity=0;}
-    buffer(uint64 capacity, uint64 size):capacity(capacity),size(size){
-        assert(capacity);
-        if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
-    }
+    /// References \a o.size elements from \a o.data pointer
+    explicit buffer(const ref<T>& o):data((T*)o.data),capacity(0),size(o.size){}
+    buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.data=0, o.size=0, o.capacity=0;}
+    /// Allocates an uninitialized buffer for \a capacity elements
+    buffer(uint64 capacity, uint64 size):capacity(capacity),size(size){ assert(capacity>=size); if(!capacity) return; if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
     explicit buffer(uint64 size):buffer(size,size){}
-
+    /// Allocates a buffer for \a capacity elements and fill with value
     buffer(uint64 capacity, uint64 size, const T& value):buffer(capacity,size){clear(data,size,value);}
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
-    ~buffer(){ free(); }
+    /// If the buffer owns the reference, returns the memory to the allocator
+    ~buffer(){ if(capacity) ::free(data); data=0; capacity=0; size=0; }
 
-    explicit operator bool() const { return data; }
+    /// Returns true if not empty
+    explicit operator bool() const { return size; }
     operator const T*() const { return data; }
-    operator T*() { return data; }
+    /// Returns a const reference to this buffer
     operator ref<T>() const { return ref<T>(data,size); }
-    T* begin() const { return data; }
-    T* end() const { return data+size; }
-    T& operator[](uint64 i) { assert(i<size, i ,size); return (T&)data[i]; }
 
-    void free() { if(capacity) ::free(data); data=0; capacity=0; size=0; }
+    /// \name Iterators
+    const T* begin() const { return data; }
+    const T* end() const { return data+size; }
+    T* begin() { return data; }
+    T* end() { return data+size; }
+    /// \}
+
+    /// Slices a const reference to elements from \a pos to \a pos + \a size
+    ref<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
+    /// Slices a const reference to elements from \a pos the end of the array
+    ref<T> slice(uint pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+
+    /// \name Accessors
+    const T& at(uint i) const { assert(i<size,i,size); return data[i]; }
+    T& at(uint i) { assert(i<size,i,size); return data[i]; }
+    const T& operator [](uint i) const { return at(i); }
+    T& operator [](uint i) { return at(i); }
+    const T& first() const { return at(0); }
+    T& first() { return at(0); }
+    const T& last() const { return at(size-1); }
+    T& last() { return at(size-1); }
+    /// \}
+
     /// Slices a mutable reference to elements from \a pos to \a pos + \a size
-    memory<T> slice(uint64 pos, uint64 size) { assert(pos+size<=this->size); return memory<T>(data+pos, data+pos+size); }
+    //memory<T> slice(uint64 pos, uint64 size) { assert(pos+size<=this->size); return memory<T>(data+pos, data+pos+size); }
     /// Slices a mutable reference to elements from \a pos the end of the array
-    memory<T> slice(uint64 pos) { assert(pos<=size); return memory<T>(data+pos, data+size); }
+    //memory<T> slice(uint64 pos) { assert(pos<=size); return memory<T>(data+pos, data+size); }
 
-    T* data=0;
-    uint64 capacity=0;
-    uint64 size=0;
+    T* data=0; /// Pointer to the buffer valid while not reallocated
+    uint64 capacity=0; /// 0: reference, >0: size of the owned heap allocation
+    uint64 size=0; /// Number of elements currently in this buffer
 };
 template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); copy(t.data,o.data,o.size); return t; }
 

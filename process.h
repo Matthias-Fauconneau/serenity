@@ -9,7 +9,7 @@ struct Rule {
     array<ref<byte>> outputs;
     Dict arguments;
 };
-inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.outputs,rule.arguments); }
+inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.arguments?str(rule.arguments):""_); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
@@ -24,8 +24,8 @@ struct Process {
     /// Recursively verifies \a target output is the same since \a queryTime
     bool sameSince(const ref<byte>& target, long queryTime, const Dict& arguments);
 
-    /// Computes target volume
-    virtual shared<Result> getVolume(const ref<byte>& target, const Dict& arguments);
+    /// Gets result from cache or computes if necessary
+    virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);
 
     /// Executes all operations to generate each target (for each value of any parameter sweep)
     void execute();
@@ -43,11 +43,12 @@ struct Process {
 
 struct ResultFile : Result {
     ResultFile(const ref<byte>& name, long timestamp, const ref<byte>& parameters, const ref<byte>& metadata, const Folder& folder, Map&& map, const ref<byte>& path)
-        : Result(name,timestamp,parameters,metadata, buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), fileName(path?:name+"."_+parameters+"."_+metadata+".1"_) {}
+        : Result(name,timestamp,parameters,metadata, buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), fileName(path?string(path):name+"."_+parameters+"."_+metadata+".1"_)
+    { assert(fileName.capacity); }
     void rename() {
         if(!fileName) return;
         string newName = name+"."_+arguments+"."_+metadata+"."_+str(userCount);
-        if(fileName!=newName) { ::rename(fileName, newName, folder); fileName=move(newName); }
+        if(fileName!=newName) { assert(fileName.capacity); ::rename(fileName, newName, folder); fileName=move(newName); }
     }
     void addUser() override { ++userCount; rename(); }
     uint removeUser() override { --userCount; rename(); return userCount; }
@@ -62,8 +63,8 @@ struct PersistentProcess : Process {
     PersistentProcess(const ref<byte>& definition, const ref<ref<byte>>& arguments);
     ~PersistentProcess();
 
-    /// Computes target volume
-    shared<Result> getVolume(const ref<byte>& target, const Dict& arguments) override;
+    /// Gets result from cache or computes if necessary
+    shared<Result> getResult(const ref<byte>& target, const Dict& arguments) override;
 
     Folder baseStorageFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
     ref<byte> name; // Used to name intermediate and output files (folder base name)

@@ -29,29 +29,11 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
         }
     });
     // Sets boundary voxels to ensures threshold volume is closed (non-zero borders) to avoid null/full rows in distance search
-    uint marginX=align(4,min(1,source.margin.x))+1, marginY=align(4,min(1,source.margin.y))+1, marginZ=align(4,min(1,source.margin.z))+1;
-    for(uint z=marginZ; z<Z-marginZ; z++) {
-        uint32* const poreZ = poreData + z*XY;
-        uint32* const rockZ = rockData + z*XY;
-        for(uint y=marginY; y<Y-marginY; y++) {
-            for(uint x=0; x<=marginX; x++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets right face
-            for(uint x=X-marginX; x<Z; x++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets left face
-        }
-        for(uint x=marginX; x<X-marginX; x++) {
-            for(uint y=0; y<=marginY; y++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets top face
-            for(uint y=Y-marginY; y<Z; y++) rockZ[y*X+x]=poreZ[y*X+x]=x*x; // Sets bottom face
-        }
-    }
-    for(uint y=marginY; y<Y-marginY; y++) {
-        uint32* const poreY = poreData + y*X;
-        uint32* const rockY = rockData + y*X;
-        for(uint x=marginX; x<X-marginX; x++) {
-            for(uint z=0; z<=marginZ; z++) rockY[z*XY+x]=poreY[z*XY+x]=x*x; // Sets front face
-            for(uint z=Z-marginZ; z<Z; z++) rockY[z*XY+x]=poreY[z*XY+x]=x*x; // Sets back face
-        }
-    }
-    pore.margin.x=marginX-1, pore.margin.y=marginY-1, pore.margin.z=marginZ-1;
-    rock.margin.x=marginX-1, rock.margin.y=marginY-1, rock.margin.z=marginZ-1;
+    uint marginX=align(4,source.margin.x)+1, marginY=align(4,source.margin.y)+1, marginZ=align(4,source.margin.z)+1;
+    pore.margin.x=marginX, pore.margin.y=marginY, pore.margin.z=marginZ;
+    rock.margin.x=marginX, rock.margin.y=marginY, rock.margin.z=marginZ;
+    setBorders(pore);
+    setBorders(rock);
 #if DEBUG
     pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;  // for the assert
 #else
@@ -61,7 +43,7 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
 
 /// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Threshold, Operation), virtual VolumeOperation {
-    ref<ref<byte>> parameters() const override { static auto p={"threshold"_}; return p; }
+    ref<byte> parameters() const override { return "threshold"_; }
     uint outputSampleSize(uint) override { return 4; }
     void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
         const Volume& source = inputs[0];
@@ -76,7 +58,7 @@ class(Threshold, Operation), virtual VolumeOperation {
             log("density", time);
             bool plot = false;
             ref<byte> name = args.at("name"_);
-            Folder resultFolder = args.at("resultFolder"_);
+            Folder resultFolder = args.at("resultFolder"_); // FIXME: split + folder output
             if(plot) writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
             if(name != "validation"_) density[0]=density[density.size-1]=0; // Ignores clipped values
 #if 0 // Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization

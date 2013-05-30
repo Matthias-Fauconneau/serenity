@@ -96,6 +96,6 @@ class(Capsules, Operation), virtual VolumeOperation {
             if(p.radius>=analytic.size) analytic.grow(p.radius+1);
             analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
         }
-        writeFile(args.at("name"_)+".analytic.tsv"_, toASCII(analytic), args.at("resultFolder"_));
+        writeFile(args.at("name"_)+".analytic.tsv"_, toASCII(analytic), args.at("resultFolder"_)); //FIXME
     }
 };

@@ -116,7 +116,8 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 #endif
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
-    exit_thread(0);
+    pthread_exit((void*)-1);
+    exit_thread(-1);
 }
 #if __x86_64
 // Configures floating-point exceptions

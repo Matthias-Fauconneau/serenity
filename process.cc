@@ -57,7 +57,7 @@ Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     unique<Operation> operation = Interface<Operation>::instance(rule.operation);
     assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
     Dict local = copy(arguments); local << rule.arguments; // not inherited
-    for(const ref<byte>& parameter: operation->parameters()) if(local.contains(parameter)) {
+    for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
         if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
         else if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter)) relevant.insert(parameter, local.at(parameter));
     }
@@ -80,7 +80,7 @@ bool Process::sameSince(const ref<byte>& target, long queryTime, const Dict& arg
     return true;
 }
 
-shared<Result> Process::getVolume(const ref<byte>& target, const Dict& arguments) {
+shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments) {
     const shared<Result>* result = results.find(target);
     if(result && sameSince(target, (*result)->timestamp, arguments)) { assert((*result)->data.size); return share( *result ); }
     error("Anonymous process manager unimplemented"_);
@@ -90,7 +90,7 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
     for(const ref<byte>& argument: arguments) {
         if(argument.contains('=') || &ruleForOutput(argument)) continue;
         if(!name) name=argument;
-        if(existsFolder(argument)) name=argument.contains('/')?section(argument,'/',-2,-1):argument;
+        if(existsFolder(argument, currentWorkingDirectory())) name=argument.contains('/')?section(argument,'/',-2,-1):argument;
     }
     assert_(name, arguments);
     storageFolder = Folder(name, baseStorageFolder, true);
@@ -115,7 +115,7 @@ PersistentProcess::~PersistentProcess() {
     }
 }
 
-shared<Result> PersistentProcess::getVolume(const ref<byte>& target, const Dict& arguments) {
+shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict& arguments) {
     const shared<Result>* result = results.find(target);
     if(result && sameSince(target, (*result)->timestamp, arguments)) return share( *result );
 
@@ -124,8 +124,11 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target, const Dict&
     unique<Operation> operation = Interface<Operation>::instance(rule.operation);
 
     array<shared<Result>> inputs;
-    for(const ref<byte>& input: rule.inputs) inputs << getVolume(input, arguments);
-    for(const shared<Result>& input: inputs) touchFile(((ResultFile*)input.pointer)->fileName, ((ResultFile*)input.pointer)->folder, false); // Updates last access time for correct LRU cache behavior
+    for(const ref<byte>& input: rule.inputs) inputs << getResult(input, arguments);
+    for(const shared<Result>& input: inputs) {
+        ResultFile& result = *(ResultFile*)input.pointer;
+        touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
+    }
 
     array<shared<Result>> outputs;
     for(uint index: range(rule.outputs.size)) {
@@ -133,56 +136,61 @@ shared<Result> PersistentProcess::getVolume(const ref<byte>& target, const Dict&
 
         if(results.contains(output)) { // Reuses same volume
             shared<ResultFile> result = results.take(results.indexOf(output));
-            string fileName = move(result->fileName); result->fileName.clear();
+            string fileName = move(result->fileName); assert(!result->fileName.size);
             rename(fileName, output, storageFolder);
         }
-        // Creates (or resizes) and maps an output result file
-        int64 outputSize = operation->outputSize(arguments, inputs, index);
-        while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
-            long minimum=currentTime()+1; string oldest;
-            for(string& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
-                if(!path.contains('.') || !isInteger(section(path,'.',-2,-1))) continue; // Not a process data
-                uint userCount = toInteger(section(path,'.',-2,-1));
-                if(userCount > 1) continue;
-                long timestamp = File(path, baseStorageFolder).accessTime();
-                if(timestamp < minimum) minimum=timestamp, oldest=move(path);
-            }
-            if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
-            if(section(oldest,'/')==name) {
-                ref<byte> resultName = section(section(oldest,'/',1,-1),'.');
-                shared<ResultFile> result = results.take(results.indexOf(resultName));
-                result->fileName.clear(); // Prevents rename
-            }
-            if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
-                ::remove(oldest, baseStorageFolder);
-                continue;
-            }
-            ::rename(baseStorageFolder, oldest, storageFolder, output); // Renames last discarded file instead of removing (avoids page zeroing)
-            break;
-        }
 
-        File file(output, storageFolder, Flags(ReadWrite|Create));
-        file.resize( outputSize );
-        outputs << shared<ResultFile>(output, currentTime(),""_, ""_, storageFolder, Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate))), output);
+        Map map;
+        int64 outputSize = operation->outputSize(arguments, inputs, index);
+        if(outputSize) { // Creates (or resizes) and maps an output result file
+            while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
+                long minimum=currentTime()+1; string oldest;
+                for(string& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
+                    if(!path.contains('.') || !isInteger(section(path,'.',-2,-1))) continue; // Not a process data
+                    uint userCount = toInteger(section(path,'.',-2,-1));
+                    if(userCount > 1) continue;
+                    long timestamp = File(path, baseStorageFolder).accessTime();
+                    if(timestamp < minimum) minimum=timestamp, oldest=move(path);
+                }
+                if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
+                if(section(oldest,'/')==name) {
+                    ref<byte> resultName = section(section(oldest,'/',1,-1),'.');
+                    shared<ResultFile> result = results.take(results.indexOf(resultName));
+                    result->fileName.clear(); // Prevents rename
+                }
+                if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
+                    ::remove(oldest, baseStorageFolder);
+                    continue;
+                }
+                ::rename(baseStorageFolder, oldest, storageFolder, output); // Renames last discarded file instead of removing (avoids page zeroing)
+                break;
+            }
+
+            File file(output, storageFolder, Flags(ReadWrite|Create));
+            file.resize( outputSize );
+            map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
+        }
+        outputs << shared<ResultFile>(output, currentTime(),""_, ""_, storageFolder, move(map), output);
     }
     assert_(outputs);
 
     Time time;
     operation->execute(arguments<<rule.arguments, outputs, inputs);
-    log(rule,'\t',toASCII(relevantArguments(rule, arguments)),'\t',time);
+    log(left(str(rule),96),left(str(toASCII(relevantArguments(rule, arguments))),64),right(str(time),32));
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
         result->arguments = toASCII(relevantArguments(rule, arguments));
-        if(result->map.size != result->data.size) {
-            assert(result->map.size > result->data.size);
+        if(result->map) { // Resizes and remaps file read-only (will be remapped Read|Write whenever used as output again)
+            assert(result->map.size >= result->data.size);
             result->map.unmap();
             File file(result->fileName, result->folder, ReadWrite);
             file.resize(result->data.size);
-            result->map = Map(file, Map::Prot(Map::Read|Map::Write));
+            result->map = Map(file);
             result->data = buffer<byte>(result->map);
+        } else { // Writes data from heap to file
+            writeFile(result->fileName, result->data, result->folder);
         }
-        if(!result->data) touchFile(result->fileName, result->folder, true); // Explicitly sets dummy timestamp files last modified time for correct dependency update
         results << move(result);
     }
     return share( *results.find(target) );
@@ -207,7 +215,7 @@ void Process::execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& 
     } else { // Actually generates targets when sweeps have been explicited
         for(const ref<byte>& target: targets) {
             log(target, relevantArguments(ruleForOutput(target), arguments), results);
-            targetResults << getVolume(target, arguments);
+            targetResults << getResult(target, arguments);
         }
     }
 }

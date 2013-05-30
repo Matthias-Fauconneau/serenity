@@ -19,6 +19,13 @@ struct VolumeOperation : virtual Operation {
     virtual void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) abstract;
     void execute(const Dict& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
         array<Volume> inputVolumes = apply<Volume>(inputs, toVolume);
+#if 1
+        for(uint index: range(inputs.size)) {
+            Volume& input = inputVolumes[index];
+            if(input.sampleSize==2) assert(maximum((const Volume16&)input)<=input.maximum, inputs[index]->name, input, hex(maximum((const Volume16&)input)), hex(input.maximum));
+            if(input.sampleSize==4) assert(maximum((const Volume32&)input)<=input.maximum, inputs[index]->name, input, hex(maximum((const Volume32&)input)), hex(input.maximum));
+        }
+#endif
         array<Volume> outputVolumes;
         for(uint index: range(outputs.size)) {
             Volume volume;
@@ -34,8 +41,8 @@ struct VolumeOperation : virtual Operation {
         execute(args, outputVolumes, inputVolumes);
         for(uint index: range(outputs.size)) {
             Volume& output = outputVolumes[index];
-            if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, output, maximum((const Volume16&)output), output.maximum);
-            if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, output, maximum((const Volume32&)output), output.maximum);
+            if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);
+            if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume32&)output), output.maximum);
             outputs[index]->metadata = volumeFormat(output);
             outputs[index]->data.size = output.data.size;
         }

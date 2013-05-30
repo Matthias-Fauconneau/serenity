@@ -14,12 +14,12 @@ skeleton = Skeleton positionx positiony positionz
 skeleton_unconnected = Tile skeleton
 skeleton_connected = FloodFill skeleton_unconnected
 bins_unconnected = Bin skeleton_unconnected
-unconnected = Rasterize bins_unconnected
 bins_connected = Bin skeleton_connected
+unconnected = Rasterize bins_unconnected
 connected = Rasterize bins_connected
 
 # Computes histogram of maximal ball radii (i.e. pore size distribution)
-#histogram_unconnected = SqrtHistogram unconnected
+histogram_unconnected = SqrtHistogram unconnected
 histogram_connected = SqrtHistogram connected
 
 #emptyx epositionx = DistanceX rock
@@ -28,15 +28,16 @@ histogram_connected = SqrtHistogram connected
 #empty = SquareRoot emptyz # Square roots and tiles distance field before using it for empty space skiping during rendering
 #density = SquareRoot distance # Square roots and normalizes (FIXME) distance to use as density values (for opacity and gradient)
 #intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
-#sourceASCII = ToASCII source
-maximumASCII = ToASCII connected
+#ascii_source = ToASCII source
+ascii_unconnected = ToASCII unconnected
+ascii_connected = ToASCII connected
 
-#sourcePNG = ToPNG source
-#smoothPNG = ToPNG smooth
-#colorizePNG = ToPNG colorize
-#distancePNG = ToPNG distance
-#skeletonPNG = ToPNG skeleton
-#maximumPNG = ToPNG connected
+#png_source = ToPNG source
+#png_smooth = ToPNG smooth
+#png_colorize = ToPNG colorize
+#png_distance = ToPNG distance
+#png_skeleton = ToPNG skeleton
+#png_maximum = ToPNG connected
 
 #Last target is the default
 #validate = Validate pore maximum

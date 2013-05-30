@@ -4,23 +4,26 @@
 #include "png.h"
 
 /// Computes histogram (with square rooted x values)
-class(SqrtHistogram, Operation), virtual VolumeInput {
-    void execute(const Dict& args, const ref<byte>& name, const Volume& source) override {
+class(SqrtHistogram, Operation) {
+    uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 0; }
+    virtual void execute(const Dict& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
+        Volume source = toVolume(inputs[0]);
         Sample squaredMaximum = histogram(source, args.contains("cylinder"_));
         squaredMaximum[0] = 0; // Clears background voxel count to plot with a bigger Y scale
         float scale = toDecimal(args.value("resolution"_,"1"_));
-        writeFile(args.at("name"_)+"."_+name+".tsv"_, toASCII(sqrtHistogram(squaredMaximum), false, false, scale), args.at("resultFolder"_));
+        outputs[0]->metadata = string("tsv"_);
+        outputs[0]->data = toASCII(sqrtHistogram(squaredMaximum), false, false, scale);
     }
 };
 
 /// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeInput {
     void execute(const Dict& args, const ref<byte>& name, const Volume& volume) override {
-        Folder folder = Folder(args.at("name"_)+"."_+name+".png"_, args.at("resultFolder"_), true);
+        Folder folder = Folder(args.at("name"_)+"."_+name+".png"_, args.at("resultFolder"_), true); //FIXME: folder output
         uint marginZ = volume.margin.z;
         Time time; Time report;
         for(int z: range(marginZ, volume.sampleCount.z-marginZ)) {
-            if(report/1000>=2) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
+            if(report/1000>=7) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
             writeFile(dec(z,4)+".png"_, encodePNG(slice(volume,z,args.contains("cylinder"_))), folder);
         }
     }

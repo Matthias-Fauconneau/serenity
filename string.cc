@@ -129,6 +129,14 @@ string repeat(const ref<byte>& s, uint times) {
     string r; for(uint unused i: range(times)) r<<s; return r;
 }
 
+string left(const ref<byte>& s,  uint width) {
+    return s+string((width-s.size)/12,(width-s.size)/12,'\t');
+}
+
+string right(const ref<byte>& s,  uint width) {
+    return string((width-s.size)/12,(width-s.size)/12,'\t')+s;
+}
+
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
 
 /// array<ref<byte>>
@@ -138,7 +146,7 @@ array<ref<byte>> split(const ref<byte>& str, byte separator) {
     const byte* b=str.begin();
     const byte* end=str.end();
     for(;;) {
-        auto e = b;
+        const byte* e = b;
         while(e!=end && *e!=separator) ++e;
         if(b==end) break;
         list << ref<byte>(b,e-b);

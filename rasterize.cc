@@ -25,7 +25,8 @@ void bin(Volume& target, const Volume16& source) {
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     assert(offsetX && offsetY && offsetZ);
 
-    Tile* const targetData = (Tile*)target.data.data;
+    Tile* const targetData = reinterpret_cast<Tile*>(target.data.data);
+    assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile));
     for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) targetData[i].ballCount=0;
 
     parallel(marginZ,Z-marginZ, [&](uint, uint z) { //TODO: Z-order
@@ -40,10 +41,10 @@ void bin(Volume& target, const Volume16& source) {
                         for(int dx=(x-radius)/tileSide; dx<=(x+radius)/tileSide; dx++) {
                             Tile* const tile = targetData + dz * (X/tileSide*Y/tileSide) + dy * (X/tileSide) + dx;
                             int tileX = dx*tileSide, tileY = dy*tileSide, tileZ = dz*tileSide;
-                            if(dmin(tileSide,x-tileX,y-tileY,z-tileZ) < sqRadius) { // Intersects tile
+                            if(dmin(tileSide,x-tileX,y-tileY,int(z)-tileZ) < sqRadius) { // Intersects tile
                                 float r = norm(vec3(tileX,tileY,tileZ)+vec3((tileSide-1)/2.)-vec3(x,y,z)), tileRadius = sqrt(3.*sqr((tileSide-1)/2.));
                                 assert_(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere
-                                assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), tile->ballCount);
+                                assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), tile->ballCount, dmin(tileSide,x-tileX,y-tileY,z-tileZ), dx,dy,dz, sqRadius,ballRadius,  x-tileX,y-tileY,int(z)-tileZ, norm(vec3(0,y-tileY,int(z)-tileZ)), x,y,z, x+ballRadius,y+ballRadius,z+ballRadius);
                                 uint index = __sync_fetch_and_add(&tile->ballCount,1); // Thread-safe lock-free add
                                 tile->balls[index] = {uint16(x),uint16(y),uint16(z),uint16(sqRadius)}; // Appends the ball to intersecting tiles
                             }

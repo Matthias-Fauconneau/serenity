@@ -13,7 +13,7 @@ struct Handle {
 
 struct Folder;
 /// Returns a file descriptor to the current working directory
-const Folder& cwd();
+const Folder& currentWorkingDirectory();
 /// Returns a file descriptor to the root folder
 const Folder& root();
 

@@ -17,7 +17,7 @@ struct Image {
     Image(byte4* data, uint width, uint height, uint stride, bool alpha) : data(data), width(width),height(height),stride(stride),alpha(alpha){}
     Image(uint width, uint height, bool alpha=false, uint stride=0) : width(width), height(height), stride(stride?:width), alpha(alpha) {
         assert(width); assert(height);
-        buffer=::buffer<byte4>(height*(stride?:width)); data=buffer;
+        buffer=::buffer<byte4>(height*(stride?:width)); data=buffer.data;
     }
 
     explicit operator bool() const { return data; }

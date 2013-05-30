@@ -6,12 +6,12 @@
 class(Source, Operation), virtual VolumeOperation {
     uint minX, minY, minZ, maxX, maxY, maxZ;
 
-    ref<ref<byte>> parameters() const override { static auto p = {"cylinder"_,"cube"_}; return p; }
+    ref<byte> parameters() const override { static auto p="cylinder cube"_; return p; }
     uint outputSampleSize(uint) override { return 2; }
     uint64 outputSize(const Dict& args, const ref<shared<Result>>&, uint) override {
         Folder folder = args.at("source"_);
         array<string> slices = folder.list(Files);
-        assert(slices, args.at("source"_));
+        assert_(slices, args.at("source"_));
         Map file (slices.first(), folder);
         const Tiff16 image (file);
         minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
@@ -32,15 +32,17 @@ class(Source, Operation), virtual VolumeOperation {
         Folder folder = args.at("source"_);
         array<string> slices = folder.list(Files);
 
-        Volume& target = outputs.first();
+        Volume16& target = outputs.first();
         target.sampleCount = int3(maxX-minX, maxY-minY, maxZ-minZ);
-        target.maximum = (1<<(target.sampleSize*8))-1;
         uint X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z, XY=X*Y;
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
         for(uint z: range(Z)) {
-            if(report/1000>=2) { log(z,"/",Z, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
+            if(report/1000>=7) { log(z,"/",Z, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
             Tiff16(Map(slices[minZ+z],folder)).read(targetData+z*XY, minX, minY, maxX-minX, maxY-minY); // Directly decodes slice images into the volume
         }
+        //target.maximum = (1<<(target.sampleSize*8))-1;
+        //assert(maximum(target) == target.maximum, maximum(target));
+        target.maximum = maximum(target); // Some sources don't use the full range
     }
 };

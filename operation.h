@@ -45,8 +45,7 @@ struct Variant : string {
 };
 template<> inline Variant copy(const Variant& o) { return copy((const string&)o); }
 template<> inline string str(const Variant& o) { return copy((const string&)o); }
-/// Associative array of variants
-typedef map<ref<byte>, Variant> Dict;
+typedef map<ref<byte>,Variant> Dict;
 
 /// Intermediate result
 struct Result : shareable {
@@ -64,7 +63,7 @@ template<> inline string str(const Result& o) { return copy(o.name); }
  /// Executes an operation using inputs to compute outputs (of given sample sizes)
 struct Operation {
     /// Returns which parameters affects this operation output
-    virtual ref<ref<byte>> parameters() const { return {}; }
+    virtual ref<byte> parameters() const { return ""_; }
     /// Returns the desired intermediate data size in bytes for each outputs
     virtual uint64 outputSize(const Dict& args, const ref<shared<Result>>& inputs, uint index) abstract;
     /// Executes the operation using inputs to compute outputs

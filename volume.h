@@ -19,7 +19,7 @@ struct Volume {
     Volume(){}
 
     uint64 size() const { return sampleCount.x*sampleCount.y*sampleCount.z; }
-    explicit operator bool() const { return data; }
+    explicit operator bool() const { return (bool)data; }
     template<Type T> operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize); return *(const VolumeT<T>*)this; }
     template<Type T> operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize); return *(VolumeT<T>*)this; }
     void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; }
@@ -58,8 +58,8 @@ void interleavedLookup(Volume& target);
 /// Tiles a volume recursively into bricks (using 3D Z ordering)
 void tile(Volume16& target, const Volume16& source);
 
-/// Clears volume margins
-template<Type T> void clearMargins(VolumeT<T>& target, uint value=0);
+/// Sets volume margins to x*x (used as EDT borders)
+template<Type T> void setBorders(VolumeT<T>& target);
 
 /// Copies a cropped version of the volume
 void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, uint x2, uint y2, uint z2);

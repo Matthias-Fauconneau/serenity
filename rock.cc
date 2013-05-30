@@ -25,12 +25,12 @@ PASS(SquareRoot, uint16, squareRoot);
 struct Rock : PersistentProcess, Widget {
     TEXT(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
-        ref<byte> resultFolder = "dev/shm"_; // Folder where histograms are written
-        ref<byte> result; // Path to file (or folder) where target volume data is copied (only for ASCII export)
+        ref<byte> resultFolder; // FIXME: folder where histograms are copied
+        ref<byte> result; // Path to file (or folder) where targets are copied
         for(const ref<byte>& argument: args) {
             if(argument.contains('=') || &ruleForOutput(argument)) continue;
-            if(!arguments.contains("source"_) && (existsFolder(argument) || argument=="validation"_)) { arguments.insert("source"_,argument); continue; }
-            if(!result) { result=argument; resultFolder = existsFolder(argument)?argument:section(argument,'/',0,-2); continue; }
+            if(!arguments.contains("source"_) && (existsFolder(argument,currentWorkingDirectory()) || argument=="validation"_)) { arguments.insert("source"_,argument); continue; }
+            if(!result) { result=argument; resultFolder = existsFolder(argument,currentWorkingDirectory())?argument:section(argument,'/',0,-2); continue; }
             error("Invalid argument"_, argument);
         }
         if(arguments.at("source"_)=="validation"_) {
@@ -46,15 +46,21 @@ struct Rock : PersistentProcess, Widget {
         arguments.insert("resultFolder"_,resultFolder);
 
         execute();
-        for(const shared<Result>& target: targetResults) if(target->data.size) { current = share( target ); break; }
-        assert_(current);
 
-        if(result!="dev/shm"_) { // Copies result to disk
-            Time time;
-            if(existsFolder(result)) writeFile(current->name+"."_+current->metadata, current->data, resultFolder), log(result+"/"_+current->name+"."_+current->metadata, time);
-            else writeFile(result, current->data, root()), log(result, time);
+        if(result!="dev/shm"_) { // Copies result to result folder (on disk)
+            if(targetResults.size>1) {
+                assert(!existsFile(result,currentWorkingDirectory()), "New folder would overwrite existing file", result);
+                if(!existsFolder(result,currentWorkingDirectory())) Folder(result,currentWorkingDirectory(),true);
+            }
+            for(const shared<Result>& target: targetResults) if(target->data.size) {
+                Time time;
+                if(existsFolder(result, currentWorkingDirectory())) writeFile(target->name+"."_+target->metadata, target->data, resultFolder), log(result+"/"_+target->name+"."_+target->metadata, time);
+                else writeFile(result, target->data, currentWorkingDirectory()), log(target->name+"."_+target->metadata,"->",result, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
+            }
         }
-        if(current->data.size==0 || current->name=="ascii"_ || arguments.value("view"_,"0"_)=="0"_) { exit(); return; }
+
+        for(const shared<Result>& target: targetResults) if(target->data.size) { current = share( target ); break; }
+        if(!current || current->data.size==0 || current->name=="ascii"_ || arguments.value("view"_,"0"_)=="0"_) { exit(); return; }
         // Displays result
         window = unique<Window>(this,int2(-1,-1),"Rock"_);
         window->localShortcut(Key('r')).connect(this, &Rock::refresh);
@@ -67,7 +73,7 @@ struct Rock : PersistentProcess, Widget {
 
     void refresh() {
         current->timestamp = 0;
-        current = getVolume(current->name, arguments);
+        current = getResult(current->name, arguments);
         updateView();
     }
 
@@ -115,9 +121,9 @@ struct Rock : PersistentProcess, Widget {
             mat3 view;
             view.rotateX(rotation.y); // pitch
             view.rotateZ(rotation.x); // yaw
-            shared<Result> empty = getVolume("empty"_, arguments);
-            shared<Result> density = getVolume("density"_, arguments);
-            shared<Result> intensity = getVolume("intensity"_, arguments);
+            shared<Result> empty = getResult("empty"_, arguments);
+            shared<Result> density = getResult("density"_, arguments);
+            shared<Result> intensity = getResult("intensity"_, arguments);
             Time time;
             assert_(position==int2(0) && size == framebuffer.size());
             ::render(framebuffer, toVolume(empty), toVolume(density), toVolume(intensity), view);
