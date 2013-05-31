@@ -1,6 +1,5 @@
 debug
 profile
 fast
-release
 *.creator.user
 *.includes
