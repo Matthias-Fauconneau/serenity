@@ -58,8 +58,8 @@ stringz strz(const ref<byte>& s);
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array<ref<byte>> split(const ref<byte>& str, byte separator=' ');
-/// Parses an array of integer value
-array<int64> toIntegers(const ref<byte>& str, char separator=',', int base=10);
+/// Converts to an array of strings
+array<string> toStrings(const array<ref<byte>>& strings);
 
 /// Forwards string
 inline const string& str(const string& s) { return s; }
@@ -79,7 +79,9 @@ inline string str(const long& n) { return dec(n); }
 inline string str(const uint64& n) { return dec(n); }
 inline string str(const int64& n) { return dec(n); }
 inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
-template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
+//template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
+inline string str(void* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
+template<Type T> inline string str(T* const& p) { return str(*p); }
 template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 template<Type T> string str(const shared<T>& t) { return str(*t.pointer); }
 

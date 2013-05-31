@@ -1,7 +1,7 @@
 #include "volume-operation.h"
 #include "thread.h"
 
-inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqDiameter, int X, int Y, int Z) {
+inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqDiameter) {
     int xf0=xf[0], yf0=yf[0], zf0=zf[0]; // First feature point
     int xfd=xf[da], yfd=yf[da], zfd=zf[da]; // Second feature point
     int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd; // Vector between feature points
@@ -17,8 +17,8 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
          sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
             ) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
-        if(crit>=0) { int r2 = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); float r=sqrt(r2); assert(z-r>=0 && y-r>=0 && x-r>=0 && z+r<Z && y+r<Y && x+r<X, x,y,z,xf0,yf0,zf0,r); skel[0] = r2; }
-        if(crit<=0) { int r2 = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); float r=sqrt(r2); assert(z-r>=0 && y-r>=0 && x-r>=0 && z+r<Z && y+r<Y && x+r<X, x,y,z,xfd,yfd,zfd,r); skel[da] = r2; }
+        if(crit>=0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); skel[0] = r; }
+        if(crit<=0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); skel[da] = r; }
     }
 }
 
@@ -48,9 +48,9 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
                 uint16* const skel = targetZY+x;
                 skel[0] = 0;
                 if(xf[0]<0xFFFF) {
-                    if(xf[-1]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, -1,0,0, -1, minimalSqDiameter, X,Y,Z);
-                    if(xf[-(int)X]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,-1,0, -X, minimalSqDiameter, X,Y,Z);
-                    if(xf[-(int)XY]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,0,-1, -XY, minimalSqDiameter, X,Y,Z);
+                    if(xf[-1]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, -1,0,0, -1, minimalSqDiameter);
+                    if(xf[-(int)X]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,-1,0, -X, minimalSqDiameter);
+                    if(xf[-(int)XY]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,0,-1, -XY, minimalSqDiameter);
                 }
             }
         }

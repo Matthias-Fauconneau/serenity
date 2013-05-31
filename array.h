@@ -127,8 +127,8 @@ template<Type T> array<T> replace(array<T>&& a, const T& before, const T& after)
 template<class O, class T, class F> array<O> apply(const ref<T>& a, F function) {
         array<O> r; for(const T& e: a) r << function(e); return r;
 }
-template<class O, class T, class F> array<O> apply(const array<T>& a, F function) {
-        array<O> r; for(const T& e: a) r << function(e); return r;
+template<class O, class T, class F, class... Args> array<O> apply(const array<T>& a, F function, Args... args) {
+        array<O> r; for(const T& e: a) r << function(e, args...); return r;
 }
 
 /// string is an array of bytes

@@ -16,16 +16,17 @@ class(Source, Operation), virtual VolumeOperation {
         const Tiff16 image (file);
         minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
         if(args.contains("cylinder"_) && args.at("cylinder"_)!=""_) {
-            auto coordinates = toIntegers(args.at("cylinder"_));
+            auto coordinates = apply(split(args.at("cylinder"_)), toInteger, 10);
             int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
             minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
         }
         if(args.contains("cube"_)) {
-            auto coordinates = toIntegers(args.at("cube"_));
+            auto coordinates = apply(split(args.at("cube"_)), toInteger, 10);
             minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
         }
         assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=image.width && maxY<=image.height && maxZ<=slices.size);
-        return (maxX-minX)*(maxY-minY)*(maxZ-minZ)*outputSampleSize(0);
+        assert( (maxX-minX)%2 == 0 && (maxY-minY)%2 == 0 && (maxZ-minZ)%2 == 0 ); // Margins are currently always symmetric
+        return align(16,maxX-minX)*align(16,maxY-minY)*align(16,maxZ-minZ)*outputSampleSize(0);
     }
 
     void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>&) {
@@ -33,16 +34,18 @@ class(Source, Operation), virtual VolumeOperation {
         array<string> slices = folder.list(Files);
 
         Volume16& target = outputs.first();
-        target.sampleCount = int3(maxX-minX, maxY-minY, maxZ-minZ);
-        uint X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z, XY=X*Y;
+        int3 size = int3(maxX-minX, maxY-minY, maxZ-minZ);
+        target.sampleCount = int3(align(16,size.x), align(16,size.y), align(16,size.z));
+        target.margin = (target.sampleCount - size)/2;
+        uint X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z;
+        uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
-        for(uint z: range(Z)) {
-            if(report/1000>=7) { log(z,"/",Z, (z*XY*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress every 2 second (initial read from a cold drive may take minutes)
-            Tiff16(Map(slices[minZ+z],folder)).read(targetData+z*XY, minX, minY, maxX-minX, maxY-minY); // Directly decodes slice images into the volume
+        for(uint z: range(size.z)) {
+            if(report/1000>=7) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+            Tiff16(Map(slices[minZ+z],folder)).read(targetData+(marginZ+z)*X*Y + marginY*X + marginX, minX, minY, maxX-minX, maxY-minY, Y); // Directly decodes slice images into the volume
         }
-        //target.maximum = (1<<(target.sampleSize*8))-1;
-        //assert(maximum(target) == target.maximum, maximum(target));
+        //target.maximum = (1<<(target.sampleSize*8))-1; assert(maximum(target) == target.maximum, maximum(target));
         target.maximum = maximum(target); // Some sources don't use the full range
     }
 };

@@ -157,7 +157,7 @@ array<ref<byte>> split(const ref<byte>& str, byte separator) {
     return list;
 }
 
-array<int64> toIntegers(const ref<byte>& str, char separator, int base) { return apply<int64>(split(str,separator), [base](const ref<byte>& s) { return toInteger(s,base); }); }
+array<string> toStrings(const array<ref<byte>>& strings) { return apply<string>(strings, [](const ref<byte>& o){return string(o);}); }
 
 /// Number conversions
 

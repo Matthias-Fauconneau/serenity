@@ -4,7 +4,7 @@
 
 struct Tiff16 {
     Tiff16(const ref<byte>& file);
-    void read(uint16* target, uint x0, uint y0, uint w, uint h);
+    void read(uint16* target, uint x0, uint y0, uint w, uint h, uint stride);
     ~Tiff16();
 
     BinaryData s;

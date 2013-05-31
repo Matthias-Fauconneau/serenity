@@ -35,7 +35,7 @@ static array<Thread*> threads __attribute((init_priority(104)));
 Thread mainThread __attribute((init_priority(105))) (20);
 
 void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
-int exit_group(int status) { return syscall(SYS_exit_group, status); }
+int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
 int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
 int gettid() { return syscall(SYS_gettid); }
 
@@ -153,28 +153,30 @@ template<> void __attribute((noreturn)) error(const ref<byte>& message) {
         reentrant = false;
     }
     log(message);
-    exit(); // Signals all threads to terminate
+    exit(-1); // Signals all threads to terminate
     {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } } // Removes this thread from list
     __builtin_trap(); //TODO: detect if running under debugger
     exit_thread(-1); // Exits this thread
 }
 
+static int exitStatus;
 // Entry point
 int main() {
     mainThread.run();
-    exit(); // Signals all threads to terminate
+    exit(0); // Signals all threads to terminate
     for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
-    return 0; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+    return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
-void exit() {
+void exit(int status) {
     Locker lock(threadsLock);
     for(Thread* thread: threads) { thread->terminate=true; thread->post(); }
+    exitStatus = status;
 }
 
 // Environment
-void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
-    if(!existsFile(path)) { warn("Executable not found",path); return; }
+int64 execute(const ref<byte>& path, const ref<string>& args, bool wait) {
+    if(!existsFile(path)) { warn("Executable not found",path); return -1; }
 
     array<stringz> args0(1+args.size);
     args0 << strz(path);
@@ -192,9 +194,9 @@ void execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     envp[env0.size]=0;
 
     int pid = fork();
-    if(pid==0) { if(!execve(strz(path),(char*const*)argv,(char*const*)envp)) exit_group(-1); }
-    else if(wait) wait4(pid,0,0,0);
-    else wait4(pid,0,WNOHANG,0);
+    if(pid==0) { if(!execve(strz(path),(char*const*)argv,(char*const*)envp)) exit_group(-1); return -1; }
+    else if(wait) { void* status; wait4(pid,&status,0,0); return (int64)status; }
+    else { wait4(pid,0,WNOHANG,0); return -1; }
 }
 
 string getenv(const ref<byte>& name) {

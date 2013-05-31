@@ -139,10 +139,12 @@ struct parallel {
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
-void exit();
+void exit(int status=0);
+/// Immediatly terminates the current thread
+void __attribute((noreturn)) exit_thread(int status);
 
 /// Execute binary at \a path with command line arguments \a args
-void execute(const ref<byte>& path, const ref<string>& args={}, bool wait=true);
+int64 execute(const ref<byte>& path, const ref<string>& args={}, bool wait=true);
 
 /// Returns value for environment variable \a name
 string getenv(const ref<byte>& name);
