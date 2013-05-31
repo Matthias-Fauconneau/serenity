@@ -52,7 +52,7 @@ bool Date::summerTime() const { //FIXME: always European Summer Time
             && (month<October || (month==October && (day<lastOctoberSunday || (day==lastOctoberSunday && hours<  1))));
 }
 int Date::localTimeOffset() const {
-    int offset = 1; //FIXME: always Central European Time (UTC+1)
+    int offset = -8; //FIXME: hardcoded Central European Time (UTC+1) or Pacific Standard Time (UTC-8)
     if(summerTime()) offset += 1;
     return offset*60;
 }
@@ -116,37 +116,31 @@ string str(Date date, const ref<byte>& format) {
         else if(s.match("TZD"_)) r << "GMT"_; //FIXME
         else r << s.next();
     }
-    if(endsWith(r,","_)) r.pop(); //prevent dangling comma when last valid part is week day
+    if(endsWith(r,","_) || endsWith(r,":"_)) r.pop(); //prevent dangling separator when last valid part is week day or seconds
     return r;
 }
 
 Date parse(TextData& s) {
     Date date;
-    if(s.match("Today"_)) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
-    else for(int i=0;i<7;i++) if(s.match(days[i])) { date.weekDay=i; goto break_; }
-    else for(int i=0;i<7;i++) if(s.match(days[i].slice(0,3))) { date.weekDay=i; break; }
-    break_:;
     {
-        s.whileAny(" ,\t"_);
-        int number = s.integer();
-        if(number>=0) {
-            if(s.match(":"_)) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : -1;
-            else if(s.match('h')) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0;
-            else if(date.day==-1) date.day=number-1;
-        }
+        if(s.match("Today"_)) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
+        else for(int i=0;i<7;i++) if(s.match(days[i])) { date.weekDay=i; goto break_; }
+        /*else*/ for(int i=0;i<7;i++) if(s.match(days[i].slice(0,3))) { date.weekDay=i; break; }
+        break_:;
     }
-    {
+    for(;;) {
         s.whileAny(" ,\t"_);
-        for(int i=0;i<12;i++) if(s.match(str(months[i]))) date.month=i;
-    }
-    {
-        s.whileAny(" ,\t"_);
-        int number = s.integer();
-        if(number>=0) {
-            if(s.match(":"_)) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : -1;
-            else if(s.match('h')) date.hours=number, date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0;
+        for(int i=0;i<12;i++) if(s.match(str(months[i]))) { date.month=i; goto continue2_; }
+        /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
+            int number = s.integer();
+            if(s.match(":"_)) { date.hours=number; date.minutes=s.integer(); if(s.match(":"_)) date.seconds=s.integer(); }
+            else if(s.match('h')) { date.hours=number; date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0; }
             else if(date.day==-1) date.day=number-1;
-        }
+            else if(date.month==-1) date.year=number-1;
+            else if(date.year==-1) date.year=number;
+            else error("Invalid date", s.buffer);
+        } else break;
+        continue2_:;
     }
     if(date.year<0 && (date.month>=0 || date.day>=0)) {
         Date now(currentTime());

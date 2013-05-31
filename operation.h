@@ -17,14 +17,18 @@ struct shareable {
 /// Abstract factory pattern (allows construction of class by names)
 template <class I> struct Interface {
     struct AbstractFactory {
+        /// Returns the version of this implementation
+        virtual ref<byte> version() abstract;
         virtual unique<I> constructNewInstance() abstract;
     };
     static map<ref<byte>, AbstractFactory*> factories;
     template <class C> struct Factory : AbstractFactory {
+        ref<byte> version() override { return __DATE__ " " __TIME__ ""_; }
         unique<I> constructNewInstance() override { return unique<C>(); }
         Factory() { TextData s (str(typeid(C).name())); s.integer(); factories.insert(s.word(), this); }
         static Factory registerFactory;
     };
+    static ref<byte> version(const ref<byte>& name) { return factories.at(name)->version(); }
     static unique<I> instance(const ref<byte>& name) { return factories.at(name)->constructNewInstance(); }
 };
 template <class I> map<ref<byte>,typename Interface<I>::AbstractFactory*> Interface<I>::factories __attribute((init_priority(1000)));

@@ -71,11 +71,11 @@ bool Process::sameSince(const ref<byte>& target, long queryTime, const Dict& arg
     const shared<Result>& result = *results.find(target);
     if(&result) {
         long time = result->timestamp;
-        unique<Operation> operation = Interface<Operation>::instance(rule.operation);
+        if((long)parse(Interface<Operation>::version(rule.operation)) > queryTime) return false; // Implementation changed since query
         if(time > queryTime || result->arguments != toASCII(relevantArguments(rule,arguments))) return false; // Target changed since query (FIXME: compare maps and not their ASCII representation)
         queryTime = time;
     }
-    // Verify inputs didnt change since last evaluation (or query if discarded), in which case target will need to be regenerated
+    // Verify inputs didn't change since last evaluation (or query if discarded), in which case target will need to be regenerated
     for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false;
     return true;
 }

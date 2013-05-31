@@ -59,7 +59,7 @@ constexpr ref<byte> months[12] = {"January"_,"February"_,"March"_,"April"_,"May"
 int daysInMonth(int month, int year);
 
 /// Returns current date formatted using \a format string
-string str(Date date, const ref<byte>& format="dddd, dd MMMM yyyy hh:mm"_);
+string str(Date date, const ref<byte>& format="dddd, dd MMMM yyyy hh:mm:ss"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy

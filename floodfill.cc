@@ -26,10 +26,10 @@ void floodFill(Volume16& target, const Volume16& source) {
         assert_(stackSize<=stackBuffer.capacity);
         short3& p = stack[--stackSize];
         uint x=p.x, y=p.y, z=p.z;
-        for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) {
+        for(int dz=-1; dz<=1; dz+=2) for(int dy=-1; dy<=1; dy+=2) for(int dx=-1; dx<=1; dx+=2) { // Visits first neighbours
             uint nx=x+dx, ny=y+dy, nz=z+dz;
             uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
-            if(source[index] && !mark[index/8]&(1<<(index%8))) {
+            if(source[index] && !(mark[index/8]&(1<<(index%8)))) {
                 mark[index/8] |= (1<<(index%8)); // Marks previously unvisited skeleton voxel
                 stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
             }
@@ -44,7 +44,7 @@ void floodFill(Volume16& target, const Volume16& source) {
         assert_(stackSize<=stackBuffer.capacity);
         short3& p = stack[--stackSize];
         uint x=p.x, y=p.y, z=p.z;
-        for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) {
+        for(int dz=-1; dz<=1; dz+=2) for(int dy=-1; dy<=1; dy+=2) for(int dx=-1; dx<=1; dx+=2) { // Visits first neighbours
             uint nx=x+dx, ny=y+dy, nz=z+dz;
             uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
             if(sourceData[index] && !targetData[index]) {

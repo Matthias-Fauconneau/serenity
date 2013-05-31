@@ -15,16 +15,19 @@ class(Source, Operation), virtual VolumeOperation {
         Map file (slices.first(), folder);
         const Tiff16 image (file);
         minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
-        if(args.contains("cylinder"_) && args.at("cylinder"_)!=""_) {
-            auto coordinates = apply<int64>(split(args.at("cylinder"_)), toInteger, 10);
-            int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
-            minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
+        if(args.contains("cylinder"_)) {
+            if(args.at("cylinder"_)!=""_) {
+                auto coordinates = apply<int64>(split(args.at("cylinder"_),','), toInteger, 10);
+                int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
+                minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
+            }
+            assert_(maxX-minX == maxY-minY, minX, minY, maxX, maxY);
         }
         if(args.contains("cube"_)) {
-            auto coordinates = apply<int64>(split(args.at("cube"_)), toInteger, 10);
+            auto coordinates = apply<int64>(split(args.at("cube"_),','), toInteger, 10);
             minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
         }
-        assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=image.width && maxY<=image.height && maxZ<=slices.size);
+        assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=image.width && maxY<=image.height && maxZ<=slices.size, minX,minY,minZ, maxX,maxY,maxZ, image.width, image.height, slices.size);
         assert( (maxX-minX)%2 == 0 && (maxY-minY)%2 == 0 && (maxZ-minZ)%2 == 0 ); // Margins are currently always symmetric
         return align(16,maxX-minX)*align(16,maxY-minY)*align(16,maxZ-minZ)*outputSampleSize(0);
     }
