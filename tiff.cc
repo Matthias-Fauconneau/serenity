@@ -1,7 +1,7 @@
 #include "tiff.h"
 #include "data.h"
 #include "image.h"
-#include <tiffio.h>
+#include <tiffio.h> //tiff
 
 tsize_t tiffRead(BinaryData& s, byte* buffer, tsize_t size) { copy(buffer, s.buffer.data+s.index, size); s.advance(size); return size; }
 tsize_t tiffWrite(BinaryData&, byte*, tsize_t) { error(""); }

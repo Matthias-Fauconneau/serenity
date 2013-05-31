@@ -67,11 +67,10 @@ Image upsample(const Image& source);
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 
-/// Declares a small .png icon embedded in the binary, accessible at runtime as an Image (lazily decoded)
-/// \note an icon with the same name must be linked by the build system
-///       'ld -r -b binary -o name.o name.png' can be used to embed a file in the binary
+/// Declares a function lazily decoding an image embedded using FILE
 #define ICON(name) \
-static Image name ## Icon() { \
-    extern byte _binary_icons_## name ##_png_start[]; extern byte _binary_icons_## name ##_png_end[]; \
-    return decodeImage(array<byte>(_binary_icons_## name ##_png_start, _binary_icons_## name ##_png_end-_binary_icons_## name ##_png_start)); \
+static const Image& name ## Icon() { \
+    extern byte _binary_## name ##_start[]; extern byte _binary_## name ##_end[]; \
+    static Image icon = decodeImage(ref<byte>(_binary_## name ##_start, _binary_## name ##_end)); \
+    return icon; \
 }

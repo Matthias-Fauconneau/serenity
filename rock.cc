@@ -1,5 +1,6 @@
 #include "thread.h"
 #include "process.h"
+#include "volume.h"
 #include "volume-operation.h"
 #include "time.h"
 #include "window.h"
@@ -7,23 +8,22 @@
 #include "render.h"
 #include "png.h"
 
-//FIXME: parse module dependencies without these dummy headers
-#include "source.h"
-#include "capsule.h"
-#include "smooth.h"
-#include "threshold.h"
-#include "distance.h"
-#include "skeleton.h"
+//#include "source.h"
+//include "capsule.h"
+//#include "smooth.h"
+//#include "threshold.h"
+//#include "distance.h"
+//#include "skeleton.h"
 PASS(Tile, uint16, tile);
-#include "floodfill.h"
-#include "rasterize.h"
-#include "validate.h"
+//#include "floodfill.h"
+//#include "rasterize.h"
+//#include "validate.h"
 PASS(SquareRoot, uint16, squareRoot);
-#include "export.h"
+//#include "export.h"
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : PersistentProcess, Widget {
-    TEXT(rock) // Rock process definition (embedded in binary)
+    FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
         ref<byte> resultFolder; // FIXME: folder where histograms are copied
         ref<byte> result; // Path to file (or folder) where targets are copied
@@ -65,7 +65,7 @@ struct Rock : PersistentProcess, Widget {
         window = unique<Window>(this,int2(-1,-1),"Rock"_);
         window->localShortcut(Key('r')).connect(this, &Rock::refresh);
         window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
-        window->localShortcut(Escape).connect(&exit);
+        window->localShortcut(Escape).connect([](){exit();});
         window->clearBackground = false;
         updateView();
         window->show();

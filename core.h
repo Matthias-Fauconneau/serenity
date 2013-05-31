@@ -148,10 +148,10 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return
 /// Returns const reference to memory used by \a t
 template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
-/// Declares a script embedded in the binary
-#define TEXT(name) static ref<byte> name() { \
-    extern char _binary_ ## name ##_txt_start[], _binary_ ## name ##_txt_end[]; \
-    return ref<byte>(_binary_ ## name ##_txt_start,_binary_ ## name ##_txt_end); \
+/// Declares a file to be embedded in the binary
+#define FILE(name) static ref<byte> name() { \
+    extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
+    return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end); \
 }
 
 // Integer operations

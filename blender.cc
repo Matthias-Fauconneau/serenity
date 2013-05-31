@@ -72,7 +72,7 @@ static bool intersect(vec3 min, vec3 max, vec3 O, vec3 D, float& t) {
 struct Triangle { vec3 N; float nd; vec3 U; float ud; vec3 V; float vd; };
 static_assert(sizeof(Triangle)==12*sizeof(float),"");
 struct Hit { vec4 P; float t, u, v; };
-#include "smmintrin.h"
+#include <smmintrin.h>
 static const float int_coef_arr[4] = { -1, -1, -1, 1 };
 static const __m128 int_coef = _mm_load_ps(int_coef_arr);
 static bool intersect(const vec4& O, const vec4& D, const Triangle &t, Hit &h) {

@@ -1,8 +1,4 @@
 #include "display.h"
-#if GL
-#include "gl.h"
-SHADER(display);
-#endif
 
 bool softwareRendering = true;
 Image framebuffer;
@@ -13,15 +9,6 @@ typedef vector<bgra,int,4> int4;
 
 void fill(Rect rect, vec4 color) {
     rect = rect & currentClip;
-#if GL
-    if(!softwareRendering) {
-        glBlend(color.w!=1, true);
-        static GLShader fill (display);
-        fill["color"] = color;
-        glDrawRectangle(fill, rect);
-        return;
-    }
-#endif
     int4 color8 (color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
     if(color8.a == 0xFF) {
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = byte4(color8);
@@ -36,17 +23,6 @@ void fill(Rect rect, vec4 color) {
 
 void blit(int2 target, const Image& source, vec4 unused color) {
     Rect rect = (target+Rect(source.size())) & currentClip;
-#if GL
-    if(!softwareRendering) {
-        glBlend(source.alpha, true);
-        static GLShader blit(display, "blit"_);
-        blit["color"] = color;
-        GLTexture texture = source; //FIXME
-        blit["sampler"]=0; texture.bind(0);
-        glDrawRectangle(blit, target+Rect(source.size()), true);
-        return;
-    }
-#endif
     if(source.alpha) {
         error("");
         /*int4 color8 = int4(color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
@@ -88,15 +64,6 @@ inline void plot(int x, int y, float c, bool transpose, int4 invert) {
 inline float fpart(float x) { return x-int(x); }
 inline float rfpart(float x) { return 1 - fpart(x); }
 void line(vec2 p1, vec2 p2, vec4 color) {
-#if GL
-    if(!softwareRendering) {
-        glBlend(true, false);
-        static GLShader fill(display);
-        fill["color"] = vec4(vec3(1)-color.xyz(),1.f);
-        glDrawLine(fill, p1, p2);
-        return;
-    }
-#endif
     float x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
     int4 invert = int4(0xFF*(1-color.z),0xFF*(1-color.y),0xFF*(1-color.x),0xFF*color.w);
     float dx = x2 - x1, dy = y2 - y1;

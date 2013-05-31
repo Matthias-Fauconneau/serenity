@@ -8,26 +8,6 @@
 #include "linux.h"
 #include "x.h"
 
-#if GL
-extern "C" {
-void* XOpenDisplay(const char*);
-int XCloseDisplay(void*);
-void** glXChooseFBConfig (void* dpy, int screen, const int* attribList, int* fbCount);
-enum { GLX_RED_SIZE=8, GLX_GREEN_SIZE, GLX_BLUE_SIZE, GLX_ALPHA_SIZE, GLX_DEPTH_SIZE };
-int glXGetFBConfigAttrib(void* dpy, void* config, int attribute, int *value);
-enum { GLX_CONTEXT_MAJOR_VERSION=0x2091, GLX_CONTEXT_MINOR_VERSION=0x2092 };
-typedef void* (*glXCreateContextAttribsARB)(void* dpy, void* fbconfig, void* share, bool direct, const int* attribList);
-void* glXGetProcAddress(const char*);
-void glXDestroyContext(void* dpy, void* ctx );
-bool glXMakeCurrent(void* dpy, uint drawable,void* ctx);
-void glXSwapBuffers(void* dpy, uint drawable);
-void glFinish();
-}
-static void* glDisplay=0;
-static void* glContext=0;
-#include "gl.h"
-#endif
-
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
@@ -433,8 +413,8 @@ string Window::getSelection(bool clipboard) {
 // Cursor
 ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move) ICON(text)
 const Image& Window::cursorIcon(Cursor cursor) {
-    static const Image icons[] = { arrowIcon(), horizontalIcon(), verticalIcon(), fdiagonalIcon(), bdiagonalIcon(), moveIcon(), textIcon() };
-    return icons[(uint)cursor];
+    static const Image& (*icons[])() = { arrowIcon, horizontalIcon, verticalIcon, fdiagonalIcon, bdiagonalIcon, moveIcon, textIcon };
+    return icons[(uint)cursor]();
 }
 int2 Window::cursorHotspot(Cursor cursor) {
     static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15), int2(4,9) };

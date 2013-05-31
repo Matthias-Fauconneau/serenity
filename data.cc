@@ -96,7 +96,7 @@ ref<byte> TextData::line() { return until('\n'); }
 ref<byte> TextData::word(const ref<byte>& special) {
     uint start=index;
     for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
-    assert(index>start, untilEnd());
+    assert(index>=start, line());
     return slice(start,index-start);
 }
 

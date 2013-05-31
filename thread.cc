@@ -3,6 +3,7 @@
 #include "linux.h"
 #include "data.h"
 #include "trace.h"
+#include <pthread.h> //pthread
 #include <sys/eventfd.h>
 #include <sched.h>
 #define signal signal_
@@ -194,8 +195,8 @@ int64 execute(const ref<byte>& path, const ref<string>& args, bool wait) {
     envp[env0.size]=0;
 
     int pid = fork();
-    if(pid==0) { if(!execve(strz(path),(char*const*)argv,(char*const*)envp)) exit_group(-1); return -1; }
-    else if(wait) { void* status; wait4(pid,&status,0,0); return (int64)status; }
+    if(pid==0) { if(!execve(strz(path),(char*const*)argv,(char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
+    else if(wait) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
     else { wait4(pid,0,WNOHANG,0); return -1; }
 }
 

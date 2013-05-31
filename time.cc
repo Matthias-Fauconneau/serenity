@@ -3,7 +3,7 @@
 #include "data.h"
 #include "string.h"
 
-#include <time.h>
+#include <time.h> //rt
 #include <sys/timerfd.h>
 
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }

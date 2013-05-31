@@ -19,7 +19,7 @@ Image crop(Image&& image, int2 origin, int2 size) {
 
 // SSE bilinear interpolation adapted from http://fastcpp.blogspot.fr/2011/06/bilinear-pixel-interpolation-using-sse.html
 #if __SSE4_1__ && 0
-#include "smmintrin.h"
+#include <smmintrin.h>
 
 // Computes the four pixel weights for x,y
 inline __m128i weights(float x, float y) {

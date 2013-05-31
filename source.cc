@@ -16,12 +16,12 @@ class(Source, Operation), virtual VolumeOperation {
         const Tiff16 image (file);
         minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
         if(args.contains("cylinder"_) && args.at("cylinder"_)!=""_) {
-            auto coordinates = apply(split(args.at("cylinder"_)), toInteger, 10);
+            auto coordinates = apply<int64>(split(args.at("cylinder"_)), toInteger, 10);
             int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
             minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
         }
         if(args.contains("cube"_)) {
-            auto coordinates = apply(split(args.at("cube"_)), toInteger, 10);
+            auto coordinates = apply<int64>(split(args.at("cube"_)), toInteger, 10);
             minX=coordinates[0], minY=coordinates[1], minZ=coordinates[2], maxX=coordinates[3], maxY=coordinates[4], maxZ=coordinates[5];
         }
         assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=image.width && maxY<=image.height && maxZ<=slices.size);
