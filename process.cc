@@ -7,13 +7,13 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
     for(TextData s(definition); s; s.skip()) {
         if(s.match('#')) { s.until('\n'); continue; }
         Rule rule;
-        for(;!s.match('='); s.skip()) rule.outputs << string(s.word("_-"_));
+        for(;!s.match('='); s.skip()) rule.outputs << s.word("_-"_);
         s.skip();
-        rule.operation = string(s.word());
+        rule.operation = s.word();
         s.whileAny(" \t\r"_);
         for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
             if(s.match('#')) { s.whileNot('\n'); continue; }
-            string word (s.word("_-"_));
+            ref<byte> word = s.word("_-"_);
             if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
             else rule.inputs << word;
         }
@@ -23,14 +23,14 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
     // Parses targets and global arguments
     for(const ref<byte>& argument: args) {
         if(argument.contains('=')) { // Stores generic argument to be parsed in relevant operation
-            string key=string(section(argument,'=',0,1)), value = string(section(argument,'=',1,-1));
+            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
             /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
                 assert(!arguments.contains(key));
                 sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
             } else {*/
             if(sweeps.contains(key) || arguments.contains(key)) {
                 if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
-                sweeps.at(key) << (Variant)value;
+                sweeps.at(key) << value;
             } else {
                 arguments.insert(key, (Variant)value);
             }
@@ -59,7 +59,7 @@ Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     Dict local = copy(arguments); local << rule.arguments; // not inherited
     for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
         if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
-        else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter))*/ relevant.insert(string(parameter), local.at(parameter));
+        else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter))*/ relevant.insert(parameter, local.at(parameter));
     }
     return relevant;
 }
@@ -100,21 +100,21 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
     }
     assert_(name, arguments);
     storageFolder = Folder(name, baseStorageFolder, true);
-    this->arguments.insert(string("name"_), name);
+    this->arguments.insert("name"_, name);
 
     // Maps intermediate results from file system
     for(const string& path: storageFolder.list(Files)) {
-        ref<byte> name = section(path,'.');
-        if(!&ruleForOutput(name) || !section(path,'.',-3,-2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
+        if(!&ruleForOutput(name) || !path.contains('{')) { ::remove(path, storageFolder); continue; } // Removes invalid data
+        TextData s (path); ref<byte> name = s.whileNot('{'); Dict arguments = parseDict(s); s.skip("["_); ref<byte> metadata = s.until(']');
         File file = File(path, storageFolder, ReadWrite);
-        results << shared<ResultFile>(name, file.modifiedTime(), parseDict(section(path,'.',-4,-3)), string(section(path,'.',-3,-2)), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
+        results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), string(metadata), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
 }
 
 PersistentProcess::~PersistentProcess() {
     results.clear();
     targetResults.clear();
-    if(arguments.value(string("clean"_),"0"_)!="0"_) {
+    if(arguments.value("clean"_,"0"_)!="0"_) {
         for(const string& path: storageFolder.list(Files)) ::remove(path, storageFolder); // Cleanups all intermediate results
         remove(storageFolder);
     }
@@ -151,17 +151,14 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=currentTime()+1; string oldest;
                 for(string& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
-                    if(!path.contains('.') || !isInteger(section(path,'.',-2,-1))) continue; // Not a process data
-                    uint userCount = toInteger(section(path,'.',-2,-1));
-                    if(userCount > 1) continue;
+                    TextData s (path); s.until('('); uint userCount=s.integer(); if(userCount>1 || !s.match(')')) continue; // Used data or not a process data
                     long timestamp = File(path, baseStorageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
                 if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
                 if(section(oldest,'/')==name) {
-                    ref<byte> resultName = section(section(oldest,'/',1,-1),'.');
-                    Dict arguments = parseDict(section(section(oldest,'/',1,-1),'.',1,2));
-                    shared<ResultFile> result = results.take(indexOf(resultName,arguments));
+                    TextData s (section(oldest,'/',1,-1)); ref<byte> name = s.whileNot('{'); Dict arguments = parseDict(s);
+                    shared<ResultFile> result = results.take(indexOf(name,arguments));
                     result->fileName.clear(); // Prevents rename
                 }
                 if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
@@ -181,7 +178,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     assert_(outputs);
 
     Time time;
-    Dict relevantArguments = Process::relevantArguments(rule, arguments<<rule.arguments);
+    Dict relevantArguments = Process::relevantArguments(rule, arguments);
     operation->execute(relevantArguments, outputs, inputs);
     log(left(str(rule),96),left(toASCII(relevantArguments),64),right(str(time),32));
 
@@ -208,11 +205,11 @@ void Process::execute() {
     for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
     execute(sweeps, arguments);
 }
-void Process::execute(const map<string, array<Variant>>& sweeps, const Dict& arguments) {
+void Process::execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
     if(sweeps) {
         auto remaining = copy(sweeps);
         auto args = copy(arguments);
-        const string& parameter = sweeps.keys.first(); // Removes first parameter and loop over it
+        ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
         assert(!args.contains(parameter));
         for(Variant& value: remaining.take(parameter)) {
             args.insert(parameter, move(value));

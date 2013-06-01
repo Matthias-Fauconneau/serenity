@@ -35,8 +35,8 @@ struct Rock : PersistentProcess, Widget {
             error("Invalid argument"_, argument);
         }
         if(arguments.at("source"_)=="validation"_) {
-            ruleForOutput("source"_).operation = string("Capsules"_);
-            ruleForOutput("pore"_).inputs = move(array<string>()<<string("source"_)); // Skip smooth
+            ruleForOutput("source"_).operation = "Capsules"_;
+            ruleForOutput("pore"_).inputs=array<ref<byte>>({"source"_}); // Skip smooth
         }
         assert_(name, "Usage: rock <source folder containing volume slices> [target] [key=value]*");
 

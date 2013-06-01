@@ -4,9 +4,9 @@
 
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
 struct Rule {
-    string operation;
-    array<string> inputs;
-    array<string> outputs;
+    ref<byte> operation;
+    array<ref<byte>> inputs;
+    array<ref<byte>> outputs;
     Dict arguments;
 };
 inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.arguments?str(rule.arguments):""_); }
@@ -35,13 +35,13 @@ struct Process {
     /// Executes all operations to generate each target (for each value of any parameter sweep)
     void execute();
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const map<string, array<Variant>>& sweeps, const Dict& arguments);
+    void execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
 
     array<Rule> rules; // Production rules
     array<ref<byte>> targets; // Target results to compute
     Dict defaultArguments; // Process specified default arguments
     Dict arguments; // User-specified arguments
-    map<string, array<Variant>> sweeps; // User-specified parameter sweeps
+    map<ref<byte>, array<Variant>> sweeps; // User-specified parameter sweeps
     array<shared<Result>> results; // Generated intermediate (and target) data
     array<shared<Result>> targetResults; // Generated target data
 };
@@ -52,7 +52,7 @@ struct ResultFile : Result {
     { assert(fileName.capacity); }
     void rename() {
         if(!fileName) return;
-        string newName = name+"."_+toASCII(relevantArguments)+"."_+metadata+"."_+str(userCount);
+        string newName = name+"{"_+toASCII(relevantArguments)+"}["_+metadata+"]("_+str(userCount)+")"_;
         if(fileName!=newName) { assert(fileName.capacity); ::rename(fileName, newName, folder); fileName=move(newName); }
     }
     void addUser() override { ++userCount; rename(); }

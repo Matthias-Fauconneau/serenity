@@ -49,26 +49,18 @@ struct Variant : string {
 };
 template<> inline Variant copy(const Variant& o) { return copy((const string&)o); }
 template<> inline string str(const Variant& o) { return copy((const string&)o); }
-//typedef map<string,Variant> Dict;
-/// Associative array of variants
-struct Dict : map<string,Variant> {
-    Dict(){}
-    Dict(map<string,Variant>&& o):map<string,Variant>(move(o)){}
-    const Variant& at(ref<byte> key) const { return map<string,Variant>::at(string(key)); }
-    Variant value(ref<byte> key, Variant&& value) const { return map<string,Variant>::value(string(key), move(value)); }
-    Variant& at(ref<byte> key) { return map<string,Variant>::at(string(key)); }
-    Variant take(ref<byte> key) { return map<string,Variant>::take(string(key)); }
-    Variant& insert(ref<byte> key, ref<byte> value) { return map<string,Variant>::insert(string(key), string(value)); }
-    void remove(ref<byte> key) { return map<string,Variant>::remove(string(key)); }
-};
-inline Dict copy(const Dict& dict) { return copy((const map<string,Variant>&)dict); }
-inline string str(const Dict& dict) { return str((const map<string,Variant>&)dict); }
-inline Dict parseDict(const ref<byte>& str) {
+typedef map<ref<byte>,Variant> Dict; /// Associative array of variants
+inline Dict parseDict(TextData& s) {
     Dict dict;
-    for(TextData s(str); s;) {
-        ref<byte> key = s.whileNo(":,"_);
-        ref<byte> value = s.match(':') ? s.until(',') : (s.skip(","_), ""_);
-        dict.insert(string(key), replace(string(value),'\\','/'));
+    s.skip("{"_);
+    for(;;) {
+        if(s.match('}')) break;
+        ref<byte> key = s.whileNo(":,}"_);
+        ref<byte> value = s.whileNo(",}"_);
+        dict.insert(key, replace(string(value),'\\','/'));
+        if(s.match(',')) continue;
+        else if(s.match('}')) break;
+        else error(s.untilEnd());
     }
     return dict;
 }

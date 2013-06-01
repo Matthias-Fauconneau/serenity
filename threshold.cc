@@ -43,7 +43,7 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
 
 /// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Threshold, Operation), virtual VolumeOperation {
-    ref<byte> parameters() const override { return "threshold"_; }
+    ref<byte> parameters() const override { return "threshold resultFolder"_; }
     uint outputSampleSize(uint) override { return 4; }
     void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
         const Volume& source = inputs[0];
@@ -57,7 +57,7 @@ class(Threshold, Operation), virtual VolumeOperation {
             Sample density = histogram(source,  args.contains("cylinder"_)); //FIXME: histogram the unsmoothed data
             log("density", time);
             bool plot = false;
-            ref<byte> name = args.at("name"_);
+            ref<byte> name = "threshold"_; // FIXME
             Folder resultFolder = args.at("resultFolder"_); // FIXME: split + folder output
             if(plot) writeFile(name+".density.tsv"_, toASCII(density), resultFolder);
             if(name != "validation"_) density[0]=density[density.size-1]=0; // Ignores clipped values
