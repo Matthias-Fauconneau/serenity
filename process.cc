@@ -7,13 +7,13 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
     for(TextData s(definition); s; s.skip()) {
         if(s.match('#')) { s.until('\n'); continue; }
         Rule rule;
-        for(;!s.match('='); s.skip()) rule.outputs << s.word("_-"_);
+        for(;!s.match('='); s.skip()) rule.outputs << string(s.word("_-"_));
         s.skip();
-        rule.operation = s.word();
+        rule.operation = string(s.word());
         s.whileAny(" \t\r"_);
         for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
             if(s.match('#')) { s.whileNot('\n'); continue; }
-            ref<byte> word = s.word("_-"_);
+            string word (s.word("_-"_));
             if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
             else rule.inputs << word;
         }
@@ -23,14 +23,14 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
     // Parses targets and global arguments
     for(const ref<byte>& argument: args) {
         if(argument.contains('=')) { // Stores generic argument to be parsed in relevant operation
-            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
+            string key=string(section(argument,'=',0,1)), value = string(section(argument,'=',1,-1));
             /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
                 assert(!arguments.contains(key));
                 sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
             } else {*/
             if(sweeps.contains(key) || arguments.contains(key)) {
                 if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
-                sweeps.at(key) << value;
+                sweeps.at(key) << (Variant)value;
             } else {
                 arguments.insert(key, (Variant)value);
             }
@@ -51,7 +51,7 @@ Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     for(const ref<byte>& input: rule.inputs) {
         for(auto arg: relevantArguments(ruleForOutput(input), arguments)) {
             if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
-            else if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key)) relevant.insert(arg.key, arg.value);
+            else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key))*/ relevant.insert(arg.key, arg.value);
         }
     }
     unique<Operation> operation = Interface<Operation>::instance(rule.operation);
@@ -59,30 +59,36 @@ Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     Dict local = copy(arguments); local << rule.arguments; // not inherited
     for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
         if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
-        else if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter)) relevant.insert(parameter, local.at(parameter));
+        else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter))*/ relevant.insert(string(parameter), local.at(parameter));
     }
     return relevant;
 }
 
-bool Process::sameSince(const ref<byte>& target, long queryTime, const Dict& arguments) {
+int Process::indexOf(const ref<byte>& target, const Dict& arguments) {
     const Rule& rule = ruleForOutput(target);
     assert_(&rule, "No rule generating '"_+str(target)+"'"_,"in",rules);
+    Dict relevantArguments = Process::relevantArguments(ruleForOutput(target), arguments);
+    for(uint i: range(results.size)) if(results[i]->name==target && results[i]->relevantArguments==relevantArguments) return i; //FIXME: unserialize map
+    return -1;
+}
+const shared<Result>& Process::find(const ref<byte>& target, const Dict& arguments) { int i = indexOf(target, arguments); return i>=0 ? results[i] : *(shared<Result>*)0; }
 
-    const shared<Result>& result = *results.find(target);
+/// Returns if computing \a target with \a arguments would give the same result now compared to \a queryTime
+bool Process::sameSince(const ref<byte>& target, long queryTime, const Dict& arguments) {
+    const shared<Result>& result = find(target, arguments);
     if(&result) {
-        long time = result->timestamp;
-        if((long)parse(Interface<Operation>::version(rule.operation)) > queryTime) return false; // Implementation changed since query
-        if(time > queryTime || result->arguments != toASCII(relevantArguments(rule,arguments))) return false; // Target changed since query (FIXME: compare maps and not their ASCII representation)
-        queryTime = time;
+        if(result->timestamp < queryTime) queryTime = result->timestamp; // Result is still valid if inputs didn't change since it was generated
+        else return false; // Result changed since query
     }
-    // Verify inputs didn't change since last evaluation (or query if discarded), in which case target will need to be regenerated
-    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false;
+    const Rule& rule = ruleForOutput(target);
+    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false; // Inputs changed since result (or query if result was discarded) was last generated
+    if((long)parse(Interface<Operation>::version(rule.operation)) > queryTime) return false; // Implementation changed since query (FIXME: timestamps might be unsynchronized)
     return true;
 }
 
 shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments) {
-    const shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp, arguments)) { assert((*result)->data.size); return share( *result ); }
+    const shared<Result>& result = find(target, arguments);
+    if(&result && sameSince(target, result->timestamp, arguments)) { assert(result->data.size); return share(result); }
     error("Anonymous process manager unimplemented"_);
 }
 
@@ -94,31 +100,30 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
     }
     assert_(name, arguments);
     storageFolder = Folder(name, baseStorageFolder, true);
-    this->arguments.insert("name"_, name);
+    this->arguments.insert(string("name"_), name);
 
     // Maps intermediate results from file system
     for(const string& path: storageFolder.list(Files)) {
         ref<byte> name = section(path,'.');
-        assert_(!results.contains(name));
         if(!&ruleForOutput(name) || !section(path,'.',-3,-2)) { ::remove(path, storageFolder); continue; } // Removes invalid data
         File file = File(path, storageFolder, ReadWrite);
-        results << shared<ResultFile>(name, file.modifiedTime(), section(path,'.',-4,-3), section(path,'.',-3,-2), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
+        results << shared<ResultFile>(name, file.modifiedTime(), parseDict(section(path,'.',-4,-3)), string(section(path,'.',-3,-2)), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
 }
 
 PersistentProcess::~PersistentProcess() {
     results.clear();
     targetResults.clear();
-    if(arguments.value("clean"_,"0"_)!="0"_) {
+    if(arguments.value(string("clean"_),"0"_)!="0"_) {
         for(const string& path: storageFolder.list(Files)) ::remove(path, storageFolder); // Cleanups all intermediate results
         remove(storageFolder);
     }
 }
 
 shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict& arguments) {
-    const shared<Result>* result = results.find(target);
-    if(result && sameSince(target, (*result)->timestamp, arguments)) return share( *result );
-
+    const shared<Result>& result = find(target, arguments);
+    if(&result && sameSince(target, result->timestamp, arguments)) return share(result); // Returns a cached result if still valid
+    // Otherwise regenerates target using new inputs, arguments and/or implementations
     const Rule& rule = ruleForOutput(target);
     assert_(&rule, target);
     unique<Operation> operation = Interface<Operation>::instance(rule.operation);
@@ -134,8 +139,8 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     for(uint index: range(rule.outputs.size)) {
         const ref<byte>& output = rule.outputs[index];
 
-        if(results.contains(output)) { // Reuses same volume
-            shared<ResultFile> result = results.take(results.indexOf(output));
+        if(&find(output, arguments)) { // Reuses same result file
+            shared<ResultFile> result = results.take(indexOf(output, arguments));
             string fileName = move(result->fileName); assert(!result->fileName.size);
             rename(fileName, output, storageFolder);
         }
@@ -155,7 +160,8 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
                 if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
                 if(section(oldest,'/')==name) {
                     ref<byte> resultName = section(section(oldest,'/',1,-1),'.');
-                    shared<ResultFile> result = results.take(results.indexOf(resultName));
+                    Dict arguments = parseDict(section(section(oldest,'/',1,-1),'.',1,2));
+                    shared<ResultFile> result = results.take(indexOf(resultName,arguments));
                     result->fileName.clear(); // Prevents rename
                 }
                 if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
@@ -170,17 +176,18 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
             file.resize( outputSize );
             map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
         }
-        outputs << shared<ResultFile>(output, currentTime(),""_, ""_, storageFolder, move(map), output);
+        outputs << shared<ResultFile>(output, currentTime(), Dict(), string(), storageFolder, move(map), output);
     }
     assert_(outputs);
 
     Time time;
-    operation->execute(arguments<<rule.arguments, outputs, inputs);
-    log(left(str(rule),96),left(str(toASCII(relevantArguments(rule, arguments))),64),right(str(time),32));
+    Dict relevantArguments = Process::relevantArguments(rule, arguments<<rule.arguments);
+    operation->execute(relevantArguments, outputs, inputs);
+    log(left(str(rule),96),left(toASCII(relevantArguments),64),right(str(time),32));
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
-        result->arguments = toASCII(relevantArguments(rule, arguments));
+        result->relevantArguments = copy(relevantArguments);
         if(result->map) { // Resizes and remaps file read-only (will be remapped Read|Write whenever used as output again)
             assert(result->map.size >= result->data.size);
             result->map.unmap();
@@ -193,7 +200,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         }
         results << move(result);
     }
-    return share( *results.find(target) );
+    return share(find(target, arguments));
 }
 
 
@@ -201,11 +208,11 @@ void Process::execute() {
     for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
     execute(sweeps, arguments);
 }
-void Process::execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
+void Process::execute(const map<string, array<Variant>>& sweeps, const Dict& arguments) {
     if(sweeps) {
         auto remaining = copy(sweeps);
         auto args = copy(arguments);
-        ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
+        const string& parameter = sweeps.keys.first(); // Removes first parameter and loop over it
         assert(!args.contains(parameter));
         for(Variant& value: remaining.take(parameter)) {
             args.insert(parameter, move(value));

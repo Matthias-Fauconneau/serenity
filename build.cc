@@ -47,8 +47,8 @@ struct Build {
                     ref<byte> module = s.until('.');
                     if(existsFile(module+".h"_, folder)) lastCompileEdit = max(lastCompileEdit, parse(module));
                     if(module == parent) continue;
-                    if(!modules.contains(module) && existsFile(module+".cc"_, folder)) lastLinkEdit = max(lastLinkEdit, compile(module));
-                    if(modules.contains(module)) parent.deps << modules.find(module)->pointer;
+                    if(!modules.contains(module) && existsFile(module+".cc"_, folder)) lastLinkEdit = max(lastLinkEdit, max(lastCompileEdit, compile(module)));
+                    if(modules.contains(module)) parent.deps << modules[modules.indexOf(module)].pointer;
                 } else { // library header
                     for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) { ref<byte> library=s.word(); if(library) libraries << string(library); break; }
                 }
@@ -63,7 +63,7 @@ struct Build {
         if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
             static const auto flags = toStrings(split("-I/ptmp/include -pipe -march=native -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers -c -o"_));
             array<string> args;
-            if(find(build,"debug"_)) args << string("-DDEBUG"_);
+            if(find(build,"debug"_)) args << string("-g"_) << string("-DDEBUG"_);
             if(find(build,"fast"_)) args << string("-Ofast"_);
             args<< flags<<object<<target+".cc"_;
             log(target);

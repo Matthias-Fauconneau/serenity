@@ -62,5 +62,5 @@ template<Type O> struct VolumePass : virtual VolumeOperation {
 struct VolumeInput : virtual Operation {
     uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 0; }
     virtual void execute(const Dict& args, const ref<byte>& name, const Volume& source) abstract;
-    virtual void execute(const Dict& args, array<shared<Result>>&, const ref<shared<Result>>& inputs) override { execute(args, inputs[0]->name+"."_+inputs[0]->arguments, toVolume(inputs[0])); }
+    virtual void execute(const Dict& args, array<shared<Result>>&, const ref<shared<Result>>& inputs) override { execute(args, inputs[0]->name+"."_+toASCII(inputs[0]->relevantArguments), toVolume(inputs[0])); }
 };

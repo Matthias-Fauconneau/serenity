@@ -115,7 +115,7 @@ template<Type K, Type V> string str(const map<K,V>& m) {
     string s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i])<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }
 template<Type K, Type V> string toASCII(const map<K,V>& m) {
-        string s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<','; } return s;
+        string s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<','; } return replace(move(s),'/','\\');
 }
 
 template<Type K, Type V> map<K,V> operator<<(const map<K,V>& a, const map<K,V>& b) {

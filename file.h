@@ -19,9 +19,9 @@ const Folder& root();
 
 enum { Files=1<<0, Folders=1<<1, Recursive=1<<2 };
 struct Folder : Handle {
-    /// Opens \a folder
-    Folder(const ref<byte>& folder, const Folder& at=root(), bool create=false);
-    /// Lists all files in \a folder
+    /// Opens \a folderPath
+    Folder(const ref<byte>& folderPath, const Folder& at=root(), bool create=false);
+    /// Lists all files in this folder
     array<string> list(uint flags) const;
 };
 /// Returns whether this \a folder exists (as a folder)

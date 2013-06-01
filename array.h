@@ -106,7 +106,7 @@ template<Type T> struct array : buffer<T> {
         return min;
     }
     /// Returns a pointer to the first occurrence of \a key. Returns 0 if \a key could not be found.
-    template<Type K> T* find(const K& key) { int i = indexOf(key); return i>=0 ? &this->at(i) : 0; }
+    //template<Type K> T* find(const K& key) { int i = indexOf(key); return i>=0 ? &this->at(i) : 0; }
 };
 
 /// Copies all elements in a new array

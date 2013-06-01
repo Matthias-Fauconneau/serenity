@@ -6,7 +6,7 @@
 class(Source, Operation), virtual VolumeOperation {
     uint minX, minY, minZ, maxX, maxY, maxZ;
 
-    ref<byte> parameters() const override { static auto p="cylinder cube"_; return p; }
+    ref<byte> parameters() const override { static auto p="source cylinder cube"_; return p; }
     uint outputSampleSize(uint) override { return 2; }
     uint64 outputSize(const Dict& args, const ref<shared<Result>>&, uint) override {
         Folder folder = args.at("source"_);
