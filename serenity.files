@@ -1,4 +1,5 @@
 Makefile
+time.cc
 build.cc
 tiff.cc
 operation.h
@@ -23,7 +24,7 @@ rasterize.h
 rasterize.cc
 validate.h
 validate.cc
-rock.txt
+files/rock
 rock.cc
 source.cc
 volume-operation.h

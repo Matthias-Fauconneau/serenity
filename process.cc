@@ -68,21 +68,21 @@ int Process::indexOf(const ref<byte>& target, const Dict& arguments) {
     const Rule& rule = ruleForOutput(target);
     assert_(&rule, "No rule generating '"_+str(target)+"'"_,"in",rules);
     Dict relevantArguments = Process::relevantArguments(ruleForOutput(target), arguments);
-    for(uint i: range(results.size)) if(results[i]->name==target && results[i]->relevantArguments==relevantArguments) return i; //FIXME: unserialize map
+    for(uint i: range(results.size)) if(results[i]->name==target && results[i]->relevantArguments==relevantArguments) return i;
     return -1;
 }
 const shared<Result>& Process::find(const ref<byte>& target, const Dict& arguments) { int i = indexOf(target, arguments); return i>=0 ? results[i] : *(shared<Result>*)0; }
 
 /// Returns if computing \a target with \a arguments would give the same result now compared to \a queryTime
-bool Process::sameSince(const ref<byte>& target, long queryTime, const Dict& arguments) {
+bool Process::sameSince(const ref<byte>& target, int64 queryTime, const Dict& arguments) {
     const shared<Result>& result = find(target, arguments);
     if(&result) {
-        if(result->timestamp < queryTime) queryTime = result->timestamp; // Result is still valid if inputs didn't change since it was generated
+        if(result->timestamp <= queryTime) queryTime = result->timestamp; // Result is still valid if inputs didn't change since it was generated
         else return false; // Result changed since query
     }
     const Rule& rule = ruleForOutput(target);
-    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false; // Inputs changed since result (or query if result was discarded) was last generated
-    if((long)parse(Interface<Operation>::version(rule.operation)) > queryTime) return false; // Implementation changed since query (FIXME: timestamps might be unsynchronized)
+    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) {  log(target,"input",input,"changed"); return false; } // Inputs changed since result (or query if result was discarded) was last generated
+    if((long)parse(Interface<Operation>::version(rule.operation)) > queryTime) { log((long)parse(Interface<Operation>::version(rule.operation)), queryTime); return false; } // Implementation changed since query (FIXME: timestamps might be unsynchronized)
     return true;
 }
 

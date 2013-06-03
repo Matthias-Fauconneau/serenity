@@ -21,7 +21,7 @@ void Sequencer::event() {
             else {
                 noteEvent(key,0);
                 if(record) {
-                    int tick = realTime()/1000;
+                    int tick = realTime()/1000000;
                     events << Event((int16)(tick-lastTick), (uint8)key, (uint8)0);
                     lastTick = tick;
                 }
@@ -32,7 +32,7 @@ void Sequencer::event() {
             pressed << key;
             noteEvent(key, min(127,(int)value*4/3)); //x4/3 to reach maximum velocity without destroying the keyboard
             if(record) {
-                int tick = realTime()/1000;
+                int tick = realTime()/1000000;
                 events << Event((int16)(tick-lastTick), (uint8)key, (uint8)value);
                 lastTick = tick;
             }

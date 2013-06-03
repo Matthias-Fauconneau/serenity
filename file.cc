@@ -64,8 +64,8 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 File::File(const ref<byte>& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),path)){}
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 File::size() const { return stat().st_size; }
-long File::accessTime() const { return stat().st_atime; }
-long File::modifiedTime() const { return stat().st_mtime; }
+int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }
+int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ul + stat.st_mtim.tv_nsec;  }
 void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 

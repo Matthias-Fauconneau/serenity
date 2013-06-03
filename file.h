@@ -76,10 +76,10 @@ struct File : Stream {
     struct stat stat() const;
     /// Returns file size
     int64 size() const;
-    /// Returns the last access Unix timestamp
-    long accessTime() const;
-    /// Returns the last modified Unix timestamp
-    long modifiedTime() const;
+    /// Returns the last access Unix timestamp (in nanoseconds)
+    int64 accessTime() const;
+    /// Returns the last modified Unix timestamp (in nanoseconds)
+    int64 modifiedTime() const;
 
     /// Resizes file
     void resize(int64 size);

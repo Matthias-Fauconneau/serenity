@@ -27,7 +27,7 @@ struct Process {
     const shared<Result>& find(const ref<byte>& target, const Dict& arguments);
 
     /// Recursively verifies \a target output is the same since \a queryTime
-    bool sameSince(const ref<byte>& target, long queryTime, const Dict& arguments);
+    bool sameSince(const ref<byte>& target, int64 queryTime, const Dict& arguments);
 
     /// Returns a valid cached Result for \a target with \a arguments or generates it if necessary
     virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);

@@ -7,8 +7,7 @@
 #include <sys/timerfd.h>
 
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
-uint64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000ul+ts.tv_nsec/1000; }
-uint64 cpuTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000ul+ts.tv_nsec/1000; }
+int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ul+ts.tv_nsec; }
 
 static bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year=0) {
@@ -20,7 +19,7 @@ int daysInMonth(int month, int year=0) {
 template<Type T> bool inRange(T min, T x, T max) { return x>=min && x<max; }
 void Date::invariant() const {
     //Date
-    if(year>=0) { assert(inRange(2012, year, 2099)); }
+    if(year>=0) { assert(inRange(2012, year, 2099), year); }
     if(month>=0) { assert(year>=0); assert(inRange(0, month, 12)); }
     if(day>=0) { assert(month>=0); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
     if(weekDay>=0) {
@@ -35,7 +34,7 @@ void Date::invariant() const {
     if(seconds>=0) { assert(inRange(0, seconds, 60)); assert(minutes>=0); }
 }
 int Date::days() const {
-    assert(year>=0 && month>=0);
+    assert(year>=0 && month>=0, year, month, day, hours, minutes, seconds);
     int days=0; //days from Thursday, 1st January 1970
     for(int year=1970;year<this->year;year++) days+= leap(year)?366:365;
     for(int month=0;month<this->month;month++) days+=daysInMonth(month,year);
@@ -130,7 +129,8 @@ Date parse(TextData& s) {
     }
     for(;;) {
         s.whileAny(" ,\t"_);
-        for(int i=0;i<12;i++) if(s.match(str(months[i]))) { date.month=i; goto continue2_; }
+        for(int i=0;i<12;i++) if(s.match(months[i])) { date.month=i; goto continue2_; }
+        /*else*/ for(int i=0;i<12;i++) if(s.match(months[i].slice(0,3))) { date.month=i; goto continue2_; }
         /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
             if(s.match(":"_)) { date.hours=number; date.minutes=s.integer(); if(s.match(":"_)) date.seconds=s.integer(); }
