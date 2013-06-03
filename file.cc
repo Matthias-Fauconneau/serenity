@@ -44,18 +44,18 @@ bool existsFolder(const ref<byte>& folder, const Folder& at) { return Handle( op
 // Stream
 void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
 int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), (int)fd, buffer, size); }
-array<byte> Stream::read(uint capacity) {
-    array<byte> buffer(capacity);
-    buffer.size = check( ::read(fd, buffer.data, capacity) );
+buffer<byte> Stream::read(uint capacity) {
+    buffer<byte> buffer(capacity);
+    buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
     assert(buffer.size==capacity, buffer.size, capacity);
     return buffer;
 }
-array<byte> Stream::readUpTo(uint capacity) {
-    array<byte> buffer(capacity);
-    buffer.size = check( ::read(fd, buffer.data, capacity) );
+buffer<byte> Stream::readUpTo(uint capacity) {
+    buffer<byte> buffer(capacity);
+    buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
     return buffer;
 }
-bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
+bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 void Stream::write(const byte* data, uint64 size) { for(uint64 offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), (int)fd, offset, size-offset, size); }
 void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
@@ -70,7 +70,7 @@ void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
 bool existsFile(const ref<byte>& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
-array<byte> readFile(const ref<byte>& path, const Folder& at) {
+buffer<byte> readFile(const ref<byte>& path, const Folder& at) {
     File file(path,at);
     uint size=file.size();
     if(size>1<<24) log(path,"use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_);
@@ -102,7 +102,7 @@ void symlink(const ref<byte>& from,const ref<byte>& to, const Folder& at) {
     remove(from,at);
     check_(symlinkat(strz(from),at.fd,strz(to)), from,"->",to);
 }
-void touchFile(const ref<byte>& path, const Folder& at, bool setModified) { timespec times[]={{}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; utimensat(at.fd, strz(path), times, 0); }
+void touchFile(const ref<byte>& path, const Folder& at, bool setModified) { timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; utimensat(at.fd, strz(path), times, 0); }
 void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate));
     for(uint64 offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);

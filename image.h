@@ -6,18 +6,11 @@ template<Type T> struct bgra { T b,g,r,a; };
 typedef vector<bgra,uint8,4> byte4;
 
 struct Image {
-    ::buffer<byte4> buffer;
-    byte4* data=0; // First pixel
-    uint width=0, height=0, stride=0;
-    bool own=false, alpha=false;
-
     Image(){}
-    Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha) :
-        buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha){}
-    Image(byte4* data, uint width, uint height, uint stride, bool alpha) : data(data), width(width),height(height),stride(stride),alpha(alpha){}
+    Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha) : buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha){}
     Image(uint width, uint height, bool alpha=false, uint stride=0) : width(width), height(height), stride(stride?:width), alpha(alpha) {
         assert(width); assert(height);
-        buffer=::buffer<byte4>(height*(stride?:width)); data=buffer.data;
+        buffer=::buffer<byte4>(height*(stride?:width)); data=buffer.begin();
     }
 
     explicit operator bool() const { return data; }
@@ -26,20 +19,21 @@ struct Image {
     byte4 operator()(uint x, uint y) const {assert(x<stride && y<height,int(x),int(y),stride,width,height); return data[y*stride+x]; }
     byte4& operator()(uint x, uint y) {assert(x<stride && y<height,int(x),int(y),stride,width,height); return data[y*stride+x]; }
     int2 size() const { return int2(width,height); }
+
+    ::buffer<byte4> buffer; //FIXME: shared
+    byte4* data=0; // First pixel
+    uint width=0, height=0, stride=0;
+    bool own=false, alpha=false;
 };
 inline string str(const Image& o) { return str(o.width,"x"_,o.height); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline Image share(const Image& o) { return Image(o.data,o.width,o.height,o.stride,o.alpha); }
+inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha); }
 
 /// Copies the image buffer
-inline void copy(Image& dst, const Image& src) {
-    assert(dst.size()==src.size() && dst.stride==src.stride);
-    ::copy((byte4*)dst.data,src.data,src.height*src.stride);
-}
-template<> inline Image copy(const Image& src) {Image dst(src.width,src.height,src.alpha); ::copy(dst,src); return dst;}
+template<> inline Image copy(const Image& src) { return Image(copy(src.buffer), src.data, src.width,src.height,src.stride,src.alpha); }
 
-/// Returns a weak reference to clipped \a image (unsafe if referenced image is freed)
+/// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
 Image clip(const Image& image, int2 origin, int2 size);
 
 /// Crops the image without any copy

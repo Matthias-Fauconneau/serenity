@@ -22,6 +22,20 @@ template<Type T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Base template for explicit copy (overriden by explicitly copyable types)
 template<Type T> T copy(const T& o) { return o; }
 
+/// Reference type with move semantics
+template<Type T> struct handle {
+    handle(T pointer=T()):pointer(pointer){}
+    handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
+    handle(handle&& o):pointer(o.pointer){o.pointer=T();}
+
+    operator T() const { return pointer; }
+    operator T&() { return pointer; }
+    T* operator &() { return &pointer; }
+    T operator ->() { return pointer; }
+
+    T pointer;
+};
+
 // Forward
 template<Type> struct is_lvalue_reference { static constexpr bool value = false; };
 template<Type T> struct is_lvalue_reference<T&> { static constexpr bool value = true; };
@@ -96,10 +110,10 @@ struct range {
     uint start, stop;
 };
 
-/// Const memory range
+/// Unmanaged fixed-size const reference to an array of elements
 template<Type T> struct ref {
     /// Default constructs an empty reference
-    constexpr ref() : data(0), size(0) {}
+    constexpr ref() {}
     /// References \a size elements from const \a data pointer
     constexpr ref(const T* data, uint64 size) : data(data), size(size) {}
     /// References \a size elements from const \a data pointer
@@ -109,10 +123,18 @@ template<Type T> struct ref {
     /// Converts a static array to ref
     template<size_t N> ref(const T (&a)[N]):  ref(a,N) {}
 
+    /// \name Operators
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& operator [](uint i) const { assert(i<size); return data[i]; }
     explicit operator bool() const { return size; }
+    operator const T*() const { return data; }
+    /// \}
+    /// \name Accessors
+    const T& at(uint i) const { assert(i<size); return data[i]; }
+    const T& operator [](uint i) const { return at(i); }
+    const T& first() const { return at(0); }
+    const T& last() const { return at(size-1); }
+    /// \}
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
     ref<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
@@ -130,17 +152,8 @@ template<Type T> struct ref {
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& key) const { return indexOf(key)>=0; }
 
-    const T* data;
-    uint64 size;
-};
-
-/// Mutable memory range
-template<Type T> struct memory {
-    /// References \a size elements from const \a data pointer
-    constexpr memory(T* data, uint64 size) : data(data), size(size) {}
-    T& operator [](uint i) { assert(i<size, i, size); return data[i]; }
-    T* data;
-    uint64 size;
+    const T* data = 0;
+    uint64 size = 0;
 };
 
 /// Returns const reference to a static string literal
@@ -163,20 +176,41 @@ inline uint align(uint width, uint offset) { assert((width&(width-1))==0); retur
 inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Computes the next highest power of 2
 inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
-/// Returns the largest positive integer that divides the numbers without a remainder
-inline int gcd(uint a, uint b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
-/// Simplify a fraction by its greatest common divisor
-inline void simplify(uint& a, uint& b) { int divisor = gcd(a,b); a/=divisor; b/=divisor; }
+
+// FIXME: split here -> memory.h
+
+/// Unmanaged fixed-size mutable reference to an array of elements
+template<Type T> struct mref : ref<T> {
+    /// Default constructs an empty reference
+    mref(){}
+    /// References \a size elements from \a data pointer
+    mref(T* data, uint64 size) : ref<T>(data,size){}
+    /// References \a o.size elements from \a o.data pointer
+    //explicit mref(const ref<T>& o):data((T*)o.data),capacity(0),size(o.size){}
+
+    T* begin() const { return (T*)data; }
+    T* end() const { return (T*)data+size; }
+    T& at(uint i) const { assert(i<size); return (T&)data[i]; }
+    T& operator [](uint i) const { return at(i); }
+    T& first() const { return at(0); }
+    T& last() const { return at(size-1); }
+
+    using ref<T>::data;
+    using ref<T>::size;
+};
 
 // Memory operations
-// Initializes memory using a constructor (placement new)
+/// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) { return p; }
 /// Initializes raw memory to zero
 inline void clear(byte* buffer, uint64 size) { for(uint i: range(size)) buffer[i]=0; }
-/// Initializes memory to \a value
+/// Copies raw memory from \a src to \dst
+inline void copy(byte* dst, const byte* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
+/// Initializes buffer elements to \a value
 template<Type T> void clear(T* buffer, uint64 size, const T& value=T()) { for(uint i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \dst
-template<Type T> void copy(T* dst,const T* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
+/// \note Ignores move and copy operators
+template<Type T> void rawCopy(T* dst,const T* src, uint size) { copy((byte*)dst, (const byte*)src, size); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);
@@ -184,85 +218,41 @@ extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
 extern "C" void* realloc(void* buffer, size_t size);
 extern "C" void free(void* buffer);
 
-/// Reference type with move semantics
-template<Type T> struct handle {
-    handle(T pointer=T()):pointer(pointer){}
-    handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
-    handle(handle&& o):pointer(o.pointer){o.pointer=T();}
-
-    operator T() const { return pointer; }
-    operator T&() { return pointer; }
-    T* operator &() { return &pointer; }
-    T operator ->() { return pointer; }
-
-    T pointer;
-};
-
-/// Reference to a fixed capacity memory region (either an heap allocation managed by this object or a reference to memory managed by another object)
-template<Type T> struct buffer {
+/// Managed fixed-capacity mutable reference to an array of elements
+/// \note either an heap allocation managed by this object or a reference to memory managed by another object
+/// \note Use array for objects with move constructors as buffer elements are not initialized on allocation
+template<Type T> struct buffer : mref<T> {
     /// Default constructs an empty buffer
     buffer(){}
-    //buffer(T* data, uint64 capacity, uint64 size):data(data),capacity(capacity),size(size){}
-    /// References \a size elements from \a data pointer
-    buffer(T* data, uint64 size):data(data),size(size){}
+    /// References \a size elements from const \a data pointer
+    buffer(const T* data, uint64 size) : mref<T>((T*)data, size) {}
     /// References \a o.size elements from \a o.data pointer
-    explicit buffer(const ref<T>& o):data((T*)o.data),capacity(0),size(o.size){}
-    buffer(buffer&& o):data(o.data),capacity(o.capacity),size(o.size){o.data=0, o.size=0, o.capacity=0;}
+    explicit buffer(const ref<T>& o): mref<T>((T*)o.data, o.size) {}
+    /// Move constructor
+    buffer(buffer&& o) : mref<T>((T*)o.data, o.size), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
-    buffer(uint64 capacity, uint64 size):capacity(capacity),size(size){ assert(capacity>=size); if(!capacity) return; if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
-    explicit buffer(uint64 size):buffer(size,size){}
+    buffer(uint64 capacity, uint64 size):mref<T>((T*)0,size),capacity(capacity){ assert(capacity>=size); if(!capacity) return; if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
+    explicit buffer(uint64 size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
-    buffer(uint64 capacity, uint64 size, const T& value):buffer(capacity,size){clear(data,size,value);}
+    buffer(uint64 capacity, uint64 size, const T& value) : buffer(capacity, size) { clear((T*)data, size, value); }
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
-    ~buffer(){ if(capacity) ::free(data); data=0; capacity=0; size=0; }
+    ~buffer(){ if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
 
-    /// Returns true if not empty
-    explicit operator bool() const { return size; }
-    operator const T*() const { return data; }
-    /// Returns a const reference to this buffer
-    operator ref<T>() const { return ref<T>(data,size); }
-
-    /// \name Iterators
-    const T* begin() const { return data; }
-    const T* end() const { return data+size; }
-    T* begin() { return data; }
-    T* end() { return data+size; }
-    /// \}
-
-    /// Slices a const reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
-    /// Slices a const reference to elements from \a pos the end of the array
-    ref<T> slice(uint pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
-
-    /// \name Accessors
-    const T& at(uint i) const { assert(i<size,i,size); return data[i]; }
-    T& at(uint i) { assert(i<size,i,size); return data[i]; }
-    const T& operator [](uint i) const { return at(i); }
-    T& operator [](uint i) { return at(i); }
-    const T& first() const { return at(0); }
-    T& first() { return at(0); }
-    const T& last() const { return at(size-1); }
-    T& last() { return at(size-1); }
-    /// \}
-
-    /// Slices a mutable reference to elements from \a pos to \a pos + \a size
-    //memory<T> slice(uint64 pos, uint64 size) { assert(pos+size<=this->size); return memory<T>(data+pos, data+pos+size); }
-    /// Slices a mutable reference to elements from \a pos the end of the array
-    //memory<T> slice(uint64 pos) { assert(pos<=size); return memory<T>(data+pos, data+size); }
-
-    T* data=0; /// Pointer to the buffer valid while not reallocated
+    using mref<T>::data;
+    using mref<T>::size;
     uint64 capacity=0; /// 0: reference, >0: size of the owned heap allocation
-    uint64 size=0; /// Number of elements currently in this buffer
 };
-template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); copy(t.data,o.data,o.size); return t; }
+/// Initializes a new buffer with the content of \a o
+template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
+/// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
+template<Type T> buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>(o.data, o.size); }
 
 /// Unique reference to an heap allocated value
 template<Type T> struct unique {
     struct null {};
     explicit unique(null):pointer(0){}
-    //unique(unique&& o):pointer(o.pointer){o.pointer=0;}
     template<Type D> unique(unique<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
     template<Type... Args> explicit unique(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     unique& operator=(unique&& o){ this->~unique(); new (this) unique(move(o)); return *this; }

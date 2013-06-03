@@ -1,4 +1,6 @@
-Makefile
+core.h
+array.h
+string.h
 time.cc
 build.cc
 tiff.cc

@@ -24,7 +24,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
-                memory<element> stack (stacks+dy*stackSize, stackSize);
+                mref<element> stack (stacks+dy*stackSize, stackSize);
                 const uint32* const sourceY = sourceZ+(y+dy)*sX;
                 int& i = stackIndices[dy]; i=-1;
                 for(int x=marginX; x<sX-marginX; x++) {
@@ -48,7 +48,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
                 uint16* const xPositionZYX = xPositionZY+x*tX*tY;
                 for(uint dy=0; dy<unroll; dy++) {
                     int& i = stackIndices[dy];
-                    memory<element> stack (stacks+dy*stackSize, stackSize);
+                    mref<element> stack (stacks+dy*stackSize, stackSize);
                     if(x==stack[i].cx) i--;
                     assert(i>=0);
                     int sx = stack[i].x;
@@ -87,7 +87,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
-                memory<element> stack (stacks+dy*stackSize, stackSize);
+                mref<element> stack (stacks+dy*stackSize, stackSize);
                 const uint32* const sourceZY = sourceZ+(y+dy)*sX;
                 int& i = stackIndices[dy]; i=-1;
                 for(int x=marginX; x<sX-marginX; x++) {
@@ -114,7 +114,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
                 uint16* const yPositionZYX = yPositionZY+x*tX*tY;
                 for(uint dy=0; dy<unroll; dy++) {
                     int& i = stackIndices[dy];
-                    memory<element> stack (stacks+dy*stackSize, stackSize);
+                    mref<element> stack (stacks+dy*stackSize, stackSize);
                     if(x==stack[i].cx) i--;
                     assert_(i>=0);
                     int sx = stack[i].x;
@@ -159,7 +159,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
             struct element { uint sd; int16 cx, x; } stacks[unroll*stackSize];
             int stackIndices[unroll];
             for(uint dy=0; dy<unroll; dy++) {
-                memory<element> stack (stacks+dy*stackSize, stackSize);
+                mref<element> stack (stacks+dy*stackSize, stackSize);
                 const uint32* const sourceZY = sourceZ+y*sX+dy*sX;
                 int& i = stackIndices[dy]; i=-1;
                 for(int x=marginX; x<sX-marginX; x++) {
@@ -189,7 +189,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
                 uint16* const zPositionZYX = zPositionZY+x*tX*tY;
                 for(uint dy=0; dy<unroll; dy++) {
                     int& i = stackIndices[dy];
-                    memory<element> stack (stacks+dy*stackSize, stackSize);
+                    mref<element> stack (stacks+dy*stackSize, stackSize);
                     if(x==stack[i].cx) i--;
                     assert_(i>=0);
                     int sx = stack[i].x;
@@ -211,7 +211,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 /// Computes distance field to nearest background (X pass)
 class(DistanceX, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2}; return sizes[index]; }
-    void execute(const Dict&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],inputs[0]);
     }
@@ -220,7 +220,7 @@ class(DistanceX, Operation), virtual VolumeOperation {
 /// Computes distance field to nearest background (Y pass)
 class(DistanceY, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2}; return sizes[index]; }
-    void execute(const Dict&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],inputs[0],inputs[1]);
     }
@@ -229,7 +229,7 @@ class(DistanceY, Operation), virtual VolumeOperation {
 /// Computes distance field to nearest background (Y pass)
 class(DistanceZ, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2, 2}; return sizes[index]; }
-    void execute(const Dict&, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],outputs[3],inputs[0],inputs[1],inputs[2]);
         Volume& target = outputs[0];

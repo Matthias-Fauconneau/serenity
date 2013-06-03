@@ -1,7 +1,5 @@
 #include "deflate.h"
 
-#include <stdlib.h>
-
 #define MINIZ_LITTLE_ENDIAN 1
 #define MINIZ_USE_UNALIGNED_LOADS_AND_STORES 0 //Avoids warnings
 #define MINIZ_HAS_64BIT_REGISTERS 1
@@ -1752,15 +1750,15 @@ size_t tdefl_compress_mem_to_mem(void *pOut_buf, size_t out_buf_len, const void 
   return out_buf.m_size;
 }
 
-array<byte> inflate(const ref<byte>& source, bool zlib) {
-    array<byte> data; size_t size;
+buffer<byte> inflate(const ref<byte>& source, bool zlib) {
+    buffer<byte> data; size_t size;
     data.data = (byte*)tinfl_decompress_mem_to_heap(source.data, source.size, &size, zlib?TINFL_FLAG_PARSE_ZLIB_HEADER:0);
     data.capacity=data.size=size;
     return data;
 }
 
-array<byte> deflate(const ref<byte>& source, bool zlib) {
-    array<byte> data; size_t size;
+buffer<byte> deflate(const ref<byte>& source, bool zlib) {
+    buffer<byte> data; size_t size;
     data.data = (byte*)tdefl_compress_mem_to_heap(source.data, source.size, &size, zlib?TDEFL_WRITE_ZLIB_HEADER:0);
     data.capacity=data.size=size;
     return data;

@@ -129,7 +129,7 @@ void __attribute((constructor(102))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recursive calls
     //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
-    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={};
+    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={0};
     check_(sigaction(SIGFPE, &sa, 0));
     check_(sigaction(SIGABRT, &sa, 0));
     check_(sigaction(SIGSEGV, &sa, 0));
@@ -176,26 +176,26 @@ void exit(int status) {
 }
 
 // Environment
-int64 execute(const ref<byte>& path, const ref<string>& args, bool wait) {
+int64 execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait) {
     if(!existsFile(path)) { warn("Executable not found",path); return -1; }
 
-    array<stringz> args0(1+args.size);
+    array<string> args0(1+args.size);
     args0 << strz(path);
     for(const auto& arg: args) args0 << strz(arg);
     const char* argv[args0.size+1];
-    for(uint i: range(args0.size)) argv[i]=args0[i];
+    for(uint i: range(args0.size)) argv[i] = args0[i].data;
     argv[args0.size]=0;
 
     array<ref<byte>> env0;
     static string environ = File("proc/self/environ"_).readUpTo(4096);
-    for(TextData s(environ);s;) env0<<s.until('\0');
+    for(TextData s(environ);s;) env0 << s.until('\0');
 
     const char* envp[env0.size+1];
     for(uint i: range(env0.size)) envp[i]=env0[i].data;
     envp[env0.size]=0;
 
     int pid = fork();
-    if(pid==0) { if(!execve(strz(path),(char*const*)argv,(char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
+    if(pid==0) { if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
     else if(wait) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
     else { wait4(pid,0,WNOHANG,0); return -1; }
 }

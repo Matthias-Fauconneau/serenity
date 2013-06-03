@@ -51,7 +51,7 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
 template<Type... Args> struct signal {
     array<function<void(Args...)>> delegates;
     /// Emits the signal to all registered delegates
-    void operator()(Args... args) const { for(const auto& delegate: delegates) delegate(args...); }
+    void operator()(Args... args) const { for(const function<void(Args...)>& delegate: delegates) delegate(args...); }
     /// Connects an anonymous function
     template<Type F> void connect(F f) { delegates<< f; }
     /// Connects a function

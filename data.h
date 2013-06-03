@@ -14,13 +14,14 @@ template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
+template<Type T, Type O> ref<T> cast(const array<O>& o) { return cast<T,O>((const ref<O>&)o); }
 
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
     Data(){}
     /// Creates a Data interface to an \a array
-    Data(array<byte>&& array) : buffer(move(array)) {}
+    Data(::buffer<byte>&& array) : buffer(move(array)) {}
     /// Creates a Data interface to a \a reference
     explicit Data(const ref<byte>& reference) : buffer(reference.data,reference.size) {}
     /// Slices a reference to the buffer from \a pos to \a pos + \a size
@@ -47,7 +48,7 @@ struct Data {
     /// Returns a reference to the next \a size bytes and advances \a size bytes
     ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
 
-    array<byte> buffer;
+    ::buffer<byte> buffer;
     uint index=0;
 };
 
@@ -55,7 +56,7 @@ struct Data {
 struct BinaryData : virtual Data {
     BinaryData(){}
     /// Creates a BinaryData interface to an \a array
-    BinaryData(array<byte>&& array, bool isBigEndian=false) : Data(move(array)), isBigEndian(isBigEndian) {}
+    BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(move(buffer)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to a \a reference
     explicit BinaryData(const ref<byte>& reference, bool isBigEndian=false):Data(reference),isBigEndian(isBigEndian){}
 

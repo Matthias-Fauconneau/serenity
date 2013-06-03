@@ -9,7 +9,7 @@ Image flip(Image&& image) {
 
 Image clip(const Image& image, int2 origin, int2 size) {
     origin=min(origin,image.size()), size=min(size,image.size()-origin);
-    return Image(image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha);
+    return Image(unsafeReference(image.buffer), image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha);
 }
 
 Image crop(Image&& image, int2 origin, int2 size) {

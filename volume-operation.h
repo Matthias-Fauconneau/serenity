@@ -14,11 +14,15 @@ inline Volume toVolume(const Result& result) {
 
 /// Convenience class to help define volume operations
 struct VolumeOperation : virtual Operation {
+    /// Overriden by implementation to return required output sample size (or 0 for non-volume output)
     virtual uint outputSampleSize(uint index) abstract;
-    uint64 outputSize(const Dict&, const ref<shared<Result>>& inputs, uint index) override {  return toVolume(inputs[0]).size() * outputSampleSize(index); }
-    virtual void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) abstract;
-    void execute(const Dict& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
-        array<Volume> inputVolumes = apply<Volume>(inputs, toVolume);
+    uint64 outputSize(const Dict&, const ref<Result*>& inputs, uint index) override {  return toVolume(*inputs[0]).size() * outputSampleSize(index); }
+    /// Actual operation (overriden by implementation)
+    virtual void execute(const Dict& args unused, const mref<Volume>& outputs unused, const ref<Volume>& inputs unused)=0;// { error("None of the execute methods were overriden by implementation"_, typeid(this).name()); }
+    /// Actual operation (overriden by implementation) with additional non-volume outputs
+    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>&) { this->execute(args, outputs, inputs); }
+    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        array<Volume> inputVolumes = apply<Volume>(inputs, [](const Result* o){return toVolume(*o);});
 #if 1
         for(uint index: range(inputs.size)) {
             Volume& input = inputVolumes[index];
@@ -27,18 +31,24 @@ struct VolumeOperation : virtual Operation {
         }
 #endif
         array<Volume> outputVolumes;
+        array<Result*> otherOutputs;
         for(uint index: range(outputs.size)) {
-            Volume volume;
-            volume.sampleSize = outputSampleSize(index);
-            volume.data = buffer<byte>(ref<byte>(outputs[index]->data));
-            if(inputVolumes) { // Inherits initial metadata from previous operation
-                const Volume& source = inputVolumes.first();
-                volume.sampleCount=source.sampleCount; volume.copyMetadata(source);
-                assert(volume.sampleSize * volume.size() == volume.data.size);
+            uint sampleSize = outputSampleSize(index);
+            if(sampleSize) {
+                Volume volume;
+                volume.sampleSize = sampleSize;
+                volume.data = buffer<byte>(ref<byte>(outputs[index]->data));
+                if(inputVolumes) { // Inherits initial metadata from previous operation
+                    const Volume& source = inputVolumes.first();
+                    volume.sampleCount=source.sampleCount; volume.copyMetadata(source);
+                    assert(volume.sampleSize * volume.size() == volume.data.size);
+                }
+                outputVolumes << move( volume );
+            } else {
+                otherOutputs << outputs[index];
             }
-            outputVolumes << move( volume );
         }
-        execute(args, outputVolumes, inputVolumes);
+        execute(args, outputVolumes, inputVolumes, otherOutputs);
         for(uint index: range(outputs.size)) {
             Volume& output = outputVolumes[index];
             if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);
@@ -53,14 +63,14 @@ struct VolumeOperation : virtual Operation {
 template<Type O> struct VolumePass : virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(O); }
     virtual void execute(const Dict& args, VolumeT<O>& target, const Volume& source) abstract;
-    virtual void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
+    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
 };
 #define PASS(name, type, function) \
     class(name, Operation), virtual VolumePass<type> { void execute(const Dict&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
 
 /// Convenience class to define a single input, no output volume operation
 struct VolumeInput : virtual Operation {
-    uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 0; }
+    uint64 outputSize(const Dict&, const ref<Result*>&, uint) override { return 0; }
     virtual void execute(const Dict& args, const ref<byte>& name, const Volume& source) abstract;
-    virtual void execute(const Dict& args, array<shared<Result>>&, const ref<shared<Result>>& inputs) override { execute(args, inputs[0]->name+"."_+toASCII(inputs[0]->relevantArguments), toVolume(inputs[0])); }
+    virtual void execute(const Dict& args, const ref<Result*>&, const ref<Result*>& inputs) override { execute(args, inputs[0]->name+"."_+toASCII(inputs[0]->relevantArguments), toVolume(*inputs[0])); }
 };

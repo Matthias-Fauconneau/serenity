@@ -16,9 +16,11 @@ Sample sqrtHistogram(const Sample& A) {
 }
 
 Sample parseSample(const ref<byte>& file) {
-    Sample sample;
     TextData s (file);
-    while(s) { float f=s.decimal(); assert(f==float(int(f))); int i=f; sample.grow(i+1); s.skip("\t"_); sample[i]=s.integer(); s.skip("\n"_); }
+    int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.integer(); s.skip("\n"_); }
+    s.index=0;
+    Sample sample(maximum+1);
+    while(s) { float x=s.decimal(); assert(x==float(int(x))); s.skip("\t"_); sample[int(x)]=s.integer(); s.skip("\n"_); }
     return sample;
 }
 

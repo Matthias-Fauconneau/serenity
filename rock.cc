@@ -26,12 +26,11 @@ struct Rock : PersistentProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
         const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
-        ref<byte> resultFolder; // FIXME: folder where histograms are copied
         ref<byte> result; // Path to file (or folder) where targets are copied
         for(const ref<byte>& argument: args) {
             if(argument.contains('=') || &ruleForOutput(argument)) continue;
             if(!arguments.contains("source"_) && (existsFolder(argument,cwd) || argument=="validation"_)) { arguments.insert("source"_,argument); continue; }
-            if(!result) { result=argument; resultFolder = existsFolder(argument,cwd)?argument:section(argument,'/',0,-2); continue; }
+            if(!result) { result=argument; continue; }
             error("Invalid argument"_, argument);
         }
         if(arguments.at("source"_)=="validation"_) {
@@ -43,19 +42,17 @@ struct Rock : PersistentProcess, Widget {
         // Configures default arguments
         if(!arguments.contains("cube"_) && arguments.at("source"_)!="validation"_) defaultArguments.insert("cylinder"_,""_); // Clips histograms and slice rendering to the inscribed cylinder
         defaultArguments.insert("kernelSize"_,"1"_);
-        if(!result) result = resultFolder = "dev/shm"_;
-        arguments.insert("resultFolder"_,resultFolder);
 
         execute();
 
-        if(result!="dev/shm"_) { // Copies result to result folder (on disk)
+        if(result) { // Copies result to result folder (on disk)
             if(targetResults.size>1) {
                 assert(!existsFile(result,cwd), "New folder would overwrite existing file", result);
                 if(!existsFolder(result,cwd)) Folder(result,cwd,true);
             }
             for(const shared<Result>& target: targetResults) if(target->data.size) {
                 Time time;
-                if(existsFolder(result, cwd)) writeFile(target->name+"."_+target->metadata, target->data, resultFolder), log(result+"/"_+target->name+"."_+target->metadata, time);
+                if(existsFolder(result, cwd)) writeFile(target->name+"."_+target->metadata, target->data, result), log(result+"/"_+target->name+"."_+target->metadata, time);
                 else writeFile(result, target->data, cwd), log(target->name+"."_+target->metadata,"->",result, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
             }
         }

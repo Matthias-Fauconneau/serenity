@@ -5,9 +5,9 @@
 
 /// Computes histogram (with square rooted x values)
 class(SqrtHistogram, Operation) {
-    uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 0; }
-    virtual void execute(const Dict& args, array<shared<Result>>& outputs, const ref<shared<Result>>& inputs) override {
-        Volume source = toVolume(inputs[0]);
+    uint64 outputSize(const Dict&, const ref<Result*>&, uint) override { return 0; }
+    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        Volume source = toVolume(*inputs[0]);
         Sample squaredMaximum = histogram(source, args.contains("cylinder"_));
         squaredMaximum[0] = 0; // Clears background voxel count to plot with a bigger Y scale
         float scale = toDecimal(args.value("resolution"_,"1"_));

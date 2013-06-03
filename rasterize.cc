@@ -25,7 +25,7 @@ void bin(Volume& target, const Volume16& source) {
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     assert(offsetX && offsetY && offsetZ);
 
-    Tile* const targetData = reinterpret_cast<Tile*>(target.data.data);
+    Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());
     assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile));
     for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) targetData[i].ballCount=0;
 

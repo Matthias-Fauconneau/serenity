@@ -8,7 +8,7 @@ class(Source, Operation), virtual VolumeOperation {
 
     ref<byte> parameters() const override { static auto p="source cylinder cube"_; return p; }
     uint outputSampleSize(uint) override { return 2; }
-    uint64 outputSize(const Dict& args, const ref<shared<Result>>&, uint) override {
+    uint64 outputSize(const Dict& args, const ref<Result*>&, uint) override {
         Folder folder = args.at("source"_);
         array<string> slices = folder.list(Files);
         assert_(slices, args.at("source"_));
@@ -29,16 +29,16 @@ class(Source, Operation), virtual VolumeOperation {
         }
         assert_(minX<maxX && minY<maxY && minZ<maxZ && maxX<=image.width && maxY<=image.height && maxZ<=slices.size, minX,minY,minZ, maxX,maxY,maxZ, image.width, image.height, slices.size);
         assert( (maxX-minX)%2 == 0 && (maxY-minY)%2 == 0 && (maxZ-minZ)%2 == 0 ); // Margins are currently always symmetric
-        return align(16,maxX-minX)*align(16,maxY-minY)*align(16,maxZ-minZ)*outputSampleSize(0);
+        return nextPowerOfTwo(maxX-minX)*nextPowerOfTwo(maxY-minY)*nextPowerOfTwo(maxZ-minZ)*outputSampleSize(0);
     }
 
-    void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>&) {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&) {
         Folder folder = args.at("source"_);
         array<string> slices = folder.list(Files);
 
         Volume16& target = outputs.first();
         int3 size = int3(maxX-minX, maxY-minY, maxZ-minZ);
-        target.sampleCount = int3(align(16,size.x), align(16,size.y), align(16,size.z));
+        target.sampleCount = int3(nextPowerOfTwo(size.x), nextPowerOfTwo(size.y), nextPowerOfTwo(size.z));
         target.margin = (target.sampleCount - size)/2;
         uint X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z;
         uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;

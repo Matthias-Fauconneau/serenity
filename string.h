@@ -30,12 +30,18 @@ double toDecimal(const ref<byte>& str);
 
 /// Forwards ref<byte>
 inline const ref<byte>& str(const ref<byte>& s) { return s; }
+/// Forwards mref<byte>
+inline const mref<byte>& str(const mref<byte>& s) { return s; }
+
 /// Returns a bounded reference to the null-terminated string pointer
 ref<byte> str(const char* s);
 /// Returns boolean as "true"/"false"
 inline ref<byte> str(const bool& b) { return b?"true"_:"false"_; }
 /// Returns a reference to the character
 inline ref<byte> str(const char& c) { return ref<byte>((byte*)&c,1); }
+
+/// Forwards buffer<byte>
+inline const buffer<byte>& str(const buffer<byte>& s) { return s; }
 
 /// Joins \a list into a single string with each element separated by \a separator
 string join(const ref<string>& list, const ref<byte>& separator);
@@ -52,17 +58,16 @@ string left(const ref<byte>& s, uint width);
 /// Aligns string right
 string right(const ref<byte>& s, uint width);
 
-struct stringz : string { operator char*(){return data;}};
+/// Forwards string
+inline const string& str(const string& s) { return s; }
+
+struct stringz : string { operator const char*(){ return data; }};
 /// Copies the reference and appends a null byte
 stringz strz(const ref<byte>& s);
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array<ref<byte>> split(const ref<byte>& str, byte separator=' ');
-/// Converts to an array of strings
-array<string> toStrings(const array<ref<byte>>& strings);
 
-/// Forwards string
-inline const string& str(const string& s) { return s; }
 /// Converts integers
 template<uint base=10> string utoa(uint64 number, int pad=0);
 template<uint base=10> string itoa(int64 number, int pad=0);
@@ -80,7 +85,7 @@ inline string str(const uint64& n) { return dec(n); }
 inline string str(const int64& n) { return dec(n); }
 inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 //template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
-inline string str(void* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
+inline string str(void* const& p) { return "0x"_+hex(ptr(p)); }
 template<Type T> inline string str(T* const& p) { return str(*p); }
 template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 template<Type T> string str(const shared<T>& t) { return str(*t.pointer); }
@@ -91,13 +96,10 @@ inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
-//template<Type T> string str(const std::initializer_list<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<Type T> string str(const ref<T>& a) { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
-//template<Type T> string str(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<Type T> string str(const buffer<T>& a) { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
-//template<Type T> string str(const buffer<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-//template<Type T> string str(const array<T>& a) { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
-template<Type T> string str(const array<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
+template<Type T> string str(const mref<T>& a) { return str((const ref<T>&)a); }
+template<Type T> string str(const buffer<T>& a) { return str((const ref<T>&)a); }
+template<Type T> string str(const array<T>& a) { return str((const ref<T>&)a); }
 template<Type T> string dec(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
 template<Type T> string hex(const ref<T>& a, char separator=' ') { string s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s; }
 

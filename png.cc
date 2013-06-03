@@ -44,7 +44,7 @@ template void unfilter<rgb,3>(byte4* dst, const byte* raw, uint width, uint heig
 template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
 
 Image decodePNG(const ref<byte>& file) {
-    BinaryData s(array<byte>(file.data,file.size), true);
+    BinaryData s(file, true);
     if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { warn("Invalid PNG"); return Image(); }
     array<byte> buffer;
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
@@ -81,14 +81,14 @@ Image decodePNG(const ref<byte>& file) {
         s.advance(4); //CRC
         assert(s);
     }
-    array<byte> data = inflate(buffer, true);
+    ::buffer<byte> data = inflate(buffer, true);
     if(bitDepth==4) {
         assert(depth==1,depth);
         assert(width%2==0);
         if(data.size != height*(1+width*depth*bitDepth/8)) { warn("Invalid PNG",data.size,height*(1+width*depth)); return Image(); }
         const byte* src = data.data;
-        array<byte> bytes; bytes.grow(height*(1+width*depth));
-        byte* dst = bytes.data;
+        ::buffer<byte> bytes(height*(1+width*depth));
+        byte* dst = bytes.begin();
         for(uint y=0;y<height;y++) {
             dst[0] = src[0]; src++; dst++;
             for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
@@ -146,10 +146,10 @@ uint adler32(const ref<byte> data) {
     return a | (b << 16);
 }
 
-array<byte> filter(const Image& image) {
+buffer<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
-    array<byte> data(w*h*4+h,w*h*4+h);
-    byte* dst = data.data; const byte* src = (byte*)image.data;
+    buffer<byte> data(w*h*4+h);
+    byte* dst = data.begin(); const byte* src = (byte*)image.data;
     for(uint unused y: range(h)) {
         *dst++ = 0;
         for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]);

@@ -63,7 +63,7 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
 class(Skeleton, Operation), virtual VolumeOperation {
     ref<byte> parameters() const override { return "minimalDiameter"_; }
     uint outputSampleSize(uint index) override { int sizes[]={2}; return sizes[index]; }
-    void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>& inputs) override {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         uint minimalSqDiameter = args.contains("minimalDiameter"_) ? sqr(toInteger(args.at("minimalDiameter"_))) : 3;
         integerMedialAxis(outputs[0],inputs[0],inputs[1],inputs[2], minimalSqDiameter);
     }

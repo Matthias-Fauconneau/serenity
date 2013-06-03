@@ -2,7 +2,7 @@
 #include "volume.h"
 
 /// Finite discrete integer-valued distribution (represented by its samples)
-typedef array<int64> Sample;
+typedef buffer<int64> Sample;
 
 /// Sums all samples
 uint64 sum(const Sample& A);

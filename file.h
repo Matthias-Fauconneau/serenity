@@ -38,15 +38,15 @@ struct Stream : Handle {
     /// Reads up to \a size bytes into \a buffer
     int readUpTo(void* buffer, uint size);
     /// Reads exactly \a size bytes
-    array<byte> read(uint size);
+    buffer<byte> read(uint size);
     /// Reads up to \a size bytes
-    array<byte> readUpTo(uint size);
+    buffer<byte> readUpTo(uint size);
     /// Reads a raw value
     template<Type T> T read() { T t; read((byte*)&t,sizeof(T)); return t; }
     /// Reads \a size raw values
-    template<Type T> array<T> read(uint size) {
-        array<T> buffer(size,size); uint byteSize=size*sizeof(T);
-        for(uint i=0;i<byteSize;) i+=readUpTo(buffer.data+i, byteSize-i);
+    template<Type T> buffer<T> read(uint size) {
+        ::buffer<T> buffer(size); uint byteSize=size*sizeof(T);
+        for(uint i=0;i<byteSize;) i+=readUpTo(buffer.begin()+i, byteSize-i);
         return buffer;
     }
     /// Polls whether reading would block
@@ -89,7 +89,7 @@ struct File : Stream {
 /// Returns whether \a path exists (as a file)
 bool existsFile(const ref<byte>& path, const Folder& at=root());
 /// Reads whole \a file content
-array<byte> readFile(const ref<byte>& path, const Folder& at=root());
+buffer<byte> readFile(const ref<byte>& path, const Folder& at=root());
 /// Writes \a content into \a file (overwrites any existing file)
 void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at=root());
 
@@ -124,8 +124,8 @@ struct Map {
     default_move(Map);
     ~Map();
 
-    explicit operator bool() { return data; }
-    operator ref<byte>() { return ref<byte>(data, size); }
+    explicit operator bool() const { return data; }
+    operator ref<byte>() const { return ref<byte>(data, size); }
 
     /// Locks memory map in RAM
     void lock(uint size=-1) const;

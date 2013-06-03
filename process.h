@@ -71,7 +71,7 @@ struct PersistentProcess : Process {
     /// Gets result from cache or computes if necessary
     shared<Result> getResult(const ref<byte>& target, const Dict& arguments) override;
 
-    Folder baseStorageFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to hold up to 2 intermediate operations of volume data (up to 32bit per sample)
+    Folder baseStorageFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to intermediate operations of volume data (e.g. up to 64bit per sample input and output)
     ref<byte> name; // Used to name intermediate and output files (folder base name)
     Folder storageFolder = ""_; // Holds intermediate operations data (=baseStorageFolder/name)
 };

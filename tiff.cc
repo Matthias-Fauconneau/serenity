@@ -40,7 +40,7 @@ void Tiff16::read(uint16 *target, uint x0, uint y0, uint w, uint h, uint stride)
     if(w==width) for(uint y: range(h)) TIFFReadScanline(tiff, target+y*stride, y0+y, 0);
     else {
         for(uint y: range(y0)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y, 0); } // Reads sequentially to avoid "Compression algorithm does not support random access" errors.
-        for(uint y: range(h)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y0+y, 0); copy(target+y*stride, buffer+x0, w); }
+        for(uint y: range(h)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y0+y, 0); rawCopy(target+y*stride, buffer+x0, w); }
     }
 }
 Tiff16::~Tiff16() { TIFFClose(tiff); }

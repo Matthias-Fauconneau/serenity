@@ -10,7 +10,7 @@ void floodFill(Volume16& target, const Volume16& source) {
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
 
     buffer<short3> stackBuffer(1<<25); // 32MiB
-    short3* const stack = stackBuffer.data;
+    short3* const stack = stackBuffer.begin();
     uint stackSize=0;
 #if 0
     uint index=0, maximum=0; for(uint i: range(source.size())) if(sourceData[i]>maximum && source.contains(zOrder(i))) index=i, maximum=sourceData[i];
@@ -18,7 +18,7 @@ void floodFill(Volume16& target, const Volume16& source) {
     stack[stackSize++] = short3(zOrder(index)); // Pushes initial seed (from maximum)
 #else
     buffer<byte> markBuffer(target.size()/8); // 128MiB
-    byte* const mark = markBuffer.data;
+    byte* const mark = markBuffer.begin();
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) stack[stackSize++] = short3(x,y,marginZ); // Pushes initial seeds (from top Z face)

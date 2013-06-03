@@ -101,7 +101,7 @@ string join(const ref<string>& list, const ref<byte>& separator) {
 string replace(const ref<byte>& s, const ref<byte>& before, const ref<byte>& after) {
     string r(s.size);
     for(uint i=0; i<s.size;) {
-        if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r<<after; i+=before.size; }
+        if(i<=s.size-before.size && ref<byte>(s.data+i, before.size)==before) { r<<after; i+=before.size; }
         else { r << s[i]; i++; }
     }
     return r;
@@ -129,12 +129,12 @@ string repeat(const ref<byte>& s, uint times) {
     string r; for(uint unused i: range(times)) r<<s; return r;
 }
 
-string left(const ref<byte>& s, uint width) {
-    return s+(int(width-s.size)/12>0?string((width-s.size)/12,(width-s.size)/12,'\t'):string());
+string left(const ref<byte>& s, uint width unused) {
+    return string(s);//+(int(width-s.size)/12>0?string((width-s.size)/12,(width-s.size)/12,'\t'):string());
 }
 
-string right(const ref<byte>& s,  uint width) {
-    return (int(width-s.size)/12>0?string((width-s.size)/12,(width-s.size)/12,'\t'):string())+s;
+string right(const ref<byte>& s,  uint width unused) {
+    return string(s);//(int(width-s.size)/12>0?string((width-s.size)/12,(width-s.size)/12,'\t'):string())+s;
 }
 
 stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
@@ -156,8 +156,6 @@ array<ref<byte>> split(const ref<byte>& str, byte separator) {
     }
     return list;
 }
-
-array<string> toStrings(const array<ref<byte>>& strings) { return apply<string>(strings, [](const ref<byte>& o){return string(o);}); }
 
 /// Number conversions
 

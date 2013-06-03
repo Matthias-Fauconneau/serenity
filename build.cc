@@ -6,7 +6,7 @@
 struct Module {
     string name;
     array<Module*> deps;
-    Module(const ref<byte>& name):name(string(name)){}
+    Module(const ref<byte>& name):name(copy(name)){}
 };
 bool operator ==(const Module& a, const Module& b) { return a.name==b.name; }
 bool operator ==(const Module& a, const ref<byte>& b) { return a.name==b; }
@@ -61,13 +61,12 @@ struct Build {
         }
         string object = tmp+build+"/"_+target+".o"_;
         if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
-            static const auto flags = toStrings(split("-I/ptmp/include -pipe -march=native -std=c++11 -funsigned-char -fno-exceptions -Wall -Wextra -Wno-missing-field-initializers -c -o"_));
+            static const array<ref<byte>> flags = split("-I/ptmp/include -pipe -march=native -std=c++11 -Wall -Wextra -c -g -o"_); //-funsigned-char -fno-exceptions -Wno-missing-field-initializers
             array<string> args;
-            if(find(build,"debug"_)) args << string("-g"_) << string("-DDEBUG"_);
-            if(find(build,"fast"_)) args << string("-Ofast"_);
-            args<< flags<<object<<target+".cc"_;
-            log(target);
-            if(execute("/ptmp/gcc-4.8.0/bin/g++"_,args)) { log("Build failed"_); exit(-1); exit_thread(-1); } //TODO: pipeline 4
+            args << object << target+".cc"_;
+            if(find(build,"debug"_)) args << string("-DDEBUG"_);
+            if(find(build,"fast"_)) args <<  string("-Ofast"_);
+            if(execute("/ptmp/gcc-4.8.0/bin/g++"_,flags+toRefs(args))) { log("Build failed"_); exit(-1); exit_thread(-1); } //TODO: pipeline 4
         }
         return lastLinkEdit;
     }
@@ -82,7 +81,7 @@ struct Build {
             for(const string& file: files) {
                 string object = tmp+"files/"_+file+".o"_;
                 if(!existsFile(object, folder) || File(file, folder).modifiedTime() >= File(object, folder).modifiedTime()) {
-                    assert_(! execute("/usr/bin/ld"_,toStrings(split("-r -b binary -o"_))<<object<<file) );
+                    assert_(! execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<file) );
                     fileChanged = true;
                 }
             }
@@ -94,7 +93,7 @@ struct Build {
             args << apply<string>(modules, [this](const unique<Module>& module){ return tmp+build+"/"_+module->name+".o"_; });
             args << apply<string>(files, [this](const string& file){ return tmp+"files/"_+file+".o"_; });
             args << string("-L/ptmp/lib"_) << apply<string>(libraries, [this](const string& library){ return "-l"_+library; });
-            if(execute("/ptmp/gcc-4.8.0/bin/g++"_,args)) { exit(-1); exit_thread(-1); }
+            if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) { exit(-1); exit_thread(-1); }
         }
     }
 } build;

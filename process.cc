@@ -104,8 +104,9 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
 
     // Maps intermediate results from file system
     for(const string& path: storageFolder.list(Files)) {
-        if(!&ruleForOutput(name) || !path.contains('{')) { ::remove(path, storageFolder); continue; } // Removes invalid data
-        TextData s (path); ref<byte> name = s.whileNot('{'); Dict arguments = parseDict(s); s.skip("["_); ref<byte> metadata = s.until(']');
+        TextData s (path); ref<byte> name = s.whileNot('{');
+        if(path==name || !&ruleForOutput(name)) { ::remove(path, storageFolder); continue; } // Removes invalid data
+        Dict arguments = parseDict(s); s.skip("["_); ref<byte> metadata = s.until(']');
         File file = File(path, storageFolder, ReadWrite);
         results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), string(metadata), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
     }
@@ -146,7 +147,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         }
 
         Map map;
-        int64 outputSize = operation->outputSize(arguments, inputs, index);
+        int64 outputSize = operation->outputSize(arguments, cast<Result*>(inputs), index);
         if(outputSize) { // Creates (or resizes) and maps an output result file
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=currentTime()+1; string oldest;
@@ -158,7 +159,9 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
                 if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
                 if(section(oldest,'/')==name) {
                     TextData s (section(oldest,'/',1,-1)); ref<byte> name = s.whileNot('{'); Dict arguments = parseDict(s);
-                    shared<ResultFile> result = results.take(indexOf(name,arguments));
+                    int i = indexOf(name,arguments);
+                    assert_(i>=0, name, arguments, results);
+                    shared<ResultFile> result = results.take(i);
                     result->fileName.clear(); // Prevents rename
                 }
                 if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
@@ -179,7 +182,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
 
     Time time;
     Dict relevantArguments = Process::relevantArguments(rule, arguments);
-    operation->execute(relevantArguments, outputs, inputs);
+    operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
     log(left(str(rule),96),left(toASCII(relevantArguments),64),right(str(time),32));
 
     for(shared<Result>& output : outputs) {
