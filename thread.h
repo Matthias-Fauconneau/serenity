@@ -5,6 +5,9 @@
 #include "function.h"
 #include <pthread.h>
 
+/// Virtual memory page size
+constexpr int64 pageSize = 1<<12;
+
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
 

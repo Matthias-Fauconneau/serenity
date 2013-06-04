@@ -82,7 +82,6 @@ inline string str(const long& n) { return dec(n); }
 inline string str(const uint64& n) { return dec(n); }
 inline string str(const int64& n) { return dec(n); }
 inline string hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
-//template<Type T> inline string str(T* const& p) { string s("0x"_); s<<hex(ptr(p)); return s; }
 inline string str(void* const& p) { return "0x"_+hex(ptr(p)); }
 template<Type T> inline string str(T* const& p) { return str(*p); }
 template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }

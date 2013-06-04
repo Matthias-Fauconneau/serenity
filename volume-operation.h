@@ -28,7 +28,7 @@ struct VolumeOperation : virtual Operation {
         if(!otherOutputs && !otherInputs) return this->execute(args, outputs, inputs);
         if(otherOutputs && !otherInputs) return this->execute(args, outputs, inputs, otherOutputs);
         if(otherInputs && !otherOutputs) return this->execute(args, outputs, inputs, otherInputs);
-        error("Implementation ignores all non-volume inputs and non-volume outputs");
+        error("Implementation ignores all non-volume inputs and non-volume outputs", outputs, inputs, otherOutputs, otherInputs);
     }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         array<Volume> inputVolumes; array<Result*> otherInputs;
@@ -62,12 +62,15 @@ struct VolumeOperation : virtual Operation {
             }
         }
         execute(args, outputVolumes, inputVolumes, otherOutputs, otherInputs);
-        for(uint index: range(outputs.size)) {
-            Volume& output = outputVolumes[index];
-            if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);
-            if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume32&)output), output.maximum);
-            outputs[index]->metadata = volumeFormat(output);
-            outputs[index]->data.size = output.data.size;
+        uint outputVolumesIndex=0; for(uint index: range(outputs.size)) {
+            uint sampleSize = this->outputSampleSize(index);
+            if(sampleSize) {
+                Volume& output = outputVolumes[outputVolumesIndex++];
+                if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);
+                if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume32&)output), output.maximum);
+                outputs[index]->metadata = volumeFormat(output);
+                outputs[index]->data.size = output.data.size;
+            }
         }
     }
 };
@@ -80,10 +83,3 @@ template<Type O> struct VolumePass : virtual VolumeOperation {
 };
 #define PASS(name, type, function) \
     class(name, Operation), virtual VolumePass<type> { void execute(const Dict&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
-
-/// Convenience class to define a single input, no output volume operation
-struct VolumeInput : virtual Operation { //FIXME: VolumeOperation other I/O is usable directly
-    uint64 outputSize(const Dict&, const ref<Result*>&, uint) override { return 0; }
-    virtual void execute(const Dict& args, const ref<byte>& name, const Volume& source) abstract;
-    virtual void execute(const Dict& args, const ref<Result*>&, const ref<Result*>& inputs) override { execute(args, inputs[0]->name+"."_+toASCII(inputs[0]->relevantArguments), toVolume(*inputs[0])); }
-};

@@ -46,21 +46,23 @@ struct Process {
     array<shared<Result>> targetResults; // Generated target data
 };
 
+/// Mirrors results on a filesystem
 struct ResultFile : Result {
-    ResultFile(const ref<byte>& name, long timestamp, Dict&& arguments, string&& metadata, const Folder& folder, Map&& map, const ref<byte>& path)
-        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map.data, map.size)), folder(folder), map(move(map)), fileName(path?string(path):name+"."_+toASCII(arguments)+"."_+metadata+".1"_)
-    { assert(fileName.capacity); }
+    ResultFile(const ref<byte>& name, long timestamp, Dict&& arguments, string&& metadata, string&& data, const ref<byte>& path, const Folder& folder)
+        : Result(name,timestamp,move(arguments),move(metadata), move(data)), fileName(string(path)), folder(folder) {}
+    ResultFile(const ref<byte>& name, long timestamp, Dict&& arguments, string&& metadata, Map&& map, const ref<byte>& path, const Folder& folder)
+        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(string(path)), folder(folder) { if(map) maps<<move(map); }
     void rename() {
         if(!fileName) return;
-        string newName = name+"{"_+toASCII(relevantArguments)+"}["_+metadata+"]("_+str(userCount)+")"_;
-        if(fileName!=newName) { assert(fileName.capacity); ::rename(fileName, newName, folder); fileName=move(newName); }
+        string newName = name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):string())+"."_+metadata;
+        if(fileName!=newName) { ::rename(fileName, newName, folder); fileName=move(newName); }
     }
     void addUser() override { ++userCount; rename(); }
     uint removeUser() override { --userCount; rename(); return userCount; }
 
-    const Folder& folder;
-    Map map;
+    array<Map> maps;
     string fileName;
+    const Folder& folder;
 };
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes

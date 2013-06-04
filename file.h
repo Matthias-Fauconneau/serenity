@@ -21,6 +21,12 @@ enum { Files=1<<0, Folders=1<<1, Recursive=1<<2 };
 struct Folder : Handle {
     /// Opens \a folderPath
     Folder(const ref<byte>& folderPath, const Folder& at=root(), bool create=false);
+    /// Returns folder properties
+    struct stat stat() const;
+    /// Returns the last access Unix timestamp (in nanoseconds)
+    int64 accessTime() const;
+    /// Returns the last modified Unix timestamp (in nanoseconds)
+    int64 modifiedTime() const;
     /// Lists all files in this folder
     array<string> list(uint flags) const;
 };
@@ -118,8 +124,8 @@ struct Map {
     enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
 
     Map(){}
-    Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    Map(const ref<byte>& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
+    explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
+    explicit Map(const ref<byte>& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     default_move(Map);
     ~Map();

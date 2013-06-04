@@ -48,7 +48,7 @@ class(Histogram, Operation) {
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         Sample histogram = ::histogram(source, args.contains("cylinder"_));
-        outputs[0]->metadata = string("histogram"_);
+        outputs[0]->metadata = string("histogram.tsv"_);
         outputs[0]->data = toASCII(histogram);
     }
 };
@@ -62,7 +62,7 @@ class(SqrtHistogram, Operation) {
         Sample squaredHistogram = ::histogram(source, args.contains("cylinder"_));
         squaredHistogram[0] = 0; // Clears background voxel count to plot with a bigger Y scale
         float scale = toDecimal(args.value("resolution"_,"1"_));
-        outputs[0]->metadata = string("tsv"_);
+        outputs[0]->metadata = string("√histogram.tsv"_);
         outputs[0]->data = toASCII(sqrtHistogram(squaredHistogram), scale);
     }
 };

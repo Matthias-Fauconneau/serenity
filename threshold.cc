@@ -8,7 +8,7 @@
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
 class(LorentzianMixtureModel, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(inputs[0]->metadata == "histogram"_);
+        assert_(inputs[0]->metadata == "histogram.tsv"_);
         Sample density = parseSample( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
@@ -21,29 +21,17 @@ class(LorentzianMixtureModel, Operation) {
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 3);
-        if(outputs.size>1) {
-            outputs[1]->metadata = string("rock"_);
-            outputs[1]->data = toASCII(sample(rock,density.size));
-        }
-        if(outputs.size>2) {
-            outputs[2]->metadata = string("notrock"_);
-            outputs[2]->data = toASCII(notrock);
-        }
-        if(outputs.size>3) {
-            outputs[3]->metadata = string("pore"_);
-            outputs[3]->data = toASCII(sample(pore,density.size));
-        }
-        if(outputs.size>4) {
-            outputs[4]->metadata = string("notpore"_);
-            outputs[4]->data = toASCII(notpore);
-        }
+        output(outputs, 1, "histogram.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
+        output(outputs, 2, "histogram.tsv"_, [&]{ return toASCII(notrock); });
+        output(outputs, 3, "histogram.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
+        output(outputs, 4, "histogram.tsv"_, [&]{ return toASCII(notpore); });
     }
 };
 
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(inputs[0]->metadata == "histogram"_);
+        assert_(inputs[0]->metadata == "histogram.tsv"_);
         Sample density = parseSample( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
         uint threshold=0; double maximum=0;
@@ -65,10 +53,7 @@ class(Otsu, Operation) {
         log("Otsu's model estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 3);
-        if(outputs.size>1) {
-            outputs[1]->metadata = string("interclass"_);
-            outputs[1]->data = toASCII( (totalMaximum/maximum)*interclass ); // Scales variance to plot over density
-        }
+        output(outputs, 1, "interclass.tsv"_, [&]{ return toASCII( (totalMaximum/maximum)*interclass ); } ); // Scales variance to plot over density
     }
 };
 

@@ -1,9 +1,9 @@
 source = Source
 capsules = Capsules
 
-histogram_source = Histogram source
-#threshold interclass = Otsu histogram_source
-threshold lorentz_rock lorentz_notrock lorentz_pore lorentz_notpore = LorentzianMixtureModel histogram_source
+histogram-source = Histogram source
+threshold interclass = Otsu histogram-source
+#threshold lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
 
 shift = ShiftRight source
 smoothx = Smooth shift
@@ -17,17 +17,17 @@ distancex positionxx = DistanceX pore
 distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
 skeleton = Skeleton positionx positiony positionz
-skeleton_unconnected = Tile skeleton
-skeleton_connected = FloodFill skeleton_unconnected
+skeleton-unconnected = Tile skeleton
+skeleton-connected = FloodFill skeleton-unconnected
 
-bin_unconnected = Bin skeleton_unconnected
-bin_connected = Bin skeleton_connected
-unconnected = Rasterize bin_unconnected
-connected = Rasterize bin_connected
+bin-unconnected = Bin skeleton-unconnected
+bin-connected = Bin skeleton-connected
+unconnected = Rasterize bin-unconnected
+connected = Rasterize bin-connected
 
 # Computes histogram of maximal ball radii (i.e. pore size distribution)
-histogram_unconnected = SqrtHistogram unconnected
-histogram_connected = SqrtHistogram connected
+histogram-unconnected = SqrtHistogram unconnected
+histogram-connected = SqrtHistogram connected
 
 #emptyx epositionx = DistanceX rock
 #emptyy epositiontx epositiony = DistanceY emptyx epositionx
@@ -35,16 +35,17 @@ histogram_connected = SqrtHistogram connected
 #empty = SquareRoot emptyz # Square roots and tiles distance field before using it for empty space skiping during rendering
 #density = SquareRoot distance # Square roots and normalizes (FIXME) distance to use as density values (for opacity and gradient)
 #intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
-#ascii_source = ToASCII source
-ascii_unconnected = ToASCII unconnected
-ascii_connected = ToASCII connected
+#ascii-source = ToASCII source
+ascii-unconnected = ToASCII unconnected
+ascii-connected = ToASCII connected
 
-#png_source = ToPNG source
-#png_smooth = ToPNG smooth
-#png_colorize = ToPNG colorize
-#png_distance = ToPNG distance
-#png_skeleton = ToPNG skeleton
-#png_maximum = ToPNG connected
+png-source = ToPNG source
+png-smooth = ToPNG smooth
+png-colorize = ToPNG colorize
+png-distance = ToPNG distance
+png-skeleton = ToPNG skeleton
+png-unconnected = ToPNG unconnected
+png-connected = ToPNG connected
 
 #Last target is the default
 #validate = Validate pore maximum

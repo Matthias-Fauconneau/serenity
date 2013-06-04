@@ -63,7 +63,7 @@ struct Rock : PersistentProcess, Widget {
         window = unique<Window>(this,int2(-1,-1),"Rock"_);
         window->localShortcut(Key('r')).connect(this, &Rock::refresh);
         window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
-        window->localShortcut(Escape).connect([](){exit();});
+        window->localShortcut(Escape).connect([]{exit();});
         window->clearBackground = false;
         updateView();
         window->show();

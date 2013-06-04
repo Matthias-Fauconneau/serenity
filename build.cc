@@ -46,6 +46,7 @@ struct Build {
             if(s.match("#include "_)) {
                 if(s.match('"')) { // module header
                     ref<byte> module = s.until('.');
+                    assert_(module);
                     if(existsFile(module+".h"_, folder)) lastCompileEdit = max(lastCompileEdit, parse(module));
                     if(module == parent) continue;
                     if(!modules.contains(module) && existsFile(module+".cc"_, folder)) lastLinkEdit = max(lastLinkEdit, max(lastCompileEdit, compile(module)));

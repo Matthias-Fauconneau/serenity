@@ -16,6 +16,7 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
         }
         s.skip();
         rule.operation = s.word();
+        assert_(rule.operation);
         s.whileAny(" \t\r"_);
         for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
             if(s.match('#')) { s.whileNot('\n'); continue; }
@@ -110,12 +111,31 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
     this->arguments.insert("name"_, name);
 
     // Maps intermediate results from file system
-    for(const string& path: storageFolder.list(Files)) {
+    for(const string& path: storageFolder.list(Files|Folders)) {
         TextData s (path); ref<byte> name = s.whileNot('{');
         if(path==name || !&ruleForOutput(name)) { ::remove(path, storageFolder); continue; } // Removes invalid data
-        Dict arguments = parseDict(s); s.skip("["_); ref<byte> metadata = s.until(']');
-        File file = File(path, storageFolder, ReadWrite);
-        results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), string(metadata), storageFolder, Map(file, Map::Prot(Map::Read|Map::Write)), path);
+        Dict arguments = parseDict(s); s.until("."_); ref<byte> metadata = s.untilEnd();
+        if(!existsFolder(path, storageFolder)) {
+            File file = File(path, storageFolder, ReadWrite);
+            if(file.size()<pageSize) { // Small file (<4K)
+                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), string(metadata), file.read(file.size()), path, storageFolder);
+            } else { // Memory-mapped file
+                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), string(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), path, storageFolder);
+            }
+        } else { // Folder
+            Folder folder (path, storageFolder);
+            shared<ResultFile> result(name, folder.modifiedTime(), move(arguments), string(metadata), string(), path, storageFolder);
+            for(const string& path: folder.list(Files)) {
+                File file = File(path, folder, ReadWrite);
+                if(file.size()<pageSize) { // Small file (<4K)
+                    result->elements << file.read(file.size());
+                } else { // Memory-mapped file
+                    result->maps << Map(file, Map::Prot(Map::Read|Map::Write));
+                    result->elements << buffer<byte>(result->maps.last());
+                }
+            }
+            results << move(result);
+        }
     }
 }
 
@@ -159,7 +179,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=currentTime()+1; string oldest;
                 for(string& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
-                    TextData s (path); s.until('('); uint userCount=s.integer(); if(userCount>1 || !s.match(')')) continue; // Used data or not a process data
+                    TextData s (path); s.until('}'); uint userCount=s.integer(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
                     long timestamp = File(path, baseStorageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
@@ -171,8 +191,13 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
                     shared<ResultFile> result = results.take(i);
                     result->fileName.clear(); // Prevents rename
                 }
-                if(outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if need to recycle more than one file
-                    ::remove(oldest, baseStorageFolder);
+                if(!existsFile(oldest, baseStorageFolder) || outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if not a file or need to recycle more than one file
+                    if(existsFile(oldest, baseStorageFolder)) ::remove(oldest, baseStorageFolder);
+                    else { // Array output (folder)
+                        Folder folder(oldest, baseStorageFolder);
+                        for(const string& path: folder.list(Files)) ::remove(path, folder);
+                        remove(folder);
+                    }
                     continue;
                 }
                 ::rename(baseStorageFolder, oldest, storageFolder, output); // Renames last discarded file instead of removing (avoids page zeroing)
@@ -180,10 +205,10 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
             }
 
             File file(output, storageFolder, Flags(ReadWrite|Create));
-            file.resize( outputSize );
-            map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
+            file.resize(outputSize);
+            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
         }
-        outputs << shared<ResultFile>(output, currentTime(), Dict(), string(), storageFolder, move(map), output);
+        outputs << shared<ResultFile>(output, currentTime(), Dict(), string(), move(map), output, storageFolder);
     }
     assert_(outputs);
 
@@ -196,15 +221,32 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         shared<ResultFile> result = move(output);
         result->timestamp = realTime();
         result->relevantArguments = copy(relevantArguments);
-        if(result->map) { // Resizes and remaps file read-only (will be remapped Read|Write whenever used as output again)
-            assert(result->map.size >= result->data.size);
-            result->map.unmap();
-            File file(result->fileName, result->folder, ReadWrite);
-            file.resize(result->data.size);
-            result->map = Map(file);
-            result->data = buffer<byte>(result->map);
-        } else { // Writes data from heap to file
-            writeFile(result->fileName, result->data, result->folder);
+        if(result->elements) { // Copies each elements data from anonymous memory to numbered files in a folder
+            assert_(!result->maps);
+            Folder folder(result->fileName, result->folder, true);
+            for(uint i: range(result->elements.size)) writeFile(dec(i,4)+"."_+result->metadata, result->elements[i], folder);
+            touchFile(result->fileName, result->folder, true);
+        } else { // Synchronizes file mappings with results
+            uint64 mappedSize = 0;
+            if(result->maps) {
+                assert_(result->maps.size == 1);
+                mappedSize = result->maps[0].size;
+                assert_(mappedSize);
+                if(mappedSize<pageSize) result->data = copy(result->data); // Copies to anonymous memory before unmapping
+                result->maps.clear();
+            }
+            File file = 0;
+            if(result->data.size <= mappedSize) { // Truncates file to result size
+                file = File(result->fileName, result->folder, ReadWrite);
+                file.resize(result->data.size);
+            } else { // Copies data from anonymous memory to file
+                file = File(result->fileName, result->folder, Flags(ReadWrite|Truncate|Create));
+                file.write(result->data);
+            }
+            if(mappedSize>=pageSize) { // Remaps file read-only (will be remapped Read|Write whenever used as output again)
+                result->maps << Map(file);
+                result->data = buffer<byte>(result->maps.last());
+            }
         }
         results << move(result);
     }

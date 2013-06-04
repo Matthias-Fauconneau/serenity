@@ -96,7 +96,7 @@ class(Capsules, Operation), virtual VolumeOperation {
             analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
         }
         if(otherOutputs) {
-            otherOutputs[0]->metadata = string("analytic"_);
+            otherOutputs[0]->metadata = string("analytic.tsv"_);
             otherOutputs[0]->data = toASCII(analytic);
         }
     }
