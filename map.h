@@ -32,20 +32,19 @@ template<Type K, Type V> struct map {
         return values[i];
     }
 
-    V value(const K& key, V&& value) const {
+    template<Type KK> V value(const KK& key, V&& value) const {
         int i = keys.indexOf(key);
         return i>=0 ? copy(values[i]) : move(value);
     }
-    const V& value(const K& key, const V& value) const {
+    template<Type KK> const V& value(const KK& key, const V& value) const {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : value;
     }
 
-    V* find(const K& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
+    template<Type KK> V* find(const KK& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
+    template<Type KK> V& insert(KK&& key) { assert(!contains(key),key); keys << move(key); values << V(); return values.last(); }
 
-    V& insert(K&& key) { assert(!contains(key),key); keys << move(key); values << V(); return values.last(); }
-    V& insert(const K& key) { assert(!contains(key),key); keys << key; values << V(); return values.last(); }
-
+#if 0
     V& insert(K&& key, V&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << move(key); values << move(value); return values.last();
@@ -54,34 +53,40 @@ template<Type K, Type V> struct map {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << move(key); values << value; return values.last();
     }
-    V& insert(const K& key, V&& value) {
+    /*template<Type KK>*/ V& insert(const K& key, V&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << key; values << move(value); return values.last();
     }
-    V& insert(const K& key, const V& value) {
+    /*template<Type KK>*/ V& insert(const K& key, const V& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << key; values << value; return values.last();
     }
-    V& insertMulti(const K& key, const V& value) {
+#else
+    template<Type KK, Type VV> V& insert(KK&& key, VV&& value) {
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        keys << K(move(key)); values << move(value); return values.last();
+    }
+#endif
+    template<Type KK> V& insertMulti(const KK& key, const V& value) {
         keys << key; values << value; return values.last();
     }
-    V& insertSorted(const K& key, const V& value) {
+    template<Type KK> V& insertSorted(const KK& key, const V& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
-        return  values.insertAt(keys.insertSorted(key),value);
+        return values.insertAt(keys.insertSorted(key),value);
     }
-    V& insertSortedMulti(const K& key, const V& value) {
-        return  values.insertAt(keys.insertSorted(key),value);
+    template<Type KK> V& insertSortedMulti(const KK& key, const V& value) {
+        return values.insertAt(keys.insertSorted(key),value);
     }
 
-    V& operator [](K key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
+    template<Type KK> V& operator [](KK key) { int i = keys.indexOf(key); if(i>=0) return values[i]; return insert(key); }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
-    V& sorted(const K& key) {
+    template<Type KK> V& sorted(const KK& key) {
         int i = keys.indexOf(key); if(i>=0) return values[i];
         return values.insertAt(keys.insertSorted(key),V());
     }
 
-    V take(const K& key) { int i=keys.indexOf(key); if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_); keys.removeAt(i); return values.take(i); }
-    void remove(const K& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
+    template<Type KK> V take(const KK& key) { int i=keys.indexOf(key); if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_); keys.removeAt(i); return values.take(i); }
+    template<Type KK> void remove(const KK& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
         const K* k; const V* v;
@@ -115,11 +120,11 @@ template<Type K, Type V> string str(const map<K,V>& m) {
     string s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i])<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }
 template<Type K, Type V> string toASCII(const map<K,V>& m) {
-        string s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<','; } return replace(move(s),'/','\\');
+        string s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
 }
 
 template<Type K, Type V> map<K,V> operator<<(const map<K,V>& a, const map<K,V>& b) {
     map<K, V> r = copy(a);
-    for(const_pair<K, V> e: b) { assert(!r.contains(e.key), r.at(e.key), e.value, a, b); r.insert(e.key, copy(e.value)); }
+    for(const_pair<K, V> e: b) { assert(!r.contains(e.key), r.at(e.key), e.value, a, b); r.insert(copy(e.key), copy(e.value)); }
     return r;
 }

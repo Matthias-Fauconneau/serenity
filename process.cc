@@ -32,7 +32,7 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
                 if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
                 sweeps.at(key) << value;
             } else {
-                arguments.insert(key, (Variant)value);
+                arguments.insert(key, Variant(value));
             }
             continue;
         }
@@ -51,7 +51,7 @@ Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     for(const ref<byte>& input: rule.inputs) {
         for(auto arg: relevantArguments(ruleForOutput(input), arguments)) {
             if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
-            else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key))*/ relevant.insert(arg.key, arg.value);
+            else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key))*/ relevant.insert(move(arg.key), move(arg.value));
         }
     }
     unique<Operation> operation = Interface<Operation>::instance(rule.operation);
@@ -183,7 +183,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     Time time;
     Dict relevantArguments = Process::relevantArguments(rule, arguments);
     operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    log(left(str(rule),96),left(toASCII(relevantArguments),64),right(str(time),32));
+    log(rule, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
@@ -210,8 +210,8 @@ void Process::execute() {
 }
 void Process::execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
     if(sweeps) {
-        auto remaining = copy(sweeps);
-        auto args = copy(arguments);
+        map<ref<byte>, array<Variant>> remaining = copy(sweeps);
+        Dict args = copy(arguments);
         ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
         assert(!args.contains(parameter));
         for(Variant& value: remaining.take(parameter)) {

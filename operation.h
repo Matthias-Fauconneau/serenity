@@ -49,14 +49,15 @@ struct Variant : string {
 };
 template<> inline Variant copy(const Variant& o) { return copy((const string&)o); }
 template<> inline string str(const Variant& o) { return copy(o); }
-typedef map<ref<byte>,Variant> Dict; /// Associative array of variants
+typedef map<string,Variant> Dict; /// Associative array of variants
 inline Dict parseDict(TextData& s) {
     Dict dict;
     s.skip("{"_);
     for(;;) {
         if(s.match('}')) break;
         ref<byte> key = s.whileNo(":,}"_);
-        ref<byte> value = s.whileNo(",}"_);
+        ref<byte> value;
+        if(s.match(':')) value = s.whileNo("|}"_);
         dict.insert(key, replace(string(value),'\\','/'));
         if(s.match(',')) continue;
         else if(s.match('}')) break;

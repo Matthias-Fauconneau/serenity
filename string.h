@@ -53,10 +53,6 @@ string toLower(const ref<byte>& s);
 string simplify(string&& s);
 /// Repeats a string
 string repeat(const ref<byte>& s, uint times);
-/// Aligns string left
-string left(const ref<byte>& s, uint width);
-/// Aligns string right
-string right(const ref<byte>& s, uint width);
 
 /// Forwards string
 inline const string& str(const string& s) { return s; }

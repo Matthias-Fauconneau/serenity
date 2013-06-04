@@ -5,7 +5,7 @@
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles = 16GiB (virtual))
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
 struct Ball { uint16 x,y,z,sqRadius; };
-struct Tile { uint64 ballCount=0; Ball balls[tileSize*2-1]; }; // 16³ tiles -> 64KB/tile ~ 16GiB (virtual) for 1K³
+struct Tile { uint64 ballCount=0; Ball balls[tileSize*4-1]; }; // 16³ tiles -> 64KB/tile ~ 16GiB (virtual) for 1K³
 
 /// Tests box-ball intersection
 inline uint dmin(int size, int vx, int vy, int vz) {
