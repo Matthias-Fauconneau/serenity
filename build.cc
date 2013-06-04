@@ -19,6 +19,7 @@ struct Build {
     array<unique<Module>> modules;
     array<string> libraries;
     array<string> files;
+    array<int> pids;
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
     long parse(ref<byte> target) {
@@ -66,10 +67,14 @@ struct Build {
             args << object << target+".cc"_;
             if(find(build,"debug"_)) args << string("-DDEBUG"_);
             if(find(build,"fast"_)) args <<  string("-Ofast"_);
-            if(execute("/ptmp/gcc-4.8.0/bin/g++"_,flags+toRefs(args))) { log("Build failed"_); exit(-1); exit_thread(-1); } //TODO: pipeline 4
+            log(target);
+            pids << execute("/ptmp/gcc-4.8.0/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
         }
         return lastLinkEdit;
     }
+
+    void fail() { log("Build failed"_); exit(-1); exit_thread(-1); }
+
     Build() {
         Folder(tmp+build, root(), true);
         long lastEdit = compile(target);
@@ -81,7 +86,7 @@ struct Build {
             for(const string& file: files) {
                 string object = tmp+"files/"_+file+".o"_;
                 if(!existsFile(object, folder) || File(file, folder).modifiedTime() >= File(object, folder).modifiedTime()) {
-                    assert_(! execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<file) );
+                    if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<file)) fail();
                     fileChanged = true;
                 }
             }
@@ -93,7 +98,8 @@ struct Build {
             args << apply<string>(modules, [this](const unique<Module>& module){ return tmp+build+"/"_+module->name+".o"_; });
             args << apply<string>(files, [this](const string& file){ return tmp+"files/"_+file+".o"_; });
             args << string("-L/ptmp/lib"_) << apply<string>(libraries, [this](const string& library){ return "-l"_+library; });
-            if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) { exit(-1); exit_thread(-1); }
+            for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
+            if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) fail();
         }
     }
 } build;

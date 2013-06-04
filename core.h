@@ -52,6 +52,9 @@ template<Type T> T max(T a, T b) { return a>b ? a : b; }
 template<Type T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
 template<Type T> T abs(T x) { return x>=0 ? x : -x; }
 
+// Arithmetic functions
+template<Type T> inline constexpr T sqr(const T& x) { return x*x; }
+
 // Basic types
 typedef char byte;
 typedef signed char int8;
@@ -210,7 +213,7 @@ inline void copy(byte* dst, const byte* src, uint size) { for(uint i: range(size
 template<Type T> void clear(T* buffer, uint64 size, const T& value=T()) { for(uint i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \dst
 /// \note Ignores move and copy operators
-template<Type T> void rawCopy(T* dst,const T* src, uint size) { copy((byte*)dst, (const byte*)src, size); }
+template<Type T> void rawCopy(T* dst,const T* src, uint size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);

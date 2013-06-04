@@ -1,22 +1,29 @@
 source = Source
 capsules = Capsules
+
+histogram_source = Histogram source
+#threshold interclass = Otsu histogram_source
+threshold lorentz_rock lorentz_notrock lorentz_pore lorentz_notpore = LorentzianMixtureModel histogram_source
+
 shift = ShiftRight source
 smoothx = Smooth shift
 smoothxy = Smooth smoothx
 smooth = Smooth smoothxy shift=0
-pore rock = Threshold smooth
+
+pore rock = Binary smooth threshold
 colorize = Colorize pore source
+
 distancex positionxx = DistanceX pore
 distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
 skeleton = Skeleton positionx positiony positionz
-#skeleton_histogram = SqrtHistogram skeleton
 skeleton_unconnected = Tile skeleton
 skeleton_connected = FloodFill skeleton_unconnected
-bins_unconnected = Bin skeleton_unconnected
-bins_connected = Bin skeleton_connected
-unconnected = Rasterize bins_unconnected
-connected = Rasterize bins_connected
+
+bin_unconnected = Bin skeleton_unconnected
+bin_connected = Bin skeleton_connected
+unconnected = Rasterize bin_unconnected
+connected = Rasterize bin_connected
 
 # Computes histogram of maximal ball radii (i.e. pore size distribution)
 histogram_unconnected = SqrtHistogram unconnected

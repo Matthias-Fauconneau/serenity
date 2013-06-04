@@ -30,21 +30,22 @@ string volumeFormat(const Volume& volume) {
     return s;
 }
 
-void parseVolumeFormat(Volume& volume, const ref<byte>& format) {
+bool parseVolumeFormat(Volume& volume, const ref<byte>& format) {
     TextData s (format);
-    volume.sampleCount.x = s.integer(); s.skip("x"_);
-    volume.sampleCount.y = s.integer(); s.skip("x"_);
+    volume.sampleCount.x = s.integer(); if(!s.match("x"_)) return false;
+    volume.sampleCount.y = s.integer(); if(!s.match("x"_)) return false;
     volume.sampleCount.z = s.integer();
     if(s.match('+')) {
-        volume.margin.x = s.integer(); s.skip("+"_);
-        volume.margin.y = s.integer(); s.skip("+"_);
+        volume.margin.x = s.integer(); if(!s.match("+"_)) return false;
+        volume.margin.y = s.integer(); if(!s.match("+"_)) return false;
         volume.margin.z = s.integer();
     }
-    s.skip("-"_);
+    if(!s.match("-"_)) return false;
     volume.maximum = s.hexadecimal();
     if(s.match("-tiled"_)) interleavedLookup(volume); else { volume.offsetX=buffer<uint>(), volume.offsetY=buffer<uint>(), volume.offsetZ=buffer<uint>(); }
     if(s.match("-squared"_)) volume.squared=true;
-    assert(!s);
+    if(s) return false;
+    return true;
 }
 
 uint maximum(const Volume16& source) {

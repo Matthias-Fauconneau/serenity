@@ -3,6 +3,14 @@
 #include "string.h"
 #include "simd.h"
 
+template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
+inline float norm(float x) { return abs(x); }
+inline constexpr float sqrt(float f) { return __builtin_sqrtf(f); }
+inline bool isNaN(float x) { return __builtin_isnan(x); }
+inline float floor(float x) { return __builtin_floorf(x); }
+inline float round(float x) { return __builtin_roundf(x); }
+inline float ceil(float x) { return __builtin_ceilf(x); }
+
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, Type T, uint N> struct vector : V<T> {
@@ -65,10 +73,6 @@ generic bool operator ==(const vector& u, const vector& v) { for(uint i=0;i<N;i+
 generic bool operator >=(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]<v[i]) return false; return true; }
 generic bool operator >(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
 
-inline float floor(float x) { return __builtin_floorf(x); }
-inline float round(float x) { return __builtin_roundf(x); }
-inline float ceil(float x) { return __builtin_ceilf(x); }
-
 generic vector abs(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
 generic vector floor(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=floor(v[i]); return r;  }
 generic vector fract(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=fract(v[i]); return r;  }
@@ -77,17 +81,11 @@ generic vector ceil(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=ceil(
 generic vector min(const vector& a, const vector& b){ vector r; for(uint i=0;i<N;i++) r[i]=min(a[i],b[i]); return r; }
 generic vector max(const vector& a, const vector& b){ vector r; for(uint i=0;i<N;i++) r[i]=max(a[i],b[i]); return r; }
 generic vector clip(const vector& min, const vector& x, const vector& max){vector r; for(uint i=0;i<N;i++) r[i]=clip(min[i],x[i],max[i]); return r;}
-template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
 
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
-template<Type T> inline constexpr T sqr(const T& x) { return x*x; }
 generic float sqr(const vector& a) { return dot(a,a); }
-inline float norm(float x) { return abs(x); }
-inline constexpr float sqrt(float f) { return __builtin_sqrtf(f); }
 generic float norm(const vector& a) { return sqrt(dot(a,a)); }
 generic vector normalize(const vector& a){ return a/norm(a); }
-
-inline bool isNaN(float x) { return __builtin_isnan(x); }
 generic bool isNaN(const vector& v){ for(uint i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
 
 generic string str(const vector& v) { string s("("_); for(uint i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }

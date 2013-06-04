@@ -1,11 +1,24 @@
 #include "sample.h"
 #include "data.h"
+#include "math.h"
 
 uint64 sum(const Sample& A) { uint64 sum=0; for(uint i: range(A.size)) sum+=A[i]; return sum; }
 
+Sample operator*(double s, const Sample& A) {
+    uint N=A.size; Sample R(N);
+    for(uint i: range(N)) R[i]=s*A[i];
+    return R;
+}
+
 Sample operator-(const Sample& A, const Sample& B) {
-    uint N=A.size; assert(B.size==N); Sample R(N,N);
-    for(uint i: range(N)) R[i]=max(0ll, A[i]-B[i]);
+    uint N=A.size; assert(B.size==N); Sample R(N);
+    for(uint i: range(N)) R[i]=max(0., A[i]-B[i]);
+    return R;
+}
+
+Sample operator*(const Sample& A, const Sample& B) {
+    uint N=A.size; assert(B.size==N); Sample R(N);
+    for(uint i: range(N)) R[i]=A[i]*B[i];
     return R;
 }
 
@@ -17,58 +30,18 @@ Sample sqrtHistogram(const Sample& A) {
 
 Sample parseSample(const ref<byte>& file) {
     TextData s (file);
-    int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.integer(); s.skip("\n"_); }
+    int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.decimal(); s.skip("\n"_); }
     s.index=0;
     Sample sample(maximum+1);
-    while(s) { float x=s.decimal(); assert(x==float(int(x))); s.skip("\t"_); sample[int(x)]=s.integer(); s.skip("\n"_); }
+    while(s) { float x=s.decimal(); assert(x==float(int(x))); s.skip("\t"_); sample[int(x)]=s.decimal(); s.skip("\n"_); }
     return sample;
 }
 
 inline float log10(float x) { return __builtin_log10f(x); }
-string toASCII(const Sample& sample, bool zeroes, bool squared, float scale) {
+string toASCII(const Sample& sample, float scale) {
     string s;
-    for(uint i=0; i<sample.size; i++) if(zeroes || sample[i]) s << ftoa((squared?sqrt(i):float(i))*scale,3) << '\t' << str(sample[i]) << '\n';
+    for(uint i=0; i<sample.size; i++) if(sample[i]) s << ftoa(i*scale,3) << '\t' << ftoa(sample[i], 3) << '\n';
     return s;
-}
-
-Sample histogram(const Volume16& source, bool cylinder) {
-    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    assert_(X==Y && marginX==marginY, source.sampleCount, source.margin);
-    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
-    Sample histogram (source.maximum+1, source.maximum+1, 0);
-    if(source.offsetX || source.offsetY || source.offsetZ) {
-        const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-        for(int z=marginZ; z<Z-marginZ; z++) {
-            const uint16* sourceZ = source+offsetZ[z];
-            for(int y=marginY; y<Y-marginY; y++) {
-                const uint16* sourceZY = sourceZ+offsetY[y];
-                for(int x=marginX; x<X-marginX; x++) {
-                    if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq) {
-                        uint sample = sourceZY[offsetX[x]];
-                        assert_(sample <= source.maximum);
-                        histogram[sample]++;
-                    }
-                }
-            }
-        }
-    }
-    else {
-        for(int z=marginZ; z<Z-marginZ; z++) {
-            const uint16* sourceZ = source+z*XY;
-            for(int y=marginY; y<Y-marginY; y++) {
-                const uint16* sourceZY = sourceZ+y*X;
-                for(int x=marginX; x<X-marginX; x++) {
-                    if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq) {
-                        uint sample = sourceZY[x];
-                        assert_(sample <= source.maximum);
-                        histogram[sample]++;
-                    }
-                }
-            }
-        }
-    }
-    return histogram;
 }
 
 Lorentz estimateLorentz(const Sample& sample) {

@@ -43,7 +43,7 @@ template<Type T> struct VolumeT : Volume {
 string volumeFormat(const Volume& volume);
 inline string str(const Volume& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
-void parseVolumeFormat(Volume& volume, const ref<byte>& format);
+bool parseVolumeFormat(Volume& volume, const ref<byte>& format);
 
 /// Returns maximum of data
 uint maximum(const Volume16& source);

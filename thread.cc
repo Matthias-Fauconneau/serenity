@@ -176,7 +176,7 @@ void exit(int status) {
 }
 
 // Environment
-int64 execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait) {
+int execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait) {
     if(!existsFile(path)) { warn("Executable not found",path); return -1; }
 
     array<string> args0(1+args.size);
@@ -196,9 +196,10 @@ int64 execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait) {
 
     int pid = fork();
     if(pid==0) { if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
-    else if(wait) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
-    else { wait4(pid,0,WNOHANG,0); return -1; }
+    else if(wait) return ::wait(pid);
+    else { wait4(pid,0,WNOHANG,0); return pid; }
 }
+int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
 string getenv(const ref<byte>& name) {
     for(TextData s = File("proc/self/environ"_).readUpTo(8192);s;) {

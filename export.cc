@@ -3,19 +3,6 @@
 #include "time.h"
 #include "png.h"
 
-/// Computes histogram (with square rooted x values)
-class(SqrtHistogram, Operation) {
-    uint64 outputSize(const Dict&, const ref<Result*>&, uint) override { return 0; }
-    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        Volume source = toVolume(*inputs[0]);
-        Sample squaredMaximum = histogram(source, args.contains("cylinder"_));
-        squaredMaximum[0] = 0; // Clears background voxel count to plot with a bigger Y scale
-        float scale = toDecimal(args.value("resolution"_,"1"_));
-        outputs[0]->metadata = string("tsv"_);
-        outputs[0]->data = toASCII(sqrtHistogram(squaredMaximum), false, false, scale);
-    }
-};
-
 /// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeInput {
     void execute(const Dict& args, const ref<byte>& name, const Volume& volume) override {

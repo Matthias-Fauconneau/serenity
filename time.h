@@ -35,7 +35,7 @@ struct Date {
     /// Constructs a calendar date (unspecified hour)
     Date(int monthDay, int month, int year, int weekDay=-1);
     /// Converts UNIX \a timestamp (in seconds) to a local time calendar date
-    Date(long timestamp);
+    Date(int64 timestamp);
     /// Returns days from Thursday, 1st January 1970
     int days() const;
     /// Returns whether this date is in daylight saving time
@@ -43,7 +43,7 @@ struct Date {
     /// Returns the local time offset from UTC in minutes (time zone + DST)
     int localTimeOffset() const;
     /// Converts the date to Unix time (in seconds)
-    operator long() const;
+    operator int64() const;
 };
 /// Orders two dates
 bool operator <(const Date& a, const Date& b);

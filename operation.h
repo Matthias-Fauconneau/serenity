@@ -55,11 +55,11 @@ inline Dict parseDict(TextData& s) {
     s.skip("{"_);
     for(;;) {
         if(s.match('}')) break;
-        ref<byte> key = s.whileNo(":,}"_);
+        ref<byte> key = s.whileNo(":|}"_);
         ref<byte> value;
         if(s.match(':')) value = s.whileNo("|}"_);
         dict.insert(key, replace(string(value),'\\','/'));
-        if(s.match(',')) continue;
+        if(s.match('|')) continue;
         else if(s.match('}')) break;
         else error(s.untilEnd());
     }
@@ -83,7 +83,7 @@ struct Operation {
     /// Returns which parameters affects this operation output
     virtual ref<byte> parameters() const { return ""_; }
     /// Returns the desired intermediate data size in bytes for each outputs
-    virtual uint64 outputSize(const Dict& args, const ref<Result*>& inputs, uint index) abstract;
+    virtual uint64 outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the operation using inputs to compute outputs
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) abstract;
 };

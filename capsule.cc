@@ -54,11 +54,11 @@ array<Capsule> randomCapsules(vec3 size, float minimumDistance, float maximumLen
     return capsules;
 }
 
-/// Rasterizes capsules inside a volume (voxels outside any surface are assigned the maximum value, voxels inside any surface are assigned zero)
+/// Rasterizes capsules inside a volume (voxels outside any surface are assigned the maximum value minus one, voxels inside any surface are assigned one)
 void rasterize(Volume16& target, const array<Capsule>& capsules) {
     const int X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
     uint16* const targetData = target;
-    clear(targetData, target.size(), (uint16)target.maximum); // Sets target to maximum value
+    clear(targetData, target.size(), (uint16)target.maximum-1); // Sets target to maximum value
     parallel(capsules.size, [&](uint, uint i) {
         Capsule p=capsules[i]; vec3 a=p.a, b=p.b;
         vec3 min = ::min(a,b)-vec3(p.radius), max = ::max(a,b)+vec3(p.radius); // Bounding box
@@ -74,7 +74,7 @@ void rasterize(Volume16& target, const array<Capsule>& capsules) {
                     uint16* const targetZYX= targetZY + x;
                     vec3 P = vec3(x,y,z);
                     float l = dot(P-a, normalize(b-a));
-                    if((0 < l && l < length && sqr(P-(a+l*normalize(b-a))) <= sqRadius) || sqr(P-a)<=sqRadius || sqr(P-b)<=sqRadius) targetZYX[0] = 0;
+                    if((0 < l && l < length && sqr(P-(a+l*normalize(b-a))) <= sqRadius) || sqr(P-a)<=sqRadius || sqr(P-b)<=sqRadius) targetZYX[0] = 1;
                 }
             }
         }

@@ -144,7 +144,9 @@ void exit(int status=0);
 void __attribute((noreturn)) exit_thread(int status);
 
 /// Execute binary at \a path with command line arguments \a args
-int64 execute(const ref<byte>& path, const ref<ref<byte>>& args={}, bool wait=true);
+/// \note if \a wait is false, Returns the PID to be used for wait
+int execute(const ref<byte>& path, const ref<ref<byte>>& args={}, bool wait=true);
+int64 wait(int pid);
 
 /// Returns value for environment variable \a name
 string getenv(const ref<byte>& name);

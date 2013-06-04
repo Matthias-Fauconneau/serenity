@@ -4,10 +4,16 @@
 
 Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
     // Parses process definition
+    array<ref<byte>> results;
     for(TextData s(definition); s; s.skip()) {
         if(s.match('#')) { s.until('\n'); continue; }
         Rule rule;
-        for(;!s.match('='); s.skip()) rule.outputs << s.word("_-"_);
+        for(;!s.match('='); s.skip()) {
+            ref<byte> output = s.word("_-"_);
+            assert_(!results.contains(output), "Multiple definitions for", output);
+            results << output;
+            rule.outputs << output;
+        }
         s.skip();
         rule.operation = s.word();
         s.whileAny(" \t\r"_);
@@ -81,8 +87,9 @@ bool Process::sameSince(const ref<byte>& target, int64 queryTime, const Dict& ar
         else return false; // Result changed since query
     }
     const Rule& rule = ruleForOutput(target);
-    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) {  log(target,"input",input,"changed"); return false; } // Inputs changed since result (or query if result was discarded) was last generated
-    if((long)parse(Interface<Operation>::version(rule.operation)) > queryTime) { log((long)parse(Interface<Operation>::version(rule.operation)), queryTime); return false; } // Implementation changed since query (FIXME: timestamps might be unsynchronized)
+    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false; // Inputs changed since result (or query if result was discarded) was last generated
+    if(parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query (FIXME: timestamps might be unsynchronized)
+    //else log("same",parse(Interface<Operation>::version(rule.operation), Date(queryTime), (long)parse(Interface<Operation>::version(rule.operation)), queryTime);
     return true;
 }
 
@@ -221,7 +228,7 @@ void Process::execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& 
         }
     } else { // Actually generates targets when sweeps have been explicited
         for(const ref<byte>& target: targets) {
-            log(target, relevantArguments(ruleForOutput(target), arguments), results);
+            log(target, relevantArguments(ruleForOutput(target), arguments));
             targetResults << getResult(target, arguments);
         }
     }

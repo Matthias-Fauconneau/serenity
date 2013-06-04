@@ -72,6 +72,10 @@ int64 toInteger(const ref<byte>& number, int base) {
     return sign*value;
 }
 
+bool isDecimal(const ref<byte>& s) {
+    if(!s) return false; bool gotDot=false; for(char c: s) if((c<'0'||c>'9')&&(gotDot||c!='.')) return false; return true;
+}
+
 double toDecimal(const ref<byte>& number) {
     if(!number) return __builtin_nan("");
     double sign=1;

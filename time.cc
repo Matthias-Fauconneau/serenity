@@ -55,7 +55,7 @@ int Date::localTimeOffset() const {
     if(summerTime()) offset += 1;
     return offset*60;
 }
-Date::Date(long time) {
+Date::Date(int64 time) {
     // UTC time and date
     seconds = time;
     minutes=seconds/60; seconds %= 60;
@@ -82,7 +82,7 @@ Date::Date(long time) {
     invariant();
     assert(long(*this)==time);
 }
-Date::operator long() const {
+Date::operator int64() const {
     invariant();
     return ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0)-localTimeOffset())*60+(seconds>=0?seconds:0);
 }

@@ -25,6 +25,8 @@ bool find(const ref<byte>& str, const ref<byte>& substring);
 bool isInteger(const ref<byte>& s);
 /// Parses an integer value
 int64 toInteger(const ref<byte>& str, int base=10);
+/// Returns true if s matches [0-9]*.?[0-9]*
+bool isDecimal(const ref<byte>& s);
 /// Parses a decimal value
 double toDecimal(const ref<byte>& str);
 

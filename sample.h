@@ -1,24 +1,27 @@
 #pragma once
-#include "volume.h"
+#include "string.h"
 
 /// Finite discrete integer-valued distribution (represented by its samples)
-typedef buffer<int64> Sample;
+typedef buffer<double> Sample;
 
 /// Sums all samples
 uint64 sum(const Sample& A);
 
-/// Substracts two samples clipping to zero
+/// Multiplies sample by a scalar
+Sample operator*(double s, const Sample& A);
+
+/// Substracts samples clipping to zero
 Sample operator-(const Sample& A, const Sample& B);
+
+/// Multiplies samples
+Sample operator*(const Sample& A, const Sample& B);
 
 /// Square roots and round X coordinates summing all sample falling in the same bin
 Sample sqrtHistogram(const Sample& A);
 
 Sample parseSample(const ref<byte>& file);
 
-string toASCII(const Sample& sample, bool zeroes=false, bool squared=false, float scale=1);
-
-/// Computes histogram of values
-Sample histogram(const Volume16& volume, bool cylinder=false);
+string toASCII(const Sample& sample, float scale=1);
 
 /// Lorentz distribution 1/(1+x²)
 struct Lorentz {
