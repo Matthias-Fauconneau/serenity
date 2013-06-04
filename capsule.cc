@@ -84,7 +84,7 @@ void rasterize(Volume16& target, const array<Capsule>& capsules) {
 class(Capsules, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint i) override { return i==0 ? 2 : 0; }
     uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 512*512*512*outputSampleSize(0); }
-    void execute(const Dict& args, array<Volume>& outputs, const ref<Volume>&) override {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {
         Volume& target = outputs.first();
         target.sampleCount = 512;
         target.maximum = (1<<(target.sampleSize*8))-1;
@@ -95,6 +95,9 @@ class(Capsules, Operation), virtual VolumeOperation {
             if(p.radius>=analytic.size) analytic.grow(p.radius+1);
             analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
         }
-        writeFile(args.at("name"_)+".analytic.tsv"_, toASCII(analytic), args.at("resultFolder"_)); //FIXME
+        if(otherOutputs) {
+            otherOutputs[0]->metadata = string("analytic"_);
+            otherOutputs[0]->data = toASCII(analytic);
+        }
     }
 };

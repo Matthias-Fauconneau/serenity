@@ -194,6 +194,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
+        result->timestamp = realTime();
         result->relevantArguments = copy(relevantArguments);
         if(result->map) { // Resizes and remaps file read-only (will be remapped Read|Write whenever used as output again)
             assert(result->map.size >= result->data.size);
