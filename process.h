@@ -13,7 +13,10 @@ inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
-    Process(const ref<byte>& definition, const ref<ref<byte>>& arguments);
+    /// Sets process arguments
+    void setArguments(const ref<ref<byte>>& arguments);
+    /// Sets process definition
+    void setDefinition(const ref<byte>& definition);
 
     /// Returns the Rule to evaluate in order to produce \a target
     Rule& ruleForOutput(const ref<byte>& target);
@@ -32,13 +35,20 @@ struct Process {
     /// Returns a valid cached Result for \a target with \a arguments or generates it if necessary
     virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);
 
-    /// Executes all operations to generate each target (for each value of any parameter sweep)
-    void execute();
+    /// Prepares to execute
+    /// \return target results to generate
+    virtual array<ref<byte>> prepare(array<ref<byte>>& arguments);
+
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
+    void execute(const array<ref<byte>>& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
+
+    /// Executes all operations to generate all target (for each value of any parameter sweep) using current definition and arguments
+    void execute();
+
+    ref<byte> definition; // Unparsed definition
+    ref<ref<byte>> rawArguments; // Initial arguments specified by user
 
     array<Rule> rules; // Production rules
-    array<ref<byte>> targets; // Target results to compute
     Dict defaultArguments; // Process specified default arguments
     Dict arguments; // User-specified arguments
     map<ref<byte>, array<Variant>> sweeps; // User-specified parameter sweeps
@@ -67,8 +77,9 @@ struct ResultFile : Result {
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
 struct PersistentProcess : Process {
-    PersistentProcess(const ref<byte>& definition, const ref<ref<byte>>& arguments);
     ~PersistentProcess();
+
+    array<ref<byte>> prepare(array<ref<byte>>& args) override;
 
     /// Gets result from cache or computes if necessary
     shared<Result> getResult(const ref<byte>& target, const Dict& arguments) override;

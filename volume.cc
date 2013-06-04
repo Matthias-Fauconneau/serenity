@@ -164,7 +164,7 @@ void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, u
     }
 }
 #endif
-#if 0
+#if 1
 void downsample(Volume16& target, const Volume16& source) {
     assert(!source.offsetX && !source.offsetY && !source.offsetZ);
     int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;

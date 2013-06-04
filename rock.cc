@@ -9,6 +9,7 @@
 #include "png.h"
 
 //#include "source.h"
+PASS(Downsample, uint16, downsample);
 //include "capsule.h"
 //#include "smooth.h"
 //#include "threshold.h"
@@ -24,25 +25,12 @@ PASS(SquareRoot, uint16, squareRoot);
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : PersistentProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)
-    Rock(const ref<ref<byte>>& args) : PersistentProcess(rock(), args) {
-        const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
-        ref<byte> result; // Path to file (or folder) where targets are copied
-        for(const ref<byte>& argument: args) {
-            if(argument.contains('=') || &ruleForOutput(argument)) continue;
-            if(!arguments.contains("source"_) && (existsFolder(argument,cwd) || argument=="validation"_)) { arguments.insert("source"_,argument); continue; }
-            if(!result) { result=argument; continue; }
-            error("Invalid argument"_, argument);
-        }
-        if(arguments.at("source"_)=="validation"_) {
-            ruleForOutput("source"_).operation = "Capsules"_;
-            ruleForOutput("pore"_).inputs=array<ref<byte>>({"source"_}); // Skip smooth
-        }
-        assert_(name, "Usage: rock <source folder containing volume slices> [target] [key=value]*");
-
-        // Configures default arguments
-        if(!arguments.contains("cube"_) && arguments.at("source"_)!="validation"_) defaultArguments.insert("cylinder"_,""_); // Clips histograms and slice rendering to the inscribed cylinder
+    Rock(const ref<ref<byte>>& args) {
+        // Set arguments
+        if(!arguments.contains("cube"_)) defaultArguments.insert("cylinder"_,""_); // Clips histograms and slice rendering to the inscribed cylinder
         defaultArguments.insert("kernelSize"_,"1"_);
-
+        setArguments(args);
+        setDefinition(rock());
         execute();
 
         if(result) { // Copies result to result folder (on disk)
@@ -67,6 +55,18 @@ struct Rock : PersistentProcess, Widget {
         window->clearBackground = false;
         updateView();
         window->show();
+    }
+
+     array<ref<byte> > prepare(array<ref<byte>>& args) override {
+        array<ref<byte>> targets = PersistentProcess::prepare(args);
+        for(const ref<byte>& argument: args) {
+            if(!arguments.contains("source"_) && existsFolder(argument,cwd)) { arguments.insert("source"_,argument); continue; }
+            if(!result) { result=argument; continue; }
+            error("Invalid argument"_, argument);
+        }
+        assert_(name, "Usage: rock <source folder containing volume slices> [target] [key=value]*");
+
+        return targets;
     }
 
     void refresh() {
@@ -144,6 +144,8 @@ struct Rock : PersistentProcess, Widget {
         log(path);
     }
 
+    const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
+    ref<byte> result; // Path to file (or folder) where targets are copied
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     unique<Window> window {unique<Window>::null()};

@@ -44,7 +44,6 @@ Sample histogram(const Volume16& source, bool cylinder) {
 /// Computes histogram using uniform integer bins
 class(Histogram, Operation) {
     virtual ref<byte> parameters() const { return "cylinder"_; }
-    uint64 outputSize(const Dict&, const ref<Result*>&, uint) override { return 0; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         Sample histogram = ::histogram(source, args.contains("cylinder"_));
@@ -56,7 +55,6 @@ class(Histogram, Operation) {
 /// Computes histogram, square roots bin values, recounts using uniform integer bins and scales bin values
 class(SqrtHistogram, Operation) {
     virtual ref<byte> parameters() const { return "cylinder resolution"_; }
-    uint64 outputSize(const Dict&, const ref<Result*>&, uint) override { return 0; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         Sample squaredHistogram = ::histogram(source, args.contains("cylinder"_));
@@ -64,5 +62,11 @@ class(SqrtHistogram, Operation) {
         float scale = toDecimal(args.value("resolution"_,"1"_));
         outputs[0]->metadata = string("√histogram.tsv"_);
         outputs[0]->data = toASCII(sqrtHistogram(squaredHistogram), scale);
+    }
+};
+
+class(Sum, Operation) {
+    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        output(outputs, 0, "scalar"_, [&]{ return str(sum(parseSample(inputs[0]->data))); });
     }
 };

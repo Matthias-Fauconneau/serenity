@@ -89,12 +89,12 @@ struct Operation {
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) abstract;
 };
 
-/// Convenient helper method to implement optionnal outputs
+/// Convenient helper method to implement outputs
 template<Type F> bool output(const ref<Result*>& outputs, uint index, const ref<byte>& metadata, F data) {
     if(outputs.size>index) {
         outputs[index]->metadata = string(metadata);
         outputs[index]->data = data();
         return true;
-    }
+    } else assert_(index>0);
     return false;
 }

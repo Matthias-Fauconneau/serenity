@@ -1,14 +1,15 @@
-source = Source
-capsules = Capsules
+if !validation: source = Source
+if validation: source = Capsules
 
 histogram-source = Histogram source
-threshold interclass = Otsu histogram-source
-#threshold lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
+if threshold==otsu: threshold interclass = Otsu histogram-source
+if threshold==lorentz: threshold lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
 
 shift = ShiftRight source
 smoothx = Smooth shift
 smoothxy = Smooth smoothx
-smooth = Smooth smoothxy shift=0
+if !downsample: smooth = Smooth smoothxy shift=0
+if downsample: smooth = Downsample source
 
 pore rock = Binary smooth threshold
 colorize = Colorize pore source
@@ -28,13 +29,18 @@ connected = Rasterize bin-connected
 # Computes histogram of maximal ball radii (i.e. pore size distribution)
 histogram-unconnected = SqrtHistogram unconnected
 histogram-connected = SqrtHistogram connected
+volume = Sum histogram-connected
 
+#For volume rendering:
 #emptyx epositionx = DistanceX rock
 #emptyy epositiontx epositiony = DistanceY emptyx epositionx
 #emptyz epositionx epositiony epositionz = DistanceZ emptyy epositionyx epositionyy
 #empty = SquareRoot emptyz # Square roots and tiles distance field before using it for empty space skiping during rendering
 #density = SquareRoot distance # Square roots and normalizes (FIXME) distance to use as density values (for opacity and gradient)
 #intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
+
+#validate = Validate pore maximum
+
 #ascii-source = ToASCII source
 ascii-unconnected = ToASCII unconnected
 ascii-connected = ToASCII connected
@@ -47,5 +53,3 @@ png-skeleton = ToPNG skeleton
 png-unconnected = ToPNG unconnected
 png-connected = ToPNG connected
 
-#Last target is the default
-#validate = Validate pore maximum

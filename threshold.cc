@@ -101,7 +101,7 @@ class(Binary, Operation), virtual VolumeOperation {
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         const Volume& source = inputs[0];
         float densityThreshold;
-        if(args.contains("threshold"_)) {
+        if(args.contains("threshold"_) && isDecimal(args.at("threshold"_))) {
             densityThreshold = toDecimal(args.at("threshold"_));
             while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
             log("Threshold argument", densityThreshold);

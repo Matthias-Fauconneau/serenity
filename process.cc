@@ -2,14 +2,35 @@
 #include "data.h"
 #include "time.h"
 
-Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
-    // Parses process definition
+void Process::setDefinition(const ref<byte>& definition) {
+    rules.clear();
+    this->definition = definition;
     array<ref<byte>> results;
     for(TextData s(definition); s; s.skip()) {
+        s.skip();
         if(s.match('#')) { s.until('\n'); continue; }
+        if(s.match("if"_)) {
+            s.skip();
+            bool enable;
+            if(s.match('!')) enable = !arguments.contains(s.word("_-"_));
+            else {
+                ref<byte> parameter = s.word("_-"_);
+                s.skip();
+                if(s.match("=="_)) {
+                    ref<byte> literal = s.identifier("_-"_);
+                    enable = arguments.value(parameter, "0"_) == literal;
+                } else {
+                    enable = arguments.contains(parameter);
+                }
+            }
+            s.skip(":"_);
+            if(!enable) { s.until('\n'); continue; }
+            s.skip();
+        }
         Rule rule;
         for(;!s.match('='); s.skip()) {
             ref<byte> output = s.word("_-"_);
+            assert_(output, s.until('\n'));
             assert_(!results.contains(output), "Multiple definitions for", output);
             results << output;
             rule.outputs << output;
@@ -26,10 +47,16 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
         }
         rules << move(rule);
     }
+}
 
+void Process::setArguments(const ref<ref<byte>>& rawArguments) {
+    array<ref<byte>> parameters;
+    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
+    arguments.clear();
+    this->rawArguments = rawArguments;
     // Parses targets and global arguments
-    for(const ref<byte>& argument: args) {
-        if(argument.contains('=')) { // Stores generic argument to be parsed in relevant operation
+    for(const ref<byte>& argument: rawArguments) {
+        if(argument.contains('=')) { // Stores generic argument affecting operations
             ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
             /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
                 assert(!arguments.contains(key));
@@ -41,14 +68,11 @@ Process::Process(const ref<byte>& definition, const ref<ref<byte>>& args) {
             } else {
                 arguments.insert(key, Variant(value));
             }
-            continue;
         }
-        if(&ruleForOutput(argument)) targets << argument;
+        else if(parameters.contains(argument)) arguments.insert(argument,""_);
     }
-    if(!targets) {
-        assert(rules && rules.last().outputs, rules);
-        targets << rules.last().outputs.last();
-    }
+    for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
+    setDefinition(this->definition);
 }
 
 Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
@@ -100,15 +124,49 @@ shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments
     error("Anonymous process manager unimplemented"_);
 }
 
-PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<byte>>& arguments) : Process(definition, arguments) {
-    for(const ref<byte>& argument: arguments) {
-        if(argument.contains('=') || &ruleForOutput(argument)) continue;
-        if(!name) name=argument;
-        if(existsFolder(argument, currentWorkingDirectory())) name=argument.contains('/')?section(argument,'/',-2,-1):argument;
+void Process::execute(const array<ref<byte>>& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
+    if(sweeps) {
+        map<ref<byte>, array<Variant>> remaining = copy(sweeps);
+        Dict args = copy(arguments);
+        ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
+        assert(!args.contains(parameter));
+        for(Variant& value: remaining.take(parameter)) {
+            args.insert(parameter, move(value));
+            execute(targets, remaining, args);
+            args.remove(parameter);
+        }
+    } else { // Actually generates targets when sweeps have been explicited
+        for(const ref<byte>& target: targets) {
+            log(target, relevantArguments(ruleForOutput(target), arguments));
+            targetResults << getResult(target, arguments);
+        }
     }
-    assert_(name, arguments);
+}
+
+array<ref<byte> > Process::prepare(array<ref<byte>>& arguments) {
+    results.clear();
+    targetResults.clear();
+
+    array<ref<byte>> targets;
+    arguments.filter([&](const ref<byte>& argument){
+        if(&ruleForOutput(argument)) { targets<<argument; return true; }
+        if(argument.contains('=')) return true;
+        return false;
+    });
+    if(!targets) { assert(rules && rules.last().outputs, rules); targets << rules.last().outputs.last(); }
+    return targets;
+}
+
+void Process::execute() {
+    array<ref<byte>> args (rawArguments);
+    execute(this->prepare(args), sweeps, arguments);
+}
+
+array<ref<byte> > PersistentProcess::prepare(array<ref<byte>>& args) {
+    array<ref<byte>> targets = Process::prepare(args);
+    for(const ref<byte>& argument: args) if(!name) name=argument.contains('/')?section(argument,'/',-2,-1):argument; // Selects a name without removing the used argument
+    assert_(name, rawArguments);
     storageFolder = Folder(name, baseStorageFolder, true);
-    this->arguments.insert("name"_, name);
 
     // Maps intermediate results from file system
     for(const string& path: storageFolder.list(Files|Folders)) {
@@ -137,6 +195,8 @@ PersistentProcess::PersistentProcess(const ref<byte>& definition, const ref<ref<
             results << move(result);
         }
     }
+
+    return targets;
 }
 
 PersistentProcess::~PersistentProcess() {
@@ -251,28 +311,4 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         results << move(result);
     }
     return share(find(target, arguments));
-}
-
-
-void Process::execute() {
-    for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
-    execute(sweeps, arguments);
-}
-void Process::execute(const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
-    if(sweeps) {
-        map<ref<byte>, array<Variant>> remaining = copy(sweeps);
-        Dict args = copy(arguments);
-        ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
-        assert(!args.contains(parameter));
-        for(Variant& value: remaining.take(parameter)) {
-            args.insert(parameter, move(value));
-            execute(remaining, args);
-            args.remove(parameter);
-        }
-    } else { // Actually generates targets when sweeps have been explicited
-        for(const ref<byte>& target: targets) {
-            log(target, relevantArguments(ruleForOutput(target), arguments));
-            targetResults << getResult(target, arguments);
-        }
-    }
 }
