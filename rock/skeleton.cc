@@ -5,10 +5,10 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     int xf0=xf[0], yf0=yf[0], zf0=zf[0]; // First feature point
     int xfd=xf[da], yfd=yf[da], zfd=zf[da]; // Second feature point
     int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd; // Vector between feature points
-    int sqNorm = sqr(x0d) + sqr(y0d) + sqr(z0d); // Squared distance between feature points
+    int sqNorm = sq(x0d) + sq(y0d) + sq(z0d); // Squared distance between feature points
     int xd=x+dx, yd=y+dy, zd=z+dz; // Second origin point
     int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd; // Bisector (vector bisecting
-    int sqDistance = sqr(dx0d) + sqr(dy0d) + sqr(dz0d);
+    int sqDistance = sq(dx0d) + sq(dy0d) + sq(dz0d);
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
     float norm = sqrt( sqDistance );
     // Prune using all methods (as rasterization is the bottleneck)
@@ -17,8 +17,8 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
          sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
             ) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
-        if(crit>=0) { int r = sqr(xf0-x) + sqr(yf0-y) + sqr(zf0-z); skel[0] = r; }
-        if(crit<=0) { int r = sqr(xfd-xd) + sqr(yfd-yd) + sqr(zfd-zd); skel[da] = r; }
+        if(crit>=0) { int r = sq(xf0-x) + sq(yf0-y) + sq(zf0-z); skel[0] = r; }
+        if(crit<=0) { int r = sq(xfd-xd) + sq(yfd-yd) + sq(zfd-zd); skel[da] = r; }
     }
 }
 
@@ -64,7 +64,7 @@ class(Skeleton, Operation), virtual VolumeOperation {
     ref<byte> parameters() const override { return "minimalDiameter"_; }
     uint outputSampleSize(uint) override { return 2; }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        uint minimalSqDiameter = args.contains("minimalDiameter"_) ? sqr(toInteger(args.at("minimalDiameter"_))) : 3;
+        uint minimalSqDiameter = args.contains("minimalDiameter"_) ? sq(toInteger(args.at("minimalDiameter"_))) : 3;
         integerMedialAxis(outputs[0],inputs[0],inputs[1],inputs[2], minimalSqDiameter);
     }
 };

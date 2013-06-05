@@ -23,11 +23,13 @@ Sample parseSample(const ref<byte>& file);
 
 string toASCII(const Sample& sample, float scale=1);
 
-/// Lorentz distribution 1/(1+x²)
+/// Cauchy-Lorentz distribution 1/(1+x²)
 struct Lorentz {
     float position, height, scale;
-    float operator[](float x) const { return height/(1+sqr((x-position)/scale)); }
+    float operator[](float x) const { return height/(1+sq((x-position)/scale)); }
 };
+template<> inline string str(const Lorentz& o) { return "x₀ "_+str(o.position)+", I"_+str(o.height)+", γ "_+str(o.scale); }
+
 /// Estimates parameters for a Lorentz distribution fitting the maximum peak
 Lorentz estimateLorentz(const Sample& sample);
 /// Evaluates a Lorentz distribution at regular intervals

@@ -6,8 +6,9 @@
 
 struct Capsule { vec3 a, b; float radius; };
 template<> inline string str(const Capsule& o) { return str(o.a,o.b,o.radius); }
+bool operator <(const Capsule& a, const Capsule& b) { return a.radius < b.radius; }
 
-float sqrDistance(Capsule A, Capsule B) {
+float sqDistance(Capsule A, Capsule B) {
 	vec3 u = A.b - A.a, v = B.b - B.a, w = A.a - B.a;
 	float a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
     float D = a*c - b*b;
@@ -29,7 +30,7 @@ float sqrDistance(Capsule A, Capsule B) {
     }
     sc = (abs(sN) < __FLT_EPSILON__ ? 0.0 : sN / sD), tc = (abs(tN) < __FLT_EPSILON__ ? 0.0 : tN / tD); // finally do the division to get sc and tc
     vec3 dP = w + (sc * u) - (tc * v);  // get the difference of the two closest points = A(sc) - B(tc)
-    return sqr( dP ); // return the closest distance
+    return sq( dP ); // return the closest distance
 }
 
 /// Returns a list of random capsules inside a cube [0, size] separated from a given minimal distance and with a given maximal length and radius
@@ -48,7 +49,7 @@ array<Capsule> randomCapsules(vec3 size, float minimumDistance, float maximumLen
         if(scale>1) continue; // Might not fit cube
         Capsule a = {origin-scale/2*axis, origin+scale/2*axis, radius};
         if(norm(a.b-a.a)>maximumLength) continue;
-        for(Capsule b: capsules) if(sqr(a.radius+minimumDistance+b.radius)>sqrDistance(a,b)) goto break_; // Discards candidates intersecting any other capsule
+        for(Capsule b: capsules) if(sq(a.radius+minimumDistance+b.radius)>sqDistance(a,b)) goto break_; // Discards candidates intersecting any other capsule
         /*else*/ capsules << a;
         break_: ;
     }
@@ -59,7 +60,7 @@ array<Capsule> randomCapsules(vec3 size, float minimumDistance, float maximumLen
 void rasterize(Volume16& target, const array<Capsule>& capsules) {
     const int X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
     uint16* const targetData = target;
-    clear(targetData, target.size(), (uint16)target.maximum-1); // Sets target to maximum value
+    clear(targetData, target.size(), (uint16)(target.maximum-1)); // Sets target to maximum value minus one
     parallel(capsules.size, [&](uint, uint i) {
         Capsule p=capsules[i]; vec3 a=p.a, b=p.b;
         vec3 min = ::min(a,b)-vec3(p.radius), max = ::max(a,b)+vec3(p.radius); // Bounding box
@@ -75,7 +76,7 @@ void rasterize(Volume16& target, const array<Capsule>& capsules) {
                     uint16* const targetZYX= targetZY + x;
                     vec3 P = vec3(x,y,z);
                     float l = dot(P-a, normalize(b-a));
-                    if((0 < l && l < length && sqr(P-(a+l*normalize(b-a))) <= sqRadius) || sqr(P-a)<=sqRadius || sqr(P-b)<=sqRadius) targetZYX[0] = 1;
+                    if((0 < l && l < length && sq(P-(a+l*normalize(b-a))) <= sqRadius) || sq(P-a)<=sqRadius || sq(P-b)<=sqRadius) targetZYX[0] = 1;
                 }
             }
         }
@@ -84,18 +85,15 @@ void rasterize(Volume16& target, const array<Capsule>& capsules) {
 
 class(Capsules, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint i) override { return i==0 ? 2 : 0; }
-    uint64 outputSize(const Dict&, const ref<shared<Result>>&, uint) override { return 512*512*512*outputSampleSize(0); }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {
+    uint64 outputSize(const Dict&, const ref<Result*>&, uint index) override { return 512*512*512*outputSampleSize(index); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {
         Volume& target = outputs.first();
         target.sampleCount = 512;
         target.maximum = (1<<(target.sampleSize*8))-1;
         array<Capsule> capsules = randomCapsules(vec3(target.sampleCount), 1, 255, 255);
         rasterize(target, capsules);
-        Sample analytic;
-        for(Capsule p : capsules) {
-            if(p.radius>=analytic.size) analytic.grow(p.radius+1);
-            analytic[p.radius] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
-        }
+        Sample analytic ( int(max(capsules).radius) + 1 );
+        for(Capsule p : capsules) analytic[int(p.radius)] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
         if(otherOutputs) {
             otherOutputs[0]->metadata = string("analytic.tsv"_);
             otherOutputs[0]->data = toASCII(analytic);

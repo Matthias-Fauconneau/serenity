@@ -10,24 +10,24 @@
 #include "png.h"
 
 //#include "source.h"
-defineVolumePass(Downsample, uint16, downsample);
-//include "capsule.h"
+//#include "capsule.h"
 //#include "smooth.h"
 //#include "threshold.h"
 //#include "distance.h"
 //#include "skeleton.h"
-defineVolumePass(Tile, uint16, tile);
 //#include "floodfill.h"
 //#include "rasterize.h"
 //#include "validate.h"
-defineVolumePass(SquareRoot, uint16, squareRoot);
 //#include "export.h"
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : PersistentProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) {
-        execute(args, rock());
+        parameters += "view"_;
+        string process;
+        for(const ref<byte>& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
+        execute(args, process? : rock());
 
         if(targetPaths) { // Copies results to disk
             if(targetPaths.size == targetResults.size) {
@@ -52,19 +52,21 @@ struct Rock : PersistentProcess, Widget {
         }
 
         // Displays first target result
-        for(const shared<Result>& target: targetResults) if(target->data.size) { current = share( target ); break; }
-        if(!current || current->data.size==0 || current->name=="ascii"_ || arguments.value("view"_,"0"_)=="0"_) { exit(); return; }
-        window = unique<Window>(this,int2(-1,-1),"Rock"_);
-        window->localShortcut(Key('r')).connect(this, &Rock::refresh);
-        window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
-        window->localShortcut(Escape).connect([]{exit();});
-        window->clearBackground = false;
-        updateView();
-        window->show();
+        if(arguments.contains("view"_)) for(const shared<Result>& target: targetResults) if(target->data.size && inRange(1u,toVolume(target).sampleSize,4u)) { current = share( target ); break; }
+        if(current) {
+            window = unique<Window>(this,int2(-1,-1),"Rock"_);
+            window->localShortcut(Key('r')).connect(this, &Rock::refresh);
+            window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
+            window->localShortcut(Escape).connect([]{exit();});
+            window->clearBackground = false;
+            updateView();
+            window->show();
+        }
     }
 
      void parseSpecialArguments(const ref<ref<byte>>& specialArguments) override {
         for(const ref<byte>& argument: specialArguments) {
+            if(endsWith(argument,".process"_)) continue; // Already parsed extern process definition
             if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
             if(!arguments.contains("path"_) && existsFolder(argument,cwd)) { arguments.insert("path"_,argument); continue; }
             targetPaths << argument;

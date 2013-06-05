@@ -10,9 +10,9 @@ struct Tile { uint64 ballCount=0; Ball balls[tileSize*2-1]; }; // 16³ tiles -> 
 /// Tests box-ball intersection
 inline uint dmin(int size, int vx, int vy, int vz) {
     uint dmin = 0;
-    if(vx < 0) dmin += sqr(vx); else if(vx-(size-1) > 0) dmin += sqr(vx-(size-1));
-    if(vy < 0) dmin += sqr(vy); else if(vy-(size-1) > 0) dmin += sqr(vy-(size-1));
-    if(vz < 0) dmin += sqr(vz); else if(vz-(size-1) > 0) dmin += sqr(vz-(size-1));
+    if(vx < 0) dmin += sq(vx); else if(vx-(size-1) > 0) dmin += sq(vx-(size-1));
+    if(vy < 0) dmin += sq(vy); else if(vy-(size-1) > 0) dmin += sq(vy-(size-1));
+    if(vz < 0) dmin += sq(vz); else if(vz-(size-1) > 0) dmin += sq(vz-(size-1));
     return dmin;
 }
 
@@ -42,7 +42,7 @@ void bin(Volume& target, const Volume16& source) {
                             Tile* const tile = targetData + dz * (X/tileSide*Y/tileSide) + dy * (X/tileSide) + dx;
                             int tileX = dx*tileSide, tileY = dy*tileSide, tileZ = dz*tileSide;
                             if(dmin(tileSide,x-tileX,y-tileY,int(z)-tileZ) < sqRadius) { // Intersects tile
-                                float r = norm(vec3(tileX,tileY,tileZ)+vec3((tileSide-1)/2.)-vec3(x,y,z)), tileRadius = sqrt(3.*sqr((tileSide-1)/2.));
+                                float r = norm(vec3(tileX,tileY,tileZ)+vec3((tileSide-1)/2.)-vec3(x,y,z)), tileRadius = sqrt(3.*sq((tileSide-1)/2.));
                                 assert_(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere
                                 assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), tile->ballCount, dmin(tileSide,x-tileX,y-tileY,z-tileZ), dx,dy,dz, sqRadius,ballRadius,  x-tileX,y-tileY,int(z)-tileZ, norm(vec3(0,y-tileY,int(z)-tileZ)), x,y,z, x+ballRadius,y+ballRadius,z+ballRadius);
                                 uint index = __sync_fetch_and_add(&tile->ballCount,1); // Thread-safe lock-free add
@@ -82,7 +82,7 @@ void rasterize(Volume16& target, const Volume& source) {
 #if 0 // Full 60s
             for(int dz=0; dz<tileSide; dz++) for(int dy=0; dy<tileSide; dy++) for(int dx=0; dx<tileSide; dx++) {
                 uint16* const voxel = tile + offsetX[dx] + offsetY[dy] + offsetZ[dz];
-                if(sqRadius>voxel[0] && sqr(tileBallX-dx)+sqr(tileBallY-dy)+sqr(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
+                if(sqRadius>voxel[0] && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
             }
 #elif 0 // Clip 18s
             int radius = ceil(sqrt(sqRadius));
@@ -90,7 +90,7 @@ void rasterize(Volume16& target, const Volume& source) {
                 for(int dy=max(0,cy-radius); dy<min(tileSide,cy+radius); dy++)
                     for(int dx=max(0,cx-radius); dx<min(tileSide,cx+radius); dx++) {
                         uint16* const voxel = target + offsetX[dx] + offsetY[dy] + offsetZ[dz];
-                        if(sqRadius>voxel[0] && sqr(tileBallX-dx)+sqr(tileBallY-dy)+sqr(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
+                        if(sqRadius>voxel[0] && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
                     }
 #else // Recursive 15s (TODO: SIMD)
             for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
@@ -112,7 +112,7 @@ void rasterize(Volume16& target, const Volume& source) {
                 uint min=-1;
                 for(int dz=0; dz<blockSide; dz++) for(int dy=0; dy<blockSide; dy++) for(int dx=0; dx<blockSide; dx++) {
                     uint16* const voxel = block + dz*blockSide*blockSide + dy*blockSide + dx;
-                    if(sqRadius>voxel[0] && sqr(blockBallX-dx)+sqr(blockBallY-dy)+sqr(blockBallZ-dz)<sqRadius) voxel[0] = sqRadius;
+                    if(sqRadius>voxel[0] && sq(blockBallX-dx)+sq(blockBallY-dy)+sq(blockBallZ-dz)<sqRadius) voxel[0] = sqRadius;
                     if(voxel[0]<min) min = voxel[0]; // FIXME: skip when possible
                 }
                 HiZ.min=min;

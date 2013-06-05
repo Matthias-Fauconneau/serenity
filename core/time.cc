@@ -16,7 +16,6 @@ int daysInMonth(int month, int year=0) {
     return daysPerMonth[month];
 }
 
-template<Type T> bool inRange(T min, T x, T max) { return x>=min && x<max; }
 void Date::invariant() const {
     //Date
     if(year>=0) { assert(inRange(2012, year, 2099), year); }

@@ -67,6 +67,9 @@ void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, u
 /// Downsamples a volume by averaging 2x2x2 samples
 void downsample(Volume16& target, const Volume16& source);
 
+/// Square roots all values
+void squareRoot(Volume8& target, const Volume16& source, bool normalize=false);
+
 /// Converts volume data to ASCII (one voxel per line, explicit coordinates)
 void toASCII(Volume& target, const Volume& source);
 

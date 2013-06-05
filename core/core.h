@@ -44,16 +44,15 @@ template<Type T> constexpr T&& forward(Type remove_reference<T>::type& t) { retu
 /// Forwards moveable values
 template<Type T> constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 
-// Comparison functions
 template<Type A, Type B> bool operator !=(const A& a, const B& b) { return !(a==b); }
-template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
-template<Type T> T min(T a, T b) { return a<b ? a : b; }
-template<Type T> T max(T a, T b) { return a>b ? a : b; }
-template<Type T> T clip(T min, T x, T max) { return x < min ? min : x > max ? max : x; }
-template<Type T> T abs(T x) { return x>=0 ? x : -x; }
-
 // Arithmetic functions
-template<Type T> inline constexpr T sqr(const T& x) { return x*x; }
+template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
+template<Type T> bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
+template<Type T> T min(T a, T b) { return a<b ? a : b; }
+template<Type T> T max(T a, T b) { return a<b ? b : a; }
+template<Type T> T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
+template<Type T> T abs(T x) { return x>=0 ? x : -x; }
+template<Type T> inline constexpr T sq(const T& x) { return x*x; }
 
 // Basic types
 typedef char byte;
@@ -169,6 +168,9 @@ template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T
     extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
     return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end); \
 }
+
+// ref<Arithmetic> operations
+template<Type T> const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
 
 // Integer operations
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)

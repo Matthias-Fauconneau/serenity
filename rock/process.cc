@@ -137,7 +137,7 @@ void Process::execute(const array<ref<byte> >& targets, const map<ref<byte>, arr
 }
 
 void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
-    parameters.clear(); arguments.clear(); sweeps.clear(); rules.clear(); results.clear(); targetResults.clear(); // Clears parsed data in case the same process is being reused several times
+    arguments.clear(); sweeps.clear(); rules.clear(); results.clear(); targetResults.clear(); // Clears parsed data in case the same process is being reused several times
 
     // Defines valid parameters using Operations and process definition
     for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());

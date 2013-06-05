@@ -2,46 +2,6 @@
 #include "thread.h"
 #include "simd.h"
 
-void squareRoot(Volume8& target, const Volume16& source, bool normalize) {
-    uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY=X*Y;
-    interleavedLookup(target);
-    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-    target.maximum = normalize ? 0xFF : round(sqrt((float)source.maximum)), target.squared=false;
-    assert_(target.maximum<0x100);
-
-    const uint16* const sourceData = source;
-    uint8* const targetData = target;
-    parallel(Z, [&](uint, uint z) {
-        if(source.offsetX || source.offsetY || source.offsetZ) {
-            assert(source.offsetX && source.offsetY && source.offsetZ);
-            const uint16* const sourceZ = sourceData + offsetZ[z];
-            uint8* const targetZ = targetData + offsetZ[z];
-            for(uint y=0; y<Y; y++) {
-                const uint16* const sourceZY = sourceZ + offsetY[y];
-                uint8* const targetZY = targetZ + offsetY[y];
-                for(uint x=0; x<X; x++) {
-                    uint value = round(sqrt(float(sourceZY[offsetX[x]])));
-                    if(normalize) value = value * 0xFF / target.maximum;
-                    targetZY[offsetX[x]] = value;
-                }
-            }
-        } else {
-            assert(!source.offsetX && !source.offsetY && !source.offsetZ);
-            const uint16* const sourceZ = sourceData + z*XY;
-            uint8* const targetZ = targetData + offsetZ[z];
-            for(uint y=0; y<Y; y++) {
-                const uint16* const sourceZY = sourceZ + y*X;
-                uint8* const targetZY = targetZ + offsetY[y];
-                for(uint x=0; x<X; x++) {
-                    uint value = round(sqrt(float(sourceZY[x])));
-                    if(normalize) value = value * 0xFF / target.maximum;
-                    targetZY[offsetX[x]] = value;
-                }
-            }
-        }
-    } );
-}
-
 void render(Image& target, const Volume8& empty, const Volume8& density, const Volume8& intensity, mat3 view) {
     // Volume
     uint stride = empty.sampleCount.x; // Unclipped volume data size

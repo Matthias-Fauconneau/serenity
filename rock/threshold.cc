@@ -21,10 +21,11 @@ class(LorentzianMixtureModel, Operation) {
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5);
-        output(outputs, 1, "histogram.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
-        output(outputs, 2, "histogram.tsv"_, [&]{ return toASCII(notrock); });
-        output(outputs, 3, "histogram.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
-        output(outputs, 4, "histogram.tsv"_, [&]{ return toASCII(notpore); });
+        output(outputs, 1, "lorentz"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore); });
+        output(outputs, 2, "histogram.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
+        output(outputs, 3, "histogram.tsv"_, [&]{ return toASCII(notrock); });
+        output(outputs, 4, "histogram.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
+        output(outputs, 5, "histogram.tsv"_, [&]{ return toASCII(notpore); });
     }
 };
 
@@ -34,26 +35,37 @@ class(Otsu, Operation) {
         assert_(inputs[0]->metadata == "histogram.tsv"_);
         Sample density = parseSample( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
-        uint threshold=0; double maximum=0;
-        uint64 totalCount=0, totalSum=0; double totalMaximum=0;
-        for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t], totalMaximum=max(totalMaximum, double(density[t]));
+        uint threshold=0; double maximumVariance=0;
+        uint64 totalCount=0, totalSum=0;
+        for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
         uint64 backgroundCount=0, backgroundSum=0;
-        Sample interclass (density.size);
+        Sample interclass (density.size); double parameters[4];
         for(uint64 t: range(density.size)) {
             backgroundCount += density[t];
             if(backgroundCount == 0) continue;
             backgroundSum += t*density[t];
             uint64 foregroundCount = totalCount - backgroundCount, foregroundSum = totalSum - backgroundSum;
             if(foregroundCount == 0) break;
-            double variance = double(foregroundCount)*double(backgroundCount)*sqr(double(foregroundSum)/double(foregroundCount) - double(backgroundSum)/double(backgroundCount));
-            if(variance > maximum) maximum=variance, threshold = t;
+            double foregroundMean = double(foregroundSum)/double(foregroundCount);
+            double backgroundMean = double(backgroundSum)/double(backgroundCount);
+            double variance = double(foregroundCount)*double(backgroundCount)*sq(foregroundMean - backgroundMean);
+            if(variance > maximumVariance) {
+                maximumVariance=variance, threshold = t;
+                parameters[0]=foregroundCount, parameters[1]=backgroundCount, parameters[2]=foregroundMean, parameters[3]=backgroundMean;
+            }
             interclass[t] = variance;
         }
         float densityThreshold = float(threshold) / float(density.size);
         log("Otsu's model estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5);
-        output(outputs, 1, "interclass.tsv"_, [&]{ return toASCII( (totalMaximum/maximum)*interclass ); } ); // Scales variance to plot over density
+        output(outputs, 1, "scalar"_, [&]{
+            return "foregroundCount "_+str(parameters[0])+
+                    ", backgroundCount "_+str(parameters[1])+
+                    ", foregroundMean "_+str(parameters[2])+
+                    ", backgroundMean "_+str(parameters[3])+
+                    ", maximumVariance"_+str(maximumVariance); } );
+        output(outputs, 2, "interclass.tsv"_, [&]{ return toASCII( (1./maximumVariance)*interclass ); } );
     }
 };
 

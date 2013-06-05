@@ -42,7 +42,7 @@ struct Process {
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
     void execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
 
-    array<ref<byte>> parameters; // Valid parameters accepted by operations compiled in this binary and used in process definition
+    array<ref<byte>> parameters; // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
     Dict defaultArguments; // Application specific default arguments (defined by process definition)
     Dict arguments; // User-specified arguments
     map<ref<byte>, array<Variant>> sweeps; // User-specified parameter sweeps

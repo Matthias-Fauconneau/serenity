@@ -7,8 +7,8 @@ if !validation: source = Source
 if validation: source = Capsules
 
 histogram-source = Histogram source
-if threshold == 'otsu': densityThreshold interclass = Otsu histogram-source
-if threshold == 'lorentz': densityThreshold lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
+if threshold == 'otsu': density-threshold otsu-parameters interclass = Otsu histogram-source
+if threshold == 'lorentz': density-threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
 
 shift = ShiftRight source
 smoothx = Smooth shift
@@ -16,7 +16,7 @@ smoothxy = Smooth smoothx
 if !downsample: smooth = Smooth smoothxy shift=0
 if downsample: smooth = Downsample source
 
-pore rock = Binary smooth densityThreshold
+pore rock = Binary smooth density-threshold
 colorize = Colorize pore source
 
 distancex positionxx = DistanceX pore
@@ -48,8 +48,8 @@ normalized-histogram-connected = Normalize histogram-connected
 #validate = Validate pore maximum
 
 #ascii-source = ToASCII source
-ascii-unconnected = ToASCII unconnected
-ascii-connected = ToASCII connected
+ascii-squaredRadius-unconnected = ToASCII unconnected
+ascii-squaredRadius-connected = ToASCII connected
 
 png-source = ToPNG source
 png-smooth = ToPNG smooth

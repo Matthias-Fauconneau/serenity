@@ -83,7 +83,7 @@ generic vector max(const vector& a, const vector& b){ vector r; for(uint i=0;i<N
 generic vector clip(const vector& min, const vector& x, const vector& max){vector r; for(uint i=0;i<N;i++) r[i]=clip(min[i],x[i],max[i]); return r;}
 
 generic float dot(const vector& a, const vector& b) { float l=0; for(uint i=0;i<N;i++) l+=a[i]*b[i]; return l; }
-generic float sqr(const vector& a) { return dot(a,a); }
+generic float sq(const vector& a) { return dot(a,a); }
 generic float norm(const vector& a) { return sqrt(dot(a,a)); }
 generic vector normalize(const vector& a){ return a/norm(a); }
 generic bool isNaN(const vector& v){ for(uint i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
