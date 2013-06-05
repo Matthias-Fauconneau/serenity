@@ -26,7 +26,7 @@ inline v4si max(v4si a, v4si b) { return __builtin_ia32_pmaxud128(a,b); }
 inline v8hi packus(v4si a, v4si b) { return __builtin_ia32_packusdw128(a,b); }
 //inline v4si blendv(v4si a, v4si b, v4si m) { return (v4si)__builtin_ia32_blendvps((v4sf)a, (v4sf)b, (v4sf)m); }
 
-#if DEBUG || O0
+#if DEBUG
 #define extracti __builtin_ia32_vec_ext_v4si
 #else
 inline int extracti(v4si a, int index) { return __builtin_ia32_vec_ext_v4si(a, index); }
@@ -103,7 +103,7 @@ inline v4sf abs(v4sf a) { return andnot(signBit, a); }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
-#if DEBUG || O0
+#if DEBUG
 #define shuffle( a,  b,  x,  y,  z,  w) __builtin_ia32_shufps(a, b, (w)<<6|(z)<<4|(y)<<2|(x))
 #else
 inline v4sf shuffle(v4sf a, v4sf b, int x, int y, int z, int w) { return __builtin_ia32_shufps(a, b, w<<6|z<<4|y<<2|x); }
@@ -116,13 +116,13 @@ inline v4sf rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline v4sf sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }
 
 inline int mask(v4sf a) { return __builtin_ia32_movmskps(a); }
-#if DEBUG || O0
+#if DEBUG
 #define blend( a, b, m) __builtin_ia32_blendps(a, b, m)
 #else
 inline v4sf blend(v4sf a, v4sf b, int m) { return __builtin_ia32_blendps(a, b, m); }
 #endif
 inline v4sf blendv(v4sf a, v4sf b, v4sf m) { return __builtin_ia32_blendvps(a, b, m); }
-#if DEBUG || O0
+#if DEBUG
 #define extractf __builtin_ia32_vec_ext_v4sf
 #else
 inline float extractf(v4sf a, int index) { return __builtin_ia32_vec_ext_v4sf(a, index); }

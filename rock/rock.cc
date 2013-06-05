@@ -42,10 +42,9 @@ struct GraphProcess : virtual Process {
         string s ("digraph \""_+name+"\" {\n"_);
         for(const ref<byte>& target: targets) s << dot(once, target);
         s << "}"_;
-        log(s);
-        string path = folder+"/"_+name;
+        string path = "/dev/shm/"_+name+".dot"_;
         writeFile(path, s);
-        ::execute("/ptmp/bin/dot"_,{"-O","-Tsvg"_,path});
+        ::execute("/ptmp/bin/dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
     }
 };
 

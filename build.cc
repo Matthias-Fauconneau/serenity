@@ -16,19 +16,21 @@ string dot(array<const Node*>& once, const Node& o) {
     string s;
     if(!once.contains(&o)) {
         once << &o;
+        s<<'"'<<o.name<<'"'<<"[shape=record];\n"_;
         for(Node* dep: o.children) { s<<'"'<<o.name<<"\" -> \""_<<dep->name<<"\"\n"_<<dot(once, *dep); }
     }
     return s;
 }
 
 void generateSVG(const Node& root, const ref<byte>& folder){
-    string s ("digraph \""_+root.name+"\" {\n"_);
+    ref<byte> name = root.name.contains('/') ? section(root.name,'/',-2,-1) : ref<byte>(root.name);
+    string s ("digraph \""_+name+"\" {\n"_);
     array<const Node*> once;
     s << ::dot(once, root);
     s << "}"_;
-    string path = folder+root.name;
+    string path = "/dev/shm/"_+name+".dot"_;
     writeFile(path, s);
-    execute("/ptmp/bin/dot"_,{"-O","-Tsvg"_,path});
+    ::execute("/ptmp/bin/dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
 }
 
 struct Build {
@@ -95,11 +97,13 @@ struct Build {
         if(compile) {
             string object = tmp+build+"/"_+target+".o"_;
             if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
-                static const array<ref<byte>> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -g -march=native -o"_);
+                static const array<ref<byte>> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -march=native -o"_);
                 array<string> args;
                 args << object << target+".cc"_;
-                if(::find(build,"debug"_)) args << string("-DDEBUG"_);
-                if(::find(build,"fast"_)) args <<  string("-Ofast"_);
+                if(::find(build,"debug"_)) args << string("-g"_) << string("-DDEBUG"_);
+                else if(::find(build,"fast"_)) args << string("-g"_) << string("-Ofast"_);
+                else if(::find(build,"release"_)) args <<  string("-Ofast"_);
+                else error("Unknown build",build);
                 args << apply<string>(folder.list(Folders), [this](const string& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
                 pids << execute("/ptmp/gcc-4.8.0/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
@@ -130,7 +134,8 @@ struct Build {
                     file = move(object);
                 }
             }
-            string binary = tmp+build+"/"_+target+"."_+build;
+            string name = target+"."_+build;
+            string binary = tmp+build+"/"_+name;
             if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime() || fileChanged) {
                 array<string> args; args<<string("-o"_)<<binary;
                 args << apply<string>(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
@@ -138,9 +143,9 @@ struct Build {
                 args << string("-L/ptmp/lib"_) << apply<string>(libraries, [this](const string& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
                 if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) fail();
-                if(install) copy(install, target+"."_+build, root(), binary);
             }
+            if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
         }
-        if(graph) generateSVG(modules.first(), tmp);
+        if(graph) generateSVG(modules.first(), getenv("HOME"_));
     }
 } build;

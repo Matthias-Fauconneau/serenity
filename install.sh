@@ -1,5 +1,6 @@
 TARGET=$1
-test -n $TARGET || TARGET=/pool/users/$USER
-./build.sh debug rock $TARGET/rock.debug
-./build.sh fast rock $TARGET/rock.fast
-cp files/rock $TARGET/rock.process
+test -z $TARGET && export TARGET=/pool/users/$USER
+./build.sh debug rock $TARGET
+./build.sh fast rock $TARGET
+./build.sh release rock $TARGET
+cp rock/rock $TARGET/rock.process
