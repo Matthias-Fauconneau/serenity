@@ -18,6 +18,36 @@ class(ToPNG, Operation), virtual VolumeOperation {
     }
 };
 
+/// Explicitly clips volume to cylinder by zeroing exterior samples
+void cylinderClip(Volume& target, const Volume& source) {
+    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    uint radiusSq = (X/2-marginX)*(Y/2-marginY);
+    assert_(!target.offsetX && !target.offsetY && !target.offsetZ);
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    uint16* const targetData = (uint16*)target.data.data;
+    for(int z=0; z<Z; z++) {
+        uint16* const targetZ = targetData + z*XY;
+        for(int y=0; y<Y; y++) {
+            uint16* const targetZY = targetZ + y*X;
+            for(int x=0; x<X; x++) {
+                uint value = 0;
+                if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq && z >= marginZ && z<Z-marginZ) {
+                    uint index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+                    if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
+                    else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
+                    else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
+                    else error(source.sampleSize);
+                    assert(value <= source.maximum, value, source.maximum);
+                }
+
+                targetZY[x] = value;
+            }
+        }
+    }
+}
+defineVolumePass(CylinderClip, uint16, cylinderClip);
+
 inline void itoa(byte* target, uint n) {
     assert(n<1000);
     uint i=4;

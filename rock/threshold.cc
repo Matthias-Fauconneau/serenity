@@ -116,12 +116,12 @@ class(Binary, Operation), virtual VolumeOperation {
         if(args.contains("threshold"_) && isDecimal(args.at("threshold"_))) {
             densityThreshold = toDecimal(args.at("threshold"_));
             while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
-            log("Threshold argument", densityThreshold);
+            //log("Threshold argument", densityThreshold);
         } else {
             Result* threshold = otherInputs[0];
             assert_(isDecimal(threshold->data), threshold->data);
             densityThreshold = toDecimal(threshold->data);
-            log("Threshold input", densityThreshold);
+            //log("Threshold input", densityThreshold);
         }
         threshold(outputs[0], outputs[1], source, densityThreshold);
     }

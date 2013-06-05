@@ -20,14 +20,45 @@
 //#include "validate.h"
 //#include "export.h"
 
+struct GraphProcess : virtual Process {
+    string dot(array<const Rule*>& once, const ref<byte>& output) {
+        const Rule& rule = ruleForOutput(output);
+        string s;
+        if(!once.contains(&rule)) {
+            once << &rule;
+            s <<'"'<<hex(ptr(&rule))<<'"'<< "[shape=record, label=\""_<<rule.operation;
+            for(ref<byte> output: rule.outputs) s<<"|<"_<<output<<"> "_<<output;
+            s<<"\"];\n"_;
+            for(ref<byte> input: rule.inputs) {
+                s<<'"'<<hex(ptr(&ruleForOutput(input)))<<"\":\""_<<input<<"\" -> \""_<<hex(ptr(&rule))<<"\"\n"_;
+                s<<dot(once, input);
+            };
+        }
+        return s;
+    }
+
+    void generateSVG(const ref<ref<byte>>& targets, const ref<byte>& name, const ref<byte>& folder){
+        array<const Rule*> once;
+        string s ("digraph \""_+name+"\" {\n"_);
+        for(const ref<byte>& target: targets) s << dot(once, target);
+        s << "}"_;
+        log(s);
+        string path = folder+"/"_+name;
+        writeFile(path, s);
+        ::execute("/ptmp/bin/dot"_,{"-O","-Tsvg"_,path});
+    }
+};
+
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
-struct Rock : PersistentProcess, Widget {
+struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) {
-        parameters += "view"_;
+        parameters += "view"_; parameters += "graph"_;
         string process;
         for(const ref<byte>& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
-        execute(args, process? : rock());
+        array<ref<byte>> targets = configure(args, process? : rock());
+        if(arguments.contains("graph"_)) { generateSVG(targets, name, getenv("HOME"_)); return; }
+        execute(targets, sweeps, arguments);
 
         if(targetPaths) { // Copies results to disk
             if(targetPaths.size == targetResults.size) {

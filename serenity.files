@@ -1,7 +1,8 @@
 TODO
+build.cc
+build.sh
 
 core/array.h
-core/build.cc
 core/core.h
 core/data.cc
 core/data.h
@@ -24,7 +25,6 @@ core/time.h
 core/trace.cc
 core/trace.h
 core/vector.h
-build.cc
 
 io/deflate.cc
 io/deflate.h
@@ -32,6 +32,7 @@ io/png.cc
 io/png.h
 io/tiff.cc
 io/tiff.h
+io/graph.h
 
 ui/display.cc
 ui/display.h

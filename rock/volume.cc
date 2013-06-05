@@ -246,7 +246,7 @@ Image slice(const Volume& source, int z, bool cylinder) {
     Image target(X,Y);
     int unused marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     //assert(X==Y && marginX==marginY);
-    uint radiusSq = cylinder ? (X/2-marginX)*(X/2-marginX) : -1;
+    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
         if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) > radiusSq) { target(x,y) = byte4(0,0,0,0); continue; }

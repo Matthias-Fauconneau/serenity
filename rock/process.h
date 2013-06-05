@@ -22,6 +22,9 @@ struct Process {
     /// Returns the Rule to evaluate in order to produce \a target
     Rule& ruleForOutput(const ref<byte>& target);
 
+    /// Configures process using given arguments and definition (which can depends on the arguments)
+    array<ref<byte>> configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
+
     /// Returns recursively relevant arguments for a rule
     Dict relevantArguments(const Rule& rule, const Dict& arguments);
 
@@ -71,7 +74,7 @@ struct ResultFile : Result {
 };
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
-struct PersistentProcess : Process {
+struct PersistentProcess : virtual Process {
     ~PersistentProcess();
 
     void parseSpecialArguments(const ref<ref<byte>>& arguments) override;

@@ -19,43 +19,58 @@ if downsample: smooth = Downsample source
 pore rock = Binary smooth density-threshold
 colorize = Colorize pore source
 
+# Computes squared distance to / position of nearest background voxel
 distancex positionxx = DistanceX pore
 distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
-skeleton = Skeleton positionx positiony positionz
-skeleton-unconnected = Tile skeleton
-skeleton-connected = FloodFill skeleton-unconnected
 
-bin-unconnected = Bin skeleton-unconnected
-bin-connected = Bin skeleton-connected
+skeleton = Skeleton positionx positiony positionz
+unconnected-skeleton = Tile skeleton
+connected-skeleton = FloodFill unconnected-skeleton
+
+bin-unconnected = Bin unconnected-skeleton
+bin-connected = Bin connected-skeleton
 unconnected = Rasterize bin-unconnected
 connected = Rasterize bin-connected
 
 # Computes histogram of maximal ball radii (i.e. pore size distribution)
 histogram-unconnected = SqrtHistogram unconnected
 histogram-connected = SqrtHistogram connected
-volume = Sum histogram-connected
-normalized-histogram-connected = Normalize histogram-connected
+volume-unconnected = Sum histogram-unconnected
+volume-connected = Sum histogram-connected
+normalize-histogram-unconnected = Normalize histogram-unconnected
+normalize-histogram-connected = Normalize histogram-connected
 
-#For volume rendering:
-#emptyx epositionx = DistanceX rock
-#emptyy epositiontx epositiony = DistanceY emptyx epositionx
-#emptyz epositionx epositiony epositionz = DistanceZ emptyy epositionyx epositionyy
-#empty = SquareRoot emptyz # Square roots and tiles distance field before using it for empty space skiping during rendering
-#density = SquareRoot distance # Square roots and normalizes (FIXME) distance to use as density values (for opacity and gradient)
-#intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
+#Render
+ #emptyx epositionx = DistanceX rock
+ #emptyy epositiontx epositiony = DistanceY emptyx epositionx
+ #emptyz epositionx epositiony epositionz = DistanceZ emptyy epositionyx epositionyy
+ #empty = SquareRoot emptyz # Square roots and tiles distance field before using it for empty space skiping during rendering
+ #density = SquareRoot distance # Square roots and normalizes (FIXME) distance to use as density values (for opacity and gradient)
+ #intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
 
-#validate = Validate pore maximum
+#Export
+ # Clips to cylinder
+ if cylinder: clip-unconnected  = CylinderClip unconnected
+ if cylinder: clip-connected = CylinderClip connected
 
-#ascii-source = ToASCII source
-ascii-squaredRadius-unconnected = ToASCII unconnected
-ascii-squaredRadius-connected = ToASCII connected
+ # Or forwards unclipped volume
+ if !cylinder: clip-unconnected = unconnected
+ if !cylinder: clip-connected = connected
 
-png-source = ToPNG source
-png-smooth = ToPNG smooth
-png-colorize = ToPNG colorize
-png-distance = ToPNG distance
-png-skeleton = ToPNG skeleton
-png-unconnected = ToPNG unconnected
-png-connected = ToPNG connected
+ # Square roots squared distance
+ sqrt-unconnected = SquareRoot clip-unconnected
+ sqrt-connected = SquareRoot clip-connected
 
+ # Exports to ASCII
+ ascii-unconnected = ToASCII sqrt-unconnected
+ ascii-connected = ToASCII sqrt-connected
+
+ # Exports to PNG
+ png-source = ToPNG source
+ png-smooth = ToPNG smooth
+ png-colorize = ToPNG colorize
+ png-distance = ToPNG distance
+ png-skeleton = ToPNG skeleton
+ png-unconnected = ToPNG unconnected
+ png-connected = ToPNG connected

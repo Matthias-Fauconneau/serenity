@@ -50,23 +50,60 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
             }
         } else {
             Rule rule;
-            rule.operation = s.word();
-            assert_(rule.operation && Interface<Operation>::factories.contains(rule.operation), rule.operation);
-            s.whileAny(" \t\r"_);
-            for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
-                if(s.match('#')) { s.whileNot('\n'); continue; }
-                ref<byte> word = s.word("_-"_);
-                if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
-                else rule.inputs << word;
+            ref<byte> word = s.word("_-"_);
+            if(symbols.contains(word)) { // Forwarding rule
+                rule.inputs << word;
+            } else {
+                rule.operation = word;
+                assert_(rule.operation && Interface<Operation>::factories.contains(rule.operation), rule.operation);
+                s.whileAny(" \t\r"_);
+                for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
+                    if(s.match('#')) { s.whileNot('\n'); continue; }
+                    ref<byte> word = s.word("_-"_);
+                    if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
+                    else rule.inputs << word;
+                }
+                for(ref<byte> output: outputs) assert_(!arguments.contains(output), "Multiple definitions for", output);
+                rule.outputs = move(outputs);
             }
-            for(ref<byte> output: outputs) assert_(!arguments.contains(output), "Multiple definitions for", output);
-            rule.outputs = move(outputs);
             if(pass) rules << move(rule);
         }
     }
 }
 
 Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
+
+array<ref<byte>> Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
+    arguments.clear(); sweeps.clear(); rules.clear(); results.clear(); targetResults.clear(); // Clears parsed data in case the same process is being reused several times
+
+    // Defines valid parameters using Operations and process definition
+    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
+    parseDefinition(definition, 0); // First pass is only to define valid parameters
+
+    array<ref<byte>> specialArgumentsOrTargets;
+    for(const ref<byte>& argument: allArguments) { // Parses explicit arguments
+        if(argument.contains('=')) { // Stores generic argument affecting operations
+            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
+            /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
+                assert(!arguments.contains(key));
+                sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
+            } else {*/
+            if(sweeps.contains(key) || arguments.contains(key)) {
+                if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
+                sweeps.at(key) << value;
+            } else {
+                arguments.insert(key, Variant(value));
+            }
+        }
+        else if(parameters.contains(argument)) arguments.insert(argument,""_);
+        else specialArgumentsOrTargets << argument;
+    }
+    parseDefinition(definition, 1); // Second pass correctly defines conditionnal rules and default arguments depending on given arguments
+    array<ref<byte>> specialArguments, targets;
+    for(ref<byte> argument: specialArgumentsOrTargets) (&ruleForOutput(argument) ? targets : specialArguments) << argument;
+    this->parseSpecialArguments(specialArguments);
+    return targets;
+}
 
 Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     Dict relevant;
@@ -77,12 +114,14 @@ Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
             else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key))*/ relevant.insert(move(arg.key), move(arg.value));
         }
     }
-    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
-    assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
-    Dict local = copy(arguments); local << rule.arguments; // not inherited
-    for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
-        if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
-        else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter))*/ relevant.insert(parameter, local.at(parameter));
+    if(rule.operation) {
+        unique<Operation> operation = Interface<Operation>::instance(rule.operation);
+        assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
+        Dict local = copy(arguments); local << rule.arguments; // not inherited
+        for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
+            if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
+            else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter))*/ relevant.insert(parameter, local.at(parameter));
+        }
     }
     return relevant;
 }
@@ -105,8 +144,7 @@ bool Process::sameSince(const ref<byte>& target, int64 queryTime, const Dict& ar
     }
     const Rule& rule = ruleForOutput(target);
     for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false; // Inputs changed since result (or query if result was discarded) was last generated
-    if(parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query (FIXME: timestamps might be unsynchronized)
-    //else log("same",parse(Interface<Operation>::version(rule.operation), Date(queryTime), (long)parse(Interface<Operation>::version(rule.operation)), queryTime);
+    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
     return true;
 }
 
@@ -137,35 +175,7 @@ void Process::execute(const array<ref<byte> >& targets, const map<ref<byte>, arr
 }
 
 void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
-    arguments.clear(); sweeps.clear(); rules.clear(); results.clear(); targetResults.clear(); // Clears parsed data in case the same process is being reused several times
-
-    // Defines valid parameters using Operations and process definition
-    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
-    parseDefinition(definition, 0); // First pass is only to define valid parameters
-
-    array<ref<byte>> specialArgumentsOrTargets;
-    for(const ref<byte>& argument: allArguments) { // Parses explicit arguments
-        if(argument.contains('=')) { // Stores generic argument affecting operations
-            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
-            /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
-                assert(!arguments.contains(key));
-                sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
-            } else {*/
-            if(sweeps.contains(key) || arguments.contains(key)) {
-                if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
-                sweeps.at(key) << value;
-            } else {
-                arguments.insert(key, Variant(value));
-            }
-        }
-        else if(parameters.contains(argument)) arguments.insert(argument,""_);
-        else specialArgumentsOrTargets << argument;
-    }
-    parseDefinition(definition, 1); // Second pass correctly defines conditionnal rules and default arguments depending on given arguments
-    array<ref<byte>> specialArguments, targets;
-    for(ref<byte> argument: specialArgumentsOrTargets) (&ruleForOutput(argument) ? targets : specialArguments) << argument;
-    this->parseSpecialArguments(specialArguments);
-    execute(targets, sweeps, arguments);
+    execute(configure(allArguments, definition), sweeps, arguments);
 }
 
 void PersistentProcess::parseSpecialArguments(const ref<ref<byte> >& arguments) {
@@ -216,7 +226,6 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     // Otherwise regenerates target using new inputs, arguments and/or implementations
     const Rule& rule = ruleForOutput(target);
     assert_(&rule, target);
-    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
 
     array<shared<Result>> inputs;
     for(const ref<byte>& input: rule.inputs) inputs << getResult(input, arguments);
@@ -224,6 +233,9 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         ResultFile& result = *(ResultFile*)input.pointer;
         touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
     }
+
+    if(!rule.operation) return move(inputs.first()); // Forwarding rule
+    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
 
     array<shared<Result>> outputs;
     for(uint index: range(rule.outputs.size)) {

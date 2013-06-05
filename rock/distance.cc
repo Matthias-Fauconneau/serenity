@@ -240,7 +240,7 @@ class(DistanceZ, Operation), virtual VolumeOperation {
             target.data.size /= 2;
             Time time;
             pack(target, target32);
-            log("Pack", time);
+            //log("Pack", time);
         }
     }
 };

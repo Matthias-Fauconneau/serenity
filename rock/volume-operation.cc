@@ -4,4 +4,4 @@ defineVolumePass(Downsample, uint16, downsample);
 
 defineVolumePass(Tile, uint16, tile);
 
-defineVolumePass(SquareRoot, uint16, squareRoot);
+defineVolumePass(SquareRoot, uint8, squareRoot);
