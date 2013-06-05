@@ -37,10 +37,10 @@ struct Process {
     virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);
 
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const array<ref<byte>>& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
+    void execute(const array<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
 
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
-    virtual void execute(const ref<ref<byte>>& arguments, const ref<byte>& definition);
+    void execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
 
     array<ref<byte>> parameters; // Valid parameters accepted by operations compiled in this binary and used in process definition
     Dict defaultArguments; // Application specific default arguments (defined by process definition)

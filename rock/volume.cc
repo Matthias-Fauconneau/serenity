@@ -164,7 +164,7 @@ void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, u
     }
 }
 #endif
-#if 1
+
 void downsample(Volume16& target, const Volume16& source) {
     assert(!source.offsetX && !source.offsetY && !source.offsetZ);
     int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;
@@ -192,7 +192,6 @@ void downsample(Volume16& target, const Volume16& source) {
         }
     }
 }
-#endif
 
 Image slice(const Volume& source, float normalizedZ, bool cylinder) {
     int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
@@ -215,7 +214,7 @@ Image slice(const Volume& source, int z, bool cylinder) {
         else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
         else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
-        else error(source.sampleSize);
+        else error("source.sampleSize"_,source.sampleSize);
         uint linear8 = source.squared ? round(sqrt(value)) * 0xFF / round(sqrt(source.maximum)) : value * 0xFF / source.maximum;
         assert(linear8<0x100 || x<marginX || y<marginY || (int)z<marginZ, linear8, value, source.maximum, x, y, z);
         linear8 = min<uint>(0xFF, linear8); //FIXME

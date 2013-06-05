@@ -62,7 +62,7 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
 /// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
 class(Skeleton, Operation), virtual VolumeOperation {
     ref<byte> parameters() const override { return "minimalDiameter"_; }
-    uint outputSampleSize(uint index) override { int sizes[]={2}; return sizes[index]; }
+    uint outputSampleSize(uint) override { return 2; }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         uint minimalSqDiameter = args.contains("minimalDiameter"_) ? sqr(toInteger(args.at("minimalDiameter"_))) : 3;
         integerMedialAxis(outputs[0],inputs[0],inputs[1],inputs[2], minimalSqDiameter);

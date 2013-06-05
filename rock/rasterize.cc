@@ -56,7 +56,7 @@ void bin(Volume& target, const Volume16& source) {
     } );
     //uint64 maximum=0; for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) maximum = max(maximum, targetData[i].ballCount); log(maximum);
 }
-PASS(Bin, uint8[sizeof(Tile)/tileSide/tileSide/tileSide], bin);
+defineVolumePass(Bin, uint8[sizeof(Tile)/tileSide/tileSide/tileSide], bin);
 
 /// Rasterizes each skeleton voxel as a ball (with maximum blending)
 void rasterize(Volume16& target, const Volume& source) {
@@ -133,4 +133,4 @@ void rasterize(Volume16& target, const Volume& source) {
     target.squared = true;
     assert_(target.maximum == source.maximum);
 }
-PASS(Rasterize, uint16, rasterize);
+defineVolumePass(Rasterize, uint16, rasterize);

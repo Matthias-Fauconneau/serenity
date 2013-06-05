@@ -20,7 +20,7 @@ class(LorentzianMixtureModel, Operation) {
         float densityThreshold = float(threshold) / float(density.size);
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
         outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 3);
+        outputs[0]->data = ftoa(densityThreshold, 5);
         output(outputs, 1, "histogram.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
         output(outputs, 2, "histogram.tsv"_, [&]{ return toASCII(notrock); });
         output(outputs, 3, "histogram.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
@@ -52,7 +52,7 @@ class(Otsu, Operation) {
         float densityThreshold = float(threshold) / float(density.size);
         log("Otsu's model estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 3);
+        outputs[0]->data = ftoa(densityThreshold, 5);
         output(outputs, 1, "interclass.tsv"_, [&]{ return toASCII( (totalMaximum/maximum)*interclass ); } ); // Scales variance to plot over density
     }
 };

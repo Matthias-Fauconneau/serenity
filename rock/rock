@@ -1,13 +1,14 @@
 # Default arguments
 kernelSize = '1'
+threshold = 'otsu'
 if !cube: cylinder = '' #Clips histograms and slice rendering to the inscribed cylinder
 
 if !validation: source = Source
 if validation: source = Capsules
 
 histogram-source = Histogram source
-if threshold==otsu: threshold interclass = Otsu histogram-source
-if threshold==lorentz: threshold lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
+if threshold == 'otsu': densityThreshold interclass = Otsu histogram-source
+if threshold == 'lorentz': densityThreshold lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
 
 shift = ShiftRight source
 smoothx = Smooth shift
@@ -15,7 +16,7 @@ smoothxy = Smooth smoothx
 if !downsample: smooth = Smooth smoothxy shift=0
 if downsample: smooth = Downsample source
 
-pore rock = Binary smooth threshold
+pore rock = Binary smooth densityThreshold
 colorize = Colorize pore source
 
 distancex positionxx = DistanceX pore
@@ -34,6 +35,7 @@ connected = Rasterize bin-connected
 histogram-unconnected = SqrtHistogram unconnected
 histogram-connected = SqrtHistogram connected
 volume = Sum histogram-connected
+normalized-histogram-connected = Normalize histogram-connected
 
 #For volume rendering:
 #emptyx epositionx = DistanceX rock

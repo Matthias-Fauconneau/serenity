@@ -60,4 +60,4 @@ void toASCII(Volume& target, const Volume& source) {
         }
     }
 }
-PASS(ToASCII, Line, toASCII);
+defineVolumePass(ToASCII, Line, toASCII);

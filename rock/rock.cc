@@ -10,17 +10,17 @@
 #include "png.h"
 
 //#include "source.h"
-PASS(Downsample, uint16, downsample);
+defineVolumePass(Downsample, uint16, downsample);
 //include "capsule.h"
 //#include "smooth.h"
 //#include "threshold.h"
 //#include "distance.h"
 //#include "skeleton.h"
-PASS(Tile, uint16, tile);
+defineVolumePass(Tile, uint16, tile);
 //#include "floodfill.h"
 //#include "rasterize.h"
 //#include "validate.h"
-PASS(SquareRoot, uint16, squareRoot);
+defineVolumePass(SquareRoot, uint16, squareRoot);
 //#include "export.h"
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
@@ -121,6 +121,7 @@ struct Rock : PersistentProcess, Widget {
         assert(current);
         Volume volume = toVolume(current);
         if(volume.sampleSize==20) { exit(); return; } // Don't try to display ASCII
+        if(volume.sampleSize>4) error(current->name, volume.sampleSize);
         if(renderVolume) {
             mat3 view;
             view.rotateX(rotation.y); // pitch

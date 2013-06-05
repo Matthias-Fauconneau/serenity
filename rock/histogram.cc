@@ -65,8 +65,18 @@ class(SqrtHistogram, Operation) {
     }
 };
 
-class(Sum, Operation) {
-    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        output(outputs, 0, "scalar"_, [&]{ return str(sum(parseSample(inputs[0]->data))); });
+//definePass(Sum, "scalar"_, str(sum(parseSample(source.data))) );
+class(Sum, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = string("scalar"_);
+        target.data = str(sum(parseSample(source.data)));
+    }
+};
+
+class(Normalize, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = copy(source.metadata);
+        Sample sample = parseSample(source.data);
+        target.data = toASCII((1./sum(sample))*sample);
     }
 };

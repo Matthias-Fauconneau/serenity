@@ -19,7 +19,9 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
                 parameters += parameter;
                 s.skip();
                 if(s.match("=="_)) {
-                    ref<byte> literal = s.identifier("_-"_);
+                    s.skip();
+                    s.skip("'"_);
+                    ref<byte> literal = s.until('\'');
                     enable = arguments.value(parameter, "0"_) == literal;
                 } else {
                     enable = arguments.contains(parameter);
@@ -40,12 +42,16 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
         s.skip();
         if(s.match('\'')) { // Default argument
             assert_(outputs.size==1);
-            ref<byte> literal = s.until('\'');
-            if(pass) defaultArguments.insert(outputs[0], literal);
+            ref<byte> key = outputs[0];
+            ref<byte> value = s.until('\'');
+            if(pass) {
+                defaultArguments.insert(key, value);
+                if(!arguments.contains(key)) arguments.insert(key, value);
+            }
         } else {
             Rule rule;
             rule.operation = s.word();
-            assert_(rule.operation);
+            assert_(rule.operation && Interface<Operation>::factories.contains(rule.operation), rule.operation);
             s.whileAny(" \t\r"_);
             for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
                 if(s.match('#')) { s.whileNot('\n'); continue; }
@@ -53,6 +59,7 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
                 if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
                 else rule.inputs << word;
             }
+            for(ref<byte> output: outputs) assert_(!arguments.contains(output), "Multiple definitions for", output);
             rule.outputs = move(outputs);
             if(pass) rules << move(rule);
         }
@@ -64,6 +71,7 @@ Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) f
 Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     Dict relevant;
     for(const ref<byte>& input: rule.inputs) {
+        assert(&ruleForOutput(input), "No rule generating", input);
         for(auto arg: relevantArguments(ruleForOutput(input), arguments)) {
             if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
             else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key))*/ relevant.insert(move(arg.key), move(arg.value));
@@ -108,7 +116,7 @@ shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments
     error("Anonymous process manager unimplemented"_);
 }
 
-void Process::execute(const array<ref<byte>>& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
+void Process::execute(const array<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
     if(sweeps) {
         map<ref<byte>, array<Variant>> remaining = copy(sweeps);
         Dict args = copy(arguments);
@@ -120,6 +128,7 @@ void Process::execute(const array<ref<byte>>& targets, const map<ref<byte>, arra
             args.remove(parameter);
         }
     } else { // Actually generates targets when sweeps have been explicited
+        assert_(targets, "No targets");
         for(const ref<byte>& target: targets) {
             log(target, relevantArguments(ruleForOutput(target), arguments));
             targetResults << getResult(target, arguments);
@@ -153,7 +162,6 @@ void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& defi
         else specialArgumentsOrTargets << argument;
     }
     parseDefinition(definition, 1); // Second pass correctly defines conditionnal rules and default arguments depending on given arguments
-    for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
     array<ref<byte>> specialArguments, targets;
     for(ref<byte> argument: specialArgumentsOrTargets) (&ruleForOutput(argument) ? targets : specialArguments) << argument;
     this->parseSpecialArguments(specialArguments);

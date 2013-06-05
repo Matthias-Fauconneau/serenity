@@ -98,3 +98,18 @@ template<Type F> bool output(const ref<Result*>& outputs, uint index, const ref<
     } else assert_(index>0);
     return false;
 }
+
+/// Convenience class to define a single input, single output operation
+struct Pass : virtual Operation {
+    virtual void execute(const Dict& args, Result& output, const Result& source) abstract;
+    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override { execute(args, *outputs[0], *inputs[0]); }
+};
+
+/*/// Convenient macro to define simple operations
+#define definePass(name, type, body) \
+class(name, Operation), virtual Pass { \
+    virtual void execute(const Dict& args unused, Result& target, const Result& source) override { \
+        target.metadata = string(type); \
+        target.data = body; \
+    } \
+}*/

@@ -54,4 +54,4 @@ void floodFill(Volume16& target, const Volume16& source) {
         }
     }
 }
-PASS(FloodFill, uint16, floodFill);
+defineVolumePass(FloodFill, uint16, floodFill);

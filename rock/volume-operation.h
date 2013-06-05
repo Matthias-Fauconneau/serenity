@@ -81,5 +81,5 @@ template<Type O> struct VolumePass : virtual VolumeOperation {
     virtual void execute(const Dict& args, VolumeT<O>& target, const Volume& source) abstract;
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
 };
-#define PASS(name, type, function) \
+#define defineVolumePass(name, type, function) \
     class(name, Operation), virtual VolumePass<type> { void execute(const Dict&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
