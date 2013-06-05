@@ -102,7 +102,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     ~Thread(){Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/}
     /// Spawns a thread running an event loop with the given \a priority
     void spawn();
-    /// Processes all events on \a polls and tasks on \a queue until #terminate is set
+    /// Processes all events on \a polls and tasks on \a queue until terminate is set
     void run();
     /// Processes one queued task
     void event();
@@ -148,7 +148,7 @@ void __attribute((noreturn)) exit_thread(int status);
 
 /// Execute binary at \a path with command line arguments \a args
 /// \note if \a wait is false, Returns the PID to be used for wait
-int execute(const ref<byte>& path, const ref<ref<byte>>& args={}, bool wait=true);
+int execute(const ref<byte>& path, const ref<ref<byte>>& args={}, bool wait=true, const Folder& workingDirectory=currentWorkingDirectory());
 int64 wait(int pid);
 
 /// Returns value for environment variable \a name

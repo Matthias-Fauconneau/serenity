@@ -17,7 +17,7 @@ const Folder& currentWorkingDirectory();
 /// Returns a file descriptor to the root folder
 const Folder& root();
 
-enum { Files=1<<0, Folders=1<<1, Recursive=1<<2 };
+enum { Files=1<<0, Folders=1<<1, Recursive=1<<2, Sorted=1<<3, Hidden=1<<4 };
 struct Folder : Handle {
     /// Opens \a folderPath
     Folder(const ref<byte>& folderPath, const Folder& at=root(), bool create=false);

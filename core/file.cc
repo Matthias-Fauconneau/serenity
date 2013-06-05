@@ -30,14 +30,12 @@ array<string> Folder::list(uint flags) const {
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
             ref<byte> name = str(entry.name);
+            assert(name);
+            if(!(flags&Hidden) && name[0]=='.') continue;
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
-            if(type==DT_DIR && flags&Recursive) {
-                array<string> files = Folder(name,*this).list(flags);
-                for(const string& file: files) list.insertSorted(name+"/"_+file);
-            } else if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) {
-                list.insertSorted(string(name));
-            }
+            if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) { if(flags&Sorted) list.insertSorted(string(name)); else list << string(name); }
+            if(type==DT_DIR && flags&Recursive) for(const string& file: Folder(name,*this).list(flags)) { if(flags&Sorted) list.insertSorted(name+"/"_+file); else list << name+"/"_+file; }
         }
     }
     return list;

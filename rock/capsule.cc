@@ -1,3 +1,4 @@
+/// \file capsule.cc 3D volume defined by all points with an uniform radius of a line segment
 #include "volume-operation.h"
 #include "sample.h"
 #include "time.h"

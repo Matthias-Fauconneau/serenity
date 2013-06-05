@@ -2,19 +2,21 @@
 #include "data.h"
 #include "time.h"
 
-void Process::setDefinition(const ref<byte>& definition) {
-    rules.clear();
-    this->definition = definition;
-    array<ref<byte>> results;
+void Process::parseDefinition(const ref<byte>& definition, int pass) {
+    array<ref<byte>> symbols;
     for(TextData s(definition); s; s.skip()) {
         s.skip();
         if(s.match('#')) { s.until('\n'); continue; }
         if(s.match("if"_)) {
             s.skip();
             bool enable;
-            if(s.match('!')) enable = !arguments.contains(s.word("_-"_));
-            else {
+            if(s.match('!')) {
                 ref<byte> parameter = s.word("_-"_);
+                parameters += parameter;
+                enable = !arguments.contains(parameter);
+            } else {
+                ref<byte> parameter = s.word("_-"_);
+                parameters += parameter;
                 s.skip();
                 if(s.match("=="_)) {
                     ref<byte> literal = s.identifier("_-"_);
@@ -27,52 +29,34 @@ void Process::setDefinition(const ref<byte>& definition) {
             if(!enable) { s.until('\n'); continue; }
             s.skip();
         }
-        Rule rule;
+        array<ref<byte>> outputs;
         for(;!s.match('='); s.skip()) {
             ref<byte> output = s.word("_-"_);
             assert_(output, s.until('\n'));
-            assert_(!results.contains(output), "Multiple definitions for", output);
-            results << output;
-            rule.outputs << output;
+            assert_(!symbols.contains(output), "Multiple definitions for", output);
+            symbols << output;
+            outputs << output;
         }
         s.skip();
-        rule.operation = s.word();
-        assert_(rule.operation);
-        s.whileAny(" \t\r"_);
-        for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
-            if(s.match('#')) { s.whileNot('\n'); continue; }
-            ref<byte> word = s.word("_-"_);
-            if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
-            else rule.inputs << word;
-        }
-        rules << move(rule);
-    }
-}
-
-void Process::setArguments(const ref<ref<byte>>& rawArguments) {
-    array<ref<byte>> parameters;
-    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
-    arguments.clear();
-    this->rawArguments = rawArguments;
-    // Parses targets and global arguments
-    for(const ref<byte>& argument: rawArguments) {
-        if(argument.contains('=')) { // Stores generic argument affecting operations
-            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
-            /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
-                assert(!arguments.contains(key));
-                sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
-            } else {*/
-            if(sweeps.contains(key) || arguments.contains(key)) {
-                if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
-                sweeps.at(key) << value;
-            } else {
-                arguments.insert(key, Variant(value));
+        if(s.match('\'')) { // Default argument
+            assert_(outputs.size==1);
+            ref<byte> literal = s.until('\'');
+            if(pass) defaultArguments.insert(outputs[0], literal);
+        } else {
+            Rule rule;
+            rule.operation = s.word();
+            assert_(rule.operation);
+            s.whileAny(" \t\r"_);
+            for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
+                if(s.match('#')) { s.whileNot('\n'); continue; }
+                ref<byte> word = s.word("_-"_);
+                if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
+                else rule.inputs << word;
             }
+            rule.outputs = move(outputs);
+            if(pass) rules << move(rule);
         }
-        else if(parameters.contains(argument)) arguments.insert(argument,""_);
     }
-    for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
-    setDefinition(this->definition);
 }
 
 Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
@@ -143,29 +127,41 @@ void Process::execute(const array<ref<byte>>& targets, const map<ref<byte>, arra
     }
 }
 
-array<ref<byte> > Process::prepare(array<ref<byte>>& arguments) {
-    results.clear();
-    targetResults.clear();
+void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
+    parameters.clear(); arguments.clear(); sweeps.clear(); rules.clear(); results.clear(); targetResults.clear(); // Clears parsed data in case the same process is being reused several times
 
-    array<ref<byte>> targets;
-    arguments.filter([&](const ref<byte>& argument){
-        if(&ruleForOutput(argument)) { targets<<argument; return true; }
-        if(argument.contains('=')) return true;
-        return false;
-    });
-    if(!targets) { assert(rules && rules.last().outputs, rules); targets << rules.last().outputs.last(); }
-    return targets;
+    // Defines valid parameters using Operations and process definition
+    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
+    parseDefinition(definition, 0); // First pass is only to define valid parameters
+
+    array<ref<byte>> specialArgumentsOrTargets;
+    for(const ref<byte>& argument: allArguments) { // Parses explicit arguments
+        if(argument.contains('=')) { // Stores generic argument affecting operations
+            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
+            /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
+                assert(!arguments.contains(key));
+                sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
+            } else {*/
+            if(sweeps.contains(key) || arguments.contains(key)) {
+                if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
+                sweeps.at(key) << value;
+            } else {
+                arguments.insert(key, Variant(value));
+            }
+        }
+        else if(parameters.contains(argument)) arguments.insert(argument,""_);
+        else specialArgumentsOrTargets << argument;
+    }
+    parseDefinition(definition, 1); // Second pass correctly defines conditionnal rules and default arguments depending on given arguments
+    for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
+    array<ref<byte>> specialArguments, targets;
+    for(ref<byte> argument: specialArgumentsOrTargets) (&ruleForOutput(argument) ? targets : specialArguments) << argument;
+    this->parseSpecialArguments(specialArguments);
+    execute(targets, sweeps, arguments);
 }
 
-void Process::execute() {
-    array<ref<byte>> args (rawArguments);
-    execute(this->prepare(args), sweeps, arguments);
-}
-
-array<ref<byte> > PersistentProcess::prepare(array<ref<byte>>& args) {
-    array<ref<byte>> targets = Process::prepare(args);
-    for(const ref<byte>& argument: args) if(!name) name=argument.contains('/')?section(argument,'/',-2,-1):argument; // Selects a name without removing the used argument
-    assert_(name, rawArguments);
+void PersistentProcess::parseSpecialArguments(const ref<ref<byte> >& arguments) {
+    if(!name) name=arguments.first(); // Use first special argument as storage folder name (if not already defined by derived class)
     storageFolder = Folder(name, baseStorageFolder, true);
 
     // Maps intermediate results from file system
@@ -195,8 +191,6 @@ array<ref<byte> > PersistentProcess::prepare(array<ref<byte>>& args) {
             results << move(result);
         }
     }
-
-    return targets;
 }
 
 PersistentProcess::~PersistentProcess() {

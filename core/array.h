@@ -1,6 +1,6 @@
 #pragma once
 /// \file array.h Contiguous collection of elements
-#include "core.h"
+#include "memory.h"
 
 /// Managed initialized dynamic mutable reference to an array of elements (either an heap allocation managed by this object or a reference to memory managed by another object)
 /// \note Adds resize/insert/remove using T constructor/destructor

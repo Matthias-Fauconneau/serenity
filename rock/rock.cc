@@ -1,3 +1,4 @@
+/// \file rock.cc Volume data processor
 #include "thread.h"
 #include "process.h"
 #include "volume.h"
@@ -26,28 +27,33 @@ PASS(SquareRoot, uint16, squareRoot);
 struct Rock : PersistentProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) {
-        // Set arguments
-        if(!arguments.contains("cube"_)) defaultArguments.insert("cylinder"_,""_); // Clips histograms and slice rendering to the inscribed cylinder
-        defaultArguments.insert("kernelSize"_,"1"_);
-        setArguments(args);
-        setDefinition(rock());
-        execute();
+        execute(args, rock());
 
-        if(result) { // Copies result to result folder (on disk)
-            if(targetResults.size>1) {
-                assert(!existsFile(result,cwd), "New folder would overwrite existing file", result);
-                if(!existsFolder(result,cwd)) Folder(result,cwd,true);
-            }
-            for(const shared<Result>& target: targetResults) if(target->data.size) {
-                Time time;
-                if(existsFolder(result, cwd)) writeFile(target->name+"."_+target->metadata, target->data, result), log(result+"/"_+target->name+"."_+target->metadata, time);
-                else writeFile(result, target->data, cwd), log(target->name+"."_+target->metadata,"->",result, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
-            }
+        if(targetPaths) { // Copies results to disk
+            if(targetPaths.size == targetResults.size) {
+                for(uint index: range(targetResults.size)) {
+                    const shared<Result>& target = targetResults[index];
+                    const ref<byte>& path = targetPaths[index];
+                    if(target->data.size) {
+                        Time time;
+                        if(existsFolder(path, cwd)) writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
+                        else writeFile(path, target->data, cwd), log(target->name+"."_+target->metadata,"->",path, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
+                    }
+                }
+            } else if(targetPaths.size == 1) {
+                const ref<byte>& path = targetPaths[0];
+                assert(!existsFile(path,cwd), "New folder would overwrite existing file", path);
+                if(!existsFolder(path,cwd)) Folder(path,cwd,true);
+                for(const shared<Result>& target: targetResults) if(target->data.size) {
+                    Time time;
+                    writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
+                }
+            } else error("target/path mismatch", targetResults, targetPaths);
         }
 
+        // Displays first target result
         for(const shared<Result>& target: targetResults) if(target->data.size) { current = share( target ); break; }
         if(!current || current->data.size==0 || current->name=="ascii"_ || arguments.value("view"_,"0"_)=="0"_) { exit(); return; }
-        // Displays result
         window = unique<Window>(this,int2(-1,-1),"Rock"_);
         window->localShortcut(Key('r')).connect(this, &Rock::refresh);
         window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
@@ -57,16 +63,16 @@ struct Rock : PersistentProcess, Widget {
         window->show();
     }
 
-     array<ref<byte> > prepare(array<ref<byte>>& args) override {
-        array<ref<byte>> targets = PersistentProcess::prepare(args);
-        for(const ref<byte>& argument: args) {
-            if(!arguments.contains("source"_) && existsFolder(argument,cwd)) { arguments.insert("source"_,argument); continue; }
-            if(!result) { result=argument; continue; }
-            error("Invalid argument"_, argument);
+     void parseSpecialArguments(const ref<ref<byte>>& specialArguments) override {
+        for(const ref<byte>& argument: specialArguments) {
+            if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
+            if(!arguments.contains("path"_) && existsFolder(argument,cwd)) { arguments.insert("path"_,argument); continue; }
+            targetPaths << argument;
         }
-        assert_(name, "Usage: rock <source folder containing volume slices> [target] [key=value]*");
-
-        return targets;
+        assert_(arguments.contains("path"_), "Usage: rock <source folder containing volume slices> (target name|target path|key=value)*");
+        ref<byte> path = arguments.at("path"_);
+        name = path.contains('/') ? section(path,'/',-2,-1) : path; // Use source path as process name (for storage folder) instead of any first arguments
+        PersistentProcess::parseSpecialArguments(specialArguments);
     }
 
     void refresh() {
@@ -145,7 +151,7 @@ struct Rock : PersistentProcess, Widget {
     }
 
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
-    ref<byte> result; // Path to file (or folder) where targets are copied
+    array<ref<byte>> targetPaths; // Path to file (or folders) where targets are copied
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     unique<Window> window {unique<Window>::null()};

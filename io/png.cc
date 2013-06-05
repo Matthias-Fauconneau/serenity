@@ -172,7 +172,7 @@ array<byte> deflate(array<byte> data) {
 }
 #endif
 
-array<byte> encodePNG(const Image& image) {
+buffer<byte> encodePNG(const Image& image) {
     array<byte> file = string("\x89PNG\r\n\x1A\n"_);
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
     array<byte> IHDR = "IHDR"_+raw(ihdr);
@@ -182,5 +182,5 @@ array<byte> encodePNG(const Image& image) {
     file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
 
     file<<raw(big32(0))<<"IEND"_<<raw(big32(crc32("IEND"_)));
-    return file;
+    return move(file);
 }

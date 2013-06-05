@@ -6,12 +6,12 @@
 class(Source, Operation), virtual VolumeOperation {
     uint minX, minY, minZ, maxX, maxY, maxZ;
 
-    ref<byte> parameters() const override { static auto p="source cylinder cube"_; return p; }
+    ref<byte> parameters() const override { static auto p="path cylinder cube"_; return p; }
     uint outputSampleSize(uint) override { return 2; }
     uint64 outputSize(const Dict& args, const ref<Result*>&, uint) override {
-        Folder folder = args.at("source"_);
-        array<string> slices = folder.list(Files);
-        assert_(slices, args.at("source"_));
+        Folder folder = args.at("path"_);
+        array<string> slices = folder.list(Files|Sorted);
+        assert_(slices, args.at("path"_));
         Map file (slices.first(), folder);
         const Tiff16 image (file);
         minX=0, minY=0, minZ=0, maxX = image.width, maxY = image.height, maxZ = slices.size;
@@ -33,8 +33,8 @@ class(Source, Operation), virtual VolumeOperation {
     }
 
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&) {
-        Folder folder = args.at("source"_);
-        array<string> slices = folder.list(Files);
+        Folder folder = args.at("path"_);
+        array<string> slices = folder.list(Files|Sorted);
 
         Volume16& target = outputs.first();
         int3 size = int3(maxX-minX, maxY-minY, maxZ-minZ);
@@ -46,7 +46,7 @@ class(Source, Operation), virtual VolumeOperation {
         uint16* const targetData = (Volume16&)outputs.first();
         for(uint z: range(size.z)) {
             if(report/1000>=7) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-            Tiff16(Map(slices[minZ+z],folder)).read(targetData+(marginZ+z)*X*Y + marginY*X + marginX, minX, minY, maxX-minX, maxY-minY, Y); // Directly decodes slice images into the volume
+            Tiff16(Map(slices[minZ+z],folder)).read(targetData + (marginZ+z)*X*Y + marginY*X + marginX, minX, minY, maxX-minX, maxY-minY, Y); // Directly decodes slice images into the volume
         }
         //target.maximum = (1<<(target.sampleSize*8))-1; assert(maximum(target) == target.maximum, maximum(target));
         target.maximum = maximum(target); // Some sources don't use the full range

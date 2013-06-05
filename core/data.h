@@ -1,10 +1,7 @@
 #pragma once
 /// \file data.h Structured data parsers (Data, BinaryData, TextData)
-#include "array.h"
+#include "memory.h"
 
-#if __GNUC_MINOR__ < 8
-inline uint16 __builtin_bswap16(uint16 x) { return (x<<8)|(x>>8); }
-#endif
 #define big16 __builtin_bswap16
 #define big32 __builtin_bswap32
 #define big64 __builtin_bswap64
@@ -14,7 +11,6 @@ template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
-template<Type T, Type O> ref<T> cast(const array<O>& o) { return cast<T,O>((const ref<O>&)o); }
 
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
@@ -97,12 +93,12 @@ struct BinaryData : virtual Data {
     ReadOperator read() { return {this}; }
 
     /// Reads \a size raw \a T elements
-    template<Type T>  ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
+    template<Type T> ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
 
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {
        BinaryData* s; uint size;
-       template<Type T> operator array<T>() { array<T> t(size); for(uint unused i: range(size)) t<<(T)s->read(); return t; }
+       template<Type T> operator ::buffer<T>() { ::buffer<T> buffer(size); for(uint i: range(size)) new (&buffer.at(i)) T(s->read()); return buffer; }
    };
    ArrayReadOperator read(uint size) { return {this,size}; }
 
@@ -117,7 +113,7 @@ struct TextData : virtual Data {
 #if __clang__ || __GNUC_MINOR__ < 8
     TextData(){}
     default_move(TextData);
-    TextData(array<byte>&& array) : Data(move(array)){}
+    TextData(buffer<byte>&& array) : Data(move(array)){}
     explicit TextData(const ref<byte>& reference):Data(reference){}
 #else
     using Data::Data;
@@ -156,9 +152,9 @@ struct TextData : virtual Data {
     ref<byte> line();
     /// Reads one possibly escaped character
     char character();
-    /// Reads a word [a-zA-Z<special>]+
+    /// Reads a word [a-zA-Z/special/]+
     ref<byte> word(const ref<byte>& special=""_);
-    /// Reads a identifier [a-zA-Z0-9<special>]*
+    /// Reads a identifier [a-zA-Z0-9/special/]*
     ref<byte> identifier(const ref<byte>& special=""_);
     /// Matches [-+]?[0-9]*
     ref<byte> whileInteger(bool sign);

@@ -195,7 +195,7 @@ void downsample(Volume16& target, const Volume16& source) {
 #endif
 
 Image slice(const Volume& source, float normalizedZ, bool cylinder) {
-    int z = source.margin.z+(source.sampleCount.z-2*source.margin.z-1)*normalizedZ;
+    int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
     assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
     return slice(source, z, cylinder);
 }

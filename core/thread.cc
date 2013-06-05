@@ -176,7 +176,7 @@ void exit(int status) {
 }
 
 // Environment
-int execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait) {
+int execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait, const Folder& workingDirectory) {
     if(!existsFile(path)) { warn("Executable not found",path); return -1; }
 
     array<string> args0(1+args.size);
@@ -194,8 +194,9 @@ int execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait) {
     for(uint i: range(env0.size)) envp[i]=env0[i].data;
     envp[env0.size]=0;
 
+    int cwd = workingDirectory.fd;
     int pid = fork();
-    if(pid==0) { if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
+    if(pid==0) { fchdir(cwd); if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
     else if(wait) return ::wait(pid);
     else { wait4(pid,0,WNOHANG,0); return pid; }
 }
