@@ -103,8 +103,8 @@ void tile(Volume16& target, const Volume16& source) {
     interleavedLookup(target);
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
-        assert(offsetZ[Z]+offsetY[y]+offsetX[x] < target.size());
-        targetData[offsetZ[Z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
+        assert(offsetZ[z]+offsetY[y]+offsetX[x] < target.size());
+        targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
     }
 }
 

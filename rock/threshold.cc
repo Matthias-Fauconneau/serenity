@@ -51,7 +51,7 @@ class(Otsu, Operation) {
             double variance = double(foregroundCount)*double(backgroundCount)*sq(foregroundMean - backgroundMean);
             if(variance > maximumVariance) {
                 maximumVariance=variance, threshold = t;
-                parameters[0]=foregroundCount, parameters[1]=backgroundCount, parameters[2]=foregroundMean, parameters[3]=backgroundMean;
+                parameters[0]=backgroundCount, parameters[1]=foregroundCount, parameters[2]=backgroundMean, parameters[3]=foregroundMean;
             }
             interclass[t] = variance;
         }
@@ -60,11 +60,12 @@ class(Otsu, Operation) {
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5);
         output(outputs, 1, "scalar"_, [&]{
-            return "foregroundCount "_+str(parameters[0])+
-                    ", backgroundCount "_+str(parameters[1])+
-                    ", foregroundMean "_+str(parameters[2])+
-                    ", backgroundMean "_+str(parameters[3])+
-                    ", maximumDeviation"_+str(sqrt(maximumVariance/sq(totalCount))); } );
+            return "threshold "_+str(threshold)+"\n"_
+                    "backgroundCount "_+dec(parameters[0])+"\n"_
+                    "foregroundCount "_+dec(parameters[1])+"\n"_
+                    "backgroundMean "_+str(parameters[2])+"\n"_
+                    "foregroundMean "_+str(parameters[3])+"\n"_
+                    "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount))); } );
         output(outputs, 2, "interclass.tsv"_, [&]{ return toASCII((1./sq(totalCount))*interclass ); } );
     }
 };

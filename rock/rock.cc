@@ -72,7 +72,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 }
             } else if(targetPaths.size == 1) {
                 const ref<byte>& path = targetPaths[0];
-                assert(!existsFile(path,cwd), "New folder would overwrite existing file", path);
+                assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
                 if(!existsFolder(path,cwd)) Folder(path,cwd,true);
                 for(const shared<Result>& target: targetResults) if(target->data.size) {
                     Time time;
