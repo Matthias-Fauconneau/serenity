@@ -10,7 +10,7 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
     int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd; // Bisector (vector bisecting
     int sqDistance = sq(dx0d) + sq(dy0d) + sq(dz0d);
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
-    float norm = sqrt( sqDistance );
+    float norm = sqrt(float(sqDistance));
     // Prune using all methods (as rasterization is the bottleneck)
     if( sqNorm > minimalSqDiameter &&  // Constant pruning: feature point far enough apart (may filter small features)
          sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 53° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)

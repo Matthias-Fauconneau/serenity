@@ -2,9 +2,15 @@
 #include "data.h"
 #include "math.h"
 
-uint64 sum(const Sample& A) { uint64 sum=0; for(uint i: range(A.size)) sum+=A[i]; return sum; }
+float sum(const Sample& A) { float sum=0; for(uint i: range(A.size)) sum += A[i]; return sum; }
+float mean(const Sample& A) { return sum(A)/A.size; }
+float variance(const Sample& A) { float mean=::mean(A), ssd=0; for(uint i: range(A.size)) ssd += sq(A[i]-mean); return ssd/A.size; }
 
-Sample operator*(double s, const Sample& A) {
+float histogramSum(const Sample& A) { float sum=0; for(uint i: range(A.size)) sum += i*A[i]; return sum; }
+float histogramMean(const Sample& A) { return histogramSum(A)/sum(A); }
+float histogramVariance(const Sample& A) { float mean=::histogramMean(A), ssd=0; for(uint i: range(A.size)) ssd += A[i]*sq(i-mean); return ssd/sum(A); }
+
+Sample operator*(float s, const Sample& A) {
     uint N=A.size; Sample R(N);
     for(uint i: range(N)) R[i]=s*A[i];
     return R;
@@ -12,7 +18,7 @@ Sample operator*(double s, const Sample& A) {
 
 Sample operator-(const Sample& A, const Sample& B) {
     uint N=A.size; assert(B.size==N); Sample R(N);
-    for(uint i: range(N)) R[i]=max(0., A[i]-B[i]);
+    for(uint i: range(N)) R[i]=max(0.f, A[i]-B[i]);
     return R;
 }
 
@@ -23,8 +29,8 @@ Sample operator*(const Sample& A, const Sample& B) {
 }
 
 Sample sqrtHistogram(const Sample& A) {
-    uint N=round(sqrt(A.size-1))+1; Sample R(N,N,0);
-    for(uint i: range(A.size)) R[round(sqrt(i))] += A[i];
+    uint N=round(sqrt(float(A.size-1)))+1; Sample R(N,N,0);
+    for(uint i: range(A.size)) R[round(sqrt(float(i)))] += A[i];
     return R;
 }
 
@@ -33,14 +39,13 @@ Sample parseSample(const ref<byte>& file) {
     int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.decimal(); s.skip("\n"_); }
     s.index=0;
     Sample sample(maximum+1);
-    while(s) { float x=s.decimal(); assert(x==float(int(x))); s.skip("\t"_); sample[int(x)]=s.decimal(); s.skip("\n"_); }
+    while(s) { double x=s.decimal(); assert_(x==double(int(x)) && x<sample.size, x, double(int(x)), maximum); s.skip("\t"_); sample[int(x)]=s.decimal(); s.skip("\n"_); }
     return sample;
 }
 
-inline float log10(float x) { return __builtin_log10f(x); }
 string toASCII(const Sample& sample, float scale) {
     string s;
-    for(uint i=0; i<sample.size; i++) if(sample[i]) s << ftoa(i*scale,3) << '\t' << ftoa(sample[i], 3) << '\n';
+    for(uint i=0; i<sample.size; i++) if(sample[i]) s << ftoa(i*scale, scale==1?0:4) << '\t' << ftoa(sample[i], 4, 0, true) << '\n';
     return s;
 }
 

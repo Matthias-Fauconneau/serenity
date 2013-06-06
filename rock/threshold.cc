@@ -10,7 +10,7 @@ class(LorentzianMixtureModel, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == "histogram.tsv"_);
         Sample density = parseSample( inputs[0]->data );
-        density[0]=density[density.size-1]=0; // Ignores clipped values
+        density[0]=density[density.size-1]=0; // Zeroes extreme values (clipping artifacts)
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
         const Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
         Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
@@ -53,7 +53,7 @@ class(Otsu, Operation) {
                 maximumVariance=variance, threshold = t;
                 parameters[0]=foregroundCount, parameters[1]=backgroundCount, parameters[2]=foregroundMean, parameters[3]=backgroundMean;
             }
-            interclass[t] = variance;
+            interclass[t] = variance / density.size;
         }
         float densityThreshold = float(threshold) / float(density.size);
         log("Otsu's model estimates threshold at", densityThreshold);
@@ -65,7 +65,7 @@ class(Otsu, Operation) {
                     ", foregroundMean "_+str(parameters[2])+
                     ", backgroundMean "_+str(parameters[3])+
                     ", maximumVariance"_+str(maximumVariance); } );
-        output(outputs, 2, "interclass.tsv"_, [&]{ return toASCII( (1./maximumVariance)*interclass ); } );
+        output(outputs, 2, "interclass.tsv"_, [&]{ return toASCII(interclass ); } );
     }
 };
 

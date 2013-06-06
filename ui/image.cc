@@ -1,6 +1,7 @@
 #include "image.h"
 #include "data.h"
 #include "vector.h"
+#include "math.h"
 
 Image flip(Image&& image) {
     for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++) swap(image(x,y),image(x,h-1-y));
@@ -161,19 +162,21 @@ Image  __attribute((weak)) decodePNG(const ref<byte>&) { error("PNG support not 
 Image  __attribute((weak)) decodeJPEG(const ref<byte>&) { error("JPEG support not linked"_); }
 Image  __attribute((weak)) decodeICO(const ref<byte>&) { error("ICO support not linked"_); }
 Image  __attribute((weak)) decodeTIFF(const ref<byte>&) { error("TIFF support not linked"_); }
+Image  __attribute((weak)) decodeBMP(const ref<byte>&) { error("BMP support not linked"_); }
 
 Image decodeImage(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
     else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return decodeTIFF(file);
+    else if(startsWith(file,"BM"_)) return decodeBMP(file);
     else { if(file.size) log("Unknown image format"_,hex(file.slice(0,min(file.size,4ull)))); return Image(); }
 }
 
 uint8 sRGB_lookup[256];
 void __attribute((constructor(10000))) compute_sRGB_lookup() {
     for(uint i=0;i<256;i++) {
-        float c = i/255.f;
-        sRGB_lookup[i] = round(255*( c>=0.0031308 ? 1.055*pow(c,1/2.4f)-0.055 : 12.92*c ));
+        double c = i/255.;
+        sRGB_lookup[i] = round(255*( c>=0.0031308 ? 1.055*pow(c,1/2.4)-0.055 : 12.92*c ));
     }
 }

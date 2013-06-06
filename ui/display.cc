@@ -1,4 +1,5 @@
 #include "display.h"
+#include "math.h"
 
 bool softwareRendering = true;
 Image framebuffer;
@@ -94,8 +95,6 @@ void line(vec2 p1, vec2 p2, vec4 color) {
     }
 }
 
-inline double mod(double q, double d) { return __builtin_fmod(q, d); }
-const double PI = 3.14159265358979323846;
 vec3 HSVtoRGB(float h, float s, float v) {
     float H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
     int i=H;

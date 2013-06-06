@@ -7,8 +7,10 @@ if !validation: source = Source
 if validation: source = Capsules
 
 histogram-source = Histogram source
+normalized-histogram-source = Normalize histogram-source
+kde-source = KernelDensityEstimation histogram-source
 if threshold == 'otsu': density-threshold otsu-parameters interclass = Otsu histogram-source
-if threshold == 'lorentz': density-threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel histogram-source
+if threshold == 'lorentz': density-threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel kde-source
 
 shift = ShiftRight source
 smoothx = Smooth shift

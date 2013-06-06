@@ -152,10 +152,12 @@ uint TextData::hexadecimal() {
 ref<byte> TextData::whileDecimal() {
     uint start=index;
     matchAny("-+"_);
-    for(bool gotDot=false;available(1);) {
+    for(bool gotDot=false, gotE=false;available(1);) {
         byte c=peek();
-        if(c=='.') { if(gotDot) break; gotDot=true; advance(1); continue; }
-        if(c>='0'&&c<='9') advance(1); else break;
+        /***/ if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
+        else if(c=='e') { if(gotE) break; gotE=true; advance(1); }
+        else if(c>='0'&&c<='9') advance(1);
+        else break;
     }
     return slice(start,index-start);
 }

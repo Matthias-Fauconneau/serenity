@@ -1,4 +1,5 @@
 #include "string.h"
+#include "math.h"
 
 /// ref<byte>
 
@@ -72,26 +73,43 @@ int64 toInteger(const ref<byte>& number, int base) {
     return sign*value;
 }
 
-bool isDecimal(const ref<byte>& s) {
-    if(!s) return false; bool gotDot=false; for(char c: s) if((c<'0'||c>'9')&&(gotDot||c!='.')) return false; return true;
+bool isDecimal(const ref<byte>& number) {
+    if(!number) return false;
+    const byte* i = number.begin();
+    if(*i == '-' || *i == '+') ++i;
+    for(bool gotDot=false, gotE=false;i!=number.end();++i) {
+        /***/ if(!gotDot && *i == '.') gotDot=true;
+        else if(!gotE && *i == 'e') gotE=true;
+        else if(*i<'0' || *i>'9') return false;
+    }
+    return true;
 }
 
-double toDecimal(const ref<byte>& number) {
+inline real exp10(real x) { return __builtin_exp10(x); }
+inline real log10(real x) { return __builtin_log10(x); }
+real toDecimal(const ref<byte>& number) {
     if(!number) return __builtin_nan("");
-    double sign=1;
+    real sign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
-    double exponent = 1;
-    double significand = 0;
-    for(bool gotDot=false;i!=number.end();++i) {
-        if(*i == '.') { gotDot=true; continue; }
-        if(*i<'0' || *i>'9') { error("Unexpected",*i); break; }
-        int n = *i-'0';
-        significand *= 10;
-        significand += n;
-        if(gotDot) exponent *= 10;
+    real significand=0, decimal=0, exponent=0;
+    for(bool gotDot=false, gotE=false;i!=number.end();++i) {
+        /***/ if(!gotDot && *i == '.') gotDot=true;
+        else if(!gotE && *i == 'e') gotE=true;
+        else {
+            if(*i<'0' || *i>'9') { error("Unexpected",*i); break; }
+            int n = *i-'0';
+            if(gotE) {
+                exponent *= 10;
+                exponent += n;
+            } else {
+                significand *= 10;
+                significand += n;
+                if(gotDot) decimal++;
+            }
+        }
     }
-    return sign*significand/exponent;
+    return sign*significand*exp10(exponent-decimal);
 }
 
 /// string
@@ -182,11 +200,6 @@ template<uint base> string itoa(int64 number, int pad) {
 }
 template string itoa<10>(int64,int);
 
-inline double exp(double x) { return __builtin_exp(x); }
-inline double ln(double x) { return __builtin_log(x); }
-inline double exp10(double x) { return exp(x*ln(10)); }
-inline double log10(double x) { return __builtin_log10(x); }
-inline double round(double x) { return __builtin_round(x); }
 string ftoa(double n, int precision, int pad, bool exponent) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return string("NaN"_);

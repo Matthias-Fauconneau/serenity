@@ -1,14 +1,29 @@
 #pragma once
 #include "string.h"
 
-/// Finite discrete integer-valued distribution (represented by its samples)
-typedef buffer<double> Sample;
+/// Finite uniformly sampled distribution
+typedef buffer<float> Sample; //TODO: non-uniform sampling (using map<float,float>)
 
-/// Sums all samples
-uint64 sum(const Sample& A);
+/// Returns the sum of the samples
+float sum(const Sample& A);
+
+/// Returns the mean of the samples
+float mean(const Sample& A);
+
+/// Returns the variance of the samples
+float variance(const Sample& A);
+
+/// Returns the sum of the samples represented by the histogram
+float histogramSum(const Sample& A);
+
+/// Returns the mean of the samples represented by the histogram
+float histogramMean(const Sample& A);
+
+/// Returns the variance of the samples represented by the histogram
+float histogramVariance(const Sample& A);
 
 /// Multiplies sample by a scalar
-Sample operator*(double s, const Sample& A);
+Sample operator*(float s, const Sample& A);
 
 /// Substracts samples clipping to zero
 Sample operator-(const Sample& A, const Sample& B);

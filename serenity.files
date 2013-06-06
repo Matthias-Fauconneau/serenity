@@ -32,12 +32,13 @@ io/png.cc
 io/png.h
 io/tiff.cc
 io/tiff.h
-io/graph.h
+io/bmp.cc
 
 ui/display.cc
 ui/display.h
 ui/font.cc
 ui/font.h
+ui/image.cc
 ui/image.h
 ui/interface.h
 ui/layout.h

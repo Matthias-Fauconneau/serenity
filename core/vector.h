@@ -2,14 +2,7 @@
 /// \file vector.h Vector types and operations
 #include "string.h"
 #include "simd.h"
-
-template<Type T> T mix(const T& a,const T& b, float t) { return a*(1-t) + b*t; }
-inline float norm(float x) { return abs(x); }
-inline constexpr float sqrt(float f) { return __builtin_sqrtf(f); }
-inline bool isNaN(float x) { return __builtin_isnan(x); }
-inline float floor(float x) { return __builtin_floorf(x); }
-inline float round(float x) { return __builtin_roundf(x); }
-inline float ceil(float x) { return __builtin_ceilf(x); }
+#include "math.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly

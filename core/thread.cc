@@ -136,11 +136,11 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
     setExceptions(
-                //Invalid | volume renderer takes square roots of negatives
-                //Denormal | Dividing by Otsu's method variance
-                //DivisionByZero | volume renderer divides by zero
-                //Overflow | volume renderer overflows
-                //Underflow | Dividing by Otsu's method variance ?
+                Invalid | //volume renderer takes square roots of negatives
+                Denormal | //Dividing by Otsu's method variance
+                DivisionByZero | //volume renderer divides by zero
+                Overflow | //volume renderer overflows
+                Underflow | //Dividing by Otsu's method variance ?
                 0);
 }
 

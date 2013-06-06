@@ -34,7 +34,7 @@ void bin(Volume& target, const Volume16& source) {
             for(int x=marginX; x<X-marginX; x++) {
                 uint sqRadius = sourceData[offsetZ[z]+offsetY[y]+offsetX[x]];
                 if(!sqRadius) continue;
-                float ballRadius = sqrt(sqRadius);
+                float ballRadius = sqrt(float(sqRadius));
                 int radius = ceil(ballRadius);
                 for(int dz=(int(z)-radius)/tileSide; dz<=(int(z)+radius)/tileSide; dz++) {
                     for(int dy=(y-radius)/tileSide; dy<=(y+radius)/tileSide; dy++) {

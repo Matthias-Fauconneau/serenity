@@ -1,4 +1,5 @@
 #include "volume.h"
+#include "math.h"
 #include "simd.h"
 #include "thread.h"
 #include "data.h"
@@ -257,7 +258,7 @@ Image slice(const Volume& source, int z, bool cylinder) {
         else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
         else error("source.sampleSize"_,source.sampleSize);
-        uint linear8 = source.squared ? round(sqrt(value)) * 0xFF / round(sqrt(source.maximum)) : value * 0xFF / source.maximum;
+        uint linear8 = source.squared ? round(sqrt(float(value))) * 0xFF / round(sqrt(float(source.maximum))) : value * 0xFF / source.maximum;
         assert(linear8<0x100 || x<marginX || y<marginY || (int)z<marginZ, linear8, value, source.maximum, x, y, z);
         linear8 = min<uint>(0xFF, linear8); //FIXME
         extern uint8 sRGB_lookup[256];

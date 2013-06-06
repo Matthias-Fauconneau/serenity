@@ -1,5 +1,7 @@
+/// \file histogram.cc Histograms volume and provides Sample methods as Operation
 #include "histogram.h"
 #include "volume-operation.h"
+#include "thread.h"
 
 Sample histogram(const Volume16& source, bool cylinder) {
     int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
@@ -52,7 +54,30 @@ class(Histogram, Operation) {
     }
 };
 
-/// Computes histogram, square roots bin values, recounts using uniform integer bins and scales bin values
+/// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel
+Sample kernelDensityEstimation(const Sample& histogram) {
+    const uint N = histogram.size;
+    real h = pow(4./(3*N),1./5) * sqrt(histogramVariance(histogram));
+    const uint clip = 8192;
+    float K[clip]; for(int i: range(clip)) K[i] = exp(-1./2*sq(i)/sq(h))/sqrt(2*PI); // Precomputes gaussian kernel
+    Sample pdf ( N );
+    parallel(N, [&](uint, uint x0){ // O(N²)
+        float sum = 0;
+        for(int i: range(min(clip,x0))) sum += histogram[x0-1-i]*K[i];
+        for(int i: range(min(clip,uint(histogram.size)-x0))) sum += histogram[x0+i]*K[i];
+        pdf[x0] = sum / (::sum(histogram)*h);
+    });
+    return pdf;
+}
+
+class(KernelDensityEstimation, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = string("kde.tsv"_);
+        target.data = toASCII(kernelDensityEstimation(parseSample(source.data)));
+    }
+};
+
+/// Computes histogram, square roots bin values, recounts using uniform integer bins and scales bin values //FIXME: use KDE instead
 class(SqrtHistogram, Operation) {
     virtual ref<byte> parameters() const { return "cylinder resolution"_; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
@@ -77,6 +102,7 @@ class(Normalize, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
         Sample sample = parseSample(source.data);
+        sample[0]=sample[sample.size-1]=0; // Zeroes extreme values (clipping artifacts)
         target.data = toASCII((1./sum(sample))*sample);
     }
 };
