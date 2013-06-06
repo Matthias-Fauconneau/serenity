@@ -1,4 +1,5 @@
 #pragma once
+/// \file function.h Equivalent to std::function
 #include "array.h"
 
 // functor abstract interface
@@ -29,6 +30,7 @@ template<Type O, Type R, Type... Args> struct const_method<O, R(Args...)> : func
 };
 
 template<Type R, Type... Args> struct function;
+/// Provides a common interface to store functions, methods (delegates) and anonymous functions (lambdas)
 template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
     long any[22]; //always store functor inline
     template<Type F> function(F f) {

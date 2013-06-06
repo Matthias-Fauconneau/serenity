@@ -1,5 +1,9 @@
+# Rock process definition
+# Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
+# Syntax: output1 output2 ... = Operator input1 input2 arg1=value ...
+
 # Default arguments
-kernelSize = '1'
+smoothKernelSize = '1'
 threshold = 'otsu'
 if !cube: cylinder = '' #Clips histograms and slice rendering to the inscribed cylinder
 
@@ -9,8 +13,8 @@ if validation: source = Capsules
 histogram-source = Histogram source
 #normalized-histogram-source = Normalize histogram-source
 density-source = KernelDensityEstimation histogram-source
-if threshold == 'otsu': density-threshold otsu-parameters interclass = Otsu histogram-source
-if threshold == 'lorentz': density-threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel kde-source
+if threshold == 'otsu': threshold otsu-parameters interclass = Otsu histogram-source
+if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel density-source
 
 shift = ShiftRight source
 smoothx = Smooth shift
@@ -18,7 +22,7 @@ smoothxy = Smooth smoothx
 if !downsample: smooth = Smooth smoothxy shift=0
 if downsample: smooth = Downsample source
 
-pore rock = Binary smooth density-threshold
+pore rock = Binary smooth threshold
 colorize = Colorize pore source
 
 # Computes squared distance to / position of nearest background voxel
@@ -39,8 +43,8 @@ connected = Rasterize bin-connected
 squaredRadius-histogram-unconnected = Histogram unconnected
 squaredRadius-histogram-connected = Histogram connected
 # Computes pore space volume
-volume-unconnected = Sum histogram-unconnected
-volume-connected = Sum histogram-connected
+volume-unconnected = Sum squaredRadius-histogram-unconnected
+volume-connected = Sum squaredRadius-histogram-connected
 # Square roots radii
 radius-histogram-unconnected = SquareRootVariable squaredRadius-histogram-unconnected
 radius-histogram-connected = SquareRootVariable squaredRadius-histogram-connected
@@ -49,8 +53,8 @@ radius-distribution-unconnected = KernelDensityEstimation radius-histogram-uncon
 radius-distribution-connected = KernelDensityEstimation radius-histogram-connected
 normalize-radius-histogram-connected = Normalize radius-histogram-connected #DEBUG
 # Scales radius to physical units
-physical-radius-distribution-unconnected = ScaleVariable radius-histogram-unconnected
-physical-radius-distribution-connected = ScaleVariable radius-histogram-connected
+physical-radius-distribution-unconnected = ScaleVariable radius-distribution-unconnected
+physical-radius-distribution-connected = ScaleVariable radius-distribution-connected
 
 #Render
  #emptyx epositionx = DistanceX rock
@@ -72,6 +76,9 @@ physical-radius-distribution-connected = ScaleVariable radius-histogram-connecte
  # Square roots squared distance
  sqrt-unconnected = SquareRoot clip-unconnected
  sqrt-connected = SquareRoot clip-connected
+
+histogram-sqrt-unconnected = Histogram sqrt-unconnected
+histogram-sqrt-connected = Histogram sqrt-connected
 
  # Exports to ASCII
  ascii-unconnected = ToASCII sqrt-unconnected

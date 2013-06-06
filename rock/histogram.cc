@@ -74,7 +74,8 @@ Sample kernelDensityEstimation(const Sample& histogram) {
 /// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel (on a non uniformly sampled distribution)
 NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram) {
     const real N = ::sum(histogram);
-    real h = pow(4./(3*N),1./5) * sqrt(histogramVariance(histogram));
+    real h = /*pow(4./(3*N),1./5) **/ sqrt(histogramVariance(histogram));
+    //log(pow(4./(3*N),1./5), sqrt(histogramVariance(histogram)), h);
     NonUniformSample pdf = copy(histogram);
     parallel(histogram.size(), [&](uint, uint i) {
         const float x0 = histogram.keys[i];
@@ -82,7 +83,7 @@ NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram) {
         for(auto sample: histogram) if((x0-sample.key)<h) { real x=-1./2*sq((x0-sample.key)/h); if(x>expUnderflow) sum += sample.value * exp(x)/sqrt(2*PI); }
         pdf.values[i] = sum / (N*h);
     });
-    pdf = (1./sum(pdf))*pdf; // FIXME
+    //pdf = (1./sum(pdf))*pdf; // FIXME
     return pdf;
 }
 

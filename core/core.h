@@ -1,5 +1,5 @@
 #pragma once
-/// \file core.h keywords, basic types, debugging, ranges, ref, buffer
+/// \file core.h keywords, basic types, debugging, ranges, ref
 
 // Keywords
 #define unused __attribute((unused))

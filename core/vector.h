@@ -1,5 +1,5 @@
 #pragma once
-/// \file vector.h Vector types and operations
+/// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "simd.h"
 #include "math.h"

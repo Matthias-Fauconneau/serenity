@@ -1,4 +1,5 @@
 #pragma once
+/// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
 typedef long long v2di __attribute__ ((__vector_size__ (16)));

@@ -3,8 +3,7 @@
 #include "time.h"
 
 void Process::parseDefinition(const ref<byte>& definition, int pass) {
-    array<ref<byte>> symbols;
-    for(TextData s(definition); s; s.skip()) {
+    for(TextData s(definition); s;) {
         s.skip();
         if(s.match('#')) { s.until('\n'); continue; }
         if(s.match("if"_)) {
@@ -35,8 +34,6 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
         for(;!s.match('='); s.skip()) {
             ref<byte> output = s.word("_-"_);
             assert_(output, s.until('\n'));
-            assert_(!symbols.contains(output), "Multiple definitions for", output);
-            symbols << output;
             outputs << output;
         }
         s.skip();
@@ -45,17 +42,20 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
             ref<byte> key = outputs[0];
             ref<byte> value = s.until('\'');
             if(pass) {
+                assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
                 defaultArguments.insert(key, value);
                 if(!arguments.contains(key)) arguments.insert(key, value);
             }
         } else {
             Rule rule;
             ref<byte> word = s.word("_-"_);
-            if(symbols.contains(word)) { // Forwarding rule
+            assert_(word);
+            if(!Interface<Operation>::factories.contains(word)) { // Forwarding rule
                 rule.inputs << word;
+                s.whileAny(" \t\r"_);
+                s.skip("\n"_);
             } else {
                 rule.operation = word;
-                assert_(rule.operation && Interface<Operation>::factories.contains(rule.operation), rule.operation);
                 s.whileAny(" \t\r"_);
                 for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
                     if(s.match('#')) { s.whileNot('\n'); continue; }
@@ -63,7 +63,7 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
                     if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
                     else rule.inputs << word;
                 }
-                for(ref<byte> output: outputs) assert_(!arguments.contains(output), "Multiple definitions for", output);
+                if(pass) for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
                 rule.outputs = move(outputs);
             }
             if(pass) rules << move(rule);
@@ -73,7 +73,7 @@ void Process::parseDefinition(const ref<byte>& definition, int pass) {
 
 Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
-array<ref<byte>> Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
+array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
     arguments.clear(); sweeps.clear(); rules.clear(); results.clear(); targetResults.clear(); // Clears parsed data in case the same process is being reused several times
 
     // Defines valid parameters using Operations and process definition
@@ -105,13 +105,20 @@ array<ref<byte>> Process::configure(const ref<ref<byte> >& allArguments, const r
     return targets;
 }
 
-Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
+Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) {
+    const Rule& rule = ruleForOutput(target);
     Dict relevant;
+    if(!&rule && arguments.contains(target)) { // Conversion from argument to result
+        relevant.insert(target, arguments.at(target));
+        return relevant;
+    }
+    assert_(&rule, "No rule generating '"_+target+"'"_,"in",rules);
+
+    // Input argument are also relevant in case they are deleted
     for(const ref<byte>& input: rule.inputs) {
-        assert_(&ruleForOutput(input), "No rule generating", input);
-        for(auto arg: relevantArguments(ruleForOutput(input), arguments)) {
+        for(auto arg: relevantArguments(input, arguments)) {
             if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
-            else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key))*/ relevant.insert(move(arg.key), move(arg.value));
+            else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key)) Default might change*/ relevant.insert(move(arg.key), move(arg.value));
         }
     }
     if(rule.operation) {
@@ -120,16 +127,14 @@ Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
         Dict local = copy(arguments); local << rule.arguments; // not inherited
         for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
             if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
-            else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter))*/ relevant.insert(parameter, local.at(parameter));
+            else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter)) Default might change*/ relevant.insert(parameter, local.at(parameter));
         }
     }
     return relevant;
 }
 
 int Process::indexOf(const ref<byte>& target, const Dict& arguments) {
-    const Rule& rule = ruleForOutput(target);
-    assert_(&rule, "No rule generating '"_+str(target)+"'"_,"in",rules);
-    Dict relevantArguments = Process::relevantArguments(ruleForOutput(target), arguments);
+    Dict relevantArguments = Process::relevantArguments(target, arguments);
     for(uint i: range(results.size)) if(results[i]->name==target && results[i]->relevantArguments==relevantArguments) return i;
     return -1;
 }
@@ -143,14 +148,10 @@ bool Process::sameSince(const ref<byte>& target, int64 queryTime, const Dict& ar
         else return false; // Result changed since query
     }
     const Rule& rule = ruleForOutput(target);
+    if(!&rule && arguments.contains(target)) return true; // Conversion from argument to result
+    assert_(&rule);
     for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false; // Inputs changed since result (or query if result was discarded) was last generated
-    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) {
-                 #if 0
-                 log("Skip", target); // Avoids regenerating when toggling debug mode
-                 return true;
-                 #endif
-                 return false; // Implementation changed since query
-    }
+    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
     return true;
 }
 
@@ -172,9 +173,9 @@ void Process::execute(const ref<ref<byte> >& targets, const map<ref<byte>, array
             args.remove(parameter);
         }
     } else { // Actually generates targets when sweeps have been explicited
-        assert_(targets, "No targets", arguments);
+        assert_(targets, "Expected target, got only arguments:", arguments, "valid targets:", resultNames);
         for(const ref<byte>& target: targets) {
-            log(target, relevantArguments(ruleForOutput(target), arguments));
+            log(target, relevantArguments(target, arguments));
             targetResults << getResult(target, arguments);
         }
     }
@@ -227,17 +228,19 @@ PersistentProcess::~PersistentProcess() {
 }
 
 shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict& arguments) {
+    const Rule& rule = ruleForOutput(target);
+    if(!&rule && arguments.contains(target)) return shared<ResultFile>(target, 0, Dict(), string(), copy(arguments.at(target)), ""_, ""_); // Conversion from argument to result
+    assert_(&rule, target);
+
     const shared<Result>& result = find(target, arguments);
     if(&result && sameSince(target, result->timestamp, arguments)) return share(result); // Returns a cached result if still valid
     // Otherwise regenerates target using new inputs, arguments and/or implementations
-    const Rule& rule = ruleForOutput(target);
-    assert_(&rule, target);
 
     array<shared<Result>> inputs;
     for(const ref<byte>& input: rule.inputs) inputs << getResult(input, arguments);
     for(const shared<Result>& input: inputs) {
         ResultFile& result = *(ResultFile*)input.pointer;
-        touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
+        if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
     }
 
     if(!rule.operation) return move(inputs.first()); // Forwarding rule
@@ -293,7 +296,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     assert_(outputs);
 
     Time time;
-    Dict relevantArguments = Process::relevantArguments(rule, arguments);
+    Dict relevantArguments = Process::relevantArguments(target, arguments);
     operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
     log(rule, time);
 

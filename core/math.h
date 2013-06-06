@@ -1,4 +1,5 @@
 #pragma once
+/// \file math.h Floating-point builtins
 #include "core.h"
 
 typedef double real;

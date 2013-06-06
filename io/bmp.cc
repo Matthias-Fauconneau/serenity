@@ -1,6 +1,8 @@
+/// \file bmp.cc Decodes Windows Device independent bitmap (DIB) files
 #include "image.h"
 #include "data.h"
 
+/// Decodes Windows Device independent bitmap (DIB) files
 Image decodeBMP(const ref<byte>& file) {
     BinaryData s(file);
 #if 0
