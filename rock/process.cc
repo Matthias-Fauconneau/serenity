@@ -108,7 +108,7 @@ array<ref<byte>> Process::configure(const ref<ref<byte> >& allArguments, const r
 Dict Process::relevantArguments(const Rule& rule, const Dict& arguments) {
     Dict relevant;
     for(const ref<byte>& input: rule.inputs) {
-        assert(&ruleForOutput(input), "No rule generating", input);
+        assert_(&ruleForOutput(input), "No rule generating", input);
         for(auto arg: relevantArguments(ruleForOutput(input), arguments)) {
             if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
             else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key))*/ relevant.insert(move(arg.key), move(arg.value));
@@ -144,7 +144,13 @@ bool Process::sameSince(const ref<byte>& target, int64 queryTime, const Dict& ar
     }
     const Rule& rule = ruleForOutput(target);
     for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false; // Inputs changed since result (or query if result was discarded) was last generated
-    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
+    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) {
+                 #if 0
+                 log("Skip", target); // Avoids regenerating when toggling debug mode
+                 return true;
+                 #endif
+                 return false; // Implementation changed since query
+    }
     return true;
 }
 
@@ -154,7 +160,7 @@ shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments
     error("Anonymous process manager unimplemented"_);
 }
 
-void Process::execute(const array<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
+void Process::execute(const ref<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
     if(sweeps) {
         map<ref<byte>, array<Variant>> remaining = copy(sweeps);
         Dict args = copy(arguments);
@@ -166,7 +172,7 @@ void Process::execute(const array<ref<byte> >& targets, const map<ref<byte>, arr
             args.remove(parameter);
         }
     } else { // Actually generates targets when sweeps have been explicited
-        assert_(targets, "No targets");
+        assert_(targets, "No targets", arguments);
         for(const ref<byte>& target: targets) {
             log(target, relevantArguments(ruleForOutput(target), arguments));
             targetResults << getResult(target, arguments);
@@ -179,7 +185,7 @@ void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& defi
 }
 
 void PersistentProcess::parseSpecialArguments(const ref<ref<byte> >& arguments) {
-    if(!name) name=arguments.first(); // Use first special argument as storage folder name (if not already defined by derived class)
+    if(!name) name = string(arguments.first()); // Use first special argument as storage folder name (if not already defined by derived class)
     storageFolder = Folder(name, baseStorageFolder, true);
 
     // Maps intermediate results from file system

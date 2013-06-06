@@ -103,7 +103,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         }
         assert_(arguments.contains("path"_), "Usage: rock <source folder containing volume slices> (target name|target path|key=value)*");
         ref<byte> path = arguments.at("path"_);
-        name = path.contains('/') ? section(path,'/',-2,-1) : path; // Use source path as process name (for storage folder) instead of any first arguments
+        name = string(path.contains('/') ? section(path,'/',-2,-1) : path); // Use source path as process name (for storage folder) instead of any first arguments
         PersistentProcess::parseSpecialArguments(specialArguments);
     }
 

@@ -8,8 +8,6 @@ template<Type T> struct mref : ref<T> {
     mref(){}
     /// References \a size elements from \a data pointer
     mref(T* data, uint64 size) : ref<T>(data,size){}
-    /// References \a o.size elements from \a o.data pointer
-    //explicit mref(const ref<T>& o):data((T*)o.data),capacity(0),size(o.size){}
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
@@ -62,6 +60,22 @@ template<Type T> struct buffer : mref<T> {
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer(){ if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
+
+    // Overrides mref const operators
+    T* begin() { return (T*)data; }
+    T* end() { return (T*)data+size; }
+    T& at(uint i) { assert(i<size); return (T&)data[i]; }
+    T& operator [](uint i) { return at(i); }
+    T& first() { return at(0); }
+    T& last() { return at(size-1); }
+
+    // and reenable const const versions
+    const T* begin() const { return data; }
+    const T* end() const { return data+size; }
+    const T& at(uint i) const { assert(i<size); return data[i]; }
+    const T& operator [](uint i) const { return at(i); }
+    const T& first() const { return at(0); }
+    const T& last() const { return at(size-1); }
 
     using mref<T>::data;
     using mref<T>::size;

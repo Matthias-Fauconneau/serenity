@@ -1,4 +1,6 @@
 #pragma once
+#include "core.h"
+
 typedef double real;
 
 inline bool isNaN(float x) { return __builtin_isnanf(x); }
@@ -14,7 +16,9 @@ inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline real sqrt(real f) { return __builtin_sqrt(f); }
 inline real pow(real x, real y) { return __builtin_pow(x,y); }
 
-inline real exp(real x) { return __builtin_exp(x); }
+const real expUnderflow = -7.45133219101941108420e+02;
+const real expOverflow = 7.09782712893383973096e+02;
+inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 inline real ln(real x) { return __builtin_log(x); }
 
 inline real cos(real t) { return __builtin_cos(t); }

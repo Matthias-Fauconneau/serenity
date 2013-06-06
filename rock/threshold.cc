@@ -53,7 +53,7 @@ class(Otsu, Operation) {
                 maximumVariance=variance, threshold = t;
                 parameters[0]=foregroundCount, parameters[1]=backgroundCount, parameters[2]=foregroundMean, parameters[3]=backgroundMean;
             }
-            interclass[t] = variance / density.size;
+            interclass[t] = variance;
         }
         float densityThreshold = float(threshold) / float(density.size);
         log("Otsu's model estimates threshold at", densityThreshold);
@@ -64,8 +64,8 @@ class(Otsu, Operation) {
                     ", backgroundCount "_+str(parameters[1])+
                     ", foregroundMean "_+str(parameters[2])+
                     ", backgroundMean "_+str(parameters[3])+
-                    ", maximumVariance"_+str(maximumVariance); } );
-        output(outputs, 2, "interclass.tsv"_, [&]{ return toASCII(interclass ); } );
+                    ", maximumDeviation"_+str(sqrt(maximumVariance/sq(totalCount))); } );
+        output(outputs, 2, "interclass.tsv"_, [&]{ return toASCII((1./sq(totalCount))*interclass ); } );
     }
 };
 
@@ -99,7 +99,7 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
     rock.margin.x=marginX, rock.margin.y=marginY, rock.margin.z=marginZ;
     setBorders(pore);
     setBorders(rock);
-#if DEBUG
+#if ASSERT
     pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;  // for the assert
 #else
     pore.maximum=(pore.sampleCount.x-1)*(pore.sampleCount.x-1), rock.maximum=(rock.sampleCount.x-1)*(rock.sampleCount.x-1); // for visualization

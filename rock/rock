@@ -7,8 +7,8 @@ if !validation: source = Source
 if validation: source = Capsules
 
 histogram-source = Histogram source
-normalized-histogram-source = Normalize histogram-source
-kde-source = KernelDensityEstimation histogram-source
+#normalized-histogram-source = Normalize histogram-source
+density-source = KernelDensityEstimation histogram-source
 if threshold == 'otsu': density-threshold otsu-parameters interclass = Otsu histogram-source
 if threshold == 'lorentz': density-threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel kde-source
 
@@ -35,13 +35,22 @@ bin-connected = Bin connected-skeleton
 unconnected = Rasterize bin-unconnected
 connected = Rasterize bin-connected
 
-# Computes histogram of maximal ball radii (i.e. pore size distribution)
-histogram-unconnected = SqrtHistogram unconnected
-histogram-connected = SqrtHistogram connected
+# Computes histogram of maximum squared radii
+squaredRadius-histogram-unconnected = Histogram unconnected
+squaredRadius-histogram-connected = Histogram connected
+# Computes pore space volume
 volume-unconnected = Sum histogram-unconnected
 volume-connected = Sum histogram-connected
-normalize-histogram-unconnected = Normalize histogram-unconnected
-normalize-histogram-connected = Normalize histogram-connected
+# Square roots radii
+radius-histogram-unconnected = SquareRootVariable squaredRadius-histogram-unconnected
+radius-histogram-connected = SquareRootVariable squaredRadius-histogram-connected
+# Computes kernel density estimation from radii histogram (i.e. pore size distribution)
+radius-distribution-unconnected = KernelDensityEstimation radius-histogram-unconnected
+radius-distribution-connected = KernelDensityEstimation radius-histogram-connected
+normalize-radius-histogram-connected = Normalize radius-histogram-connected #DEBUG
+# Scales radius to physical units
+physical-radius-distribution-unconnected = ScaleVariable radius-histogram-unconnected
+physical-radius-distribution-connected = ScaleVariable radius-histogram-connected
 
 #Render
  #emptyx epositionx = DistanceX rock

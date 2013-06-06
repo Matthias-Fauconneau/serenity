@@ -86,7 +86,7 @@ template<> void log(const ref<byte>& message);
 template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
 template<> void error(const ref<byte>& message) __attribute((noreturn));
 
-#ifdef DEBUG
+#if ASSERT
 #define warn error
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
@@ -125,18 +125,15 @@ template<Type T> struct ref {
     /// Converts a static array to ref
     template<size_t N> ref(const T (&a)[N]):  ref(a,N) {}
 
-    /// \name Operators
-    const T* begin() const { return data; }
-    const T* end() const { return data+size; }
     explicit operator bool() const { return size; }
     operator const T*() const { return data; }
-    /// \}
-    /// \name Accessors
+
+    const T* begin() const { return data; }
+    const T* end() const { return data+size; }
     const T& at(uint i) const { assert(i<size); return data[i]; }
     const T& operator [](uint i) const { return at(i); }
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
-    /// \}
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
     ref<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }

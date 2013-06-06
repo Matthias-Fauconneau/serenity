@@ -19,7 +19,7 @@ void validate(Volume16& target, const Volume32& pore, const Volume16& maximum) {
                 uint max = maximumData[offsetZ[z]+offsetY[y]+offsetX[x]];
                 assert(!max || pore == 0xFFFFFFFF, pore, max);
                 if(pore == 0xFFFFFFFF && !max) targetData[z*XY+y*X+x] = maximum.maximum; // Show prunned pores
-                //targetData[z*XY+y*X+x] = max && max < 4 ? maximum.maximum-max : 0; //DEBUG: show only most frequent values
+                //targetData[z*XY+y*X+x] = max && max < 4 ? maximum.maximum-max : 0; // Shows only small radii
             }
         }
     } );

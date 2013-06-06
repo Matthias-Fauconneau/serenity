@@ -96,23 +96,16 @@ void pack(Volume16& target, const Volume32& source) {
 }
 
 void tile(Volume16& target, const Volume16& source) {
-    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    assert_(!source.offsetX && !source.offsetY && !source.offsetZ);
+    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const uint16* const sourceData = source;
-    interleavedLookup(target);
     uint16* const targetData = target;
+    interleavedLookup(target);
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-
-    for(uint z=0; z<Z; z++) {
-        const uint16* const sourceZ = sourceData+z*XY;
-        uint16* const targetZ = targetData+offsetZ[z];
-        for(uint y=0; y<Y; y++) {
-            const uint16* const sourceZY = sourceZ+y*X;
-            uint16* const targetZY = targetZ+offsetY[y];
-            //for(uint x=0; x<X; x+=2) *(uint32*)(targetZY+offsetX[x]) = *(uint32*)(sourceZY+x);
-            for(uint x=0; x<X; x++) targetZY[offsetX[x]] = sourceZY[x];
-        }
+    for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
+        assert(offsetZ[Z]+offsetY[y]+offsetX[x] < target.size());
+        targetData[offsetZ[Z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
     }
-    target.copyMetadata(source);
 }
 
 template<Type T> void setBorders(VolumeT<T>& target) {

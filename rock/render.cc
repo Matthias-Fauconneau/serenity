@@ -36,6 +36,10 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
     const v4sf _m4a_4_m4a_4 = {-4*a, 4, -4*a, 4};
     const v4sf rcp_2a = float4(-1./(2*a));
 
+    enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
+    extern void setExceptions(int except);
+    setExceptions(Denormal | Underflow);
+
     #define tileSize 8
     assert(imageX%tileSize ==0 && imageY%tileSize ==0, imageX, imageY);
     parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {

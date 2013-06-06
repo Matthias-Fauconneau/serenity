@@ -1,8 +1,11 @@
+/// \file sample.h Methods for (non-)uniformly sampled distribution
 #pragma once
 #include "string.h"
+#include "map.h"
 
-/// Finite uniformly sampled distribution
-typedef buffer<float> Sample; //TODO: non-uniform sampling (using map<float,float>)
+/// Uniformly sampled distribution
+typedef buffer<float> UniformSample;
+typedef UniformSample Sample;
 
 /// Returns the sum of the samples
 float sum(const Sample& A);
@@ -31,12 +34,37 @@ Sample operator-(const Sample& A, const Sample& B);
 /// Multiplies samples
 Sample operator*(const Sample& A, const Sample& B);
 
-/// Square roots and round X coordinates summing all sample falling in the same bin
-Sample sqrtHistogram(const Sample& A);
-
 Sample parseSample(const ref<byte>& file);
 
-string toASCII(const Sample& sample, float scale=1);
+string toASCII(const Sample& A, float scale=1);
+
+// NonUniformSample
+
+/// Non-uniformly sampled distribution
+typedef map<float, float> NonUniformSample;
+
+float sum(const NonUniformSample& A);
+float histogramSum(const NonUniformSample& A);
+float histogramMean(const NonUniformSample& A);
+float histogramVariance(const NonUniformSample& A);
+
+/// Converts to UniformSample if possible
+UniformSample toUniformSample(const NonUniformSample& A);
+
+/// Multiplies sample by a scalar
+NonUniformSample operator*(float s, const NonUniformSample& A);
+
+/// Scales variable
+NonUniformSample scaleVariable(float s, const NonUniformSample& A);
+
+/// Square roots variable
+NonUniformSample squareRootVariable(const NonUniformSample& A);
+
+NonUniformSample parseNonUniformSample(const ref<byte>& file);
+
+string toASCII(const NonUniformSample& A);
+
+// Lorentz
 
 /// Cauchy-Lorentz distribution 1/(1+x²)
 struct Lorentz {

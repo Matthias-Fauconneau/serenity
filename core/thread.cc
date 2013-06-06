@@ -135,13 +135,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    setExceptions(
-                Invalid | //volume renderer takes square roots of negatives
-                Denormal | //Dividing by Otsu's method variance
-                DivisionByZero | //volume renderer divides by zero
-                Overflow | //volume renderer overflows
-                Underflow | //Dividing by Otsu's method variance ?
-                0);
+    //setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); //FIXME: KDE
 }
 
 template<> void __attribute((noreturn)) error(const ref<byte>& message) {

@@ -40,7 +40,7 @@ struct Process {
     virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);
 
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const array<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
+    void execute(const ref<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
 
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
     void execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
@@ -83,6 +83,6 @@ struct PersistentProcess : virtual Process {
     shared<Result> getResult(const ref<byte>& target, const Dict& arguments) override;
 
     Folder baseStorageFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to intermediate operations of volume data (e.g. up to 64bit per sample input and output)
-    ref<byte> name; // Used to name intermediate and output files (folder base name)
+    string name; // Used to name intermediate and output files (folder base name)
     Folder storageFolder = ""_; // Holds intermediate operations data (=baseStorageFolder/name)
 };
