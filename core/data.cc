@@ -126,7 +126,11 @@ ref<byte> TextData::whileInteger(bool sign) {
 }
 
 int TextData::integer(bool sign) {
-    ref<byte> s = whileInteger(sign);
+    return toInteger(whileInteger(sign), 10);
+}
+
+uint TextData::mayInteger() {
+    ref<byte> s = whileInteger(false);
     return s?toInteger(s, 10):-1;
 }
 
@@ -140,17 +144,16 @@ ref<byte> TextData::whileHexadecimal() {
 }
 
 uint TextData::hexadecimal() {
-    ref<byte> s = whileHexadecimal();
-    return s?toInteger(s, 16):-1;
+    return toInteger(whileHexadecimal(), 16);
 }
 
 ref<byte> TextData::whileDecimal() {
     uint start=index;
     matchAny("-+"_);
-    for(bool gotDot=false, gotE=false;available(1);) {
+    if(!match("∞"_)) for(bool gotDot=false, gotE=false;available(1);) {
         byte c=peek();
         /***/ if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
-        else if(c=='e') { if(gotE) break; gotE=true; advance(1); }
+        else if(c=='e') { if(gotE) break; gotE=true; advance(1); if(peek()=='-') advance(1); }
         else if(c>='0'&&c<='9') advance(1);
         else break;
     }

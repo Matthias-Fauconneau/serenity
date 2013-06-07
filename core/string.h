@@ -88,7 +88,7 @@ template<Type T> string str(const unique<T>& t) { return str(*t.pointer); }
 template<Type T> string str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
-string ftoa(double number, int precision=2, int pad=0, bool exponent=false);
+string ftoa(double number, int precision=2, int pad=0, bool exponent=false, bool inf=true);
 inline string str(const float& n) { return ftoa(n); }
 inline string str(const double& n) { return ftoa(n); }
 

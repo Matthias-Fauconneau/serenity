@@ -2,108 +2,112 @@
 #include "data.h"
 #include "time.h"
 
-void Process::parseDefinition(const ref<byte>& definition, int pass) {
-    for(TextData s(definition); s;) {
-        s.skip();
-        if(s.match('#')) { s.until('\n'); continue; }
-        if(s.match("if"_)) {
+array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
+    array<ref<byte>> targets, specialArguments;
+    // Parses definitions and arguments twice to solve cyclic dependencies
+    // 1) Process definition defines valid parameters and targets
+    // 2) Arguments are parsed using default definition
+    // 3) Process definition is parsed with conditionnals taken according to user arguments
+    // 4) Arguments are parsed again using the customized process definition
+    for(uint pass unused: range(2)) {
+        array<ref<byte>> parameters = copy(specialParameters); // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
+        Dict defaultArguments; // Application specific default arguments (defined by process definition)
+        array<ref<byte>> resultNames; // Valid result names defined by process
+        rules.clear();
+        for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
+
+        for(TextData s(definition); s;) {
             s.skip();
-            bool enable;
-            if(s.match('!')) {
-                ref<byte> parameter = s.word("_-"_);
-                parameters += parameter;
-                enable = !arguments.contains(parameter);
-            } else {
-                ref<byte> parameter = s.word("_-"_);
-                parameters += parameter;
+            if(s.match('#')) { s.until('\n'); continue; }
+            if(s.match("if"_)) {
                 s.skip();
-                if(s.match("=="_)) {
-                    s.skip();
-                    s.skip("'"_);
-                    ref<byte> literal = s.until('\'');
-                    enable = arguments.value(parameter, "0"_) == literal;
+                bool enable;
+                if(s.match('!')) {
+                    ref<byte> parameter = s.word("_-"_);
+                    parameters += parameter;
+                    enable = !arguments.contains(parameter);
                 } else {
-                    enable = arguments.contains(parameter);
+                    ref<byte> parameter = s.word("_-"_);
+                    parameters += parameter;
+                    s.skip();
+                    if(s.match("=="_)) {
+                        s.skip();
+                        s.skip("'"_);
+                        ref<byte> literal = s.until('\'');
+                        enable = arguments.value(parameter, "0"_) == literal;
+                    } else {
+                        enable = arguments.contains(parameter);
+                    }
                 }
+                s.skip(":"_);
+                if(!enable) { s.until('\n'); continue; }
+                s.skip();
             }
-            s.skip(":"_);
-            if(!enable) { s.until('\n'); continue; }
+            array<ref<byte>> outputs;
+            for(;!s.match('='); s.skip()) {
+                ref<byte> output = s.word("_-"_);
+                assert_(output, s.until('\n'));
+                outputs << output;
+            }
             s.skip();
-        }
-        array<ref<byte>> outputs;
-        for(;!s.match('='); s.skip()) {
-            ref<byte> output = s.word("_-"_);
-            assert_(output, s.until('\n'));
-            outputs << output;
-        }
-        s.skip();
-        if(s.match('\'')) { // Default argument
-            assert_(outputs.size==1);
-            ref<byte> key = outputs[0];
-            ref<byte> value = s.until('\'');
-            if(pass) {
+            if(s.match('\'')) { // Default argument
+                assert_(outputs.size==1);
+                ref<byte> key = outputs[0];
+                ref<byte> value = s.until('\'');
                 assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
                 defaultArguments.insert(key, value);
                 if(!arguments.contains(key)) arguments.insert(key, value);
-            }
-        } else {
-            Rule rule;
-            ref<byte> word = s.word("_-"_);
-            assert_(word);
-            if(!Interface<Operation>::factories.contains(word)) { // Forwarding rule
-                rule.inputs << word;
-                s.whileAny(" \t\r"_);
-                s.skip("\n"_);
             } else {
-                rule.operation = word;
-                s.whileAny(" \t\r"_);
-                for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
-                    if(s.match('#')) { s.whileNot('\n'); continue; }
-                    ref<byte> word = s.word("_-"_);
-                    if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
-                    else rule.inputs << word;
+                Rule rule;
+                ref<byte> word = s.word("_-"_);
+                assert_(word);
+                if(!Interface<Operation>::factories.contains(word)) { // Forwarding rule
+                    rule.inputs << word;
+                    s.whileAny(" \t\r"_);
+                    s.skip("\n"_);
+                } else {
+                    rule.operation = word;
+                    s.whileAny(" \t\r"_);
+                    for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
+                        if(s.match('#')) { s.whileNot('\n'); continue; }
+                        ref<byte> word = s.word("_-"_);
+                        if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
+                        else rule.inputs << word;
+                    }
+                    for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
+                    rule.outputs = move(outputs);
                 }
-                if(pass) for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
-                rule.outputs = move(outputs);
+                rules << move(rule);
             }
-            if(pass) rules << move(rule);
         }
-    }
-}
 
-Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
-
-array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
-    arguments.clear(); sweeps.clear(); rules.clear(); results.clear(); targetResults.clear(); // Clears parsed data in case the same process is being reused several times
-
-    // Defines valid parameters using Operations and process definition
-    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
-    parseDefinition(definition, 0); // First pass is only to define valid parameters
-
-    array<ref<byte>> specialArgumentsOrTargets;
-    for(const ref<byte>& argument: allArguments) { // Parses explicit arguments
-        if(argument.contains('=')) { // Stores generic argument affecting operations
-            ref<byte> key=section(argument,'=',0,1), value = section(argument,'=',1,-1);
-            /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
+        arguments.clear(); sweeps.clear(); targets.clear(); specialArguments.clear();
+        for(const ref<byte>& argument: allArguments) { // Parses explicit arguments
+            TextData s (argument); ref<byte> key = s.word("-_"_);
+            if(s.match('=')) { // Stores generic argument affecting operations
+                ref<byte> value = s.untilEnd();
+                /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
                 assert(!arguments.contains(key));
                 sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
-            } else {*/
-            if(sweeps.contains(key) || arguments.contains(key)) {
-                if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
-                sweeps.at(key) << value;
-            } else {
-                arguments.insert(key, Variant(value));
+                } else*/
+                if(sweeps.contains(key) || arguments.contains(key)) {
+                    if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
+                    sweeps.at(key) << value;
+                } else {
+                    arguments.insert(key, Variant(value));
+                }
             }
+            else if(resultNames.contains(argument)) targets << argument;
+            else if(parameters.contains(argument)) arguments.insert(argument,""_);
+            else specialArguments << argument;
         }
-        else if(parameters.contains(argument)) arguments.insert(argument,""_);
-        else specialArgumentsOrTargets << argument;
+        for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
     }
-    parseDefinition(definition, 1); // Second pass correctly defines conditionnal rules and default arguments depending on given arguments
-    array<ref<byte>> specialArguments, targets;
-    for(ref<byte> argument: specialArgumentsOrTargets) (&ruleForOutput(argument) ? targets : specialArguments) << argument;
     this->parseSpecialArguments(specialArguments);
     return targets;
 }
+
+Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
 Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) {
     const Rule& rule = ruleForOutput(target);
@@ -118,7 +122,7 @@ Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) 
     for(const ref<byte>& input: rule.inputs) {
         for(auto arg: relevantArguments(input, arguments)) {
             if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
-            else /*if(!defaultArguments.contains(arg.key) || arg.value!=defaultArguments.at(arg.key)) Default might change*/ relevant.insert(move(arg.key), move(arg.value));
+            else relevant.insert(move(arg.key), move(arg.value));
         }
     }
     if(rule.operation) {
@@ -127,7 +131,7 @@ Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) 
         Dict local = copy(arguments); local << rule.arguments; // not inherited
         for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
             if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
-            else /*if(!defaultArguments.contains(parameter) || local.at(parameter)!=defaultArguments.at(parameter)) Default might change*/ relevant.insert(parameter, local.at(parameter));
+            else relevant.insert(parameter, local.at(parameter));
         }
     }
     return relevant;
@@ -173,7 +177,7 @@ void Process::execute(const ref<ref<byte> >& targets, const map<ref<byte>, array
             args.remove(parameter);
         }
     } else { // Actually generates targets when sweeps have been explicited
-        assert_(targets, "Expected target, got only arguments:", arguments, "valid targets:", resultNames);
+        assert_(targets, "Expected target, got only arguments:", arguments);
         for(const ref<byte>& target: targets) {
             log(target, relevantArguments(target, arguments));
             targetResults << getResult(target, arguments);
@@ -182,6 +186,7 @@ void Process::execute(const ref<ref<byte> >& targets, const map<ref<byte>, array
 }
 
 void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
+    targetResults.clear();
     execute(configure(allArguments, definition), sweeps, arguments);
 }
 

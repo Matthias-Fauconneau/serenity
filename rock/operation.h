@@ -39,11 +39,15 @@ template <class I> template <class C> typename Interface<I>::template Factory<C>
     struct C : virtual I
 
 /// Dynamic-typed value
+/// \note Implemented as a string with implicit conversions
 struct Variant : string {
+    Variant(){}
     Variant(string&& s) : string(move(s)) {}
     Variant(const ref<byte>& s) : string(s) {}
     Variant(int integer) : string(dec(integer)){}
-    operator int() const { return toInteger(*this); }
+    operator int() const { return *this ? toInteger(*this) : 0; }
+    operator double() const { return toDecimal(*this); }
+    operator const ref<byte>&() const { return *this; }
     operator const string&() const { return *this; }
     template<Type T> operator T() const { return T((const ref<byte>&)*this); } // Enables implicit conversion to any type with an implicit ref<byte> constructor
 };

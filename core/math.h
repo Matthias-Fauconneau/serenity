@@ -4,7 +4,9 @@
 
 typedef double real;
 
+constexpr real nan = __builtin_nan("");
 inline bool isNaN(float x) { return __builtin_isnanf(x); }
+inline bool isNaN(real x) { return __builtin_isnan(x); }
 
 inline float floor(float x) { return __builtin_floorf(x); }
 inline real floor(real x) { return __builtin_floor(x); }

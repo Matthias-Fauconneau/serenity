@@ -9,7 +9,7 @@ struct Script {
         for(const ref<byte>& file: folder.list(Files)) {
             TextData s(file); s.whileNo("0123456789"_); uint minimalDiameter=s.integer(); s.skip(".tsv"_); assert(!s);
             if(minimalDiameter>=volume.size) volume.grow(minimalDiameter+1);
-            volume[minimalDiameter] = sum(parseSample(readFile(file,folder)));
+            volume[minimalDiameter] = sum(parseUniformSample(readFile(file,folder)));
         }
         writeFile("volume.tsv",toASCII(volume),folder);
     }

@@ -72,10 +72,10 @@ Sample kernelDensityEstimation(const Sample& histogram) {
 }
 
 /// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel (on a non uniformly sampled distribution)
-NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram) {
+NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram, real h=nan) {
     const real N = ::sum(histogram);
-    real h = /*pow(4./(3*N),1./5) **/ sqrt(histogramVariance(histogram));
-    //log(pow(4./(3*N),1./5), sqrt(histogramVariance(histogram)), h);
+    if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogramVariance(histogram));
+    log("kernelDensityEstimation using bandwidth", h);
     NonUniformSample pdf = copy(histogram);
     parallel(histogram.size(), [&](uint, uint i) {
         const float x0 = histogram.keys[i];
@@ -88,19 +88,20 @@ NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram) {
 }
 
 class(KernelDensityEstimation, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
+    virtual ref<byte> parameters() const { return "bandwidth"_; }
+    virtual void execute(const Dict& args, Result& target, const Result& source) override {
         target.metadata = string("kde.tsv"_);
         NonUniformSample sample = parseNonUniformSample(source.data);
         UniformSample uniformSample = toUniformSample(sample);
-        target.data = uniformSample ? toASCII(kernelDensityEstimation(uniformSample)) : toASCII(kernelDensityEstimation(sample));
+        target.data = uniformSample ? toASCII(kernelDensityEstimation(uniformSample)) : toASCII(kernelDensityEstimation(sample, toDecimal(args.value("bandwidth"_))));
     }
 };
 
-//definePass(Sum, "scalar"_, str(sum(parseSample(source.data))) );
+//definePass(Sum, "scalar"_, str(sum(parseUniformSample(source.data))) );
 class(Sum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = string("scalar"_);
-        target.data = str(sum(parseSample(source.data)));
+        target.data = str(sum(parseUniformSample(source.data)));
     }
 };
 
@@ -108,9 +109,15 @@ class(Sum, Operation), virtual Pass {
 class(Normalize, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
+#if 1
+        UniformSample sample = parseUniformSample(source.data);
+        sample[0]=sample[sample.size-1]=0; // Zeroes extreme values (clipping artifacts)
+        target.data = toASCII((1./sum(sample))*sample);
+#else
         NonUniformSample sample = parseNonUniformSample(source.data);
         sample.values[0]=sample.values[sample.size()-1]=0; // Zeroes extreme values (clipping artifacts)
         target.data = toASCII((1./sum(sample))*sample);
+#endif
     }
 };
 #endif

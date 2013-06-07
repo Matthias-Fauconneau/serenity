@@ -31,10 +31,13 @@ Sample operator*(float s, const Sample& A);
 /// Substracts samples clipping to zero
 Sample operator-(const Sample& A, const Sample& B);
 
-/// Multiplies samples
-Sample operator*(const Sample& A, const Sample& B);
+/*/// Multiplies samples
+Sample operator*(const Sample& A, const Sample& B);*/
 
-Sample parseSample(const ref<byte>& file);
+/// Square roots samples
+Sample squareRoot(const Sample& A);
+
+Sample parseUniformSample(const ref<byte>& file);
 
 string toASCII(const Sample& A, float scale=1);
 

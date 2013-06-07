@@ -52,33 +52,33 @@ struct GraphProcess : virtual Process {
 struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<ref<byte>>& args) {
-        parameters += "view"_; parameters += "graph"_;
+        specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_;
         string process;
         for(const ref<byte>& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<ref<byte>> targets = configure(args, process? : rock());
         if(arguments.contains("graph"_)) { generateSVG(targets, name, getenv("HOME"_)); return; }
         execute(targets, sweeps, arguments);
 
-        if(targetPaths) { // Copies results to disk
-            if(targetPaths.size == targetResults.size) {
-                for(uint index: range(targetResults.size)) {
-                    const shared<Result>& target = targetResults[index];
-                    const ref<byte>& path = targetPaths[index];
-                    if(target->data.size) {
-                        Time time;
-                        if(existsFolder(path, cwd)) writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
-                        else writeFile(path, target->data, cwd), log(target->name+"."_+target->metadata,"->",path, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
-                    }
-                }
-            } else if(targetPaths.size == 1) {
-                const ref<byte>& path = targetPaths[0];
-                assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
-                if(!existsFolder(path,cwd)) Folder(path,cwd,true);
-                for(const shared<Result>& target: targetResults) if(target->data.size) {
+        if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
+            for(uint index: range(min(targetResults.size, targetPaths.size))) {
+                const shared<Result>& target = targetResults[index];
+                const ref<byte>& path = targetPaths[index];
+                if(target->data.size) {
                     Time time;
-                    writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
+                    if(existsFolder(path, cwd)) writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
+                    else writeFile(path, target->data, cwd), log(target->name+"."_+target->metadata,"->",path, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
                 }
-            } else error("target/path mismatch", targetResults, targetPaths);
+            }
+            if(targetPaths.size < targetResults.size) if(!arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(targetPaths.size));
+            if(targetPaths.size > targetResults.size) error("Expected less names, skipped names"_, targetPaths.slice(targetResults.size));
+        } else if(targetPaths.size == 1) { // Copies results into folder
+            const ref<byte>& path = targetPaths[0];
+            assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
+            if(!existsFolder(path,cwd)) Folder(path,cwd,true);
+            for(const shared<Result>& target: targetResults) if(target->data.size) {
+                Time time;
+                writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
+            }
         }
 
         // Displays first target result

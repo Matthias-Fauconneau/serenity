@@ -36,7 +36,7 @@ template<Type K, Type V> struct map {
         int i = keys.indexOf(key);
         return i>=0 ? copy(values[i]) : move(value);
     }
-    template<Type KK> const V& value(const KK& key, const V& value) const {
+    template<Type KK> const V& value(const KK& key, const V& value=V()) const {
         int i = keys.indexOf(key);
         return i>=0 ? values[i] : value;
     }

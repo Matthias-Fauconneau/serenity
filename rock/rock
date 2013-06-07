@@ -11,9 +11,10 @@ if !validation: source = Source
 if validation: source = Capsules
 
 histogram-source = Histogram source
-#normalized-histogram-source = Normalize histogram-source
+normalized-histogram-source = Normalize histogram-source
 density-source = KernelDensityEstimation histogram-source
-if threshold == 'otsu': threshold otsu-parameters interclass = Otsu histogram-source
+if threshold == 'otsu': threshold otsu-parameters otsu-interclass-variance = Otsu histogram-source
+if threshold == 'otsu': normalized-otsu-interclass-variance = Normalize otsu-interclass-variance #DEBUG: for comparison with histogram-source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel density-source
 
 shift = ShiftRight source
@@ -23,7 +24,8 @@ if !downsample: smooth = Smooth smoothxy shift=0
 if downsample: smooth = Downsample source
 
 pore rock = Binary smooth threshold
-colorize = Colorize pore source
+if !downsample: colorize = Colorize pore source
+if downsample: colorize = Colorize pore smooth
 
 # Computes squared distance to / position of nearest background voxel
 distancex positionxx = DistanceX pore
@@ -52,9 +54,9 @@ radius-histogram-connected = SquareRootVariable squaredRadius-histogram-connecte
 radius-distribution-unconnected = KernelDensityEstimation radius-histogram-unconnected
 radius-distribution-connected = KernelDensityEstimation radius-histogram-connected
 normalize-radius-histogram-connected = Normalize radius-histogram-connected #DEBUG
-# Scales radius to physical units
-physical-radius-distribution-unconnected = ScaleVariable radius-distribution-unconnected
-physical-radius-distribution-connected = ScaleVariable radius-distribution-connected
+# Scales radius (e.g to original pixel or physical resolution)
+scaled-radius-distribution-unconnected = ScaleVariable radius-distribution-unconnected
+scaled-radius-distribution-connected = ScaleVariable radius-distribution-connected
 
 #Render
  #emptyx epositionx = DistanceX rock

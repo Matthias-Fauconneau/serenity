@@ -157,9 +157,11 @@ struct TextData : virtual Data {
     /// Reads a identifier [a-zA-Z0-9/special/]*
     ref<byte> identifier(const ref<byte>& special=""_);
     /// Matches [-+]?[0-9]*
-    ref<byte> whileInteger(bool sign);
+    ref<byte> whileInteger(bool sign=false);
     /// Reads an integer
     int integer(bool sign=false);
+    /// Reads an unsigned integer, return -1 if fails
+    uint mayInteger();
     /// Matches [0-9a-fA-F]*
     ref<byte> whileHexadecimal();
     /// Reads an hexadecimal integer

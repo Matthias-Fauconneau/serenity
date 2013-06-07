@@ -1,7 +1,6 @@
 #pragma once
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
-#include "math.h"
 
 struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation

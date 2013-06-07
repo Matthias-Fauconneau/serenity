@@ -27,13 +27,19 @@ Sample operator-(const Sample& A, const Sample& B) {
     return R;
 }
 
-Sample operator*(const Sample& A, const Sample& B) {
+/*Sample operator*(const Sample& A, const Sample& B) {
     uint N=A.size; assert(B.size==N); Sample R(N);
     for(uint i: range(N)) R[i]=A[i]*B[i];
     return R;
+}*/
+
+Sample squareRoot(const Sample& A) {
+    uint N=A.size; Sample R(N);
+    for(uint i: range(N)) { R[i]=sqrt(A[i]); assert(!__builtin_isnanf(R[i]) && R[i]!=__builtin_inff()); }
+    return R;
 }
 
-Sample parseSample(const ref<byte>& file) {
+Sample parseUniformSample(const ref<byte>& file) {
     TextData s (file);
     int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.decimal(); s.skip("\n"_); }
     s.index=0;

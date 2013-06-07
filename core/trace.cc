@@ -59,12 +59,12 @@ string demangle(TextData& s, bool function=true) {
     else if(s.match('t')) r<<"ushort"_;
     else if(s.match('x')) r<<"int64"_;
     else if(s.match('y')) r<<"uint64"_;
-    else if(s.match('A')) { r<<"[]"_; s.integer(); s.match('_'); }
+    else if(s.match('A')) { r<<"[]"_; s.whileInteger(); s.match('_'); }
     else if(s.match('M')) { r<<demangle(s)<<"::"_<<demangle(s); }
-    else if(s.match("Tv"_)) { r<<"thunk "_; s.integer(); s.match('_'); if(s.match("n"_)) { s.integer(); s.match('_'); r<<demangle(s); } }
-    else if(s.match('T')) { r<<'T'; s.integer(); s.match('_'); }
+    else if(s.match("Tv"_)) { r<<"thunk "_; s.whileInteger(); s.match('_'); if(s.match("n"_)) { s.whileInteger(); s.match('_'); r<<demangle(s); } }
+    else if(s.match('T')) { r<<'T'; s.whileInteger(); s.match('_'); }
     else if(s.match("St"_)) r<<"std"_;
-    else if(s.match('S')) { r<<'S'; s.integer(); s.match('_'); }
+    else if(s.match('S')) { r<<'S'; s.whileInteger(); s.match('_'); }
     else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
     else if(s.match("Li"_)) r<<dec(s.integer());
     else if(s.match("Lj"_)) r<<dec(s.integer());
@@ -96,7 +96,7 @@ string demangle(TextData& s, bool function=true) {
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
     } else {
-        l=uint(s.integer());
+        l=s.mayInteger();
         if(l<=s.available(l)) {
             r<<s.read(l); //struct
             if(s && s.peek()=='I') r<< demangle(s);

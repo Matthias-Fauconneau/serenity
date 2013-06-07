@@ -13,17 +13,14 @@ inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
-    /// Parses process definition (which can depends on explicit arguments)
-    void parseDefinition(const ref<byte>& definition, int pass);
+    /// Configures process using given arguments and definition (which can depends on the arguments)
+    array<ref<byte>> configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
 
     /// Parses special arguments
     virtual void parseSpecialArguments(const ref<ref<byte>>& arguments) { assert_(!arguments); }
 
     /// Returns the Rule to evaluate in order to produce \a target
     Rule& ruleForOutput(const ref<byte>& target);
-
-    /// Configures process using given arguments and definition (which can depends on the arguments)
-    array<ref<byte>> configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
 
     /// Returns recursively relevant arguments for a rule
     Dict relevantArguments(const ref<byte>& target, const Dict& arguments);
@@ -45,9 +42,7 @@ struct Process {
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
     void execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
 
-    array<ref<byte>> resultNames; // Valid result names defined by process
-    array<ref<byte>> parameters; // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
-    Dict defaultArguments; // Application specific default arguments (defined by process definition)
+    array<ref<byte>> specialParameters; // Valid parameters accepted for derived class special behavior
     Dict arguments; // User-specified arguments
     map<ref<byte>, array<Variant>> sweeps; // User-specified parameter sweeps
     array<Rule> rules; // Production rules

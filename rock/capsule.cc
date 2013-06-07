@@ -2,7 +2,6 @@
 #include "volume-operation.h"
 #include "sample.h"
 #include "time.h"
-#include "math.h"
 
 struct Capsule { vec3 a, b; float radius; };
 template<> inline string str(const Capsule& o) { return str(o.a,o.b,o.radius); }

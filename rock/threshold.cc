@@ -9,7 +9,7 @@
 class(LorentzianMixtureModel, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == "histogram.tsv"_);
-        Sample density = parseSample( inputs[0]->data );
+        Sample density = parseUniformSample( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Zeroes extreme values (clipping artifacts)
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
         const Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
@@ -33,13 +33,13 @@ class(LorentzianMixtureModel, Operation) {
 class(Otsu, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == "histogram.tsv"_);
-        Sample density = parseSample( inputs[0]->data );
+        Sample density = parseUniformSample( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
         uint threshold=0; double maximumVariance=0;
         uint64 totalCount=0, totalSum=0;
         for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
         uint64 backgroundCount=0, backgroundSum=0;
-        Sample interclass (density.size); double parameters[4];
+        Sample interclassVariance (density.size); double parameters[4];
         for(uint64 t: range(density.size)) {
             backgroundCount += density[t];
             if(backgroundCount == 0) continue;
@@ -53,7 +53,7 @@ class(Otsu, Operation) {
                 maximumVariance=variance, threshold = t;
                 parameters[0]=backgroundCount, parameters[1]=foregroundCount, parameters[2]=backgroundMean, parameters[3]=foregroundMean;
             }
-            interclass[t] = variance;
+            interclassVariance[t] = variance;
         }
         float densityThreshold = float(threshold) / float(density.size);
         log("Otsu's model estimates threshold at", densityThreshold);
@@ -66,7 +66,7 @@ class(Otsu, Operation) {
                     "backgroundMean "_+str(parameters[2])+"\n"_
                     "foregroundMean "_+str(parameters[3])+"\n"_
                     "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount))); } );
-        output(outputs, 2, "interclass.tsv"_, [&]{ return toASCII((1./sq(totalCount))*interclass ); } );
+        output(outputs, 2, "variance.tsv"_, [&]{ return toASCII((1./totalCount)*squareRoot(interclassVariance)); } );
     }
 };
 
@@ -130,7 +130,9 @@ class(Binary, Operation), virtual VolumeOperation {
 
 /// Maps intensity to either red or green channel depending on binary classification
 void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
-    assert(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
+    assert_(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
+    assert_(!intensity.offsetX && !intensity.offsetY && !intensity.offsetZ);
+    assert_(binary.sampleCount == intensity.sampleCount);
     int X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z, XY = X*Y;
     const uint32* const binaryData = binary;
     const uint16* const intensityData = intensity;
