@@ -245,7 +245,7 @@ Image slice(const Volume& source, int z, bool cylinder) {
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
         if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) > radiusSq) { target(x,y) = byte4(0,0,0,0); continue; }
         uint value = 0;
-        uint index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+        uint64 index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : (uint64)z*XY + y*X + x;
         if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
         else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
         else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB

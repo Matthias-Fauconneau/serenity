@@ -54,10 +54,9 @@ template<uint pad> inline void itoa(byte*& target, uint n) {
     assert(n<1000);
     uint i=pad;
     do { target[--i]="0123456789"[n%10]; n /= 10; } while( n!=0 );
-    assert(i>=1);
-    while(i>1) target[--i]=' ';
-    target += pad;
-    target[0]=',';
+    while(i>0) target[--i]=' ';
+    target[pad]=',';
+    target += pad+1;
 }
 
 FILE(CDL)
@@ -79,7 +78,7 @@ string toCDL(const Volume& source) {
                 else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
                 else error(source.sampleSize);
                 assert(value <= source.maximum, value, source.maximum);
-                if(value) itoa<5>(positionPtr, x), itoa<5>(positionPtr, y), itoa<5>(positionPtr, z), itoa<6>(valuePtr, value);
+                if(value) itoa<4>(positionPtr, x), itoa<4>(positionPtr, y), itoa<4>(positionPtr, z), itoa<6>(valuePtr, value);
             }
         }
     }
@@ -91,10 +90,10 @@ string toCDL(const Volume& source) {
     for(TextData s(header);;) {
         data << s.until('$'); // Copies header until next substitution
         /***/ if(s.match('#')) data << str(valueCount); // Substitutes non-zero values count
-        else if(s.match('0')) data << repeat("0,"_, valueCount), data.last()=';'; // Substitutes zeroes
-        else if(s.match('1')) data << repeat("1,"_, valueCount), data.last()=';'; // Substitutes ones
-        else if(s.match("position"_)) data << positions, data.last()=';'; // Substitutes sample positions
-        else if(s.match("value"_)) data << values, data.last()=';'; // Substitutes sample values
+        else if(s.match('0')) { data << repeat("0,"_, valueCount), data.last()=';'; } // Substitutes zeroes
+        else if(s.match('1')) { data << repeat("1,"_, valueCount); data.last()=';'; } // Substitutes ones
+        else if(s.match("position"_)) { data << positions; data.last()=';'; } // Substitutes sample positions
+        else if(s.match("value"_)) { data << values; data.last()=';'; } // Substitutes sample values
         else if(!s) break;
         else error("Unknown substitution",s.until(';'));
     }

@@ -43,7 +43,7 @@ class(Source, Operation), virtual VolumeOperation {
         while(sampleCount.x < min(sampleCount.y, sampleCount.z)/2) sampleCount.x*=2;
         while(sampleCount.y < min(sampleCount.z, sampleCount.x)/2) sampleCount.y*=2;
         while(sampleCount.z < min(sampleCount.x, sampleCount.y)/2) sampleCount.z*=2;
-        return sampleCount.x*sampleCount.y*sampleCount.z*outputSampleSize(0);
+        return (uint64)sampleCount.x*sampleCount.y*sampleCount.z*outputSampleSize(0);
     }
 
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&) {
@@ -61,7 +61,13 @@ class(Source, Operation), virtual VolumeOperation {
         uint16* const targetData = (Volume16&)outputs.first();
         for(uint z: range(size.z)) {
             if(report/1000>=5) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-            Tiff16(Map(slices[minZ+z],folder)).read(targetData + (marginZ+z)*X*Y + marginY*X + marginX, minX, minY, maxX-minX, maxY-minY, Y); // Directly decodes slice images into the volume
+            uint16* const targetSlice = targetData + (uint64)(marginZ+z)*X*Y + marginY*X + marginX;
+            Map file(slices[minZ+z],folder);
+            if(isTiff(file)) Tiff16(file).read(targetSlice, minX, minY, size.x, size.y, X); // Directly decodes slice images into the volume
+            else { // Use generic image decoder (FIXME: Converts to RGBA and back)
+                Image image = decodeImage(file);
+                for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(minX+x, minY+y).a;
+            }
         }
         //target.maximum = (1<<(target.sampleSize*8))-1; assert(maximum(target) == target.maximum, maximum(target));
         target.maximum = maximum(target); // Some sources don't use the full range

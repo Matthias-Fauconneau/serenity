@@ -16,7 +16,7 @@ typedef VolumeT<uint32> Volume32;
 struct Volume {
     Volume(){}
 
-    uint64 size() const { return sampleCount.x*sampleCount.y*sampleCount.z; }
+    uint64 size() const { return (uint64)sampleCount.x*sampleCount.y*sampleCount.z; }
     explicit operator bool() const { return (bool)data; }
     template<Type T> operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize); return *(const VolumeT<T>*)this; }
     template<Type T> operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize); return *(VolumeT<T>*)this; }
@@ -33,8 +33,8 @@ struct Volume {
 };
 
 template<Type T> struct VolumeT : Volume {
-    operator const T*() const { return (T*)data.data; }
-    operator T*() { return (T*)data.data; }
+    operator const T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (const T*)data.data; }
+    operator T*() { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
 };
 
 /// Serializes volume format (size, margin, range, layout)
