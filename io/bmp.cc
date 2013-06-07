@@ -15,6 +15,9 @@ Image decodeBMP(const ref<byte>& file) {
     assert(header.depth==8);
     assert(header.compression==0);
 
+    if(header.depth<=8) s.advance((1<<header.depth)*sizeof(byte4)); // Assumes palette[i]=i
+    assert(bitmapFileHeader.offset == s.index);
+
     uint w=header.width,h=header.height;
     uint size = header.depth*w*h/8;
     if(size>s.available(size)) { warn("Invalid BMP"); return Image(); }
