@@ -117,14 +117,12 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
 }
 
 template<Type K, Type V> string str(const map<K,V>& m) {
-    string s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i])<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
+    string s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }
 template<Type K, Type V> string toASCII(const map<K,V>& m) {
         string s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
 }
 
-template<Type K, Type V> map<K,V> operator<<(const map<K,V>& a, const map<K,V>& b) {
-    map<K, V> r = copy(a);
-    for(const_pair<K, V> e: b) { assert(!r.contains(e.key), r.at(e.key), e.value, a, b); r.insert(copy(e.key), copy(e.value)); }
-    return r;
+template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {
+    for(const_pair<K, V> e: b) { assert_(!a.contains(e.key), a.at(e.key), e.value, a, b); a.insert(copy(e.key), copy(e.value)); }
 }

@@ -31,9 +31,6 @@ Sample operator*(float s, const Sample& A);
 /// Substracts samples clipping to zero
 Sample operator-(const Sample& A, const Sample& B);
 
-/*/// Multiplies samples
-Sample operator*(const Sample& A, const Sample& B);*/
-
 /// Square roots samples
 Sample squareRoot(const Sample& A);
 
@@ -53,6 +50,9 @@ float histogramVariance(const NonUniformSample& A);
 
 /// Converts to UniformSample if possible
 UniformSample toUniformSample(const NonUniformSample& A);
+
+/// Converts to NonUniformSample (FIXME: implement scaled UniformSample)
+NonUniformSample toNonUniformSample(const UniformSample& A);
 
 /// Multiplies sample by a scalar
 NonUniformSample operator*(float s, const NonUniformSample& A);

@@ -1,5 +1,5 @@
-/// \file histogram.cc Histograms volume and provides Sample methods as Operation
-#include "histogram.h"
+/// \file histogram.cc Histograms volume
+#include "sample.h"
 #include "volume-operation.h"
 #include "thread.h"
 
@@ -52,89 +52,5 @@ class(Histogram, Operation) {
         Sample histogram = ::histogram(source, args.contains("cylinder"_));
         outputs[0]->metadata = string("histogram.tsv"_);
         outputs[0]->data = toASCII(histogram);
-    }
-};
-
-/// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel
-Sample kernelDensityEstimation(const Sample& histogram) {
-    const real N = ::sum(histogram);
-    real h = pow(4./(3*N),1./5) * sqrt(histogramVariance(histogram));
-    const uint clip = 8192;
-    float K[clip]; for(int i: range(clip)) { float x=-1./2*sq(i/h); K[i] = x>expUnderflow?exp(x)/sqrt(2*PI) : 0; } // Precomputes gaussian kernel
-    Sample pdf (histogram.size);
-    parallel(histogram.size, [&](uint, uint x0) {
-        float sum = 0;
-        for(int i: range(min(clip,x0))) sum += histogram[x0-1-i]*K[i];
-        for(int i: range(min(clip,uint(histogram.size)-x0))) sum += histogram[x0+i]*K[i];
-        pdf[x0] = sum / (N*h);
-    });
-    return pdf;
-}
-
-/// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel (on a non uniformly sampled distribution)
-NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram, real h=nan) {
-    const real N = ::sum(histogram);
-    if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogramVariance(histogram));
-    log("kernelDensityEstimation using bandwidth", h);
-    NonUniformSample pdf = copy(histogram);
-    parallel(histogram.size(), [&](uint, uint i) {
-        const float x0 = histogram.keys[i];
-        float sum = 0;
-        for(auto sample: histogram) if((x0-sample.key)<h) { real x=-1./2*sq((x0-sample.key)/h); if(x>expUnderflow) sum += sample.value * exp(x)/sqrt(2*PI); }
-        pdf.values[i] = sum / (N*h);
-    });
-    //pdf = (1./sum(pdf))*pdf; // FIXME
-    return pdf;
-}
-
-class(KernelDensityEstimation, Operation), virtual Pass {
-    virtual ref<byte> parameters() const { return "bandwidth"_; }
-    virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        target.metadata = string("kde.tsv"_);
-        NonUniformSample sample = parseNonUniformSample(source.data);
-        UniformSample uniformSample = toUniformSample(sample);
-        target.data = uniformSample ? toASCII(kernelDensityEstimation(uniformSample)) : toASCII(kernelDensityEstimation(sample, toDecimal(args.value("bandwidth"_))));
-    }
-};
-
-//definePass(Sum, "scalar"_, str(sum(parseUniformSample(source.data))) );
-class(Sum, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = string("scalar"_);
-        target.data = str(sum(parseUniformSample(source.data)));
-    }
-};
-
-#if 1 // Superseded by KDE (for KDE debugging purpose only)
-class(Normalize, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-#if 1
-        UniformSample sample = parseUniformSample(source.data);
-        sample[0]=sample[sample.size-1]=0; // Zeroes extreme values (clipping artifacts)
-        target.data = toASCII((1./sum(sample))*sample);
-#else
-        NonUniformSample sample = parseNonUniformSample(source.data);
-        sample.values[0]=sample.values[sample.size()-1]=0; // Zeroes extreme values (clipping artifacts)
-        target.data = toASCII((1./sum(sample))*sample);
-#endif
-    }
-};
-#endif
-
-/// Square roots the variable of a distribution
-class(SquareRootVariable, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-        target.data = toASCII(squareRootVariable(parseNonUniformSample(source.data)));
-    }
-};
-
-/// Scales the variable of a distribution
-class(ScaleVariable, Operation), virtual Pass {
-    virtual ref<byte> parameters() const { return "scale"_; }
-    virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-        target.data = toASCII(scaleVariable(toDecimal(args.at("scale"_)), parseNonUniformSample(source.data)));
     }
 };

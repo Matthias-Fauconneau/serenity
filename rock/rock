@@ -53,10 +53,14 @@ radius-histogram-connected = SquareRootVariable squaredRadius-histogram-connecte
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 radius-distribution-unconnected = KernelDensityEstimation radius-histogram-unconnected
 radius-distribution-connected = KernelDensityEstimation radius-histogram-connected
-normalize-radius-histogram-connected = Normalize radius-histogram-connected #DEBUG
 # Scales radius (e.g to original pixel or physical resolution)
 scaled-radius-distribution-unconnected = ScaleVariable radius-distribution-unconnected
 scaled-radius-distribution-connected = ScaleVariable radius-distribution-connected
+
+#DEBUG: Superseded by KDE
+normalize-squaredRadius-histogram-connected = Normalize squaredRadius-histogram-connected
+normalize-radius-histogram-connected = SquareRootVariable normalize-squaredRadius-histogram-connected
+scaled-radius-histogram-connected = ScaleVariable normalize-radius-histogram-connected
 
 #Render
  #emptyx epositionx = DistanceX rock

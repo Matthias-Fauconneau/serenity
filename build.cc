@@ -100,7 +100,7 @@ struct Build {
                 static const array<ref<byte>> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -march=native -o"_);
                 array<string> args;
                 args << object << target+".cc"_;
-                if(::find(build,"debug"_)) args << string("-g"_) << string("-DNO_INLINE"_) << string("-DASSERT"_);
+                if(::find(build,"debug"_)) args << string("-g"_) << string("-Og"_) << string("-DNO_INLINE"_) << string("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << string("-g"_) << string("-Ofast"_);
                 else if(::find(build,"release"_)) args <<  string("-Ofast"_);
                 else error("Unknown build",build);

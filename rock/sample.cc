@@ -61,6 +61,10 @@ UniformSample toUniformSample(const NonUniformSample& A) {
     return copy(A.values);
 }
 
+NonUniformSample toNonUniformSample(const UniformSample& A) {
+    NonUniformSample r; for(uint i: range(A.size)) r.insert(i, A[i]); return r;
+}
+
 NonUniformSample operator*(float s, const NonUniformSample& A) {
     NonUniformSample R=copy(A);
     for(float& x: R.values) x*=s;

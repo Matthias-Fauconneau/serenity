@@ -12,12 +12,13 @@
 //#include "source.h"
 //#include "capsule.h"
 //#include "smooth.h"
+//#include "histogram.h"
 //#include "threshold.h"
 //#include "distance.h"
 //#include "skeleton.h"
 //#include "floodfill.h"
 //#include "rasterize.h"
-//#include "validate.h"
+//#include "kernel-density-estimation.h"
 //#include "export.h"
 
 struct GraphProcess : virtual Process {

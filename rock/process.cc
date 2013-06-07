@@ -64,7 +64,7 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                 if(!Interface<Operation>::factories.contains(word)) { // Forwarding rule
                     rule.inputs << word;
                     s.whileAny(" \t\r"_);
-                    s.skip("\n"_);
+                    if(!s.match('\n')) error("Unknown operation", word);
                 } else {
                     rule.operation = word;
                     s.whileAny(" \t\r"_);
@@ -129,6 +129,7 @@ Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) 
         unique<Operation> operation = Interface<Operation>::instance(rule.operation);
         assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
         Dict local = copy(arguments); local << rule.arguments; // not inherited
+        for(ref<byte> key: rule.arguments.keys) assert_(split(operation->parameters()).contains(key));
         for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
             if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
             else relevant.insert(parameter, local.at(parameter));
@@ -303,7 +304,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     Time time;
     Dict relevantArguments = Process::relevantArguments(target, arguments);
     operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    log(rule, time);
+    log(target, rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

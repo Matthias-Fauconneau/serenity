@@ -56,7 +56,6 @@ rock/distance.cc
 rock/export.cc
 rock/floodfill.cc
 rock/histogram.cc
-rock/histogram.h
 rock/interface.cc
 rock/layout.cc
 rock/operation.h
@@ -74,8 +73,8 @@ rock/skeleton.cc
 rock/smooth.cc
 rock/source.cc
 rock/threshold.cc
-rock/validate.cc
 rock/volume.cc
 rock/volume.h
 rock/volume-operation.h
 rock/volume-operation.cc
+rock/kernel-density-estimation.cc

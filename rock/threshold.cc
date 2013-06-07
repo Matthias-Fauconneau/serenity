@@ -1,6 +1,5 @@
 #include "volume-operation.h"
 #include "sample.h"
-#include "histogram.h"
 #include "time.h"
 #include "thread.h"
 #include "simd.h"
@@ -58,9 +57,9 @@ class(Otsu, Operation) {
         float densityThreshold = float(threshold) / float(density.size);
         log("Otsu's model estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 5);
+        outputs[0]->data = ftoa(densityThreshold, 6);
         output(outputs, 1, "scalar"_, [&]{
-            return "threshold "_+str(threshold)+"\n"_
+            return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
                     "backgroundCount "_+dec(parameters[0])+"\n"_
                     "foregroundCount "_+dec(parameters[1])+"\n"_
                     "backgroundMean "_+str(parameters[2])+"\n"_

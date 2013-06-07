@@ -33,13 +33,13 @@ string volumeFormat(const Volume& volume) {
 
 bool parseVolumeFormat(Volume& volume, const ref<byte>& format) {
     TextData s (format);
-    volume.sampleCount.x = s.integer(); if(!s.match("x"_)) return false;
-    volume.sampleCount.y = s.integer(); if(!s.match("x"_)) return false;
-    volume.sampleCount.z = s.integer();
+    volume.sampleCount.x = s.mayInteger(); if(!s.match("x"_)) return false;
+    volume.sampleCount.y = s.mayInteger(); if(!s.match("x"_)) return false;
+    volume.sampleCount.z = s.mayInteger();
     if(s.match('+')) {
-        volume.margin.x = s.integer(); if(!s.match("+"_)) return false;
-        volume.margin.y = s.integer(); if(!s.match("+"_)) return false;
-        volume.margin.z = s.integer();
+        volume.margin.x = s.mayInteger(); if(!s.match("+"_)) return false;
+        volume.margin.y = s.mayInteger(); if(!s.match("+"_)) return false;
+        volume.margin.z = s.mayInteger();
     }
     if(!s.match("-"_)) return false;
     volume.maximum = s.hexadecimal();
