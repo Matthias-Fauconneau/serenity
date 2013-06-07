@@ -12,8 +12,6 @@ typedef VolumeT<uint16> Volume16;
 struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } } packed;
 typedef VolumeT<bgr> Volume24;
 typedef VolumeT<uint32> Volume32;
-typedef char Line[20];
-typedef VolumeT<Line> VolumeASCII;
 
 struct Volume {
     Volume(){}

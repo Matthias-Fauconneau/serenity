@@ -57,19 +57,6 @@ radius-distribution-connected = KernelDensityEstimation radius-histogram-connect
 scaled-radius-distribution-unconnected = ScaleVariable radius-distribution-unconnected
 scaled-radius-distribution-connected = ScaleVariable radius-distribution-connected
 
-#DEBUG: Superseded by KDE
-normalize-squaredRadius-histogram-connected = Normalize squaredRadius-histogram-connected
-normalize-radius-histogram-connected = SquareRootVariable normalize-squaredRadius-histogram-connected
-scaled-radius-histogram-connected = ScaleVariable normalize-radius-histogram-connected
-
-#Render
- #emptyx epositionx = DistanceX rock
- #emptyy epositiontx epositiony = DistanceY emptyx epositionx
- #emptyz epositionx epositiony epositionz = DistanceZ emptyy epositionyx epositionyy
- #empty = SquareRoot emptyz # Square roots and tiles distance field before using it for empty space skiping during rendering
- #density = SquareRoot distance # Square roots and normalizes (FIXME) distance to use as density values (for opacity and gradient)
- #intensity = SquareRoot maximum # Square roots and normalizes (FIXME) maximum to use as intensity values (for color intensity)
-
 #Export
  # Clips to cylinder
  if cylinder: clip-unconnected  = CylinderClip unconnected
@@ -83,12 +70,9 @@ scaled-radius-histogram-connected = ScaleVariable normalize-radius-histogram-con
  sqrt-unconnected = SquareRoot clip-unconnected
  sqrt-connected = SquareRoot clip-connected
 
-histogram-sqrt-unconnected = Histogram sqrt-unconnected
-histogram-sqrt-connected = Histogram sqrt-connected
-
- # Exports to ASCII
- ascii-unconnected = ToASCII sqrt-unconnected
- ascii-connected = ToASCII sqrt-connected
+ # Exports to CDL
+ cdl-unconnected = ToCDL sqrt-unconnected
+ cdl-connected = ToCDL sqrt-connected
 
  # Exports to PNG
  png-source = ToPNG source

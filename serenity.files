@@ -54,6 +54,7 @@ ui/x.h
 rock/capsule.cc
 rock/distance.cc
 rock/export.cc
+rock/CDL
 rock/floodfill.cc
 rock/histogram.cc
 rock/interface.cc
