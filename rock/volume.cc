@@ -162,7 +162,7 @@ void crop(Volume16& target, const Volume16& source, uint x1, uint y1, uint z1, u
 void downsample(Volume16& target, const Volume16& source) {
     assert(!source.offsetX && !source.offsetY && !source.offsetZ);
     int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;
-    assert(X%2==0 && Y%2==0 && Z%==0);
+    assert(X%2==0 && Y%2==0 && Z%2==0);
     target.sampleCount = source.sampleCount/2;
     target.data.size /= 8;
     assert(source.margin.x%2==0 && source.margin.y%2==0 && source.margin.z%2==0);

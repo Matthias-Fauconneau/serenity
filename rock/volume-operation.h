@@ -32,18 +32,11 @@ struct VolumeOperation : virtual Operation {
     }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         array<Volume> inputVolumes; array<Result*> otherInputs;
-#if 1
         for(Result* input: inputs) {
             Volume volume = toVolume(*input);
-            if(volume) {
-                if(volume.sampleSize==2) assert(maximum((const Volume16&)volume)<=volume.maximum, input->name, volume, hex(maximum((const Volume16&)volume)), hex(volume.maximum));
-                if(volume.sampleSize==4) assert(maximum((const Volume32&)volume)<=volume.maximum, input->name, volume, hex(maximum((const Volume32&)volume)), hex(volume.maximum));
-                inputVolumes << move(volume);
-            } else {
-                otherInputs << input;
-            }
+            if(volume) inputVolumes << move(volume);
+            else otherInputs << input;
         }
-#endif
         array<Volume> outputVolumes; array<Result*> otherOutputs;
         for(uint index: range(outputs.size)) {
             uint sampleSize = this->outputSampleSize(index);

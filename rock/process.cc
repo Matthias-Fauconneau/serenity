@@ -304,7 +304,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     Time time;
     Dict relevantArguments = Process::relevantArguments(target, arguments);
     operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    log(target, rule, relevantArguments, time);
+    log(rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

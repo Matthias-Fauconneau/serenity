@@ -4,7 +4,7 @@
 #include "map.h"
 
 /// Uniformly sampled distribution
-typedef buffer<float> UniformSample;
+typedef buffer<float> UniformSample; //FIXME: template<Type T>
 typedef UniformSample Sample;
 
 /// Returns the sum of the samples

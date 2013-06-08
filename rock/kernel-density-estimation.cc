@@ -60,23 +60,6 @@ class(Sum, Operation), virtual Pass {
     }
 };
 
-#if 1 // Superseded by KDE (for KDE debugging purpose only)
-class(Normalize, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-#if 1
-        UniformSample sample = parseUniformSample(source.data);
-        sample[0]=sample[sample.size-1]=0; // Zeroes extreme values (clipping artifacts)
-        target.data = toASCII((1./sum(sample))*sample);
-#else
-        NonUniformSample sample = parseNonUniformSample(source.data);
-        sample.values[0]=sample.values[sample.size()-1]=0; // Zeroes extreme values (clipping artifacts)
-        target.data = toASCII((1./sum(sample))*sample);
-#endif
-    }
-};
-#endif
-
 /// Square roots the variable of a distribution
 class(SquareRootVariable, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {

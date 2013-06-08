@@ -11,11 +11,10 @@ if !validation: source = Source
 if validation: source = Capsules
 
 histogram-source = Histogram source
-normalized-histogram-source = Normalize histogram-source
 density-source = KernelDensityEstimation histogram-source
-if threshold == 'otsu': threshold otsu-parameters otsu-interclass-variance = Otsu histogram-source
-if threshold == 'otsu': normalized-otsu-interclass-variance = Normalize otsu-interclass-variance #DEBUG: for comparison with histogram-source
-if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel density-source
+if threshold == 'otsu': threshold otsu-parameters otsu-interclass-variance = Otsu histogram-source # Recommended robust statistic method
+if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source # Use this method for backward compatibility only
+if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel density-source # Explicit model
 
 shift = ShiftRight source
 smoothx = Smooth shift

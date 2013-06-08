@@ -4,30 +4,6 @@
 #include "thread.h"
 #include "simd.h"
 
-/// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
-class(LorentzianMixtureModel, Operation) {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(inputs[0]->metadata == "histogram.tsv"_);
-        Sample density = parseUniformSample( inputs[0]->data );
-        density[0]=density[density.size-1]=0; // Zeroes extreme values (clipping artifacts)
-        const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
-        const Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
-        Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
-        pore.height = density[pore.position]; // Use peak height from total data (estimating on not-rock yields too low estimate because rock is estimated so wide its tail overlaps pore peak)
-        const Sample notpore = density - sample(pore, density.size);
-        uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
-        float densityThreshold = float(threshold) / float(density.size);
-        log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
-        outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 5);
-        output(outputs, 1, "lorentz"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore); });
-        output(outputs, 2, "histogram.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
-        output(outputs, 3, "histogram.tsv"_, [&]{ return toASCII(notrock); });
-        output(outputs, 4, "histogram.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
-        output(outputs, 5, "histogram.tsv"_, [&]{ return toASCII(notpore); });
-    }
-};
-
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
@@ -55,10 +31,10 @@ class(Otsu, Operation) {
             interclassVariance[t] = variance;
         }
         float densityThreshold = float(threshold) / float(density.size);
-        log("Otsu's model estimates threshold at", densityThreshold);
+        log("Otsu's method estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 6);
-        output(outputs, 1, "scalar"_, [&]{
+        output(outputs, 1, "otsu"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
                     "backgroundCount "_+dec(parameters[0])+"\n"_
                     "foregroundCount "_+dec(parameters[1])+"\n"_
@@ -66,6 +42,64 @@ class(Otsu, Operation) {
                     "foregroundMean "_+str(parameters[3])+"\n"_
                     "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount))); } );
         output(outputs, 2, "variance.tsv"_, [&]{ return toASCII((1./totalCount)*squareRoot(interclassVariance)); } );
+    }
+};
+
+/// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
+class(LorentzianMixtureModel, Operation) {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        assert_(inputs[0]->metadata == "histogram.tsv"_);
+        Sample density = parseUniformSample( inputs[0]->data );
+        density[0]=density[density.size-1]=0; // Zeroes extreme values (clipping artifacts)
+        const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
+        const Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
+        Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
+        pore.height = density[pore.position]; // Use peak height from total data (estimating on not-rock yields too low estimate because rock is estimated so wide its tail overlaps pore peak)
+        const Sample notpore = density - sample(pore, density.size);
+        uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
+        float densityThreshold = float(threshold) / float(density.size);
+        log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
+        outputs[0]->metadata = string("scalar"_);
+        outputs[0]->data = ftoa(densityThreshold, 5);
+        output(outputs, 1, "lorentz"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore); });
+        output(outputs, 2, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
+        output(outputs, 3, "density.tsv"_, [&]{ return toASCII(notrock); });
+        output(outputs, 4, "lorentz.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
+        output(outputs, 5, "density.tsv"_, [&]{ return toASCII(notpore); });
+    }
+};
+
+/// Computes the mean gradient for each set of voxels with the same density, and defines threshold as the density of the set of voxels with the maximum mean gradient
+/// \note Provided for backward compatibility only
+class(MaximumMeanGradient, Operation) {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        const Volume16& source = toVolume(*inputs[0]);
+        uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+        Sample gradientSum (source.maximum+1, source.maximum+1, 0); // Sum of finite differences for voxels belonging to each density value
+        Sample histogram (source.maximum+1, source.maximum+1, 0); // Count samples belonging to each class to compute mean
+        for(uint z: range(Z-1)) for(uint y: range(Y-1)) for(uint x: range(X-1)) {
+            const uint16* const voxel = &source[z*X*Y+y*X+x];
+            uint gradient = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) /*+ abs(voxel[0] - voxel[X*Y])*/; //[sic] Anistropic for backward compatibility
+            const uint binCount = 255; assert(binCount<=source.maximum); // Quantizes to 8bit as this method fails if voxels are not grouped in large enough sets
+            uint bin = uint(voxel[0])*binCount/source.maximum*source.maximum/binCount;
+            gradientSum[bin] += gradient, histogram[bin]++;
+            //gradientSum[voxel[1]] += gradient, histogram[voxel[1]]++; //[sic] Asymetric for backward compatibility
+            //gradientSum[voxel[X]] += gradient, histogram[voxel[X]]++; //[sic] Asymetric for backward compatibility
+            //gradientSum[voxel[X*Y]] += gradient, histogram[voxel[X*Y]]++; //[sic] Asymetric for backward compatibility
+        }
+        uint threshold=0; float maximum=__FLT_MAX__;
+        Sample gradientMean (source.maximum+1);
+        for(uint density: range(histogram.size)) {
+            if(!histogram[density]) continue; // Not enough samples to properly estimate mean gradient for this density threshold
+            float mean = gradientSum[density]/histogram[density];
+            if(mean<maximum) maximum = mean, threshold = density; // Actually, it seems the minimum gradient mean is used ???!!!
+            gradientMean[density] = mean;
+        }
+        float densityThreshold = float(threshold) / float(histogram.size);
+        log("Maximum mean gradient estimates threshold at", densityThreshold, "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels");
+        outputs[0]->metadata = string("scalar"_);
+        outputs[0]->data = ftoa(densityThreshold, 5);
+        output(outputs, 1, "gradient-mean.tsv"_, [&]{ return toASCII(gradientMean); } );
     }
 };
 
