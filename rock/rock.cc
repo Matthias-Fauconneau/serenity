@@ -108,6 +108,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             for(const shared<Result>& target: targetResults) {
                 assert(target->data.size);
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
+                else if(endsWith(target->metadata,".tsv"_)) log(target->name, ":\n"_+target->data);
                 else if(inRange(1u,toVolume(target).sampleSize,4u)) current = share( target ); // Displays last displayable volume
             }
         }
@@ -216,7 +217,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     array<ref<byte>> targetPaths; // Path to file (or folders) where targets are copied
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
-    unique<Window> window {unique<Window>::null()};
+    unique<Window> window = nullptr;
 
     bool renderVolume = false;
     int2 lastPos;

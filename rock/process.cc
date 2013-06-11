@@ -65,39 +65,45 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                 Rule rule;
                 ref<byte> word = s.word("_-"_);
                 assert_(word);
-                if(!Interface<Operation>::factories.contains(word)) { // Forwarding rule
-                    rule.inputs << word;
-                    s.whileAny(" \t\r"_);
-                    if(!s.match('\n')) error("Unknown operation", word);
-                } else {
-                    rule.operation = word;
-                    s.whileAny(" \t\r"_);
-                    for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
-                        if(s.match('#')) { s.whileNot('\n'); continue; }
-                        ref<byte> word = s.word("_-"_);
-                        if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
-                        else if(resultNames.contains(word)) rule.inputs << word; // Result input
-                        else if(parameters.contains(word) && !arguments.contains(word)) rule.arguments.insert(word); // Empty argument
-                        else if(parameters.contains(word)) rule.inputs << word; // Argument input
-                        else error("Unknown result or parameter for input", word);
-                    }
-                    for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
-                    rule.outputs = move(outputs);
+                if(!Interface<Operation>::factories.contains(word)) rule.inputs << word; // Forwarding rule
+                else rule.operation = word; // Generating rule
+                s.whileAny(" \t\r"_);
+                for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
+                    if(s.match('#')) { s.whileNot('\n'); continue; }
+                    ref<byte> key = s.word("_-"_);
+                    if(s.match('=')) { // Explicit argument
+                        if(s.match('{')) { // Sweep
+                            ref<byte> sweep = s.until('}');
+                            assert(!arguments.contains(key));
+                            if(::find(sweep,".."_)) {
+                                TextData s (sweep);
+                                int begin = s.integer(); s.skip(".."_); int end = s.integer(); assert(!s);
+                                assert(begin >= 0 && end > begin);
+                                array<Variant> sequence;
+                                for(uint i: range(begin, end)) sequence << i;
+                                rule.sweeps.insert(key, sequence);
+                            } else rule.sweeps.insert(key, apply<Variant>(split(sweep,','), [](const ref<byte>& o){return o;}));
+                        } else {
+                            ref<byte> value = s.whileNo(" \t\r\n"_);
+                            rule.arguments.insert(key, value);
+                        }
+                    } else if(resultNames.contains(key)) rule.inputs << key; // Result input
+                    else if(parameters.contains(key) && !arguments.contains(key)) rule.arguments.insert(key); // Empty argument
+                    else if(parameters.contains(key)) rule.inputs << key; // Argument input
+                    else error("Unknown result or parameter for input", key);
                 }
+                for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
+                rule.outputs = move(outputs);
                 rules << move(rule);
             }
         }
 
         arguments.clear(); sweeps.clear(); targets.clear(); specialArguments.clear();
-        for(const ref<byte>& argument: allArguments) { // Parses explicit arguments
+        for(const ref<byte>& argument: allArguments) { // Parses generic arguments (may affect process definition)
             TextData s (argument); ref<byte> key = s.word("-_"_);
-            if(s.match('=')) { // Stores generic argument affecting operations
+            if(s.match('=')) { // Explicit argument
                 assert_(parameters.contains(key),"Invalid parameter", key);
                 ref<byte> value = s.untilEnd();
-                /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
-                assert(!arguments.contains(key)); assert(!::find(value,".."_));
-                sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
-                } else*/
                 if(sweeps.contains(key) || arguments.contains(key)) {
                     if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
                     sweeps.at(key) << value;
@@ -188,8 +194,10 @@ void Process::execute(const ref<ref<byte> >& targets, const map<ref<byte>, array
     } else { // Actually generates targets when sweeps have been explicited
         assert_(targets, "Expected target, got only arguments:", arguments);
         for(const ref<byte>& target: targets) {
-            log(target, relevantArguments(target, arguments));
+            log(">>", target, relevantArguments(target, arguments));
+            Time time;
             targetResults << getResult(target, arguments);
+            if((uint64)time > 100) log("<<", target, time);
         }
     }
 }
@@ -251,14 +259,18 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     // Otherwise regenerates target using new inputs, arguments and/or implementations
 
     array<shared<Result>> inputs;
-    for(const ref<byte>& input: rule.inputs) inputs << getResult(input, arguments);
+    if(!rule.sweeps)
+        for(const ref<byte>& input: rule.inputs) inputs << getResult(input, arguments);
     for(const shared<Result>& input: inputs) {
         ResultFile& result = *(ResultFile*)input.pointer;
         if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
     }
 
-    if(!rule.operation) return move(inputs.first()); // Forwarding rule
-    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
+    if(!rule.operation && !rule.sweeps) { // Simple forwarding rule
+        assert(inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded");
+        return move(inputs.first());
+    }
+    unique<Operation> operation = rule.operation ? Interface<Operation>::instance(rule.operation) : nullptr;
 
     array<shared<Result>> outputs;
     for(uint index: range(rule.outputs.size)) {
@@ -271,7 +283,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         }
 
         Map map;
-        int64 outputSize = operation->outputSize(arguments, cast<Result*>(inputs), index);
+        int64 outputSize = operation ? operation->outputSize(arguments, cast<Result*>(inputs), index) : 0;
         if(outputSize) { // Creates (or resizes) and maps an output result file
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); string oldest;
@@ -311,7 +323,24 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
 
     Time time;
     Dict relevantArguments = Process::relevantArguments(target, arguments);
-    operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
+    if(operation) operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
+    else { // Sweep generator
+           assert(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
+           assert(rule.inputs.size == 1 && outputs.size==1, "FIXME: Only single target sweeps can be generated");
+           Dict args = copy(arguments);
+           ref<byte> parameter = rule.sweeps.keys.first(); // Removes first parameter and loop over it
+           assert(!args.contains(parameter));
+           string data;
+           for(const Variant& value: rule.sweeps.at(parameter)) {
+               args.insert(parameter, value);
+               shared<Result> result = getResult(rule.inputs.first(), args);
+               assert(result->metadata=="scalar"_, "FIXME: only scalar sweep can be generated"_);
+               data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
+               args.remove(parameter);
+           }
+           outputs.first()->metadata = string("sweep.tsv"_);
+           outputs.first()->data = move(data);
+    }
     log(rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {

@@ -56,7 +56,7 @@ class(KernelDensityEstimation, Operation), virtual Pass {
 class(Sum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = string("scalar"_);
-        target.data = str(sum(parseUniformSample(source.data)));
+        target.data = str(sum(parseUniformSample(source.data)))+"\n"_;
     }
 };
 
@@ -81,6 +81,6 @@ class(ScaleVariable, Operation), virtual Pass {
 class(Div, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = str(toDecimal(inputs[0]->data)/toDecimal(inputs[1]->data));
+        outputs[0]->data = str(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal())+"\n"_;
     }
 };

@@ -57,6 +57,9 @@ volume-total = Sum histogram-total
 porosity-unconnected = Div volume-unconnected volume-total
 porosity-connected = Div volume-connected volume-total
 
+# Volume( minimalSqDiameter) sweep
+volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter={3..9}
+
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected
 histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connected

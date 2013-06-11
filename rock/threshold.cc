@@ -33,7 +33,7 @@ class(Otsu, Operation) {
         float densityThreshold = float(threshold) / float(density.size);
         //log("Otsu's method estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 6);
+        outputs[0]->data = ftoa(densityThreshold, 6)+"\n"_;
         output(outputs, 1, "otsu"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
                     "backgroundCount "_+dec(parameters[0])+"\n"_
@@ -60,7 +60,7 @@ class(LorentzianMixtureModel, Operation) {
         float densityThreshold = float(threshold) / float(density.size);
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
         outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 5);
+        outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
         output(outputs, 1, "lorentz"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore); });
         output(outputs, 2, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
         output(outputs, 3, "density.tsv"_, [&]{ return toASCII(notrock); });
@@ -109,7 +109,7 @@ class(MaximumMeanGradient, Operation) {
         float densityThreshold = float(threshold) / float(histogram.size);
         log("Maximum mean gradient estimates threshold at", densityThreshold, "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels");
         outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 5);
+        outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
         output(outputs, 1, "gradient-mean.tsv"_, [&]{ return toASCII(gradientMean); } );
     }
 };
@@ -164,8 +164,7 @@ class(Binary, Operation), virtual VolumeOperation {
             //log("Threshold argument", densityThreshold);
         } else {
             Result* threshold = otherInputs[0];
-            assert_(isDecimal(threshold->data), threshold->data);
-            densityThreshold = toDecimal(threshold->data);
+            densityThreshold = TextData(threshold->data).decimal();
             //log("Threshold input", densityThreshold);
         }
         threshold(outputs[0], outputs[1], source, densityThreshold);

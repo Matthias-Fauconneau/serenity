@@ -126,7 +126,9 @@ ref<byte> TextData::whileInteger(bool sign) {
 }
 
 int TextData::integer(bool sign) {
-    return toInteger(whileInteger(sign), 10);
+    ref<byte> s = whileInteger(sign);
+    assert(s, untilEnd());
+    return toInteger(s, 10);
 }
 
 uint TextData::mayInteger() {

@@ -8,6 +8,7 @@ struct Rule {
     array<ref<byte>> inputs;
     array<ref<byte>> outputs;
     Dict arguments;
+    map<ref<byte>, array<Variant>> sweeps; // Process-specified parameter sweeps
 };
 inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.arguments?str(rule.arguments):""_); }
 
