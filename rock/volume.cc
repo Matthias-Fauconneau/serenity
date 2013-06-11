@@ -89,6 +89,7 @@ uint maximum(const Volume32& source) {
 
 void pack(Volume16& target, const Volume32& source) {
     const uint32* const sourceData = source;
+    target.data.size = source.data.size / 2;
     uint16* const targetData = target;
     uint64 size = source.size();
     for(uint i=0; i<size; i+=8) storea(targetData+i, packus(loada(sourceData+i),loada(sourceData+i+4)));

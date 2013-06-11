@@ -72,7 +72,9 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                         if(s.match('#')) { s.whileNot('\n'); continue; }
                         ref<byte> word = s.word("_-"_);
                         if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
-                        else rule.inputs << word;
+                        else if(resultNames.contains(word)) rule.inputs << word;
+                        else if(parameters.contains(word)) rule.arguments.insert(word);
+                        else error("Unknown result or parameter for input", word);
                     }
                     for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
                     rule.outputs = move(outputs);
@@ -116,7 +118,7 @@ Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) 
         relevant.insert(target, arguments.at(target));
         return relevant;
     }
-    assert_(&rule, "No rule generating '"_+target+"'"_,"in",rules);
+    assert_(&rule, "No rule generating '"_+target+"'"_);
 
     // Input argument are also relevant in case they are deleted
     for(const ref<byte>& input: rule.inputs) {

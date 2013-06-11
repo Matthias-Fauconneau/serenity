@@ -42,7 +42,7 @@ template<Type K, Type V> struct map {
     }
 
     template<Type KK> V* find(const KK& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
-    template<Type KK> V& insert(KK&& key) { assert(!contains(key),key); keys << move(key); values << V(); return values.last(); }
+    template<Type KK> V& insert(KK&& key) { assert(!contains(key),key); keys << K(move(key)); values << V(); return values.last(); }
 
 #if 0
     V& insert(K&& key, V&& value) {

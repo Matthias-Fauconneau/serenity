@@ -208,7 +208,7 @@ string ftoa(double n, int precision, int pad, bool exponent, bool inf) {
     int e=0; if(n && (exponent /*|| int(n*exp10(precision))==0*/)) e=round(log10(n)), n /= exp10(e);
     string s;
     if(sign) s<<'-';
-    if(precision) {
+    if(precision && n!=round(n)) {
         double integer=1, fract=__builtin_modf(n, &integer);
         uint decimal = round(fract*exp10(precision));
         if(decimal==(uint)exp10(precision)) integer++, decimal=0; // Rounds to ceiling integer

@@ -2,6 +2,7 @@
 #include "sample.h"
 #include "time.h"
 #include "png.h"
+#include "utf8.h"
 
 /// Explicitly clips volume to cylinder by zeroing exterior samples
 void cylinderClip(Volume& target, const Volume& source) {
@@ -59,6 +60,37 @@ template<uint pad> inline void itoa(byte*& target, uint n) {
     target += pad+1;
 }
 
+/// Exports volume to ASCII, one sample per line formatted as "x, y, z, f(x,y,z)"
+buffer<byte> toASCII(const Volume& source) {
+    uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    buffer<byte> target (X*Y*Z*(3*5+6)); assert_(X<=1e4 && Y<=1e4 && Z<=1e4 && source.maximum < 1e5);
+    byte *targetPtr = target.begin();
+    for(uint z=marginZ; z<Z-marginZ; z++) {
+        for(uint y=marginY; y<Y-marginY; y++) {
+            for(uint x=marginX; x<X-marginX; x++) {
+                uint index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+                uint value = 0;
+                if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
+                else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
+                else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
+                else error(source.sampleSize);
+                assert(value <= source.maximum, value, source.maximum);
+                if(value) { itoa<4>(targetPtr, x); itoa<4>(targetPtr, y); itoa<4>(targetPtr, z); itoa<6>(targetPtr, value); targetPtr[-1]='\n'; }
+            }
+        }
+    }
+    target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
+    return target;
+}
+class(ToASCII, Operation), virtual VolumeOperation {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+        outputs[0]->metadata = string("ascii"_);
+        outputs[0]->data = toASCII(inputs[0]);
+    }
+};
+
 FILE(CDL)
 /// Exports volume to unidata netCDF CDL (network Common data form Description Language) (can be converted to a binary netCDF dataset using ncgen)
 string toCDL(const Volume& source) {
@@ -97,6 +129,7 @@ string toCDL(const Volume& source) {
         else if(!s) break;
         else error("Unknown substitution",s.until(';'));
     }
+    assert(toUTF32(data)); // Asserts output is valid UTF-8
     return data;
 }
 class(ToCDL, Operation), virtual VolumeOperation {

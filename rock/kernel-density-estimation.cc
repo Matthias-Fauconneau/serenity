@@ -77,3 +77,10 @@ class(ScaleVariable, Operation), virtual Pass {
     }
 };
 
+/// Divides two scalars
+class(Div, Operation) {
+    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        outputs[0]->metadata = string("scalar"_);
+        outputs[0]->data = str(toDecimal(inputs[0]->data)/toDecimal(inputs[1]->data));
+    }
+};

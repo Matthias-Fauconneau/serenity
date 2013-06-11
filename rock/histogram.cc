@@ -40,16 +40,16 @@ Sample histogram(const Volume16& source, bool cylinder) {
             }
         }
     }
-    histogram[0] = 0; // Zeroes first value (clipping artifacts or background)
     return histogram;
 }
 
 /// Computes histogram using uniform integer bins
 class(Histogram, Operation) {
-    virtual ref<byte> parameters() const { return "cylinder"_; } //FIXME: use ClipCylinder
+    virtual ref<byte> parameters() const { return "cylinder zero"_; } //zero: Whether to include 0 (clipping or background) in the histogram (Defaults to no)
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         Sample histogram = ::histogram(source, args.contains("cylinder"_));
+        if(!args.contains("zero"_)) histogram[0] = 0; // Zeroes first value (clipping artifacts or background)
         outputs[0]->metadata = string("histogram.tsv"_);
         outputs[0]->data = toASCII(histogram);
     }

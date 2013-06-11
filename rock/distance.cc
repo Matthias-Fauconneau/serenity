@@ -236,11 +236,8 @@ class(DistanceZ, Operation), virtual VolumeOperation {
         target.maximum=maximum((const Volume32&)target);
         if(target.maximum < (1ul<<(8*(target.sampleSize/2)))) { // Packs outputs if needed
             const Volume32& target32 = target;
-            target.sampleSize /= 2;
-            target.data.size /= 2;
-            Time time;
+            target.sampleSize = target.sampleSize / 2;
             pack(target, target32);
-            //log("Pack", time);
         }
     }
 };

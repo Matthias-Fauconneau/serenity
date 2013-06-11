@@ -11,10 +11,10 @@ if !validation: source = Source
 if validation: source = Capsules
 
 histogram-source = Histogram source
-density-source = KernelDensityEstimation histogram-source
+distribution-source = KernelDensityEstimation histogram-source
 if threshold == 'otsu': threshold otsu-parameters otsu-interclass-variance = Otsu histogram-source # Recommended robust statistic method
-if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source density-source # Use this method for backward compatibility only (FIXME)
-if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel density-source # Explicit model
+if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-source # Use this method for backward compatibility only (FIXME)
+if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-source # Explicit model
 
 shift = ShiftRight source
 smoothx = Smooth shift
@@ -41,20 +41,27 @@ unconnected = Rasterize bin-unconnected
 connected = Rasterize bin-connected
 
 # Computes histogram of maximum squared radii
-squaredRadius-histogram-unconnected = Histogram unconnected
-squaredRadius-histogram-connected = Histogram connected
+histogram-squaredRadius-unconnected = Histogram unconnected
+histogram-squaredRadius-connected = Histogram connected
 # Computes pore space volume
-volume-unconnected = Sum squaredRadius-histogram-unconnected
-volume-connected = Sum squaredRadius-histogram-connected
-# Square roots radii
-radius-histogram-unconnected = SquareRootVariable squaredRadius-histogram-unconnected
-radius-histogram-connected = SquareRootVariable squaredRadius-histogram-connected
+volume-unconnected = Sum histogram-squaredRadius-unconnected
+volume-connected = Sum histogram-squaredRadius-connected
+# Computes total volume using existing operators (inefficient)
+histogram-total = Histogram unconnected zero # Input volume doesn't matter
+volume-total = Sum histogram-total
+# Computes porosity (= pore space volume / total volume )
+porosity-unconnected = Div volume-unconnected volume-total
+porosity-connected = Div volume-connected volume-total
+
+# Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
+histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected
+histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connected
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
-radius-distribution-unconnected = KernelDensityEstimation radius-histogram-unconnected
-radius-distribution-connected = KernelDensityEstimation radius-histogram-connected
+distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected
+distribution-radius-connected = KernelDensityEstimation histogram-radius-connected
 # Scales radius (e.g to original pixel or physical resolution)
-scaled-radius-distribution-unconnected = ScaleVariable radius-distribution-unconnected
-scaled-radius-distribution-connected = ScaleVariable radius-distribution-connected
+distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected
+distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected
 
 #Export
  # Clips to cylinder
@@ -72,6 +79,10 @@ scaled-radius-distribution-connected = ScaleVariable radius-distribution-connect
  # Exports to CDL
  cdl-unconnected = ToCDL sqrt-unconnected
  cdl-connected = ToCDL sqrt-connected
+
+ # Exports to ASCII
+ ascii-unconnected = ToASCII sqrt-unconnected
+ ascii-connected = ToASCII sqrt-connected
 
  # Exports to PNG
  png-source = ToPNG source
