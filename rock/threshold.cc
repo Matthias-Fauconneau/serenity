@@ -31,7 +31,7 @@ class(Otsu, Operation) {
             interclassVariance[t] = variance;
         }
         float densityThreshold = float(threshold) / float(density.size);
-        log("Otsu's method estimates threshold at", densityThreshold);
+        //log("Otsu's method estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 6);
         output(outputs, 1, "otsu"_, [&]{
@@ -41,7 +41,7 @@ class(Otsu, Operation) {
                     "backgroundMean "_+str(parameters[2])+"\n"_
                     "foregroundMean "_+str(parameters[3])+"\n"_
                     "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount))); } );
-        output(outputs, 2, "variance.tsv"_, [&]{ return toASCII((1./totalCount)*squareRoot(interclassVariance)); } );
+        output(outputs, 2, "deviation.tsv"_, [&]{ return toASCII((1./(totalCount-1))*squareRoot(interclassVariance)); } );
     }
 };
 

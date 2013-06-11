@@ -4,36 +4,6 @@
 #include "png.h"
 #include "utf8.h"
 
-/// Explicitly clips volume to cylinder by zeroing exterior samples
-void cylinderClip(Volume& target, const Volume& source) {
-    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    uint radiusSq = (X/2-marginX)*(Y/2-marginY);
-    assert_(!target.offsetX && !target.offsetY && !target.offsetZ);
-    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    uint16* const targetData = (uint16*)target.data.data;
-    for(int z=0; z<Z; z++) {
-        uint16* const targetZ = targetData + z*XY;
-        for(int y=0; y<Y; y++) {
-            uint16* const targetZY = targetZ + y*X;
-            for(int x=0; x<X; x++) {
-                uint value = 0;
-                if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq && z >= marginZ && z<Z-marginZ) {
-                    uint index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
-                    if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
-                    else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
-                    else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
-                    else error(source.sampleSize);
-                    assert(value <= source.maximum, value, source.maximum);
-                }
-
-                targetZY[x] = value;
-            }
-        }
-    }
-}
-defineVolumePass(CylinderClip, uint16, cylinderClip);
-
 /// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeOperation {
     ref<byte> parameters() const { return "cylinder"_; }
@@ -97,9 +67,9 @@ string toCDL(const Volume& source) {
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    buffer<byte> positions (X*Y*Z*3*5); assert_(X<=1e4 && Y<=1e4 && Z<=1e4);
-    buffer<byte> values (X*Y*Z*6); assert_(source.maximum < 1e5);
-    byte *positionPtr = positions.begin(), *valuePtr = values.begin();
+    constexpr uint positionSize="8191"_.size; buffer<byte> positions (X*Y*Z*3*(positionSize+1)); assert_(X<=1e4 && Y<=1e4 && Z<=1e4);
+    constexpr uint valueSize="65535"_.size; buffer<byte> values (X*Y*Z*(valueSize+1)); assert_(source.maximum < 1e5);
+    byte *positionIndex = positions.begin(), *valueIndex = values.begin();
     for(uint z=marginZ; z<Z-marginZ; z++) {
         for(uint y=marginY; y<Y-marginY; y++) {
             for(uint x=marginX; x<X-marginX; x++) {
@@ -110,15 +80,15 @@ string toCDL(const Volume& source) {
                 else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
                 else error(source.sampleSize);
                 assert(value <= source.maximum, value, source.maximum);
-                if(value) itoa<4>(positionPtr, x), itoa<4>(positionPtr, y), itoa<4>(positionPtr, z), itoa<6>(valuePtr, value);
+                if(value) itoa<positionSize>(positionIndex, x), itoa<positionSize>(positionIndex, y), itoa<positionSize>(positionIndex, z), itoa<valueSize>(valueIndex, value);
             }
         }
     }
-    positions.size = positionPtr-positions.begin(); assert(positions.size <= positions.capacity);
-    values.size = valuePtr-values.begin(); assert(values.size <= values.capacity);
-    uint valueCount = values.size / 6;
+    positions.size = positionIndex-positions.begin(); assert(positions.size <= positions.capacity);
+    values.size = valueIndex-values.begin(); assert(values.size <= values.capacity);
+    uint valueCount = values.size / (valueSize+1);
     ref<byte> header = CDL();
-    string data (header.size + 3*valueCount*2 + positions.size + values.size);
+    string data (header.size + 3*valueCount*"0,"_.size + positions.size + values.size);
     for(TextData s(header);;) {
         data << s.until('$'); // Copies header until next substitution
         /***/ if(s.match('#')) data << str(valueCount); // Substitutes non-zero values count

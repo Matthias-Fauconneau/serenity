@@ -51,27 +51,48 @@ struct GraphProcess : virtual Process {
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
-    FILE(rock) // Rock process definition (embedded in binary)
+    FILE(rock) // Rock process definition (embedded in binary)i
     Rock(const ref<ref<byte>>& args) {
-        specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_;
+        specialParameters += "dump"_; specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_;
         string process;
         for(const ref<byte>& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<ref<byte>> targets = configure(args, process? : rock());
+#ifndef BUILD
+#define BUILD "undefined"
+#endif
+        if(arguments.contains("dump"_)) {
+            log("Rock binary built on " __DATE__ " " __TIME__ " (" BUILD ")");
+            log("Operations:",Interface<Operation>::factories.keys);
+            log("Parameters:",parameters());
+            log("Results:",resultNames);
+            log("Targets:",targets);
+            log("Arguments:",arguments, sweeps);
+            log("Target paths:",targetPaths);
+        }
         if(arguments.contains("graph"_)) { generateSVG(targets, name, getenv("HOME"_)); return; }
         execute(targets, sweeps, arguments);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
-            for(uint index: range(min(targetResults.size, targetPaths.size))) {
-                const shared<Result>& target = targetResults[index];
-                const ref<byte>& path = targetPaths[index];
-                if(target->data.size) {
-                    Time time;
-                    if(existsFolder(path, cwd)) writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
-                    else writeFile(path, target->data, cwd), log(target->name+"."_+target->metadata,"->",path, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
+            if(sweeps) { // Concatenates sweep results into a single file
+                assert(sweeps.size()==1, "FIXME: Only single sweeps can be concatenated");
+                string data;
+                for(const shared<Result>& target: targetResults) data << target->relevantArguments.at(sweeps.keys[0]) << "\t"_ << target->data << "\n"_;
+                log(data);
+                writeFile(targetPaths[0], data, cwd);
+            } else {
+                for(uint index: range(min(targetResults.size, targetPaths.size))) {
+                    const shared<Result>& target = targetResults[index];
+                    const ref<byte>& path = targetPaths[index];
+                    if(target->data.size) {
+                        Time time;
+                        if(existsFolder(path, cwd)) writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
+                        else writeFile(path, target->data, cwd), log(target->name+"."_+target->metadata,"->",path, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
+                    }
                 }
+                if(targetPaths.size < targetResults.size) if(!arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(targetPaths.size));
+                if(targetPaths.size > targetResults.size) error("Expected less names, skipped names"_, targetPaths.slice(targetResults.size),
+                                                                "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
             }
-            if(targetPaths.size < targetResults.size) if(!arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(targetPaths.size));
-            if(targetPaths.size > targetResults.size) error("Expected less names, skipped names"_, targetPaths.slice(targetResults.size));
         } else if(targetPaths.size == 1) { // Copies results into folder
             const ref<byte>& path = targetPaths[0];
             assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
@@ -80,10 +101,16 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 Time time;
                 writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
             }
-        }
+        } else assert(arguments.contains("view"_), "Expected target paths"_);
 
-        // Displays first target result
-        if(arguments.contains("view"_)) for(const shared<Result>& target: targetResults) if(target->data.size && inRange(1u,toVolume(target).sampleSize,4u)) { current = share( target ); break; }
+        // Displays target results
+        if(arguments.contains("view"_)) {
+            for(const shared<Result>& target: targetResults) {
+                assert(target->data.size);
+                if(target->metadata=="scalar"_) log(target->name, "=", target->data);
+                else if(inRange(1u,toVolume(target).sampleSize,4u)) current = share( target ); // Displays last displayable volume
+            }
+        }
         if(current) {
             window = unique<Window>(this,int2(-1,-1),"Rock"_);
             window->localShortcut(Key('r')).connect(this, &Rock::refresh);
@@ -97,10 +124,11 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
 
      void parseSpecialArguments(const ref<ref<byte>>& specialArguments) override {
         for(const ref<byte>& argument: specialArguments) {
-            if(endsWith(argument,".process"_)) continue; // Already parsed extern process definition
-            if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
-            if(!arguments.contains("path"_) && existsFolder(argument,cwd)) { arguments.insert("path"_,argument); continue; }
-            targetPaths << argument;
+            /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
+            else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
+            else if(!arguments.contains("path"_) && existsFolder(argument,cwd)) arguments.insert("path"_,argument);
+            else if(!argument.contains('=')) targetPaths << argument;
+            else error("Invalid argument", argument);
         }
         assert_(arguments.contains("path"_), "Usage: rock <source folder containing volume slices> (target name|target path|key=value)*");
         ref<byte> path = arguments.at("path"_);

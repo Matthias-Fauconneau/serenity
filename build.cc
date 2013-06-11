@@ -97,7 +97,7 @@ struct Build {
             if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
                 static const array<ref<byte>> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -march=native -o"_);
                 array<string> args;
-                args << object << target+".cc"_;
+                args << object << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
                 if(::find(build,"debug"_)) args << string("-g"_) << string("-Og"_) << string("-DNO_INLINE"_) << string("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << string("-g"_) << string("-Ofast"_);
                 else if(::find(build,"release"_)) args <<  string("-Ofast"_);

@@ -1,6 +1,6 @@
 # Rock process definition
 # Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
-# Syntax: output1 output2 ... = Operator input1 input2 arg1=value ...
+# Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Default arguments
 smoothKernelSize = '1'
@@ -12,7 +12,7 @@ if validation: source = Capsules
 
 histogram-source = Histogram source
 distribution-source = KernelDensityEstimation histogram-source
-if threshold == 'otsu': threshold otsu-parameters otsu-interclass-variance = Otsu histogram-source # Recommended robust statistic method
+if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-source # Recommended robust statistic method
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-source # Use this method for backward compatibility only (FIXME)
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-source # Explicit model
 
@@ -33,7 +33,11 @@ distance positionx positiony positionz = DistanceZ distancey positionyx position
 
 skeleton = Skeleton positionx positiony positionz
 unconnected-skeleton = Tile skeleton
-connected-skeleton = FloodFill unconnected-skeleton
+
+if cylinder: clip-unconnected-skeleton = CylinderClip unconnected-skeleton # Clips to cylinder
+if !cylinder: clip-unconnected-skeleton = unconnected-skeleton # Or forwards unclipped skeleton
+
+connected-skeleton = FloodFill clip-unconnected-skeleton
 
 bin-unconnected = Bin unconnected-skeleton
 bin-connected = Bin connected-skeleton
@@ -47,7 +51,7 @@ histogram-squaredRadius-connected = Histogram connected
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
 # Computes total volume using existing operators (inefficient)
-histogram-total = Histogram unconnected zero # Input volume doesn't matter
+histogram-total = Histogram unconnected zero
 volume-total = Sum histogram-total
 # Computes porosity (= pore space volume / total volume )
 porosity-unconnected = Div volume-unconnected volume-total
@@ -64,17 +68,12 @@ distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-uncon
 distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected
 
 #Export
- # Clips to cylinder
- if cylinder: clip-unconnected  = CylinderClip unconnected
- if cylinder: clip-connected = CylinderClip connected
-
- # Or forwards unclipped volume
- if !cylinder: clip-unconnected = unconnected
- if !cylinder: clip-connected = connected
-
+ if cylinder: clip-unconnected  = CylinderClip unconnected # Clips to cylinder
+ if !cylinder: clip-unconnected = unconnected # Or forwards unclipped volume
+  
  # Square roots squared distance
  sqrt-unconnected = SquareRoot clip-unconnected
- sqrt-connected = SquareRoot clip-connected
+ sqrt-connected = SquareRoot connected
 
  # Exports to CDL
  cdl-unconnected = ToCDL sqrt-unconnected

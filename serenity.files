@@ -70,7 +70,6 @@ rock/rock
 rock/rock.cc
 rock/sample.cc
 rock/sample.h
-rock/concatenate.cc
 rock/skeleton.cc
 rock/smooth.cc
 rock/source.cc

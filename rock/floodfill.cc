@@ -1,5 +1,36 @@
 #include "volume-operation.h"
 
+/// Explicitly clips volume to cylinder by zeroing exterior samples
+void cylinderClip(Volume& target, const Volume& source) {
+    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    uint radiusSq = (X/2-marginX)*(Y/2-marginY);
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    bool interleaved = offsetX || offsetY || offsetZ;
+    if(interleaved) { assert(offsetX && offsetY && offsetZ); interleavedLookup(target); }
+    uint16* const targetData = (uint16*)target.data.data;
+    for(int z=0; z<Z; z++) {
+        uint16* const targetZ = targetData + (interleaved ? offsetZ[z] : z*XY);
+        for(int y=0; y<Y; y++) {
+            uint16* const targetZY = targetZ + (interleaved ? offsetY[y] : y*X);
+            for(int x=0; x<X; x++) {
+                uint value = 0;
+                if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq && z >= marginZ && z<Z-marginZ) {
+                    uint index = interleaved ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+                    if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
+                    else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
+                    else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
+                    else error(source.sampleSize);
+                    assert(value <= source.maximum, value, source.maximum);
+                }
+
+                targetZY[offsetX[x]] = value;
+            }
+        }
+    }
+}
+defineVolumePass(CylinderClip, uint16, cylinderClip);
+
 void floodFill(Volume16& target, const Volume16& source) {
     assert_(source.offsetX && source.offsetY && source.offsetZ);
     const uint16* const sourceData = source;
@@ -17,29 +48,50 @@ void floodFill(Volume16& target, const Volume16& source) {
     assert(maximum, index, zOrder(index), maximum);
     stack[stackSize++] = short3(zOrder(index)); // Pushes initial seed (from maximum)
 #else
-    buffer<byte> markBuffer(target.size()/8); // 128MiB
+    buffer<byte> markBuffer(target.size()/8, target.size()/8, 0); // 128MiB
     byte* const mark = markBuffer.begin();
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) stack[stackSize++] = short3(x,y,marginZ); // Pushes initial seeds (from top Z face)
-    while(stackSize) {
-        assert_(stackSize<=stackBuffer.capacity);
-        short3& p = stack[--stackSize];
-        uint x=p.x, y=p.y, z=p.z;
-        for(int dz=-1; dz<=1; dz+=2) for(int dy=-1; dy<=1; dy+=2) for(int dx=-1; dx<=1; dx+=2) { // Visits first neighbours
-            uint nx=x+dx, ny=y+dy, nz=z+dz;
-            uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
-            if(source[index] && !(mark[index/8]&(1<<(index%8)))) {
-                mark[index/8] |= (1<<(index%8)); // Marks previously unvisited skeleton voxel
-                stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
+    uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    for(uint z=marginZ;; z++) { // until at least 3 seeds are pushed
+        assert_(z<Z-marginZ); // Null volume
+        stackSize=0;
+        for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
+            uint index = offsetX[x]+offsetY[y]+offsetZ[z];
+            if(sourceData[index]) stack[stackSize++] = short3(x,y,z); // Pushes initial seeds (from bottom Z face)
+        }
+        if(stackSize>3) { if(stackSize<12) log(stackSize,"seeds for bottom face z="_,z, ref<short3>(stack, stackSize)); break; }
+    }
+    {uint unused markCount = 0;
+        while(stackSize) {
+            assert_(stackSize<=stackBuffer.capacity);
+            short3& p = stack[--stackSize];
+            uint x=p.x, y=p.y, z=p.z;
+            for(int dz=-1; dz<=1; dz+=2) for(int dy=-1; dy<=1; dy+=2) for(int dx=-1; dx<=1; dx+=2) { // Visits first neighbours
+                uint nx=x+dx, ny=y+dy, nz=z+dz;
+                uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
+                if(sourceData[index] && !(mark[index/8]&(1<<(index%8)))) {
+                    mark[index/8] |= (1<<(index%8)); // Marks previously unvisited skeleton voxel
+                    markCount++;
+                    stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
+                }
             }
         }
+        assert_(markCount); // Null volume
     }
-    for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
-        uint index = offsetX[x]+offsetY[y]+offsetZ[Z-1-marginZ];
-        if(mark[index/8]&(1<<(index%8))) stack[stackSize++] = short3(x,y,Z-1-marginZ); // Only seeds bottom face voxels connected to top face
+    for(uint z=Z-1-marginZ;; z--) { // until at least one seed is pushed
+        assert_(z>=marginZ, marginZ, Z); // Null volume
+        for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
+            uint index = offsetX[x]+offsetY[y]+offsetZ[z];
+            if(mark[index/8]&(1<<(index%8))) {
+                assert_(sourceData[index]);
+                stack[stackSize++] = short3(x,y,z); // Only seeds top face voxels connected to bottom face
+            }
+        }
+        if(stackSize) { if(stackSize<12) log(stackSize,"seeds for top face z="_,z, ref<short3>(stack, stackSize)); break; }
     }
 #endif
+    uint unused markCount = 0;
+    uint maximum = 0;
     while(stackSize) {
         assert_(stackSize<=stackBuffer.capacity);
         short3& p = stack[--stackSize];
@@ -49,9 +101,14 @@ void floodFill(Volume16& target, const Volume16& source) {
             uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
             if(sourceData[index] && !targetData[index]) {
                 targetData[index] = sourceData[index]; // Marks previously unvisited skeleton voxel
+                maximum = max<uint>(maximum, targetData[index]);
+                markCount++;
                 stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
             }
         }
     }
+    assert_(markCount); // Null volume
+    assert_(maximum);
+    target.maximum = maximum; // Source maximum might be unconnected
 }
 defineVolumePass(FloodFill, uint16, floodFill);

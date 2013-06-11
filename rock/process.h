@@ -13,6 +13,9 @@ inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
+    /// Returns all valid parameters
+    array<ref<byte>> parameters();
+
     /// Configures process using given arguments and definition (which can depends on the arguments)
     array<ref<byte>> configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
 
@@ -46,6 +49,7 @@ struct Process {
     Dict arguments; // User-specified arguments
     map<ref<byte>, array<Variant>> sweeps; // User-specified parameter sweeps
     array<Rule> rules; // Production rules
+    array<ref<byte>> resultNames; // Valid result names defined by process
     array<shared<Result>> results; // Generated intermediate (and target) data
     array<shared<Result>> targetResults; // Generated target data
 };

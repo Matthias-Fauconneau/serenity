@@ -2,6 +2,12 @@
 #include "data.h"
 #include "time.h"
 
+array<ref<byte> > Process::parameters() {
+    array<ref<byte>> parameters = copy(specialParameters); // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
+    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
+    return parameters;
+}
+
 array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
     array<ref<byte>> targets, specialArguments;
     // Parses definitions and arguments twice to solve cyclic dependencies
@@ -10,11 +16,9 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
     // 3) Process definition is parsed with conditionnals taken according to user arguments
     // 4) Arguments are parsed again using the customized process definition
     for(uint pass unused: range(2)) {
-        array<ref<byte>> parameters = copy(specialParameters); // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
+        rules.clear(); resultNames.clear();
+        array<ref<byte>> parameters = this->parameters();
         Dict defaultArguments; // Application specific default arguments (defined by process definition)
-        array<ref<byte>> resultNames; // Valid result names defined by process
-        rules.clear();
-        for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
 
         for(TextData s(definition); s;) {
             s.skip();
@@ -72,8 +76,9 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                         if(s.match('#')) { s.whileNot('\n'); continue; }
                         ref<byte> word = s.word("_-"_);
                         if(s.match('=')) rule.arguments.insert(word, s.whileNo(" \t\r\n"_));
-                        else if(resultNames.contains(word)) rule.inputs << word;
-                        else if(parameters.contains(word)) rule.arguments.insert(word);
+                        else if(resultNames.contains(word)) rule.inputs << word; // Result input
+                        else if(parameters.contains(word) && !arguments.contains(word)) rule.arguments.insert(word); // Empty argument
+                        else if(parameters.contains(word)) rule.inputs << word; // Argument input
                         else error("Unknown result or parameter for input", word);
                     }
                     for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
@@ -87,9 +92,10 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
         for(const ref<byte>& argument: allArguments) { // Parses explicit arguments
             TextData s (argument); ref<byte> key = s.word("-_"_);
             if(s.match('=')) { // Stores generic argument affecting operations
+                assert_(parameters.contains(key),"Invalid parameter", key);
                 ref<byte> value = s.untilEnd();
                 /*if(startsWith(value,"{"_) && endsWith(value,"}"_)) { // Replaced by shell
-                assert(!arguments.contains(key));
+                assert(!arguments.contains(key)); assert(!::find(value,".."_));
                 sweeps.insert(key, apply<Variant>(split(value,','), [](const ref<byte>& o){return o;}));
                 } else*/
                 if(sweeps.contains(key) || arguments.contains(key)) {
@@ -131,7 +137,7 @@ Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) 
         unique<Operation> operation = Interface<Operation>::instance(rule.operation);
         assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
         Dict local = copy(arguments); local << rule.arguments; // not inherited
-        for(ref<byte> key: rule.arguments.keys) assert_(split(operation->parameters()).contains(key));
+        for(ref<byte> key: rule.arguments.keys) assert_(split(operation->parameters()).contains(key), "Irrelevant argument", key, "for", rule);
         for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
             if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
             else relevant.insert(parameter, local.at(parameter));
@@ -268,19 +274,19 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         int64 outputSize = operation->outputSize(arguments, cast<Result*>(inputs), index);
         if(outputSize) { // Creates (or resizes) and maps an output result file
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
-                long minimum=currentTime()+1; string oldest;
+                long minimum=realTime(); string oldest;
                 for(string& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
-                    TextData s (path); s.until('}'); uint userCount=s.integer(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
+                    TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
                     long timestamp = File(path, baseStorageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
                 if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
                 if(section(oldest,'/')==name) {
-                    TextData s (section(oldest,'/',1,-1)); ref<byte> name = s.whileNot('{'); Dict arguments = parseDict(s);
-                    int i = indexOf(name,arguments);
-                    assert_(i>=0, name, arguments, results);
-                    shared<ResultFile> result = results.take(i);
-                    result->fileName.clear(); // Prevents rename
+                    TextData s (section(oldest,'/',1,-1)); ref<byte> name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
+                    for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
+                        ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename
+                        break;
+                    }
                 }
                 if(!existsFile(oldest, baseStorageFolder) || outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if not a file or need to recycle more than one file
                     if(existsFile(oldest, baseStorageFolder)) ::remove(oldest, baseStorageFolder);

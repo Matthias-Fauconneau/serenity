@@ -54,7 +54,9 @@ void bin(Volume& target, const Volume16& source) {
             }
         }
     } );
-    //uint64 maximum=0; for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) maximum = max(maximum, targetData[i].ballCount); log(maximum);
+#if DEBUG
+    uint64 maximum=0; for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) maximum = max(maximum, targetData[i].ballCount); log(maximum); assert(maximum);
+#endif
 }
 defineVolumePass(Bin, uint8[sizeof(Tile)/tileSide/tileSide/tileSide], bin);
 
@@ -132,5 +134,6 @@ void rasterize(Volume16& target, const Volume& source) {
     } );
     target.squared = true;
     assert_(target.maximum == source.maximum);
+    assert_(maximum(target) == target.maximum, maximum(target), target.maximum);
 }
 defineVolumePass(Rasterize, uint16, rasterize);

@@ -55,7 +55,7 @@ void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
 
 /// Denoises data by averaging samples in a window
 class(Smooth, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "smoothKernelSize"_; }
+    ref<byte> parameters() const override { return "smoothKernelSize shift"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
         int kernelSize = toInteger(args.at("smoothKernelSize"_)), sampleCount = 2*kernelSize+1, shift = args.value("shift"_,log2(sampleCount));
         target.margin.y += align(4, kernelSize);
