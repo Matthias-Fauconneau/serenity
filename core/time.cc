@@ -18,19 +18,19 @@ int daysInMonth(int month, int year=0) {
 
 void Date::invariant() const {
     //Date
-    if(year>=0) { assert(inRange(2012, year, 2099), year); }
-    if(month>=0) { assert(year>=0); assert(inRange(0, month, 12)); }
-    if(day>=0) { assert(month>=0); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
-    if(weekDay>=0) {
+    if(year!=-1) { assert(inRange(2012, year, 2099), year); }
+    if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12)); }
+    if(day!=-1) { assert(month!=-1); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
+    if(weekDay!=-1) {
         assert(inRange(0, weekDay, 7));
-        if(year>=0 && month>=0 && day>=0) {
+        if(year!=-1 && month!=-1 && day!=-1) {
             assert(weekDay==(Thursday+days())%7,weekDay,(Thursday+days())%7,str(*this));
         }
     }
     //Hour
-    if(hours>=0) { assert(inRange(0, hours, 24)); }
-    if(minutes>=0) { assert(inRange(0, minutes, 60)); assert(hours>=0); }
-    if(seconds>=0) { assert(inRange(0, seconds, 60)); assert(minutes>=0); }
+    if(hours!=-1) { assert(inRange(0, hours, 24)); }
+    if(minutes!=-1) { assert(inRange(0, minutes, 60)); assert(hours>=0); }
+    if(seconds!=-1) { assert(inRange(0, seconds, 60)); assert(minutes>=0, hours, minutes, seconds); }
 }
 int Date::days() const {
     assert(year>=0 && month>=0, year, month, day, hours, minutes, seconds);
@@ -44,46 +44,37 @@ Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),d
     invariant();
 }
 bool Date::summerTime() const { //FIXME: always European Summer Time
+    assert(year>=0);
     int lastMarchSunday = 31-1-(Date(31-1,March,year).weekDay+1)%7; // after 01:00 UTC on the last Sunday in March
     int lastOctoberSunday = 31-1-(Date(31-1,October,year).weekDay+1)%7; // until 01:00 UTC on the last Sunday in October
     return    (month>March    || (month==March    && (day>lastMarchSunday    || (day==lastMarchSunday    && hours>=1))))
             && (month<October || (month==October && (day<lastOctoberSunday || (day==lastOctoberSunday && hours<  1))));
 }
 int Date::localTimeOffset() const {
+    assert(year>=0);
     int offset = -8; //FIXME: hardcoded Central European Time (UTC+1) or Pacific Standard Time (UTC-8)
     if(summerTime()) offset += 1;
-    return offset*60;
+    return offset*60*60;
 }
 Date::Date(int64 time) {
-    // UTC time and date
-    seconds = time;
-    minutes=seconds/60; seconds %= 60;
-    hours=minutes/60; minutes %= 60;
-    int days=hours/24; hours %= 24;
-    weekDay = (Thursday+days)%7, month=0, year=1970;
-    for(;;) { int nofDays = leap(year)?366:365; if(days>=nofDays) days-=nofDays, year++; else break; }
-    for(;days>=daysInMonth(month,year);month++) days-=daysInMonth(month,year);
-    day=days;
-
-    // Local time and date
-    minutes+=localTimeOffset();
-    if(minutes>=60) {
-        hours += minutes/60; minutes %= 60;
-        if(hours>=24) {
-            hours-=24; weekDay=(weekDay+1)%7; day++;
-            if(day>=daysInMonth(month,year)) {
-                day=0, month++;
-                if(month>=12) month=0, year++;
-            }
-        }
+    int64 utc unused = time;
+    for(uint i unused: range(2)) { // First pass computes UTC date to determine DST, second pass computes local date
+        seconds = time;
+        minutes=seconds/60; seconds %= 60;
+        hours=minutes/60; minutes %= 60;
+        int days=hours/24; hours %= 24;
+        weekDay = (Thursday+days)%7, month=0, year=1970;
+        for(;;) { int nofDays = leap(year)?366:365; if(days>=nofDays) days-=nofDays, year++; else break; }
+        for(;days>=daysInMonth(month,year);month++) days-=daysInMonth(month,year);
+        day=days;
+        time += localTimeOffset(); // localTimeOffset is only defined once we computed the UTC date
     }
-
     invariant();
-    assert(long(*this)==time);
+    assert(long(*this)==utc);
 }
 Date::operator int64() const {
     invariant();
-    return ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0)-localTimeOffset())*60+(seconds>=0?seconds:0);
+    return ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0))*60+(seconds>=0?seconds:0)-localTimeOffset();
 }
 
 bool operator <(const Date& a, const Date& b) {

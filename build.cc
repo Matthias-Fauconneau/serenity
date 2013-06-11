@@ -43,11 +43,9 @@ struct Build {
     array<string> files;
     array<int> pids;
 
-    string find(const ref<byte>& file, const ref<byte>& suffix=""_) {
-        assert(file && !startsWith(file, "/"_), file);
-        for(ref<byte> subfolder: folder.list(Folders|Recursive)) if(existsFile(file+suffix,Folder(subfolder, folder))) return subfolder+"/"_+file;
-        return string();
-    }
+    array<string> sources = folder.list(Files|Recursive);
+    /// Returns the first path matching file
+    string find(const ref<byte>& file) { for(string& path: sources) if(endsWith(path, file)) return string(path.contains('.')?section(path,'.',0,-2):path); return string(); }
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
     long parseHeader(const ref<byte>& name) {
@@ -56,7 +54,7 @@ struct Build {
         for(TextData s = file.read(file.size()); s; s.advance(1)) {
             if(s.match("#include \""_)) {
                 ref<byte> name = s.until('.');
-                string header = find(name,".h"_);
+                string header = find(name+".h"_);
                 if(header) lastEdit = max(lastEdit, parseHeader(header));
             }
         }
@@ -77,9 +75,9 @@ struct Build {
                 if(s.match('"')) { // module header
                     ref<byte> name = s.until('.');
                     assert_(name);
-                    string header = find(name,".h"_);
+                    string header = find(name+".h"_);
                     if(header) lastCompileEdit = max(lastCompileEdit, parseHeader(header));
-                    string module = find(name,".cc"_);
+                    string module = find(name+".cc"_);
                     if(!module || module == parent) continue;
                     if(!modules.contains(module)) lastLinkEdit = max(lastLinkEdit, max(lastCompileEdit, processModule(module)));
                     parent.children << modules[modules.indexOf(module)].pointer;
@@ -89,7 +87,7 @@ struct Build {
             }
             if(s.match("FILE("_) || s.match("ICON("_)) {
                 ref<byte> file = s.word("_-"_);
-                assert(file && !files.contains(file), file);
+                assert_(file && !files.contains(file), file);
                 files << string(file);
                 s.skip(")"_);
             }
@@ -117,15 +115,16 @@ struct Build {
     Build() {
         Folder(tmp+build, root(), true);
         for(ref<byte> subfolder: folder.list(Folders|Recursive)) Folder(tmp+build+"/"_+subfolder, root(), true);
-        long lastEdit = processModule( find(target,".cc"_) );
+        long lastEdit = processModule( find(target+".cc"_) );
         if(compile) {
             bool fileChanged = false;
             if(files) {
                 Folder(tmp+"files"_, root(), true);
                 for(string& file: files) {
-                    file = find(replace(move(file),'_','/'));
-                    Folder subfolder = Folder(section(file,'/',0,-2), folder);
-                    ref<byte> name = section(file,'/',-2,-1);
+                    string path = find(replace(file,"_"_,"/"_));
+                    assert_(path, file);
+                    Folder subfolder = Folder(section(path,'/',0,-2), folder);
+                    ref<byte> name = section(path,'/',-2,-1);
                     string object = tmp+"files/"_+name+".o"_;
                     if(!existsFile(object) || File(name, subfolder).modifiedTime() >= File(object).modifiedTime()) {
                         if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();

@@ -35,12 +35,12 @@ struct Date {
     /// Constructs a calendar date (unspecified hour)
     Date(int monthDay, int month, int year, int weekDay=-1);
     /// Converts UNIX \a timestamp (in seconds) to a local time calendar date
-    Date(int64 timestamp);
+    Date(int64 time);
     /// Returns days from Thursday, 1st January 1970
     int days() const;
     /// Returns whether this date is in daylight saving time
     bool summerTime() const;
-    /// Returns the local time offset from UTC in minutes (time zone + DST)
+    /// Returns the local time offset from UTC in seconds (time zone + DST)
     int localTimeOffset() const;
     /// Converts the date to Unix time (in seconds)
     operator int64() const;

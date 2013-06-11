@@ -87,13 +87,24 @@ class(MaximumMeanGradient, Operation) {
             //gradientSum[voxel[X]] += gradient, histogram[voxel[X]]++; //[sic] Asymetric for backward compatibility
             //gradientSum[voxel[X*Y]] += gradient, histogram[voxel[X*Y]]++; //[sic] Asymetric for backward compatibility
         }
-        uint threshold=0; float maximum=__FLT_MAX__;
+        // Pick pore and rock space as the two highest density maximums (FIXME: is this backward compatible ?)
+        Sample density = parseUniformSample( inputs[1]->data );
+        uint pore=0, rock=0; float poreMaximum=0, rockMaximum=0;
+        for(uint i: range(1,density.size-1)) {
+            if(density[i-1]<density[i] && density[i]<density[i+1] && density[i]>poreMaximum) {
+                pore=i; poreMaximum = density[i];
+                if(poreMaximum > rockMaximum) swap(pore, rock), swap(poreMaximum, rockMaximum);
+            }
+        }
+        log(pore/ float(histogram.size), rock/ float(histogram.size));
+        assert(rock > pore); assert(rockMaximum>poreMaximum); assert(rock < histogram.size);
+        uint threshold=0; float maximum=0;
         Sample gradientMean (source.maximum+1);
-        for(uint density: range(histogram.size)) {
-            if(!histogram[density]) continue; // Not enough samples to properly estimate mean gradient for this density threshold
-            float mean = gradientSum[density]/histogram[density];
-            if(mean<maximum) maximum = mean, threshold = density; // Actually, it seems the minimum gradient mean is used ???!!!
-            gradientMean[density] = mean;
+        for(uint i: range(pore, rock)) {
+            if(!histogram[i]) continue; // Not enough samples to properly estimate mean gradient for this density threshold
+            float mean = gradientSum[i]/histogram[i];
+            if(mean>maximum) maximum = mean, threshold = i;
+            gradientMean[i] = mean;
         }
         float densityThreshold = float(threshold) / float(histogram.size);
         log("Maximum mean gradient estimates threshold at", densityThreshold, "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels");

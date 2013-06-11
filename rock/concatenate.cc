@@ -2,8 +2,9 @@
 #include "sample.h"
 #include "data.h"
 
-struct Script {
-    Script(const ref<ref<byte>>& arguments) {
+/// Concatenate sweep results into a single file //FIXME: integrate in process manager
+struct Concatenate {
+    Summary(const ref<ref<byte>>& arguments) {
         Folder folder = arguments[0];
         Sample volume;
         for(const ref<byte>& file: folder.list(Files)) {

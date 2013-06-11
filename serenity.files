@@ -1,6 +1,7 @@
 TODO
 build.cc
 build.sh
+test.cc
 
 core/array.h
 core/core.h
@@ -69,7 +70,7 @@ rock/rock
 rock/rock.cc
 rock/sample.cc
 rock/sample.h
-rock/script.cc
+rock/concatenate.cc
 rock/skeleton.cc
 rock/smooth.cc
 rock/source.cc
