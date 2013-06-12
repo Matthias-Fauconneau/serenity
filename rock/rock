@@ -3,7 +3,8 @@
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Default arguments
-if !downsample: smoothKernelSize = '1'
+if !downsample: denoise = 'median'
+averageWindow = '1'
 threshold = 'otsu'
 if !cube: cylinder = '' #Clips histograms and slice rendering to the inscribed cylinder
 if !scale: scale=downsample
@@ -17,15 +18,16 @@ if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Ot
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-source # Use this method for backward compatibility only (FIXME)
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-source # Explicit model
 
+if downsample: clean = Downsample source
 shift = ShiftRight source
-smoothx = Smooth shift
-smoothxy = Smooth smoothx
-if !downsample: smooth = Smooth smoothxy shift=0
-if downsample: smooth = Downsample source
+averagex = Average shift
+averagexy = Average averagex
+if denoise == 'average': clean = Average averagexy shift=0
+if denoise == 'median': clean = Median source
 
-pore rock = Binary smooth threshold
+pore rock = Binary clean threshold
 if !downsample: colorize = Colorize pore source
-if downsample: colorize = Colorize pore smooth
+if downsample: colorize = Colorize pore clean
 
 # Computes squared distance to / position of nearest background voxel
 distancex positionxx = DistanceX pore
@@ -97,7 +99,7 @@ distribution-radius-connected-scaled = ScaleVariable distribution-radius-connect
 
  # Exports to PNG
  png-source = ToPNG source
- png-smooth = ToPNG smooth
+ png-clean = ToPNG clean
  png-colorize = ToPNG colorize
  png-distance = ToPNG distance
  png-skeleton = ToPNG skeleton

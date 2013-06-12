@@ -13,9 +13,9 @@ void shiftRight(Volume16& target, const Volume16& source, uint shift) {
 
 /// Shifts data before summing to avoid overflow
 class(ShiftRight, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "smoothKernelSize"_; }
+    ref<byte> parameters() const override { return "averageWindow"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        int kernelSize = toInteger(args.at("smoothKernelSize"_)), sampleCount = 2*kernelSize+1, shift = log2(sampleCount);
+        int averageWindow = toInteger(args.at("averageWindow"_)), sampleCount = 2*averageWindow+1, shift = log2(sampleCount);
         int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
         int bits = log2(nextPowerOfTwo(max));
         int headroomShift = ::max(0,bits-16);
@@ -25,7 +25,7 @@ class(ShiftRight, Operation), virtual VolumePass<uint16> {
 };
 
 /// Computes one pass of running average
-void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
+void average(Volume16& target, const Volume16& source, uint size, uint shift) {
     const uint16* const sourceData = source;
     uint16* const targetData = target;
     const uint sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
@@ -54,13 +54,13 @@ void smooth(Volume16& target, const Volume16& source, uint size, uint shift) {
 }
 
 /// Denoises data by averaging samples in a window
-class(Smooth, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "smoothKernelSize shift"_; }
+class(Average, Operation), virtual VolumePass<uint16> {
+    ref<byte> parameters() const override { return "averageWindow shift"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        int kernelSize = toInteger(args.at("smoothKernelSize"_)), sampleCount = 2*kernelSize+1, shift = args.value("shift"_,log2(sampleCount));
-        target.margin.y += align(4, kernelSize);
+        int averageWindow = toInteger(args.at("averageWindow"_)), sampleCount = 2*averageWindow+1, shift = args.value("shift"_,log2(sampleCount));
+        target.margin.y += align(4, averageWindow);
         target.maximum *= sampleCount; target.maximum >>= shift;
         target.sampleCount=rotate(target.sampleCount); target.margin=rotate(target.margin);
-        smooth(target, source, kernelSize, shift);
+        average(target, source, averageWindow, shift);
     }
 };

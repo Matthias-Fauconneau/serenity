@@ -11,7 +11,8 @@
 
 //#include "source.h"
 //#include "capsule.h"
-//#include "smooth.h"
+//#include "average.h"
+//#include "median.h"
 //#include "histogram.h"
 //#include "threshold.h"
 //#include "distance.h"

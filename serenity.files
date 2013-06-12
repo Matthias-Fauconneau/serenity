@@ -71,7 +71,7 @@ rock/rock.cc
 rock/sample.cc
 rock/sample.h
 rock/skeleton.cc
-rock/smooth.cc
+rock/average.cc
 rock/source.cc
 rock/threshold.cc
 rock/volume.cc
@@ -79,3 +79,4 @@ rock/volume.h
 rock/volume-operation.h
 rock/volume-operation.cc
 rock/kernel-density-estimation.cc
+rock/median.cc
