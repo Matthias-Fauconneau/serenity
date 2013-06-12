@@ -3,9 +3,10 @@
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Default arguments
-smoothKernelSize = '1'
+if !downsample: smoothKernelSize = '1'
 threshold = 'otsu'
 if !cube: cylinder = '' #Clips histograms and slice rendering to the inscribed cylinder
+if !scale: scale=downsample
 
 if !validation: source = Source
 if validation: source = Capsules
@@ -63,7 +64,10 @@ porosity-unconnected = Div volume-unconnected volume-total
 porosity-connected = Div volume-connected volume-total
 
 # Volume( minimalSqDiameter) sweep
-volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter={3..9}
+#volume-connected-minimalDiameter = volume-connected minimalDiameter={3..14} #TODO: until zero (~17 without downsampling?)
+volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter={3..26} #TODO: until zero (~50 without downsampling?)
+volume-connected-minimalDiameter = SquareRootVariable volume-connected-minimalSqDiameter
+porosity-connected-minimalDiameter = Div volume-connected-minimalDiameter volume-total
 
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected

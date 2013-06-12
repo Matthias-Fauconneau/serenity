@@ -33,14 +33,14 @@ void floodFill(Volume16& target, const Volume16& source) {
     interleavedLookup(target);
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
 
-    buffer<short3> stackBuffer(1<<25); // 32MiB
+    buffer<short3> stackBuffer(1<<27); // 1024³~128MiB
     short3* const stack = stackBuffer.begin();
     int stackSize=0;
-    if(1) {
+    if(0) { // Seeds from maximum
         uint index=0, maximum=0; for(uint i: range(source.size())) if(sourceData[i]>maximum && source.contains(zOrder(i))) index=i, maximum=sourceData[i];
         assert(maximum, index, zOrder(index), maximum);
         stack[stackSize++] = short3(zOrder(index)); // Pushes initial seed (from maximum)
-    } else {
+    } else { // Seeds from top/bottom Z faces
         buffer<byte> markBuffer(target.size()/8, target.size()/8, 0); // 1024³~128MiB
         byte* const mark = markBuffer.begin();
         uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
@@ -100,5 +100,5 @@ void floodFill(Volume16& target, const Volume16& source) {
     target.maximum = maximum; // Source maximum might be unconnected (with Z face method)
 }
 class(FloodFill, Operation), virtual VolumePass<uint16> {
-    void execute(const Dict& args, VolumeT<uint16>& target, const Volume& source) override { log("minimalSqDiameter",args.at("minimalSqDiameter"_)); floodFill(target, source); }
+    void execute(const Dict&, VolumeT<uint16>& target, const Volume& source) override { floodFill(target, source); }
 };

@@ -80,7 +80,8 @@ class(ScaleVariable, Operation), virtual Pass {
 /// Divides two scalars
 class(Div, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        outputs[0]->metadata = string("scalar"_);
-        outputs[0]->data = str(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal())+"\n"_;
+        outputs[0]->metadata = copy(inputs[0]->metadata);
+        if(inputs[0]->metadata=="scalar"_) outputs[0]->data = ftoa(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal(), 4)+"\n"_;
+        else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseNonUniformSample(inputs[0]->data) );
     }
 };
