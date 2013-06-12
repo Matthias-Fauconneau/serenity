@@ -2,6 +2,21 @@
 #include "thread.h"
 #include "time.h"
 
+/// Tiles a volume recursively into bricks (using 3D Z ordering)
+void zOrder(Volume16& target, const Volume16& source) {
+    assert_(!source.tiled());
+    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const uint16* const sourceData = source;
+    uint16* const targetData = target;
+    interleavedLookup(target);
+    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
+        assert(offsetZ[z]+offsetY[y]+offsetX[x] < target.size());
+        targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
+    }
+}
+defineVolumePass(ZOrder, uint16, zOrder);
+
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles = 16GiB (virtual))
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
 struct Ball { uint16 x,y,z,sqRadius; };
@@ -22,8 +37,8 @@ void bin(Volume& target, const Volume16& source) {
     const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
     int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    assert(source.tiled());
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    assert(offsetX && offsetY && offsetZ);
 
     Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());
     assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile));
@@ -121,7 +136,7 @@ void rasterize(Volume16& target, const Volume& source) {
             }
 #endif
         }
-        // Writes out fully interleaved target for compatibility (visualization methods currently only accepts untiled or fully tiled (Z-order) buffers)
+        // Writes out fully interleaved target for compatibility (metadata tiled flags currently only define untiled or fully tiled (Z-order) volumes)
         uint16* const target = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
         for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
             int blockX = dx*blockSide, blockY = dy*blockSide, blockZ = dz*blockSide;
@@ -134,6 +149,5 @@ void rasterize(Volume16& target, const Volume& source) {
     } );
     target.squared = true;
     assert_(target.maximum == source.maximum);
-    assert_(maximum(target) == target.maximum, maximum(target), target.maximum);
 }
 defineVolumePass(Rasterize, uint16, rasterize);

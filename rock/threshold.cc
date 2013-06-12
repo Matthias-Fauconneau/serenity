@@ -173,28 +173,16 @@ class(Binary, Operation), virtual VolumeOperation {
 
 /// Maps intensity to either red or green channel depending on binary classification
 void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
-    assert_(!binary.offsetX && !binary.offsetY && !binary.offsetZ);
-    assert_(!intensity.offsetX && !intensity.offsetY && !intensity.offsetZ);
-    assert_(binary.sampleCount == intensity.sampleCount);
+    assert_(!binary.tiled() && !intensity.tiled() && binary.sampleCount == intensity.sampleCount);
     int X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z, XY = X*Y;
+    const uint maximum = intensity.maximum;
     const uint32* const binaryData = binary;
     const uint16* const intensityData = intensity;
-    const uint maximum = intensity.maximum;
     bgr* const targetData = target;
-    parallel(Z, [&](uint, uint z) {
-        const uint32* const binaryZ = binaryData+z*XY;
-        const uint16* const intensityZ = intensityData+z*XY;
-        bgr* const targetZ = targetData+z*XY;
-        for(int y=0; y<Y; y++) {
-            const uint32* const binaryZY = binaryZ+y*X;
-            const uint16* const intensityZY = intensityZ+y*X;
-            bgr* const targetZY = targetZ+y*X;
-            for(int x=0; x<X; x++) {
-                uint8 c = 0xFF*intensityZY[x]/maximum;
-                targetZY[x] = binaryZY[x]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
-            }
-        }
-    });
+    for(uint i : range(binary.size())) {
+        uint8 c = 0xFF*intensityData[i]/maximum;
+        targetData[i] = binaryData[i]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
+    }
     target.maximum=0xFF;
 }
 

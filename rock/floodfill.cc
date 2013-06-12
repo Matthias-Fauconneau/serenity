@@ -2,15 +2,12 @@
 
 /// Explicitly clips volume to cylinder by zeroing exterior samples
 void cylinderClip(Volume& target, const Volume& source) {
-    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     uint radiusSq = (X/2-marginX)*(Y/2-marginY);
-    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    bool interleaved = offsetX || offsetY || offsetZ;
-    if(interleaved) { assert(offsetX && offsetY && offsetZ); interleavedLookup(target); }
     uint16* const targetData = (uint16*)target.data.data;
     for(int z=0; z<Z; z++) for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
-        uint index = interleaved ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+        uint index = source.index(x,y,z);
         uint value = 0;
         if(uint(sq(x-X/2)+sq(y-Y/2)) <= radiusSq && z >= marginZ && z<Z-marginZ) {
             if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
@@ -25,13 +22,12 @@ void cylinderClip(Volume& target, const Volume& source) {
 class(CylinderClip, Operation), virtual VolumePass<uint16> { void execute(const Dict&, VolumeT<uint16>& target, const Volume& source) override { cylinderClip(target, source); } };
 
 void floodFill(Volume16& target, const Volume16& source) {
-    assert_(source.offsetX && source.offsetY && source.offsetZ);
+    assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;
 
     uint16* const targetData = target;
     clear(targetData, target.size());
-    interleavedLookup(target);
-    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
 
     buffer<short3> stackBuffer(1<<27); // 1024³~128MiB
     short3* const stack = stackBuffer.begin();

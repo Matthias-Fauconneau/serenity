@@ -77,6 +77,5 @@ rock/threshold.cc
 rock/volume.cc
 rock/volume.h
 rock/volume-operation.h
-rock/volume-operation.cc
 rock/kernel-density-estimation.cc
 rock/median.cc

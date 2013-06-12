@@ -12,11 +12,11 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     const uint8* const densityData = density;
     const uint8* const intensityData = intensity;
+    assert_(empty.tiled());
     const uint8* const emptyData = empty;
     const uint* const offsetX = empty.offsetX + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint* const offsetY = empty.offsetY + stride/2;
     const uint* const offsetZ = empty.offsetZ + stride/2;
-    assert_(offsetX && offsetY && offsetZ);
 
     // Image
     int imageX = target.width, imageY = target.height; // Target image size

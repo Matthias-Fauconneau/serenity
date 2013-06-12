@@ -35,7 +35,7 @@ distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
 
 skeleton = Skeleton positionx positiony positionz
-unconnected-skeleton = Tile skeleton
+unconnected-skeleton = ZOrder skeleton
 
 if cylinder: clip-unconnected-skeleton = CylinderClip unconnected-skeleton # Clips to cylinder
 if !cylinder: clip-unconnected-skeleton = unconnected-skeleton # Or forwards unclipped skeleton
@@ -88,6 +88,10 @@ distribution-radius-connected-scaled = ScaleVariable distribution-radius-connect
  # Square roots squared distance
  sqrt-unconnected = SquareRoot clip-unconnected
  sqrt-connected = SquareRoot connected
+
+ # Scale volume values
+ sqrt-unconnected-scaled = ScaleValues sqrt-unconnected
+ sqrt-connected-scaled = ScaleValues sqrt-connected
 
  # Exports to CDL
  cdl-unconnected = ToCDL sqrt-unconnected

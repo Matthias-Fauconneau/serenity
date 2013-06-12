@@ -4,6 +4,26 @@
 #include "png.h"
 #include "utf8.h"
 
+/// Square roots all values
+void squareRoot(VolumeFloat& target, const Volume16& source) {
+    assert_(source.squared);
+    target.maximum = ceil(sqrt((float)source.maximum)), target.squared=false;
+    const uint16* const sourceData = source; float* const targetData = target;
+    for(uint index: range(source.size())) targetData[index] = sqrt((float)sourceData[index]);
+}
+defineVolumePass(SquareRoot, float, squareRoot);
+
+/// Scales all values
+void scaleValues(VolumeFloat& target, const VolumeFloat& source, const float scale) {
+    assert_(source.squared);
+    target.maximum = ceil(scale*source.maximum), target.squared=false;
+    const float* const sourceData = source; float* const targetData = target;
+    for(uint index: range(source.size())) targetData[index] = scale*sourceData[index];
+}
+class(ScaleValues, Operation), virtual VolumePass<float> {
+    void execute(const Dict& args, VolumeT<float>& target, const Volume& source) override { scaleValues(target, source, args.at("scale"_)); }
+};
+
 /// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeOperation {
     ref<byte> parameters() const { return "cylinder"_; }
@@ -40,7 +60,7 @@ buffer<byte> toASCII(const Volume& source) {
     for(uint z=marginZ; z<Z-marginZ; z++) {
         for(uint y=marginY; y<Y-marginY; y++) {
             for(uint x=marginX; x<X-marginX; x++) {
-                uint index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+                uint index = source.tiled() ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
                 uint value = 0;
                 if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
                 else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
@@ -73,7 +93,7 @@ string toCDL(const Volume& source) {
     for(uint z=marginZ; z<Z-marginZ; z++) {
         for(uint y=marginY; y<Y-marginY; y++) {
             for(uint x=marginX; x<X-marginX; x++) {
-                uint index = offsetX ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
+                uint index = source.tiled() ? offsetX[x] + offsetY[y] + offsetZ[z] : z*XY + y*X + x;
                 uint value = 0;
                 if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
                 else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];

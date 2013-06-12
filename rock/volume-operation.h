@@ -48,6 +48,7 @@ struct VolumeOperation : virtual Operation {
                     const Volume& source = inputVolumes.first();
                     volume.sampleCount=source.sampleCount; volume.copyMetadata(source);
                     assert(volume.sampleSize * volume.size() == volume.data.size, volume.sampleSize, volume.size(), volume.data.size, index, outputs);
+                    if(source.tiled()) interleavedLookup(volume);
                 }
                 outputVolumes << move( volume );
             } else {
@@ -59,8 +60,8 @@ struct VolumeOperation : virtual Operation {
             uint sampleSize = this->outputSampleSize(index);
             if(sampleSize) {
                 Volume& output = outputVolumes[outputVolumesIndex++];
-                if(output.sampleSize==2) assert(maximum((const Volume16&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);
-                if(output.sampleSize==4) assert(maximum((const Volume32&)output)<=output.maximum, outputs[index]->name, output, maximum((const Volume32&)output), output.maximum);
+                if(output.sampleSize==2) assert(maximum((const Volume16&)output)==output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);
+                if(output.sampleSize==4) assert(maximum((const Volume32&)output)==output.maximum, outputs[index]->name, output, maximum((const Volume32&)output), output.maximum);
                 outputs[index]->metadata = volumeFormat(output);
                 outputs[index]->data.size = output.data.size;
             }

@@ -9,33 +9,13 @@ Sample histogram(const Volume16& source, bool cylinder) {
     assert_(X==Y && marginX==marginY, source.sampleCount, source.margin);
     uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     Sample histogram (source.maximum+1, source.maximum+1, 0);
-    if(source.offsetX || source.offsetY || source.offsetZ) {
-        const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-        for(int z=marginZ; z<Z-marginZ; z++) {
-            const uint16* sourceZ = source+offsetZ[z];
-            for(int y=marginY; y<Y-marginY; y++) {
-                const uint16* sourceZY = sourceZ+offsetY[y];
-                for(int x=marginX; x<X-marginX; x++) {
-                    if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq) {
-                        uint sample = sourceZY[offsetX[x]];
-                        assert_(sample <= source.maximum);
-                        histogram[sample]++;
-                    }
-                }
-            }
-        }
-    }
-    else {
-        for(int z=marginZ; z<Z-marginZ; z++) {
-            const uint16* sourceZ = source+z*XY;
-            for(int y=marginY; y<Y-marginY; y++) {
-                const uint16* sourceZY = sourceZ+y*X;
-                for(int x=marginX; x<X-marginX; x++) {
-                    if(uint((x-X/2)*(x-X/2)+(y-Y/2)*(y-Y/2)) <= radiusSq) {
-                        uint sample = sourceZY[x];
-                        assert_(sample <= source.maximum);
-                        histogram[sample]++;
-                    }
+    for(int z=marginZ; z<Z-marginZ; z++) {
+        for(int y=marginY; y<Y-marginY; y++) {
+            for(int x=marginX; x<X-marginX; x++) {
+                if(uint(sq(x-X/2)+sq(y-Y/2)) <= radiusSq) {
+                    uint sample = source(x,y,z);
+                    assert_(sample <= source.maximum);
+                    histogram[sample]++;
                 }
             }
         }

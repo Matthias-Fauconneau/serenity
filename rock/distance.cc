@@ -208,6 +208,16 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
     positionZ.squared=false, positionZ.maximum=sX-1;
 }
 
+/// Converts a 32bit volume to 16bit
+void pack(Volume16& target, const Volume32& source) {
+    const uint32* const sourceData = source;
+    target.data.size = source.data.size / 2;
+    uint16* const targetData = target;
+    uint64 size = source.size();
+    for(uint i=0; i<size; i+=8) storea(targetData+i, packus(loada(sourceData+i),loada(sourceData+i+4)));
+    target.maximum=source.maximum;
+}
+
 /// Computes distance field to nearest background (X pass)
 class(DistanceX, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2}; return sizes[index]; }

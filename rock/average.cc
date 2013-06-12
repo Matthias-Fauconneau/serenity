@@ -2,6 +2,45 @@
 #include "thread.h"
 #include "simd.h"
 
+/// Downsamples a volume by averaging 2x2x2 samples
+void downsample(Volume16& target, const Volume16& source) {
+    assert(!source.tiled());
+    int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;
+    assert(X%2==0 && Y%2==0 && Z%2==0);
+    target.sampleCount = source.sampleCount/2;
+    target.data.size /= 8;
+    assert(source.margin.x%2==0 && source.margin.y%2==0 && source.margin.z%2==0);
+    target.margin = source.margin/2;
+    target.maximum=source.maximum;
+    const uint16* const sourceData = source;
+    uint16* const targetData = target;
+    for(int z=0; z<Z/2; z++) {
+        const uint16* const sourceZ = sourceData+z*2*XY;
+        uint16* const targetZ = targetData+z*XY/2/2;
+        for(int y=0; y<Y/2; y++) {
+            const uint16* const sourceZY = sourceZ+y*2*X;
+            uint16* const targetZY = targetZ+y*X/2;
+            for(int x=0; x<X/2; x++) {
+                const uint16* const sourceZYX = sourceZY+x*2;
+                targetZY[x] =
+                        (
+                            ( sourceZYX[0*XY+0*X+0] + sourceZYX[0*XY+0*X+1] +
+                        sourceZYX[0*XY+1*X+0] + sourceZYX[0*XY+1*X+1]  )
+                        +
+                        ( sourceZYX[1*XY+0*X+0] + sourceZYX[1*XY+0*X+1] +
+                        sourceZYX[1*XY+1*X+0] + sourceZYX[1*XY+1*X+1]  ) ) / 8;
+            }
+        }
+    }
+}
+class(Downsample, Operation), virtual VolumePass<uint16> {
+    ref<byte> parameters() const override { return "downsample"_; }
+    void execute(const Dict& args, VolumeT<uint16>& target, const Volume& source) override {
+        downsample(target, source);
+        for(uint times unused: range(((int)args.at("downsample"_)?:1)-1)) downsample(target, target);
+    }
+};
+
 /// Shifts all values to the right
 void shiftRight(Volume16& target, const Volume16& source, uint shift) {
     const uint16* const src = source;

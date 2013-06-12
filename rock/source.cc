@@ -64,13 +64,12 @@ class(Source, Operation), virtual VolumeOperation {
             uint16* const targetSlice = targetData + (uint64)(marginZ+z)*X*Y + marginY*X + marginX;
             Map file(slices[minZ+z],folder);
             if(isTiff(file)) Tiff16(file).read(targetSlice, minX, minY, size.x, size.y, X); // Directly decodes slice images into the volume
-            else { // Use generic image decoder (FIXME: Unnecessary roundtrip to RGBA)
+            else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
                 Image image = decodeImage(file);
                 assert_(int2(minX,minY)+image.size()>=size.xy(), slices[minZ+z]);
                 for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(minX+x, minY+y).a;
             }
         }
-        //target.maximum = (1<<(target.sampleSize*8))-1; assert(maximum(target) == target.maximum, maximum(target));
         target.maximum = maximum(target); // Some sources don't use the full range
     }
 };
