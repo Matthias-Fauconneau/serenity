@@ -80,7 +80,7 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                                 int begin = s.integer(); s.skip(".."_); int end = s.integer(); assert(!s);
                                 assert(begin >= 0 && end > begin);
                                 array<Variant> sequence;
-                                for(uint i: range(begin, end)) sequence << i;
+                                for(uint i: range(begin, end+1)) sequence << i;
                                 rule.sweeps.insert(key, sequence);
                             } else rule.sweeps.insert(key, apply<Variant>(split(sweep,','), [](const ref<byte>& o){return o;}));
                         } else {
@@ -207,8 +207,9 @@ void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& defi
     execute(configure(allArguments, definition), sweeps, arguments);
 }
 
-void PersistentProcess::parseSpecialArguments(const ref<ref<byte> >& arguments) {
-    if(!name) name = string(arguments.first()); // Use first special argument as storage folder name (if not already defined by derived class)
+void PersistentProcess::parseSpecialArguments(const ref<ref<byte> >& args) {
+    if(!name) name = string(args.first()); // Use first special argument as storage folder name (if not already defined by derived class)
+    if(arguments.contains("baseStorageFolder"_)) baseStorageFolder = Folder(arguments.at("baseStorageFolder"_),currentWorkingDirectory());
     storageFolder = Folder(name, baseStorageFolder, true);
 
     // Maps intermediate results from file system
@@ -341,7 +342,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
            outputs.first()->metadata = string("sweep.tsv"_);
            outputs.first()->data = move(data);
     }
-    log(rule, relevantArguments, time);
+    if((uint64)time>100) log(rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

@@ -37,12 +37,17 @@ unconnected-skeleton = Tile skeleton
 if cylinder: clip-unconnected-skeleton = CylinderClip unconnected-skeleton # Clips to cylinder
 if !cylinder: clip-unconnected-skeleton = unconnected-skeleton # Or forwards unclipped skeleton
 
+# Floodfill skeleton (much faster but needs to be fixed)
 connected-skeleton = FloodFill clip-unconnected-skeleton
-
 bin-unconnected = Bin unconnected-skeleton
 bin-connected = Bin connected-skeleton
-unconnected = Rasterize bin-unconnected
-connected = Rasterize bin-connected
+if floodfillSkeleton: unconnected = Rasterize bin-unconnected
+if floodfillSkeleton: connected = Rasterize bin-connected
+
+# Floodfill rasterized pores (much slower but works)
+bin = Bin unconnected-skeleton
+if !floodfillSkeleton: unconnected = Rasterize bin
+if !floodfillSkeleton: connected = FloodFill unconnected
 
 # Computes histogram of maximum squared radii
 histogram-squaredRadius-unconnected = Histogram unconnected

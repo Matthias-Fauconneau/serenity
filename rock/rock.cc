@@ -109,12 +109,11 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 assert(target->data.size);
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
                 else if(endsWith(target->metadata,".tsv"_)) log(target->name, ":\n"_+target->data);
-                else if(inRange(1u,toVolume(target).sampleSize,4u)) current = share( target ); // Displays last displayable volume
+                else if(inRange(1u,toVolume(target).sampleSize,4u)) current = share(target); // Displays last displayable volume
             }
         }
         if(current) {
             window = unique<Window>(this,int2(-1,-1),"Rock"_);
-            window->localShortcut(Key('r')).connect(this, &Rock::refresh);
             window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
             window->localShortcut(Escape).connect([]{exit();});
             window->clearBackground = false;
@@ -137,18 +136,13 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         PersistentProcess::parseSpecialArguments(specialArguments);
     }
 
-    void refresh() {
-        current->timestamp = 0;
-        current = getResult(current->name, arguments);
-        updateView();
-    }
-
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
         if(button==WheelDown||button==WheelUp) {
-            map<ref<byte>, const shared<Result>*> volumes;
-            for(const shared<Result>& target: targetResults) if(target->data.size) volumes.insert(target->name, &target);
-            int index = clip<int>(0,volumes.keys.indexOf(current->name)+(button==WheelUp?1:-1),volumes.size()-1);
-            current = share(*volumes.values[index]);
+            int volumeCount=0, volumeIndex=0;
+            for(const shared<Result>& target: targetResults) if(toVolume(target)) { if(target==current) volumeIndex=volumeCount; volumeCount++; }
+            int newVolumeIndex = clip<int>(0,volumeIndex+(button==WheelUp?1:-1),volumeCount-1);
+            if(newVolumeIndex == volumeIndex) return true;
+            volumeCount = 0; for(const shared<Result>& target: targetResults) if(toVolume(target)) { if(newVolumeIndex==volumeCount) current=share(target); volumeCount++; }
             updateView();
             return true;
         }
@@ -169,14 +163,13 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     }
 
     void updateView() {
-        window->setTitle(current->name+"*"_);
         assert(current);
         Volume volume = toVolume(current);
         int2 size = volume.sampleCount.xy();
         while(2*size<displaySize) size *= 2;
         if(window->size != size) window->setSize(size);
         else window->render();
-        window->setTitle(current->name);
+        window->setTitle(str(current));
     }
 
     void render(int2 position, int2 size) {
