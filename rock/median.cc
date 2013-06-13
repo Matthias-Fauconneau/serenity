@@ -13,7 +13,7 @@ void median(Volume16& target, const Volume16& source) {
     uint maximum[8] = {};
     Time time; Time report;
     parallel(marginZ, Z-marginZ, [&](uint id, uint z) {
-        if(id==0 && report/1000>=8) log(z,"/", Z-2*marginZ, (z*X*Y/1024./1024.)/(time/1000.), "MS/s"), report.reset();
+        if(id==0 && report/1000>=8) log_("\t"_+str(z,"/", Z-2*marginZ, (z*X*Y/1024./1024.)/(time/1000.), "MS/s")), report.reset();
         for(uint y: range(marginY, Y-marginY)) {
             uint8 histogram4[1<<4] = {};
             uint8 histogram8[1<<8] = {};

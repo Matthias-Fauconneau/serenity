@@ -9,10 +9,6 @@ struct Rule {
     array<ref<byte>> outputs;
     struct Expression : Variant { enum EType { Literal, Value } type=Value; Expression(Variant&& value=Variant(), EType type=Literal):Variant(move(value)),type(type){} };
     map<string, Expression> argumentExps;
-    /// Returns relevant rule parameters (from operation and argument expressions)
-    array<ref<byte> > parameters() const;
-    /// Evaluates local rule arguments (using scope for value arguments)
-    Dict arguments(const Dict& scopeArguments=Dict(), const ref<byte>& scope=""_) const;
     map<ref<byte>, array<Variant>> sweeps; // Process-specified parameter sweeps
 };
 template<> inline string str(const Rule::Expression& e) { return str<Variant>(e); }
@@ -32,8 +28,8 @@ struct Process {
     /// Returns the Rule to evaluate in order to produce \a target
     Rule& ruleForOutput(const ref<byte>& target);
 
-    /// Returns recursively relevant arguments for a rule
-    Dict relevantArguments(const ref<byte>& target, const Dict& arguments, const ref<byte>& scope=""_);
+    /// Recursively evaluates relevant arguments for a rule
+    Dict evaluateArguments(const ref<byte>& target, const Dict& arguments, bool local=false,  const ref<byte>& scope=""_);
 
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
     int indexOf(const ref<byte>& target, const Dict& arguments);
