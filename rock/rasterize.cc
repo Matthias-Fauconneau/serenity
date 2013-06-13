@@ -73,7 +73,10 @@ void bin(Volume& target, const Volume16& source) {
     uint64 maximum=0; for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) maximum = max(maximum, targetData[i].ballCount); log(maximum); assert(maximum);
 #endif
 }
-defineVolumePass(Bin, uint8[sizeof(Tile)/tileSide/tileSide/tileSide], bin);
+class(Bin, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(Tile)/tileSide/tileSide/tileSide; }
+    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { bin(outputs[0], inputs[0]); }
+};
 
 /// Rasterizes each skeleton voxel as a ball (with maximum blending)
 void rasterize(Volume16& target, const Volume& source) {

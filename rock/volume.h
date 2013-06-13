@@ -25,7 +25,7 @@ struct Volume {
 
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
     uint index(uint x, uint y, uint z) const {
-        assert(x<sampleCount.x && y<sampleCount.y && y<sampleCount.y);
+        assert(x<uint(sampleCount.x) && y<uint(sampleCount.y) && y<uint(sampleCount.y));
         return tiled()?offsetX[x]+offsetY[y]+offsetZ[z]:z*sampleCount.x*sampleCount.y+y*sampleCount.x+x;
     }
 
@@ -44,7 +44,7 @@ struct Volume {
 template<Type T> struct VolumeT : Volume {
     operator const T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (const T*)data.data; }
     operator T*() { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
-    const T& operator()(uint x, uint y, uint z) const { return data[index(x,y,z)]; }
+    T operator()(uint x, uint y, uint z) const { return data[index(x,y,z)]; }
     T& operator()(uint x, uint y, uint z) { return data[index(x,y,z)]; }
 };
 

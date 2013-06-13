@@ -174,7 +174,6 @@ class(Binary, Operation), virtual VolumeOperation {
 /// Maps intensity to either red or green channel depending on binary classification
 void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
     assert_(!binary.tiled() && !intensity.tiled() && binary.sampleCount == intensity.sampleCount);
-    int X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z, XY = X*Y;
     const uint maximum = intensity.maximum;
     const uint32* const binaryData = binary;
     const uint16* const intensityData = intensity;

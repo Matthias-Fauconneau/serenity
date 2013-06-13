@@ -52,9 +52,8 @@ void shiftRight(Volume16& target, const Volume16& source, uint shift) {
 
 /// Shifts data before summing to avoid overflow
 class(ShiftRight, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "averageWindow"_; }
-    void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        int averageWindow = toInteger(args.at("averageWindow"_)), sampleCount = 2*averageWindow+1, shift = log2(sampleCount);
+    void execute(const Dict&, Volume16& target, const Volume& source) override {
+        const int averageWindow = 1, sampleCount = 2*averageWindow+1, shift = log2(sampleCount);
         int max = ((((target.maximum*sampleCount)>>shift)*sampleCount)>>shift)*sampleCount;
         int bits = log2(nextPowerOfTwo(max));
         int headroomShift = ::max(0,bits-16);
@@ -94,9 +93,9 @@ void average(Volume16& target, const Volume16& source, uint size, uint shift) {
 
 /// Denoises data by averaging samples in a window
 class(Average, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "averageWindow shift"_; }
+    ref<byte> parameters() const override { return "shift"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        int averageWindow = toInteger(args.at("averageWindow"_)), sampleCount = 2*averageWindow+1, shift = args.value("shift"_,log2(sampleCount));
+        const int averageWindow = 1, sampleCount = 2*averageWindow+1, shift = args.value("shift"_,log2(sampleCount));
         target.margin.y += align(4, averageWindow);
         target.maximum *= sampleCount; target.maximum >>= shift;
         target.sampleCount=rotate(target.sampleCount); target.margin=rotate(target.margin);

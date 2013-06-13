@@ -4,26 +4,26 @@
 
 # Default arguments
 if !downsample: denoise = 'median'
-averageWindow = '1'
-threshold = 'otsu'
 if !cube: cylinder = '' #Clips histograms and slice rendering to the inscribed cylinder
-if !scale: scale=downsample
+threshold = 'otsu'
+#if !scale: scale=downsample #FIXME: argument copy unimplemented
 
 if !validation: source = Source
 if validation: source = Capsules
 
-histogram-source = Histogram source
-distribution-source = KernelDensityEstimation histogram-source
-if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-source # Recommended robust statistic method
-if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-source # Use this method for backward compatibility only (FIXME)
-if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-source # Explicit model
-
+# Denoises
 if downsample: clean = Downsample source
 shift = ShiftRight source
 averagex = Average shift
 averagexy = Average averagex
 if denoise == 'average': clean = Average averagexy shift=0
 if denoise == 'median': clean = Median source
+
+histogram-density = Histogram clean
+distribution-density = KernelDensityEstimation histogram-density
+if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-density # Recommended robust statistic method
+if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only (FIXME)
+if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
 pore rock = Binary clean threshold
 if !downsample: colorize = Colorize pore source

@@ -142,7 +142,14 @@ Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) 
     if(rule.operation) {
         unique<Operation> operation = Interface<Operation>::instance(rule.operation);
         assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
-        Dict local = copy(arguments); local << rule.arguments; // not inherited
+        Dict local = copy(rule.arguments); // not inherited
+        for(auto arg: arguments) {
+            if(local.contains(arg.key)) {
+                log("Overriding local default argument",arg.key,'=',local.at(arg.key),"->"_,arg.value);
+                local.at(arg.key)=copy(arg.value);
+            }
+            else local.insert(copy(arg.key), copy(arg.value));
+        }
         for(ref<byte> key: rule.arguments.keys) assert_(split(operation->parameters()).contains(key), "Irrelevant argument", key, "for", rule);
         for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
             if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
