@@ -14,9 +14,9 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
     const uint8* const intensityData = intensity;
     assert_(empty.tiled());
     const uint8* const emptyData = empty;
-    const uint* const offsetX = empty.offsetX + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
-    const uint* const offsetY = empty.offsetY + stride/2;
-    const uint* const offsetZ = empty.offsetZ + stride/2;
+    const uint* const offsetX = empty.offsetX.data + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
+    const uint* const offsetY = empty.offsetY.data + stride/2;
+    const uint* const offsetZ = empty.offsetZ.data + stride/2;
 
     // Image
     int imageX = target.width, imageY = target.height; // Target image size

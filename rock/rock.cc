@@ -71,6 +71,11 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             log("Target paths:",targetPaths);
         }
         if(arguments.contains("graph"_)) { generateSVG(targets, name, getenv("HOME"_)); return; }
+        if(!targets) {
+            if(arguments || sweeps) log("Arguments:",arguments, sweeps);
+            if(targetPaths) log("Target paths:",targetPaths);
+            assert_(targets, "Expected target");
+        }
         execute(targets, sweeps, arguments);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files

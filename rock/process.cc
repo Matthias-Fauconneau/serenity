@@ -2,6 +2,31 @@
 #include "data.h"
 #include "time.h"
 
+array<ref<byte> > Rule::parameters() const {
+    array<ref<byte>> parameters;
+    if(this->operation) {
+        unique<Operation> operation = Interface<Operation>::instance(this->operation);
+        assert_(operation, "Operation", this->operation, "not found in", Interface<Operation>::factories.keys);
+        parameters += split(operation->parameters());
+    }
+    for(auto arg: argumentExps) if(arg.value.type==Expression::Value) parameters += arg.value;
+    return parameters;
+}
+/// Evaluates local rule arguments (using scope for value arguments)
+Dict Rule::arguments(const Dict& scopeArguments, const ref<byte>& scope) const {
+    Dict arguments;
+    for(auto arg: argumentExps) {
+        assert_(parameters().contains(arg.key), "Irrelevant argument", arg.key, "for", *this);
+        ref<byte> value = arg.value;
+        if(arg.value.type == Expression::Value) {
+            assert_(scopeArguments.contains(value), scope+"/"_+str(*this), ": Undefined", value, "in evaluation of", arg.key, "with scope arguments", scopeArguments);
+            value = scopeArguments.at(value);
+        }
+        arguments.insert(copy(arg.key), copy(value));
+    }
+    return arguments;
+}
+
 array<ref<byte> > Process::parameters() {
     array<ref<byte>> parameters = copy(specialParameters); // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
     for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
@@ -16,11 +41,12 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
     // 3) Process definition is parsed with conditionnals taken according to user arguments
     // 4) Arguments are parsed again using the customized process definition
     for(uint pass unused: range(2)) {
-        rules.clear(); resultNames.clear();
+        rules.clear(); resultNames.clear(); array<ref<byte>> sweepOverrides;
         array<ref<byte>> parameters = this->parameters();
-        Dict defaultArguments; // Application specific default arguments (defined by process definition)
+        Dict defaultArguments; // Process-specified default arguments
+        map<ref<byte>, array<Variant>> defaultSweeps; // Process-specified default sweeps
 
-        for(TextData s(definition); s;) {
+        for(TextData s(definition); s;) { //FIXME: factorize (parseArgument, parseSweep, ...), use parser
             s.skip();
             if(s.match('#')) { s.until('\n'); continue; }
             if(s.match("if"_)) {
@@ -53,44 +79,75 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                 assert_(output, s.until('\n'));
                 outputs << output;
             }
+            assert_(outputs, s.until('\n'));
             s.skip();
-            if(s.match('\'')) { // Default argument
-                assert_(outputs.size==1);
+            if(outputs.size==1 /*&& parameters.contains(outputs[0]) process parameter might not be defined yet*/ && (s.peek()=='\'' || s.peek()=='{')) { // Default argument
                 ref<byte> key = outputs[0];
-                ref<byte> value = s.until('\'');
-                assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
-                defaultArguments.insert(key, value);
-                if(!arguments.contains(key)) arguments.insert(key, value);
+                if(s.match('\'')) {
+                    ref<byte> value = s.until('\''); // Literal
+                    assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
+                    defaultArguments.insert(key, value);
+                    if(!arguments.contains(key)) arguments.insert(key, value);
+                }
+                else if(s.match('{')) { // Sweep
+                    ref<byte> sweep = s.until('}');
+                    assert(!arguments.contains(key));
+                    array<Variant> sequence;
+                    if(::find(sweep,".."_)) {
+                        TextData s (sweep);
+                        int begin = s.integer(); s.skip(".."_); int end = s.integer(); assert(!s);
+                        assert(begin >= 0 && end > begin);
+                        for(uint i: range(begin, end+1)) sequence << i;
+                    } else sequence = apply<Variant>(split(sweep,','), [](const ref<byte>& o){return o;});
+                    defaultSweeps.insert(key, sequence);
+                    if(!sweeps.contains(key)) sweeps.insert(key, sequence);
+                }
+                // TODO: default argument value
+                else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
             } else {
                 Rule rule;
                 ref<byte> word = s.word("_-"_);
-                assert_(word);
+                assert_(word, "Expected operator or input for", outputs);
                 if(!Interface<Operation>::factories.contains(word)) rule.inputs << word; // Forwarding rule
                 else rule.operation = word; // Generating rule
                 s.whileAny(" \t\r"_);
                 for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
                     if(s.match('#')) { s.whileNot('\n'); continue; }
                     ref<byte> key = s.word("_-"_);
+                    assert_(key, s.until('\n'), word);
                     if(s.match('=')) { // Explicit argument
                         if(s.match('{')) { // Sweep
                             ref<byte> sweep = s.until('}');
                             assert(!arguments.contains(key));
-                            if(::find(sweep,".."_)) {
-                                TextData s (sweep);
-                                int begin = s.integer(); s.skip(".."_); int end = s.integer(); assert(!s);
-                                assert(begin >= 0 && end > begin);
-                                array<Variant> sequence;
-                                for(uint i: range(begin, end+1)) sequence << i;
-                                rule.sweeps.insert(key, sequence);
-                            } else rule.sweeps.insert(key, apply<Variant>(split(sweep,','), [](const ref<byte>& o){return o;}));
+                            if(sweeps.contains(key)) { // User overrides local sweep
+                                rule.sweeps.insert(key, sweeps.at(key));
+                                if(targets.contains(rule.inputs[0])) sweepOverrides += key;
+                            } else {
+                                if(::find(sweep,".."_)) {
+                                    TextData s (sweep);
+                                    int begin = s.integer(); s.skip(".."_); int end = s.integer(); assert(!s);
+                                    assert(begin >= 0 && end > begin);
+                                    array<Variant> sequence;
+                                    for(uint i: range(begin, end+1)) sequence << i;
+                                    rule.sweeps.insert(key, sequence);
+                                } else rule.sweeps.insert(key, apply<Variant>(split(sweep,','), [](const ref<byte>& o){return o;}));
+                            }
                         } else {
-                            ref<byte> value = s.whileNo(" \t\r\n"_);
-                            rule.arguments.insert(key, value);
+                            if(s.match('\'')) rule.argumentExps.insert(key, Rule::Expression(s.until('\'')));
+                            else {
+                                ref<byte> word = s.word("-_"_);
+                                assert_(word, "Unquoted literal", s.whileNo(" \t\r\n"_));
+                                parameters += word;
+                                rule.argumentExps.insert(key, Rule::Expression(word, Rule::Expression::Value));
+                            }
                         }
-                    } else if(resultNames.contains(key)) rule.inputs << key; // Result input
-                    else if(parameters.contains(key) && !arguments.contains(key)) rule.arguments.insert(key); // Empty argument
-                    else if(parameters.contains(key)) rule.inputs << key; // Argument input
-                    else error("Unknown result or parameter for input", key);
+                    }
+                    else if(resultNames.contains(key)) rule.inputs << key; // Result input
+                    else if(parameters.contains(key)) {
+                        if(arguments.contains(key)) rule.inputs << key; // Argument value
+                        else if(sweeps.contains(key)) rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
+                        else rule.argumentExps.insert(key); // Empty argument
+                    } else parameters += key, rule.inputs << key; // Argument value (yet undefined)
                 }
                 for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
                 rule.outputs = move(outputs);
@@ -116,6 +173,9 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
             else specialArguments << argument;
         }
         for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
+        for(auto arg: defaultSweeps) if(!sweeps.contains(arg.key)) sweeps.insert(arg.key, arg.value);
+        for(auto key: sweeps.keys) assert_(!arguments.contains(key));
+        for(ref<byte> key: sweepOverrides) sweeps.remove(key); // Removes sweep overrides from process sweeps
     }
     this->parseSpecialArguments(specialArguments);
     return targets;
@@ -123,32 +183,35 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
 
 Rule& Process::ruleForOutput(const ref<byte>& target) { for(Rule& rule: rules) for(const ref<byte>& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
-Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments) {
+Dict Process::relevantArguments(const ref<byte>& target, const Dict& arguments, const ref<byte>& scope) {
     const Rule& rule = ruleForOutput(target);
     Dict relevant;
     if(!&rule && arguments.contains(target)) { // Conversion from argument to result
         relevant.insert(target, arguments.at(target));
         return relevant;
     }
-    assert_(&rule, "No rule generating '"_+target+"'"_);
+    assert_(&rule, "No rule generating '"_+target+"' for"_,scope);
+
+    Dict args = copy(arguments);
+    for(auto arg: rule.sweeps) {
+        if(args.contains(arg.key)) /*log("Sweep overrides scope argument",arg.key,'=',args.at(arg.key),"->"_,arg.value),*/ args.remove(arg.key);
+        args.insert(arg.key, str(arg.value,','));
+    }
 
     // Input argument are also relevant in case they are deleted
     for(const ref<byte>& input: rule.inputs) {
-        for(auto arg: relevantArguments(input, arguments)) {
+        for(auto arg: relevantArguments(input, args, scope+"/"_+target)) { //FIXME: memoize
             if(relevant.contains(arg.key)) assert_(relevant.at(arg.key)==arg.value, "Arguments conflicts", arg.key, relevant.at(arg.key), arg.value);
             else relevant.insert(move(arg.key), move(arg.value));
         }
     }
     if(rule.operation) {
-        unique<Operation> operation = Interface<Operation>::instance(rule.operation);
-        assert_(operation, "Operation", rule.operation, "not found in", Interface<Operation>::factories.keys);
-        Dict local = copy(rule.arguments); // not inherited
-        for(auto arg: arguments) {
-            if(local.contains(arg.key)) local.at(arg.key)=copy(arg.value); //, log("Overriding local default argument",arg.key,'=',local.at(arg.key),"->"_,arg.value);
-            else local.insert(copy(arg.key), copy(arg.value));
+        Dict local = copy(rule.arguments(args, scope)); // not inherited
+        for(auto arg: args) {
+            //if(local.contains(arg.key)) /*log("Scope overrides local argument",arg.key,'=',local.at(arg.key),"->"_,arg.value),*/ local.remove(arg.key);
+            local.insert(copy(arg.key), copy(arg.value));
         }
-        for(ref<byte> key: rule.arguments.keys) assert_(split(operation->parameters()).contains(key), "Irrelevant argument", key, "for", rule);
-        for(ref<byte> parameter: split(operation->parameters())) if(local.contains(parameter)) {
+        for(ref<byte> parameter: rule.parameters()) if(local.contains(parameter)) {
             if(relevant.contains(parameter)) assert_(relevant.at(parameter) == local.at(parameter), "Arguments conflicts", parameter, relevant.at(parameter), local.at(parameter));
             else relevant.insert(parameter, local.at(parameter));
         }
@@ -189,7 +252,8 @@ void Process::execute(const ref<ref<byte> >& targets, const map<ref<byte>, array
         map<ref<byte>, array<Variant>> remaining = copy(sweeps);
         Dict args = copy(arguments);
         ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
-        assert(!args.contains(parameter));
+        //assert_(!args.contains(parameter), "Sweep parameter overrides existing argument", args.at(parameter));
+        if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
         for(Variant& value: remaining.take(parameter)) {
             args.insert(parameter, move(value));
             execute(targets, remaining, args);
@@ -326,27 +390,38 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     }
     assert_(outputs);
 
+    log_(str(rule));
     Time time;
-    Dict relevantArguments = Process::relevantArguments(target, arguments);
-    if(operation) operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    else { // Sweep generator
-           assert(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
-           assert(rule.inputs.size == 1 && outputs.size==1, "FIXME: Only single target sweeps can be generated");
+    Dict relevantArguments;
+    if(operation) {
+        relevantArguments = Process::relevantArguments(target, arguments);
+        log_("\t"_+str(relevantArguments));
+        operation->execute(relevantArguments, cast<Result*>(outputs), cast<Result*>(inputs));
+    } else { // Sweep generator
+           assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
+           assert_(rule.inputs.size == 1 && outputs.size==1, "FIXME: Only single target sweeps can be generated");
+
            Dict args = copy(arguments);
            ref<byte> parameter = rule.sweeps.keys.first(); // Removes first parameter and loop over it
-           assert(!args.contains(parameter));
+           if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
+
+           args.insert(parameter, str(rule.sweeps.at(parameter)));
+           relevantArguments = Process::relevantArguments(target, arguments);
+           assert_(relevantArguments.contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
+           log_("\t"_+str(relevantArguments));
+
            string data;
            for(const Variant& value: rule.sweeps.at(parameter)) {
+               args.remove(parameter);
                args.insert(parameter, value);
                shared<Result> result = getResult(rule.inputs.first(), args);
-               assert(result->metadata=="scalar"_, "FIXME: only scalar sweep can be generated"_);
+               assert_(result->metadata=="scalar"_, "FIXME: only scalar sweep can be generated"_);
                data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
-               args.remove(parameter);
            }
            outputs.first()->metadata = string("sweep.tsv"_);
            outputs.first()->data = move(data);
     }
-    if((uint64)time>100) log(rule, relevantArguments, time);
+    log("\t"_+str(time));
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

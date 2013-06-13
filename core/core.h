@@ -79,6 +79,8 @@ inline constexpr ref<byte> operator "" _(const char* data, size_t size);
 #endif
 
 // Debugging
+/// Logs a message to standard output without newline
+void log_(const ref<byte>& message);
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
 template<> void log(const ref<byte>& message);

@@ -2,6 +2,7 @@
 # Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
+# Source
 if !validation: source = Source
 if validation: source = Capsules
 
@@ -9,7 +10,7 @@ if validation: source = Capsules
 shift = ShiftRight source
 averagex = Average shift
 averagexy = Average averagex
-average = Average averagexy shift=0
+average = Average averagexy shift='0'
 
 # Median
 median = Median source
@@ -21,7 +22,6 @@ if denoise == 'average': clean = average
 if denoise == 'median': clean = median
 
 # Downsamples
-#if downsample > 1: final = Downsample source # Skip denoising FIXME: argument comparison unimplemented
 if downsample: final = Downsample clean # Downsamples
 if !downsample: final = clean # Forwards
 
@@ -33,7 +33,7 @@ distribution-density = KernelDensityEstimation histogram-density
 # Threshold determination
 threshold = 'otsu'
 if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-density # Recommended robust statistic method
-if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only (FIXME)
+if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
 pore rock = Binary final threshold
@@ -51,37 +51,34 @@ unconnected-skeleton = ZOrder skeleton
 if cylinder: clip-unconnected-skeleton = CylinderClip unconnected-skeleton # Clips to cylinder
 if !cylinder: clip-unconnected-skeleton = unconnected-skeleton # Or forwards unclipped skeleton
 
-# Floodfills skeleton (much faster but needs to be fixed)
-connected-skeleton = FloodFill clip-unconnected-skeleton
-bin-unconnected = Bin unconnected-skeleton
-bin-connected = Bin connected-skeleton
-if floodfillSkeleton: rasterize-unconnected = Rasterize bin-unconnected
-if floodfillSkeleton: rasterize-connected = Rasterize bin-connected
-
-# Floodfills rasterized pores (much slower but works)
+# Rasterizes clipped skeleton
 bin = Bin clip-unconnected-skeleton
-if !floodfillSkeleton: rasterize-unconnected = Rasterize bin
-# Prunes rasterized pore space
-if !pruneSkeleton: unconnected = ThresholdClip rasterize-unconnected #threshold=minimalSqDiameter FIXME: argument copy
-if pruneSkeleton: unconnected = rasterize-unconnected # Or forwards rasterized pruned skeleton
-# Flood fills pruned pore space
-if !floodfillSkeleton: connected = FloodFill unconnected
+unconnected = Rasterize bin
+connected = FloodFill unconnected # Flood fills pore space
+minimalSqDiameter = {3..10}
+pruned-unconnected = ThresholdClip unconnected minimalSqDiameter #TODO: until maximum radius
+pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
 
 # Computes histogram of maximum squared radii
-histogram-squaredRadius-unconnected = Histogram unconnected
-histogram-squaredRadius-connected = Histogram connected
+histogram-squaredRadius-unconnected = Histogram pruned-unconnected
+histogram-squaredRadius-connected = Histogram pruned-connected
 # Computes pore space volume
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
 # Computes total volume using existing operators (inefficient)
-histogram-total = Histogram unconnected zero
+histogram-total = Histogram skeleton zero # Skeleton is the last operation adding margins
 volume-total = Sum histogram-total
 # Computes porosity (= pore space volume / total volume )
 porosity-unconnected = Div volume-unconnected volume-total
 porosity-connected = Div volume-connected volume-total
 
-# Volume( minimalSqDiameter) sweep
-volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter={3..10} #TODO: until zero
+# Unconnected Volume( minimalSqDiameter) sweep
+volume-unconnected-minimalSqDiameter = volume-unconnected minimalSqDiameter
+volume-unconnected-minimalDiameter = SquareRootVariable volume-unconnected-minimalSqDiameter
+porosity-unconnected-minimalDiameter = Div volume-unconnected-minimalDiameter volume-total
+
+# Connected Volume( minimalSqDiameter) sweep
+volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter #TODO: until zero connected volume
 volume-connected-minimalDiameter = SquareRootVariable volume-connected-minimalSqDiameter
 porosity-connected-minimalDiameter = Div volume-connected-minimalDiameter volume-total
 
@@ -93,17 +90,14 @@ distribution-radius-unconnected = KernelDensityEstimation histogram-radius-uncon
 distribution-radius-connected = KernelDensityEstimation histogram-radius-connected
 
 # Scales radius (e.g to original pixel or physical resolution)
- if !scale: scale=downsample #FIXME: argument copy unimplemented
+ #if !scale: scale=2^downsample #FIXME: argument arithmetic
  distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected
  distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected
 
-# Clip
- if cylinder: clip-unconnected  = CylinderClip unconnected # Clips to cylinder
- if !cylinder: clip-unconnected = unconnected # Or forwards unclipped volume
-  
+# Clip 
 # Square roots squared distance
- sqrt-unconnected = SquareRoot clip-unconnected
- sqrt-connected = SquareRoot connected
+ sqrt-unconnected = SquareRoot pruned-unconnected
+ sqrt-connected = SquareRoot pruned-connected
 
 # Scale volume values
  sqrt-unconnected-scaled = ScaleValues sqrt-unconnected

@@ -7,10 +7,16 @@ struct Rule {
     ref<byte> operation;
     array<ref<byte>> inputs;
     array<ref<byte>> outputs;
-    Dict arguments;
+    struct Expression : Variant { enum EType { Literal, Value } type=Value; Expression(Variant&& value=Variant(), EType type=Literal):Variant(move(value)),type(type){} };
+    map<string, Expression> argumentExps;
+    /// Returns relevant rule parameters (from operation and argument expressions)
+    array<ref<byte> > parameters() const;
+    /// Evaluates local rule arguments (using scope for value arguments)
+    Dict arguments(const Dict& scopeArguments=Dict(), const ref<byte>& scope=""_) const;
     map<ref<byte>, array<Variant>> sweeps; // Process-specified parameter sweeps
 };
-inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.arguments?str(rule.arguments):""_); }
+template<> inline string str(const Rule::Expression& e) { return str<Variant>(e); }
+template<> inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.argumentExps?str(rule.argumentExps):""_); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
@@ -27,7 +33,7 @@ struct Process {
     Rule& ruleForOutput(const ref<byte>& target);
 
     /// Returns recursively relevant arguments for a rule
-    Dict relevantArguments(const ref<byte>& target, const Dict& arguments);
+    Dict relevantArguments(const ref<byte>& target, const Dict& arguments, const ref<byte>& scope=""_);
 
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
     int indexOf(const ref<byte>& target, const Dict& arguments);

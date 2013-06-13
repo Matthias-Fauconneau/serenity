@@ -63,6 +63,7 @@ class(Sum, Operation), virtual Pass {
 /// Square roots the variable of a distribution
 class(SquareRootVariable, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
+        assert_(endsWith(source.metadata,".tsv"_), source.metadata, source.name, target.name);
         target.metadata = copy(source.metadata);
         target.data = toASCII(squareRootVariable(parseNonUniformSample(source.data)));
     }

@@ -86,7 +86,7 @@ template<Type K, Type V> struct map {
     }
 
     template<Type KK> V take(const KK& key) { int i=keys.indexOf(key); if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_); keys.removeAt(i); return values.take(i); }
-    template<Type KK> void remove(const KK& key) { int i=keys.indexOf(key); assert(i>=0); keys.removeAt(i); values.removeAt(i); }
+    template<Type KK> void remove(const KK& key) { int i=keys.indexOf(key); if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
         const K* k; const V* v;

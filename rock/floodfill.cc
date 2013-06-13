@@ -9,9 +9,15 @@ void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
         for(uint i : range(size)) targetData[i] = sourceData[i] > threshold ? sourceData[i] : 0;
     });
 }
-class(ThresholdClip, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "minimalSqDiameter"_; } //FIXME: threshold=arg needs argument copy
-    void execute(const Dict& args, VolumeT<uint16>& target, const Volume& source) override { thresholdClip(target, source, args.at("minimalSqDiameter"_)); }
+class(ThresholdClip, Operation), virtual VolumeOperation {
+    ref<byte> parameters() const override { return "clipThreshold"_; }
+    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        uint clipThreshold;
+        if(args.contains("clipThreshold"_) && isInteger(args.at("clipThreshold"_))) clipThreshold = toInteger(args.at("clipThreshold"_));
+        else clipThreshold = TextData(otherInputs[0]->data).integer();
+        thresholdClip(outputs[0], inputs[0], clipThreshold);
+    }
 };
 
 /// Explicitly clips volume to cylinder by zeroing exterior samples

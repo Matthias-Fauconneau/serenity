@@ -154,20 +154,17 @@ void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float thr
 /// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
     ref<byte> parameters() const override { return "threshold"_; }
-    uint outputSampleSize(uint) override { return 4; }
+    uint outputSampleSize(uint) override { return sizeof(uint); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        const Volume& source = inputs[0];
-        float densityThreshold;
+        float binaryThreshold;
         if(args.contains("threshold"_) && isDecimal(args.at("threshold"_))) {
-            densityThreshold = toDecimal(args.at("threshold"_));
-            while(densityThreshold >= 1) densityThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
-            //log("Threshold argument", densityThreshold);
+            binaryThreshold = toDecimal(args.at("threshold"_));
+            while(binaryThreshold >= 1) binaryThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
         } else {
             Result* threshold = otherInputs[0];
-            densityThreshold = TextData(threshold->data).decimal();
-            //log("Threshold input", densityThreshold);
+            binaryThreshold = TextData(threshold->data).decimal();
         }
-        threshold(outputs[0], outputs[1], source, densityThreshold);
+        threshold(outputs[0], outputs[1], inputs[0], binaryThreshold);
     }
 };
 
