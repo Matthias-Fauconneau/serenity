@@ -4,23 +4,31 @@
 #include "thread.h"
 
 Sample histogram(const Volume16& source, bool cylinder) {
-    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     assert_(X==Y && marginX==marginY);
     uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
-    Sample histogram (source.maximum+1, source.maximum+1, 0);
-    for(int z=marginZ; z<Z-marginZ; z++) {
-        for(int y=marginY; y<Y-marginY; y++) {
-            for(int x=marginX; x<X-marginX; x++) {
+    bool tiled=source.tiled();
+    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const uint16* sourceData = source;
+    buffer<uint> histograms[coreCount];
+    for(uint id: range(coreCount)) histograms[id] = buffer<uint>(source.maximum+1, source.maximum+1, 0);
+    parallel(marginZ, Z-marginZ, [&](uint id, uint z) {
+        for(uint y=marginY; y<Y-marginY; y++) {
+            for(uint x=marginX; x<X-marginX; x++) {
                 if(uint(sq(x-X/2)+sq(y-Y/2)) <= radiusSq) {
-                    uint sample = source(x,y,z);
+                    uint sample = sourceData[ tiled ? (offsetX[x]+offsetY[y]+offsetZ[z]) : (z*X*Y+y*X+x) ];
                     assert(sample <= source.maximum);
-                    histogram[sample]++;
+                    histograms[id][sample]++;
                 }
             }
         }
+    });
+    Sample histogram (source.maximum+1);
+    for(uint value: range(source.maximum+1)) { // Merges histograms (and converts to float)
+        histogram[value] = 0;
+        for(uint id: range(coreCount)) histogram[value] += histograms[id][value];
     }
-    assert(sum(histogram));
     return histogram;
 }
 

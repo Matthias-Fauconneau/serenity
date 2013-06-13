@@ -130,24 +130,24 @@ template<Type T> struct ref {
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& at(uint i) const { assert(i<size); return data[i]; }
-    const T& operator [](uint i) const { return at(i); }
+    const T& at(uint64 i) const { assert(i<size); return data[i]; }
+    const T& operator [](uint64 i) const { return at(i); }
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(uint pos, uint size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
+    ref<T> slice(uint64 pos, uint64 size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
     /// Slices a reference to elements from to the end of the reference
-    ref<T> slice(uint pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+    ref<T> slice(uint64 pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
     /// Compares all elements
     bool operator ==(const ref<T>& o) const {
         if(size != o.size) return false;
-        for(uint i: range(size)) if(data[i]!=o.data[i]) return false;
+        for(uint64 i: range(size)) if(data[i]!=o.data[i]) return false;
         return true;
     }
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    int indexOf(const T& key) const { for(uint i: range(size)) { if(data[i]==key) return i; } return -1; }
+    int indexOf(const T& key) const { for(uint64 i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& key) const { return indexOf(key)>=0; }
 

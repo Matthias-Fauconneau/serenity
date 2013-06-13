@@ -119,18 +119,19 @@ template<Type T> void setBorders(VolumeT<T>& target) {
 template void setBorders<uint32>(VolumeT<uint32>& target);
 
 Image slice(const Volume& source, float normalizedZ, bool cylinder) {
-    int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
-    assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
+    //int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
+    //assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
+    int z = normalizedZ*(source.sampleCount.z-1);
     return slice(source, z, cylinder);
 }
 
 Image slice(const Volume& source, int z, bool cylinder) {
     int X=source.sampleCount.x, Y=source.sampleCount.y;
     int marginX=source.margin.x, marginY=source.margin.y;
-    Image target(X-2*marginX,Y-2*marginY);
+    Image target(X,Y);
     uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
-    for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
-        if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = byte4(0,0,0,0); continue; }
+    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
+        if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq || x<marginX || y<marginY || x>=X-marginX || y>=Y-marginY) { target(x,y) = byte4(0,0,0,0); continue; }
         uint value = 0;
         uint64 index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
@@ -141,7 +142,7 @@ Image slice(const Volume& source, int z, bool cylinder) {
         uint linear8 = source.squared ? round(sqrt(float(value))) * 0xFF / round(sqrt(float(source.maximum))) : value * 0xFF / source.maximum;
         extern uint8 sRGB_lookup[256]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
         uint sRGB8 = sRGB_lookup[linear8];
-        target(x-marginX,y-marginY) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
+        target(x,y) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;
 }

@@ -11,8 +11,8 @@ template<Type T> struct mref : ref<T> {
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
-    T& at(uint i) const { assert(i<size); return (T&)data[i]; }
-    T& operator [](uint i) const { return at(i); }
+    T& at(uint64 i) const { assert(i<size); return (T&)data[i]; }
+    T& operator [](uint64 i) const { return at(i); }
     T& first() const { return at(0); }
     T& last() const { return at(size-1); }
 
@@ -24,14 +24,14 @@ template<Type T> struct mref : ref<T> {
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) { return p; }
 /// Initializes raw memory to zero
-inline void clear(byte* buffer, uint64 size) { for(uint i: range(size)) buffer[i]=0; }
+inline void clear(byte* buffer, uint64 size) { for(uint64 i: range(size)) buffer[i]=0; }
 /// Copies raw memory from \a src to \a dst
-inline void copy(byte* dst, const byte* src, uint size) { for(uint i: range(size)) dst[i]=src[i]; }
-/// Initializes buffer elements to \a value
-template<Type T> void clear(T* buffer, uint64 size, const T& value=T()) { for(uint i: range(size)) new (&buffer[i]) T(copy(value)); }
+inline void copy(byte* dst, const byte* src, uint64 size) { for(uint64 i: range(size)) dst[i]=src[i]; }
+/// Initializes buffer to \a value
+template<Type T> void clear(T* buffer, uint64 size, const T& value=T()) { for(uint64 i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \a dst
 /// \note Ignores move and copy operators
-template<Type T> void rawCopy(T* dst,const T* src, uint size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
+template<Type T> void rawCopy(T* dst,const T* src, uint64 size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);
@@ -64,16 +64,16 @@ template<Type T> struct buffer : mref<T> {
     // Overrides mref const operators
     T* begin() { return (T*)data; }
     T* end() { return (T*)data+size; }
-    T& at(uint i) { assert(i<size); return (T&)data[i]; }
-    T& operator [](uint i) { return at(i); }
+    T& at(uint64 i) { assert(i<size); return (T&)data[i]; }
+    T& operator [](uint64 i) { return at(i); }
     T& first() { return at(0); }
     T& last() { return at(size-1); }
 
     // and reenable const const versions
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& at(uint i) const { assert(i<size); return data[i]; }
-    const T& operator [](uint i) const { return at(i); }
+    const T& at(uint64 i) const { assert(i<size); return data[i]; }
+    const T& operator [](uint64 i) const { return at(i); }
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
 

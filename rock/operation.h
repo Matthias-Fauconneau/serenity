@@ -46,6 +46,7 @@ struct Variant : string {
     Variant(const ref<byte>& s) : string(s) {}
     Variant(int integer) : string(dec(integer)){}
     operator int() const { return *this ? toInteger(*this) : 0; }
+    operator uint() const { return *this ? toInteger(*this) : 0; }
     operator float() const { return toDecimal(*this); }
     operator double() const { return toDecimal(*this); }
     operator const ref<byte>&() const { return *this; }

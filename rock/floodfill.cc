@@ -1,11 +1,25 @@
 #include "volume-operation.h"
+#include "thread.h"
+
+/// Clips volume to values above a thresold
+void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
+    chunk_parallel(source.size(), [&](uint offset, uint size) {
+        const uint16* const sourceData = source + offset;
+        uint16* const targetData = target + offset;
+        for(uint i : range(size)) targetData[i] = sourceData[i] > threshold ? sourceData[i] : 0;
+    });
+}
+class(ThresholdClip, Operation), virtual VolumePass<uint16> {
+    ref<byte> parameters() const override { return "minimalSqDiameter"_; } //FIXME: threshold=arg needs argument copy
+    void execute(const Dict& args, VolumeT<uint16>& target, const Volume& source) override { thresholdClip(target, source, args.at("minimalSqDiameter"_)); }
+};
 
 /// Explicitly clips volume to cylinder by zeroing exterior samples
-void cylinderClip(Volume& target, const Volume& source) {
+void cylinderClip(Volume16& target, const Volume& source) {
     int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     uint radiusSq = (X/2-marginX)*(Y/2-marginY);
-    uint16* const targetData = (uint16*)target.data.data;
+    uint16* const targetData = target;
     for(int z=0; z<Z; z++) for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
         uint index = source.index(x,y,z);
         uint value = 0;

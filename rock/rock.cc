@@ -110,7 +110,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 assert(target->data.size);
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
                 else if(endsWith(target->metadata,".tsv"_)) log(target->name, ":\n"_+target->data);
-                else if(inRange(1u,toVolume(target).sampleSize,4u)) current = share(target); // Displays last displayable volume
+                else if(!current && inRange(1u,toVolume(target).sampleSize,4u)) current = share(target); // Displays first displayable volume
             }
         }
         if(current) {

@@ -5,6 +5,8 @@
 #include "function.h"
 #include <pthread.h>
 
+/// Logical cores count
+constexpr uint coreCount=8;
 /// Virtual memory page size
 constexpr int64 pageSize = 1<<12;
 
@@ -108,38 +110,42 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void event();
 };
 
+struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
+static void* start_routine(thread* t) {
+    for(;;) {
+        uint64 i=__sync_fetch_and_add(t->counter,1);
+        if(i>=t->stop) break;
+        (*t->delegate)(t->id, i);
+    }
+    return 0;
+}
+
 /// Runs a loop in parallel
-struct parallel {
-    uint64 counter;
-    uint64 stop;
-    function<void(uint, uint)> delegate;
-    struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
-    static void* start_routine(thread* t) {
-        for(;;) {
-            uint64 i=__sync_fetch_and_add(t->counter,1);
-            if(i>=t->stop) break;
-            (*t->delegate)(t->id, i);
-        }
-        return 0;
-    }
-    template<class F> parallel(uint start, uint stop, F f) : counter(start), stop(stop), delegate(f) {
+template<class F> void parallel(uint64 start, uint64 stop, F f) {
 #if DEBUG || PROFILE
-        for(uint i : range(start, stop)) f(0, i);
+    for(uint i : range(start, stop)) f(0, i);
 #else
-        constexpr uint N=8;
-        thread threads[N];
-        for(int i=0;i<N;i++) {
-            threads[i].id = i;
-            threads[i].counter = &counter;
-            threads[i].stop = stop;
-            threads[i].delegate = &delegate;
-            pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
-        }
-        for(int i=0;i<N;i++) { uint64 status=-1; pthread_join(threads[i].pthread,(void**)&status); assert_(status==0); }
-#endif
+    function<void(uint, uint)> delegate = f;
+    thread threads[coreCount];
+    for(uint i: range(coreCount)) {
+        threads[i].id = i;
+        threads[i].counter = &start;
+        threads[i].stop = stop;
+        threads[i].delegate = &delegate;
+        pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
     }
-    template<class F> parallel(uint stop, F f) : parallel(0,stop,f) {}
-};
+    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert_(status==0); }
+#endif
+}
+template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
+
+/// Runs a loop in parallel chunks
+template<class F> void chunk_parallel(uint totalSize, F f) {
+    constexpr uint chunkCount = coreCount;
+    assert(totalSize%chunkCount==0);
+    const uint chunkSize = totalSize/chunkCount;
+    parallel(chunkCount, [&](uint, uint chunkIndex) { f(chunkIndex*chunkSize, chunkSize); });
+}
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
 void exit(int status=0);

@@ -2,32 +2,43 @@
 # Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
-# Default arguments
-if !downsample: denoise = 'median'
-if !cube: cylinder = '' #Clips histograms and slice rendering to the inscribed cylinder
-threshold = 'otsu'
-#if !scale: scale=downsample #FIXME: argument copy unimplemented
-
 if !validation: source = Source
 if validation: source = Capsules
 
-# Denoises
-if downsample: clean = Downsample source
+# Average
 shift = ShiftRight source
 averagex = Average shift
 averagexy = Average averagex
-if denoise == 'average': clean = Average averagexy shift=0
-if denoise == 'median': clean = Median source
+average = Average averagexy shift=0
 
-histogram-density = Histogram clean
+# Median
+median = Median source
+
+# Denoises
+denoise = 'median'
+if !denoise: clean = source
+if denoise == 'average': clean = average
+if denoise == 'median': clean = median
+
+# Downsamples
+#if downsample > 1: final = Downsample source # Skip denoising FIXME: argument comparison unimplemented
+if downsample: final = Downsample clean # Downsamples
+if !downsample: final = clean # Forwards
+
+# Density distribution
+if !cube: cylinder = '' #Clips histograms to the inscribed cylinder
+histogram-density = Histogram final
 distribution-density = KernelDensityEstimation histogram-density
+
+# Threshold determination
+threshold = 'otsu'
 if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-density # Recommended robust statistic method
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only (FIXME)
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
-pore rock = Binary clean threshold
+pore rock = Binary final threshold
 if !downsample: colorize = Colorize pore source
-if downsample: colorize = Colorize pore clean
+if downsample: colorize = Colorize pore final
 
 # Computes squared distance to / position of nearest background voxel
 distancex positionxx = DistanceX pore
@@ -40,16 +51,20 @@ unconnected-skeleton = ZOrder skeleton
 if cylinder: clip-unconnected-skeleton = CylinderClip unconnected-skeleton # Clips to cylinder
 if !cylinder: clip-unconnected-skeleton = unconnected-skeleton # Or forwards unclipped skeleton
 
-# Floodfill skeleton (much faster but needs to be fixed)
+# Floodfills skeleton (much faster but needs to be fixed)
 connected-skeleton = FloodFill clip-unconnected-skeleton
 bin-unconnected = Bin unconnected-skeleton
 bin-connected = Bin connected-skeleton
-if floodfillSkeleton: unconnected = Rasterize bin-unconnected
-if floodfillSkeleton: connected = Rasterize bin-connected
+if floodfillSkeleton: rasterize-unconnected = Rasterize bin-unconnected
+if floodfillSkeleton: rasterize-connected = Rasterize bin-connected
 
-# Floodfill rasterized pores (much slower but works)
-bin = Bin unconnected-skeleton
-if !floodfillSkeleton: unconnected = Rasterize bin
+# Floodfills rasterized pores (much slower but works)
+bin = Bin clip-unconnected-skeleton
+if !floodfillSkeleton: rasterize-unconnected = Rasterize bin
+# Prunes rasterized pore space
+if !pruneSkeleton: unconnected = ThresholdClip rasterize-unconnected #threshold=minimalSqDiameter FIXME: argument copy
+if pruneSkeleton: unconnected = rasterize-unconnected # Or forwards rasterized pruned skeleton
+# Flood fills pruned pore space
 if !floodfillSkeleton: connected = FloodFill unconnected
 
 # Computes histogram of maximum squared radii
@@ -66,8 +81,7 @@ porosity-unconnected = Div volume-unconnected volume-total
 porosity-connected = Div volume-connected volume-total
 
 # Volume( minimalSqDiameter) sweep
-#volume-connected-minimalDiameter = volume-connected minimalDiameter={3..14} #TODO: until zero (~17 without downsampling?)
-volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter={3..26} #TODO: until zero (~50 without downsampling?)
+volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter={3..10} #TODO: until zero
 volume-connected-minimalDiameter = SquareRootVariable volume-connected-minimalSqDiameter
 porosity-connected-minimalDiameter = Div volume-connected-minimalDiameter volume-total
 
@@ -77,31 +91,33 @@ histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connecte
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected
 distribution-radius-connected = KernelDensityEstimation histogram-radius-connected
-# Scales radius (e.g to original pixel or physical resolution)
-distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected
-distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected
 
-#Export
+# Scales radius (e.g to original pixel or physical resolution)
+ if !scale: scale=downsample #FIXME: argument copy unimplemented
+ distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected
+ distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected
+
+# Clip
  if cylinder: clip-unconnected  = CylinderClip unconnected # Clips to cylinder
  if !cylinder: clip-unconnected = unconnected # Or forwards unclipped volume
   
- # Square roots squared distance
+# Square roots squared distance
  sqrt-unconnected = SquareRoot clip-unconnected
  sqrt-connected = SquareRoot connected
 
- # Scale volume values
+# Scale volume values
  sqrt-unconnected-scaled = ScaleValues sqrt-unconnected
  sqrt-connected-scaled = ScaleValues sqrt-connected
 
- # Exports to CDL
+# Exports to CDL
  cdl-unconnected = ToCDL sqrt-unconnected
  cdl-connected = ToCDL sqrt-connected
 
- # Exports to ASCII
+# Exports to ASCII
  ascii-unconnected = ToASCII sqrt-unconnected
  ascii-connected = ToASCII sqrt-connected
 
- # Exports to PNG
+# Exports to PNG
  png-source = ToPNG source
  png-clean = ToPNG clean
  png-colorize = ToPNG colorize

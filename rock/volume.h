@@ -24,9 +24,9 @@ struct Volume {
     void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; }
 
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
-    uint index(uint x, uint y, uint z) const {
+    uint64 index(uint x, uint y, uint z) const {
         assert(x<uint(sampleCount.x) && y<uint(sampleCount.y) && y<uint(sampleCount.y));
-        return tiled()?offsetX[x]+offsetY[y]+offsetZ[z]:z*sampleCount.x*sampleCount.y+y*sampleCount.x+x;
+        return tiled() ? (offsetX[x]+offsetY[y]+offsetZ[z]) : (z*sampleCount.x*sampleCount.y+y*sampleCount.x+x);
     }
 
     template<Type T> operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize); return *(const VolumeT<T>*)this; }
@@ -44,8 +44,8 @@ struct Volume {
 template<Type T> struct VolumeT : Volume {
     operator const T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (const T*)data.data; }
     operator T*() { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
-    T operator()(uint x, uint y, uint z) const { return data[index(x,y,z)]; }
-    T& operator()(uint x, uint y, uint z) { return data[index(x,y,z)]; }
+    T operator()(uint x, uint y, uint z) const { return ((const T*)data.data)[index(x,y,z)]; }
+    T& operator()(uint x, uint y, uint z) { return ((T*)data.data)[index(x,y,z)]; }
 };
 
 /// Serializes volume format (size, margin, range, layout)

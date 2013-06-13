@@ -175,13 +175,15 @@ class(Binary, Operation), virtual VolumeOperation {
 void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
     assert_(!binary.tiled() && !intensity.tiled() && binary.sampleCount == intensity.sampleCount);
     const uint maximum = intensity.maximum;
-    const uint32* const binaryData = binary;
-    const uint16* const intensityData = intensity;
-    bgr* const targetData = target;
-    for(uint i : range(binary.size())) {
-        uint8 c = 0xFF*intensityData[i]/maximum;
-        targetData[i] = binaryData[i]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
-    }
+    chunk_parallel(binary.size(), [&](uint offset, uint size) {
+        const uint32* const binaryData = binary + offset;
+        const uint16* const intensityData = intensity + offset;
+        bgr* const targetData = target + offset;
+        for(uint i : range(size)) {
+            uint8 c = 0xFF*intensityData[i]/maximum;
+            targetData[i] = binaryData[i]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
+        }
+    });
     target.maximum=0xFF;
 }
 
