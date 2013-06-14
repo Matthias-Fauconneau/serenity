@@ -24,6 +24,7 @@ Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0)
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 Folder::accessTime() const { struct stat stat = Folder::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }
 int64 Folder::modifiedTime() const { struct stat stat = Folder::stat(); return stat.st_mtim.tv_sec*1000000000ul + stat.st_mtim.tv_nsec;  }
+string Folder::name() const { string s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity)); return s; }
 array<string> Folder::list(uint flags) const {
     Folder fd(""_,*this);
     array<string> list; byte buffer[0x1000];
@@ -62,7 +63,7 @@ void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
-File::File(const ref<byte>& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),path)){}
+File::File(const ref<byte>& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),at.name()+"/"_+path+"'"_, (int)flags)){}
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 File::size() const { return stat().st_size; }
 int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }

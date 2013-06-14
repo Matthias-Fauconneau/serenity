@@ -177,7 +177,10 @@ Dict Process::evaluateArguments(const ref<byte>& target, const Dict& scopeArgume
     assert_(&rule, "No rule generating '"_+target+"'"_, scope, scopeArguments);
 
     Dict scopeArgumentsAndSweeps = copy(scopeArguments);
-    for(auto arg: rule.sweeps) scopeArgumentsAndSweeps.insert(arg.key, str(arg.value,',')); // Explicits sweep as arguments (for argument validation)
+    for(auto arg: rule.sweeps) {
+        if(scopeArgumentsAndSweeps.contains(arg.key)) assert_(scopeArgumentsAndSweeps.at(arg.key)==str(arg.value,','), rule, arg.key, scopeArgumentsAndSweeps.at(arg.key), str(arg.value,','));
+        else scopeArgumentsAndSweeps.insert(arg.key, str(arg.value,',')); // Explicits sweep as arguments (for argument validation)
+    }
 
     // Recursively evaluate to invalid cache on argument changes
     for(const ref<byte>& input: rule.inputs) {
@@ -436,14 +439,15 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
                 result->maps.clear();
             }
             File file = 0;
-            if(result->data.size <= mappedSize) { // Truncates file to result size
+            if(mappedSize && result->data.size <= mappedSize) { // Truncates file to result size
                 file = File(result->fileName, result->folder, ReadWrite);
-                file.resize(result->data.size);
+                if(result->data.size < mappedSize) file.resize(result->data.size);
+                //else only open file to map read-only
             } else { // Copies data from anonymous memory to file
                 file = File(result->fileName, result->folder, Flags(ReadWrite|Truncate|Create));
                 file.write(result->data);
             }
-            if(mappedSize>=pageSize) { // Remaps file read-only (will be remapped Read|Write whenever used as output again)
+            if(result->data.size>=pageSize) { // Remaps file read-only (will be remapped Read|Write whenever used as output again)
                 result->maps << Map(file);
                 result->data = buffer<byte>(result->maps.last());
             }

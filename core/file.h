@@ -27,6 +27,8 @@ struct Folder : Handle {
     int64 accessTime() const;
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
+    /// Returns folder name
+    string name() const;
     /// Lists all files in this folder
     array<string> list(uint flags) const;
 };

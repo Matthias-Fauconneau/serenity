@@ -12,7 +12,7 @@ struct Rule {
     map<ref<byte>, array<Variant>> sweeps; // Process-specified parameter sweeps
 };
 template<> inline string str(const Rule::Expression& e) { return str<Variant>(e); }
-template<> inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.argumentExps?str(rule.argumentExps):""_,rule.sweeps?str(rule.sweeps):""_); }
+template<> inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs/*,rule.argumentExps?str(rule.argumentExps):""_,rule.sweeps?str(rule.sweeps):""_*/); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {

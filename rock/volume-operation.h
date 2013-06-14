@@ -18,7 +18,7 @@ struct VolumeOperation : virtual Operation {
     virtual uint outputSampleSize(uint index unused) { return 0; } // No volume output by default
     uint64 outputSize(const Dict&, const ref<Result*>& inputs, uint index) override {
         assert_(inputs);
-        assert_(toVolume(*inputs[0]), inputs[0]->name);
+        assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
         return toVolume(*inputs[0]).size() * outputSampleSize(index);
     }
     /// Actual operation (overriden by implementation)
