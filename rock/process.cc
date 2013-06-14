@@ -10,16 +10,16 @@ array<ref<byte> > Process::parameters() {
 
 array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
     array<ref<byte>> targets, results, sweepOverrides, specialArguments;
+    Dict defaultArguments; // Process-specified default arguments
+    map<ref<byte>, array<Variant>> defaultSweeps; // Process-specified default sweeps
     // Parses definitions and arguments twice to solve cyclic dependencies
     // 1) Process definition defines valid parameters and targets
     // 2) Arguments are parsed using default definition
     // 3) Process definition is parsed with conditionnals taken according to user arguments
     // 4) Arguments are parsed again using the customized process definition
     for(uint pass unused: range(2)) {
-        rules.clear(); resultNames.clear(); sweepOverrides.clear();
         array<ref<byte>> parameters = this->parameters();
-        Dict defaultArguments; // Process-specified default arguments
-        map<ref<byte>, array<Variant>> defaultSweeps; // Process-specified default sweeps
+        rules.clear(); resultNames.clear(); sweepOverrides.clear(); defaultArguments.clear(); defaultSweeps.clear();
 
         for(TextData s(definition); s;) { //FIXME: factorize (parseArgument, parseSweep, ...), use parser
             s.skip();
@@ -123,8 +123,8 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                         if(rule.operation) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) {
                             rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
-                            if(results.contains(rule.inputs[0])) sweepOverrides += key;
-                        } else error(key); // Empty argument
+                            if(results.contains(outputs[0])) sweepOverrides += key;
+                        } else if(pass==2) error(key, arguments);
                         /*if(arguments.contains(key)) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) {
                             rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
@@ -159,8 +159,10 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
         for(auto arg: defaultSweeps) if(!sweeps.contains(arg.key)) sweeps.insert(arg.key, arg.value);
         array<ref<byte>> stack = copy(targets);
         while(stack) { // Traverse dependency to get all intermediate result names
-            const Rule& rule = ruleForOutput(stack.pop());
-            if(&rule) stack << rule.inputs, results += rule.inputs;
+            ref<byte> result = stack.pop();
+            results += result;
+            const Rule& rule = ruleForOutput(result);
+            if(&rule) stack << rule.inputs;
         }
     }
     for(auto key: sweeps.keys) assert_(!arguments.contains(key));
@@ -248,11 +250,10 @@ bool Process::sameSince(const ref<byte>& target, int64 queryTime, const Dict& ar
             Dict args = copy(arguments);
             ref<byte> parameter = rule.sweeps.keys.first(); // Removes first parameter and loop over it
             if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
-            args.insert(parameter, str(rule.sweeps.at(parameter)));
             for(const Variant& value: rule.sweeps.at(parameter)) {
-                args.remove(parameter);
                 args.insert(parameter, value);
                 if(!sameSince(rule.inputs.first(), queryTime, args)) return false;
+                args.remove(parameter);
             }
         } else {
             if(!sameSince(input, queryTime, arguments)) return false;
@@ -271,15 +272,16 @@ shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments
 void Process::execute(const ref<byte>& target, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
     if(sweeps) {
         map<ref<byte>, array<Variant>> remaining = copy(sweeps);
-        Dict args = copy(arguments);
         ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
-        assert_(evaluateArguments(target,arguments).contains(parameter), "Irrelevant sweep parameter", parameter);
+        Dict args = copy(arguments);
         //assert_(!args.contains(parameter), "Sweep parameter overrides existing argument", args.at(parameter));
-        if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
+        //if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
+        args.insert(parameter, str(sweeps.at(parameter),','));
+        assert_(evaluateArguments(target,args).contains(parameter), "Irrelevant sweep parameter", parameter);
         for(Variant& value: remaining.take(parameter)) {
+            args.remove(parameter);
             args.insert(parameter, move(value));
             execute(target, remaining, args);
-            args.remove(parameter);
         }
     } else { // Actually generates targets when sweeps have been explicited
         log(">>", target, evaluateArguments(target, arguments));
@@ -423,7 +425,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
            ref<byte> parameter = rule.sweeps.keys.first(); // Removes first parameter and loop over it
            if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
 
-           args.insert(parameter, str(rule.sweeps.at(parameter)));
+           args.insert(parameter, str(rule.sweeps.at(parameter),','));
            relevantArguments = evaluateArguments(target, arguments);
            assert_(relevantArguments.contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
 
@@ -438,7 +440,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
            outputs.first()->metadata = string("sweep.tsv"_);
            outputs.first()->data = move(data);
     }
-    if((uint64)time>100) log(rule, relevantArguments, time);
+    /*if((uint64)time>100)*/ log(rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

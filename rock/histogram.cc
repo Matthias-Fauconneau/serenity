@@ -38,7 +38,7 @@ class(Histogram, Operation) {
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         Sample histogram = ::histogram(source, args.contains("cylinder"_));
-        for(uint i: range((uint)args.value("clip"_,"0"_))) histogram[i] = 0; // Zeroes values until clip (discards clipping artifacts or background)
+        for(uint i: range((uint)args.value("clip"_,"1"_))) histogram[i] = 0; // Zeroes values until clip (discards clipping artifacts or background)
         outputs[0]->metadata = string("histogram.tsv"_);
         outputs[0]->data = toASCII(histogram);
     }
