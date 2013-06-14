@@ -8,6 +8,9 @@ template<Type T> string str(const T&) { static_assert(0&&sizeof(T),"No overload 
 /// Lexically compare strings
 bool operator <(const ref<byte>& a, const ref<byte>& b);
 
+/// Counts number of occurence of a character in a string
+uint count(const ref<byte>& a, byte c);
+
 /// Returns a reference to the string between the {begin}th and {end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 ref<byte> section(const ref<byte>& str, byte separator, int begin=0, int end=1);

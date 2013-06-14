@@ -58,6 +58,7 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
             s.skip();
             if(outputs.size==1 /*&& parameters.contains(outputs[0]) process parameter might not be defined yet*/ && (s.peek()=='\'' || s.peek()=='{')) { // Default argument
                 ref<byte> key = outputs[0];
+                parameters += key; // May not be defined yet
                 if(s.match('\'')) {
                     ref<byte> value = s.until('\''); // Literal
                     assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
@@ -118,13 +119,14 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                         }
                     }
                     else if(resultNames.contains(key)) rule.inputs << key; // Result input
-                    else if(parameters.contains(key)) {
+                    else {
+                        parameters += key; // May be yet undefined
                         if(arguments.contains(key)) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) {
                             rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
                             if(results.contains(rule.inputs[0])) sweepOverrides += key;
                         } else rule.argumentExps.insert(key); // Empty argument
-                    } else parameters += key, rule.inputs << key; // Argument value (yet undefined)
+                    }
                 }
                 for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
                 rule.outputs = move(outputs);
@@ -243,32 +245,31 @@ shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments
     error("Anonymous process manager unimplemented"_);
 }
 
-void Process::execute(const ref<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
+void Process::execute(const ref<byte>& target, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
     if(sweeps) {
         map<ref<byte>, array<Variant>> remaining = copy(sweeps);
         Dict args = copy(arguments);
         ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
+        assert_(evaluateArguments(target,arguments).contains(parameter), "Irrelevant sweep parameter", parameter);
         //assert_(!args.contains(parameter), "Sweep parameter overrides existing argument", args.at(parameter));
         if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
         for(Variant& value: remaining.take(parameter)) {
             args.insert(parameter, move(value));
-            execute(targets, remaining, args);
+            execute(target, remaining, args);
             args.remove(parameter);
         }
     } else { // Actually generates targets when sweeps have been explicited
-        assert_(targets, "Expected target, got only arguments:", arguments);
-        for(const ref<byte>& target: targets) {
-            log(">>", target, evaluateArguments(target, arguments));
-            Time time;
-            targetResults << getResult(target, arguments);
-            if((uint64)time > 100) log("<<", target, time);
-        }
+        log(">>", target, evaluateArguments(target, arguments));
+        Time time;
+        targetResults << getResult(target, arguments);
+        if((uint64)time > 100) log("<<", target, time);
     }
 }
 
 void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
     targetResults.clear();
-    execute(configure(allArguments, definition), sweeps, arguments);
+    array<ref<byte>> targets = configure(allArguments, definition);
+    for(ref<byte> target: targets) execute(target, sweeps, arguments);
 }
 
 void PersistentProcess::parseSpecialArguments(const ref<ref<byte> >& args) {
@@ -324,8 +325,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     // Otherwise regenerates target using new inputs, arguments and/or implementations
 
     array<shared<Result>> inputs;
-    if(!rule.sweeps)
-        for(const ref<byte>& input: rule.inputs) inputs << getResult(input, arguments);
+    if(!rule.sweeps) for(const ref<byte>& input: rule.inputs) inputs << getResult(input, arguments);
     for(const shared<Result>& input: inputs) {
         ResultFile& result = *(ResultFile*)input.pointer;
         if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
@@ -335,7 +335,8 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
         assert(inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded");
         return move(inputs.first());
     }
-    unique<Operation> operation = rule.operation ? Interface<Operation>::instance(rule.operation) : nullptr;
+
+    unique<Operation> operation = !rule.sweeps ? Interface<Operation>::instance(rule.operation) : nullptr;
 
     array<shared<Result>> outputs;
     for(uint index: range(rule.outputs.size)) {
@@ -386,12 +387,10 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
     }
     assert_(outputs);
 
-    log_(str(rule));
     Time time;
     Dict relevantArguments;
     if(operation) {
         relevantArguments = evaluateArguments(target, arguments);
-        log_("\t"_+str(relevantArguments));
         operation->execute(evaluateArguments(target, arguments, true), cast<Result*>(outputs), cast<Result*>(inputs));
     } else { // Sweep generator
            assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
@@ -404,7 +403,6 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
            args.insert(parameter, str(rule.sweeps.at(parameter)));
            relevantArguments = evaluateArguments(target, arguments);
            assert_(relevantArguments.contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
-           log_("\t"_+str(relevantArguments));
 
            string data;
            for(const Variant& value: rule.sweeps.at(parameter)) {
@@ -417,7 +415,7 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
            outputs.first()->metadata = string("sweep.tsv"_);
            outputs.first()->data = move(data);
     }
-    log("\t"_+str(time));
+    log(rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

@@ -21,9 +21,15 @@ class(Source, Operation), virtual VolumeOperation {
         minX=0, minY=0, minZ=0, maxX = width, maxY = height, maxZ = slices.size;
         if(args.contains("cylinder"_)) {
             if(args.at("cylinder"_)!=""_) {
-                auto coordinates = apply<int64>(split(args.at("cylinder"_),','), toInteger, 10);
-                int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
-                minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
+                if(args.at("cylinder"_).contains(',')) { // x, y, r, zMin, zMax
+                    auto coordinates = apply<int64>(split(args.at("cylinder"_),','), toInteger, 10);
+                    int x=coordinates[0], y=coordinates[1], r=coordinates[2]; minZ=coordinates[3], maxZ=coordinates[4];
+                    minX=x-r, minY=y-r, maxX=x+r, maxY=y+r;
+                } else {
+                    int r = toInteger(args.at("cylinder"_));
+                    minX=maxX/2-r, minY=maxY/2-r, minZ=maxZ/2-r;
+                    maxX=maxX/2+r, maxY=maxY/2+r, maxZ=maxZ/2+r;
+                }
             }
             int margin = int(maxX-minX) - int(maxY-minY);
             if(margin > 0) minX+=margin/2, maxX-=margin/2;

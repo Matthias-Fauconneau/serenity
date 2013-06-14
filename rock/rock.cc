@@ -76,7 +76,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             if(targetPaths) log("Target paths:",targetPaths);
             assert_(targets, "Expected target");
         }
-        execute(targets, sweeps, arguments);
+        for(ref<byte> target: targets) execute(target, sweeps, arguments);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
             if(sweeps) { // Concatenates sweep results into a single file
@@ -110,11 +110,11 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         } else assert(arguments.contains("view"_), "Expected target paths"_);
 
         // Displays target results
-        if(arguments.contains("view"_)) {
+        if(arguments.value("view"_,"0"_)!="0"_) {
             for(const shared<Result>& target: targetResults) {
                 assert(target->data.size);
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
-                else if(endsWith(target->metadata,".tsv"_)) log(target->name, ":\n"_+target->data);
+                else if(endsWith(target->metadata,".tsv"_) && count(target->data,'\n')<64) log(target->name, ":\n"_+target->data);
                 else if(!current && inRange(1u,toVolume(target).sampleSize,4u)) current = share(target); // Displays first displayable volume
             }
         }

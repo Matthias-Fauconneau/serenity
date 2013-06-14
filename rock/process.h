@@ -12,7 +12,7 @@ struct Rule {
     map<ref<byte>, array<Variant>> sweeps; // Process-specified parameter sweeps
 };
 template<> inline string str(const Rule::Expression& e) { return str<Variant>(e); }
-template<> inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.argumentExps?str(rule.argumentExps):""_); }
+template<> inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs,rule.argumentExps?str(rule.argumentExps):""_,rule.sweeps?str(rule.sweeps):""_); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
@@ -43,7 +43,7 @@ struct Process {
     virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);
 
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const ref<ref<byte> >& targets, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
+    void execute(const ref<byte>& target, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
 
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
     void execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition);

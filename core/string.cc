@@ -10,6 +10,10 @@ bool operator <(const ref<byte>& a, const ref<byte>& b) {
     return a.size > b.size;
 }
 
+uint count(const ref<byte>& a, byte c) {
+    uint count=0; for(byte b: a) if(b==c) count++; return count;
+}
+
 ref<byte> str(const char* s) {
     if(!s) return "null"_; int i=0; while(s[i]) i++; return ref<byte>((byte*)s,i);
 }
