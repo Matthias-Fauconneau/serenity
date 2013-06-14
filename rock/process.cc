@@ -120,12 +120,16 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                     }
                     else if(resultNames.contains(key)) rule.inputs << key; // Result input
                     else {
-                        parameters += key; // May be yet undefined
-                        if(arguments.contains(key)) rule.inputs << key; // Argument value
+                        if(rule.operation) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) {
                             rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
                             if(results.contains(rule.inputs[0])) sweepOverrides += key;
-                        } else rule.argumentExps.insert(key); // Empty argument
+                        } else error(key); // Empty argument
+                        /*if(arguments.contains(key)) rule.inputs << key; // Argument value
+                        else if(sweeps.contains(key)) {
+                            rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
+                            if(results.contains(rule.inputs[0])) sweepOverrides += key;
+                        } else rule.argumentExps.insert(key); // Empty argument*/
                     }
                 }
                 for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
@@ -162,6 +166,7 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
     for(auto key: sweeps.keys) assert_(!arguments.contains(key));
     for(ref<byte> key: sweepOverrides) sweeps.remove(key); // Removes sweep overrides from process sweeps
     this->parseSpecialArguments(specialArguments);
+    log(arguments, sweeps);
     return targets;
 }
 
@@ -178,7 +183,8 @@ Dict Process::evaluateArguments(const ref<byte>& target, const Dict& scopeArgume
 
     Dict scopeArgumentsAndSweeps = copy(scopeArguments);
     for(auto arg: rule.sweeps) {
-        if(scopeArgumentsAndSweeps.contains(arg.key)) assert_(scopeArgumentsAndSweeps.at(arg.key)==str(arg.value,','), rule, arg.key, scopeArgumentsAndSweeps.at(arg.key), str(arg.value,','));
+        //if(scopeArgumentsAndSweeps.contains(arg.key)) assert_(scopeArgumentsAndSweeps.at(arg.key)==str(arg.value,','), rule, arg.key, scopeArgumentsAndSweeps.at(arg.key), str(arg.value,','));
+        if(scopeArgumentsAndSweeps.contains(arg.key)) {}
         else scopeArgumentsAndSweeps.insert(arg.key, str(arg.value,',')); // Explicits sweep as arguments (for argument validation)
     }
 
@@ -236,8 +242,22 @@ bool Process::sameSince(const ref<byte>& target, int64 queryTime, const Dict& ar
     }
     const Rule& rule = ruleForOutput(target);
     if(!&rule && arguments.contains(target)) return true; // Conversion from argument to result
-    assert_(&rule);
-    for(const ref<byte>& input: rule.inputs) if(!sameSince(input, queryTime, arguments)) return false; // Inputs changed since result (or query if result was discarded) was last generated
+    for(const ref<byte>& input: rule.inputs) { // Inputs changed since result (or query if result was discarded) was last generated
+        if(rule.sweeps) { // Check all sweeped results
+            assert_(rule.sweeps.size()==1);
+            Dict args = copy(arguments);
+            ref<byte> parameter = rule.sweeps.keys.first(); // Removes first parameter and loop over it
+            if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
+            args.insert(parameter, str(rule.sweeps.at(parameter)));
+            for(const Variant& value: rule.sweeps.at(parameter)) {
+                args.remove(parameter);
+                args.insert(parameter, value);
+                if(!sameSince(rule.inputs.first(), queryTime, args)) return false;
+            }
+        } else {
+            if(!sameSince(input, queryTime, arguments)) return false;
+        }
+    }
     if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
     return true;
 }
@@ -412,13 +432,13 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
                args.remove(parameter);
                args.insert(parameter, value);
                shared<Result> result = getResult(rule.inputs.first(), args);
-               assert_(result->metadata=="scalar"_, "FIXME: only scalar sweep can be generated"_);
+               assert_(result->metadata=="scalar"_, "Non-scalar sweep for"_, rule, rule.sweeps);
                data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
            }
            outputs.first()->metadata = string("sweep.tsv"_);
            outputs.first()->data = move(data);
     }
-    log(rule, relevantArguments, time);
+    if((uint64)time>100) log(rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

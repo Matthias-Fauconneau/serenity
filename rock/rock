@@ -55,7 +55,8 @@ if !cylinder: clip-unconnected-skeleton = unconnected-skeleton # Or forwards unc
 bin = Bin clip-unconnected-skeleton
 unconnected = Rasterize bin
 connected = FloodFill unconnected # Flood fills pore space
-if sweep: minimalSqDiameter = {3..13}
+#if sweep:
+minimalSqDiameter = {3..13}
 pruned-unconnected = ThresholdClip unconnected minimalSqDiameter #TODO: until maximum radius
 pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
 
@@ -66,7 +67,7 @@ histogram-squaredRadius-connected = Histogram pruned-connected
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
 # Computes total volume using existing operators (inefficient)
-histogram-total = Histogram skeleton zero # Skeleton is the last operation adding margins
+histogram-total = Histogram skeleton clip='1' # Skeleton is the last operation adding margins
 volume-total = Sum histogram-total
 # Computes porosity (= pore space volume / total volume )
 porosity-unconnected = Div volume-unconnected volume-total
