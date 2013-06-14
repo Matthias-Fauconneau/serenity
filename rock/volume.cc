@@ -29,6 +29,7 @@ string volumeFormat(const Volume& volume) {
     s << '-' << hex(volume.maximum);
     if(volume.tiled()) s << "-tiled"_;
     if(volume.squared) s << "-squared"_;
+    if(volume.floatingPoint) s << "-float";
     return s;
 }
 
@@ -46,6 +47,7 @@ bool parseVolumeFormat(Volume& volume, const ref<byte>& format) {
     volume.maximum = s.hexadecimal();
     if(s.match("-tiled"_)) interleavedLookup(volume); else { volume.offsetX=buffer<uint>(), volume.offsetY=buffer<uint>(), volume.offsetZ=buffer<uint>(); }
     if(s.match("-squared"_)) volume.squared=true;
+    if(s.match("-float"_)) volume.floatingPoint=true;
     if(s) return false;
     return true;
 }

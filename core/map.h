@@ -44,7 +44,7 @@ template<Type K, Type V> struct map {
     template<Type KK> V* find(const KK& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
     template<Type KK> V& insert(KK&& key) { assert(!contains(key),key); keys << K(move(key)); values << V(); return values.last(); }
 
-#if 0
+#if 1
     V& insert(K&& key, V&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << move(key); values << move(value); return values.last();

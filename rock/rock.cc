@@ -22,6 +22,13 @@
 //#include "kernel-density-estimation.h"
 //#include "export.h"
 
+string strByteCount(uint64 byteCount) {
+    if(byteCount < 1u<<10) return str(byteCount,"B"_);
+    if(byteCount < 10u<<20) return str(byteCount>>10,"kiB"_);
+    if(byteCount < 10u<<30) return str(byteCount>>20,"MiB"_);
+    return str(byteCount>>30,"GiB"_);
+}
+
 struct GraphProcess : virtual Process {
     string dot(array<const Rule*>& once, const ref<byte>& output) {
         const Rule& rule = ruleForOutput(output);
@@ -109,7 +116,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                         }
                     }
                     resultIndex += sweepSize;
-                    if(!data) log(name,"->",path, "["_+str(sweepSize)+"x]"_, "["_+str(dataSize/1024/1024)+" MiB]"_, time);
+                    if(!data) log(name,"->",path, "["_+str(sweepSize)+"x]"_, "["_+strByteCount(dataSize)+"]"_, (uint64)time>100 ? (string)time : ""_);
                 } else {
                     const shared<Result>& target = targetResults[resultIndex];
                     name = target->name+"."_+target->metadata;
@@ -119,10 +126,10 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 if(data) {
                     if(existsFolder(path, cwd)) {
                         writeFile(name, data, Folder(path, cwd));
-                        log(path+"/"_+name, "["_+str(data.size/1024/1024)+" MiB]"_, time);
+                        log(path+"/"_+name, "["_+strByteCount(data.size)+"]"_, time);
                     } else {
                         writeFile(path, data, cwd);
-                        log(name,"->",path, "["_+str(data.size/1024/1024)+" MiB]"_, time);
+                        log(name,"->",path, "["_+strByteCount(data.size)+"]"_, time);
                     }
                 }
             }
@@ -161,7 +168,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         for(const ref<byte>& argument: specialArguments) {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
-            else if(!arguments.contains("path"_) && existsFolder(argument,cwd)) arguments.insert("path"_,argument);
+            else if(!arguments.contains("path"_) && existsFolder(argument,cwd)) arguments.insert(string("path"_),argument);
             else if(!argument.contains('=')) targetPaths << argument;
             else error("Invalid argument", argument);
         }

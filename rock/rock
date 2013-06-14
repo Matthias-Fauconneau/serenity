@@ -22,8 +22,9 @@ if denoise == 'average': clean = average
 if denoise == 'median': clean = median
 
 # Downsamples
-if downsample: final = Downsample clean # Downsamples
-if !downsample: final = clean # Forwards
+downsample = '0'
+if downsample=='0': final = clean # Forwards
+if downsample!='0': final = Downsample clean # Downsamples
 
 # Density distribution
 if !cube: cylinder = '' #Clips histograms to the inscribed cylinder
@@ -57,7 +58,8 @@ bin = Bin clip-unconnected-skeleton
 unconnected = Rasterize bin
 connected = FloodFill unconnected # Flood fills pore space
 
-minimalSqDiameter = {3..10}
+if !sweep: minimalSqDiameter = '0'
+if sweep: minimalSqDiameter = {3..10}
 pruned-unconnected = ThresholdClip unconnected minimalSqDiameter #TODO: until maximum radius
 pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
 
@@ -88,8 +90,8 @@ porosity-connected-minimalDiameter = Div volume-connected-minimalDiameter volume
 histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected
 histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connected
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
-distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected #bandwidth=0.5
-distribution-radius-connected = KernelDensityEstimation histogram-radius-connected #bandwidth=0.5
+distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected bandwidth='0.5'
+distribution-radius-connected = KernelDensityEstimation histogram-radius-connected bandwidth='0.5'
 
 # Scales radius (e.g to original pixel or physical resolution)
  #if !scale: scale=2^downsample #FIXME: argument arithmetic

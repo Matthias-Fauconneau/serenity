@@ -10,12 +10,13 @@ void squareRoot(VolumeFloat& target, const Volume16& source) {
     target.maximum = ceil(sqrt((float)source.maximum)), target.squared=false;
     const uint16* const sourceData = source; float* const targetData = target;
     for(uint index: range(source.size())) targetData[index] = sqrt((float)sourceData[index]);
+    target.floatingPoint = true;
 }
 defineVolumePass(SquareRoot, float, squareRoot);
 
 /// Scales all values
 void scaleValues(VolumeFloat& target, const VolumeFloat& source, const float scale) {
-    assert_(source.squared);
+    assert_(source.squared && source.floatingPoint);
     target.maximum = ceil(scale*source.maximum), target.squared=false;
     const float* const sourceData = source; float* const targetData = target;
     for(uint index: range(source.size())) targetData[index] = scale*sourceData[index];
@@ -40,10 +41,9 @@ class(ToPNG, Operation), virtual VolumeOperation {
     }
 };
 
-// Converts integers to ASCII decimal
+/// Converts integers to ASCII decimal
 template<uint pad> inline void itoa(byte*& target, uint n) {
-    assert(n<1000);
-    uint i=pad;
+    int i = pad;
     do { target[--i]="0123456789"[n%10]; n /= 10; } while( n!=0 );
     while(i>0) target[--i]=' ';
     target[pad]=',';
@@ -64,10 +64,11 @@ buffer<byte> toASCII(const Volume& source) {
                 uint value = 0;
                 if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
                 else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
-                else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
+                else if(source.sampleSize==4 && !source.floatingPoint) value = ((uint32*)source.data.data)[index];
+                else if(source.sampleSize==4 && source.floatingPoint) value = round(((float*)source.data.data)[index]); //FIXME: converts to ASCII with decimals
                 else error(source.sampleSize);
-                assert(value <= source.maximum, value, source.maximum);
-                if(value) { itoa<4>(targetPtr, x); itoa<4>(targetPtr, y); itoa<4>(targetPtr, z); itoa<6>(targetPtr, value); targetPtr[-1]='\n'; }
+                assert_(value <= source.maximum, value, source.maximum, source.sampleSize);
+                if(value) { itoa<4>(targetPtr, x); itoa<4>(targetPtr, y); itoa<4>(targetPtr, z); itoa<5>(targetPtr, value); targetPtr[-1]='\n'; }
             }
         }
     }
@@ -97,7 +98,8 @@ string toCDL(const Volume& source) {
                 uint value = 0;
                 if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
                 else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
-                else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
+                else if(source.sampleSize==4 && !source.floatingPoint) value = ((uint32*)source.data.data)[index];
+                else if(source.sampleSize==4 && source.floatingPoint) value = round(((float*)source.data.data)[index]); //FIXME: converts to ASCII with decimals
                 else error(source.sampleSize);
                 assert(value <= source.maximum, value, source.maximum);
                 if(value) itoa<positionSize>(positionIndex, x), itoa<positionSize>(positionIndex, y), itoa<positionSize>(positionIndex, z), itoa<valueSize>(valueIndex, value);

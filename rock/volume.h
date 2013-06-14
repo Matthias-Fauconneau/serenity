@@ -21,7 +21,7 @@ struct Volume {
     explicit operator bool() const { return (bool)data; }
     uint64 size() const { return (uint64)sampleCount.x*sampleCount.y*sampleCount.z; }
     bool tiled() const { if(offsetX || offsetY || offsetZ) { assert(offsetX && offsetY && offsetZ); return true; } else return false; }
-    void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; }
+    void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; floatingPoint=source.floatingPoint; }
 
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
     uint64 index(uint x, uint y, uint z) const {
@@ -39,6 +39,7 @@ struct Volume {
     uint maximum=0; // Maximum value (to compute normalized values)
     uint sampleSize=0; // Sample integer size (in bytes)
     bool squared=false; // Whether the sample are a squared magnitude
+    bool floatingPoint=false;  // Whether the sample are stored as floats
 };
 
 template<Type T> struct VolumeT : Volume {

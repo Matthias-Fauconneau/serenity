@@ -37,7 +37,7 @@ bool TextData::matchNo(const ref<byte>& any) {
 }
 
 void TextData::skip(const ref<byte>& key) {
-    assert_(match(key), "'"_+key+"'"_, "'"_+untilEnd()+"'"_);
+    assert_(match(key), "'"_+key+"'"_, /*"'"_+untilEnd()+"'"_*/ until('\n'));
 }
 
 ref<byte> TextData::whileNot(char key) {

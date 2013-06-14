@@ -45,6 +45,7 @@ struct Variant : string {
     Variant(string&& s) : string(move(s)) {}
     Variant(const ref<byte>& s) : string(s) {}
     Variant(int integer) : string(dec(integer)){}
+    explicit operator bool() { return size; }
     operator int() const { return *this ? toInteger(*this) : 0; }
     operator uint() const { return *this ? toInteger(*this) : 0; }
     operator float() const { return toDecimal(*this); }
@@ -64,7 +65,7 @@ inline Dict parseDict(TextData& s) {
         ref<byte> key = s.whileNo(":|}"_);
         ref<byte> value;
         if(s.match(':')) value = s.whileNo("|}"_);
-        dict.insert(key, replace(string(value),'\\','/'));
+        dict.insert(string(key), replace(string(value),'\\','/'));
         if(s.match('|')) continue;
         else if(s.match('}')) break;
         else error(s.untilEnd());
