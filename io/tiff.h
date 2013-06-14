@@ -7,10 +7,11 @@ inline bool isTiff(const ref<byte>& file) { return startsWith(file,"\x49\x49\x2A
 
 struct Tiff16 {
     Tiff16(const ref<byte>& file);
-    void read(uint16* target, uint x0, uint y0, uint w, uint h, uint stride);
     ~Tiff16();
+    void read(uint16* target, uint x0, uint y0, uint w, uint h, uint stride);
+    explicit operator bool() { return tiff; }
 
     BinaryData s;
-    struct tiff* tiff;
-    uint width, height;
+    struct tiff* tiff = 0;
+    uint width = 0, height = 0;
 };

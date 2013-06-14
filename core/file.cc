@@ -24,7 +24,7 @@ Folder::Folder(const ref<byte>& folder, const Folder& at, bool create):Handle(0)
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 Folder::accessTime() const { struct stat stat = Folder::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }
 int64 Folder::modifiedTime() const { struct stat stat = Folder::stat(); return stat.st_mtim.tv_sec*1000000000ul + stat.st_mtim.tv_nsec;  }
-string Folder::name() const { string s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity)); return s; }
+string Folder::name() const { if(fd==AT_FDCWD) return string("."_); string s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity), (int)fd); return s; }
 array<string> Folder::list(uint flags) const {
     Folder fd(""_,*this);
     array<string> list; byte buffer[0x1000];

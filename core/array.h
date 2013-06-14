@@ -31,7 +31,7 @@ template<Type T> struct array : buffer<T> {
         }
     }
     /// Resizes the array to \a size and default initialize new elements
-    void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (data+i) T(); }
+    void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (&at(i)) T(); }
     /// Sets the array size to \a size and destroys removed elements
     void shrink(uint size) { assert(capacity && size<=this->size); for(uint i: range(size,this->size)) data[i].~T(); this->size=size; }
     /// Removes all elements

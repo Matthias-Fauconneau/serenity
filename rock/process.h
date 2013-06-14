@@ -2,6 +2,9 @@
 #include "operation.h"
 #include "file.h"
 
+/// Defines arguments taking multiple values
+typedef map<ref<byte>, array<Variant>> Sweeps;
+
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
 struct Rule {
     ref<byte> operation;
@@ -9,7 +12,7 @@ struct Rule {
     array<ref<byte>> outputs;
     struct Expression : Variant { enum EType { Literal, Value } type=Value; Expression(Variant&& value=Variant(), EType type=Literal):Variant(move(value)),type(type){} };
     map<string, Expression> argumentExps;
-    map<ref<byte>, array<Variant>> sweeps; // Process-specified parameter sweeps
+    Sweeps sweeps; // Process-specified parameter sweeps
 };
 template<> inline string str(const Rule::Expression& e) { return str<Variant>(e); }
 template<> inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs/*,rule.argumentExps?str(rule.argumentExps):""_,rule.sweeps?str(rule.sweeps):""_*/); }
@@ -43,14 +46,14 @@ struct Process {
     virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);
 
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const ref<byte>& target, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments);
+    void execute(const ref<byte>& target, const Sweeps& sweeps, const Dict& arguments);
 
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
     void execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
 
     array<ref<byte>> specialParameters; // Valid parameters accepted for derived class special behavior
     Dict arguments; // User-specified arguments
-    map<ref<byte>, array<Variant>> sweeps; // User-specified parameter sweeps
+    array<Sweeps> targetsSweeps; // User-specified parameter sweeps (for each target)
     array<Rule> rules; // Production rules
     array<ref<byte>> resultNames; // Valid result names defined by process
     array<shared<Result>> results; // Generated intermediate (and target) data

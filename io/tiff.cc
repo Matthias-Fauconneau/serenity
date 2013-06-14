@@ -3,7 +3,7 @@
 #include "image.h"
 #include <tiffio.h> //tiff
 
-tsize_t tiffRead(BinaryData& s, byte* buffer, tsize_t size) { copy(buffer, s.buffer.data+s.index, size); s.advance(size); return size; }
+tsize_t tiffRead(BinaryData& s, byte* buffer, tsize_t size) { size=min(size,int(s.buffer.size-s.index)); copy(buffer, s.buffer.data+s.index, size); s.advance(size); return size; }
 tsize_t tiffWrite(BinaryData&, byte*, tsize_t) { error(""); }
 toff_t tiffSeek(BinaryData& s, toff_t off, int whence) {
     if(whence==SEEK_SET) s.index=off;
@@ -30,7 +30,8 @@ Image decodeTIFF(const ref<byte>& file) {
 
 Tiff16::Tiff16(const ref<byte>& file) : s(file) {
     tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
-    assert(tiff);
+    assert(tiff, file.size, hex(file.slice(0, 4)));
+    if(!tiff) return;
     TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
     uint16 bitPerSample=1; TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitPerSample); assert(bitPerSample==16);

@@ -209,7 +209,7 @@ string ftoa(double n, int precision, int pad, bool exponent, bool inf) {
     if(__builtin_isnan(n)) return string("NaN"_);
     if(n==__builtin_inff()) { assert_(inf); return string("∞"_); }
     if(n==-__builtin_inff()) { assert_(inf); return string("-∞"_); }
-    int e=0; if(n && (exponent /*|| int(n*exp10(precision))==0*/) && log10(n)>=precision+4) e=round(log10(n)), n /= exp10(e);
+    int e=0; if(n && (exponent /*|| int(n*exp10(precision))==0*/) && (n<1 || log10(n)>=precision+4)) e=round(log10(n)), n /= exp10(e);
     string s;
     if(sign) s<<'-';
     if(precision && n!=round(n)) {

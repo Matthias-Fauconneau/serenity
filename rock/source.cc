@@ -69,8 +69,11 @@ class(Source, Operation), virtual VolumeOperation {
             if(report/1000>=5) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
             uint16* const targetSlice = targetData + (uint64)(marginZ+z)*X*Y + marginY*X + marginX;
             Map file(slices[minZ+z],folder);
-            if(isTiff(file)) Tiff16(file).read(targetSlice, minX, minY, size.x, size.y, X); // Directly decodes slice images into the volume
-            else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
+            if(isTiff(file)) { // Directly decodes slice images into the volume
+                Tiff16 tiff(file);
+                assert_(tiff, args.at("path"_), slices[minZ+z]);
+                tiff.read(targetSlice, minX, minY, size.x, size.y, X);
+            } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
                 Image image = decodeImage(file);
                 assert_(int2(minX,minY)+image.size()>=size.xy(), slices[minZ+z]);
                 for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(minX+x, minY+y).a;

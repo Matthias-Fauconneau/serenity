@@ -67,38 +67,66 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             log("Parameters:",parameters());
             log("Results:",resultNames);
             log("Targets:",targets);
-            log("Arguments:",arguments, sweeps);
+            log("Arguments:",arguments, targetsSweeps);
             log("Target paths:",targetPaths);
         }
         if(arguments.contains("graph"_)) { generateSVG(targets, name, getenv("HOME"_)); return; }
         if(!targets) {
-            if(arguments || sweeps) log("Arguments:",arguments, sweeps);
+            if(arguments || targetsSweeps) log("Arguments:",arguments, targetsSweeps);
             if(targetPaths) log("Target paths:",targetPaths);
             assert_(targets, "Expected target");
         }
-        for(ref<byte> target: targets) execute(target, sweeps, arguments);
+        for(uint i: range(targets.size)) execute(targets[i], targetsSweeps[i], arguments);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
-            if(sweeps) { // Concatenates sweep results into a single file
-                assert(sweeps.size()==1, "FIXME: Only single sweeps can be concatenated");
-                string data;
-                for(const shared<Result>& target: targetResults) data << target->relevantArguments.at(sweeps.keys[0]) << "\t"_ << target->data << "\n"_;
-                log(data);
-                writeFile(targetPaths[0], data, cwd);
-            } else {
-                for(uint index: range(min(targetResults.size, targetPaths.size))) {
-                    const shared<Result>& target = targetResults[index];
-                    const ref<byte>& path = targetPaths[index];
-                    if(target->data.size) {
-                        Time time;
-                        if(existsFolder(path, cwd)) writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
-                        else writeFile(path, target->data, cwd), log(target->name+"."_+target->metadata,"->",path, "["_+str(target->data.size/1024/1024)+" MiB]"_, time);
+            uint resultIndex=0;
+            for(uint index: range(targetPaths.size)) {
+                if(resultIndex>=targetResults.size) {
+                    error("Expected less names, skipped names"_, targetPaths.slice(index),
+                          "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
+                    break;
+                }
+                Time time;
+                const ref<byte>& path = targetPaths[index];
+                string name, data;
+                if(targetsSweeps[index]) { // Concatenates sweep results into a single file
+                    const Sweeps& sweeps = targetsSweeps[index];
+                    assert_(sweeps.size()==1, "FIXME: Only single sweeps can be concatenated");
+                    uint sweepSize = sweeps.values[0].size, dataSize = 0;
+                    assert_(sweepSize, targets[index], path, sweeps);
+                    for(const shared<Result>& result: targetResults.slice(resultIndex, sweepSize)) {
+                        string resultName = result->name+"."_+result->metadata;
+                        if(!name) name = copy(resultName);
+                        assert_(resultName==name);
+                        ref<byte> key = result->relevantArguments.at(sweeps.keys[0]);
+                        if(result->metadata=="scalar"_) data << key << "\t"_ << result->data << "\n"_;
+                        else {
+                            assert_(!data);
+                            assert_(!existsFile(path, cwd) || existsFolder(path, cwd), path);
+                            Folder folder (path, cwd, true);
+                            writeFile(key, result->data, folder);
+                            dataSize += result->data.size;
+                        }
+                    }
+                    resultIndex += sweepSize;
+                    if(!data) log(name,"->",path, "["_+str(sweepSize)+"x]"_, "["_+str(dataSize/1024/1024)+" MiB]"_, time);
+                } else {
+                    const shared<Result>& target = targetResults[resultIndex];
+                    name = target->name+"."_+target->metadata;
+                    data = unsafeReference(target->data);
+                    resultIndex++;
+                }
+                if(data) {
+                    if(existsFolder(path, cwd)) {
+                        writeFile(name, data, Folder(path, cwd));
+                        log(path+"/"_+name, "["_+str(data.size/1024/1024)+" MiB]"_, time);
+                    } else {
+                        writeFile(path, data, cwd);
+                        log(name,"->",path, "["_+str(data.size/1024/1024)+" MiB]"_, time);
                     }
                 }
-                if(targetPaths.size < targetResults.size) if(!arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(targetPaths.size));
-                if(targetPaths.size > targetResults.size) error("Expected less names, skipped names"_, targetPaths.slice(targetResults.size),
-                                                                "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
             }
+            if(targetResults.slice(resultIndex) && !arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(resultIndex));
         } else if(targetPaths.size == 1) { // Copies results into folder
             const ref<byte>& path = targetPaths[0];
             assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
@@ -114,7 +142,8 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             for(const shared<Result>& target: targetResults) {
                 assert(target->data.size);
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
-                else if(endsWith(target->metadata,".tsv"_) && count(target->data,'\n')<64) log(target->name, ":\n"_+target->data);
+                else if(endsWith(target->metadata,"map"_) && count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data)); // Map of scalars
+                else if(endsWith(target->metadata,".tsv"_) && count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data));
                 else if(!current && inRange(1u,toVolume(target).sampleSize,4u)) current = share(target); // Displays first displayable volume
             }
         }

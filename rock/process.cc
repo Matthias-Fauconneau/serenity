@@ -9,9 +9,11 @@ array<ref<byte> > Process::parameters() {
 }
 
 array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
-    array<ref<byte>> targets, results, sweepOverrides, specialArguments;
+    array<ref<byte>> targets, specialArguments;
+    array<array<ref<byte>>> results; // Intermediate result names for each target
+    array<array<ref<byte>>> sweepOverrides; // Sweep overrides for each target (Converts user specified sweeps to rule sweeps)
     Dict defaultArguments; // Process-specified default arguments
-    map<ref<byte>, array<Variant>> defaultSweeps; // Process-specified default sweeps
+    Sweeps sweeps, defaultSweeps; // Process-specified default sweeps
     // Parses definitions and arguments twice to solve cyclic dependencies
     // 1) Process definition defines valid parameters and targets
     // 2) Arguments are parsed using default definition
@@ -19,7 +21,7 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
     // 4) Arguments are parsed again using the customized process definition
     for(uint pass unused: range(2)) {
         array<ref<byte>> parameters = this->parameters();
-        rules.clear(); resultNames.clear(); sweepOverrides.clear(); defaultArguments.clear(); defaultSweeps.clear();
+        rules.clear(); resultNames.clear(); sweepOverrides.clear(); sweepOverrides.grow(targets.size); defaultArguments.clear(); defaultSweeps.clear();
 
         for(TextData s(definition); s;) { //FIXME: factorize (parseArgument, parseSweep, ...), use parser
             s.skip();
@@ -75,6 +77,7 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                         assert(begin >= 0 && end > begin);
                         for(uint i: range(begin, end+1)) sequence << i;
                     } else sequence = apply<Variant>(split(sweep,','), [](const ref<byte>& o){return o;});
+                    assert_(sequence);
                     defaultSweeps.insert(key, sequence);
                     if(!sweeps.contains(key)) sweeps.insert(key, sequence);
                 }
@@ -97,7 +100,7 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                             assert(!arguments.contains(key));
                             if(sweeps.contains(key)) { // User overrides local sweep
                                 rule.sweeps.insert(key, sweeps.at(key));
-                                if(results.contains(rule.inputs[0])) sweepOverrides += key;
+                                for(uint i: range(targets.size)) if(results[i].contains(rule.inputs[0])) sweepOverrides[i] += key;
                             } else {
                                 if(::find(sweep,".."_)) {
                                     TextData s (sweep);
@@ -123,13 +126,8 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                         if(rule.operation) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) {
                             rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
-                            if(results.contains(outputs[0])) sweepOverrides += key;
+                            for(uint i: range(targets.size)) if(results[i].contains(outputs[0])) sweepOverrides[i] += key;
                         } else if(pass==2) error(key, arguments);
-                        /*if(arguments.contains(key)) rule.inputs << key; // Argument value
-                        else if(sweeps.contains(key)) {
-                            rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
-                            if(results.contains(rule.inputs[0])) sweepOverrides += key;
-                        } else rule.argumentExps.insert(key); // Empty argument*/
                     }
                 }
                 for(ref<byte> output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
@@ -138,37 +136,50 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
             }
         }
 
-        arguments.clear(); sweeps.clear(); targets.clear(); results.clear(); specialArguments.clear();
+        arguments.clear(); targetsSweeps.clear(); sweeps.clear(); targets.clear(); results.clear(); specialArguments.clear();
         for(const ref<byte>& argument: allArguments) { // Parses generic arguments (may affect process definition)
             TextData s (argument); ref<byte> key = s.word("-_"_);
             if(s.match('=')) { // Explicit argument
                 assert_(parameters.contains(key),"Invalid parameter", key);
                 ref<byte> value = s.untilEnd();
-                if(sweeps.contains(key) || arguments.contains(key)) {
-                    if(arguments.contains(key)) sweeps.insert(key, array<Variant>()<<arguments.take(key));
-                    sweeps.at(key) << value;
-                } else {
-                    arguments.insert(key, Variant(value));
-                }
+                assert_(value);
+                if(arguments.contains(key)) { Variant value=arguments.take(key); assert_(value); sweeps.insert(key, array<Variant>()<<value); }
+                else if(sweeps.contains(key)) sweeps.at(key) << value;
+                else arguments.insert(key, Variant(value));
             }
             else if(resultNames.contains(argument)) targets << argument;
             else if(parameters.contains(argument)) arguments.insert(argument,""_);
             else specialArguments << argument;
         }
         for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(arg.key, arg.value);
-        for(auto arg: defaultSweeps) if(!sweeps.contains(arg.key)) sweeps.insert(arg.key, arg.value);
-        array<ref<byte>> stack = copy(targets);
-        while(stack) { // Traverse dependency to get all intermediate result names
-            ref<byte> result = stack.pop();
-            results += result;
-            const Rule& rule = ruleForOutput(result);
-            if(&rule) stack << rule.inputs;
+        for(auto arg: defaultSweeps) { assert_(arg.value); if(!sweeps.contains(arg.key)) sweeps.insert(arg.key, arg.value); }
+        results.grow(targets.size);
+        for(uint i: range(targets.size)) {
+            array<ref<byte>> stack; stack << targets[i];
+            while(stack) { // Traverse dependency to get all intermediate result names
+                ref<byte> result = stack.pop();
+                results[i] += result;
+                const Rule& rule = ruleForOutput(result);
+                if(&rule) stack << rule.inputs;
+            }
         }
     }
     for(auto key: sweeps.keys) assert_(!arguments.contains(key));
-    for(ref<byte> key: sweepOverrides) sweeps.remove(key); // Removes sweep overrides from process sweeps
+    for(uint i: range(targets.size)) {
+        Sweeps targetSweeps;
+        for(auto sweep: (const Sweeps&)sweeps) { // Discards irrelevant sweeps
+            assert_(sweep.value, targets[i], sweeps);
+            Dict args = copy(arguments);
+            args.insert(sweep.key, str(sweep.value,','));
+            bool relevant = false;
+            if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
+            if(relevant) targetSweeps.insert(sweep.key, sweep.value);
+            else assert_(defaultSweeps.contains(sweep.key));
+        }
+        for(ref<byte> key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps
+        targetsSweeps << targetSweeps;
+    }
     this->parseSpecialArguments(specialArguments);
-    log(arguments, sweeps);
     return targets;
 }
 
@@ -269,16 +280,18 @@ shared<Result> Process::getResult(const ref<byte>& target, const Dict& arguments
     error("Anonymous process manager unimplemented"_);
 }
 
-void Process::execute(const ref<byte>& target, const map<ref<byte>, array<Variant>>& sweeps, const Dict& arguments) {
+void Process::execute(const ref<byte>& target, const Sweeps& sweeps, const Dict& arguments) {
     if(sweeps) {
-        map<ref<byte>, array<Variant>> remaining = copy(sweeps);
+        Sweeps remaining = copy(sweeps);
         ref<byte> parameter = sweeps.keys.first(); // Removes first parameter and loop over it
+        array<Variant> sweep = remaining.take(parameter);
         Dict args = copy(arguments);
         //assert_(!args.contains(parameter), "Sweep parameter overrides existing argument", args.at(parameter));
         //if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
-        args.insert(parameter, str(sweeps.at(parameter),','));
+        args.insert(parameter, str(sweep,','));
+        if(!evaluateArguments(target,args).contains(parameter)) return execute(target, remaining, args);
         assert_(evaluateArguments(target,args).contains(parameter), "Irrelevant sweep parameter", parameter);
-        for(Variant& value: remaining.take(parameter)) {
+        for(Variant& value: sweep) {
             args.remove(parameter);
             args.insert(parameter, move(value));
             execute(target, remaining, args);
@@ -294,7 +307,7 @@ void Process::execute(const ref<byte>& target, const map<ref<byte>, array<Varian
 void Process::execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition) {
     targetResults.clear();
     array<ref<byte>> targets = configure(allArguments, definition);
-    for(ref<byte> target: targets) execute(target, sweeps, arguments);
+    for(uint i: range(targets.size)) execute(targets[i], targetsSweeps[i], arguments);
 }
 
 void PersistentProcess::parseSpecialArguments(const ref<ref<byte> >& args) {

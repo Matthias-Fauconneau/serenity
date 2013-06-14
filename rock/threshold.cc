@@ -30,17 +30,19 @@ class(Otsu, Operation) {
             }
             interclassVariance[t] = variance;
         }
-        float densityThreshold = float(threshold) / float(density.size);
+        float densityThreshold = float(threshold) / float(density.size-1);
         //log("Otsu's method estimates threshold at", densityThreshold);
         outputs[0]->metadata = string("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 6)+"\n"_;
-        output(outputs, 1, "otsu"_, [&]{
+        output(outputs, 1, "map"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
+                    "threshold16 "_+dec(threshold)+"\n"_
+                    "maximum "_+dec(density.size-1)+"\n"_
                     "backgroundCount "_+dec(parameters[0])+"\n"_
                     "foregroundCount "_+dec(parameters[1])+"\n"_
                     "backgroundMean "_+str(parameters[2])+"\n"_
                     "foregroundMean "_+str(parameters[3])+"\n"_
-                    "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount))); } );
+                    "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount)))+"\n"_; } );
         output(outputs, 2, "deviation.tsv"_, [&]{ return toASCII((1./(totalCount-1))*squareRoot(interclassVariance)); } );
     }
 };
@@ -115,8 +117,8 @@ class(MaximumMeanGradient, Operation) {
 };
 
 /// Segments by setting values over a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
-void threshold(Volume32& pore, Volume32& rock, const Volume16& source, float threshold) {
-    v4si scaledThreshold = set1(threshold*source.maximum);
+void threshold(Volume32& pore, Volume32& rock, const Volume16& source, uint16 threshold) {
+    v4si scaledThreshold = set1(threshold);
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     assert(X%8==0);
     uint32 sqr[X]; for(uint x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
@@ -156,13 +158,15 @@ class(Binary, Operation), virtual VolumeOperation {
     ref<byte> parameters() const override { return "threshold"_; }
     uint outputSampleSize(uint) override { return sizeof(uint); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        float binaryThreshold;
+        uint16 binaryThreshold;
         if(args.contains("threshold"_) && isDecimal(args.at("threshold"_))) {
-            binaryThreshold = toDecimal(args.at("threshold"_));
-            while(binaryThreshold >= 1) binaryThreshold /= 1<<8; // Accepts 16bit, 8bit or normalized threshold
+            float threshold = toDecimal(args.at("threshold"_));
+            if(threshold < 1) binaryThreshold = round( threshold*inputs[0].maximum ); // Normalized (/maximum)
+            else if(threshold < 256) binaryThreshold = round(threshold*(1<<8)); // 8bit -> 16bit
+            else binaryThreshold = round(threshold); // 16bit
         } else {
             Result* threshold = otherInputs[0];
-            binaryThreshold = TextData(threshold->data).decimal();
+            binaryThreshold = round( TextData(threshold->data).decimal() * inputs[0].maximum );
         }
         threshold(outputs[0], outputs[1], inputs[0], binaryThreshold);
     }

@@ -43,3 +43,12 @@ class(Histogram, Operation) {
         outputs[0]->data = toASCII(histogram);
     }
 };
+
+class(Normalize, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = copy(source.metadata);
+        UniformSample sample = parseUniformSample(source.data);
+        //NonUniformSample sample = parseNonUniformSample(source.data);
+        target.data = toASCII((1./sum(sample))*sample);
+    }
+};

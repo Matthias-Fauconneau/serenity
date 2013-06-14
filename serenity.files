@@ -10,6 +10,8 @@ core/data.h
 core/file.cc
 core/file.h
 core/function.h
+core/image.h
+core/image.cc
 core/linux.h
 core/map.h
 core/math.h
@@ -39,8 +41,6 @@ ui/display.cc
 ui/display.h
 ui/font.cc
 ui/font.h
-ui/image.cc
-ui/image.h
 ui/interface.h
 ui/layout.h
 ui/text.cc
