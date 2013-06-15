@@ -1,6 +1,7 @@
 #include "process.h"
 #include "data.h"
 #include "time.h"
+#include "math.h"
 
 array<string> Process::parameters() {
     array<string> parameters = copy(specialParameters); // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
@@ -23,7 +24,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
         array<string> parameters = this->parameters();
         rules.clear(); resultNames.clear(); sweepOverrides.clear(); sweepOverrides.grow(targets.size); defaultArguments.clear(); defaultSweeps.clear();
 
-        for(TextData s(definition); s;) { //FIXME: factorize (parseArgument, parseSweep, ...), use parser
+        for(TextData s(definition); s;) { //FIXME: factorize (arguments, sweeps, expressions ...), use parser
             s.skip();
             if(s.match('#')) { s.until('\n'); continue; }
             if(s.match("if"_)) {
@@ -58,7 +59,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
             assert_(outputs, s.until('\n'));
             s.skip();
-            if(outputs.size==1 /*&& parameters.contains(outputs[0]) process parameter might not be defined yet*/ && (s.peek()=='\'' || s.peek()=='{')) { // Default argument
+            if(outputs.size==1 /*&& parameters.contains(outputs[0]) process parameter might not be defined yet*/ && (s.peek()=='\'' || s.peek()=='{' || s.peek()=='$')) { // Default argument
                 string key = outputs[0];
                 parameters += key; // May not be defined yet
                 if(s.match('\'')) {
@@ -68,6 +69,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     if(!arguments.contains(key)) arguments.insert(String(key), Variant(value));
                 }
                 else if(s.match('{')) { // Sweep
+                    error("Disabled");
                     string sweep = s.until('}');
                     assert(!arguments.contains(key));
                     array<Variant> sequence;
@@ -80,9 +82,33 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     assert_(sequence);
                     defaultSweeps.insert(key, sequence);
                     if(!sweeps.contains(key)) sweeps.insert(key, sequence);
+                } else if(s.match('$')) { // Default argument value
+                    string word = s.word("_-"_);
+                    assert_(word);
+                    string op = s.whileAny("^"_);
+                    int right=0;
+                    if(op) right = s.integer();
+                    if(sweeps.contains(word)) {
+                        array<Variant> values;
+                        for(const Variant& left: sweeps.take(word)) {
+                            Variant value;
+                            if(!op) value = copy(left);
+                            else if(op=="^"_) value = pow(left, right);
+                            else error("Unknown operator", op);
+                            values << value;
+                        }
+                        defaultSweeps.insert(key, values);
+                        if(!sweeps.contains(key)) sweeps.insert(key, values);
+                    } else {
+                        const Variant& left = arguments.at(word);
+                        Variant value;
+                        if(!op) value = copy(left);
+                        else if(op=="^"_) value = pow(left, right);
+                        else error("Unknown operator", op);
+                        arguments.insert(String(key), value);
+                    }
                 }
-                // TODO: default argument value
-                else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
+                //else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
             } else {
                 Rule rule;
                 string word = s.word("_-"_);
@@ -190,7 +216,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             bool relevant = false;
             if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
             if(relevant) targetSweeps.insert(sweep.key, sweep.value);
-            else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key, "for", targets[i], str(sweep.value,','));
+            //else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key, "for", targets[i], str(sweep.value,','), sweeps, defaultSweeps);
         }
         for(string key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps
         targetsSweeps << targetSweeps;
