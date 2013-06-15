@@ -106,7 +106,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                         if(!name) name = copy(resultName);
                         assert_(resultName==name);
                         ref<byte> key = result->relevantArguments.at(sweeps.keys[0]);
-                        if(result->metadata=="scalar"_) data << key << "\t"_ << result->data << "\n"_;
+                        if(result->metadata=="scalar"_) data << key << "\t"_ << result->data;
                         else {
                             assert_(!data);
                             assert_(!existsFile(path, cwd) || existsFolder(path, cwd), path);

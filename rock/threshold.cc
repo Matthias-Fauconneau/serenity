@@ -116,46 +116,49 @@ class(MaximumMeanGradient, Operation) {
     }
 };
 
-/// Segments by setting values over a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
-void threshold(Volume32& pore, Volume32& rock, const Volume16& source, uint16 threshold) {
-    v4si scaledThreshold = set1(threshold);
-    uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    assert(X%8==0);
-    uint32 sqr[X]; for(uint x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
+/// Segments by setting values under a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
+void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint16 threshold, bool cylinder=false) {
+    // Ensures threshold volume is closed to avoid null/full rows in aligned distance search
+    int marginX=align(4,source.margin.x)+1, marginY=align(4,source.margin.y)+1, marginZ=align(4,source.margin.z)+1;
+    v4si threshold4 = set1(threshold);
+    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    assert_(X%8==0 && (!cylinder || (X%2==0 && Y%2==0 && X-2*marginX==Y-2*marginY)));
+    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
+    uint32 sqr[X]; for(int x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
+    uint32 mask[X*Y]; // Disk mask
+    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 0xFFFFFFFF;
     uint32* const poreData = pore;
-    uint32* const rockData = rock;
-    parallel(Z, [&](uint, uint z) {
+    //uint32* const rockData = rock;
+    parallel(Z, [&](uint, int z) {
         const uint16* const sourceZ = source + z*XY;
         uint32* const poreZ = poreData + z*XY;
-        uint32* const rockZ = rockData + z*XY;
-        for(uint y=0; y<Y; y++) {
+        //uint32* const rockZ = rockData + z*XY;
+        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) for(int x=0; x<X; x+=8) storea(poreZ+y*X+x, _1b);
+        else for(int y=0; y<Y; y++) {
             const uint16* const sourceY = sourceZ + y*X;
             uint32* const poreZY = poreZ + y*X;
-            uint32* const rockZY = rockZ + y*X;
-            for(uint x=0; x<X; x+=8) {
-                storea(poreZY+x, loada(sqr+x) | (scaledThreshold > unpacklo(loada(sourceY+x), _0h)));
-                storea(poreZY+x+4, loada(sqr+x+4) | (scaledThreshold > unpackhi(loada(sourceY+x), _0h)));
-                storea(rockZY+x, loada(sqr+x) | (unpacklo(loada(sourceY+x), _0h) > scaledThreshold));
-                storea(rockZY+x+4, loada(sqr+x+4) | (unpackhi(loada(sourceY+x), _0h) > scaledThreshold));
+            //uint32* const rockZY = rockZ + y*X;
+            uint32* const maskY = mask + y*X;
+            for(int x=0; x<X; x+=8) {
+                storea(poreZY+x, loada(sqr+x) | ((threshold4 > unpacklo(loada(sourceY+x), _0h)) & loada(maskY+x)) );
+                storea(poreZY+x+4, loada(sqr+x+4) | ((threshold4 > unpackhi(loada(sourceY+x), _0h)) & loada(maskY+x+4)) );
+                //storea(rockZY+x, loada(maskY+x) | (unpacklo(loada(sourceY+x), _0h) > scaledThreshold));
+                //storea(rockZY+x+4, loada(maskY+x+4) | (unpackhi(loada(sourceY+x), _0h) > scaledThreshold));
             }
         }
     });
-    // Sets boundary voxels to ensures threshold volume is closed (non-zero borders) to avoid null/full rows in distance search
-    uint marginX=align(4,source.margin.x)+1, marginY=align(4,source.margin.y)+1, marginZ=align(4,source.margin.z)+1;
     pore.margin.x=marginX, pore.margin.y=marginY, pore.margin.z=marginZ;
-    rock.margin.x=marginX, rock.margin.y=marginY, rock.margin.z=marginZ;
-    setBorders(pore);
-    setBorders(rock);
+    //rock.margin.x=marginX, rock.margin.y=marginY, rock.margin.z=marginZ;
 #if ASSERT
-    pore.maximum=0xFFFFFFFF, rock.maximum=0xFFFFFFFF;  // for the assert
+    pore.maximum=0xFFFFFFFF;//, rock.maximum=0xFFFFFFFF;  // for the assert
 #else
-    pore.maximum=(pore.sampleCount.x-1)*(pore.sampleCount.x-1), rock.maximum=(rock.sampleCount.x-1)*(rock.sampleCount.x-1); // for visualization
+    pore.maximum=(pore.sampleCount.x-1)*(pore.sampleCount.x-1);//, rock.maximum=(rock.sampleCount.x-1)*(rock.sampleCount.x-1); // for visualization
 #endif
 }
 
 /// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
-    ref<byte> parameters() const override { return "threshold"_; }
+    ref<byte> parameters() const override { return "threshold cylinder"_; }
     uint outputSampleSize(uint) override { return sizeof(uint); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         uint16 binaryThreshold;
@@ -168,7 +171,7 @@ class(Binary, Operation), virtual VolumeOperation {
             Result* threshold = otherInputs[0];
             binaryThreshold = round( TextData(threshold->data).decimal() * inputs[0].maximum );
         }
-        threshold(outputs[0], outputs[1], inputs[0], binaryThreshold);
+        threshold(outputs[0], /*outputs[1],*/ inputs[0], binaryThreshold, args.value("cylinder"_,"0"_)!="0"_);
     }
 };
 

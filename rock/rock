@@ -38,7 +38,7 @@ if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Ot
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
-pore rock = Binary final threshold
+pore = Binary final threshold # Also clips to cylinder
 if !downsample: colorize = Colorize pore source
 if downsample: colorize = Colorize pore final
 
@@ -50,17 +50,14 @@ distance positionx positiony positionz = DistanceZ distancey positionyx position
 skeleton = Skeleton positionx positiony positionz
 unconnected-skeleton = ZOrder skeleton
 
-if cylinder: clip-unconnected-skeleton = CylinderClip unconnected-skeleton # Clips to cylinder
-if !cylinder: clip-unconnected-skeleton = unconnected-skeleton # Or forwards unclipped skeleton
-
 # Rasterizes clipped skeleton
-bin = Bin clip-unconnected-skeleton
+bin = Bin unconnected-skeleton
 unconnected = Rasterize bin
 connected = FloodFill unconnected # Flood fills pore space
 
-if !sweep: minimalSqDiameter = '0'
-if sweep: minimalSqDiameter = {3..10}
-pruned-unconnected = ThresholdClip unconnected minimalSqDiameter #TODO: until maximum radius
+if !sweep: minimalSqRadius = '0'
+if sweep: minimalSqRadius = {3..10}
+pruned-unconnected = ThresholdClip unconnected minimalSqRadius
 pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
 
 # Computes histogram of maximum squared radii
@@ -76,15 +73,15 @@ volume-total = Sum histogram-total
 porosity-unconnected = Div volume-unconnected volume-total
 porosity-connected = Div volume-connected volume-total
 
-# Unconnected Volume( minimalSqDiameter) sweep #FIXME: accumulate histogram-squaredRadius-unconnected
-volume-unconnected-minimalSqDiameter = volume-unconnected minimalSqDiameter
-volume-unconnected-minimalDiameter = SquareRootVariable volume-unconnected-minimalSqDiameter
-porosity-unconnected-minimalDiameter = Div volume-unconnected-minimalDiameter volume-total
+# Unconnected Volume( minimalSqRadius) sweep #FIXME: accumulate histogram-squaredRadius-unconnected
+volume-unconnected-minimalSqRadius = volume-unconnected minimalSqRadius
+volume-unconnected-minimalRadius = SquareRootVariable volume-unconnected-minimalSqRadius
+porosity-unconnected-minimalRadius = Div volume-unconnected-minimalRadius volume-total
 
-# Connected Volume( minimalSqDiameter) sweep
-volume-connected-minimalSqDiameter = volume-connected minimalSqDiameter #TODO: until zero connected volume
-volume-connected-minimalDiameter = SquareRootVariable volume-connected-minimalSqDiameter
-porosity-connected-minimalDiameter = Div volume-connected-minimalDiameter volume-total
+# Connected Volume( minimalSqRadius) sweep
+volume-connected-minimalSqRadius = volume-connected minimalSqRadius #TODO: until zero connected volume
+volume-connected-minimalRadius = SquareRootVariable volume-connected-minimalSqRadius
+porosity-connected-minimalRadius = Div volume-connected-minimalRadius volume-total
 
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected

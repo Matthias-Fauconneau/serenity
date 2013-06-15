@@ -34,7 +34,9 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                 if(s.match('!')) op="=="_, right="0"_;
                 ref<byte> parameter = s.word("_-"_);
                 parameters += parameter;
-                Variant left = arguments.value(parameter, "0"_);
+                Variant left = "0"_;
+                if(sweeps.contains(parameter)) left = str(sweeps.at(parameter),',');
+                else if(arguments.contains(parameter)) left = copy(arguments.at(parameter));
                 if(!left) left="1"_;
                 s.skip();
                 if(!op) op = s.whileAny("!="_);
@@ -153,8 +155,9 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
                         rule.argumentExps[parameter] = Rule::Expression(value);
                     }
                     assert_(match, scope);
-                } else if(arguments.contains(parameter)) { Variant value=arguments.take(parameter); assert_(value); sweeps.insert(parameter, array<Variant>()<<value); }
-                else if(sweeps.contains(parameter)) sweeps.at(parameter) << value;
+                }
+                else if(arguments.contains(parameter)) { Variant first=arguments.take(parameter); assert_(first); sweeps.insert(parameter, array<Variant>()<<first<<value); }
+                else if(sweeps.contains(parameter)) { sweeps.at(parameter) << value; assert_(sweeps.at(parameter).size>1); }
                 else arguments.insert(string(parameter), Variant(value));
             }
             else if(resultNames.contains(argument)) targets << argument;
@@ -174,17 +177,20 @@ array<ref<byte> > Process::configure(const ref<ref<byte> >& allArguments, const 
             }
         }
     }
-    for(auto key: sweeps.keys) if(!defaultArguments.contains(key)) assert_(!arguments.contains(key), "Sweep overrides argument", key, defaultArguments);
     for(uint i: range(targets.size)) {
         Sweeps targetSweeps;
-        for(auto sweep: (const Sweeps&)sweeps) { // Discards irrelevant sweeps
-            assert_(sweep.value, targets[i], sweeps);
+        for(auto sweep: sweeps) { // Discards irrelevant sweeps
+            assert_(sweep.value.size>1, targets[i], sweeps);
             Dict args = copy(arguments);
-            args.insert(string(sweep.key), str(sweep.value,','));
+            if(args.contains(sweep.key)) {
+                if(!defaultArguments.contains(sweep.key)) assert_(!arguments.contains(sweep.key), "Sweep overrides argument", sweep.key, defaultArguments);
+                args.at(sweep.key) = str(sweep.value,',');
+            }
+            else args.insert(string(sweep.key), str(sweep.value,','));
             bool relevant = false;
             if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
             if(relevant) targetSweeps.insert(sweep.key, sweep.value);
-            else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key);
+            else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key, "for", targets[i], str(sweep.value,','));
         }
         for(ref<byte> key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps
         targetsSweeps << targetSweeps;
@@ -235,8 +241,8 @@ Dict Process::evaluateArguments(const ref<byte>& target, const Dict& scopeArgume
     }
     for(auto arg: rule.sweeps) { // Explicits sweep as arguments (for cache validation)
         assert_(arg.value, arg.key);
-        if(args.contains(arg.key)) assert_(args.at(arg.key)==str(arg.value,','), rule, arg.key, "'"_+args.at(arg.key)+"'"_, "'"_+str(arg.value,',')+"'"_);
-        else args.insert(string(arg.key), str(arg.value,','));
+        if(args.contains(arg.key)) args.remove(arg.key); // Sweep overrides local argument
+        args.insert(string(arg.key), str(arg.value,','));
     }
     for(auto arg: rule.argumentExps) { // Evaluates local arguments
         if(args.contains(arg.key)) continue;
@@ -299,13 +305,12 @@ void Process::execute(const ref<byte>& target, const Sweeps& sweeps, const Dict&
         array<Variant> sweep = remaining.take(parameter);
         Dict args = copy(arguments);
         //assert_(!args.contains(parameter), "Sweep parameter overrides existing argument", args.at(parameter));
-        //if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
+        if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
         args.insert(string(parameter), str(sweep,','));
         if(!evaluateArguments(target,args).contains(parameter)) return execute(target, remaining, args);
         assert_(evaluateArguments(target,args).contains(parameter), "Irrelevant sweep parameter", parameter);
         for(Variant& value: sweep) {
-            args.remove(parameter);
-            args.insert(string(parameter), move(value));
+            args.at(parameter) = move(value);
             execute(target, remaining, args);
         }
     } else { // Actually generates targets when sweeps have been explicited
@@ -448,8 +453,8 @@ shared<Result> PersistentProcess::getResult(const ref<byte>& target, const Dict&
 
            Dict args = copy(arguments);
            ref<byte> parameter = rule.sweeps.keys.first(); // Removes first parameter and loop over it
+           assert_(rule.sweeps.at(parameter), "Single value sweep", parameter, rule.sweeps.at(parameter));
            if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
-
            args.insert(string(parameter), str(rule.sweeps.at(parameter),','));
            relevantArguments = evaluateArguments(target, arguments);
            assert_(relevantArguments.contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);

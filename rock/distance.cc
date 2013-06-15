@@ -2,6 +2,35 @@
 #include "time.h"
 #include "simd.h"
 
+void setBorders(Volume32& target) {
+    const uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY=X*Y;
+    uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
+    typedef uint32 T;
+    T* const targetData = target;
+    assert(!target.tiled());
+    for(uint z=0; z<Z; z++) {
+        T* const targetZ = targetData + z*XY;
+        for(uint y=0; y<Y; y++) {
+            T* const targetZY = targetZ + y*X;
+            for(uint x=0; x<=marginX; x++) targetZY[x] = x*x;
+            for(uint x=X-marginX; x<X; x++) targetZY[x] = x*x;
+        }
+        for(uint x=0; x<X; x++) {
+            T* const targetZX = targetZ + x;
+            for(uint y=0; y<=marginY; y++) targetZX[y*X] = x*x;
+            for(uint y=Y-marginY; y<Y; y++) targetZX[y*X] = x*x;
+        }
+    }
+    for(uint y=0; y<Y; y++) {
+        T* const targetY = targetData + y*X;
+        for(uint x=0; x<X; x++) {
+            T* const targetYX = targetY + x;
+            for(uint z=0; z<=marginZ; z++) targetYX[z*XY] = x*x;
+            for(uint z=Z-marginZ; z<Z; z++) targetYX[(Z-marginZ-1)*XY] = x*x;
+        }
+    }
+}
+
 // FIXME: try to factor these
 
 // X

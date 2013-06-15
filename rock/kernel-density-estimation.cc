@@ -63,7 +63,7 @@ class(Sum, Operation), virtual Pass {
 /// Square roots the variable of a distribution
 class(SquareRootVariable, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
-        assert_(endsWith(source.metadata,".tsv"_), source.metadata, source.name, target.name);
+        assert_(endsWith(source.metadata,".tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
         target.metadata = copy(source.metadata);
         target.data = toASCII(squareRootVariable(parseNonUniformSample(source.data)));
     }
@@ -73,6 +73,7 @@ class(SquareRootVariable, Operation), virtual Pass {
 class(ScaleVariable, Operation), virtual Pass {
     virtual ref<byte> parameters() const { return "scale"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
+        assert_(endsWith(source.metadata,".tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
         target.metadata = copy(source.metadata);
         target.data = toASCII(scaleVariable(toDecimal(args.at("scale"_)), parseNonUniformSample(source.data)));
     }

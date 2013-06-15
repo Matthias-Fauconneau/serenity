@@ -4,13 +4,14 @@
 
 /// Downsamples a volume by averaging 2x2x2 samples
 void downsample(Volume16& target, const Volume16& source) {
-    assert(!source.tiled());
+    assert_(!source.tiled());
     int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;
-    assert(X%2==0 && Y%2==0 && Z%2==0);
+    assert_(X%2==0 && Y%2==0 && Z%2==0);
     target.sampleCount = source.sampleCount/2;
     target.data.size /= 8;
     assert(source.margin.x%2==0 && source.margin.y%2==0 && source.margin.z%2==0);
     target.margin = source.margin/2;
+    if(source.margin.x%2) target.margin.x++; if(source.margin.y%2) target.margin.y++; if(source.margin.z%2) target.margin.z++;
     target.maximum=source.maximum;
     const uint16* const sourceData = source;
     uint16* const targetData = target;
@@ -36,8 +37,10 @@ void downsample(Volume16& target, const Volume16& source) {
 class(Downsample, Operation), virtual VolumePass<uint16> {
     ref<byte> parameters() const override { return "downsample"_; }
     void execute(const Dict& args, VolumeT<uint16>& target, const Volume& source) override {
+        int times = args.at("downsample"_)?(int)args.at("downsample"_):1;
+        if(!times) { rawCopy<uint16>(target, (const Volume16&)source, source.size()); return; } // May happen on downsample sweep (FIXME: evaluate process definition for each sweep instance)
         downsample(target, source);
-        for(uint times unused: range(((int)args.at("downsample"_)?:1)-1)) downsample(target, target);
+        for(uint i unused: range(times-1)) downsample(target, target);
     }
 };
 

@@ -62,9 +62,6 @@ uint maximum(const Volume32& source);
 /// Generates lookup tables for tiled volume data access
 void interleavedLookup(Volume& target);
 
-/// Sets volume margins to x*x (used as EDT borders)
-template<Type T> void setBorders(VolumeT<T>& target);
-
 /// Returns an image of a volume slice
 Image slice(const Volume& volume, float z, bool cylinder=false);
 Image slice(const Volume& volume, int z, bool cylinder=false);

@@ -20,27 +20,6 @@ class(ThresholdClip, Operation), virtual VolumeOperation {
     }
 };
 
-/// Explicitly clips volume to cylinder by zeroing exterior samples
-void cylinderClip(Volume16& target, const Volume& source) {
-    int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    uint radiusSq = (X/2-marginX)*(Y/2-marginY);
-    uint16* const targetData = target;
-    for(int z=0; z<Z; z++) for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
-        uint index = source.index(x,y,z);
-        uint value = 0;
-        if(uint(sq(x-X/2)+sq(y-Y/2)) <= radiusSq && z >= marginZ && z<Z-marginZ) {
-            if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
-            else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
-            else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
-            else error(source.sampleSize);
-            assert(value <= source.maximum, value, source.maximum);
-        }
-        targetData[index] = value;
-    }
-}
-class(CylinderClip, Operation), virtual VolumePass<uint16> { void execute(const Dict&, VolumeT<uint16>& target, const Volume& source) override { cylinderClip(target, source); } };
-
 void floodFill(Volume16& target, const Volume16& source) {
     assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;

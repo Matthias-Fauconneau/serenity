@@ -28,10 +28,10 @@ inline void clear(byte* buffer, uint64 size) { for(uint64 i: range(size)) buffer
 /// Copies raw memory from \a src to \a dst
 inline void copy(byte* dst, const byte* src, uint64 size) { for(uint64 i: range(size)) dst[i]=src[i]; }
 /// Initializes buffer to \a value
-template<Type T> void clear(T* buffer, uint64 size, const T& value=T()) { for(uint64 i: range(size)) new (&buffer[i]) T(copy(value)); }
+template<Type T> inline void clear(T* buffer, uint64 size, const T& value=T()) { for(uint64 i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \a dst
 /// \note Ignores move and copy operators
-template<Type T> void rawCopy(T* dst,const T* src, uint64 size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
+template<Type T> inline void rawCopy(T* dst,const T* src, uint64 size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);

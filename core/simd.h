@@ -143,6 +143,7 @@ inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 //inline v8hi packus(v8si a) { return __builtin_ia32_packusdw128(__builtin_ia32_vextractf128_si256(a,0),__builtin_ia32_vextractf128_si256(a,1)); }
 
 // Constants
+unused const v4si _1b = {-1, -1, -1, -1};
 unused const v4si _1i = {1,1,1,1};
 unused const v8hi _0h = {0,0,0,0};
 
