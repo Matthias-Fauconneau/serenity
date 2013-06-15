@@ -1,6 +1,16 @@
 #include "volume-operation.h"
 #include "thread.h"
 
+/// Transposes a volume permuting its coordinates
+void transpose(Volume16& target, const Volume16& source) {
+    const uint sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
+    const uint tX=sY, tY=sZ;
+    const uint16* const sourceData = source;
+    uint16* const targetData = target;
+    for(uint z: range(sZ)) for(uint y: range(sY)) for(uint x: range(sX)) targetData[x*tX*tY + z*tX + y] = sourceData[z*sX*sY + y*sX + x];
+}
+defineVolumePass(Transpose, uint16, transpose);
+
 /// Clips volume to values above a thresold
 void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
     chunk_parallel(source.size(), [&](uint offset, uint size) {

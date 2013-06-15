@@ -3,8 +3,14 @@
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Source
-if !validation: source = Source
-if validation: source = Capsules
+if !validation: original = Source
+if validation: original = Capsules
+
+# Transpose
+if !transpose: source = original
+transpose = Transpose original
+if transpose==1: source = transpose
+if transpose==2: source = Transpose transpose
 
 # Average
 shift = ShiftRight source
@@ -28,7 +34,8 @@ if downsample!='0': final = Downsample clean # Downsamples
 
 # Density distribution
 if !cube: cylinder = '' #Clips histograms to the inscribed cylinder
-histogram-density = Histogram final
+if !thresholdFromSource: histogram-density = Histogram final
+if thresholdFromSource: histogram-density = Histogram source
 histogram-density-normalized = Normalize histogram-density # For debugging purpose: distribution-density (using kernel density estimation) is strictly better
 distribution-density = KernelDensityEstimation histogram-density
 
