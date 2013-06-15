@@ -131,5 +131,5 @@ template<Type T> array<ref<T>> toRefs(const ref<array<T>>& o) {
     array<ref<T>> r; for(const array<T>& e: o) r << (const ref<T>&)e; return r;
 }
 
-/// string is an array of bytes
-typedef array<byte> string;
+/// String is an array of bytes
+typedef array<byte> String;

@@ -8,17 +8,17 @@
 /// Rich text format control code encoded in 00-1F range
 /// \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
 enum Format { Regular=0,Bold=1,Italic=2,Underline=4, /*8,'\n','\t'*/ Link=16 };
-inline string format(Format f) { string s; s << (char)f; return s; }
+inline String format(Format f) { String s; s << (char)f; return s; }
 inline Format format(uint f) { assert(f<32); return Format(f); }
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const ref<byte>& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0);
+    Text(const string& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0);
     // Resolves cat overloading
-    Text(const string& text, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text((ref<byte>)text,size,color,wrap){}
+    Text(const String& text, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text((string)text,size,color,wrap){}
 
-    void setText(const ref<byte>& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
+    void setText(const string& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
 
     /// Displayed text in UTF32
@@ -32,7 +32,7 @@ struct Text : Widget {
     /// User clicked on this Text
     signal<> textClicked;
     /// User clicked on a \a Format::Link
-    signal<const ref<byte>&> linkActivated;
+    signal<const string&> linkActivated;
 
     int2 sizeHint();
     void layout();
@@ -65,17 +65,17 @@ struct Text : Widget {
     uint index();
 
     // Inline links
-    struct Link { Cursor begin,end; string identifier;};
+    struct Link { Cursor begin,end; String identifier;};
     array<Link> links;
 };
 
 /// TextInput is an editable \a Text
 struct TextInput : Text {
-    TextInput(const ref<byte>& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text(text,size,color,wrap){} //FIXME: inherit
+    TextInput(const string& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text(text,size,color,wrap){} //FIXME: inherit
     /// User edited this text
-    signal<const ref<byte>&> textChanged;
+    signal<const string&> textChanged;
     /// User pressed enter
-    signal<const ref<byte>&> textEntered;
+    signal<const string&> textEntered;
     /// Cursor start position for selections
     Cursor selectionStart;
 

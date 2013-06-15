@@ -19,8 +19,8 @@ const utf8_iterator& utf8_iterator::operator++() {
     return *this;
 }
 
-string utf8(uint c) {
-    string utf8;
+String utf8(uint c) {
+    String utf8;
     /**/  if(c<(1<<7)) utf8 << c;
     else if(c<(1<<(7+6))) utf8 << (0b11000000|(c>>6)) << (0b10000000|(c&0b111111));
     else if(c<(1<<(7+6+6))) utf8 << (0b11100000|(c>>12)) << (0b10000000|((c>>6)&0b111111)) << (0b10000000|(c&0b111111));
@@ -28,7 +28,7 @@ string utf8(uint c) {
     return utf8;
 }
 
-array<uint> toUTF32(ref<byte> utf8) {
+array<uint> toUTF32(string utf8) {
     array<uint> utf32(utf8.size);
     for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) {
         utf32 << *it;
@@ -36,8 +36,8 @@ array<uint> toUTF32(ref<byte> utf8) {
     return utf32;
 }
 
-string toUTF8(ref<uint> utf32) {
-    string utf8(utf32.size);
+String toUTF8(ref<uint> utf32) {
+    String utf8(utf32.size);
     for(uint c: utf32) utf8 << ::utf8(c);
     return utf8;
 }

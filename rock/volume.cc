@@ -23,8 +23,8 @@ void interleavedLookup(Volume& target) {
     target.offsetZ = interleavedLookup(target.sampleCount.z,2);
 }
 
-string volumeFormat(const Volume& volume) {
-    string s; s << str(volume.sampleCount.x) << 'x' << str(volume.sampleCount.y) << 'x' << str(volume.sampleCount.z);
+String volumeFormat(const Volume& volume) {
+    String s; s << str(volume.sampleCount.x) << 'x' << str(volume.sampleCount.y) << 'x' << str(volume.sampleCount.z);
     if(volume.margin) s << '+' << str(volume.margin.x) << '+' << str(volume.margin.y) << '+' << str(volume.margin.z);
     s << '-' << hex(volume.maximum);
     if(volume.tiled()) s << "-tiled"_;
@@ -33,7 +33,7 @@ string volumeFormat(const Volume& volume) {
     return s;
 }
 
-bool parseVolumeFormat(Volume& volume, const ref<byte>& format) {
+bool parseVolumeFormat(Volume& volume, const string& format) {
     TextData s (format);
     volume.sampleCount.x = s.mayInteger(); if(!s.match("x"_)) return false;
     volume.sampleCount.y = s.mayInteger(); if(!s.match("x"_)) return false;

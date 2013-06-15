@@ -81,7 +81,7 @@ generic float norm(const vector& a) { return sqrt(dot(a,a)); }
 generic vector normalize(const vector& a){ return a/norm(a); }
 generic bool isNaN(const vector& v){ for(uint i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
 
-generic string str(const vector& v) { string s("("_); for(uint i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
+generic String str(const vector& v) { String s("("_); for(uint i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
 
 #undef vector
 #undef generic
@@ -135,4 +135,4 @@ inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,off
 inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,b.max)); }
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline bool operator ==(Rect a, Rect b) { return a.min==b.min && a.max==b.max; }
-inline string str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
+inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }

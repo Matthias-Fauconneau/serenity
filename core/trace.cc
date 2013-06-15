@@ -18,8 +18,8 @@ static int readLEV(BinaryData& s, bool sign=false) {
     return result;
 }
 
-string demangle(TextData& s, bool function=true) {
-    string r;
+String demangle(TextData& s, bool function=true) {
+    String r;
     bool rvalue=false,ref=false; int pointer=0;
     for(;;) {
         /**/  if(s.match('O')) rvalue=true;
@@ -71,7 +71,7 @@ string demangle(TextData& s, bool function=true) {
     else if(s.match("Lb"_)) r<<str((bool)s.integer());
     else if(s.match('L')) r<<"extern "_<<demangle(s);
     else if(s.match('I')||s.match('J')) { //template | argument pack
-        array<string> args;
+        array<String> args;
         while(s && !s.match('E')) {
             if(s.peek()=='Z') args<<(demangle(s)+"::"_+demangle(s));
             else args<<demangle(s,false);
@@ -80,13 +80,13 @@ string demangle(TextData& s, bool function=true) {
     }
     else if(s.match('Z')) {
         r<< demangle(s);
-        array<string> args;
+        array<String> args;
         while(s && !s.match('E')) args << demangle(s);
         r<< '(' << join(args,", "_) << ')';
     }
     else if(s.match("_0"_)) {}
     else if(s.match('N')) {
-        array<string> list;
+        array<String> list;
         bool const_method =false;
         if(s.match('K')) const_method=true;
         while(s && !s.match('E')) {
@@ -107,7 +107,7 @@ string demangle(TextData& s, bool function=true) {
     if(ref) r<<'&';
     return r;
 }
-string demangle(const ref<byte>& symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
+String demangle(const string& symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findSymbol(void* find) {
     static Map exe("/proc/self/exe"_);
@@ -129,7 +129,7 @@ Symbol findSymbol(void* find) {
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) s.untilNull();
-        array<ref<byte>> files;
+        array<string> files;
         while(s.peek()) {
             files << s.untilNull();
             int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
@@ -199,7 +199,7 @@ void* return_address(void* fp) { return *((void**)fp-1); }
 #error Unsupported architecture
 #endif
 
-string trace(int skip, void* ip) {
+String trace(int skip, void* ip) {
     void* stack[32];
     void* frame = __builtin_frame_address(0);
     int i=0;
@@ -212,7 +212,7 @@ string trace(int skip, void* ip) {
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }
-    string r;
+    String r;
     for(i=i-4; i>=skip; i--) { Symbol s = findSymbol(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<"0x"_+hex(ptr(stack[i]))<<"\n"_; }
     if(ip) { Symbol s = findSymbol(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<"0x"_+hex(ptr(ip))<<"\n"_; }
     return r;

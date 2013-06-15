@@ -57,11 +57,11 @@ typedef ImageView Icon;
 /// Clickable image
 struct ImageLink : ImageView {
     /// Argument given to triggered
-    string link;
+    String link;
     /// User clicked on the image
     signal<> triggered;
     /// User clicked on the image
-    signal<const ref<byte>&> linkActivated;
+    signal<const string&> linkActivated;
 
     ImageLink(){}
     ImageLink(Image&& image):Icon(move(image)){}
@@ -118,7 +118,7 @@ struct Slider : Progress {
 struct Item : Horizontal {
     Icon icon; Text text;
     Item(){}
-    Item(Image&& icon, string&& text, int size=16):icon(move(icon)),text(move(text),size){}
+    Item(Image&& icon, String&& text, int size=16):icon(move(icon)),text(move(text),size){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
 };
@@ -126,7 +126,7 @@ struct Item : Horizontal {
 /// Clickable Item
 struct TriggerItem : Item {
     TriggerItem(){}
-    TriggerItem(Image&& icon, string&& text, int size=16):Item(move(icon),move(text),size){}
+    TriggerItem(Image&& icon, String&& text, int size=16):Item(move(icon),move(text),size){}
     /// User clicked on the button
     signal<> triggered;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;

@@ -22,7 +22,7 @@
 //#include "kernel-density-estimation.h"
 //#include "export.h"
 
-string strByteCount(uint64 byteCount) {
+String strByteCount(uint64 byteCount) {
     if(byteCount < 1u<<10) return str(byteCount,"B"_);
     if(byteCount < 10u<<20) return str(byteCount>>10,"kiB"_);
     if(byteCount < 10u<<30) return str(byteCount>>20,"MiB"_);
@@ -30,15 +30,15 @@ string strByteCount(uint64 byteCount) {
 }
 
 struct GraphProcess : virtual Process {
-    string dot(array<const Rule*>& once, const ref<byte>& output) {
+    String dot(array<const Rule*>& once, const string& output) {
         const Rule& rule = ruleForOutput(output);
-        string s;
+        String s;
         if(!once.contains(&rule)) {
             once << &rule;
             s <<'"'<<hex(ptr(&rule))<<'"'<< "[shape=record, label=\""_<<rule.operation;
-            for(ref<byte> output: rule.outputs) s<<"|<"_<<output<<"> "_<<output;
+            for(string output: rule.outputs) s<<"|<"_<<output<<"> "_<<output;
             s<<"\"];\n"_;
-            for(ref<byte> input: rule.inputs) {
+            for(string input: rule.inputs) {
                 s<<'"'<<hex(ptr(&ruleForOutput(input)))<<"\":\""_<<input<<"\" -> \""_<<hex(ptr(&rule))<<"\"\n"_;
                 s<<dot(once, input);
             };
@@ -46,12 +46,12 @@ struct GraphProcess : virtual Process {
         return s;
     }
 
-    void generateSVG(const ref<ref<byte>>& targets, const ref<byte>& name, const ref<byte>& folder){
+    void generateSVG(const ref<string>& targets, const string& name, const string& folder){
         array<const Rule*> once;
-        string s ("digraph \""_+name+"\" {\n"_);
-        for(const ref<byte>& target: targets) s << dot(once, target);
+        String s ("digraph \""_+name+"\" {\n"_);
+        for(const string& target: targets) s << dot(once, target);
         s << "}"_;
-        string path = "/dev/shm/"_+name+".dot"_;
+        String path = "/dev/shm/"_+name+".dot"_;
         writeFile(path, s);
         ::execute("/ptmp/bin/dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
     }
@@ -60,11 +60,11 @@ struct GraphProcess : virtual Process {
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)i
-    Rock(const ref<ref<byte>>& args) {
+    Rock(const ref<string>& args) {
         specialParameters += "dump"_; specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_;
-        string process;
-        for(const ref<byte>& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
-        array<ref<byte>> targets = configure(args, process? : rock());
+        String process;
+        for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
+        array<string> targets = configure(args, process? : rock());
 #ifndef BUILD
 #define BUILD "undefined"
 #endif
@@ -94,18 +94,18 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                     break;
                 }
                 Time time;
-                const ref<byte>& path = targetPaths[index];
-                string name, data;
+                const string& path = targetPaths[index];
+                String name, data;
                 if(targetsSweeps[index]) { // Concatenates sweep results into a single file
                     const Sweeps& sweeps = targetsSweeps[index];
                     assert_(sweeps.size()==1, "FIXME: Only single sweeps can be concatenated");
                     uint sweepSize = sweeps.values[0].size, dataSize = 0;
                     assert_(sweepSize, targets[index], path, sweeps);
                     for(const shared<Result>& result: targetResults.slice(resultIndex, sweepSize)) {
-                        string resultName = result->name+"."_+result->metadata;
+                        String resultName = result->name+"."_+result->metadata;
                         if(!name) name = copy(resultName);
                         assert_(resultName==name);
-                        ref<byte> key = result->relevantArguments.at(sweeps.keys[0]);
+                        string key = result->relevantArguments.at(sweeps.keys[0]);
                         if(result->metadata=="scalar"_) data << key << "\t"_ << result->data;
                         else {
                             assert_(!data);
@@ -116,7 +116,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                         }
                     }
                     resultIndex += sweepSize;
-                    if(!data) log(name,"->",path, "["_+str(sweepSize)+"x]"_, "["_+strByteCount(dataSize)+"]"_, (uint64)time>100 ? (string)time : ""_);
+                    if(!data) log(name,"->",path, "["_+str(sweepSize)+"x]"_, "["_+strByteCount(dataSize)+"]"_, (uint64)time>100 ? (String)time : ""_);
                 } else {
                     const shared<Result>& target = targetResults[resultIndex];
                     name = target->name+"."_+target->metadata;
@@ -135,7 +135,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             }
             if(targetResults.slice(resultIndex) && !arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(resultIndex));
         } else if(targetPaths.size == 1) { // Copies results into folder
-            const ref<byte>& path = targetPaths[0];
+            const string& path = targetPaths[0];
             assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
             if(!existsFolder(path,cwd)) Folder(path,cwd,true);
             for(const shared<Result>& target: targetResults) if(target->data.size) {
@@ -164,17 +164,17 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         }
     }
 
-     void parseSpecialArguments(const ref<ref<byte>>& specialArguments) override {
-        for(const ref<byte>& argument: specialArguments) {
+     void parseSpecialArguments(const ref<string>& specialArguments) override {
+        for(const string& argument: specialArguments) {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
-            else if(!arguments.contains("path"_) && existsFolder(argument,cwd)) arguments.insert(string("path"_),argument);
+            else if(!arguments.contains("path"_) && existsFolder(argument,cwd)) arguments.insert(String("path"_),argument);
             else if(!argument.contains('=')) targetPaths << argument;
             else error("Invalid argument", argument);
         }
         assert_(arguments.contains("path"_), "Usage: rock <source folder containing volume slices> (target name|target path|key=value)*");
-        ref<byte> path = arguments.at("path"_);
-        name = string(path.contains('/') ? section(path,'/',-2,-1) : path); // Use source path as process name (for storage folder) instead of any first arguments
+        string path = arguments.at("path"_);
+        name = String(path.contains('/') ? section(path,'/',-2,-1) : path); // Use source path as process name (for storage folder) instead of any first arguments
         PersistentProcess::parseSpecialArguments(specialArguments);
     }
 
@@ -243,13 +243,13 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     }
 
     void saveSlice() {
-        string path = name+"."_+current->name+"."_+current->metadata+".png"_;
+        String path = name+"."_+current->name+"."_+current->metadata+".png"_;
         writeFile(path, encodePNG(slice(toVolume(current),sliceZ,arguments.contains("cylinder"_))), home());
         log(path);
     }
 
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
-    array<ref<byte>> targetPaths; // Path to file (or folders) where targets are copied
+    array<string> targetPaths; // Path to file (or folders) where targets are copied
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     unique<Window> window = nullptr;

@@ -3,79 +3,79 @@
 #include "file.h"
 
 /// Defines arguments taking multiple values
-typedef map<ref<byte>, array<Variant>> Sweeps;
+typedef map<string, array<Variant>> Sweeps;
 
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
 struct Rule {
-    ref<byte> operation;
-    array<ref<byte>> inputs;
-    array<ref<byte>> outputs;
+    string operation;
+    array<string> inputs;
+    array<string> outputs;
     struct Expression : Variant { enum EType { Literal, Value } type=Value; Expression(Variant&& value=Variant(), EType type=Literal):Variant(move(value)),type(type){} };
-    map<string, Expression> argumentExps;
+    map<String, Expression> argumentExps;
     Sweeps sweeps; // Process-specified parameter sweeps
 };
-template<> inline string str(const Rule::Expression& e) { return str<Variant>(e); }
-template<> inline string str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs/*,rule.argumentExps?str(rule.argumentExps):""_,rule.sweeps?str(rule.sweeps):""_*/); }
+template<> inline String str(const Rule::Expression& e) { return str<Variant>(e); }
+template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs/*,rule.argumentExps?str(rule.argumentExps):""_,rule.sweeps?str(rule.sweeps):""_*/); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
     /// Returns all valid parameters
-    array<ref<byte>> parameters();
+    array<string> parameters();
 
     /// Configures process using given arguments and definition (which can depends on the arguments)
-    array<ref<byte>> configure(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
+    array<string> configure(const ref<string>& allArguments, const string& definition);
 
     /// Parses special arguments
-    virtual void parseSpecialArguments(const ref<ref<byte>>& arguments) { assert_(!arguments); }
+    virtual void parseSpecialArguments(const ref<string>& arguments) { assert_(!arguments); }
 
     /// Returns the Rule to evaluate in order to produce \a target
-    Rule& ruleForOutput(const ref<byte>& target);
+    Rule& ruleForOutput(const string& target);
 
     /// Recursively evaluates relevant arguments for a rule
-    Dict evaluateArguments(const ref<byte>& target, const Dict& arguments, bool local=false,  const ref<byte>& scope=""_);
+    Dict evaluateArguments(const string& target, const Dict& arguments, bool local=false,  const string& scope=""_);
 
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
-    int indexOf(const ref<byte>& target, const Dict& arguments);
+    int indexOf(const string& target, const Dict& arguments);
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
-    const shared<Result>& find(const ref<byte>& target, const Dict& arguments);
+    const shared<Result>& find(const string& target, const Dict& arguments);
 
     /// Recursively verifies \a target output is the same since \a queryTime
-    bool sameSince(const ref<byte>& target, int64 queryTime, const Dict& arguments);
+    bool sameSince(const string& target, int64 queryTime, const Dict& arguments);
 
     /// Returns a valid cached Result for \a target with \a arguments or generates it if necessary
-    virtual shared<Result> getResult(const ref<byte>& target, const Dict& arguments);
+    virtual shared<Result> getResult(const string& target, const Dict& arguments);
 
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const ref<byte>& target, const Sweeps& sweeps, const Dict& arguments);
+    void execute(const string& target, const Sweeps& sweeps, const Dict& arguments);
 
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
-    void execute(const ref<ref<byte> >& allArguments, const ref<byte>& definition);
+    void execute(const ref<string>& allArguments, const string& definition);
 
-    array<ref<byte>> specialParameters; // Valid parameters accepted for derived class special behavior
+    array<string> specialParameters; // Valid parameters accepted for derived class special behavior
     Dict arguments; // User-specified arguments
     array<Sweeps> targetsSweeps; // User-specified parameter sweeps (for each target)
     array<Rule> rules; // Production rules
-    array<ref<byte>> resultNames; // Valid result names defined by process
+    array<string> resultNames; // Valid result names defined by process
     array<shared<Result>> results; // Generated intermediate (and target) data
     array<shared<Result>> targetResults; // Generated target data
 };
 
 /// Mirrors results on a filesystem
 struct ResultFile : Result {
-    ResultFile(const ref<byte>& name, long timestamp, Dict&& arguments, string&& metadata, string&& data, const ref<byte>& path, const Folder& folder)
-        : Result(name,timestamp,move(arguments),move(metadata), move(data)), fileName(string(path)), folder(folder) {}
-    ResultFile(const ref<byte>& name, long timestamp, Dict&& arguments, string&& metadata, Map&& map, const ref<byte>& path, const Folder& folder)
-        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(string(path)), folder(folder) { if(map) maps<<move(map); }
+    ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, String&& data, const string& path, const Folder& folder)
+        : Result(name,timestamp,move(arguments),move(metadata), move(data)), fileName(String(path)), folder(folder) {}
+    ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, Map&& map, const string& path, const Folder& folder)
+        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(String(path)), folder(folder) { if(map) maps<<move(map); }
     void rename() {
         if(!fileName) return;
-        string newName = name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):string())+"."_+metadata;
+        String newName = name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata;
         if(fileName!=newName) { ::rename(fileName, newName, folder); fileName=move(newName); }
     }
     void addUser() override { ++userCount; rename(); }
     uint removeUser() override { --userCount; rename(); return userCount; }
 
     array<Map> maps;
-    string fileName;
+    String fileName;
     const Folder& folder;
 };
 
@@ -83,12 +83,12 @@ struct ResultFile : Result {
 struct PersistentProcess : virtual Process {
     ~PersistentProcess();
 
-    void parseSpecialArguments(const ref<ref<byte>>& arguments) override;
+    void parseSpecialArguments(const ref<string>& arguments) override;
 
     /// Gets result from cache or computes if necessary
-    shared<Result> getResult(const ref<byte>& target, const Dict& arguments) override;
+    shared<Result> getResult(const string& target, const Dict& arguments) override;
 
     Folder baseStorageFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to intermediate operations of volume data (e.g. up to 64bit per sample input and output)
-    string name; // Used to name intermediate and output files (folder base name)
+    String name; // Used to name intermediate and output files (folder base name)
     Folder storageFolder = ""_; // Holds intermediate operations data (=baseStorageFolder/name)
 };

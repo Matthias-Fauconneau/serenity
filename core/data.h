@@ -114,7 +114,7 @@ struct TextData : virtual Data {
     TextData(){}
     default_move(TextData);
     TextData(buffer<byte>&& array) : Data(move(array)){}
-    explicit TextData(const ref<byte>& reference):Data(reference){}
+    explicit TextData(const string& reference):Data(reference){}
 #else
     using Data::Data;
 #endif
@@ -122,52 +122,52 @@ struct TextData : virtual Data {
     /// If input match \a key, advances \a pos by \a key size
     bool match(char key);
     /// If input match \a key, advances \a pos by \a key size
-    bool match(const ref<byte>& key);
+    bool match(const string& key);
     /// If input match any of \a key, advances \a pos
-    bool matchAny(const ref<byte>& any);
+    bool matchAny(const string& any);
     /// If input match none of \a key, advances \a pos
-    bool matchNo(const ref<byte>& any);
+    bool matchNo(const string& any);
 
     /// Asserts stream matches \a key and advances \a key length bytes
-    void skip(const ref<byte>& key);
+    void skip(const string& key);
 
     /// Advances while input doesn't match \a key. \sa until
-    ref<byte> whileNot(char key);
+    string whileNot(char key);
     /// Advances while input match any of \a key
-    ref<byte> whileAny(const ref<byte>& key);
+    string whileAny(const string& key);
     /// Advances while input match none of \a key
-    ref<byte> whileNo(const ref<byte>& key);
+    string whileNo(const string& key);
 
     /// Reads until input match \a key. \sa whileNot
-    ref<byte> until(char key);
+    string until(char key);
     /// Reads until input match \a key
-    ref<byte> until(const ref<byte>& key);
+    string until(const string& key);
     /// Reads until input match any character of \a key
-    ref<byte> untilAny(const ref<byte>& any);
+    string untilAny(const string& any);
     /// Reads until the end of input
-    ref<byte> untilEnd();
+    string untilEnd();
     /// Skips whitespaces
     void skip();
     /// Reads until end of line
-    ref<byte> line();
+    string line();
     /// Reads one possibly escaped character
     char character();
     /// Reads a word [a-zA-Z/special/]+
-    ref<byte> word(const ref<byte>& special=""_);
+    string word(const string& special=""_);
     /// Reads a identifier [a-zA-Z0-9/special/]*
-    ref<byte> identifier(const ref<byte>& special=""_);
+    string identifier(const string& special=""_);
     /// Matches [-+]?[0-9]*
-    ref<byte> whileInteger(bool sign=false);
+    string whileInteger(bool sign=false);
     /// Reads an integer
     int integer(bool sign=false);
     /// Reads an unsigned integer, return -1 if fails
     uint mayInteger();
     /// Matches [0-9a-fA-F]*
-    ref<byte> whileHexadecimal();
+    string whileHexadecimal();
     /// Reads an hexadecimal integer
     uint hexadecimal();
     /// Matches [-+]?[0-9]*\.[0-9]*
-    ref<byte> whileDecimal();
+    string whileDecimal();
     /// Reads a decimal number
     double decimal();
 };

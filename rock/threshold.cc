@@ -32,7 +32,7 @@ class(Otsu, Operation) {
         }
         float densityThreshold = float(threshold) / float(density.size-1);
         //log("Otsu's method estimates threshold at", densityThreshold);
-        outputs[0]->metadata = string("scalar"_);
+        outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 6)+"\n"_;
         output(outputs, 1, "map"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
@@ -61,7 +61,7 @@ class(LorentzianMixtureModel, Operation) {
         uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
         float densityThreshold = float(threshold) / float(density.size);
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
-        outputs[0]->metadata = string("scalar"_);
+        outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
         output(outputs, 1, "lorentz"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore); });
         output(outputs, 2, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
@@ -110,7 +110,7 @@ class(MaximumMeanGradient, Operation) {
         }
         float densityThreshold = float(threshold) / float(histogram.size);
         log("Maximum mean gradient estimates threshold at", densityThreshold, "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels");
-        outputs[0]->metadata = string("scalar"_);
+        outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
         output(outputs, 1, "gradient-mean.tsv"_, [&]{ return toASCII(gradientMean); } );
     }
@@ -152,7 +152,7 @@ void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint1
 
 /// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
-    ref<byte> parameters() const override { return "threshold cylinder"_; }
+    string parameters() const override { return "threshold cylinder"_; }
     uint outputSampleSize(uint) override { return sizeof(uint); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         uint16 binaryThreshold;

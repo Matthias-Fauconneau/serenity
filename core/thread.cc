@@ -13,8 +13,8 @@
 #include <sys/wait.h>
 
 // Log
-void log_(const ref<byte>& buffer) { check_(write(2,buffer.data,buffer.size)); }
-template<> void log(const ref<byte>& buffer) { log_(buffer+"\n"_); }
+void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
+template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 
 // Poll
 void Poll::registerPoll() {
@@ -89,7 +89,7 @@ void Thread::event() {
 }
 
 // Debugger
-string trace(int skip, void* ip);
+String trace(int skip, void* ip);
 void traceAllThreads() {
     Locker lock(threadsLock);
     for(Thread* thread: threads) {
@@ -97,7 +97,7 @@ void traceAllThreads() {
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
 }
-static constexpr ref<byte> fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
+static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
                                          "Invalid"_, "Denormal"_};
 static void handler(int sig, siginfo_t* info, void* ctx) {
 #if __x86_64
@@ -108,8 +108,8 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP];
 #endif
     if(sig==SIGSEGV) log("Segmentation fault"_);
-    string s = trace(1,ip);
-    if(threads.size>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    String s = trace(1,ip);
+    if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
 #ifndef __arm
@@ -138,13 +138,13 @@ void __attribute((constructor(102))) setup_signals() {
     //setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); //FIXME: KDE
 }
 
-template<> void __attribute((noreturn)) error(const ref<byte>& message) {
+template<> void __attribute((noreturn)) error(const string& message) {
     static bool reentrant = false;
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
         traceAllThreads();
-        string s = trace(1,0);
-        if(threads.size>1) log_(string("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+        String s = trace(1,0);
+        if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
         reentrant = false;
     }
     log(message);
@@ -170,18 +170,18 @@ void exit(int status) {
 }
 
 // Environment
-int execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait, const Folder& workingDirectory) {
+int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory) {
     if(!existsFile(path)) { warn("Executable not found",path); return -1; }
 
-    array<string> args0(1+args.size);
+    array<String> args0(1+args.size);
     args0 << strz(path);
     for(const auto& arg: args) args0 << strz(arg);
     const char* argv[args0.size+1];
     for(uint i: range(args0.size)) argv[i] = args0[i].data;
     argv[args0.size]=0;
 
-    array<ref<byte>> env0;
-    static string environ = File("proc/self/environ"_).readUpTo(4096);
+    array<string> env0;
+    static String environ = File("proc/self/environ"_).readUpTo(4096);
     for(TextData s(environ);s;) env0 << s.until('\0');
 
     const char* envp[env0.size+1];
@@ -196,18 +196,18 @@ int execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait, const 
 }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
-ref<byte> getenv(const ref<byte>& name) {
-    static string environ = File("proc/self/environ"_).readUpTo(8192);
+string getenv(const string& name) {
+    static String environ = File("proc/self/environ"_).readUpTo(8192);
     for(TextData s(environ);s;) {
-        ref<byte> key=s.until('='); ref<byte> value=s.until('\0');
+        string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
     }
     warn("Undefined environment variable"_, name);
     return ""_;
 }
 
-array<ref<byte> > arguments() {
-    static string cmdline = File("proc/self/cmdline"_).readUpTo(4096);
+array<string> arguments() {
+    static String cmdline = File("proc/self/cmdline"_).readUpTo(4096);
     assert_(cmdline.size<4096);
     return split(section(cmdline,0,1,-1),0);
 }

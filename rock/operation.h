@@ -18,20 +18,20 @@ struct shareable {
 template <class I> struct Interface {
     struct AbstractFactory {
         /// Returns the version of this implementation
-        virtual ref<byte> version() abstract;
+        virtual string version() abstract;
         virtual unique<I> constructNewInstance() abstract;
     };
-    static map<ref<byte>, AbstractFactory*> factories;
+    static map<string, AbstractFactory*> factories;
     template <class C> struct Factory : AbstractFactory {
-        ref<byte> version() override { return __DATE__ " " __TIME__ ""_; }
+        string version() override { return __DATE__ " " __TIME__ ""_; }
         unique<I> constructNewInstance() override { return unique<C>(); }
         Factory() { TextData s (str(typeid(C).name())); s.integer(); factories.insert(s.word(), this); }
         static Factory registerFactory;
     };
-    static ref<byte> version(const ref<byte>& name) { return factories.at(name)->version(); }
-    static unique<I> instance(const ref<byte>& name) { return factories.at(name)->constructNewInstance(); }
+    static string version(const string& name) { return factories.at(name)->version(); }
+    static unique<I> instance(const string& name) { return factories.at(name)->constructNewInstance(); }
 };
-template <class I> map<ref<byte>,typename Interface<I>::AbstractFactory*> Interface<I>::factories __attribute((init_priority(1000)));
+template <class I> map<string,typename Interface<I>::AbstractFactory*> Interface<I>::factories __attribute((init_priority(1000)));
 template <class I> template <class C> typename Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory __attribute((init_priority(1001)));
 #define class(C,I) \
     struct C; \
@@ -39,33 +39,33 @@ template <class I> template <class C> typename Interface<I>::template Factory<C>
     struct C : virtual I
 
 /// Dynamic-typed value
-/// \note Implemented as a string with implicit conversions
-struct Variant : string {
+/// \note Implemented as a String with implicit conversions
+struct Variant : String {
     Variant(){}
-    Variant(string&& s) : string(move(s)) {}
-    Variant(const ref<byte>& s) : string(s) {}
-    Variant(int integer) : string(dec(integer)){}
+    Variant(String&& s) : String(move(s)) {}
+    Variant(const string& s) : String(s) {}
+    Variant(int integer) : String(dec(integer)){}
     explicit operator bool() { return size; }
     operator int() const { return *this ? toInteger(*this) : 0; }
     operator uint() const { return *this ? toInteger(*this) : 0; }
     operator float() const { return toDecimal(*this); }
     operator double() const { return toDecimal(*this); }
-    operator const ref<byte>&() const { return *this; }
     operator const string&() const { return *this; }
-    template<Type T> operator T() const { return T((const ref<byte>&)*this); } // Enables implicit conversion to any type with an implicit ref<byte> constructor
+    operator const String&() const { return *this; }
+    template<Type T> operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
 };
-template<> inline Variant copy(const Variant& o) { return copy((const string&)o); }
-template<> inline string str(const Variant& o) { return copy(o); }
-typedef map<string,Variant> Dict; /// Associative array of variants
+template<> inline Variant copy(const Variant& o) { return copy((const String&)o); }
+template<> inline String str(const Variant& o) { return copy(o); }
+typedef map<String,Variant> Dict; /// Associative array of variants
 inline Dict parseDict(TextData& s) {
     Dict dict;
     s.skip("{"_);
     for(;;) {
         if(s.match('}')) break;
-        ref<byte> key = s.whileNo(":|}"_);
-        ref<byte> value;
+        string key = s.whileNo(":|}"_);
+        string value;
         if(s.match(':')) value = s.whileNo("|}"_);
-        dict.insert(string(key), replace(string(value),'\\','/'));
+        dict.insert(String(key), replace(String(value),'\\','/'));
         if(s.match('|')) continue;
         else if(s.match('}')) break;
         else error(s.untilEnd());
@@ -75,21 +75,21 @@ inline Dict parseDict(TextData& s) {
 
 /// Intermediate result
 struct Result : shareable {
-    Result(const ref<byte>& name, long timestamp, Dict&& relevantArguments, string&& metadata, buffer<byte>&& data)
+    Result(const string& name, long timestamp, Dict&& relevantArguments, String&& metadata, buffer<byte>&& data)
         : name(name), timestamp(timestamp), relevantArguments(move(relevantArguments)), metadata(move(metadata)), data(move(data)) {}
-    string name; /// Unique identifier used to reference this result in rules' inputs and outputs
+    String name; /// Unique identifier used to reference this result in rules' inputs and outputs
     int64 timestamp; /// Unix timestamp when this result finished succesfully computing [PersistentProcess: file last modified time]
     Dict relevantArguments; /// Relevant arguments (defined only by process and user)
-    string metadata; /// Metadata (defined by Operation depending on inputs and arguments) [PersistentProcess: file system metadata (currently part of file name (limit to 255 bytes)]
+    String metadata; /// Metadata (defined by Operation depending on inputs and arguments) [PersistentProcess: file system metadata (currently part of file name (limit to 255 bytes)]
     buffer<byte> data; /// Data for single outputs (generated by Operation depending on inputs and arguments) [PersistentProcess: file content and memory mapped when possible]
     array<buffer<byte>> elements; /// Data for array outputs (generated by Operation depending on inputs and arguments) [PersistentProcess: folder with numbered files for each element]
 };
-template<> inline string str(const Result& o) { return o.name+str(o.relevantArguments); }
+template<> inline String str(const Result& o) { return o.name+str(o.relevantArguments); }
 
  /// Executes an operation using inputs to compute outputs (of given sample sizes)
 struct Operation {
     /// Returns which parameters affects this operation output
-    virtual ref<byte> parameters() const { return ""_; }
+    virtual string parameters() const { return ""_; }
     /// Returns the desired intermediate data size in bytes for each outputs
     virtual uint64 outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the operation using inputs to compute outputs
@@ -97,9 +97,9 @@ struct Operation {
 };
 
 /// Convenient helper method to implement outputs
-template<Type F> bool output(const ref<Result*>& outputs, uint index, const ref<byte>& metadata, F data) {
+template<Type F> bool output(const ref<Result*>& outputs, uint index, const string& metadata, F data) {
     if(outputs.size>index) {
-        outputs[index]->metadata = string(metadata);
+        outputs[index]->metadata = String(metadata);
         outputs[index]->data = data();
         return true;
     } else assert_(index>0);
@@ -116,7 +116,7 @@ struct Pass : virtual Operation {
 #define definePass(name, type, body) \
 class(name, Operation), virtual Pass { \
     virtual void execute(const Dict& args unused, Result& target, const Result& source) override { \
-        target.metadata = string(type); \
+        target.metadata = String(type); \
         target.data = body; \
     } \
 }*/

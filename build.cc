@@ -4,16 +4,16 @@
 #include "string.h"
 
 struct Node {
-    string name;
+    String name;
     array<Node*> children;
-    Node(const ref<byte>& name):name(copy(name)){}
+    Node(const string& name):name(copy(name)){}
 };
 bool operator ==(const Node& a, const Node& b) { return a.name==b.name; }
-bool operator ==(const Node& a, const ref<byte>& b) { return a.name==b; }
-string str(const Node& o) { string s = copy(o.name); if(o.children) s<<'{'<<str(o.children)<<'}'; return s; }
+bool operator ==(const Node& a, const string& b) { return a.name==b; }
+String str(const Node& o) { String s = copy(o.name); if(o.children) s<<'{'<<str(o.children)<<'}'; return s; }
 
-string dot(array<const Node*>& once, const Node& o) {
-    string s;
+String dot(array<const Node*>& once, const Node& o) {
+    String s;
     if(!once.contains(&o)) {
         once << &o;
         s<<'"'<<o.name<<'"'<<"[shape=record];\n"_;
@@ -22,39 +22,39 @@ string dot(array<const Node*>& once, const Node& o) {
     return s;
 }
 
-void generateSVG(const Node& root, const ref<byte>& folder){
-    ref<byte> name = root.name.contains('/') ? section(root.name,'/',-2,-1) : ref<byte>(root.name);
-    string s ("digraph \""_+name+"\" {\n"_);
+void generateSVG(const Node& root, const string& folder){
+    string name = root.name.contains('/') ? section(root.name,'/',-2,-1) : string(root.name);
+    String s ("digraph \""_+name+"\" {\n"_);
     array<const Node*> once;
     s << ::dot(once, root);
     s << "}"_;
-    string path = "/dev/shm/"_+name+".dot"_;
+    String path = "/dev/shm/"_+name+".dot"_;
     writeFile(path, s);
     ::execute("/ptmp/bin/dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
 }
 
 struct Build {
-    ref<byte> build = arguments()[0], target = arguments()[1], install = arguments().size>2?arguments()[2]:""_;
+    string build = arguments()[0], target = arguments()[1], install = arguments().size>2?arguments()[2]:""_;
     bool graph = build=="graph"_, compile = !graph;
     const Folder& folder = currentWorkingDirectory();
-    const ref<byte> tmp = "/dev/shm/"_;
+    const string tmp = "/dev/shm/"_;
     array<unique<Node>> modules;
-    array<string> libraries;
-    array<string> files;
+    array<String> libraries;
+    array<String> files;
     array<int> pids;
 
-    array<string> sources = folder.list(Files|Recursive);
+    array<String> sources = folder.list(Files|Recursive);
     /// Returns the first path matching file
-    string find(const ref<byte>& file) { for(string& path: sources) if(endsWith(path, file)) return string(path.contains('.')?section(path,'.',0,-2):path); return string(); }
+    String find(const string& file) { for(String& path: sources) if(endsWith(path, file)) return String(path.contains('.')?section(path,'.',0,-2):path); return String(); }
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
-    long parseHeader(const ref<byte>& name) {
+    long parseHeader(const string& name) {
         File file (name+".h"_, folder);
         long lastEdit = file.modifiedTime();
         for(TextData s = file.read(file.size()); s; s.advance(1)) {
             if(s.match("#include \""_)) {
-                ref<byte> name = s.until('.');
-                string header = find(name+".h"_);
+                string name = s.until('.');
+                String header = find(name+".h"_);
                 if(header) lastEdit = max(lastEdit, parseHeader(header));
             }
         }
@@ -63,7 +63,7 @@ struct Build {
 
     /// Compiles a module and its dependencies as needed
     /// \return Timestamp of the last modified module implementation (deep)
-    long processModule(const ref<byte>& target) {
+    long processModule(const string& target) {
         assert_(target);
         modules << unique<Node>(target);
         Node& parent = modules.last();
@@ -73,36 +73,36 @@ struct Build {
         for(TextData s = file.read(file.size()); s; s.advance(1)) {
             if(s.match("#include "_)) {
                 if(s.match('"')) { // module header
-                    ref<byte> name = s.until('.');
+                    string name = s.until('.');
                     assert_(name);
-                    string header = find(name+".h"_);
+                    String header = find(name+".h"_);
                     if(header) lastCompileEdit = max(lastCompileEdit, parseHeader(header));
-                    string module = find(name+".cc"_);
+                    String module = find(name+".cc"_);
                     if(!module || module == parent) continue;
                     if(!modules.contains(module)) lastLinkEdit = max(lastLinkEdit, max(lastCompileEdit, processModule(module)));
                     parent.children << modules[modules.indexOf(module)].pointer;
                 } else { // library header
-                    for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) { ref<byte> library=s.word(); if(library) libraries << string(library); break; }
+                    for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) { string library=s.word(); if(library) libraries << String(library); break; }
                 }
             }
             if(s.match("FILE("_) || s.match("ICON("_)) {
-                ref<byte> file = s.word("_-"_);
+                string file = s.word("_-"_);
                 assert_(file && !files.contains(file), file);
-                files << string(file);
+                files << String(file);
                 s.skip(")"_);
             }
         }
         if(compile) {
-            string object = tmp+build+"/"_+target+".o"_;
+            String object = tmp+build+"/"_+target+".o"_;
             if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
-                static const array<ref<byte>> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -march=native -o"_);
-                array<string> args;
+                static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -march=native -o"_);
+                array<String> args;
                 args << object << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
-                if(::find(build,"debug"_)) args << string("-g"_) << string("-Og"_) << string("-DNO_INLINE"_) << string("-DASSERT"_);
-                else if(::find(build,"fast"_)) args << string("-g"_) << string("-Ofast"_);
-                else if(::find(build,"release"_)) args <<  string("-Ofast"_);
+                if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DNO_INLINE"_) << String("-DASSERT"_);
+                else if(::find(build,"fast"_)) args << String("-g"_) << String("-Ofast"_);
+                else if(::find(build,"release"_)) args <<  String("-Ofast"_);
                 else error("Unknown build",build);
-                args << apply<string>(folder.list(Folders), [this](const string& subfolder){ return "-iquote"_+subfolder; });
+                args << apply<String>(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
                 pids << execute("/ptmp/gcc-4.8.0/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
             }
@@ -114,18 +114,18 @@ struct Build {
 
     Build() {
         Folder(tmp+build, root(), true);
-        for(ref<byte> subfolder: folder.list(Folders|Recursive)) Folder(tmp+build+"/"_+subfolder, root(), true);
+        for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+build+"/"_+subfolder, root(), true);
         long lastEdit = processModule( find(target+".cc"_) );
         if(compile) {
             bool fileChanged = false;
             if(files) {
                 Folder(tmp+"files"_, root(), true);
-                for(string& file: files) {
-                    string path = find(replace(file,"_"_,"/"_));
+                for(String& file: files) {
+                    String path = find(replace(file,"_"_,"/"_));
                     assert_(path, file);
                     Folder subfolder = Folder(section(path,'/',0,-2), folder);
-                    ref<byte> name = section(path,'/',-2,-1);
-                    string object = tmp+"files/"_+name+".o"_;
+                    string name = section(path,'/',-2,-1);
+                    String object = tmp+"files/"_+name+".o"_;
                     if(!existsFile(object) || File(name, subfolder).modifiedTime() >= File(object).modifiedTime()) {
                         if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
                         fileChanged = true;
@@ -133,13 +133,13 @@ struct Build {
                     file = move(object);
                 }
             }
-            string name = target+"."_+build;
-            string binary = tmp+build+"/"_+name;
+            String name = target+"."_+build;
+            String binary = tmp+build+"/"_+name;
             if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime() || fileChanged) {
-                array<string> args; args<<string("-o"_)<<binary;
-                args << apply<string>(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
+                array<String> args; args<<String("-o"_)<<binary;
+                args << apply<String>(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
                 args << files;
-                args << string("-L/ptmp/lib"_) << apply<string>(libraries, [this](const string& library){ return "-l"_+library; });
+                args << String("-L/ptmp/lib"_) << apply<String>(libraries, [this](const String& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
                 if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) fail();
             }

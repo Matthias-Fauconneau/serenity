@@ -18,29 +18,29 @@ bool TextData::match(char key) {
     else return false;
 }
 
-bool TextData::match(const ref<byte>& key) {
+bool TextData::match(const string& key) {
     if(available(key.size)>=key.size && peek(key.size) == key) { advance(key.size); return true; }
     else return false;
 }
 
-bool TextData::matchAny(const ref<byte>& any) {
+bool TextData::matchAny(const string& any) {
     if(!available(1)) return false;
     byte c=peek();
     for(const byte& e: any) if(c == e) { advance(1); return true; }
     return false;
 }
 
-bool TextData::matchNo(const ref<byte>& any) {
+bool TextData::matchNo(const string& any) {
     byte c=peek();
     for(const byte& e: any) if(c == e) return false;
     advance(1); return true;
 }
 
-void TextData::skip(const ref<byte>& key) {
+void TextData::skip(const string& key) {
     assert_(match(key), "'"_+key+"'"_, /*"'"_+untilEnd()+"'"_*/ until('\n'));
 }
 
-ref<byte> TextData::whileNot(char key) {
+string TextData::whileNot(char key) {
     uint start=index, end;
     for(;;advance(1)) {
         if(!available(1)) { end=index; break; }
@@ -48,14 +48,14 @@ ref<byte> TextData::whileNot(char key) {
     }
     return slice(start, end-start);
 }
-ref<byte> TextData::whileAny(const ref<byte>& any) {
+string TextData::whileAny(const string& any) {
     uint start=index; while(available(1) && matchAny(any)){} return slice(start,index-start);
 }
-ref<byte> TextData::whileNo(const ref<byte>& any) {
+string TextData::whileNo(const string& any) {
     uint start=index; while(available(1) && matchNo(any)){} return slice(start,index-start);
 }
 
-ref<byte> TextData::until(char key) {
+string TextData::until(char key) {
     uint start=index, end;
     for(;;advance(1)) {
         if(!available(1)) { end=index; break; }
@@ -64,7 +64,7 @@ ref<byte> TextData::until(char key) {
     return slice(start, end-start);
 }
 
-ref<byte> TextData::until(const ref<byte>& key) {
+string TextData::until(const string& key) {
     uint start=index, end;
     for(;;advance(1)) {
         if(available(key.size)<key.size) { end=index; break; }
@@ -73,7 +73,7 @@ ref<byte> TextData::until(const ref<byte>& key) {
     return slice(start, end-start);
 }
 
-ref<byte> TextData::untilAny(const ref<byte>& any) {
+string TextData::untilAny(const string& any) {
     uint start=index, end;
     for(;;advance(1)) {
         if(!available(1)) { end=index; break; }
@@ -82,20 +82,20 @@ ref<byte> TextData::untilAny(const ref<byte>& any) {
     return slice(start,end-start);
 }
 
-ref<byte> TextData::untilEnd() { uint size=available(-1); return read(size); }
+string TextData::untilEnd() { uint size=available(-1); return read(size); }
 
 void TextData::skip() { whileAny(" \t\n\r"_); }
 
-ref<byte> TextData::line() { return until('\n'); }
+string TextData::line() { return until('\n'); }
 
-ref<byte> TextData::word(const ref<byte>& special) {
+string TextData::word(const string& special) {
     uint start=index;
     for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
     assert(index>=start, line());
     return slice(start,index-start);
 }
 
-ref<byte> TextData::identifier(const ref<byte>& special) {
+string TextData::identifier(const string& special) {
     uint start=index;
     for(;available(1);) {
         byte c=peek();
@@ -115,7 +115,7 @@ char TextData::character() {
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 
-ref<byte> TextData::whileInteger(bool sign) {
+string TextData::whileInteger(bool sign) {
     uint start=index;
     if(sign) matchAny("-+"_);
     for(;available(1);) {
@@ -126,17 +126,17 @@ ref<byte> TextData::whileInteger(bool sign) {
 }
 
 int TextData::integer(bool sign) {
-    ref<byte> s = whileInteger(sign);
+    string s = whileInteger(sign);
     assert(s, untilEnd());
     return toInteger(s, 10);
 }
 
 uint TextData::mayInteger() {
-    ref<byte> s = whileInteger(false);
+    string s = whileInteger(false);
     return s?toInteger(s, 10):-1;
 }
 
-ref<byte> TextData::whileHexadecimal() {
+string TextData::whileHexadecimal() {
     uint start=index;
     for(;available(1);) {
         byte c=peek();
@@ -149,7 +149,7 @@ uint TextData::hexadecimal() {
     return toInteger(whileHexadecimal(), 16);
 }
 
-ref<byte> TextData::whileDecimal() {
+string TextData::whileDecimal() {
     uint start=index;
     matchAny("-+"_);
     if(!match("∞"_)) for(bool gotDot=false, gotE=false;available(1);) {

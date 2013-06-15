@@ -4,7 +4,7 @@
 #include "time.h"
 
 struct Capsule { vec3 a, b; float radius; };
-template<> inline string str(const Capsule& o) { return str(o.a,o.b,o.radius); }
+template<> inline String str(const Capsule& o) { return str(o.a,o.b,o.radius); }
 bool operator <(const Capsule& a, const Capsule& b) { return a.radius < b.radius; }
 
 float sqDistance(Capsule A, Capsule B) {
@@ -94,7 +94,7 @@ class(Capsules, Operation), virtual VolumeOperation {
         Sample analytic ( int(max(capsules).radius) + 1 );
         for(Capsule p : capsules) analytic[int(p.radius)] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
         if(otherOutputs) {
-            otherOutputs[0]->metadata = string("analytic.tsv"_);
+            otherOutputs[0]->metadata = String("analytic.tsv"_);
             otherOutputs[0]->data = toASCII(analytic);
         }
     }

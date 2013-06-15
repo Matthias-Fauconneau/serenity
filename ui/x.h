@@ -85,13 +85,13 @@ struct QueryExtensionReply { byte pad; uint16 seq; uint length; uint8 present,ma
 struct GetKeyboardMapping { int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad=0; };
 struct GetKeyboardMappingReply { uint8 numKeySymsPerKeyCode; uint16 seq; uint length; byte pad[24]; } fixed(GetKeyboardMappingReply);
 
-constexpr ref<byte> requests[] = {"0"_,"CreateWindow"_,"ChangeWindowAttributes"_,"GetWindowAttributes"_,"DestroyWindow"_,"DestroySubwindows"_,"ChangeSaveSet"_,"ReparentWindow"_,"MapWindow"_,"MapSubwindows"_,"UnmapWindow"_,"UnmapSubwindows"_,"ConfigureWindow"_,"CirculateWindow"_,"GetGeometry"_,"QueryTree"_,"InternAtom"_,"GetAtomName"_,"ChangeProperty"_,"DeleteProperty"_,"GetProperty"_,"ListProperties"_,"SetSelectionOwner"_,"GetSelectionOwner"_,"ConvertSelection"_,"SendEvents"_,"GrabPointer"_,"UngrabPointer"_,"GrabButton"_,"UngrabButton"_,"ChangeActivePointerGrab"_,"GrabKeyboard"_,"UngrabKeyboard"_,"GrabKey"_,"UngrabKey"_,"AllowEvents"_,"GrabServer"_,"UngrabServer"_,"QueryPointer"_,"GetMotionEvents"_,"TranslateCoordinates"_,"WarpPointer"_,"SetInputFocus"_,"GetInputFocus"_,"QueryKeymap"_,"OpenFont"_,"CloseFont"_,"QueryFont"_,"QueryTextElements"_,"ListFonts"_,"ListFontsWithInfo"_,"SetFontPath"_,"GetFontPath"_,"CreatePixmap"_,"FreePixmap"_,"CreateGC"_,"ChangeGC"_,"CopyGC"_,"SetDashes"_,"SetClipRectangles"_,"FreeGC"_,"ClearArea"_,"CopyArea"_,"CopyPlane"_,"PolyPoint"_,"PolyLine"_,"PolySegment"_,"PolyRectange"_,"PolyArc"_,"FillPoly"_,"PolyFillRectangle"_,"PolyFillArc"_,"PutImage"_};
-constexpr ref<byte> events[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"ButtonPress"_,"ButtonRelease"_,"MotionNotify"_,"EnterNotify"_,
+constexpr string requests[] = {"0"_,"CreateWindow"_,"ChangeWindowAttributes"_,"GetWindowAttributes"_,"DestroyWindow"_,"DestroySubwindows"_,"ChangeSaveSet"_,"ReparentWindow"_,"MapWindow"_,"MapSubwindows"_,"UnmapWindow"_,"UnmapSubwindows"_,"ConfigureWindow"_,"CirculateWindow"_,"GetGeometry"_,"QueryTree"_,"InternAtom"_,"GetAtomName"_,"ChangeProperty"_,"DeleteProperty"_,"GetProperty"_,"ListProperties"_,"SetSelectionOwner"_,"GetSelectionOwner"_,"ConvertSelection"_,"SendEvents"_,"GrabPointer"_,"UngrabPointer"_,"GrabButton"_,"UngrabButton"_,"ChangeActivePointerGrab"_,"GrabKeyboard"_,"UngrabKeyboard"_,"GrabKey"_,"UngrabKey"_,"AllowEvents"_,"GrabServer"_,"UngrabServer"_,"QueryPointer"_,"GetMotionEvents"_,"TranslateCoordinates"_,"WarpPointer"_,"SetInputFocus"_,"GetInputFocus"_,"QueryKeymap"_,"OpenFont"_,"CloseFont"_,"QueryFont"_,"QueryTextElements"_,"ListFonts"_,"ListFontsWithInfo"_,"SetFontPath"_,"GetFontPath"_,"CreatePixmap"_,"FreePixmap"_,"CreateGC"_,"ChangeGC"_,"CopyGC"_,"SetDashes"_,"SetClipRectangles"_,"FreeGC"_,"ClearArea"_,"CopyArea"_,"CopyPlane"_,"PolyPoint"_,"PolyLine"_,"PolySegment"_,"PolyRectange"_,"PolyArc"_,"FillPoly"_,"PolyFillRectangle"_,"PolyFillArc"_,"PutImage"_};
+constexpr string events[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"ButtonPress"_,"ButtonRelease"_,"MotionNotify"_,"EnterNotify"_,
                                 "LeaveNotify"_,"FocusIn"_,"FocusOut"_,"KeymapNotify"_,"Expose"_,"GraphicsExpose"_,"NoExpose"_,"VisibilityNotify"_,
                                 "CreateNotify"_,"DestroyNotify"_,"UnmapNotify"_,"MapNotify"_,"MapRequest"_,"ReparentNotify"_,"ConfigureNotify"_,
                                 "ConfigureRequest"_,"GravityNotify"_,"ResizeRequest"_,"CirculateNotify"_,"CirculateRequest"_,"PropertyNotify"_,
                                 "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_,"MappingNotify"_};
-constexpr ref<byte> errors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
+constexpr string errors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
                                   "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
 
 namespace Shm {
@@ -105,8 +105,8 @@ struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint
 struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0; };
 struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual, size, pad[4]; } fixed(GetImageReply);
 enum { Completion };
-constexpr ref<byte> requests[] = {"QueryVersion"_,"Attach"_,"Detach"_,"PutImage"_,"GetImage"_};
-constexpr ref<byte> errors[] = {"BadSeg"_};
+constexpr string requests[] = {"QueryVersion"_,"Attach"_,"Detach"_,"PutImage"_,"GetImage"_};
+constexpr string errors[] = {"BadSeg"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 
@@ -126,8 +126,8 @@ struct CreatePicture { int8 ext=EXT,req=4; uint16 size=5; uint picture,drawable,
 struct FreePicture { int8 ext=EXT,req=7; uint16 size=2; uint picture; };
 struct Composite { int8 ext=EXT,req=8; uint16 size=9; uint8 op=Over; uint src,mask=0,dst; int16 srcX=0,srcY=0,maskX=0,maskY=0,dstX=0,dstY=0,width,height; };
 struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
-constexpr ref<byte> requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPictIndexValues"_, "QueryFilters"_, "CreatePicture"_, "ChangePicture"_, "SetPictureClipRectangles"_, "SetPictureTransform"_, "SetPictureFilter"_, "FreePicture"_, "Composite"_};
-constexpr ref<byte> errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
+constexpr string requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPictIndexValues"_, "QueryFilters"_, "CreatePicture"_, "ChangePicture"_, "SetPictureClipRectangles"_, "SetPictureTransform"_, "SetPictureFilter"_, "FreePicture"_, "Composite"_};
+constexpr string errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 

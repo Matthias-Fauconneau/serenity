@@ -39,7 +39,7 @@ Sample squareRoot(const Sample& A) {
     return R;
 }
 
-Sample parseUniformSample(const ref<byte>& file) {
+Sample parseUniformSample(const string& file) {
     TextData s (file);
     int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.decimal(); s.skip("\n"_); }
     s.index=0;
@@ -48,8 +48,8 @@ Sample parseUniformSample(const ref<byte>& file) {
     return sample;
 }
 
-string toASCII(const Sample& sample, float scale) {
-    string s;
+String toASCII(const Sample& sample, float scale) {
+    String s;
     for(uint i=0; i<sample.size; i++) s << ftoa(i*scale, scale==1?0:4) << '\t' << ftoa(sample[i], 4, 0, true) << '\n';
     return s;
 }
@@ -83,15 +83,15 @@ NonUniformSample squareRootVariable(const NonUniformSample& A) {
     return R;
 }
 
-NonUniformSample parseNonUniformSample(const ref<byte>& file) {
+NonUniformSample parseNonUniformSample(const string& file) {
     TextData s (file);
     NonUniformSample sample;
     while(s) { double x=s.decimal(); s.skip("\t"_); sample.insert(x, s.decimal()); s.skip("\n"_); }
     return sample;
 }
 
-string toASCII(const NonUniformSample& A) {
-    string s;
+String toASCII(const NonUniformSample& A) {
+    String s;
     for(auto sample: A) s << ftoa(sample.key, 4) << '\t' << ftoa(sample.value, 4, 0, true) << '\n';
     return s;
 }

@@ -10,7 +10,7 @@ void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
     });
 }
 class(ThresholdClip, Operation), virtual VolumeOperation {
-    ref<byte> parameters() const override { return "clipThreshold"_; }
+    string parameters() const override { return "clipThreshold"_; }
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         uint clipThreshold;

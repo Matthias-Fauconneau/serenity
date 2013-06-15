@@ -17,11 +17,11 @@ struct Window : Socket, Poll {
     enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const ref<byte>& name=""_, const Image& icon=Image(),
-           const ref<byte>& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread, Renderer renderer=Raster);
+    Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image(),
+           const string& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread, Renderer renderer=Raster);
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size, const ref<byte>& name,  const Image& icon, Renderer renderer) :
+    Window(Widget* widget, int2 size, const string& name,  const Image& icon, Renderer renderer) :
         Window(widget, size, name, icon, "_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread, renderer){}
     ~Window() { destroy(); }
 
@@ -39,13 +39,13 @@ struct Window : Socket, Poll {
     /// Processes one X event
     void processEvent(uint8 type, const XEvent& e);
     /// Returns Atom for \a name
-    uint Atom(const ref<byte>& name);
+    uint Atom(const string& name);
     /// Returns KeySym for key \a code and modifier \a state
     Key KeySym(uint8 code, uint8 state);
     /// Returns KeyCode for \a sym
     uint KeyCode(Key sym);
     /// Returns property \a name on \a window
-    template<class T> array<T> getProperty(uint window, const ref<byte>& name, uint size=2+128*128);
+    template<class T> array<T> getProperty(uint window, const string& name, uint size=2+128*128);
 
     /// Shows window.
     void show();
@@ -61,11 +61,11 @@ struct Window : Socket, Poll {
     /// Moves window to \a position and resizes to \a size in one request
     void setGeometry(int2 position, int2 size);
     /// Sets window title to \a title
-    void setTitle(const ref<byte>& title);
+    void setTitle(const string& title);
     /// Sets window icon to \a icon
     void setIcon(const Image& icon);
     /// Sets window type to \a type
-    void setType(const ref<byte>& type);
+    void setType(const string& type);
 
     /// Registers local shortcut on \a key
     signal<>& localShortcut(Key);
@@ -74,7 +74,7 @@ struct Window : Socket, Poll {
 
     /// Gets current text selection
     /// \note The selection owner might lock this process if it fails to notify
-    string getSelection(bool clipboard=false);
+    String getSelection(bool clipboard=false);
 
     /// Returns cursor icon for \a cursor
     const Image& cursorIcon(Cursor cursor);

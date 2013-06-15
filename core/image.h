@@ -25,7 +25,7 @@ struct Image {
     uint width=0, height=0, stride=0;
     bool own=false, alpha=false;
 };
-inline string str(const Image& o) { return str(o.width,"x"_,o.height); }
+inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha); }

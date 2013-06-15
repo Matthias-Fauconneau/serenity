@@ -43,9 +43,9 @@ NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram, floa
 }
 
 class(KernelDensityEstimation, Operation), virtual Pass {
-    virtual ref<byte> parameters() const { return "bandwidth"_; }
+    virtual string parameters() const { return "bandwidth"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        target.metadata = string("kde.tsv"_);
+        target.metadata = String("kde.tsv"_);
         NonUniformSample sample = parseNonUniformSample(source.data);
         UniformSample uniformSample = toUniformSample(sample);
         target.data = uniformSample ? toASCII(kernelDensityEstimation(uniformSample)) : toASCII(kernelDensityEstimation(sample, toDecimal(args.value("bandwidth"_))));
@@ -55,7 +55,7 @@ class(KernelDensityEstimation, Operation), virtual Pass {
 //definePass(Sum, "scalar"_, str(sum(parseUniformSample(source.data))) );
 class(Sum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = string("scalar"_);
+        target.metadata = String("scalar"_);
         target.data = str(sum(parseUniformSample(source.data)))+"\n"_;
     }
 };
@@ -71,7 +71,7 @@ class(SquareRootVariable, Operation), virtual Pass {
 
 /// Scales the variable of a distribution
 class(ScaleVariable, Operation), virtual Pass {
-    virtual ref<byte> parameters() const { return "scale"_; }
+    virtual string parameters() const { return "scale"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
         target.metadata = copy(source.metadata);

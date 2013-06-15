@@ -34,9 +34,9 @@ Sample operator-(const Sample& A, const Sample& B);
 /// Square roots samples
 Sample squareRoot(const Sample& A);
 
-Sample parseUniformSample(const ref<byte>& file);
+Sample parseUniformSample(const string& file);
 
-string toASCII(const Sample& A, float scale=1);
+String toASCII(const Sample& A, float scale=1);
 
 // NonUniformSample
 
@@ -63,9 +63,9 @@ NonUniformSample scaleVariable(float s, const NonUniformSample& A);
 /// Square roots variable
 NonUniformSample squareRootVariable(const NonUniformSample& A);
 
-NonUniformSample parseNonUniformSample(const ref<byte>& file);
+NonUniformSample parseNonUniformSample(const string& file);
 
-string toASCII(const NonUniformSample& A);
+String toASCII(const NonUniformSample& A);
 
 // Lorentz
 
@@ -74,7 +74,7 @@ struct Lorentz {
     float position, height, scale;
     float operator[](float x) const { return height/(1+sq((x-position)/scale)); }
 };
-template<> inline string str(const Lorentz& o) { return "x₀ "_+str(o.position)+", I"_+str(o.height)+", γ "_+str(o.scale); }
+template<> inline String str(const Lorentz& o) { return "x₀ "_+str(o.position)+", I"_+str(o.height)+", γ "_+str(o.scale); }
 
 /// Estimates parameters for a Lorentz distribution fitting the maximum peak
 Lorentz estimateLorentz(const Sample& sample);

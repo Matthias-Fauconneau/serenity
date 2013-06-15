@@ -8,11 +8,11 @@ class(Source, Operation), virtual VolumeOperation {
     uint minX, minY, minZ, maxX, maxY, maxZ;
     int3 sampleCount;
 
-    ref<byte> parameters() const override { static auto p="path cylinder cube"_; return p; }
+    string parameters() const override { static auto p="path cylinder cube"_; return p; }
     uint outputSampleSize(uint) override { return 2; }
     uint64 outputSize(const Dict& args, const ref<Result*>&, uint) override {
         Folder folder = Folder(args.at("path"_), currentWorkingDirectory());
-        array<string> slices = folder.list(Files|Sorted);
+        array<String> slices = folder.list(Files|Sorted);
         assert_(slices, args.at("path"_));
         Map file (slices.first(), folder);
         uint width, height;
@@ -54,7 +54,7 @@ class(Source, Operation), virtual VolumeOperation {
 
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&) {
         Folder folder = Folder(args.at("path"_), currentWorkingDirectory());
-        array<string> slices = folder.list(Files|Sorted);
+        array<String> slices = folder.list(Files|Sorted);
 
         Volume16& target = outputs.first();
         target.sampleCount = sampleCount;

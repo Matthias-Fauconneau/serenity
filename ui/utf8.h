@@ -12,10 +12,10 @@ struct utf8_iterator {
 };
 
 /// Converts Unicode code point to UTF-8
-string utf8(uint code);
+String utf8(uint code);
 
-/// Converts UTF8 string to UTF32
-array<uint> toUTF32(ref<byte> utf8);
+/// Converts UTF8 String to UTF32
+array<uint> toUTF32(string utf8);
 
-/// Converts UTF32 string to UTF8
-string toUTF8(ref<uint> utf32);
+/// Converts UTF32 String to UTF8
+String toUTF8(ref<uint> utf32);

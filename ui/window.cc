@@ -17,21 +17,21 @@ static __thread Window* window; // Current window for Widget event and render me
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
 bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
 void setDrag(Widget* widget) { assert(window); window->drag=widget; }
-string getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
+String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
-Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& icon, const ref<byte>& type, Thread& thread, Renderer renderer)
+Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, const string& type, Thread& thread, Renderer renderer)
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
-    string path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1,1);
+    String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home())) {
             BinaryData s(readFile(".Xauthority"_,home())); s.advance(4); s.untilNull();/*host*/ s.untilNull();/*display*/
-            send(string(raw(r)+s.read<byte>(align(4,(r.nameSize=18))+(r.dataSize=16))));
+            send(String(raw(r)+s.read<byte>(align(4,(r.nameSize=18))+(r.dataSize=16))));
         } else send(raw(r));
     }
-    {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,ref<byte>((byte*)&r.release,r.reason-1));
+    {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,string((byte*)&r.release,r.reason-1));
         read(align(4,r.vendorLength));
         read<XFormat>(r.numFormats);
         for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>();
@@ -46,10 +46,10 @@ Window::Window(Widget* widget, int2 size, const ref<byte>& title, const Image& i
     }
     assert(visual);
 
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; string(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
 
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; string(raw(r)+"RENDER"_+pad(4,r.length));}));
+    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"RENDER"_+pad(4,r.length));}));
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>(raw(QueryPictFormats()));
         array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
@@ -105,7 +105,7 @@ void Window::create() {
         r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
-        r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
+        r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     created = true;
 }
 void Window::destroy() {
@@ -209,24 +209,24 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             int reqSize=sizeof(XRender::requests)/sizeof(*XRender::requests);
             if(code>=XRender::errorBase && code<=XRender::errorBase+XRender::errorCount) { code-=XRender::errorBase;
                 assert(code<sizeof(XRender::errors)/sizeof(*XRender::errors));
-                log("XError",XRender::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(XRender::requests[e.minor]):dec(e.minor));
+                log("XError",XRender::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(XRender::requests[e.minor]):dec(e.minor));
+                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
             }
         } else if(e.major==Shm::EXT) {
             int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
             if(code>=Shm::errorBase && code<=Shm::errorBase+Shm::errorCount) { code-=Shm::errorBase;
                 assert(code<sizeof(Shm::errors)/sizeof(*Shm::errors));
-                log("XError",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+                log("XError",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?string(Shm::requests[e.minor]):dec(e.minor));
+                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
             }
         } else {
             assert(code<sizeof(::errors)/sizeof(*::errors),code,e.major);
             int reqSize=sizeof(::requests)/sizeof(*::requests);
-            log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?string(::requests[e.major]):dec(e.major),"minor",e.minor);
+            log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?String(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
     }
     else if(type==1) error("Unexpected reply");
@@ -374,32 +374,32 @@ signal<>& Window::globalShortcut(Key key) {
 }
 
 // Properties
-uint Window::Atom(const ref<byte>& name) {
-    InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; return readReply<InternAtomReply>(string(raw(r)+name+pad(4,r.length))).atom;
+uint Window::Atom(const string& name) {
+    InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; return readReply<InternAtomReply>(String(raw(r)+name+pad(4,r.length))).atom;
 }
-template<class T> array<T> Window::getProperty(uint window, const ref<byte>& name, uint size) {
+template<class T> array<T> Window::getProperty(uint window, const string& name, uint size) {
     GetProperty r; GetPropertyReply reply=readReply<GetPropertyReply>(({r.window=window; r.property=Atom(name); r.length=size; raw(r); }));
     { uint size=reply.length*reply.format/8; array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
 }
-template array<uint> Window::getProperty(uint window, const ref<byte>& name, uint size);
-template array<byte> Window::getProperty(uint window, const ref<byte>& name, uint size);
+template array<uint> Window::getProperty(uint window, const string& name, uint size);
+template array<byte> Window::getProperty(uint window, const string& name, uint size);
 
-void Window::setType(const ref<byte>& type) {
+void Window::setType(const string& type) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_WINDOW_TYPE"_); r.type=Atom("ATOM"_); r.format=32;
-    r.length=1; r.size+=r.length; send(string(raw(r)+raw(Atom(type))));
+    r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom(type))));
 }
-void Window::setTitle(const ref<byte>& title) {
+void Window::setTitle(const string& title) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
-    r.length=title.size; r.size+=align(4, r.length)/4; send(string(raw(r)+title+pad(4,title.size)));
+    r.length=title.size; r.size+=align(4, r.length)/4; send(String(raw(r)+title+pad(4,title.size)));
 }
 void Window::setIcon(const Image& icon) {
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
-    r.length=2+icon.width*icon.height; r.size+=r.length; send(string(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
+    r.length=2+icon.width*icon.height; r.size+=r.length; send(String(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }
 
-string Window::getSelection(bool clipboard) {
+String Window::getSelection(bool clipboard) {
     GetSelectionOwner r; uint owner = readReply<GetSelectionOwnerReply>(({ if(clipboard) r.selection=Atom("CLIPBOARD"_); raw(r); })).owner;
-    if(!owner) return string();
+    if(!owner) return String();
     {ConvertSelection r; r.requestor=id; if(clipboard) r.selection=Atom("CLIPBOARD"_); r.target=Atom("UTF8_STRING"_); send(raw(r));}
     for(;;) {
         readLock.lock();
@@ -428,7 +428,7 @@ void Window::setCursor(Cursor cursor, uint window) {
     }
     {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=image.width, r.h=image.height; send(raw(r));}
     {::PutImage r; r.drawable=id+Pixmap; r.context=id+GContext; r.w=image.width, r.h=image.height; r.size+=r.w*r.h;
-        send(string(raw(r)+ref<byte>(premultiplied)));}
+        send(String(raw(r)+ref<byte>(premultiplied)));}
     {XRender::CreatePicture r; r.picture=id+Picture; r.drawable=id+Pixmap; r.format=format; send(raw(r));}
     {XRender::CreateCursor r; r.cursor=id+XCursor; r.picture=id+Picture; r.x=hotspot.x; r.y=hotspot.y; send(raw(r));}
     {SetWindowCursor r; r.window=window?:id; r.cursor=id+XCursor; send(raw(r));}

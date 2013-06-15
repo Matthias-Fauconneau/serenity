@@ -35,7 +35,7 @@ void downsample(Volume16& target, const Volume16& source) {
     }
 }
 class(Downsample, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "downsample"_; }
+    string parameters() const override { return "downsample"_; }
     void execute(const Dict& args, VolumeT<uint16>& target, const Volume& source) override {
         int times = args.at("downsample"_)?(int)args.at("downsample"_):1;
         if(!times) { rawCopy<uint16>(target, (const Volume16&)source, source.size()); return; } // May happen on downsample sweep (FIXME: evaluate process definition for each sweep instance)
@@ -96,7 +96,7 @@ void average(Volume16& target, const Volume16& source, uint size, uint shift) {
 
 /// Denoises data by averaging samples in a window
 class(Average, Operation), virtual VolumePass<uint16> {
-    ref<byte> parameters() const override { return "shift"_; }
+    string parameters() const override { return "shift"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
         const int averageWindow = 1, sampleCount = 2*averageWindow+1, shift = args.value("shift"_,log2(sampleCount));
         target.margin.y += align(4, averageWindow);

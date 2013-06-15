@@ -50,10 +50,10 @@ template<Type T> struct VolumeT : Volume {
 };
 
 /// Serializes volume format (size, margin, range, layout)
-string volumeFormat(const Volume& volume);
-inline string str(const Volume& volume) { return volumeFormat(volume); }
+String volumeFormat(const Volume& volume);
+inline String str(const Volume& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
-bool parseVolumeFormat(Volume& volume, const ref<byte>& format);
+bool parseVolumeFormat(Volume& volume, const string& format);
 
 /// Returns maximum of data
 uint maximum(const Volume16& source);

@@ -1,8 +1,8 @@
 #include "string.h"
 
-/// ref<byte>
+/// string
 
-bool operator <(const ref<byte>& a, const ref<byte>& b) {
+bool operator <(const string& a, const string& b) {
     for(uint i: range(min(a.size,b.size))) {
         if(a[i] < b[i]) return true;
         if(a[i] > b[i]) return false;
@@ -10,31 +10,31 @@ bool operator <(const ref<byte>& a, const ref<byte>& b) {
     return a.size > b.size;
 }
 
-uint count(const ref<byte>& a, byte c) {
+uint count(const string& a, byte c) {
     uint count=0; for(byte b: a) if(b==c) count++; return count;
 }
 
-ref<byte> str(const char* s) {
-    if(!s) return "null"_; int i=0; while(s[i]) i++; return ref<byte>((byte*)s,i);
+string str(const char* s) {
+    if(!s) return "null"_; int i=0; while(s[i]) i++; return string((byte*)s,i);
 }
 
-bool startsWith(const ref<byte>& s, const ref<byte>& a) {
-    return a.size<=s.size && ref<byte>(s.data,a.size)==a;
+bool startsWith(const string& s, const string& a) {
+    return a.size<=s.size && string(s.data,a.size)==a;
 }
 
-bool find(const ref<byte>& s, const ref<byte>& a) {
+bool find(const string& s, const string& a) {
     if(a.size>s.size) return false;
     for(uint i=0;i<=s.size-a.size;i++) {
-        if(ref<byte>(s.data+i,a.size)==a) return true;
+        if(string(s.data+i,a.size)==a) return true;
     }
     return false;
 }
 
-bool endsWith(const ref<byte>& s, const ref<byte>& a) {
-    return a.size<=s.size && ref<byte>(s.data+s.size-a.size,a.size)==a;
+bool endsWith(const string& s, const string& a) {
+    return a.size<=s.size && string(s.data+s.size-a.size,a.size)==a;
 }
 
-ref<byte> section(const ref<byte>& s, byte separator, int begin, int end) {
+string section(const string& s, byte separator, int begin, int end) {
     if(!s) return ""_;
     uint b,e;
     if(begin>=0) { b=0; for(uint i=0;i<(uint)begin && b<s.size;b++) if(s[b]==separator) i++; }
@@ -42,21 +42,21 @@ ref<byte> section(const ref<byte>& s, byte separator, int begin, int end) {
     if(end>=0) { e=0; for(uint i=0;e<s.size;e++) if(s[e]==separator) { i++; if(i>=(uint)end) break; } }
     else { e=s.size; if(end!=-1) { e--; for(uint i=0;e>0;e--) { if(s[e]==separator) { i++; if(i>=uint(-end-1)) break; } } } }
     assert(e>=b,s,separator,begin,end);
-    return ref<byte>(s.data+b,e-b);
+    return string(s.data+b,e-b);
 }
 
-ref<byte> trim(const ref<byte>& s) {
+string trim(const string& s) {
     int begin=0,end=s.size;
     for(;begin<end;begin++) { byte c=s[begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
     for(;end>begin;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
     return s.slice(begin, end-begin);
 }
 
-bool isInteger(const ref<byte>& s) {
+bool isInteger(const string& s) {
     if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
 }
 
-int64 toInteger(const ref<byte>& number, int base) {
+int64 toInteger(const string& number, int base) {
     assert(base>=2 && base<=16);
     assert(number);
     int sign=1;
@@ -76,7 +76,7 @@ int64 toInteger(const ref<byte>& number, int base) {
     return sign*value;
 }
 
-bool isDecimal(const ref<byte>& number) {
+bool isDecimal(const string& number) {
     if(!number) return false;
     const byte* i = number.begin();
     if(*i == '-' || *i == '+') ++i;
@@ -90,7 +90,7 @@ bool isDecimal(const ref<byte>& number) {
 
 inline double exp10(double x) { return __builtin_exp10(x); }
 inline double log10(double x) { return __builtin_log10(x); }
-double toDecimal(const ref<byte>& number) {
+double toDecimal(const string& number) {
     if(!number) return __builtin_nan("");
     if(number == "∞"_) return __builtin_inf();
     double sign=1, eSign=1;
@@ -115,30 +115,30 @@ double toDecimal(const ref<byte>& number) {
     return sign*significand*exp10(eSign*exponent-decimal);
 }
 
-/// string
+/// String
 
-string join(const ref<string>& list, const ref<byte>& separator) {
-    string str;
+String join(const ref<String>& list, const string& separator) {
+    String str;
     for(uint i: range(list.size)) { str<< list[i]; if(i<list.size-1) str<<separator; }
     return str;
 }
 
-string replace(const ref<byte>& s, const ref<byte>& before, const ref<byte>& after) {
-    string r(s.size);
+String replace(const string& s, const string& before, const string& after) {
+    String r(s.size);
     for(uint i=0; i<s.size;) {
-        if(i<=s.size-before.size && ref<byte>(s.data+i, before.size)==before) { r<<after; i+=before.size; }
+        if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r<<after; i+=before.size; }
         else { r << s[i]; i++; }
     }
     return r;
 }
 
-string toLower(const ref<byte>& s) {
-    string lower;
+String toLower(const string& s) {
+    String lower;
     for(char c: s) if(c>='A'&&c<='Z') lower<<'a'+c-'A'; else lower << c;
     return lower;
 }
 
-string simplify(string&& s) {
+String simplify(String&& s) {
     for(uint i=0; i<s.size;) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
     for(uint i=0; i<s.size;) {
         byte c=s[i];
@@ -150,23 +150,23 @@ string simplify(string&& s) {
     return move(s);
 }
 
-string repeat(const ref<byte>& s, uint times) {
-    string r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
+String repeat(const string& s, uint times) {
+    String r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
 }
 
-stringz strz(const ref<byte>& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
+stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
 
-/// array<ref<byte>>
+/// array<string>
 
-array<ref<byte>> split(const ref<byte>& str, byte separator) {
-    array<ref<byte>> list;
+array<string> split(const string& str, byte separator) {
+    array<string> list;
     const byte* b=str.begin();
     const byte* end=str.end();
     for(;;) {
         const byte* e = b;
         while(e!=end && *e!=separator) ++e;
         if(b==end) break;
-        list << ref<byte>(b,e-b);
+        list << string(b,e-b);
         if(e==end) break;
         b = e;
         if(b!=end && *b==separator) ++b;
@@ -176,7 +176,7 @@ array<ref<byte>> split(const ref<byte>& str, byte separator) {
 
 /// Number conversions
 
-template<uint base> string utoa(uint64 n, int pad) {
+template<uint base> String utoa(uint64 n, int pad) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
@@ -184,12 +184,12 @@ template<uint base> string utoa(uint64 n, int pad) {
         n /= base;
     } while( n!=0 );
     while(64-i<pad) buf[--i] = '0';
-    return string(ref<byte>(buf+i,64-i));
+    return String(string(buf+i,64-i));
 }
-template string utoa<2>(uint64,int);
-template string utoa<16>(uint64,int);
+template String utoa<2>(uint64,int);
+template String utoa<16>(uint64,int);
 
-template<uint base> string itoa(int64 number, int pad) {
+template<uint base> String itoa(int64 number, int pad) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint64 n=abs(number);
@@ -199,18 +199,18 @@ template<uint base> string itoa(int64 number, int pad) {
     } while( n!=0 );
     if(number<0) buf[--i]='-';
     while(64-i<pad) buf[--i] = '0';
-    return string(ref<byte>(buf+i,64-i));
+    return String(string(buf+i,64-i));
 }
-template string itoa<10>(int64,int);
+template String itoa<10>(int64,int);
 
 inline double round(double x) { return __builtin_round(x); }
-string ftoa(double n, int precision, int pad, bool exponent, bool inf) {
+String ftoa(double n, int precision, int pad, bool exponent, bool inf) {
     bool sign = n<0; n=abs(n);
-    if(__builtin_isnan(n)) return string("NaN"_);
-    if(n==__builtin_inff()) { assert_(inf); return string("∞"_); }
-    if(n==-__builtin_inff()) { assert_(inf); return string("-∞"_); }
+    if(__builtin_isnan(n)) return String("NaN"_);
+    if(n==__builtin_inff()) { assert_(inf); return String("∞"_); }
+    if(n==-__builtin_inff()) { assert_(inf); return String("-∞"_); }
     int e=0; if(n && (exponent /*|| int(n*exp10(precision))==0*/) && (n<1 || log10(n)>=precision+4)) e=round(log10(n)), n /= exp10(e);
-    string s;
+    String s;
     if(sign) s<<'-';
     if(precision && n!=round(n)) {
         double integer=1, fract=__builtin_modf(n, &integer);

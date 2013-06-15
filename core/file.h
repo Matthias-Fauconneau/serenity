@@ -20,7 +20,7 @@ const Folder& root();
 enum { Files=1<<0, Folders=1<<1, Recursive=1<<2, Sorted=1<<3, Hidden=1<<4 };
 struct Folder : Handle {
     /// Opens \a folderPath
-    Folder(const ref<byte>& folderPath, const Folder& at=root(), bool create=false);
+    Folder(const string& folderPath, const Folder& at=root(), bool create=false);
     /// Returns folder properties
     struct stat stat() const;
     /// Returns the last access Unix timestamp (in nanoseconds)
@@ -28,12 +28,12 @@ struct Folder : Handle {
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
     /// Returns folder name
-    string name() const;
+    String name() const;
     /// Lists all files in this folder
-    array<string> list(uint flags) const;
+    array<String> list(uint flags) const;
 };
 /// Returns whether this \a folder exists (as a folder)
-bool existsFolder(const ref<byte>& folder, const Folder& at=root());
+bool existsFolder(const string& folder, const Folder& at=root());
 
 enum { IDLE=64 };
 #include <poll.h>
@@ -79,7 +79,7 @@ struct File : Stream {
     /// Opens \a path
     /// If read only, fails if not existing
     /// If write only, fails if existing
-    File(const ref<byte>& path, const Folder& at=root(), Flags flags=ReadOnly);
+    File(const string& path, const Folder& at=root(), Flags flags=ReadOnly);
     /// Returns file properties
     struct stat stat() const;
     /// Returns file size
@@ -95,11 +95,11 @@ struct File : Stream {
     void seek(int index);
 };
 /// Returns whether \a path exists (as a file)
-bool existsFile(const ref<byte>& path, const Folder& at=root());
+bool existsFile(const string& path, const Folder& at=root());
 /// Reads whole \a file content
-buffer<byte> readFile(const ref<byte>& path, const Folder& at=root());
+buffer<byte> readFile(const string& path, const Folder& at=root());
 /// Writes \a content into \a file (overwrites any existing file)
-void writeFile(const ref<byte>& path, const ref<byte>& content, const Folder& at=root());
+void writeFile(const string& path, const ref<byte>& content, const Folder& at=root());
 
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOW { typedef T Args; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
@@ -107,7 +107,7 @@ template<uint major, uint minor, Type T> struct IOR { typedef T Args; static con
 template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 /// Handle to a device
 struct Device : File {
-    Device(const ref<byte>& path, Flags flags=ReadWrite):File(path, root(), flags){}
+    Device(const string& path, Flags flags=ReadWrite):File(path, root(), flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);
     /// Sends ioctl request with neither input/outputs arguments
@@ -127,7 +127,7 @@ struct Map {
 
     Map(){}
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    explicit Map(const ref<byte>& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
+    explicit Map(const string& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     default_move(Map);
     ~Map();
@@ -145,21 +145,21 @@ struct Map {
 };
 
 /// Renames a file replacing any existing files or links
-void rename(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);
+void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName);
 /// Renames a file replacing any existing files or links
-void rename(const ref<byte>& oldName, const ref<byte>& newName, const Folder& at=root());
+void rename(const string& oldName, const string& newName, const Folder& at=root());
 /// Removes file
-void remove(const ref<byte>& name, const Folder& at=root());
+void remove(const string& name, const Folder& at=root());
 /// Removes folder
 void remove(const Folder& folder);
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
-void symlink(const ref<byte>& target,const ref<byte>& name, const Folder& at=root());
+void symlink(const string& target,const string& name, const Folder& at=root());
 /// Sets the last modified time for \a path to current time
-void touchFile(const ref<byte>& path, const Folder& at=root(), bool setModified=false);
+void touchFile(const string& path, const Folder& at=root(), bool setModified=false);
 /// Copies a file replacing any existing files or links
-void copy(const Folder& oldAt, const ref<byte>& oldName, const Folder& newAt, const ref<byte>& newName);
+void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName);
 
 /// Returns available free space in bytes for the file system containing \a file
 int64 freeSpace(const Handle& file);
 /// Returns available free space in bytes for the file system containing \a path
-int64 freeSpace(const ref<byte>& path, const Folder& at=root());
+int64 freeSpace(const string& path, const Folder& at=root());

@@ -73,20 +73,22 @@ typedef unsigned int size_t;
 #endif
 namespace std { template<Type T> struct initializer_list { const T* data; size_t size; }; }
 template<Type T> struct ref;
-inline constexpr ref<byte> operator "" _(const char* data, size_t size);
+/// Convenient typedef for ref<byte> holding UTF8 text strings
+typedef ref<byte> string;
+inline constexpr string operator "" _(const char* data, size_t size);
 #ifndef __GXX_EXPERIMENTAL_CXX0X__
 #define _ // QtCreator doesn't parse custom literal operators (""_)
 #endif
 
 // Debugging
 /// Logs a message to standard output without newline
-void log_(const ref<byte>& message);
+void log_(const string& message);
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
-template<> void log(const ref<byte>& message);
+template<> void log(const string& message);
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
 template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
-template<> void error(const ref<byte>& message) __attribute((noreturn));
+template<> void error(const string& message) __attribute((noreturn));
 
 #if ASSERT
 #define warn error
@@ -158,7 +160,7 @@ template<Type T> struct ref {
 };
 
 /// Returns const reference to a static string literal
-inline constexpr ref<byte> operator "" _(const char* data, size_t size) { return ref<byte>(data,size); }
+inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 /// Returns const reference to memory used by \a t
 template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 

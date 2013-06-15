@@ -27,10 +27,10 @@ class(ScaleValues, Operation), virtual VolumePass<float> {
 
 /// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeOperation {
-    ref<byte> parameters() const { return "cylinder"_; }
+    string parameters() const { return "cylinder"_; }
     void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
-        outputs[0]->metadata = string("png"_);
+        outputs[0]->metadata = String("png"_);
         array<buffer<byte>>& elements = outputs[0]->elements;
         uint marginZ = volume.margin.z;
         Time time; Time report;
@@ -77,14 +77,14 @@ buffer<byte> toASCII(const Volume& source) {
 }
 class(ToASCII, Operation), virtual VolumeOperation {
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
-        outputs[0]->metadata = string("ascii"_);
+        outputs[0]->metadata = String("ascii"_);
         outputs[0]->data = toASCII(inputs[0]);
     }
 };
 
 FILE(CDL)
 /// Exports volume to unidata netCDF CDL (network Common data form Description Language) (can be converted to a binary netCDF dataset using ncgen)
-string toCDL(const Volume& source) {
+String toCDL(const Volume& source) {
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
@@ -109,8 +109,8 @@ string toCDL(const Volume& source) {
     positions.size = positionIndex-positions.begin(); assert(positions.size <= positions.capacity);
     values.size = valueIndex-values.begin(); assert(values.size <= values.capacity);
     uint valueCount = values.size / (valueSize+1);
-    ref<byte> header = CDL();
-    string data (header.size + 3*valueCount*"0,"_.size + positions.size + values.size);
+    string header = CDL();
+    String data (header.size + 3*valueCount*"0,"_.size + positions.size + values.size);
     for(TextData s(header);;) {
         data << s.until('$'); // Copies header until next substitution
         /***/ if(s.match('#')) data << str(valueCount); // Substitutes non-zero values count
@@ -126,7 +126,7 @@ string toCDL(const Volume& source) {
 }
 class(ToCDL, Operation), virtual VolumeOperation {
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
-        outputs[0]->metadata = string("cdl"_);
+        outputs[0]->metadata = String("cdl"_);
         outputs[0]->data = toCDL(inputs[0]);
     }
 };

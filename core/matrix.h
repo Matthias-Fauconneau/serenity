@@ -46,8 +46,8 @@ struct mat3 {
 };
 inline mat3 operator*(float s, mat3 M) {mat3 r; for(int j=0;j<3;j++) for(int i=0;i<3;i++) r.M(i,j)=s*M(i,j); return r; }
 
-template<int M, int N> inline string str(const float a[M*N]) {
-    string s; s<<"\n["_;
+template<int M, int N> inline String str(const float a[M*N]) {
+    String s; s<<"\n["_;
     for(int i=0;i<M;i++) {
         if(N==1) s = s+"\t"_+str(a[i]);
         else {
@@ -60,4 +60,4 @@ template<int M, int N> inline string str(const float a[M*N]) {
     s<<" ]"_;
     return s;
 }
-inline string str(const mat3& M) { return str<3,3>(M.data); }
+inline String str(const mat3& M) { return str<3,3>(M.data); }

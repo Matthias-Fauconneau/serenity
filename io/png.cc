@@ -51,7 +51,7 @@ Image decodePNG(const ref<byte>& file) {
     uint palette[256]; bool alpha=false;
     for(;;) {
         uint32 size = s.read();
-        ref<byte> tag = s.read<byte>(4);
+        string tag = s.read<byte>(4);
         if(tag == "IHDR"_) {
             width = s.read(), height = s.read();
             bitDepth = s.read(); if(bitDepth!=8 && bitDepth != 4){ log("Unsupported PNG depth"_,bitDepth,width,height); return Image(); }
@@ -173,7 +173,7 @@ array<byte> deflate(array<byte> data) {
 #endif
 
 buffer<byte> encodePNG(const Image& image) {
-    array<byte> file = string("\x89PNG\r\n\x1A\n"_);
+    array<byte> file = String("\x89PNG\r\n\x1A\n"_);
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
     array<byte> IHDR = "IHDR"_+raw(ihdr);
     file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));

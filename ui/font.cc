@@ -32,7 +32,7 @@ void Font::setSize(float size) {
     ascender=face->size->metrics.ascender*0x1p-6;
 }
 
-uint16 Font::index(const ref<byte>& name) {
+uint16 Font::index(const string& name) {
     uint index = FT_Get_Name_Index(face, (char*)(const char*)strz(name));
     if(!index) for(int i=0;i<face->num_glyphs;i++) { char buffer[256]; FT_Get_Glyph_Name(face,i,buffer,sizeof(buffer)); log(buffer); }
     assert(index,name); return index;

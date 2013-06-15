@@ -116,11 +116,11 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
     map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
-template<Type K, Type V> string str(const map<K,V>& m) {
-    string s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
+template<Type K, Type V> String str(const map<K,V>& m) {
+    String s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }
-template<Type K, Type V> string toASCII(const map<K,V>& m) {
-        string s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
+template<Type K, Type V> String toASCII(const map<K,V>& m) {
+        String s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
 }
 
 template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {
