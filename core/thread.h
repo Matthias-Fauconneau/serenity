@@ -158,7 +158,7 @@ int execute(const ref<byte>& path, const ref<ref<byte>>& args={}, bool wait=true
 int64 wait(int pid);
 
 /// Returns value for environment variable \a name
-string getenv(const ref<byte>& name);
+ref<byte> getenv(const ref<byte>& name);
 
 /// Returns command line arguments
 array<ref<byte>> arguments();

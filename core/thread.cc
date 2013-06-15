@@ -196,18 +196,20 @@ int execute(const ref<byte>& path, const ref<ref<byte>>& args, bool wait, const 
 }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
-string getenv(const ref<byte>& name) {
-    for(TextData s = File("proc/self/environ"_).readUpTo(8192);s;) {
+ref<byte> getenv(const ref<byte>& name) {
+    static string environ = File("proc/self/environ"_).readUpTo(8192);
+    for(TextData s(environ);s;) {
         ref<byte> key=s.until('='); ref<byte> value=s.until('\0');
-        if(key==name) return string(value);
+        if(key==name) return value;
     }
     warn("Undefined environment variable"_, name);
-    return string();
+    return ""_;
 }
 
-array<ref<byte>> arguments() {
-    static string arguments = File("proc/self/cmdline"_).readUpTo(4096);
-    return split(section(arguments,0,1,-1),0);
+array<ref<byte> > arguments() {
+    static string cmdline = File("proc/self/cmdline"_).readUpTo(4096);
+    assert_(cmdline.size<4096);
+    return split(section(cmdline,0,1,-1),0);
 }
 
 const Folder& home() { static Folder home(getenv("HOME"_)); return home; }

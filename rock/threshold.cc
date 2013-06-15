@@ -128,31 +128,25 @@ void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint1
     uint32 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 0xFFFFFFFF;
     uint32* const poreData = pore;
-    //uint32* const rockData = rock;
     parallel(Z, [&](uint, int z) {
         const uint16* const sourceZ = source + z*XY;
         uint32* const poreZ = poreData + z*XY;
-        //uint32* const rockZ = rockData + z*XY;
-        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) for(int x=0; x<X; x+=8) storea(poreZ+y*X+x, _1b);
+        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) for(int x=0; x<X; x+=4) storea(poreZ+y*X+x, loada(sqr+x));
         else for(int y=0; y<Y; y++) {
             const uint16* const sourceY = sourceZ + y*X;
             uint32* const poreZY = poreZ + y*X;
-            //uint32* const rockZY = rockZ + y*X;
             uint32* const maskY = mask + y*X;
             for(int x=0; x<X; x+=8) {
                 storea(poreZY+x, loada(sqr+x) | ((threshold4 > unpacklo(loada(sourceY+x), _0h)) & loada(maskY+x)) );
                 storea(poreZY+x+4, loada(sqr+x+4) | ((threshold4 > unpackhi(loada(sourceY+x), _0h)) & loada(maskY+x+4)) );
-                //storea(rockZY+x, loada(maskY+x) | (unpacklo(loada(sourceY+x), _0h) > scaledThreshold));
-                //storea(rockZY+x+4, loada(maskY+x+4) | (unpackhi(loada(sourceY+x), _0h) > scaledThreshold));
             }
         }
     });
     pore.margin.x=marginX, pore.margin.y=marginY, pore.margin.z=marginZ;
-    //rock.margin.x=marginX, rock.margin.y=marginY, rock.margin.z=marginZ;
 #if ASSERT
-    pore.maximum=0xFFFFFFFF;//, rock.maximum=0xFFFFFFFF;  // for the assert
+    pore.maximum=0xFFFFFFFF; // for the assert
 #else
-    pore.maximum=(pore.sampleCount.x-1)*(pore.sampleCount.x-1);//, rock.maximum=(rock.sampleCount.x-1)*(rock.sampleCount.x-1); // for visualization
+    pore.maximum=(pore.sampleCount.x-1)*(pore.sampleCount.x-1); // for visualization
 #endif
 }
 
