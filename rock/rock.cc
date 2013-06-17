@@ -60,7 +60,7 @@ struct GraphProcess : virtual Process {
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)i
-    Rock(const ref<string>& args) {
+    Rock(const ref<string>& args) : PersistentProcess("rock"_) {
         specialParameters += "dump"_; specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_;
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
@@ -249,6 +249,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     }
 
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
+    String name; // Used to name output files (source folder base name)
     array<string> targetPaths; // Path to file (or folders) where targets are copied
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice

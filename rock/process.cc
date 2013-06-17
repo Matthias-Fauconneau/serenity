@@ -353,10 +353,8 @@ void Process::execute(const ref<string>& allArguments, const string& definition)
     for(uint i: range(targets.size)) execute(targets[i], targetsSweeps[i], arguments);
 }
 
-void PersistentProcess::parseSpecialArguments(const ref<string>& args) {
-    if(!name) name = String(args.first()); // Use first special argument as storage folder name (if not already defined by derived class)
-    if(arguments.contains("baseStorageFolder"_)) baseStorageFolder = Folder(arguments.at("baseStorageFolder"_),currentWorkingDirectory());
-    storageFolder = Folder(name, baseStorageFolder, true);
+void PersistentProcess::parseSpecialArguments(const ref<string>&) {
+    if(arguments.contains("storageFolder"_)) storageFolder = Folder(arguments.at("storageFolder"_),currentWorkingDirectory());
 
     // Maps intermediate results from file system
     for(const String& path: storageFolder.list(Files|Folders)) {
@@ -434,30 +432,28 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         if(outputSize) { // Creates (or resizes) and maps an output result file
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); String oldest;
-                for(String& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
+                for(String& path: storageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
-                    if(File(path, baseStorageFolder).size() < 4096) continue; // Keeps small result files
-                    long timestamp = File(path, baseStorageFolder).accessTime();
+                    if(File(path, storageFolder).size() < 4096) continue; // Keeps small result files
+                    long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
                 if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
-                if(section(oldest,'/')==name) {
-                    TextData s (section(oldest,'/',1,-1)); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
-                    for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
-                        ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename
-                        break;
-                    }
+                TextData s (section(oldest,'/',1,-1)); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
+                for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
+                    ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename
+                    break;
                 }
-                if(!existsFile(oldest, baseStorageFolder) || outputSize > File(oldest,baseStorageFolder).size() + freeSpace(storageFolder)) { // Removes if not a file or need to recycle more than one file
-                    if(existsFile(oldest, baseStorageFolder)) ::remove(oldest, baseStorageFolder);
+                if(!existsFile(oldest, storageFolder) || outputSize > File(oldest,storageFolder).size() + freeSpace(storageFolder)) { // Removes if not a file or need to recycle more than one file
+                    if(existsFile(oldest, storageFolder)) ::remove(oldest, storageFolder);
                     else { // Array output (folder)
-                        Folder folder(oldest, baseStorageFolder);
+                        Folder folder(oldest, storageFolder);
                         for(const String& path: folder.list(Files)) ::remove(path, folder);
                         remove(folder);
                     }
                     continue;
                 }
-                ::rename(baseStorageFolder, oldest, storageFolder, output); // Renames last discarded file instead of removing (avoids page zeroing)
+                ::rename(storageFolder, oldest, storageFolder, output); // Renames last discarded file instead of removing (avoids page zeroing)
                 break;
             }
 

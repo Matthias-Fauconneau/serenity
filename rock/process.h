@@ -81,6 +81,7 @@ struct ResultFile : Result {
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
 struct PersistentProcess : virtual Process {
+     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("dev/shm"_),true) {}
     ~PersistentProcess();
 
     void parseSpecialArguments(const ref<string>& arguments) override;
@@ -88,7 +89,5 @@ struct PersistentProcess : virtual Process {
     /// Gets result from cache or computes if necessary
     shared<Result> getResult(const string& target, const Dict& arguments) override;
 
-    Folder baseStorageFolder = "dev/shm"_; // Should be a RAM (or local disk) filesystem large enough to intermediate operations of volume data (e.g. up to 64bit per sample input and output)
-    String name; // Used to name intermediate and output files (folder base name)
-    Folder storageFolder = ""_; // Holds intermediate operations data (=baseStorageFolder/name)
+    Folder storageFolder; // Should be a RAM (or local disk) filesystem large enough to hold intermediate operations of volume data
 };
