@@ -21,7 +21,7 @@ UniformSample<double> kernelDensityEstimation(const UniformHistogram& histogram)
 }
 
 /// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel (on a non uniformly sampled distribution)
-UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogram, double h=nan) {
+UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogram, double h=nan, bool normalize=false) {
     const double N = histogram.sampleCount();
     if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
     float max = ::max(histogram.keys);
@@ -34,21 +34,22 @@ UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogr
     uint sampleCount = max/delta;
     UniformSample<double> pdf ( sampleCount );
     pdf.scale = delta;
+    const float scale = 1./h/*Normalize kernel (area=1)*/ * (normalize ? 1./N : 1)/*Normalize sampleCount (to density)*/;
     parallel(pdf.size, [&](uint, uint i) {
         const float x0 = i*delta;
         float sum = 0;
         for(auto sample: histogram) sum += sample.value * exp(-1./2*sq((x0-sample.key)/h))/sqrt(2*PI);
-        pdf[i] = sum / (N*h);
+        pdf[i] = scale * sum;
     });
     return pdf;
 }
 
 class(KernelDensityEstimation, Operation), virtual Pass {
-    virtual string parameters() const { return "bandwidth"_; }
+    virtual string parameters() const { return "bandwidth normalize"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         target.metadata = String("kde.tsv"_);
         NonUniformHistogram H = parseNonUniformSample<double,int64>(source.data);
-        for(uint i: range(H.size())) if(H.keys[i] != i) target.data = toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)))); // Non uniform KDE
+        for(uint i: range(H.size())) if(H.keys[i] != i) target.data = toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)); // Non uniform KDE
         else toASCII(kernelDensityEstimation(copy(H.values)));
     }
 };

@@ -69,9 +69,8 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     if(!arguments.contains(key)) arguments.insert(String(key), Variant(value));
                 }
                 else if(s.match('{')) { // Sweep
-                    error("Disabled");
                     string sweep = s.until('}');
-                    assert(!arguments.contains(key));
+                    //assert_(!arguments.contains(key));
                     array<Variant> sequence;
                     if(::find(sweep,".."_)) {
                         TextData s (sweep);
@@ -105,6 +104,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                         if(!op) value = copy(left);
                         else if(op=="^"_) value = pow(left, right);
                         else error("Unknown operator", op);
+                        defaultArguments.insert(String(key), value);
                         arguments.insert(String(key), value);
                     }
                 }
@@ -205,14 +205,16 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
     }
     for(uint i: range(targets.size)) {
         Sweeps targetSweeps;
-        for(auto sweep: sweeps) { // Discards irrelevant sweeps
+        Dict args = copy(arguments);
+        for(auto sweep: sweeps) { // Defines sweep variables
             assert_(sweep.value.size>1, targets[i], sweeps);
-            Dict args = copy(arguments);
             if(args.contains(sweep.key)) {
                 if(!defaultArguments.contains(sweep.key)) assert_(!arguments.contains(sweep.key), "Sweep overrides argument", sweep.key, defaultArguments);
                 args.at(sweep.key) = str(sweep.value,',');
             }
             else args.insert(String(sweep.key), str(sweep.value,','));
+        }
+        for(auto sweep: sweeps) { // Discards irrelevant sweeps
             bool relevant = false;
             if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
             if(relevant) targetSweeps.insert(sweep.key, sweep.value);
@@ -326,13 +328,15 @@ shared<Result> Process::getResult(const string& target, const Dict& arguments) {
 
 void Process::execute(const string& target, const Sweeps& sweeps, const Dict& arguments) {
     if(sweeps) {
+        Dict args = copy(arguments);
+        for(auto sweep: sweeps) { // Defines all sweeps parameters
+            if(args.contains(sweep.key)) args.remove(sweep.key); // Allows sweep to override default arguments
+            args.insert(String(sweep.key), str(sweep.value,','));
+        }
         Sweeps remaining = copy(sweeps);
         string parameter = sweeps.keys.first(); // Removes first parameter and loop over it
         array<Variant> sweep = remaining.take(parameter);
-        Dict args = copy(arguments);
-        //assert_(!args.contains(parameter), "Sweep parameter overrides existing argument", args.at(parameter));
-        if(args.contains(parameter)) args.remove(parameter); // Allows sweep to override default arguments
-        args.insert(String(parameter), str(sweep,','));
+
         if(!evaluateArguments(target,args).contains(parameter)) return execute(target, remaining, args);
         assert_(evaluateArguments(target,args).contains(parameter), "Irrelevant sweep parameter", parameter);
         for(Variant& value: sweep) {
@@ -432,14 +436,14 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         if(outputSize) { // Creates (or resizes) and maps an output result file
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); String oldest;
-                for(String& path: storageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
+                for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
                     if(File(path, storageFolder).size() < 4096) continue; // Keeps small result files
                     long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
                 if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
-                TextData s (section(oldest,'/',1,-1)); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
+                TextData s (oldest); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
                     ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename
                     break;
@@ -489,6 +493,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                shared<Result> result = getResult(rule.inputs.first(), args);
                assert_(result->metadata=="scalar"_, "Non-scalar sweep for"_, rule, rule.sweeps);
                data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
+               if(toDecimal(result->data) == 0) break;
            }
            outputs.first()->metadata = String("sweep.tsv"_);
            outputs.first()->data = move(data);

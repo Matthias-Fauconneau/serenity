@@ -42,7 +42,7 @@ template<Type K, Type V> struct map {
     }
 
     template<Type KK> V* find(const KK& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
-    template<Type KK> V& insert(KK&& key) { assert(!contains(key),key); keys << K(move(key)); values << V(); return values.last(); }
+    template<Type KK> V& insert(KK&& key) { if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_); keys << K(move(key)); values << V(); return values.last(); }
 
     V& insert(K&& key, V&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
@@ -113,9 +113,9 @@ template<Type K, Type V> String str(const map<K,V>& m) {
     String s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }
 template<Type K, Type V> String toASCII(const map<K,V>& m) {
-        String s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
+    String s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
 }
 
 template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {
-    for(const_pair<K, V> e: b) { assert_(!a.contains(e.key), a.at(e.key), e.value, a, b); a.insert(copy(e.key), copy(e.value)); }
+    for(const_pair<K, V> e: b) { if(a.contains(e.key)) error("a.contains(e.key)", a.at(e.key), e.value, a, b); a.insert(copy(e.key), copy(e.value)); }
 }

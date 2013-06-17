@@ -77,7 +77,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             log("Arguments:",arguments, targetsSweeps);
             log("Target paths:",targetPaths);
         }
-        if(arguments.contains("graph"_)) { generateSVG(targets, name, getenv("HOME"_)); return; }
+        if(arguments.contains("graph"_)) { generateSVG(targets, "process"_, getenv("HOME"_)); return; }
         if(!targets) {
             if(arguments || targetsSweeps) log("Arguments:",arguments, targetsSweeps);
             if(targetPaths) log("Target paths:",targetPaths);
@@ -156,7 +156,6 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         }
         if(current) {
             window = unique<Window>(this,int2(-1,-1),"Rock"_);
-            window->localShortcut(PrintScreen).connect(this, &Rock::saveSlice);
             window->localShortcut(Escape).connect([]{exit();});
             window->clearBackground = false;
             updateView();
@@ -172,9 +171,6 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             else if(!argument.contains('=')) targetPaths << argument;
             else error("Invalid argument", argument);
         }
-        assert_(arguments.contains("path"_), "Usage: rock <source folder containing volume slices> (target name|target path|key=value)*");
-        string path = arguments.at("path"_);
-        name = String(path.contains('/') ? section(path,'/',-2,-1) : path); // Use source path as process name (for storage folder) instead of any first arguments
         PersistentProcess::parseSpecialArguments(specialArguments);
     }
 
@@ -242,14 +238,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         }
     }
 
-    void saveSlice() {
-        String path = name+"."_+current->name+"."_+current->metadata+".png"_;
-        writeFile(path, encodePNG(slice(toVolume(current),sliceZ,arguments.contains("cylinder"_))), home());
-        log(path);
-    }
-
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
-    String name; // Used to name output files (source folder base name)
     array<string> targetPaths; // Path to file (or folders) where targets are copied
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice

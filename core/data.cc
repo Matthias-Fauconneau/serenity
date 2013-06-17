@@ -37,7 +37,7 @@ bool TextData::matchNo(const string& any) {
 }
 
 void TextData::skip(const string& key) {
-    assert_(match(key), "'"_+key+"'"_, /*"'"_+untilEnd()+"'"_*/ until('\n'));
+    assert_(match(key), "'"_+key+"'"_, "'"_+buffer+"'"_);
 }
 
 string TextData::whileNot(char key) {

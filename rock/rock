@@ -63,7 +63,7 @@ unconnected = Rasterize bin
 connected = FloodFill unconnected # Flood fills pore space
 
 if !sweep: minimalRadius = '0'
-if sweep: minimalRadius = {0..6} while volume-connected
+if sweep: minimalRadius = {0..6}
 minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
 pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
@@ -95,8 +95,11 @@ porosity-connected-minimalRadius = Div volume-connected-minimalRadius volume-tot
 histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected
 histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connected
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
-distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected bandwidth='0.5'
-distribution-radius-connected = KernelDensityEstimation histogram-radius-connected bandwidth='0.5'
+volume-distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected bandwidth='0.5'
+volume-distribution-radius-connected = KernelDensityEstimation histogram-radius-connected bandwidth='0.5'
+# Normalize probability density on total volume
+distribution-radius-unconnected = Div volume-distribution-radius-unconnected volume-total
+distribution-radius-connected = Div histogram-radius-connected volume-total
 
 # Scales radius (e.g to original pixel or physical resolution)
  #if !scale: scale=2^downsample #FIXME: argument arithmetic
