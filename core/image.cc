@@ -169,7 +169,7 @@ Image decodeImage(const ref<byte>& file) {
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
     else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return decodeTIFF(file);
     else if(startsWith(file,"BM"_)) return decodeBMP(file);
-    else { if(file.size) log("Unknown image format"_,hex(file.slice(0,min(file.size,4ull)))); return Image(); }
+    else { if(file.size) log("Unknown image format"_,hex(file.slice(0,min<size_t>(file.size,4)))); return Image(); }
 }
 
 uint8 sRGB_lookup[256];

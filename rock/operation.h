@@ -91,7 +91,7 @@ struct Operation {
     /// Returns which parameters affects this operation output
     virtual string parameters() const { return ""_; }
     /// Returns the desired intermediate data size in bytes for each outputs
-    virtual uint64 outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
+    virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the operation using inputs to compute outputs
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) abstract;
 };

@@ -121,7 +121,7 @@ template<Type T> struct ref {
     /// Default constructs an empty reference
     constexpr ref() {}
     /// References \a size elements from const \a data pointer
-    constexpr ref(const T* data, uint64 size) : data(data), size(size) {}
+    constexpr ref(const T* data, size_t size) : data(data), size(size) {}
     /// References \a size elements from const \a data pointer
     constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
     /// Converts an std::initializer_list to ref
@@ -129,34 +129,34 @@ template<Type T> struct ref {
     /// Converts a static array to ref
     template<size_t N> ref(const T (&a)[N]):  ref(a,N) {}
 
-    explicit operator bool() const { return size; }
+    explicit operator bool() const { if(size) assert(data); return size; }
     operator const T*() const { return data; }
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& at(uint64 i) const { assert(i<size); return data[i]; }
-    const T& operator [](uint64 i) const { return at(i); }
+    const T& at(size_t i) const { assert(i<size); return data[i]; }
+    const T& operator [](size_t i) const { return at(i); }
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(uint64 pos, uint64 size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
+    ref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
     /// Slices a reference to elements from to the end of the reference
-    ref<T> slice(uint64 pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+    ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
     /// Compares all elements
     bool operator ==(const ref<T>& o) const {
         if(size != o.size) return false;
-        for(uint64 i: range(size)) if(data[i]!=o.data[i]) return false;
+        for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
         return true;
     }
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    int indexOf(const T& key) const { for(uint64 i: range(size)) { if(data[i]==key) return i; } return -1; }
+    int indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& key) const { return indexOf(key)>=0; }
 
     const T* data = 0;
-    uint64 size = 0;
+    size_t size = 0;
 };
 
 /// Returns const reference to a static string literal

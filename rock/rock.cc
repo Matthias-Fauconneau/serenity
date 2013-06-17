@@ -22,7 +22,7 @@
 //#include "kernel-density-estimation.h"
 //#include "export.h"
 
-String strByteCount(uint64 byteCount) {
+String strByteCount(size_t byteCount) {
     if(byteCount < 1u<<10) return str(byteCount,"B"_);
     if(byteCount < 10u<<20) return str(byteCount>>10,"kiB"_);
     if(byteCount < 10u<<30) return str(byteCount>>20,"MiB"_);
@@ -168,7 +168,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         for(const string& argument: specialArguments) {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
-            else if(!arguments.contains("path"_) && existsFolder(argument,cwd)) arguments.insert(String("path"_),argument);
+            else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) arguments.insert(String("path"_),argument);
             else if(!argument.contains('=')) targetPaths << argument;
             else error("Invalid argument", argument);
         }

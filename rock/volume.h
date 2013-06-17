@@ -19,12 +19,12 @@ struct Volume {
     Volume(){}
 
     explicit operator bool() const { return (bool)data; }
-    uint64 size() const { return (uint64)sampleCount.x*sampleCount.y*sampleCount.z; }
+    size_t size() const { return (size_t)sampleCount.x*sampleCount.y*sampleCount.z; }
     bool tiled() const { if(offsetX || offsetY || offsetZ) { assert(offsetX && offsetY && offsetZ); return true; } else return false; }
     void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; floatingPoint=source.floatingPoint; }
 
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
-    uint64 index(uint x, uint y, uint z) const {
+    size_t index(uint x, uint y, uint z) const {
         assert(x<uint(sampleCount.x) && y<uint(sampleCount.y) && y<uint(sampleCount.y));
         return tiled() ? (offsetX[x]+offsetY[y]+offsetZ[z]) : (z*sampleCount.x*sampleCount.y+y*sampleCount.x+x);
     }

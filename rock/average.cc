@@ -34,21 +34,13 @@ void downsample(Volume16& target, const Volume16& source) {
         }
     }
 }
-class(Downsample, Operation), virtual VolumePass<uint16> {
-    string parameters() const override { return "downsample"_; }
-    void execute(const Dict& args, VolumeT<uint16>& target, const Volume& source) override {
-        int times = args.at("downsample"_)?(int)args.at("downsample"_):1;
-        if(!times) { rawCopy<uint16>(target, (const Volume16&)source, source.size()); return; } // May happen on downsample sweep (FIXME: evaluate process definition for each sweep instance)
-        downsample(target, source);
-        for(uint i unused: range(times-1)) downsample(target, target);
-    }
-};
+defineVolumePass(Downsample, uint16, downsample);
 
 /// Shifts all values to the right
 void shiftRight(Volume16& target, const Volume16& source, uint shift) {
     const uint16* const src = source;
     uint16* const dst = target;
-    uint64 size = source.size();
+    size_t size = source.size();
     assert_(size%8==0);
     for(uint i=0; i<size; i+=8) storea(dst+i, shiftRight(loada(src+i), shift));
 }

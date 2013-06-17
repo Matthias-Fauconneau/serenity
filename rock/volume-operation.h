@@ -16,7 +16,7 @@ inline Volume toVolume(const Result& result) {
 struct VolumeOperation : virtual Operation {
     /// Overriden by implementation to return required output sample size (or 0 for non-volume output)
     virtual uint outputSampleSize(uint index unused) { return 0; } // No volume output by default
-    uint64 outputSize(const Dict&, const ref<Result*>& inputs, uint index) override {
+    size_t outputSize(const Dict&, const ref<Result*>& inputs, uint index) override {
         assert_(inputs);
         assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
         return toVolume(*inputs[0]).size() * outputSampleSize(index);

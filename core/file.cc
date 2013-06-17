@@ -13,6 +13,7 @@ enum {DT_DIR=4, DT_REG=8};
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
+String Handle::name() const { if(fd==AT_FDCWD) return String("."_); String s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity), (int)fd); return s; }
 
 // Folder
 const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
@@ -24,7 +25,6 @@ Folder::Folder(const string& folder, const Folder& at, bool create):Handle(0){
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 Folder::accessTime() const { struct stat stat = Folder::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }
 int64 Folder::modifiedTime() const { struct stat stat = Folder::stat(); return stat.st_mtim.tv_sec*1000000000ul + stat.st_mtim.tv_nsec;  }
-String Folder::name() const { if(fd==AT_FDCWD) return String("."_); String s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity), (int)fd); return s; }
 array<String> Folder::list(uint flags) const {
     Folder fd(""_,*this);
     array<String> list; byte buffer[0x1000];
@@ -44,21 +44,21 @@ array<String> Folder::list(uint flags) const {
 bool existsFolder(const string& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
 
 // Stream
-void Stream::read(void* buffer, uint size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
-int Stream::readUpTo(void* buffer, uint size) { return check( ::read(fd, buffer, size), (int)fd, buffer, size); }
-buffer<byte> Stream::read(uint capacity) {
-    buffer<byte> buffer(capacity);
-    buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
-    assert(buffer.size==capacity, buffer.size, capacity);
+void Stream::read(void* buffer, size_t size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
+int64 Stream::readUpTo(void* buffer, size_t size) { return check( ::read(fd, buffer, size), (int)fd, buffer, size); }
+buffer<byte> Stream::read(size_t size) {
+    buffer<byte> buffer(size);
+    size_t offset=0; for(; offset<size;) offset+=check(::read(fd, buffer.begin()+offset, size-offset));
+    assert(offset==size);
     return buffer;
 }
-buffer<byte> Stream::readUpTo(uint capacity) {
+buffer<byte> Stream::readUpTo(size_t capacity) {
     buffer<byte> buffer(capacity);
     buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
     return buffer;
 }
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
-void Stream::write(const byte* data, uint64 size) { for(uint64 offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), (int)fd, offset, size-offset, size); }
+void Stream::write(const byte* data, size_t size) { assert(data); for(size_t offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), name()); }
 void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
@@ -72,12 +72,7 @@ void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
 bool existsFile(const string& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
-buffer<byte> readFile(const string& path, const Folder& at) {
-    File file(path,at);
-    uint size=file.size();
-    if(size>1<<24) log(path,"use mapFile to avoid copying "_+dec(file.size()>>10)+"KB"_);
-    return file.read(size);
-}
+buffer<byte> readFile(const string& path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
 void writeFile(const string& path, const ref<byte>& content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
 
 // Device
@@ -107,7 +102,7 @@ void symlink(const string& from,const string& to, const Folder& at) {
 void touchFile(const string& path, const Folder& at, bool setModified) { timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; utimensat(at.fd, strz(path), times, 0); }
 void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate));
-    for(uint64 offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
+    for(size_t offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
     assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
 }
 

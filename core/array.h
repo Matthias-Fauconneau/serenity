@@ -9,7 +9,7 @@ template<Type T> struct array : buffer<T> {
     /// Default constructs an empty array
     array() {}
     /// Allocates an uninitialized buffer for \a capacity elements
-    explicit array(uint capacity/*, uint64 size=0*/) : buffer<T>(capacity, /*size*/0) {}
+    explicit array(uint capacity/*, size_t size=0*/) : buffer<T>(capacity, /*size*/0) {}
     /// Copies elements from a reference
     explicit array(const ref<T>& ref) : buffer<T>(ref.size) { for(uint i: range(ref.size)) new (&at(i)) T(ref[i]); }
     /// Converts a buffer to an array
@@ -31,7 +31,7 @@ template<Type T> struct array : buffer<T> {
         }
     }
     /// Resizes the array to \a size and default initialize new elements
-    void grow(uint size) { uint old=this->size; assert(size>old); reserve(size); this->size=size; for(uint i: range(old,size)) new (&at(i)) T(); }
+    void grow(uint size) { uint old=this->size; assert(size>=old); reserve(size); this->size=size; for(uint i: range(old,size)) new (&at(i)) T(); }
     /// Sets the array size to \a size and destroys removed elements
     void shrink(uint size) { assert(capacity && size<=this->size); for(uint i: range(size,this->size)) data[i].~T(); this->size=size; }
     /// Removes all elements

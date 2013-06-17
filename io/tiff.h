@@ -14,4 +14,5 @@ struct Tiff16 {
     BinaryData s;
     struct tiff* tiff = 0;
     uint width = 0, height = 0;
+    bool randomAccess = false;
 };

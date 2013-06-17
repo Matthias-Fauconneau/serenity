@@ -508,7 +508,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
             for(uint i: range(result->elements.size)) writeFile(dec(i,4)+"."_+result->metadata, result->elements[i], folder);
             touchFile(result->fileName, result->folder, true);
         } else { // Synchronizes file mappings with results
-            uint64 mappedSize = 0;
+            size_t mappedSize = 0;
             if(result->maps) {
                 assert_(result->maps.size == 1);
                 mappedSize = result->maps[0].size;
@@ -523,6 +523,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                 //else only open file to map read-only
             } else { // Copies data from anonymous memory to file
                 file = File(result->fileName, result->folder, Flags(ReadWrite|Truncate|Create));
+                assert(result->data);
                 file.write(result->data);
             }
             if(result->data.size>=pageSize) { // Remaps file read-only (will be remapped Read|Write whenever used as output again)

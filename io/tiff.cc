@@ -34,11 +34,14 @@ Tiff16::Tiff16(const ref<byte>& file) : s(file) {
     if(!tiff) return;
     TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
+    uint rowsPerStrip=0; TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip);
+    uint compression=0; TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &compression);
+    randomAccess = rowsPerStrip == 1 && compression == 1;
     uint16 bitPerSample=1; TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitPerSample); assert(bitPerSample==16);
 }
 void Tiff16::read(uint16* target, uint x0, uint y0, uint w, uint h, uint stride) {
     assert(x0+w<=width && y0+h<=height, x0, y0, w, h, width, height);
-    for(uint y: range(y0)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y, 0); } // Reads first lines to avoid "Compression algorithm does not support random access" errors.
+    if(!randomAccess) for(uint y: range(y0)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y, 0); } // Reads first lines to avoid "Compression algorithm does not support random access" errors.
     if(w==width) for(uint y: range(h)) TIFFReadScanline(tiff, target+y*stride, y0+y, 0);
     else {
         for(uint y: range(h)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y0+y, 0); rawCopy(target+y*stride, buffer+x0, w); }

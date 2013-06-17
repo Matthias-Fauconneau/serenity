@@ -9,6 +9,8 @@ struct Handle {
     default_move(Handle);
     ~Handle();
     explicit operator bool() const { return fd; }
+    /// Returns file descriptor name
+    String name() const;
 };
 
 struct Folder;
@@ -27,8 +29,6 @@ struct Folder : Handle {
     int64 accessTime() const;
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
-    /// Returns folder name
-    String name() const;
     /// Lists all files in this folder
     array<String> list(uint flags) const;
 };
@@ -42,25 +42,26 @@ enum { IDLE=64 };
 struct Stream : Handle {
     Stream(int fd):Handle(fd){}
     /// Reads exactly \a size bytes into \a buffer
-    void read(void* buffer, uint size);
+    void read(void* buffer, size_t size);
     /// Reads up to \a size bytes into \a buffer
-    int readUpTo(void* buffer, uint size);
+    int64 readUpTo(void* buffer, size_t size);
     /// Reads exactly \a size bytes
-    buffer<byte> read(uint size);
+    buffer<byte> read(size_t size);
     /// Reads up to \a size bytes
-    buffer<byte> readUpTo(uint size);
+    buffer<byte> readUpTo(size_t size);
     /// Reads a raw value
     template<Type T> T read() { T t; read((byte*)&t,sizeof(T)); return t; }
     /// Reads \a size raw values
-    template<Type T> buffer<T> read(uint size) {
-        ::buffer<T> buffer(size); uint byteSize=size*sizeof(T);
-        for(uint i=0;i<byteSize;) i+=readUpTo(buffer.begin()+i, byteSize-i);
+    template<Type T> buffer<T> read(size_t size) {
+        ::buffer<T> buffer(size); size_t byteSize=size*sizeof(T);
+        size_t offset=0; while(offset<byteSize) offset+=readUpTo(buffer.begin()+offset, byteSize-offset);
+        assert(offset==byteSize);
         return buffer;
     }
     /// Polls whether reading would block
     bool poll(int timeout=0);
     /// Writes \a buffer of \a size bytes
-    void write(const byte* data, uint64 size);
+    void write(const byte* data, size_t size);
     /// Writes \a buffer
     void write(const ref<byte>& buffer);
 };
@@ -88,6 +89,8 @@ struct File : Stream {
     int64 accessTime() const;
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
+    /// Returns file name
+    String name() const;
 
     /// Resizes file
     void resize(int64 size);
@@ -141,7 +144,7 @@ struct Map {
     void unmap();
 
     handle<byte*> data;
-    uint64 size=0;
+    size_t size=0;
 };
 
 /// Renames a file replacing any existing files or links

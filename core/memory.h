@@ -7,12 +7,12 @@ template<Type T> struct mref : ref<T> {
     /// Default constructs an empty reference
     mref(){}
     /// References \a size elements from \a data pointer
-    mref(T* data, uint64 size) : ref<T>(data,size){}
+    mref(T* data, size_t size) : ref<T>(data,size){}
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
-    T& at(uint64 i) const { assert(i<size); return (T&)data[i]; }
-    T& operator [](uint64 i) const { return at(i); }
+    T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
+    T& operator [](size_t i) const { return at(i); }
     T& first() const { return at(0); }
     T& last() const { return at(size-1); }
 
@@ -24,14 +24,16 @@ template<Type T> struct mref : ref<T> {
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) { return p; }
 /// Initializes raw memory to zero
-inline void clear(byte* buffer, uint64 size) { for(uint64 i: range(size)) buffer[i]=0; }
+inline void clear(byte* buffer, size_t size) { for(size_t i: range(size)) buffer[i]=0; }
 /// Copies raw memory from \a src to \a dst
-inline void copy(byte* dst, const byte* src, uint64 size) { for(uint64 i: range(size)) dst[i]=src[i]; }
+inline void copy(byte* dst, const byte* src, size_t size) { for(size_t i: range(size)) dst[i]=src[i]; }
 /// Initializes buffer to \a value
-template<Type T> inline void clear(T* buffer, uint64 size, const T& value=T()) { for(uint64 i: range(size)) new (&buffer[i]) T(copy(value)); }
+template<Type T> inline void clear(T* buffer, size_t size, const T& value=T()) { for(size_t i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \a dst
 /// \note Ignores move and copy operators
-template<Type T> inline void rawCopy(T* dst,const T* src, uint64 size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
+template<Type T> inline void rawCopy(T* dst,const T* src, size_t size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
+/// Copies raw memory from \a src to \a dst
+inline void copy(const mref<byte>& dst, const ref<byte>& src) { assert(dst.size==src.size, dst.size, src.size); copy(dst.begin(), src.begin(), src.size); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size);
@@ -46,16 +48,16 @@ template<Type T> struct buffer : mref<T> {
     /// Default constructs an empty buffer
     buffer(){}
     /// References \a size elements from const \a data pointer
-    buffer(const T* data, uint64 size) : mref<T>((T*)data, size) {}
+    buffer(const T* data, size_t size) : mref<T>((T*)data, size) {}
     /// References \a o.size elements from \a o.data pointer
     explicit buffer(const ref<T>& o): mref<T>((T*)o.data, o.size) {}
     /// Move constructor
     buffer(buffer&& o) : mref<T>((T*)o.data, o.size), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
-    buffer(uint64 capacity, uint64 size):mref<T>((T*)0,size),capacity(capacity){ assert(capacity>=size); if(!capacity) return; if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
-    explicit buffer(uint64 size) : buffer(size, size){}
+    buffer(size_t capacity, size_t size):mref<T>((T*)0,size),capacity(capacity){ assert(capacity>=size); if(!capacity) return; if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
+    explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
-    buffer(uint64 capacity, uint64 size, const T& value) : buffer(capacity, size) { clear((T*)data, size, value); }
+    buffer(size_t capacity, size_t size, const T& value) : buffer(capacity, size) { clear((T*)data, size, value); }
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
@@ -64,22 +66,22 @@ template<Type T> struct buffer : mref<T> {
     // Overrides mref const operators
     T* begin() { return (T*)data; }
     T* end() { return (T*)data+size; }
-    T& at(uint64 i) { assert(i<size); return (T&)data[i]; }
-    T& operator [](uint64 i) { return at(i); }
+    T& at(size_t i) { assert(i<size); return (T&)data[i]; }
+    T& operator [](size_t i) { return at(i); }
     T& first() { return at(0); }
     T& last() { return at(size-1); }
 
     // and reenable const const versions
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& at(uint64 i) const { assert(i<size); return data[i]; }
-    const T& operator [](uint64 i) const { return at(i); }
+    const T& at(size_t i) const { assert(i<size); return data[i]; }
+    const T& operator [](size_t i) const { return at(i); }
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
 
     using mref<T>::data;
     using mref<T>::size;
-    uint64 capacity=0; /// 0: reference, >0: size of the owned heap allocation
+    size_t capacity=0; /// 0: reference, >0: size of the owned heap allocation
 };
 /// Initializes a new buffer with the content of \a o
 template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
