@@ -2,10 +2,10 @@
 #include "data.h"
 #include "deflate.h"
 
-template<Type T> struct rgba { T r,g,b,a; operator byte4() const { return byte4 {b,g,r,a}; } };
-template<Type T> struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255}; } };
-template<Type T> struct ia { T i,a; operator byte4() const {return byte4 {i,i,i,a}; } };
-template<Type T> struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } };
+generic struct rgba { T r,g,b,a; operator byte4() const { return byte4 {b,g,r,a}; } };
+generic struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255}; } };
+generic struct ia { T i,a; operator byte4() const {return byte4 {i,i,i,a}; } };
+generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } };
 
 typedef vector<rgb,uint8,3> rgb3;
 

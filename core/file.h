@@ -50,9 +50,9 @@ struct Stream : Handle {
     /// Reads up to \a size bytes
     buffer<byte> readUpTo(size_t size);
     /// Reads a raw value
-    template<Type T> T read() { T t; read((byte*)&t,sizeof(T)); return t; }
+    generic T read() { T t; read((byte*)&t,sizeof(T)); return t; }
     /// Reads \a size raw values
-    template<Type T> buffer<T> read(size_t size) {
+    generic buffer<T> read(size_t size) {
         ::buffer<T> buffer(size); size_t byteSize=size*sizeof(T);
         size_t offset=0; while(offset<byteSize) offset+=readUpTo(buffer.begin()+offset, byteSize-offset);
         assert(offset==byteSize);

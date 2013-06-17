@@ -4,17 +4,24 @@
 #include "thread.h"
 #include "simd.h"
 
+/// Square roots samples
+UniformSample<double> squareRoot(const UniformSample<double>& A) {
+    uint N=A.size; UniformSample<double> R(N);
+    for(uint i: range(N)) { R[i]=sqrt(A[i]); assert(!__builtin_isnanf(R[i]) && R[i]!=__builtin_inff()); }
+    return R;
+}
+
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == "histogram.tsv"_);
-        Sample density = parseUniformSample( inputs[0]->data );
+        UniformHistogram density = parseUniformSample<uint64>( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
         uint threshold=0; double maximumVariance=0;
         uint64 totalCount=0, totalSum=0;
         for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
         uint64 backgroundCount=0, backgroundSum=0;
-        Sample interclassVariance (density.size); double parameters[4];
+        UniformSample<double> interclassVariance(density.size); double parameters[4];
         for(uint64 t: range(density.size)) {
             backgroundCount += density[t];
             if(backgroundCount == 0) continue;
@@ -47,6 +54,40 @@ class(Otsu, Operation) {
     }
 };
 
+#if LORENTZ
+// Lorentz
+/// Substracts samples clipping to zero
+Sample operator-(const Sample& A, const Sample& B) {
+    uint N=A.size; assert(B.size==N); Sample R(N);
+    for(uint i: range(N)) R[i]=max(0.f, A[i]-B[i]);
+    return R;
+}
+
+/// Cauchy-Lorentz distribution 1/(1+x²)
+struct Lorentz {
+    float position, height, scale;
+    float operator[](float x) const { return height/(1+sq((x-position)/scale)); }
+};
+template<> inline String str(const Lorentz& o) { return "x₀ "_+str(o.position)+", I"_+str(o.height)+", γ "_+str(o.scale); }
+
+/// Estimates parameters for a Lorentz distribution fitting the maximum peak
+Lorentz estimateLorentz(const Sample& sample) {
+    Lorentz lorentz;
+    int x0=0; for(uint x=0; x<sample.size; x++) if(sample[x]>sample[x0]) x0=x;
+    int y0 = sample[x0];
+    int l0=0; for(int x=x0; x>=0; x--) if(sample[x]<=y0/2) { l0=x; break; } // Left half maximum
+    int r0=sample.size; for(int x=x0; x<(int)sample.size; x++) if(sample[x]<=y0/2) { r0=x; break; } // Right half maximum
+    lorentz.position = max(x0, (l0+r0)/2); // Position estimated from half maximum is probably more accurate
+    lorentz.scale = (r0-l0)/2; // half-width at half-maximum (HWHM)
+    lorentz.height = y0;
+    return lorentz;
+}
+/// Evaluates a Lorentz distribution at regular intervals
+Sample sample(const Lorentz& lorentz, uint size) {
+    Sample sample(size, size, 0);
+    for(int x=0; x<(int)size; x++) sample[x] = lorentz[x];
+    return sample;
+}
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
 class(LorentzianMixtureModel, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
@@ -70,7 +111,9 @@ class(LorentzianMixtureModel, Operation) {
         output(outputs, 5, "density.tsv"_, [&]{ return toASCII(notpore); });
     }
 };
+#endif
 
+#if MAXIMUMMEANGRADIENTBETWEENTWOMAXIMUMPEAKS
 /// Computes the mean gradient for each set of voxels with the same density, and defines threshold as the density of the set of voxels with the maximum mean gradient
 /// \note Provided for backward compatibility only
 class(MaximumMeanGradient, Operation) {
@@ -115,6 +158,7 @@ class(MaximumMeanGradient, Operation) {
         output(outputs, 1, "gradient-mean.tsv"_, [&]{ return toASCII(gradientMean); } );
     }
 };
+#endif
 
 /// Segments by setting values under a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
 void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint16 threshold, bool cylinder=false) {

@@ -5,14 +5,14 @@
 #include "thread.h"
 
 /// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel
-Sample kernelDensityEstimation(const Sample& histogram) {
-    const float N = ::sum(histogram);
-    float h = pow(4./(3*N),1./5) * sqrt(histogramVariance(histogram));
+UniformSample<double> kernelDensityEstimation(const UniformHistogram& histogram) {
+    const double N = histogram.sampleCount();
+    double h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
     const uint clip = 8192;
-    float K[clip]; for(int i: range(clip)) { float x=-1./2*sq(i/h); K[i] = x>expUnderflow?exp(x)/sqrt(2*PI) : 0; } // Precomputes gaussian kernel
-    Sample pdf (histogram.size);
+    double K[clip]; for(int i: range(clip)) { float x=-1./2*sq(i/h); K[i] = x>expUnderflow?exp(x)/sqrt(2*PI) : 0; } // Precomputes gaussian kernel
+    UniformSample<double> pdf (histogram.size);
     parallel(pdf.size, [&](uint, uint x0) {
-        float sum = 0;
+        double sum = 0;
         for(int i: range(min(clip,x0))) sum += histogram[x0-1-i]*K[i];
         for(int i: range(min(clip,uint(histogram.size)-x0))) sum += histogram[x0+i]*K[i];
         pdf[x0] = sum / (N*h);
@@ -21,9 +21,9 @@ Sample kernelDensityEstimation(const Sample& histogram) {
 }
 
 /// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel (on a non uniformly sampled distribution)
-NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram, float h=nan) {
-    const float N = ::sum(histogram);
-    if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogramVariance(histogram));
+UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogram, double h=nan) {
+    const double N = histogram.sampleCount();
+    if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
     float max = ::max(histogram.keys);
     float delta=__FLT_MAX__;
     for(uint i: range(histogram.keys.size-1)) {
@@ -32,23 +32,24 @@ NonUniformSample kernelDensityEstimation(const NonUniformSample& histogram, floa
         delta=min(delta, diff);
     }
     uint sampleCount = max/delta;
-    UniformSample pdf ( sampleCount );
+    UniformSample<double> pdf ( sampleCount );
+    pdf.scale = delta;
     parallel(pdf.size, [&](uint, uint i) {
         const float x0 = i*delta;
         float sum = 0;
         for(auto sample: histogram) sum += sample.value * exp(-1./2*sq((x0-sample.key)/h))/sqrt(2*PI);
         pdf[i] = sum / (N*h);
     });
-    return scaleVariable(max/sampleCount, toNonUniformSample(pdf)); //FIXME: implement scaled UniformSample
+    return pdf;
 }
 
 class(KernelDensityEstimation, Operation), virtual Pass {
     virtual string parameters() const { return "bandwidth"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         target.metadata = String("kde.tsv"_);
-        NonUniformSample sample = parseNonUniformSample(source.data);
-        UniformSample uniformSample = toUniformSample(sample);
-        target.data = uniformSample ? toASCII(kernelDensityEstimation(uniformSample)) : toASCII(kernelDensityEstimation(sample, toDecimal(args.value("bandwidth"_))));
+        NonUniformHistogram H = parseNonUniformSample<double,uint64>(source.data);
+        for(uint i: range(H.size())) if(H.keys[i] != i) target.data = toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)))); // Non uniform KDE
+        else toASCII(kernelDensityEstimation(copy(H.values)));
     }
 };
 
@@ -56,26 +57,29 @@ class(KernelDensityEstimation, Operation), virtual Pass {
 class(Sum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = String("scalar"_);
-        target.data = str(sum(parseUniformSample(source.data)))+"\n"_;
+        target.data = str(parseUniformSample<double>(source.data).sum())+"\n"_;
     }
 };
 
+template<Type X, Type Y> NonUniformSample<X,Y> squareRootVariable(NonUniformSample<X,Y>&& A) { for(X& x: A.keys) x=sqrt(x); return move(A); }
 /// Square roots the variable of a distribution
 class(SquareRootVariable, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
         target.metadata = copy(source.metadata);
-        target.data = toASCII(squareRootVariable(parseNonUniformSample(source.data)));
+        target.data = toASCII(squareRootVariable(parseNonUniformSample<double,double>(source.data)));
     }
 };
 
+/// Scales variable
+template<Type X, Type Y> NonUniformSample<X,Y> scaleVariable(float scalar, NonUniformSample<X,Y>&& A) { for(X& x: A.keys) x *= scalar; return move(A); }
 /// Scales the variable of a distribution
 class(ScaleVariable, Operation), virtual Pass {
     virtual string parameters() const { return "scale"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
         target.metadata = copy(source.metadata);
-        target.data = toASCII(scaleVariable(toDecimal(args.at("scale"_)), parseNonUniformSample(source.data)));
+        target.data = toASCII(scaleVariable(toDecimal(args.at("scale"_)), parseNonUniformSample<double,double>(source.data)));
     }
 };
 
@@ -84,6 +88,6 @@ class(Div, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         outputs[0]->metadata = copy(inputs[0]->metadata);
         if(inputs[0]->metadata=="scalar"_) outputs[0]->data = ftoa(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal(), 4)+"\n"_;
-        else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseNonUniformSample(inputs[0]->data) );
+        else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseNonUniformSample<double,double>(inputs[0]->data) );
     }
 };

@@ -3,7 +3,7 @@
 #include "array.h"
 
 // Enforces exact match for overload resolution
-template<Type T> String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return String(); }
+generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return String(); }
 
 /// Lexically compare strings
 bool operator <(const string& a, const string& b);
@@ -86,9 +86,9 @@ inline String str(const uint64& n) { return dec(n); }
 inline String str(const int64& n) { return dec(n); }
 inline String hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 inline String str(void* const& p) { return "0x"_+hex(ptr(p)); }
-template<Type T> inline String str(T* const& p) { return str(*p); }
-template<Type T> String str(const unique<T>& t) { return str(*t.pointer); }
-template<Type T> String str(const shared<T>& t) { return str(*t.pointer); }
+generic inline String str(T* const& p) { return str(*p); }
+generic String str(const unique<T>& t) { return str(*t.pointer); }
+generic String str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
 String ftoa(double number, int precision=2, int pad=0, bool exponent=false, bool inf=true);
@@ -96,12 +96,12 @@ inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 
 /// Converts arrays
-template<Type T> String str(const ref<T>& a) { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
-template<Type T> String str(const mref<T>& a) { return str((const ref<T>&)a); }
-template<Type T> String str(const buffer<T>& a) { return str((const ref<T>&)a); }
-template<Type T> String str(const array<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<Type T> String dec(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
-template<Type T> String hex(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s; }
+generic String str(const ref<T>& a) { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
+generic String str(const mref<T>& a) { return str((const ref<T>&)a); }
+generic String str(const buffer<T>& a) { return str((const ref<T>&)a); }
+generic String str(const array<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
+generic String dec(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
+generic String hex(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s; }
 
 /// Converts static arrays
 template<Type T, size_t N> String str(const T (&a)[N]) { return str(ref<T>(a,N)); }

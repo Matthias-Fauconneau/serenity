@@ -52,7 +52,7 @@ struct Variant : String {
     operator double() const { return toDecimal(*this); }
     operator const string&() const { return *this; }
     operator const String&() const { return *this; }
-    template<Type T> operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
+    generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
 };
 template<> inline Variant copy(const Variant& o) { return copy((const String&)o); }
 template<> inline String str(const Variant& o) { return copy(o); }

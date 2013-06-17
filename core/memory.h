@@ -3,7 +3,7 @@
 #include "core.h"
 
 /// Unmanaged fixed-size mutable reference to an array of elements
-template<Type T> struct mref : ref<T> {
+generic struct mref : ref<T> {
     /// Default constructs an empty reference
     mref(){}
     /// References \a size elements from \a data pointer
@@ -28,10 +28,10 @@ inline void clear(byte* buffer, size_t size) { for(size_t i: range(size)) buffer
 /// Copies raw memory from \a src to \a dst
 inline void copy(byte* dst, const byte* src, size_t size) { for(size_t i: range(size)) dst[i]=src[i]; }
 /// Initializes buffer to \a value
-template<Type T> inline void clear(T* buffer, size_t size, const T& value=T()) { for(size_t i: range(size)) new (&buffer[i]) T(copy(value)); }
+generic inline void clear(T* buffer, size_t size, const T& value=T()) { for(size_t i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \a dst
 /// \note Ignores move and copy operators
-template<Type T> inline void rawCopy(T* dst,const T* src, size_t size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
+generic inline void rawCopy(T* dst,const T* src, size_t size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
 /// Copies raw memory from \a src to \a dst
 inline void copy(const mref<byte>& dst, const ref<byte>& src) { assert(dst.size==src.size, dst.size, src.size); copy(dst.begin(), src.begin(), src.size); }
 
@@ -44,7 +44,7 @@ extern "C" void free(void* buffer);
 /// Managed fixed-capacity mutable reference to an array of elements
 /// \note either an heap allocation managed by this object or a reference to memory managed by another object
 /// \note Use array for objects with move constructors as buffer elements are not initialized on allocation
-template<Type T> struct buffer : mref<T> {
+generic struct buffer : mref<T> {
     /// Default constructs an empty buffer
     buffer(){}
     /// References \a size elements from const \a data pointer
@@ -84,12 +84,12 @@ template<Type T> struct buffer : mref<T> {
     size_t capacity=0; /// 0: reference, >0: size of the owned heap allocation
 };
 /// Initializes a new buffer with the content of \a o
-template<Type T> buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
+generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
-template<Type T> buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>(o.data, o.size); }
+generic buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>(o.data, o.size); }
 
 /// Unique reference to an heap allocated value
-template<Type T> struct unique {
+generic struct unique {
     unique(decltype(nullptr)):pointer(0){}
     template<Type D> unique(unique<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
     template<Type... Args> explicit unique(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
@@ -106,12 +106,12 @@ template<Type T> struct unique {
 
     T* pointer;
 };
-template<Type T> unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.pointer)); }
+generic unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.pointer)); }
 
 /// Reference to a shared heap allocated value managed using a reference counter
 /// \note the shared type must implement a reference counter (e.g. by inheriting shareable)
 /// \note Move semantics are still used whenever adequate (sharing is explicit)
-template<Type T> struct shared {
+generic struct shared {
     explicit shared():pointer(0){}
     template<Type D> shared(shared<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
     template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
@@ -129,5 +129,5 @@ template<Type T> struct shared {
 
     T* pointer;
 };
-template<Type T> shared<T> copy(const shared<T>& o) { return shared<T>(copy(*o.pointer)); }
-template<Type T> shared<T> share(const shared<T>& o) { return shared<T>(o); }
+generic shared<T> copy(const shared<T>& o) { return shared<T>(copy(*o.pointer)); }
+generic shared<T> share(const shared<T>& o) { return shared<T>(o); }

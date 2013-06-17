@@ -2,83 +2,91 @@
 #pragma once
 #include "string.h"
 #include "map.h"
+#include "data.h"
+
+// UniformSample
 
 /// Uniformly sampled distribution
-typedef buffer<float> UniformSample; //FIXME: template<Type T>
-typedef UniformSample Sample;
+generic struct UniformSample : buffer<T> {
+    using buffer<T>::buffer;
+    UniformSample(buffer<T>&& A):buffer<T>(move(A)){}
+    /// Returns the sum of the samples
+    T sum() const { T sum=0; for(uint i: range(size)) sum += at(i); return sum; }
+    /// Returns the mean of the samples
+    T mean() const { return sum()/size; }
+    /// Returns the variance of the samples
+    T variance() const { float mean=UniformSample::mean(), ssd=0; for(uint i: range(size)) ssd += sq(at(i)-mean); return ssd/size; }
 
-/// Returns the sum of the samples
-float sum(const Sample& A);
-
-/// Returns the mean of the samples
-float mean(const Sample& A);
-
-/// Returns the variance of the samples
-float variance(const Sample& A);
-
-/// Returns the sum of the samples represented by the histogram
-float histogramSum(const Sample& A);
-
-/// Returns the mean of the samples represented by the histogram
-float histogramMean(const Sample& A);
-
-/// Returns the variance of the samples represented by the histogram
-float histogramVariance(const Sample& A);
-
+    using buffer<T>::at;
+    using buffer<T>::size;
+    float scale=1; // Scales from integer sample indices to floating-point sample positions
+};
 /// Multiplies sample by a scalar
-Sample operator*(float s, const Sample& A);
+generic UniformSample<T> operator*(T scalar, const UniformSample<T>& A) { uint N=A.size; UniformSample<T> R(N); for(uint i: range(N)) R[i]=scalar*A[i]; return R; }
+/// Parses a uniformly sampled distribution from tab-separated values
+generic UniformSample<T> parseUniformSample(const string& file) {
+    TextData s (file);
+    int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.decimal(); s.skip("\n"_); }
+    s.index=0;
+    UniformSample<T> sample(maximum+1);
+    while(s) { double x=s.decimal(); assert_(x==double(int(x))); s.skip("\t"_); sample[int(x)]=s.decimal(); s.skip("\n"_); }
+    return sample;
+}
+/// Converts a uniformly sampled distribution to tab-separated values
+generic String toASCII(const UniformSample<T>& A) {
+    String s;
+    for(uint i=0; i<A.size; i++) s << ftoa(i,4,0,true) << '\t' << ftoa(A[i],4,0,true) << '\n';
+    return s;
+}
 
-/// Substracts samples clipping to zero
-Sample operator-(const Sample& A, const Sample& B);
-
-/// Square roots samples
-Sample squareRoot(const Sample& A);
-
-Sample parseUniformSample(const string& file);
-
-String toASCII(const Sample& A, float scale=1);
+/// Represents a sample distribution by its histogram
+struct UniformHistogram : UniformSample<uint64> {
+    using UniformSample::UniformSample;
+    UniformHistogram(UniformSample&& A):UniformSample(move(A)){}
+    /// Returns the number of samples represented by this histogram
+    uint64 sampleCount() const { return UniformSample::sum(); }
+    /// Returns the sum of the samples represented by the histogram
+    double sum() const { double sum=0; for(uint i: range(size)) sum += i*at(i); return sum; }
+    /// Returns the mean of the samples represented by the histogram
+    double mean() const { return sum()/sampleCount(); }
+    /// Returns the variance of the samples represented by the histogram
+    double variance() const { float sampleMean=mean(), ssd=0; for(uint i: range(size)) ssd += at(i)*sq(i-sampleMean); return ssd/sampleCount(); }
+};
 
 // NonUniformSample
 
 /// Non-uniformly sampled distribution
-typedef map<float, float> NonUniformSample;
+template<Type X, Type Y> struct NonUniformSample : map<X, Y> {
+    /// Returns the sum of the samples
+    Y sum() const { Y sum=0; for(uint i: range(values.size)) sum += values[i]; return sum; }
 
-float sum(const NonUniformSample& A);
-float histogramSum(const NonUniformSample& A);
-float histogramMean(const NonUniformSample& A);
-float histogramVariance(const NonUniformSample& A);
-
-/// Converts to UniformSample if possible
-UniformSample toUniformSample(const NonUniformSample& A);
-
-/// Converts to NonUniformSample (FIXME: implement scaled UniformSample)
-NonUniformSample toNonUniformSample(const UniformSample& A);
-
-/// Multiplies sample by a scalar
-NonUniformSample operator*(float s, const NonUniformSample& A);
-
-/// Scales variable
-NonUniformSample scaleVariable(float s, const NonUniformSample& A);
-
-/// Square roots variable
-NonUniformSample squareRootVariable(const NonUniformSample& A);
-
-NonUniformSample parseNonUniformSample(const string& file);
-
-String toASCII(const NonUniformSample& A);
-
-// Lorentz
-
-/// Cauchy-Lorentz distribution 1/(1+x²)
-struct Lorentz {
-    float position, height, scale;
-    float operator[](float x) const { return height/(1+sq((x-position)/scale)); }
+    using map<X, Y>::values;
 };
-template<> inline String str(const Lorentz& o) { return "x₀ "_+str(o.position)+", I"_+str(o.height)+", γ "_+str(o.scale); }
+/// Multiplies sample by a scalar
+template<Type X, Type Y> NonUniformSample<X,Y> operator*(float scalar, NonUniformSample<X,Y>&& A) { for(double& x: A.values) x *= scalar; return move(A); }
+/// Parses a uniformly sampled distribution from tab-separated values
+template<Type X, Type Y> NonUniformSample<X,Y> parseNonUniformSample(const string& file) {
+    TextData s (file);
+    NonUniformSample<X,Y> sample;
+    while(s) { double x=s.decimal(); s.skip("\t"_); sample.insert(x, s.decimal()); s.skip("\n"_); }
+    return sample;
+}
+/// Converts a uniformly sampled distribution to tab-separated values
+template<Type X, Type Y> String toASCII(const NonUniformSample<X,Y>& A) {
+    String s;
+    for(auto sample: A) s << ftoa(sample.key, 4) << '\t' << ftoa(sample.value, 4, 0, true) << '\n';
+    return s;
+}
 
-/// Estimates parameters for a Lorentz distribution fitting the maximum peak
-Lorentz estimateLorentz(const Sample& sample);
-/// Evaluates a Lorentz distribution at regular intervals
-Sample sample(const Lorentz& lorentz, uint size);
-/// Computes the intersection of two Lorentz distributions
-//float intersect(const Lorentz& a, const Lorentz& b);
+struct NonUniformHistogram : NonUniformSample<double, uint64> {
+    using NonUniformSample::NonUniformSample;
+    NonUniformHistogram(NonUniformSample&& A):NonUniformSample(move(A)){}
+    /// Returns the number of samples represented by this histogram
+    uint64 sampleCount() const { return NonUniformSample::sum(); }
+    /// Returns the sum of the samples represented by the histogram
+    double sum() const { double sum=0; for(auto sample: *this) sum += sample.value*sample.key; return sum; }
+    /// Returns the mean of the samples represented by the histogram
+    double mean() const { return sum()/NonUniformSample::sum(); }
+    /// Returns the variance of the samples represented by the histogram
+    double variance() const { double sampleMean=mean(), ssd=0; for(auto sample: *this) ssd += sample.value*sq(sample.key-sampleMean); return ssd/sampleCount(); }
+};

@@ -4,7 +4,7 @@
 
 /// Managed initialized dynamic mutable reference to an array of elements (either an heap allocation managed by this object or a reference to memory managed by another object)
 /// \note Adds resize/insert/remove using T constructor/destructor
-template<Type T> struct array : buffer<T> {
+generic struct array : buffer<T> {
     default_move(array);
     /// Default constructs an empty array
     array() {}
@@ -111,13 +111,13 @@ template<Type T> struct array : buffer<T> {
     using buffer<T>::at;
 };
 /// Copies all elements in a new array
-template<Type T> array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
+generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
 
 /// Concatenates two arrays
-template<Type T> inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a; r<<b; return r; }
+generic inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a; r<<b; return r; }
 
 /// Replaces in \a array every occurence of \a before with \a after
-template<Type T> array<T> replace(array<T>&& a, const T& before, const T& after) {
+generic array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=copy(after); return move(a);
 }
 
@@ -127,7 +127,7 @@ template<class O, class T, class F, class... Args> array<O> apply(const ref<T>& 
 }
 
 /// Converts arrays to references
-template<Type T> array<ref<T>> toRefs(const ref<array<T>>& o) {
+generic array<ref<T>> toRefs(const ref<array<T>>& o) {
     array<ref<T>> r; for(const array<T>& e: o) r << (const ref<T>&)e; return r;
 }
 

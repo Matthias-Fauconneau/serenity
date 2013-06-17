@@ -6,7 +6,7 @@ int3 zOrder(uint index);
 /// Returns Z-order curve index for the given coordinates
 uint zOrder(int3 coordinates);
 
-template<Type T> struct VolumeT;
+generic struct VolumeT;
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
 struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } } packed;
@@ -29,8 +29,8 @@ struct Volume {
         return tiled() ? (offsetX[x]+offsetY[y]+offsetZ[z]) : (z*sampleCount.x*sampleCount.y+y*sampleCount.x+x);
     }
 
-    template<Type T> operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize); return *(const VolumeT<T>*)this; }
-    template<Type T> operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize); return *(VolumeT<T>*)this; }
+    generic operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize); return *(const VolumeT<T>*)this; }
+    generic operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize); return *(VolumeT<T>*)this; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
     buffer<uint> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
@@ -42,7 +42,7 @@ struct Volume {
     bool floatingPoint=false;  // Whether the sample are stored as floats
 };
 
-template<Type T> struct VolumeT : Volume {
+generic struct VolumeT : Volume {
     operator const T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (const T*)data.data; }
     operator T*() { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
     T operator()(uint x, uint y, uint z) const { return ((const T*)data.data)[index(x,y,z)]; }

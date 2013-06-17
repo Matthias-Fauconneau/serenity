@@ -35,12 +35,13 @@ if downsample!='0': clean = Downsample denoised # Downsamples
 if !cube: cylinder = '' #Clips histograms to the inscribed cylinder
 if !thresholdFromSource: histogram-density = Histogram clean
 if thresholdFromSource: histogram-density = Histogram source
-histogram-density-normalized = Normalize histogram-density # For debugging purpose: distribution-density (using kernel density estimation) is strictly better
+histogram-density-normalized = Normalize histogram-density
 distribution-density = KernelDensityEstimation histogram-density
 
 # Threshold determination
 threshold = 'otsu'
 if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-density # Recommended robust statistic method
+otsu-interclass-deviation-normalized = Normalize otsu-interclass-deviation
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 

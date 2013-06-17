@@ -91,7 +91,7 @@ class(Capsules, Operation), virtual VolumeOperation {
         target.maximum = (1<<(target.sampleSize*8))-1;
         array<Capsule> capsules = randomCapsules(vec3(target.sampleCount), 1, 255, 255);
         rasterize(target, capsules);
-        Sample analytic ( int(max(capsules).radius) + 1 );
+        UniformSample analytic ( int(max(capsules).radius) + 1 );
         for(Capsule p : capsules) analytic[int(p.radius)] += PI*p.radius*p.radius*(4./3*p.radius + norm(p.b-p.a));
         if(otherOutputs) {
             otherOutputs[0]->metadata = String("analytic.tsv"_);

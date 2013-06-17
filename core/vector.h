@@ -45,6 +45,7 @@ template<template<typename> class V, Type T, uint N> struct vector : V<T> {
     /// \}
 };
 
+#undef generic
 #define generic template <template <typename> class V, Type T, uint N>
 #define vector vector<V,T,N>
 
@@ -85,8 +86,9 @@ generic String str(const vector& v) { String s("("_); for(uint i=0;i<N;i++) { s<
 
 #undef vector
 #undef generic
+#define generic template<Type T>
 
-template<Type T> struct xy { T x,y; };
+generic struct xy { T x,y; };
 /// Integer x,y vector
 typedef vector<xy,int,2> int2;
 /// Integer x,y vector (16bit)
@@ -97,7 +99,7 @@ inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
 
-template<Type T> struct xyz {
+generic struct xyz {
     T x,y,z;
     vector<xy,T,2> xy() const { return vector< ::xy,T,2>(x,y); }
     inline operator v4sf() const { return (v4sf){x,y,z,0}; }
@@ -110,7 +112,7 @@ typedef vector<xyz,uint16,3> short3;
 typedef vector<xyz,float,3> vec3;
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
 
-template<Type T> struct xyzw {
+generic struct xyzw {
     T x,y,z,w;
     vector< ::xyz,T,3> xyz() const { return vector< ::xyz,T,3>(x,y,z); }
     vector< ::xyz,T,3> xyw() const { return vector< ::xyz,T,3>(x,y,w); }

@@ -10,7 +10,7 @@
 #include "png.h"
 
 //#include "source.h"
-//#include "capsule.h"
+//include "capsule.h"
 //#include "average.h"
 //#include "median.h"
 //#include "histogram.h"

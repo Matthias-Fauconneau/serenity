@@ -69,7 +69,7 @@ struct BinaryData : virtual Data {
     ref<byte> untilNull();
 
     /// Reads one raw \a T element
-    template<Type T> const T& read() { return *(T*)Data::read(sizeof(T)).data; }
+    generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
     int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
     int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
     int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
@@ -93,17 +93,17 @@ struct BinaryData : virtual Data {
     ReadOperator read() { return {this}; }
 
     /// Reads \a size raw \a T elements
-    template<Type T> ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
+    generic ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
 
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {
        BinaryData* s; uint size;
-       template<Type T> operator ::buffer<T>() { ::buffer<T> buffer(size); for(uint i: range(size)) new (&buffer.at(i)) T(s->read()); return buffer; }
+       generic operator ::buffer<T>() { ::buffer<T> buffer(size); for(uint i: range(size)) new (&buffer.at(i)) T(s->read()); return buffer; }
    };
    ArrayReadOperator read(uint size) { return {this,size}; }
 
    /// Reads \a size \a T elements (swap as needed)
-   template<Type T>  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
+   generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
 
    bool isBigEndian = false;
 };

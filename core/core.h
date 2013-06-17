@@ -6,24 +6,25 @@
 #define packed __attribute((packed))
 /// Less verbose template declarations
 #define Type typename
+#define generic template<Type T>
 /// Nicer abstract declaration
 #define abstract =0
 /// Declares the default move constructor and move assigmment operator
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
 
 // Move semantics
-template<Type T> struct remove_reference { typedef T type; };
-template<Type T> struct remove_reference<T&> { typedef T type; };
-template<Type T> struct remove_reference<T&&> { typedef T type; };
+generic struct remove_reference { typedef T type; };
+generic struct remove_reference<T&> { typedef T type; };
+generic struct remove_reference<T&&> { typedef T type; };
 /// Allows move assignment
-template<Type T> inline constexpr Type remove_reference<T>::type&& move(T&& t) { return (Type remove_reference<T>::type&&)(t); }
+generic inline constexpr Type remove_reference<T>::type&& move(T&& t) { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
-template<Type T> void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+generic void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Base template for explicit copy (overriden by explicitly copyable types)
-template<Type T> T copy(const T& o) { return o; }
+generic T copy(const T& o) { return o; }
 
 /// Reference type with move semantics
-template<Type T> struct handle {
+generic struct handle {
     handle(T pointer=T()):pointer(pointer){}
     handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
     handle(handle&& o):pointer(o.pointer){o.pointer=T();}
@@ -38,21 +39,21 @@ template<Type T> struct handle {
 
 // Forward
 template<Type> struct is_lvalue_reference { static constexpr bool value = false; };
-template<Type T> struct is_lvalue_reference<T&> { static constexpr bool value = true; };
+generic struct is_lvalue_reference<T&> { static constexpr bool value = true; };
 /// Forwards references and copyable values
-template<Type T> constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
+generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
 /// Forwards moveable values
-template<Type T> constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
+generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 
 template<Type A, Type B> bool operator !=(const A& a, const B& b) { return !(a==b); }
 // Arithmetic functions
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
-template<Type T> bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
-template<Type T> T min(T a, T b) { return a<b ? a : b; }
-template<Type T> T max(T a, T b) { return a<b ? b : a; }
-template<Type T> T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
-template<Type T> T abs(T x) { return x>=0 ? x : -x; }
-template<Type T> inline constexpr T sq(const T& x) { return x*x; }
+generic bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
+generic T min(T a, T b) { return a<b ? a : b; }
+generic T max(T a, T b) { return a<b ? b : a; }
+generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
+generic T abs(T x) { return x>=0 ? x : -x; }
+generic inline constexpr T sq(const T& x) { return x*x; }
 
 // Basic types
 typedef char byte;
@@ -71,8 +72,8 @@ typedef unsigned long size_t;
 #else
 typedef unsigned int size_t;
 #endif
-namespace std { template<Type T> struct initializer_list { const T* data; size_t size; }; }
-template<Type T> struct ref;
+namespace std { generic struct initializer_list { const T* data; size_t size; }; }
+generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;
 inline constexpr string operator "" _(const char* data, size_t size);
@@ -117,7 +118,7 @@ struct range {
 };
 
 /// Unmanaged fixed-size const reference to an array of elements
-template<Type T> struct ref {
+generic struct ref {
     /// Default constructs an empty reference
     constexpr ref() {}
     /// References \a size elements from const \a data pointer
@@ -162,7 +163,7 @@ template<Type T> struct ref {
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 /// Returns const reference to memory used by \a t
-template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
+generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
 /// Declares a file to be embedded in the binary
 #define FILE(name) static ref<byte> name() { \
@@ -171,7 +172,7 @@ template<Type T> ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T
 }
 
 // ref<Arithmetic> operations
-template<Type T> const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
+generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
 
 // Integer operations
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
