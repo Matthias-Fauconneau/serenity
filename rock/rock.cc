@@ -86,13 +86,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         for(uint i: range(targets.size)) execute(targets[i], targetsSweeps[i], arguments);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
-            uint resultIndex=0;
             for(uint index: range(targetPaths.size)) {
-                if(resultIndex>=targetResults.size) {
-                    error("Expected less names, skipped names"_, targetPaths.slice(index),
-                          "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
-                    break;
-                }
                 Time time;
                 const string& path = targetPaths[index];
                 String name, data;
@@ -101,7 +95,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                     assert_(sweeps.size()==1, "FIXME: Only single sweeps can be concatenated");
                     uint sweepSize = sweeps.values[0].size, dataSize = 0;
                     assert_(sweepSize, targets[index], path, sweeps);
-                    for(const shared<Result>& result: targetResults.slice(resultIndex, sweepSize)) {
+                    for(const shared<Result>& result: targetResults[index]) {
                         String resultName = result->name+"."_+result->metadata;
                         if(!name) name = copy(resultName);
                         assert_(resultName==name);
@@ -115,13 +109,11 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                             dataSize += result->data.size;
                         }
                     }
-                    resultIndex += sweepSize;
                     if(!data) log(name,"->",path, "["_+str(sweepSize)+"x]"_, "["_+strByteCount(dataSize)+"]"_, (uint64)time>100 ? (String)time : ""_);
                 } else {
-                    const shared<Result>& target = targetResults[resultIndex];
+                    const shared<Result>& target = targetResults[index][0];
                     name = target->name+"."_+target->metadata;
                     data = unsafeReference(target->data);
-                    resultIndex++;
                 }
                 if(data) {
                     if(existsFolder(path, cwd)) {
@@ -133,12 +125,14 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                     }
                 }
             }
-            if(targetResults.slice(resultIndex) && !arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(resultIndex));
+            if(targetPaths.size>targetResults.size) error("Expected less names, skipped names"_, targetPaths.slice(targetResults.size),
+                                                      "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
+            if(targetResults.size>targetPaths.size && !arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(targetPaths.size));
         } else if(targetPaths.size == 1) { // Copies results into folder
             const string& path = targetPaths[0];
             assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
             if(!existsFolder(path,cwd)) Folder(path,cwd,true);
-            for(const shared<Result>& target: targetResults) if(target->data.size) {
+            for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) if(target->data.size) {
                 Time time;
                 writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
             }
@@ -146,7 +140,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
 
         // Displays target results
         if(arguments.value("view"_,"0"_)!="0"_) {
-            for(const shared<Result>& target: targetResults) {
+            for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) {
                 assert(target->data.size);
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
                 else if(endsWith(target->metadata,"map"_) && count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data)); // Map of scalars
@@ -177,10 +171,13 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
         if(button==WheelDown||button==WheelUp) {
             int volumeCount=0, volumeIndex=0;
-            for(const shared<Result>& target: targetResults) if(toVolume(target)) { if(target==current) volumeIndex=volumeCount; volumeCount++; }
+            for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results)
+                if(toVolume(target)) { if(target==current) volumeIndex=volumeCount; volumeCount++; }
             int newVolumeIndex = clip<int>(0,volumeIndex+(button==WheelUp?1:-1),volumeCount-1);
             if(newVolumeIndex == volumeIndex) return true;
-            volumeCount = 0; for(const shared<Result>& target: targetResults) if(toVolume(target)) { if(newVolumeIndex==volumeCount) current=share(target); volumeCount++; }
+            volumeCount = 0;
+            for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results)
+                if(toVolume(target)) { if(newVolumeIndex==volumeCount) current=share(target); volumeCount++; }
             updateView();
             return true;
         }

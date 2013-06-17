@@ -46,7 +46,7 @@ struct Process {
     virtual shared<Result> getResult(const string& target, const Dict& arguments);
 
     /// Recursively loop over each sweep parameters expliciting each value into arguments
-    void execute(const string& target, const Sweeps& sweeps, const Dict& arguments);
+    array<shared<Result>> execute(const string& target, const Sweeps& sweeps, const Dict& arguments);
 
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
     void execute(const ref<string>& allArguments, const string& definition);
@@ -57,7 +57,7 @@ struct Process {
     array<Rule> rules; // Production rules
     array<string> resultNames; // Valid result names defined by process
     array<shared<Result>> results; // Generated intermediate (and target) data
-    array<shared<Result>> targetResults; // Generated target data
+    array<array<shared<Result>>> targetResults; // Generated data for each target
 };
 
 /// Mirrors results on a filesystem

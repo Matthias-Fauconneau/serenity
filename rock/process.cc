@@ -326,7 +326,8 @@ shared<Result> Process::getResult(const string& target, const Dict& arguments) {
     error("Anonymous process manager unimplemented"_);
 }
 
-void Process::execute(const string& target, const Sweeps& sweeps, const Dict& arguments) {
+array<shared<Result> > Process::execute(const string& target, const Sweeps& sweeps, const Dict& arguments) {
+    array<shared<Result>> results;
     if(sweeps) {
         Dict args = copy(arguments);
         for(auto sweep: sweeps) { // Defines all sweeps parameters
@@ -341,20 +342,25 @@ void Process::execute(const string& target, const Sweeps& sweeps, const Dict& ar
         assert_(evaluateArguments(target,args).contains(parameter), "Irrelevant sweep parameter", parameter);
         for(Variant& value: sweep) {
             args.at(parameter) = move(value);
-            execute(target, remaining, args);
+            array<shared<Result>> result = execute(target, remaining, args);
+            results << move(result);
+            if(result.size==1) { // Early exits last sweep on null results
+                if(!results.last()->data || (results.last()->metadata=="scalar"_ && toDecimal(results.last()->data) == 0)) break;
+            }
         }
     } else { // Actually generates targets when sweeps have been explicited
         log(">>", target, evaluateArguments(target, arguments));
         Time time;
-        targetResults << getResult(target, arguments);
+        results << getResult(target, arguments);
         if((uint64)time > 100) log("<<", target, time);
     }
+    return results;
 }
 
 void Process::execute(const ref<string>& allArguments, const string& definition) {
     targetResults.clear();
     array<string> targets = configure(allArguments, definition);
-    for(uint i: range(targets.size)) execute(targets[i], targetsSweeps[i], arguments);
+    for(uint i: range(targets.size)) targetResults << execute(targets[i], targetsSweeps[i], arguments);
 }
 
 void PersistentProcess::parseSpecialArguments(const ref<string>&) {
