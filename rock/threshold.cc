@@ -15,7 +15,7 @@ UniformSample<double> squareRoot(const UniformSample<double>& A) {
 class(Otsu, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == "histogram.tsv"_);
-        UniformHistogram density = parseUniformSample<uint64>( inputs[0]->data );
+        UniformHistogram density = parseUniformSample<int64>( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
         uint threshold=0; double maximumVariance=0;
         uint64 totalCount=0, totalSum=0;
@@ -54,52 +54,52 @@ class(Otsu, Operation) {
     }
 };
 
-#if LORENTZ
+#if 1
 // Lorentz
 /// Substracts samples clipping to zero
-Sample operator-(const Sample& A, const Sample& B) {
-    uint N=A.size; assert(B.size==N); Sample R(N);
-    for(uint i: range(N)) R[i]=max(0.f, A[i]-B[i]);
+generic UniformSample<T> operator-(const UniformSample<T>& A, const UniformSample<T>& B) {
+    uint N=A.size; assert(B.size==N); UniformSample<T> R(N);
+    for(uint i: range(N)) R[i]=max<T>(0, A[i]-B[i]);
     return R;
 }
 
 /// Cauchy-Lorentz distribution 1/(1+x²)
 struct Lorentz {
-    float position, height, scale;
-    float operator[](float x) const { return height/(1+sq((x-position)/scale)); }
+    double position, height, scale;
+    double operator()(float x) const { return height/(1+sq((x-position)/scale)); }
 };
 template<> inline String str(const Lorentz& o) { return "x₀ "_+str(o.position)+", I"_+str(o.height)+", γ "_+str(o.scale); }
 
 /// Estimates parameters for a Lorentz distribution fitting the maximum peak
-Lorentz estimateLorentz(const Sample& sample) {
+Lorentz estimateLorentz(const UniformSample<int64>& sample) {
     Lorentz lorentz;
-    int x0=0; for(uint x=0; x<sample.size; x++) if(sample[x]>sample[x0]) x0=x;
-    int y0 = sample[x0];
-    int l0=0; for(int x=x0; x>=0; x--) if(sample[x]<=y0/2) { l0=x; break; } // Left half maximum
-    int r0=sample.size; for(int x=x0; x<(int)sample.size; x++) if(sample[x]<=y0/2) { r0=x; break; } // Right half maximum
+    uint x0=0; for(uint x=0; x<sample.size; x++) if(sample[x]>sample[x0]) x0=x;
+    uint y0 = sample[x0];
+    uint l0=0; for(int x=x0; x>=0; x--) if(sample[x]<=y0/2) { l0=x; break; } // Left half maximum
+    uint r0=sample.size; for(int x=x0; x<(int)sample.size; x++) if(sample[x]<=y0/2) { r0=x; break; } // Right half maximum
     lorentz.position = max(x0, (l0+r0)/2); // Position estimated from half maximum is probably more accurate
     lorentz.scale = (r0-l0)/2; // half-width at half-maximum (HWHM)
     lorentz.height = y0;
     return lorentz;
 }
 /// Evaluates a Lorentz distribution at regular intervals
-Sample sample(const Lorentz& lorentz, uint size) {
-    Sample sample(size, size, 0);
-    for(int x=0; x<(int)size; x++) sample[x] = lorentz[x];
+UniformSample<int64> sample(const Lorentz& lorentz, uint size) {
+    UniformSample<int64> sample(size);
+    for(int x=0; x<(int)size; x++) sample[x] = lorentz(x);
     return sample;
 }
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
 class(LorentzianMixtureModel, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == "histogram.tsv"_);
-        Sample density = parseUniformSample( inputs[0]->data );
+        UniformHistogram density = parseUniformSample<int64>( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Zeroes extreme values (clipping artifacts)
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
-        const Sample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
+        const UniformSample<int64> notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
         Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
         pore.height = density[pore.position]; // Use peak height from total data (estimating on not-rock yields too low estimate because rock is estimated so wide its tail overlaps pore peak)
-        const Sample notpore = density - sample(pore, density.size);
-        uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore[i] <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
+        const UniformSample<int64> notpore = density - sample(pore, density.size);
+        uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore(i) <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
         float densityThreshold = float(threshold) / float(density.size);
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
         outputs[0]->metadata = String("scalar"_);
@@ -113,15 +113,15 @@ class(LorentzianMixtureModel, Operation) {
 };
 #endif
 
-#if MAXIMUMMEANGRADIENTBETWEENTWOMAXIMUMPEAKS
+#if 1
 /// Computes the mean gradient for each set of voxels with the same density, and defines threshold as the density of the set of voxels with the maximum mean gradient
 /// \note Provided for backward compatibility only
 class(MaximumMeanGradient, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         const Volume16& source = toVolume(*inputs[0]);
         uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-        Sample gradientSum (source.maximum+1, source.maximum+1, 0); // Sum of finite differences for voxels belonging to each density value
-        Sample histogram (source.maximum+1, source.maximum+1, 0); // Count samples belonging to each class to compute mean
+        UniformSample<int64> gradientSum (source.maximum+1, source.maximum+1, 0); // Sum of finite differences for voxels belonging to each density value
+        UniformHistogram histogram (source.maximum+1, source.maximum+1, 0); // Count samples belonging to each class to compute mean
         for(uint z: range(Z-1)) for(uint y: range(Y-1)) for(uint x: range(X-1)) {
             const uint16* const voxel = &source[z*X*Y+y*X+x];
             uint gradient = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) /*+ abs(voxel[0] - voxel[X*Y])*/; //[sic] Anistropic for backward compatibility
@@ -133,25 +133,25 @@ class(MaximumMeanGradient, Operation) {
             //gradientSum[voxel[X*Y]] += gradient, histogram[voxel[X*Y]]++; //[sic] Asymetric for backward compatibility
         }
         // Pick pore and rock space as the two highest density maximums (FIXME: is this backward compatible ?)
-        Sample density = parseUniformSample( inputs[1]->data );
-        uint pore=0, rock=0; float poreMaximum=0, rockMaximum=0;
+        UniformSample<double> density = parseUniformSample<double>( inputs[1]->data );
+        uint pore=0, rock=0; double poreMaximum=0, rockMaximum=0;
         for(uint i: range(1,density.size-1)) {
             if(density[i-1]<density[i] && density[i]<density[i+1] && density[i]>poreMaximum) {
                 pore=i; poreMaximum = density[i];
                 if(poreMaximum > rockMaximum) swap(pore, rock), swap(poreMaximum, rockMaximum);
             }
         }
-        log(pore/ float(histogram.size), rock/ float(histogram.size));
+        log((double)pore/histogram.size, (double)rock/histogram.size);
         assert(rock > pore); assert(rockMaximum>poreMaximum); assert(rock < histogram.size);
-        uint threshold=0; float maximum=0;
-        Sample gradientMean (source.maximum+1);
+        uint threshold=0; double maximum=0;
+        UniformSample<int64> gradientMean (source.maximum+1);
         for(uint i: range(pore, rock)) {
             if(!histogram[i]) continue; // Not enough samples to properly estimate mean gradient for this density threshold
-            float mean = gradientSum[i]/histogram[i];
+            double mean = gradientSum[i]/histogram[i];
             if(mean>maximum) maximum = mean, threshold = i;
             gradientMean[i] = mean;
         }
-        float densityThreshold = float(threshold) / float(histogram.size);
+        double densityThreshold = (double)threshold/histogram.size;
         log("Maximum mean gradient estimates threshold at", densityThreshold, "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels");
         outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;

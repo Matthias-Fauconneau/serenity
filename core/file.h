@@ -97,7 +97,7 @@ struct File : Stream {
     /// Seeks to \a index
     void seek(int index);
 };
-/// Returns whether \a path exists (as a file)
+/// Returns whether \a path exists (as a file or a folder)
 bool existsFile(const string& path, const Folder& at=root());
 /// Reads whole \a file content
 buffer<byte> readFile(const string& path, const Folder& at=root());

@@ -62,7 +62,8 @@ bin = Bin unconnected-skeleton
 unconnected = Rasterize bin
 connected = FloodFill unconnected # Flood fills pore space
 
-minimalRadius = '0'
+if !sweep: minimalRadius = '0'
+if sweep: minimalRadius = {0..6} while volume-connected
 minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
 pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
@@ -74,7 +75,7 @@ histogram-squaredRadius-connected = Histogram pruned-connected
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
 # Computes total volume using existing operators (inefficient)
-histogram-total = Histogram skeleton clip='0' # Skeleton is the last operation adding margins; clip='0' includes background
+histogram-total = Histogram unconnected clip='0'
 volume-total = Sum histogram-total
 # Computes porosity (= pore space volume / total volume )
 porosity-unconnected = Div volume-unconnected volume-total

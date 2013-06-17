@@ -40,7 +40,7 @@ generic String toASCII(const UniformSample<T>& A) {
 }
 
 /// Represents a sample distribution by its histogram
-struct UniformHistogram : UniformSample<uint64> {
+struct UniformHistogram : UniformSample<int64> {
     using UniformSample::UniformSample;
     UniformHistogram(UniformSample&& A):UniformSample(move(A)){}
     /// Returns the number of samples represented by this histogram
@@ -78,7 +78,7 @@ template<Type X, Type Y> String toASCII(const NonUniformSample<X,Y>& A) {
     return s;
 }
 
-struct NonUniformHistogram : NonUniformSample<double, uint64> {
+struct NonUniformHistogram : NonUniformSample<double, int64> {
     using NonUniformSample::NonUniformSample;
     NonUniformHistogram(NonUniformSample&& A):NonUniformSample(move(A)){}
     /// Returns the number of samples represented by this histogram

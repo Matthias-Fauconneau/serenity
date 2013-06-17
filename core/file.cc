@@ -71,7 +71,7 @@ int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.
 void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
-bool existsFile(const string& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY, 0) ).fd > 0; }
+bool existsFile(const string& path, const Folder& at) { return Handle( openat(at.fd, strz(path), O_RDONLY, 0) ).fd > 0; }
 buffer<byte> readFile(const string& path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
 void writeFile(const string& path, const ref<byte>& content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
 

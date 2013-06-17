@@ -436,6 +436,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                 long minimum=realTime(); String oldest;
                 for(String& path: baseStorageFolder.list(Files|Recursive)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
+                    if(File(path, baseStorageFolder).size() < 4096) continue; // Keeps small result files
                     long timestamp = File(path, baseStorageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }

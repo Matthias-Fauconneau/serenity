@@ -12,7 +12,7 @@ class(Source, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return 2; }
     size_t outputSize(const Dict& args, const ref<Result*>&, uint) override {
         string path = args.at("path"_);
-        if(existsFile(path, currentWorkingDirectory())) {
+        if(!existsFolder(path, currentWorkingDirectory())) {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume volume;
             if(!parseVolumeFormat(volume, metadata)) error("Unknown format");
@@ -68,7 +68,7 @@ class(Source, Operation), virtual VolumeOperation {
 
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&) {
         string path = args.at("path"_);
-        if(existsFile(path, currentWorkingDirectory())) {
+        if(!existsFolder(path, currentWorkingDirectory())) {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume16& target = outputs.first();
             if(!parseVolumeFormat(target, metadata)) error("Unknown format");

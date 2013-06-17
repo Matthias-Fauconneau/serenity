@@ -47,7 +47,7 @@ class(KernelDensityEstimation, Operation), virtual Pass {
     virtual string parameters() const { return "bandwidth"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         target.metadata = String("kde.tsv"_);
-        NonUniformHistogram H = parseNonUniformSample<double,uint64>(source.data);
+        NonUniformHistogram H = parseNonUniformSample<double,int64>(source.data);
         for(uint i: range(H.size())) if(H.keys[i] != i) target.data = toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)))); // Non uniform KDE
         else toASCII(kernelDensityEstimation(copy(H.values)));
     }
