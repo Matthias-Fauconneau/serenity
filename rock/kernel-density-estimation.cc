@@ -40,7 +40,7 @@ UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogr
     chunk_parallel(pdf.size, [&](uint offset, uint size) { for(uint i : range(offset, offset+size)) {
         const double x0 = i*delta;
         double sum = 0;
-        for(auto sample: histogram) sum += double(sample.value) * exp(-1/(2*sq(h))*sq(x0-sample.key));
+        for(auto sample: histogram) sum += double(sample.value) * exp(-1/2*sq((x0-sample.key)/h));
         pdf[i] = scale * sum;
     }});
     return pdf;
@@ -53,8 +53,9 @@ class(KernelDensityEstimation, Operation), virtual Pass {
         NonUniformHistogram H = parseNonUniformSample<double,int64>(source.data);
         bool uniform = true;
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }
-        if(uniform) toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_));
-        else target.data = toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)); // Non uniform KDE
+        target.data = uniform ?
+                    toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)) :
+                    toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)); // Non uniform KDE
     }
 };
 
@@ -76,11 +77,11 @@ class(SquareRootVariable, Operation), virtual Pass {
 };
 
 /// Parses physical resolution from source path
-class(AutomaticScale, Operation) {
+class(PhysicalResolution, Operation) {
     string parameters() const override { return "path sliceDownsample downsample"_; }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>&) override {
         string resolutionMetadata = section(args.at("path"_),'-',1,2);
-        double resolution = resolutionMetadata ? toDecimal(resolutionMetadata)/1000.0 : 1;
+        double resolution = resolutionMetadata ? TextData(resolutionMetadata).decimal()/1000.0 : 1;
         resolution *= pow(2, toInteger(args.value("sliceDownsample"_,"0"_)));
         resolution *= pow(2, toInteger(args.value("downsample"_,"0"_)));
         outputs[0]->metadata = String("scalar"_);

@@ -66,7 +66,7 @@ unconnected = Rasterize bin
 connected = FloodFill unconnected # Flood fills pore space
 
 if !sweep: minimalRadius = '0'
-if sweep: minimalRadius = {0..7}
+if sweep: minimalRadius = {0..15}
 minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
 pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
@@ -106,8 +106,12 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
 
 # Scales radius (e.g to original pixel or physical resolution)
  if !resolution: resolution = PhysicalResolution
+
  distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resolution
  distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resolution
+
+ porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resolution
+ porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resolution
 
 # Clip 
 # Square roots squared distance
