@@ -76,19 +76,6 @@ class(SquareRootVariable, Operation), virtual Pass {
     }
 };
 
-/// Parses physical resolution from source path
-class(PhysicalResolution, Operation) {
-    string parameters() const override { return "path sliceDownsample downsample"_; }
-    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>&) override {
-        string resolutionMetadata = section(args.at("path"_),'-',1,2);
-        double resolution = resolutionMetadata ? TextData(resolutionMetadata).decimal()/1000.0 : 1;
-        resolution *= pow(2, toInteger(args.value("sliceDownsample"_,"0"_)));
-        resolution *= pow(2, toInteger(args.value("downsample"_,"0"_)));
-        outputs[0]->metadata = String("scalar"_);
-        outputs[0]->data = str(resolution)+"\n"_;
-    }
-};
-
 /// Scales variable
 template<Type X, Type Y> NonUniformSample<X,Y> scaleVariable(float scalar, NonUniformSample<X,Y>&& A) { for(X& x: A.keys) x *= scalar; return move(A); }
 /// Scales the variable of a distribution
@@ -113,10 +100,19 @@ class(Div, Operation) {
 };
 
 /// Rounds vectors
-class(Round, Operation) {
-    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        outputs[0]->metadata = copy(inputs[0]->metadata);
-        if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( round( parseVector<double>(inputs[0]->data) ) );
-        else error(inputs[0]->metadata);
+class(Round, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = copy(source.metadata);
+        if(source.metadata=="vector"_) target.data = toASCII( round( parseVector<double>(source,data) ) );
+        else error(source.metadata);
+    }
+};
+
+/// Returns maximum value
+class(Maximum, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = copy(source.metadata);
+        if(endsWith(inputs[0]->metadata,".tsv"_)) target.data = toASCII( round( parseVector<double>(source,data) ) );
+        else error(source.metadata);
     }
 };

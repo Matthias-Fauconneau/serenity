@@ -10,7 +10,7 @@ array<string> Process::parameters() {
 }
 
 array<string> Process::configure(const ref<string>& allArguments, const string& definition) {
-    array<string> targets, specialArguments;
+    array<string> targets;
     array<array<string>> results; // Intermediate result names for each target
     //array<array<string>> sweepOverrides; // Sweep overrides for each target (Converts user specified sweeps to rule sweeps)
     Dict defaultArguments; // Process-specified default arguments
@@ -152,11 +152,9 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     else if(resultNames.contains(key)) rule.inputs << key; // Result input
                     else {
                         if(rule.operation) rule.inputs << key; // Argument value
-                        else if(sweeps.contains(key)) {
-                            assert_(sweeps.at(key), sweeps);
-                            rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
-                            //for(uint i: range(targets.size)) if(results[i].contains(outputs[0])) sweepOverrides[i] += key;
-                        } else if(pass==2) error(key, arguments);
+                        else if(sweeps.contains(key)) rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
+                        else if(arguments.contains(key)) rule.sweeps.insert(key, array<Variant>()<<arguments.at(key)); // Single sweep value
+                        else if(pass>=1) error(key, arguments, sweeps);
                     }
                 }
                 for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
@@ -165,7 +163,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
         }
 
-        arguments.clear(); targetsSweeps.clear(); sweeps.clear(); targets.clear(); results.clear(); specialArguments.clear();
+        arguments.clear(); targetsSweeps.clear(); sweeps.clear(); targets.clear(); results.clear(); array<string> specialArguments;
         for(const string& argument: allArguments) { // Parses generic arguments (may affect process definition)
             TextData s (argument); string key = s.word("-_."_);
             if(s.match('=')) { // Explicit argument
@@ -202,28 +200,28 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 if(&rule) stack << rule.inputs;
             }
         }
-    }
-    for(uint i: range(targets.size)) {
-        Sweeps targetSweeps;
-        Dict args = copy(arguments);
-        for(auto sweep: sweeps) { // Defines sweep variables
-            assert_(sweep.value.size>1, targets[i], sweeps);
-            if(args.contains(sweep.key)) {
-                if(!defaultArguments.contains(sweep.key)) assert_(!arguments.contains(sweep.key), "Sweep overrides argument", sweep.key, defaultArguments);
-                args.at(sweep.key) = str(sweep.value,',');
+        for(uint i: range(targets.size)) {
+            Sweeps targetSweeps;
+            Dict args = copy(arguments);
+            for(auto sweep: sweeps) { // Defines sweep variables
+                assert_(sweep.value.size>1, targets[i], sweeps);
+                if(args.contains(sweep.key)) {
+                    if(!defaultArguments.contains(sweep.key)) assert_(!arguments.contains(sweep.key), "Sweep overrides argument", sweep.key, defaultArguments);
+                    args.at(sweep.key) = str(sweep.value,',');
+                }
+                else args.insert(String(sweep.key), str(sweep.value,','));
             }
-            else args.insert(String(sweep.key), str(sweep.value,','));
+            for(auto sweep: sweeps) { // Discards irrelevant sweeps
+                bool relevant = false;
+                if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
+                if(relevant) targetSweeps.insert(sweep.key, sweep.value);
+                //else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key, "for", targets[i], str(sweep.value,','), sweeps, defaultSweeps);
+            }
+            //for(string key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps (will be discarded as irrelevant (hopefully)
+            targetsSweeps << targetSweeps;
         }
-        for(auto sweep: sweeps) { // Discards irrelevant sweeps
-            bool relevant = false;
-            if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
-            if(relevant) targetSweeps.insert(sweep.key, sweep.value);
-            //else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key, "for", targets[i], str(sweep.value,','), sweeps, defaultSweeps);
-        }
-        //for(string key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps (will be discarded as irrelevant (hopefully)
-        targetsSweeps << targetSweeps;
+        this->parseSpecialArguments(specialArguments);
     }
-    this->parseSpecialArguments(specialArguments);
     return targets;
 }
 
@@ -430,12 +428,12 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
     }
 
-    if(!rule.operation && !rule.sweeps) { // Simple forwarding rule
-        assert(inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded");
+    if(!rule.operation && !rule.sweeps && !rule.argumentExps) { // Simple forwarding rule
+        assert_(inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded");
         return move(inputs.first());
     }
 
-    unique<Operation> operation = !rule.sweeps ? Interface<Operation>::instance(rule.operation) : nullptr;
+    unique<Operation> operation = rule.operation ? Interface<Operation>::instance(rule.operation) : nullptr;
 
     array<shared<Result>> outputs;
     for(uint index: range(rule.outputs.size)) {
@@ -490,7 +488,12 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     if(operation) {
         relevantArguments = evaluateArguments(target, arguments);
         operation->execute(evaluateArguments(target, arguments, true), cast<Result*>(outputs), cast<Result*>(inputs));
-    } else { // Sweep generator
+    } /*else if(!rule.sweeps) { // Sweep-compatible argument copy
+        assert_(rule.inputs.size == 1 && outputs.size==1 && rule.argumentExps.size()==1, rule);
+        outputs[0]->metadata = String("sweep.tsv"_);
+        shared<Result> result = getResult(rule.inputs.first(), arguments);
+        outputs[0]->data = rule.argumentExps.keys.first()+"\t"_+result->data+"\n"_;
+    }*/ else { // Sweep generator
            assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
            assert_(rule.inputs.size == 1 && outputs.size==1, "FIXME: Only single target sweeps can be generated");
 
@@ -514,8 +517,8 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                } else error("Non-concatenable sweep result type for"_, rule, rule.sweeps);
                if(TextData(result->data).decimal() == 0) break;
            }
-           outputs.first()->metadata = move(metadata);
-           outputs.first()->data = move(data);
+           outputs[0]->metadata = move(metadata);
+           outputs[0]->data = move(data);
     }
     /*if((uint64)time>100)*/ log(rule, relevantArguments, time);
 

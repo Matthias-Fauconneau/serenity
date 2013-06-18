@@ -4,6 +4,18 @@
 //#include "bmp.h"
 #include "sample.h"
 
+/// Parses physical resolution from source path
+class(PhysicalResolution, Operation) {
+    string parameters() const override { return "path sliceDownsample"_; }
+    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>&) override {
+        string resolutionMetadata = section(args.at("path"_),'-',1,2);
+        double resolution = resolutionMetadata ? TextData(resolutionMetadata).decimal()/1000.0 : 1;
+        {string times = args.value("sliceDownsample"_,"0"_); resolution *= pow(2, toInteger(times?:"1"_));}
+        outputs[0]->metadata = String("scalar"_);
+        outputs[0]->data = str(resolution)+"\n"_;
+    }
+};
+
 /// Concatenates image slice files in a volume
 class(Source, Operation), virtual VolumeOperation {
     int3 min, max, sampleCount;
@@ -142,10 +154,10 @@ inline Dict parseMap(const string& file) {
     return dict;
 }
 
-/// Returns largest possible sample size fitting all inputs
+/// Returns largest possible box fitting all inputs
 class(CommonSampleSize, Operation), virtual Pass {
     virtual void execute(const Dict& arguments, Result& size, const Result& resolutions) override {
-        assert_(endsWith(resolutions.metadata,"tsv"_));
+        assert_(endsWith(resolutions.metadata,"tsv"_), resolutions.metadata, resolutions.data);
         Dict inputs = parseMap(resolutions.data);
         array<vec3> physicalSampleSizes;
         for(auto input: inputs) {

@@ -2,46 +2,42 @@
 # Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
-# Automatic configuration
-if !path: path = Path path-resolution #TODO?: path-resolution sweeps
+# Parse physical resolutions (i.e inverse sample rate)
+#if !path: path = Path path-resolution #TODO?: path-resolution sweeps
 if !resolution: resolution = PhysicalResolution # Parse resolution from input files #TODO?: parse from path-resolution sweep argument
 resolutions = resolution path # Parses all resolutions (using sweep generator)
-common-box = CommonSampleSize resolutions # Returns largest possible box fitting all inputs
-input-box = Div common-box resolution # Converts physical common box to pixels (using current input resolution)
-if !box: box = Round input-box # Rounds input-box to nearest integer for Source
 
-# Source
-if !validation: original = Source box # Use 'sliceDownsample' to downsample the volume on the fly while reading slices from disk (i.e without storing full size volume)
-if validation: original = Capsules
+# Use largest possible box fitting all inputs
+if !box: box = Round input-box # Rounds input-box to nearest integer for Source (FIXME: if !box and #path>1)
+ input-box = Div common-box resolution # Converts physical common box to pixels (using current input resolution)
+ common-box = CommonSampleSize resolutions # Returns largest possible box fitting all inputs
 
-# Transpose
-if !transpose: source = original
-transposed = Transpose original
-if transpose=='1': source = transposed
-if transpose=='2': source = Transpose transposed
-
-# Average
-shift = ShiftRight source
-averagex = Average shift
-averagexy = Average averagex
-average = Average averagexy shift='0'
-
-# Median
-median = Median source
+# Imports volume data from image slices
+if !validation: source = Source box # Use 'sliceDownsample' to downsample the volume on the fly while reading slices from disk (i.e without storing full size volume)
+if validation: source = Capsules
 
 # Denoises
 denoise = 'median'
 if !denoise: denoised = source
 if denoise == 'average': denoised = average
+ shift = ShiftRight source
+ averagex = Average shift
+ averagexy = Average averagex
+ average = Average averagexy shift='0'
 if denoise == 'median': denoised = median
+ median = Median source
 
-# Use 'downsample' to downsample after denoising (for data sets fitting memory or processed on disk)
-if downsample=='0': clean = denoised # Forwards
-if downsample!='0': clean = Downsample denoised # Downsamples
-
+# Resamples all volumes to coarsest resolution
+common-resolution = Maximum resolutions
+input-scale = Div resolution common-resolution # Scale factor to resample input to the common resolution
+resample = 'true'
+if resample: resampled mipmap = Resample denoised input-scale # Resamples
+if resample: resampled-resolution = common-resolution # Forwards common resolution
+if !resample: resampled = denoised # Forwards original volume
+if !resample: resampled-resolution = resolution # Forwards original resolution
 # Density distribution
 if !box: cylinder = '' #Clips histograms to the inscribed cylinder
-if !thresholdFromSource: histogram-density = Histogram clean
+if !thresholdFromSource: histogram-density = Histogram resampled
 if thresholdFromSource: histogram-density = Histogram source
 histogram-density-normalized = Normalize histogram-density
 distribution-density = KernelDensityEstimation histogram-density
@@ -53,9 +49,9 @@ otsu-interclass-deviation-normalized = Normalize otsu-interclass-deviation
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
-pore = Binary clean threshold # Also clips to cylinder
+pore = Binary resampled threshold # Also clips to cylinder
 if !downsample: colorize = Colorize pore source
-if downsample: colorize = Colorize pore clean
+if downsample: colorize = Colorize pore resampled
 
 # Computes squared distance to / position of nearest background voxel
 distancex positionxx = DistanceX pore
@@ -63,13 +59,23 @@ distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
 
 skeleton = Skeleton positionx positiony positionz
-unconnected-skeleton = ZOrder skeleton
+skeleton-tiled = ZOrder skeleton
 
 # Rasterizes clipped skeleton
-bin = Bin unconnected-skeleton
-unconnected = Rasterize bin
-connected = FloodFill unconnected # Flood fills pore space
+sphere-bins = Bin skeleton-tiled
+rasterized = Rasterize sphere-bins
 
+# Transposes to use an alternate connectivity axis (FloodFill always use Z)
+transposed = Transpose rasterized
+if transpose=='X': unconnected = transposed
+if transpose=='Y': unconnected = Transpose transposed
+if transpose=='Z': unconnected = rasterized
+if !transpose: unconnected = rasterized
+
+# Flood fills pore space (same as pruned-unconnected{minimalRadius=0}
+connected = FloodFill unconnected
+
+# Discards small and unconnected pores
 if !sweep: minimalRadius = '0'
 if sweep: minimalRadius = {0..15}
 minimalSqRadius = $minimalRadius^2
@@ -82,7 +88,7 @@ histogram-squaredRadius-connected = Histogram pruned-connected
 # Computes pore space volume
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
-# Computes total volume using existing operators (inefficient)
+# Computes total volume (including rock)
 histogram-total = Histogram unconnected clip='0'
 volume-total = Sum histogram-total
 # Computes porosity (= pore space volume / total volume )
@@ -95,7 +101,7 @@ volume-unconnected-minimalRadius = SquareRootVariable volume-unconnected-minimal
 porosity-unconnected-minimalRadius = Div volume-unconnected-minimalRadius volume-total
 
 # Connected Volume( minimalSqRadius) sweep
-volume-connected-minimalSqRadius = volume-connected minimalSqRadius #TODO: until zero connected volume
+volume-connected-minimalSqRadius = volume-connected minimalSqRadius
 volume-connected-minimalRadius = SquareRootVariable volume-connected-minimalSqRadius
 porosity-connected-minimalRadius = Div volume-connected-minimalRadius volume-total
 
@@ -110,11 +116,11 @@ distribution-radius-unconnected = Div volume-distribution-radius-unconnected vol
 distribution-radius-connected = Div volume-distribution-radius-connected volume-total
 
 # Scales radius (e.g to original pixel or physical resolution)
- distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resolution
- distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resolution
+ distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resampled-resolution
+ distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resampled-resolution
 
- porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resolution
- porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resolution
+ porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resampled-resolution
+ porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resampled-resolution
 
 # Clip 
 # Square roots squared distance
@@ -122,8 +128,8 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  sqrt-connected = SquareRoot pruned-connected
 
 # Scale volume values
- sqrt-unconnected-scaled = ScaleValues sqrt-unconnected resolution
- sqrt-connected-scaled = ScaleValues sqrt-connected resolution
+ sqrt-unconnected-scaled = ScaleValues sqrt-unconnected resampled-resolution
+ sqrt-connected-scaled = ScaleValues sqrt-connected resampled-resolution
 
 # Exports to CDL
  cdl-unconnected = ToCDL sqrt-unconnected

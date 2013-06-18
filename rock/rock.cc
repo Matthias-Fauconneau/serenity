@@ -11,6 +11,7 @@
 
 //#include "source.h"
 //include "capsule.h"
+//include "resample.h"
 //#include "average.h"
 //#include "median.h"
 //#include "histogram.h"
@@ -190,6 +191,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     }
 
      void parseSpecialArguments(const ref<string>& specialArguments) override {
+         targetPaths.clear();
         for(const string& argument: specialArguments) {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) { remove(Folder(argument,cwd)); targetPaths << argument; } // Removes any empty target folder
