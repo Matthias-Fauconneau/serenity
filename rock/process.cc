@@ -345,7 +345,7 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
             array<shared<Result>> result = execute(target, remaining, args);
             results << move(result);
             if(result.size==1) { // Early exits last sweep on null results
-                if(!results.last()->data || (results.last()->metadata=="scalar"_ && toDecimal(results.last()->data) == 0)) break;
+                if(!results.last()->data || (results.last()->metadata=="scalar"_ && TextData(results.last()->data).decimal() == 0)) break;
             }
         }
     } else { // Actually generates targets when sweeps have been explicited

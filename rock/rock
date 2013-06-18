@@ -2,6 +2,9 @@
 # Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
+#pathTarget = path
+#paths = pathTarget path
+
 # Source
 if !validation: original = Source # Use 'sliceDownsample' to downsample the volume on the fly while reading slices from disk (i.e without storing full size volume)
 if validation: original = Capsules
@@ -102,9 +105,9 @@ distribution-radius-unconnected = Div volume-distribution-radius-unconnected vol
 distribution-radius-connected = Div volume-distribution-radius-connected volume-total
 
 # Scales radius (e.g to original pixel or physical resolution)
- #if !scale: scale=2^downsample #FIXME: argument arithmetic
- distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected
- distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected
+ if !resolution: resolution = PhysicalResolution
+ distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resolution
+ distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resolution
 
 # Clip 
 # Square roots squared distance
@@ -112,8 +115,8 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  sqrt-connected = SquareRoot pruned-connected
 
 # Scale volume values
- sqrt-unconnected-scaled = ScaleValues sqrt-unconnected
- sqrt-connected-scaled = ScaleValues sqrt-connected
+ sqrt-unconnected-scaled = ScaleValues sqrt-unconnected resolution
+ sqrt-connected-scaled = ScaleValues sqrt-connected resolution
 
 # Exports to CDL
  cdl-unconnected = ToCDL sqrt-unconnected

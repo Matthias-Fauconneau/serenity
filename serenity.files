@@ -68,7 +68,6 @@ rock/render.cc
 rock/render.h
 rock/rock
 rock/rock.cc
-rock/sample.cc
 rock/sample.h
 rock/skeleton.cc
 rock/average.cc

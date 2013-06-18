@@ -5,17 +5,18 @@
 #include "thread.h"
 
 /// Samples the probability density function estimated from an histogram using kernel density estimation with a gaussian kernel
-UniformSample<double> kernelDensityEstimation(const UniformHistogram& histogram) {
+UniformSample<double> kernelDensityEstimation(const UniformHistogram& histogram, double h=nan, bool normalize=false) {
     const double N = histogram.sampleCount();
-    double h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
+    if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
     const uint clip = 8192;
-    double K[clip]; for(int i: range(clip)) { float x=-1./2*sq(i/h); K[i] = x>expUnderflow?exp(x)/sqrt(2*PI) : 0; } // Precomputes gaussian kernel
+    const double scale = 1./( sqrt(2*PI) * h /*Normalize kernel (area=1)*/ * (normalize ? N : 1) /*Normalize sampleCount (to density)*/);
+    double K[clip]; for(int i: range(clip)) { double x=-1./2*sq(i/h); K[i] = x>expUnderflow ? scale * exp(x) : 0; } // Precomputes gaussian kernel
     UniformSample<double> pdf (histogram.size);
     parallel(pdf.size, [&](uint, uint x0) {
         double sum = 0;
         for(int i: range(min(clip,x0))) sum += histogram[x0-1-i]*K[i];
         for(int i: range(min(clip,uint(histogram.size)-x0))) sum += histogram[x0+i]*K[i];
-        pdf[x0] = sum / (N*h);
+        pdf[x0] = sum;
     });
     return pdf;
 }
@@ -31,15 +32,15 @@ UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogr
         assert_(diff>0, histogram.keys[i], histogram.keys[i+1]);
         delta=min(delta, diff);
     }
-    uint sampleCount = max/delta;
+    uint sampleCount = align(coreCount, max/delta);
+    delta = max/sampleCount;
     UniformSample<double> pdf ( sampleCount );
     pdf.scale = delta;
-    const double scale = 1./(sqrt(2*PI)*h)/*Normalize kernel (area=1)*/ * (normalize ? 1./N : 1)/*Normalize sampleCount (to density)*/;
+    const double scale = 1./( sqrt(2*PI) * h /*Normalize kernel (area=1)*/ * (normalize ? N : 1) /*Normalize sampleCount (to density)*/);
     chunk_parallel(pdf.size, [&](uint offset, uint size) { for(uint i : range(offset, offset+size)) {
         const double x0 = i*delta;
         double sum = 0;
-        for(auto sample: histogram) sum += sample.value * exp(-1./2*sq((x0-sample.key)/h));
-        assert(sum < 1, sum);
+        for(auto sample: histogram) sum += double(sample.value) * exp(-1/(2*sq(h))*sq(x0-sample.key));
         pdf[i] = scale * sum;
     }});
     return pdf;
@@ -50,12 +51,13 @@ class(KernelDensityEstimation, Operation), virtual Pass {
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         target.metadata = String("kde.tsv"_);
         NonUniformHistogram H = parseNonUniformSample<double,int64>(source.data);
-        for(uint i: range(H.size())) if(H.keys[i] != i) target.data = toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)); // Non uniform KDE
-        else toASCII(kernelDensityEstimation(copy(H.values)));
+        bool uniform = true;
+        for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }
+        if(uniform) toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_));
+        else target.data = toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)); // Non uniform KDE
     }
 };
 
-//definePass(Sum, "scalar"_, str(sum(parseUniformSample(source.data))) );
 class(Sum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = String("scalar"_);
@@ -73,15 +75,28 @@ class(SquareRootVariable, Operation), virtual Pass {
     }
 };
 
+/// Parses physical resolution from source path
+class(AutomaticScale, Operation) {
+    string parameters() const override { return "path sliceDownsample downsample"_; }
+    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>&) override {
+        string resolutionMetadata = section(args.at("path"_),'-',1,2);
+        double resolution = resolutionMetadata ? toDecimal(resolutionMetadata)/1000.0 : 1;
+        resolution *= pow(2, toInteger(args.value("sliceDownsample"_,"0"_)));
+        resolution *= pow(2, toInteger(args.value("downsample"_,"0"_)));
+        outputs[0]->metadata = String("scalar"_);
+        outputs[0]->data = str(resolution)+"\n"_;
+    }
+};
+
 /// Scales variable
 template<Type X, Type Y> NonUniformSample<X,Y> scaleVariable(float scalar, NonUniformSample<X,Y>&& A) { for(X& x: A.keys) x *= scalar; return move(A); }
 /// Scales the variable of a distribution
-class(ScaleVariable, Operation), virtual Pass {
-    virtual string parameters() const { return "scale"_; }
-    virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        assert_(endsWith(source.metadata,".tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
-        target.metadata = copy(source.metadata);
-        target.data = toASCII(scaleVariable(toDecimal(args.at("scale"_)), parseNonUniformSample<double,double>(source.data)));
+class(ScaleVariable, Operation) {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", inputs[0]->metadata, inputs[0]->name);
+        assert_(inputs[1]->metadata=="scalar"_, "Expected a scalar, not a", inputs[1]->metadata, inputs[1]->name);
+        outputs[0]->metadata = copy(inputs[0]->metadata);
+        outputs[0]->data = toASCII(scaleVariable(TextData(inputs[1]->data).decimal(), parseNonUniformSample<double,double>(inputs[0]->data)));
     }
 };
 

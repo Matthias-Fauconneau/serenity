@@ -35,7 +35,7 @@ generic UniformSample<T> parseUniformSample(const string& file) {
 /// Converts a uniformly sampled distribution to tab-separated values
 generic String toASCII(const UniformSample<T>& A) {
     String s;
-    for(uint i=0; i<A.size; i++) s << ftoa(i,4,0,true) << '\t' << ftoa(A[i],4,0,true) << '\n';
+    for(uint i=0; i<A.size; i++) s << ftoa(A.scale*i,4,0,true) << '\t' << ftoa(A[i],4,0,true) << '\n';
     return s;
 }
 

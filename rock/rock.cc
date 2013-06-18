@@ -93,7 +93,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             for(uint index: range(min(targetResults.size,targetPaths.size))) {
                 const string& path = targetPaths[index];
                 String name, data;
-                if(targetResults[index]) output(targetsSweeps[index], targetResults[index], path);
+                if(targetResults[index].size>1) output(targetsSweeps[index], targetResults[index], path);
                 else {
                     const shared<Result>& target = targetResults[index][0];
                     name = target->name+"."_+target->metadata;
@@ -130,7 +130,8 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
                 else if(endsWith(target->metadata,"map"_) && count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data)); // Map of scalars
                 else if(endsWith(target->metadata,".tsv"_) && count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data));
-                else if(!current && inRange(1u,toVolume(target).sampleSize,4u)) current = share(target); // Displays first displayable volume
+                else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(current) current = share(target); } // Displays first displayable volume
+                else error(target->name, target->relevantArguments, target->metadata, target->data);
             }
         }
         if(current) {
@@ -143,7 +144,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     }
 
     uint output(const Sweeps& sweeps, const ref<shared<Result>>& results, const string& path) {
-        assert(sweeps);
+        assert_(sweeps);
         Sweeps remaining = copy(sweeps);
         string parameter = sweeps.keys.first(); // Removes first parameter and loop over it
         array<Variant> sweep = remaining.take(parameter);
