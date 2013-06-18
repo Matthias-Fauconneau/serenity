@@ -167,7 +167,9 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                     assert_(!data);
                     assert_(!existsFile(path, cwd) || existsFolder(path, cwd), path);
                     Folder folder (path, cwd, true);
-                    writeFile(key, result->data, folder);
+                    String name = result->name+"{"_+parameter+":"_+key+"}."_+result->metadata;
+                    assert_(!existsFile(name, folder), path, name);
+                    writeFile(name, result->data, folder);
                     dataSize += result->data.size;
                 }
                 resultIndex++;
@@ -191,7 +193,13 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         for(const string& argument: specialArguments) {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) { remove(Folder(argument,cwd)); targetPaths << argument; } // Removes any empty target folder
-            else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) arguments.insert(String("path"_),argument);
+            else if(!isDefined("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
+                for(const string& file: Folder(argument,cwd).list(Files|Folders)) {
+                    assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments, targetsSweeps);
+                    assert_(imageFileFormat(Map(file,Folder(argument,cwd))), file, arguments, targetsSweeps);
+                }
+                arguments.insert(String("path"_),argument);
+            }
             else if(!argument.contains('=')) targetPaths << argument;
             else error("Invalid argument", argument);
         }

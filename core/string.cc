@@ -58,7 +58,7 @@ bool isInteger(const string& s) {
 
 int64 toInteger(const string& number, int base) {
     assert(base>=2 && base<=16);
-    assert(number);
+    assert_(number);
     int sign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;

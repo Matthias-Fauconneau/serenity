@@ -227,6 +227,13 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
     return targets;
 }
 
+bool Process::isDefined(const string& parameter) {
+    if(arguments.contains(parameter)) return true;
+    for(const Sweeps& sweeps: targetsSweeps) if(sweeps.contains(parameter)) return true;
+    for(const Rule& rule: rules) if(rule.sweeps.contains(parameter)) return true;
+    return false;
+}
+
 Rule& Process::ruleForOutput(const string& target) { for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
 Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments, bool local, const string& scope) {
@@ -408,7 +415,7 @@ PersistentProcess::~PersistentProcess() {
 
 shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments) {
     const Rule& rule = ruleForOutput(target);
-    if(!&rule && arguments.contains(target)) return shared<ResultFile>(target, 0, Dict(), String(), copy(arguments.at(target)), ""_, ""_); // Conversion from argument to result
+    if(!&rule && arguments.contains(target)) return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_); // Conversion from argument to result
     assert_(&rule, target);
 
     const shared<Result>& result = find(target, arguments);

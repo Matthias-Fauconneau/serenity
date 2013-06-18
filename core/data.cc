@@ -127,7 +127,7 @@ string TextData::whileInteger(bool sign) {
 
 int TextData::integer(bool sign) {
     string s = whileInteger(sign);
-    assert(s, untilEnd());
+    assert_(s, untilEnd());
     return toInteger(s, 10);
 }
 

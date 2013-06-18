@@ -25,6 +25,9 @@ struct Process {
     /// Configures process using given arguments and definition (which can depends on the arguments)
     virtual array<string> configure(const ref<string>& allArguments, const string& definition);
 
+    /// Returns whether a parameter is defined (as an argument or (local/global) sweep)
+    bool isDefined(const string& parameter);
+
     /// Parses special arguments
     virtual void parseSpecialArguments(const ref<string>& arguments) { assert_(!arguments); }
 

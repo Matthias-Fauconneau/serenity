@@ -40,7 +40,7 @@ UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogr
     chunk_parallel(pdf.size, [&](uint offset, uint size) { for(uint i : range(offset, offset+size)) {
         const double x0 = i*delta;
         double sum = 0;
-        for(auto sample: histogram) sum += double(sample.value) * exp(-1/2*sq((x0-sample.key)/h));
+        for(auto sample: histogram) sum += double(sample.value) * exp(-1./2*sq((x0-sample.key)/h));
         pdf[i] = scale * sum;
     }});
     return pdf;

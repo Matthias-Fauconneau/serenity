@@ -58,6 +58,9 @@ inline Image resize(Image&& image, uint width, uint height) {
 /// Upsamples an image by duplicating samples
 Image upsample(const Image& source);
 
+/// Returns the image file format if valid
+string imageFileFormat(const ref<byte>& file);
+
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 

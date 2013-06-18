@@ -2,11 +2,17 @@
 # Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
-#pathTarget = path
-#paths = pathTarget path
+# Automatic configuration
+pathTarget = path # Converts path argument to a target
+paths = pathTarget path # Concatenates all paths (using sweep generator)
+
+if !resolution: resolution = PhysicalResolution
+resolutions = resolution path # Parses all resolutions (using sweep generator)
+
+#if !cube: cube = CommonSampleSize resolutions paths # Uses largest possible sample size fitting all inputs
 
 # Source
-if !validation: original = Source # Use 'sliceDownsample' to downsample the volume on the fly while reading slices from disk (i.e without storing full size volume)
+if !validation: original = Source cube # Use 'sliceDownsample' to downsample the volume on the fly while reading slices from disk (i.e without storing full size volume)
 if validation: original = Capsules
 
 # Transpose
@@ -105,8 +111,6 @@ distribution-radius-unconnected = Div volume-distribution-radius-unconnected vol
 distribution-radius-connected = Div volume-distribution-radius-connected volume-total
 
 # Scales radius (e.g to original pixel or physical resolution)
- if !resolution: resolution = PhysicalResolution
-
  distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resolution
  distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resolution
 
