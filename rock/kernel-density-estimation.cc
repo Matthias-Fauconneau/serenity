@@ -24,23 +24,24 @@ UniformSample<double> kernelDensityEstimation(const UniformHistogram& histogram)
 UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogram, double h=nan, bool normalize=false) {
     const double N = histogram.sampleCount();
     if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
-    float max = ::max(histogram.keys);
-    float delta=__FLT_MAX__;
+    double max = ::max(histogram.keys);
+    double delta=__FLT_MAX__;
     for(uint i: range(histogram.keys.size-1)) {
-        float diff = histogram.keys[i+1]-histogram.keys[i];
+        double diff = histogram.keys[i+1]-histogram.keys[i];
         assert_(diff>0, histogram.keys[i], histogram.keys[i+1]);
         delta=min(delta, diff);
     }
     uint sampleCount = max/delta;
     UniformSample<double> pdf ( sampleCount );
     pdf.scale = delta;
-    const float scale = 1./h/*Normalize kernel (area=1)*/ * (normalize ? 1./N : 1)/*Normalize sampleCount (to density)*/;
-    parallel(pdf.size, [&](uint, uint i) {
-        const float x0 = i*delta;
-        float sum = 0;
-        for(auto sample: histogram) sum += sample.value * exp(-1./2*sq((x0-sample.key)/h))/sqrt(2*PI);
+    const double scale = 1./(sqrt(2*PI)*h)/*Normalize kernel (area=1)*/ * (normalize ? 1./N : 1)/*Normalize sampleCount (to density)*/;
+    chunk_parallel(pdf.size, [&](uint offset, uint size) { for(uint i : range(offset, offset+size)) {
+        const double x0 = i*delta;
+        double sum = 0;
+        for(auto sample: histogram) sum += sample.value * exp(-1./2*sq((x0-sample.key)/h));
+        assert(sum < 1, sum);
         pdf[i] = scale * sum;
-    });
+    }});
     return pdf;
 }
 

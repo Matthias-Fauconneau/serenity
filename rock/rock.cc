@@ -65,6 +65,9 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
+        if(targetPaths.size>targets.size) error("Expected less names, skipped names"_, targetPaths.slice(targets.size),
+                                                  "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
+        if(targets.size>targetPaths.size && !arguments.contains("view"_)) error("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
 #ifndef BUILD
 #define BUILD "undefined"
 #endif
@@ -83,58 +86,40 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             if(targetPaths) log("Target paths:",targetPaths);
             assert_(targets, "Expected target");
         }
-        for(uint i: range(targets.size)) execute(targets[i], targetsSweeps[i], arguments);
+        for(uint i: range(targets.size)) targetResults << execute(targets[i], targetsSweeps[i], arguments);
+        assert_(targetResults.size == targets.size, targets, targetResults);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
-            for(uint index: range(targetPaths.size)) {
-                Time time;
+            for(uint index: range(min(targetResults.size,targetPaths.size))) {
                 const string& path = targetPaths[index];
                 String name, data;
-                if(targetsSweeps[index]) { // Concatenates sweep results into a single file
-                    const Sweeps& sweeps = targetsSweeps[index];
-                    assert_(sweeps.size()==1, "FIXME: Only single sweeps can be concatenated");
-                    uint sweepSize = sweeps.values[0].size, dataSize = 0;
-                    assert_(sweepSize, targets[index], path, sweeps);
-                    for(const shared<Result>& result: targetResults[index]) {
-                        String resultName = result->name+"."_+result->metadata;
-                        if(!name) name = copy(resultName);
-                        assert_(resultName==name);
-                        string key = result->relevantArguments.at(sweeps.keys[0]);
-                        if(result->metadata=="scalar"_) data << key << "\t"_ << result->data;
-                        else {
-                            assert_(!data);
-                            assert_(!existsFile(path, cwd) || existsFolder(path, cwd), path);
-                            Folder folder (path, cwd, true);
-                            writeFile(key, result->data, folder);
-                            dataSize += result->data.size;
-                        }
-                    }
-                    if(!data) log(name,"->",path, "["_+str(sweepSize)+"x]"_, "["_+strByteCount(dataSize)+"]"_, (uint64)time>100 ? (String)time : ""_);
-                } else {
+                if(targetResults[index]) output(targetsSweeps[index], targetResults[index], path);
+                else {
                     const shared<Result>& target = targetResults[index][0];
                     name = target->name+"."_+target->metadata;
                     data = unsafeReference(target->data);
-                }
-                if(data) {
                     if(existsFolder(path, cwd)) {
+                        Time time;
                         writeFile(name, data, Folder(path, cwd));
                         log(path+"/"_+name, "["_+strByteCount(data.size)+"]"_, time);
                     } else {
+                        Time time;
                         writeFile(path, data, cwd);
                         log(name,"->",path, "["_+strByteCount(data.size)+"]"_, time);
                     }
                 }
             }
-            if(targetPaths.size>targetResults.size) error("Expected less names, skipped names"_, targetPaths.slice(targetResults.size),
-                                                      "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
-            if(targetResults.size>targetPaths.size && !arguments.contains("view"_)) error("Expected more names, skipped targets"_, targetResults.slice(targetPaths.size));
         } else if(targetPaths.size == 1) { // Copies results into folder
             const string& path = targetPaths[0];
-            assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
-            if(!existsFolder(path,cwd)) Folder(path,cwd,true);
+            if(!existsFolder(path,cwd)) {
+                assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
+                Folder(path,cwd,true);
+            }
             for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) if(target->data.size) {
                 Time time;
-                writeFile(target->name+"."_+target->metadata, target->data, Folder(path, cwd)), log(path+"/"_+target->name+"."_+target->metadata, time);
+                String fileName = target->name+"{"_+toASCII(target->relevantArguments)+"}."_+target->metadata;
+                writeFile(fileName, target->data, Folder(path, cwd));
+                log(fileName, "["_+strByteCount(target->data.size)+"]"_, time);
             }
         } else assert(arguments.contains("view"_), "Expected target paths"_);
 
@@ -157,15 +142,58 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         }
     }
 
+    uint output(const Sweeps& sweeps, const ref<shared<Result>>& results, const string& path) {
+        assert(sweeps);
+        Sweeps remaining = copy(sweeps);
+        string parameter = sweeps.keys.first(); // Removes first parameter and loop over it
+        array<Variant> sweep = remaining.take(parameter);
+
+        uint resultIndex=0;
+        if(remaining) { // Recursively outputs sweeps in nested folders
+            for(Variant& value: sweep)
+                resultIndex += output(remaining, results.slice(resultIndex), path+"/"_+str(value));
+        } else { // Outputs last sweep as files or for scalar result sweeps, concatenates in a single file
+            String name, data;
+            uint dataSize=0;
+            Time time;
+            for(const shared<Result>& result: results.slice(0,sweep.size)) {
+                String resultName = result->name+"."_+result->metadata;
+                if(!name) name = copy(resultName);
+                assert_(resultName==name);
+                string key = result->relevantArguments.at(parameter);
+                if(result->metadata=="scalar"_) data << key << "\t"_ << result->data;
+                else {
+                    assert_(!data);
+                    assert_(!existsFile(path, cwd) || existsFolder(path, cwd), path);
+                    Folder folder (path, cwd, true);
+                    writeFile(key, result->data, folder);
+                    dataSize += result->data.size;
+                }
+                resultIndex++;
+                if(!result->data || (result->metadata=="scalar"_ && TextData(result->data).decimal() == 0)) break;
+            }
+            if(!data) log(name,"->",path, "["_+str(sweep.size)+"x]"_, "["_+strByteCount(dataSize)+"]"_, (uint64)time>100 ? (String)time : ""_);
+            if(data) {
+                if(existsFolder(path, cwd)) {
+                    writeFile(name, data, Folder(path, cwd));
+                    log(path+"/"_+name, "["_+strByteCount(data.size)+"]"_, time);
+                } else {
+                    writeFile(path, data, cwd);
+                    log(name,"->",path, "["_+strByteCount(data.size)+"]"_, time);
+                }
+            }
+        }
+        return resultIndex;
+    }
+
      void parseSpecialArguments(const ref<string>& specialArguments) override {
         for(const string& argument: specialArguments) {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
-            else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders)) remove(Folder(argument,cwd)); // Removes any empty target folder
+            else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) { remove(Folder(argument,cwd)); targetPaths << argument; } // Removes any empty target folder
             else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) arguments.insert(String("path"_),argument);
             else if(!argument.contains('=')) targetPaths << argument;
             else error("Invalid argument", argument);
         }
-        PersistentProcess::parseSpecialArguments(specialArguments);
     }
 
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
@@ -237,6 +265,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
 
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
     array<string> targetPaths; // Path to file (or folders) where targets are copied
+    array<array<shared<Result>>> targetResults; // Generated datas for each target
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     unique<Window> window = nullptr;

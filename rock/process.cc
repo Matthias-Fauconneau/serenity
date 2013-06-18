@@ -105,7 +105,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                         else if(op=="^"_) value = pow(left, right);
                         else error("Unknown operator", op);
                         defaultArguments.insert(String(key), value);
-                        arguments.insert(String(key), value);
+                        if(!arguments.contains(key)) arguments.insert(String(key), value);
                     }
                 }
                 //else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
@@ -357,15 +357,17 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
     return results;
 }
 
-void Process::execute(const ref<string>& allArguments, const string& definition) {
-    targetResults.clear();
+array<array<shared<Result>>> Process::execute(const ref<string>& allArguments, const string& definition) {
+    array<array<shared<Result>>> targetResults; // Generated results for each target
     array<string> targets = configure(allArguments, definition);
     for(uint i: range(targets.size)) targetResults << execute(targets[i], targetsSweeps[i], arguments);
+    return targetResults;
 }
 
-void PersistentProcess::parseSpecialArguments(const ref<string>&) {
+array<string> PersistentProcess::configure(const ref<string>& allArguments, const string& definition) {
+    assert_(!results);
+    array<string> targets = Process::configure(allArguments, definition);
     if(arguments.contains("storageFolder"_)) storageFolder = Folder(arguments.at("storageFolder"_),currentWorkingDirectory());
-
     // Maps intermediate results from file system
     for(const String& path: storageFolder.list(Files|Folders)) {
         TextData s (path); string name = s.whileNot('{');
@@ -393,11 +395,11 @@ void PersistentProcess::parseSpecialArguments(const ref<string>&) {
             results << move(result);
         }
     }
+    return move(targets);
 }
 
 PersistentProcess::~PersistentProcess() {
     results.clear();
-    targetResults.clear();
     if(arguments.value("clean"_,"0"_)!="0"_) {
         for(const String& path: storageFolder.list(Files)) ::remove(path, storageFolder); // Cleanups all intermediate results
         remove(storageFolder);
@@ -444,7 +446,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                 long minimum=realTime(); String oldest;
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
-                    if(File(path, storageFolder).size() < 4096) continue; // Keeps small result files
+                    if(File(path, storageFolder).size() < 64*1024) continue; // Keeps small result files
                     long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
@@ -499,7 +501,8 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                shared<Result> result = getResult(rule.inputs.first(), args);
                assert_(result->metadata=="scalar"_, "Non-scalar sweep for"_, rule, rule.sweeps);
                data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
-               if(toDecimal(result->data) == 0) break;
+
+               if(TextData(result->data).decimal() == 0) break;
            }
            outputs.first()->metadata = String("sweep.tsv"_);
            outputs.first()->data = move(data);
@@ -539,6 +542,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                 result->data = buffer<byte>(result->maps.last());
             }
         }
+        result->rename();
         results << move(result);
     }
     return share(find(target, arguments));

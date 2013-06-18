@@ -19,7 +19,7 @@ String Handle::name() const { if(fd==AT_FDCWD) return String("."_); String s(256
 const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
 const Folder& root() { static const Folder root("/"_,currentWorkingDirectory()); return root; }
 Folder::Folder(const string& folder, const Folder& at, bool create):Handle(0){
-    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), folder);
+    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_);
 }
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
@@ -93,7 +93,7 @@ void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, con
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { rename(at, oldName, at, newName); }
 void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
-void remove(const Folder& folder) { check_( unlinkat(folder.fd,".",AT_REMOVEDIR)); }
+void remove(const Folder& folder) { check_( unlinkat(folder.fd,".",AT_REMOVEDIR), folder.name()); }
 void symlink(const string& from,const string& to, const Folder& at) {
     assert(from!=to);
     remove(from,at);

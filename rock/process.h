@@ -23,7 +23,7 @@ struct Process {
     array<string> parameters();
 
     /// Configures process using given arguments and definition (which can depends on the arguments)
-    array<string> configure(const ref<string>& allArguments, const string& definition);
+    virtual array<string> configure(const ref<string>& allArguments, const string& definition);
 
     /// Parses special arguments
     virtual void parseSpecialArguments(const ref<string>& arguments) { assert_(!arguments); }
@@ -49,7 +49,7 @@ struct Process {
     array<shared<Result>> execute(const string& target, const Sweeps& sweeps, const Dict& arguments);
 
     /// Executes all operations to generate all target (for each value of any parameter sweep) using given arguments and definition (which can depends on the arguments)
-    void execute(const ref<string>& allArguments, const string& definition);
+    array<array<shared<Result>>> execute(const ref<string>& allArguments, const string& definition);
 
     array<string> specialParameters; // Valid parameters accepted for derived class special behavior
     Dict arguments; // User-specified arguments
@@ -57,7 +57,6 @@ struct Process {
     array<Rule> rules; // Production rules
     array<string> resultNames; // Valid result names defined by process
     array<shared<Result>> results; // Generated intermediate (and target) data
-    array<array<shared<Result>>> targetResults; // Generated data for each target
 };
 
 /// Mirrors results on a filesystem
@@ -84,7 +83,7 @@ struct PersistentProcess : virtual Process {
      PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("dev/shm"_),true) {}
     ~PersistentProcess();
 
-    void parseSpecialArguments(const ref<string>& arguments) override;
+    array<string> configure(const ref<string>& allArguments, const string& definition) override;
 
     /// Gets result from cache or computes if necessary
     shared<Result> getResult(const string& target, const Dict& arguments) override;
