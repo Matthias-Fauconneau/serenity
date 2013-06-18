@@ -5,6 +5,9 @@
 #include "data.h"
 #include "math.h"
 
+// Scalar
+inline String toASCII(double scalar) { return ftoa(scalar, 6)+"\n"_; }
+
 // Vector
 generic struct Vector : buffer<T> {
        using buffer<T>::buffer;
@@ -112,3 +115,18 @@ struct NonUniformHistogram : NonUniformSample<double, int64> {
     /// Returns the variance of the samples represented by the histogram
     double variance() const { double sampleMean=mean(), ssd=0; for(auto sample: *this) ssd += sample.value*sq(sample.key-sampleMean); return ssd/sampleCount(); }
 };
+
+/// Set of named scalars
+//generic using ScalarMap = map<String, T>;
+typedef map<String, double> ScalarMap;
+
+//generic ScalarMap<T> parseMap(const string& file) {
+inline ScalarMap parseMap(const string& file) {
+    map<String, double> dict;
+    for(TextData s(file);s;) {
+        string key = s.until('\t');
+        string value = s.until('\n');
+        dict.insert(String(key), toDecimal(value));
+    }
+    return dict;
+}

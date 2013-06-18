@@ -488,12 +488,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     if(operation) {
         relevantArguments = evaluateArguments(target, arguments);
         operation->execute(evaluateArguments(target, arguments, true), cast<Result*>(outputs), cast<Result*>(inputs));
-    } /*else if(!rule.sweeps) { // Sweep-compatible argument copy
-        assert_(rule.inputs.size == 1 && outputs.size==1 && rule.argumentExps.size()==1, rule);
-        outputs[0]->metadata = String("sweep.tsv"_);
-        shared<Result> result = getResult(rule.inputs.first(), arguments);
-        outputs[0]->data = rule.argumentExps.keys.first()+"\t"_+result->data+"\n"_;
-    }*/ else { // Sweep generator
+    } else { // Sweep generator
            assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
            assert_(rule.inputs.size == 1 && outputs.size==1, "FIXME: Only single target sweeps can be generated");
 

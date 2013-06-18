@@ -144,21 +144,11 @@ class(Source, Operation), virtual VolumeOperation {
     }
 };
 
-inline Dict parseMap(const string& file) {
-    Dict dict;
-    for(TextData s(file);s;) {
-        string key = s.until('\t');
-        string value = s.until('\n');
-        dict.insert(String(key), String(value));
-    }
-    return dict;
-}
-
 /// Returns largest possible box fitting all inputs
 class(CommonSampleSize, Operation), virtual Pass {
     virtual void execute(const Dict& arguments, Result& size, const Result& resolutions) override {
         assert_(endsWith(resolutions.metadata,"tsv"_), resolutions.metadata, resolutions.data);
-        Dict inputs = parseMap(resolutions.data);
+        ScalarMap inputs = parseMap(resolutions.data);
         array<vec3> physicalSampleSizes;
         for(auto input: inputs) {
             Dict args = copy(arguments);

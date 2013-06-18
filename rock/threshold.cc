@@ -40,9 +40,9 @@ class(Otsu, Operation) {
         float densityThreshold = float(threshold) / float(density.size-1);
         //log("Otsu's method estimates threshold at", densityThreshold);
         outputs[0]->metadata = String("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 6)+"\n"_;
+        outputs[0]->data = toASCII(densityThreshold);
         output(outputs, 1, "map"_, [&]{
-            return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
+            return "threshold "_+toASCII(densityThreshold)+"\n"_
                     "threshold16 "_+dec(threshold)+"\n"_
                     "maximum "_+dec(density.size-1)+"\n"_
                     "backgroundCount "_+dec(parameters[0])+"\n"_

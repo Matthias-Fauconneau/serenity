@@ -92,7 +92,7 @@ class(ScaleVariable, Operation) {
 class(Div, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         outputs[0]->metadata = copy(inputs[0]->metadata);
-        if(inputs[0]->metadata=="scalar"_) outputs[0]->data = ftoa(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal(), 4)+"\n"_;
+        if(inputs[0]->metadata=="scalar"_) outputs[0]->data = toASCII(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal());
         else if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseVector<double>(inputs[0]->data) );
         else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseNonUniformSample<double,double>(inputs[0]->data) );
         else error(inputs[0]->metadata);
@@ -103,7 +103,7 @@ class(Div, Operation) {
 class(Round, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
-        if(source.metadata=="vector"_) target.data = toASCII( round( parseVector<double>(source,data) ) );
+        if(source.metadata=="vector"_) target.data = toASCII( round( parseVector<double>(source.data) ) );
         else error(source.metadata);
     }
 };
@@ -111,8 +111,8 @@ class(Round, Operation), virtual Pass {
 /// Returns maximum value
 class(Maximum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-        if(endsWith(inputs[0]->metadata,".tsv"_)) target.data = toASCII( round( parseVector<double>(source,data) ) );
+        target.metadata = String("scalar"_);
+        if(endsWith(source.metadata,".tsv"_)) target.data = toASCII( max( parseMap(source.data).values ) );
         else error(source.metadata);
     }
 };

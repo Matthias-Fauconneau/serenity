@@ -33,16 +33,24 @@ void downsample(Volume16& target, const Volume16& source) {
 }
 defineVolumePass(Downsample, uint16, downsample);
 
+/// Copies a volume
+void copy(Volume& target, const Volume& source) {
+    assert(target.data.size == source.data.size);
+    copy(target.data.begin(), source.data, source.data.size);
+}
+
 /// Resamples a volume using nearest neighbour (FIXME: linear, cubic)
 void resample(Volume16& target, const Volume16& source, int sourceResolution, int targetResolution) {
-    double ratio = targetResolution/sourceResolution;
-    assert_(ratio > 1./2 && ratio < 1);
+    assert_(targetResolution > sourceResolution && targetResolution < sourceResolution*2);
     assert_(!source.tiled());
     int X = source.sampleCount.x, Y = source.sampleCount.y, XY = X*Y;
-    int3 targetSize = (source.sampleCount-source.margin) * targetResolution / sourceResolution;
-    assert_(target.sampleCount == source.sampleCount);
-    target.margin = target.sampleCount - targetSize;
-    assert_(2*target.margin < target.sampleCount/2);
+    int3 targetSize = (source.sampleCount-source.margin) * sourceResolution / targetResolution;
+    assert_(source.sampleCount <= target.sampleCount);
+    target.sampleCount = source.sampleCount;
+    assert_(target.size() * target.sampleSize <= target.data.size);
+    target.data.size = target.size() * target.sampleSize;
+    target.margin = (target.sampleCount - targetSize)/2;
+    assert_(target.margin >= int3(0) && 2*target.margin < target.sampleCount/2, target.sampleCount, targetSize, target.margin);
     target.maximum=source.maximum;
     const uint16* const sourceData = source + source.index(source.margin);
     uint16* const targetData = target + target.index(target.margin);
@@ -63,8 +71,9 @@ void resample(Volume16& target, const Volume16& source, int sourceResolution, in
 class(Resample, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        int sourceResolution = TextData(otherInputs[0]->data).integer(), targetResolution = TextData(otherInputs[1]->data).integer();
-        assert_(targetResolution > sourceResolution); // Supports only downsampling
+        int sourceResolution = round(TextData(otherInputs[0]->data).decimal()*1000), targetResolution = round(TextData(otherInputs[1]->data).decimal()*1000);
+        if(sourceResolution == targetResolution) { copy(outputs[0], inputs[0]); return; }
+        assert_(targetResolution > sourceResolution, targetResolution, sourceResolution); // Supports only downsampling
         const Volume* source = &inputs[0];
         int times = log2(targetResolution/sourceResolution);
         Volume* mipmap[2] = {&outputs[0], &outputs[1]};
@@ -76,7 +85,6 @@ class(Resample, Operation), virtual VolumeOperation {
             source = mipmap[1];
         }
         assert_(mipmap[1]==&outputs[1]);
-        assert_(targetResolution > sourceResolution && targetResolution < sourceResolution*2);
         resample(outputs[0], *source, sourceResolution, targetResolution);
     }
 };

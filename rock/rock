@@ -3,12 +3,12 @@
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Parse physical resolutions (i.e inverse sample rate)
-#if !path: path = Path path-resolution #TODO?: path-resolution sweeps
-if !resolution: resolution = PhysicalResolution # Parse resolution from input files #TODO?: parse from path-resolution sweep argument
+#if !path: path = Path path-resolution
+if !resolution: resolution = PhysicalResolution # Parses resolution from input files
 resolutions = resolution path # Parses all resolutions (using sweep generator)
 
 # Use largest possible box fitting all inputs
-if !box: box = Round input-box # Rounds input-box to nearest integer for Source (FIXME: if !box and #path>1)
+if !box: box = Round input-box # Rounds input-box to nearest integer for Source
  input-box = Div common-box resolution # Converts physical common box to pixels (using current input resolution)
  common-box = CommonSampleSize resolutions # Returns largest possible box fitting all inputs
 
@@ -28,10 +28,9 @@ if denoise == 'median': denoised = median
  median = Median source
 
 # Resamples all volumes to coarsest resolution
-common-resolution = Maximum resolutions
-input-scale = Div resolution common-resolution # Scale factor to resample input to the common resolution
 resample = 'true'
-if resample: resampled mipmap = Resample denoised input-scale # Resamples
+common-resolution = Maximum resolutions
+if resample: resampled mipmap = Resample denoised resolution common-resolution # Resamples from input resolution to common-resolution
 if resample: resampled-resolution = common-resolution # Forwards common resolution
 if !resample: resampled = denoised # Forwards original volume
 if !resample: resampled-resolution = resolution # Forwards original resolution
