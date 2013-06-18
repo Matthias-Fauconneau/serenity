@@ -172,6 +172,7 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 }
 
 // ref<Arithmetic> operations
+generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
 generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
 
 // Integer operations

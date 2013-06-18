@@ -12,7 +12,7 @@ array<string> Process::parameters() {
 array<string> Process::configure(const ref<string>& allArguments, const string& definition) {
     array<string> targets, specialArguments;
     array<array<string>> results; // Intermediate result names for each target
-    array<array<string>> sweepOverrides; // Sweep overrides for each target (Converts user specified sweeps to rule sweeps)
+    //array<array<string>> sweepOverrides; // Sweep overrides for each target (Converts user specified sweeps to rule sweeps)
     Dict defaultArguments; // Process-specified default arguments
     Sweeps sweeps, defaultSweeps; // Process-specified default sweeps
     // Parses definitions and arguments twice to solve cyclic dependencies
@@ -22,7 +22,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
     // 4) Arguments are parsed again using the customized process definition
     for(uint pass unused: range(2)) {
         array<string> parameters = this->parameters();
-        rules.clear(); resultNames.clear(); sweepOverrides.clear(); sweepOverrides.grow(targets.size); defaultArguments.clear(); defaultSweeps.clear();
+        rules.clear(); resultNames.clear(); /*sweepOverrides.clear(); sweepOverrides.grow(targets.size);*/ defaultArguments.clear(); defaultSweeps.clear();
 
         for(TextData s(definition); s;) { //FIXME: factorize (arguments, sweeps, expressions ...), use parser
             s.skip();
@@ -127,7 +127,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                             if(sweeps.contains(key)) { // User overrides local sweep
                                 assert_(sweeps.at(key));
                                 rule.sweeps.insert(key, sweeps.at(key));
-                                for(uint i: range(targets.size)) if(results[i].contains(rule.inputs[0])) sweepOverrides[i] += key;
+                                //for(uint i: range(targets.size)) if(results[i].contains(rule.inputs[0])) sweepOverrides[i] += key;
                             } else {
                                 if(::find(sweep,".."_)) {
                                     TextData s (sweep);
@@ -155,7 +155,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                         else if(sweeps.contains(key)) {
                             assert_(sweeps.at(key), sweeps);
                             rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
-                            for(uint i: range(targets.size)) if(results[i].contains(outputs[0])) sweepOverrides[i] += key;
+                            //for(uint i: range(targets.size)) if(results[i].contains(outputs[0])) sweepOverrides[i] += key;
                         } else if(pass==2) error(key, arguments);
                     }
                 }
@@ -220,7 +220,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             if(relevant) targetSweeps.insert(sweep.key, sweep.value);
             //else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key, "for", targets[i], str(sweep.value,','), sweeps, defaultSweeps);
         }
-        for(string key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps
+        //for(string key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps (will be discarded as irrelevant (hopefully)
         targetsSweeps << targetSweeps;
     }
     this->parseSpecialArguments(specialArguments);
@@ -230,7 +230,6 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
 bool Process::isDefined(const string& parameter) {
     if(arguments.contains(parameter)) return true;
     for(const Sweeps& sweeps: targetsSweeps) if(sweeps.contains(parameter)) return true;
-    for(const Rule& rule: rules) if(rule.sweeps.contains(parameter)) return true;
     return false;
 }
 
@@ -259,6 +258,8 @@ Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments
             if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value);
             else args.insert(arg.key, arg.value);
         }
+        const Rule& rule = ruleForOutput(input);
+        if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter); // Removes parameters handled by sweep generator (Prevents duplicate sweep by process sweeper)
     }
 
     /// Relevant rule parameters (from operation and argument expressions)
@@ -364,7 +365,7 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
     return results;
 }
 
-array<array<shared<Result>>> Process::execute(const ref<string>& allArguments, const string& definition) {
+array<array<shared<Result> > > Process::execute(const ref<string>& allArguments, const string& definition) {
     array<array<shared<Result>>> targetResults; // Generated results for each target
     array<string> targets = configure(allArguments, definition);
     for(uint i: range(targets.size)) targetResults << execute(targets[i], targetsSweeps[i], arguments);
@@ -501,17 +502,19 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
            relevantArguments = evaluateArguments(target, arguments);
            assert_(relevantArguments.contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
 
-           String data;
+           String metadata, data;
            for(const Variant& value: rule.sweeps.at(parameter)) {
                args.remove(parameter);
                args.insert(String(parameter), value);
                shared<Result> result = getResult(rule.inputs.first(), args);
-               assert_(result->metadata=="scalar"_, "Non-scalar sweep for"_, rule, rule.sweeps);
-               data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
-
+               if(result->metadata=="scalar"_) {
+                   if(!metadata) metadata = String("sweep.tsv"_);
+                   assert(metadata == "sweep.tsv"_);
+                   data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
+               } else error("Non-concatenable sweep result type for"_, rule, rule.sweeps);
                if(TextData(result->data).decimal() == 0) break;
            }
-           outputs.first()->metadata = String("sweep.tsv"_);
+           outputs.first()->metadata = move(metadata);
            outputs.first()->data = move(data);
     }
     /*if((uint64)time>100)*/ log(rule, relevantArguments, time);

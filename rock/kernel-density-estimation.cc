@@ -101,11 +101,22 @@ class(ScaleVariable, Operation) {
     }
 };
 
-/// Divides two scalars
+/// Divides two scalars / vectors / sample
 class(Div, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         outputs[0]->metadata = copy(inputs[0]->metadata);
         if(inputs[0]->metadata=="scalar"_) outputs[0]->data = ftoa(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal(), 4)+"\n"_;
+        else if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseVector<double>(inputs[0]->data) );
         else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseNonUniformSample<double,double>(inputs[0]->data) );
+        else error(inputs[0]->metadata);
+    }
+};
+
+/// Rounds vectors
+class(Round, Operation) {
+    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        outputs[0]->metadata = copy(inputs[0]->metadata);
+        if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( round( parseVector<double>(inputs[0]->data) ) );
+        else error(inputs[0]->metadata);
     }
 };

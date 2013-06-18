@@ -3,16 +3,15 @@
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Automatic configuration
-pathTarget = path # Converts path argument to a target
-paths = pathTarget path # Concatenates all paths (using sweep generator)
-
-if !resolution: resolution = PhysicalResolution
+if !path: path = Path path-resolution #TODO?: path-resolution sweeps
+if !resolution: resolution = PhysicalResolution # Parse resolution from input files #TODO?: parse from path-resolution sweep argument
 resolutions = resolution path # Parses all resolutions (using sweep generator)
-
-#if !cube: cube = CommonSampleSize resolutions paths # Uses largest possible sample size fitting all inputs
+common-box = CommonSampleSize resolutions # Returns largest possible box fitting all inputs
+input-box = Div common-box resolution # Converts physical common box to pixels (using current input resolution)
+if !box: box = Round input-box # Rounds input-box to nearest integer for Source
 
 # Source
-if !validation: original = Source cube # Use 'sliceDownsample' to downsample the volume on the fly while reading slices from disk (i.e without storing full size volume)
+if !validation: original = Source box # Use 'sliceDownsample' to downsample the volume on the fly while reading slices from disk (i.e without storing full size volume)
 if validation: original = Capsules
 
 # Transpose
@@ -41,7 +40,7 @@ if downsample=='0': clean = denoised # Forwards
 if downsample!='0': clean = Downsample denoised # Downsamples
 
 # Density distribution
-if !cube: cylinder = '' #Clips histograms to the inscribed cylinder
+if !box: cylinder = '' #Clips histograms to the inscribed cylinder
 if !thresholdFromSource: histogram-density = Histogram clean
 if thresholdFromSource: histogram-density = Histogram source
 histogram-density-normalized = Normalize histogram-density

@@ -32,7 +32,7 @@ float sqDistance(Capsule A, Capsule B) {
     return sq( dP ); // return the closest distance
 }
 
-/// Returns a list of random capsules inside a cube [0, size] separated from a given minimal distance and with a given maximal length and radius
+/// Returns a list of random capsules inside a box [0, size] separated from a given minimal distance and with a given maximal length and radius
 array<Capsule> randomCapsules(vec3 size, float minimumDistance, float maximumLength, float maximumRadius) {
     maximumRadius = min(maximumRadius, min(size.x, min(size.y, size.z))/2-minimumDistance);
     Random random;
@@ -45,7 +45,7 @@ array<Capsule> randomCapsules(vec3 size, float minimumDistance, float maximumLen
         float length = random()*maximumLength;
         vec3 origin=(ends[0]+ends[1])/2.f, axis=ends[1]-ends[0];
         float scale = length/norm(axis);
-        if(scale>1) continue; // Might not fit cube
+        if(scale>1) continue; // Might not fit box
         Capsule a = {origin-scale/2*axis, origin+scale/2*axis, radius};
         if(norm(a.b-a.a)>maximumLength) continue;
         for(Capsule b: capsules) if(sq(a.radius+minimumDistance+b.radius)>sqDistance(a,b)) goto break_; // Discards candidates intersecting any other capsule

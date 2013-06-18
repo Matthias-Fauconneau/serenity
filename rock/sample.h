@@ -3,13 +3,37 @@
 #include "string.h"
 #include "map.h"
 #include "data.h"
+#include "math.h"
+
+// Vector
+generic struct Vector : buffer<T> {
+       using buffer<T>::buffer;
+       Vector(buffer<T>&& A):buffer<T>(move(A)){}
+};
+/// Multiplies vector by a scalar
+generic Vector<T> operator*(T scalar, const Vector<T>& A) { uint N=A.size; Vector<T> R(N); for(uint i: range(N)) R[i]=scalar*A[i]; return R; }
+inline Vector<int> round(const Vector<double>& A) { uint N=A.size; Vector<int> R(N); for(uint i: range(N)) R[i]=round(A[i]); return R; }
+/// Parses a vector from comma-separated values
+generic Vector<T> parseVector(const string& file)  {
+    TextData s (file);
+    Vector<T> vector(count(file,',')+1);
+    for(uint i: range(vector.size)) { vector[i]=s.decimal(); if(i<vector.size-1) s.skip(","_); s.skip(); }
+    return vector;
+}
+template<> inline Vector<int> parseVector(const string& file)  {
+    TextData s (file);
+    Vector<int> vector(count(file,',')+1);
+    for(uint i: range(vector.size)) { vector[i]=s.integer(); if(i<vector.size-1) s.skip(","_); s.skip(); }
+    return vector;
+}
+generic String toASCII(const Vector<T>& a) { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<", "_;} s<<"\n"_; return s; }
 
 // UniformSample
 
 /// Uniformly sampled distribution
-generic struct UniformSample : buffer<T> {
-    using buffer<T>::buffer;
-    UniformSample(buffer<T>&& A):buffer<T>(move(A)){}
+generic struct UniformSample : Vector<T> {
+    using Vector<T>::Vector;
+    UniformSample(Vector<T>&& A):Vector<T>(move(A)){}
     /// Returns the sum of the samples
     T sum() const { T sum=0; for(uint i: range(size)) sum += at(i); return sum; }
     /// Returns the mean of the samples
@@ -22,14 +46,12 @@ generic struct UniformSample : buffer<T> {
     float scale=1; // Scales from integer sample indices to floating-point sample positions
 };
 /// Multiplies sample by a scalar
-generic UniformSample<T> operator*(T scalar, const UniformSample<T>& A) { uint N=A.size; UniformSample<T> R(N); for(uint i: range(N)) R[i]=scalar*A[i]; return R; }
+generic UniformSample<T> operator*(T scalar, const UniformSample<T>& A) { return scalar*(const Vector<T>&)A; }
 /// Parses a uniformly sampled distribution from tab-separated values
 generic UniformSample<T> parseUniformSample(const string& file) {
     TextData s (file);
-    int maximum=0; while(s) { maximum=max(maximum, int(s.decimal())); s.skip("\t"_); s.decimal(); s.skip("\n"_); }
-    s.index=0;
-    UniformSample<T> sample(maximum+1);
-    while(s) { double x=s.decimal(); assert_(x==double(int(x))); s.skip("\t"_); sample[int(x)]=s.decimal(); s.skip("\n"_); }
+    UniformSample<T> sample(count(file,'\n'));
+    for(uint i: range(sample.size)) { double x=s.decimal(); assert_(x==i); s.skip("\t"_); sample[i]=s.decimal(); s.skip("\n"_); }
     return sample;
 }
 /// Converts a uniformly sampled distribution to tab-separated values
