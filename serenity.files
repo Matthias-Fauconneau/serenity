@@ -79,3 +79,5 @@ rock/volume-operation.h
 rock/kernel-density-estimation.cc
 rock/median.cc
 rock/resample.cc
+rock/analysis.cc
+rock/sample.cc

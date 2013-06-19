@@ -82,6 +82,9 @@ struct UniformHistogram : UniformSample<int64> {
 
 /// Non-uniformly sampled distribution
 template<Type X, Type Y> struct NonUniformSample : map<X, Y> {
+    using map<X, Y>::map;
+    //NonUniformSample(map<X, Y>&& A):map<X, Y>(move(A)){}
+
     /// Returns the sum of the samples
     Y sum() const { Y sum=0; for(uint i: range(values.size)) sum += values[i]; return sum; }
 

@@ -121,10 +121,17 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resampled-resolution
  distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resampled-resolution
  porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resampled-resolution
+ porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resampled-resolution
 
 # Connected Porosity( cylinderRadius ) sweep (REV)
  porosity-connected-cylinderRadius = porosity-connected cylinder
  porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
+
+# Automatic analysis
+ # Computes sequence of relative errors between subsequent values (REV sequence should be log uniform for best results)
+ porosity-deviation-cylinderRadius = RunningDeviation porosity-connected-cylinderRadius-scaled
+ # Returns the minimum cylinderRadius with deviation < 1%
+ representative-cylinderRadius = MinimumArgument porosity-deviation-cylinderRadius constraint='<0.01'
 
 # Clip 
 # Square roots squared distance
