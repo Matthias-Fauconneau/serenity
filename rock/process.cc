@@ -154,7 +154,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                         if(rule.operation) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) rule.sweeps.insert(key, copy(sweeps.at(key))); // Sweep value
                         else if(arguments.contains(key)) rule.sweeps.insert(key, array<Variant>()<<arguments.at(key)); // Single sweep value
-                        else if(pass>=1) error(key, arguments, sweeps);
+                        else if(pass>=1) error("Undefined argument", key, arguments, sweeps);
                     }
                 }
                 for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }

@@ -3,7 +3,6 @@
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Parse physical resolutions (i.e inverse sample rate)
-#if !path: path = Path path-resolution
 resolution = '1'
 if resolution == 'auto': resolution = PhysicalResolution # Parses resolution from input folder name as "name-resolution"
 resolutions = resolution path # Parses all resolutions (using sweep generator)
@@ -107,6 +106,9 @@ volume-connected-minimalSqRadius = volume-connected minimalSqRadius
 volume-connected-minimalRadius = SquareRootVariable volume-connected-minimalSqRadius
 porosity-connected-minimalRadius = Div volume-connected-minimalRadius volume-total
 
+# Returns the maximum pruning radius with volume > 0 (connectivity)
+maximum-minimalRadius = Optimize volume-connected-minimalRadius criteria='maximumArgument' constraint='>0'
+
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected
 histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connected
@@ -128,10 +130,10 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
 
 # Automatic analysis
- # Computes sequence of relative errors between subsequent values (REV sequence should be log uniform for best results)
+ # Computes sequence of relative deviation between neighbouring values (REV sequence should be log uniform for best results)
  porosity-deviation-cylinderRadius = RunningDeviation porosity-connected-cylinderRadius-scaled
- # Returns the minimum cylinderRadius with deviation < 1%
- representative-cylinderRadius = MinimumArgument porosity-deviation-cylinderRadius constraint='<0.01'
+ # Returns the minimum cylinderRadius with deviation < 5%
+ minimum-cylinderRadius = Optimize porosity-deviation-cylinderRadius criteria='minimumArgument' constraint='<0.05'
 
 # Clip 
 # Square roots squared distance
