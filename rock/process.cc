@@ -233,12 +233,14 @@ bool Process::isDefined(const string& parameter) {
 
 Rule& Process::ruleForOutput(const string& target) { for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
-Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments, bool local, bool sweep, const string& scope) {
+const Dict& Process::evaluateArguments(const string& target, const Dict& scopeArguments, bool local, bool sweep, const string& scope) {
+    for(const Evaluation& e: cache) if(e.target==target && e.input==scopeArguments && e.local==local && e.sweep==sweep) return e.output;
     const Rule& rule = ruleForOutput(target);
     Dict args;
     if(!&rule && scopeArguments.contains(target)) { // Conversion from argument to result
         args.insert(String(target), scopeArguments.at(target));
-        return args;
+        cache << unique<Evaluation>(String(target), copy(scopeArguments), local, sweep, move(args));
+        return cache.last()->output;
     }
     assert_(&rule, "No rule generating '"_+target+"'"_, scope, scopeArguments);
 
@@ -256,7 +258,7 @@ Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments
             if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value);
             else args.insert(arg.key, arg.value);
         }
-        /*if(!sweep)*/ { // Removes parameters handled by sweep generator (Prevents duplicate sweep by process sweeper)
+        if(!sweep) { // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
             const Rule& rule = ruleForOutput(input);
             if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter);
         }
@@ -271,9 +273,9 @@ Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments
     }
     for(auto arg: rule.argumentExps) if(arg.value.type==Rule::Expression::Value) parameters += arg.value;
 
-    for(auto arg: scopeArguments) if(parameters.contains(arg.key)) {
+    for(auto arg: scopeArgumentsAndSweeps) if(parameters.contains(arg.key)) {
         if(args.contains(arg.key)) args.remove(arg.key); // Removes inherited sweep //assert_(args.at(arg.key)==arg.value, scope+"/"_+target, arg.key, args.at(arg.key), arg.value);
-        else args.insert(copy(arg.key), copy(arg.value)); // Filters relevant scope arguments
+        args.insert(copy(arg.key), copy(arg.value)); // Filters relevant scope arguments
     }
     for(auto arg: rule.sweeps) { // Explicits sweep as arguments (for cache validation)
         assert_(arg.value, arg.key);
@@ -284,17 +286,19 @@ Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments
         if(args.contains(arg.key)) continue;
         assert_(parameters.contains(arg.key), "Irrelevant argument", arg.key, "for", rule);
         if(arg.value.type == Rule::Expression::Value) { // Local value argument
-            assert_(scopeArguments.contains(arg.value), rule, ": Undefined", arg.value);
-            args.insert(copy(arg.key), copy(scopeArguments.at(arg.value)));
+            assert_(scopeArgumentsAndSweeps.contains(arg.value), rule, ": Undefined", arg.value);
+            args.insert(copy(arg.key), copy(scopeArgumentsAndSweeps.at(arg.value)));
         } else if(local) { // Local literal argument (only needed for Operation execution)
             args.insert(copy(arg.key), arg.value);
         }
     }
-    return args;
+    //log(scope+"/"_+target, scopeArgumentsAndSweeps, "->"_, args);
+    cache << unique<Evaluation>(target, move(scopeArgumentsAndSweeps), local, sweep, move(args));
+    return cache.last()->output;
 }
 
 int Process::indexOf(const string& target, const Dict& arguments) {
-    Dict relevantArguments = Process::evaluateArguments(target, arguments);
+    const Dict& relevantArguments = Process::evaluateArguments(target, arguments);
     for(uint i: range(results.size)) if(results[i]->name==target && results[i]->relevantArguments==relevantArguments) return i;
     return -1;
 }
@@ -328,7 +332,7 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
     return true;
 }
 
-shared<Result> Process::getResult(const string& target, const Dict& arguments) {
+shared<Result> Process::getResult(const string& target, const Dict& arguments, const string&) {
     const shared<Result>& result = find(target, arguments);
     if(&result && sameSince(target, result->timestamp, arguments)) { assert(result->data.size); return share(result); }
     error("Anonymous process manager unimplemented"_);
@@ -413,7 +417,7 @@ PersistentProcess::~PersistentProcess() {
     }
 }
 
-shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments) {
+shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments, const string& scope) {
     const Rule& rule = ruleForOutput(target);
     if(!&rule && arguments.contains(target)) return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_); // Conversion from argument to result
     assert_(&rule, target);
@@ -423,7 +427,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     // Otherwise regenerates target using new inputs, arguments and/or implementations
 
     array<shared<Result>> inputs;
-    if(!rule.sweeps) for(const string& input: rule.inputs) inputs << getResult(input, arguments);
+    if(!rule.sweeps) for(const string& input: rule.inputs) inputs << getResult(input, arguments, scope+"/"_+target);
     for(const shared<Result>& input: inputs) {
         ResultFile& result = *(ResultFile*)input.pointer;
         if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
@@ -485,9 +489,10 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     assert_(outputs);
 
     Time time;
-    Dict relevantArguments;
+    const Dict* relevantArguments;
     if(operation) {
-        relevantArguments = evaluateArguments(target, arguments);
+        relevantArguments = &evaluateArguments(target, arguments);
+        //log(scope+"/"_+target);
         operation->execute(evaluateArguments(target, arguments, true), cast<Result*>(outputs), cast<Result*>(inputs));
     } else { // Sweep generator
            assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
@@ -498,14 +503,14 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
            assert_(rule.sweeps.at(parameter), "Single value sweep", parameter, rule.sweeps.at(parameter));
            if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
            args.insert(String(parameter), str(rule.sweeps.at(parameter),','));
-           relevantArguments = evaluateArguments(target, arguments);
-           assert_(relevantArguments.contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
+           relevantArguments = &evaluateArguments(target, arguments);
+           assert_(relevantArguments->contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
 
            String metadata, data;
            for(const Variant& value: rule.sweeps.at(parameter)) {
                args.remove(parameter);
                args.insert(String(parameter), value);
-               shared<Result> result = getResult(rule.inputs.first(), args);
+               shared<Result> result = getResult(rule.inputs.first(), args, scope+"/"_+target);
                if(result->metadata=="scalar"_ || result->metadata=="argument"_) {
                    if(!metadata) metadata = String("sweep.tsv"_);
                    assert(metadata == "sweep.tsv"_);
@@ -521,7 +526,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
         result->timestamp = realTime();
-        result->relevantArguments = copy(relevantArguments);
+        result->relevantArguments = copy(*relevantArguments);
         if(result->elements) { // Copies each elements data from anonymous memory to numbered files in a folder
             assert_(!result->maps);
             Folder folder(result->fileName, result->folder, true);

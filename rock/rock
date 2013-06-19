@@ -81,6 +81,9 @@ minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
 pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
 
+# Crops result to remove boundary bias
+#TODO
+
 # Computes histogram of maximum squared radii
 histogram-squaredRadius-unconnected = Histogram pruned-unconnected
 histogram-squaredRadius-connected = Histogram pruned-connected

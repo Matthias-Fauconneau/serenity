@@ -35,7 +35,7 @@ struct Process {
     Rule& ruleForOutput(const string& target);
 
     /// Recursively evaluates relevant arguments for a rule
-    Dict evaluateArguments(const string& target, const Dict& arguments, bool local=false, bool sweep=true, const string& scope=""_);
+    const Dict& evaluateArguments(const string& target, const Dict& arguments, bool local=false, bool sweep=true, const string& scope=""_);
 
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
     int indexOf(const string& target, const Dict& arguments);
@@ -46,7 +46,7 @@ struct Process {
     bool sameSince(const string& target, int64 queryTime, const Dict& arguments);
 
     /// Returns a valid cached Result for \a target with \a arguments or generates it if necessary
-    virtual shared<Result> getResult(const string& target, const Dict& arguments);
+    virtual shared<Result> getResult(const string& target, const Dict& arguments, const string& scope=""_);
 
     /// Recursively loop over each sweep parameters expliciting each value into arguments
     array<shared<Result>> execute(const string& target, const Sweeps& sweeps, const Dict& arguments);
@@ -60,6 +60,11 @@ struct Process {
     array<Rule> rules; // Production rules
     array<string> resultNames; // Valid result names defined by process
     array<shared<Result>> results; // Generated intermediate (and target) data
+    struct Evaluation {
+        String target; Dict input; bool local, sweep; Dict output;
+        Evaluation(const string& target, Dict&& input, bool local, bool sweep, Dict&& output):target(String(target)),input(move(input)),local(local),sweep(sweep), output(move(output)){}
+    };
+    array<unique<Evaluation>> cache; // Caches argument evaluation
 };
 
 /// Mirrors results on a filesystem
@@ -89,7 +94,7 @@ struct PersistentProcess : virtual Process {
     array<string> configure(const ref<string>& allArguments, const string& definition) override;
 
     /// Gets result from cache or computes if necessary
-    shared<Result> getResult(const string& target, const Dict& arguments) override;
+    shared<Result> getResult(const string& target, const Dict& arguments, const string& scope=""_) override;
 
     Folder storageFolder; // Should be a RAM (or local disk) filesystem large enough to hold intermediate operations of volume data
 };

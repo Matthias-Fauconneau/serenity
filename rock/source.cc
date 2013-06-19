@@ -8,6 +8,7 @@
 class(PhysicalResolution, Operation) {
     string parameters() const override { return "path downsample"_; }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>&) override {
+        assert_(args.contains("path"_), args);
         string resolutionMetadata = section(args.at("path"_),'-',1,2);
         double resolution = resolutionMetadata ? TextData(resolutionMetadata).decimal()/1000.0 : 1;
         {string times = args.value("downsample"_,"0"_); resolution *= pow(2, toInteger(times?:"1"_));}

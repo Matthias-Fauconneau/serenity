@@ -62,7 +62,7 @@ struct GraphProcess : virtual Process {
 struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
     FILE(rock) // Rock process definition (embedded in binary)i
     Rock(const ref<string>& args) : PersistentProcess("rock"_) {
-        specialParameters += "dump"_; specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_;
+        specialParameters += "dump"_; specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_; specialParameters += "storageFolder"_;
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
