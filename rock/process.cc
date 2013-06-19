@@ -233,7 +233,7 @@ bool Process::isDefined(const string& parameter) {
 
 Rule& Process::ruleForOutput(const string& target) { for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
-Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments, bool local, const string& scope) {
+Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments, bool local, bool sweep, const string& scope) {
     const Rule& rule = ruleForOutput(target);
     Dict args;
     if(!&rule && scopeArguments.contains(target)) { // Conversion from argument to result
@@ -252,12 +252,14 @@ Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments
 
     // Recursively evaluate to invalid cache on argument changes
     for(const string& input: rule.inputs) {
-        for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, scope+"/"_+target)) { //FIXME: memoize
+        for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) { //FIXME: memoize
             if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value);
             else args.insert(arg.key, arg.value);
         }
-        const Rule& rule = ruleForOutput(input);
-        if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter); // Removes parameters handled by sweep generator (Prevents duplicate sweep by process sweeper)
+        if(!sweep) { // Removes parameters handled by sweep generator (Prevents duplicate sweep by process sweeper)
+            const Rule& rule = ruleForOutput(input);
+            if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter);
+        }
     }
 
     /// Relevant rule parameters (from operation and argument expressions)
@@ -344,8 +346,7 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
         string parameter = sweeps.keys.first(); // Removes first parameter and loop over it
         array<Variant> sweep = remaining.take(parameter);
 
-        if(!evaluateArguments(target,args).contains(parameter)) return execute(target, remaining, args);
-        assert_(evaluateArguments(target,args).contains(parameter), "Irrelevant sweep parameter", parameter);
+        if(!evaluateArguments(target,args,false,false).contains(parameter)) return execute(target, remaining, args);
         for(Variant& value: sweep) {
             args.at(parameter) = move(value);
             array<shared<Result>> result = execute(target, remaining, args);

@@ -35,7 +35,7 @@ struct Process {
     Rule& ruleForOutput(const string& target);
 
     /// Recursively evaluates relevant arguments for a rule
-    Dict evaluateArguments(const string& target, const Dict& arguments, bool local=false,  const string& scope=""_);
+    Dict evaluateArguments(const string& target, const Dict& arguments, bool local=false, bool sweep=true, const string& scope=""_);
 
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
     int indexOf(const string& target, const Dict& arguments);

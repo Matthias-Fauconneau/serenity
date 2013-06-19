@@ -6,11 +6,11 @@
 
 /// Parses physical resolution from source path
 class(PhysicalResolution, Operation) {
-    string parameters() const override { return "path sliceDownsample"_; }
+    string parameters() const override { return "path downsample"_; }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>&) override {
         string resolutionMetadata = section(args.at("path"_),'-',1,2);
         double resolution = resolutionMetadata ? TextData(resolutionMetadata).decimal()/1000.0 : 1;
-        {string times = args.value("sliceDownsample"_,"0"_); resolution *= pow(2, toInteger(times?:"1"_));}
+        {string times = args.value("downsample"_,"0"_); resolution *= pow(2, toInteger(times?:"1"_));}
         outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = str(resolution)+"\n"_;
     }
@@ -20,7 +20,7 @@ class(PhysicalResolution, Operation) {
 class(Source, Operation), virtual VolumeOperation {
     int3 min, max, sampleCount;
 
-    string parameters() const override { static auto p="path cylinder box sliceDownsample"_; return p; }
+    string parameters() const override { static auto p="path cylinder box downsample"_; return p; }
     uint outputSampleSize(uint) override { return 2; }
     size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint) override {
         int3 sourceSize;
@@ -66,7 +66,7 @@ class(Source, Operation), virtual VolumeOperation {
                 else if(coordinates.size == 3) { int3 size (coordinates[0],coordinates[1],coordinates[2]); min=max/2-size/2, max=max/2+size/2; } // Crops centered box
             } else { int size = TextData(box).integer(); min=max/2-int3(size/2), max=max/2+int3(size/2); } // Crops centered cube
         }
-        if(args.value("sliceDownsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
+        if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
         if((max.x-min.x)%2) { if(max.x%2) max.x--; else assert(min.x%2), min.x++; }
         if((max.y-min.y)%2) { if(max.y%2) max.y--; else assert(min.y%2), min.y++; }
         if((max.z-min.z)%2) { if(max.z%2) max.z--; else assert(min.z%2), min.z++; }
@@ -113,7 +113,7 @@ class(Source, Operation), virtual VolumeOperation {
             for(uint z: range(size.z)) {
                 if(report/1000>=5) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                 uint16* const targetSlice = targetData + (uint64)(marginZ+z)*X*Y + marginY*X + marginX;
-                if(args.value("sliceDownsample"_,"0"_)!="0"_) { // Streaming downsample for larger than RAM volumes
+                if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample for larger than RAM volumes
                     const uint sliceStride = Y*2*X*2;
                     buffer<uint16> sliceBuffer(2*sliceStride);
                     for(uint i: range(2)) {

@@ -164,7 +164,9 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 assert_(resultName==name);
                 string key = result->relevantArguments.at(parameter);
                 if(result->metadata=="scalar"_) data << key << "\t"_ << result->data;
-                else {
+                else if(result->metadata=="sweep.tsv"_ && count(result->data,'\n')==1) { // Single value sweep;
+                    TextData s(result->data); s.until('\t'); data << key << "\t"_ << s.until('\n') << "\n"_; assert_(!s);
+                } else {
                     assert_(!data);
                     assert_(!existsFile(path, cwd) || existsFolder(path, cwd), path);
                     Folder folder (path, cwd, true);

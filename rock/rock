@@ -5,17 +5,17 @@
 # Parse physical resolutions (i.e inverse sample rate)
 #if !path: path = Path path-resolution
 resolution = '1'
-if automaticResolution: resolution = PhysicalResolution # Parses resolution from input folder name as "name-resolution"
+if resolution == 'auto': resolution = PhysicalResolution # Parses resolution from input folder name as "name-resolution"
 resolutions = resolution path # Parses all resolutions (using sweep generator)
 
-# Use largest possible box fitting all inputs ("automaticCrop")
+# Use largest possible box fitting all inputs (box=auto)
 if !box: box = Round input-box # Rounds input-box to nearest integer for Source
  input-box = Div common-box resolution # Converts physical common box to pixels (using current input resolution)
  common-box = CommonSampleSize resolutions # Returns largest possible box fitting all inputs
 
 # Imports volume data from image slices
-if automaticCrop: source = Source box
-if !automaticCrop: source = Source
+if box == 'auto': source = Source box
+if box != 'auto': source = Source
 
 # Denoises
 denoise = 'median'
@@ -118,7 +118,10 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resampled-resolution
  distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resampled-resolution
  porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resampled-resolution
- porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resampled-resolution
+
+# Connected Porosity( cylinderRadius ) sweep (REV)
+ porosity-connected-cylinderRadius = porosity-connected cylinder
+ porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
 
 # Clip 
 # Square roots squared distance
