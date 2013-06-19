@@ -34,21 +34,21 @@ class(Optimize, Operation), virtual Pass {
         TextData s(args.at("constraint"_));
         string op = s.whileAny("><"_);
         double value = s.decimal();
-        NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
+        const NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
         target.metadata = String("scalar"_);
-        double best=nan;
-        for(const pair<double,double>& s: sample) {
+        double best = nan;
+        for(const_pair<double,double> s: sample) {
             bool good=false; // Inside constraints
             /***/ if(op=="<"_) good=s.value<value;
             else if(op==">"_) good=s.value>value;
             else error("Unknown constraint operator", op);
             if(!good) continue;
             bool better=false; // Better than current best
-            double criteriaValue;
-            /***/ if(criteria=="minimum"_) better=s.value<best, criteriaValue=s.value;
-            else if(criteria=="maximum"_) better=s.value>best, criteriaValue=s.value;
-            else if(criteria=="minimumArgument"_) better=s.key<best, criteriaValue=s.key;
-            else if(criteria=="maximumArgument"_) better=s.key>best, criteriaValue=s.key;
+            double criteriaValue = nan;
+            /***/ if(criteria=="minimum"_) { better=s.value<best; criteriaValue=s.value; }
+            else if(criteria=="maximum"_) { better=s.value>best; criteriaValue=s.value; }
+            else if(criteria=="minimumArgument"_) { better=s.key<best; criteriaValue=s.key; }
+            else if(criteria=="maximumArgument"_) { better=s.key>best; criteriaValue=s.key; }
             else error("Unknown criteria", criteria);
             if(better || isNaN(best)) best = criteriaValue;
         }
