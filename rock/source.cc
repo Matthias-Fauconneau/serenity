@@ -24,6 +24,7 @@ class(Source, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return 2; }
     size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint) override {
         int3 sourceSize;
+        assert_(args.contains("path"_), args);
         string path = args.at("path"_);
         if(!existsFolder(path, currentWorkingDirectory())) {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
@@ -58,7 +59,7 @@ class(Source, Operation), virtual VolumeOperation {
         }
         string box;
         if(inputs) box = inputs[0]->data; // input argument (from automatic crop)
-        if(args.contains("box"_)) box = args.at("box"_); // "box" argument overrides input
+        if(args.contains("box"_) && args.at("box"_)!="auto"_) box = args.at("box"_); // "box" argument overrides input
         if(box) {
             if(box.contains(',')) {
                 Vector<int> coordinates = parseVector<int>(box);
@@ -152,6 +153,7 @@ class(CommonSampleSize, Operation), virtual Pass {
         array<vec3> physicalSampleSizes;
         for(auto input: inputs) {
             Dict args = copy(arguments);
+            if(args.contains("path"_)) args.remove("path"_); //Removes sweep argument
             args.insert(String("path"_), input.key);
             Source source; source.outputSize(args, {}, 0);
             physicalSampleSizes << float(input.value)*vec3(source.max);

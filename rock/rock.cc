@@ -129,8 +129,8 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) {
                 assert(target->data.size);
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
-                else if(endsWith(target->metadata,"map"_)) { if(count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data));  } // Map of scalars
-                else if(endsWith(target->metadata,".tsv"_)) { if(count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data)); } // Distribution
+                else if(endsWith(target->metadata,"map"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data));  } // Map of scalars
+                else if(endsWith(target->metadata,".tsv"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data)); } // Distribution
                 else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(!current) current = share(target); } // Displays first displayable volume
                 else error(target->name, target->relevantArguments, target->metadata);
             }

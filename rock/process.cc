@@ -256,7 +256,7 @@ Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments
             if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value);
             else args.insert(arg.key, arg.value);
         }
-        if(!sweep) { // Removes parameters handled by sweep generator (Prevents duplicate sweep by process sweeper)
+        /*if(!sweep)*/ { // Removes parameters handled by sweep generator (Prevents duplicate sweep by process sweeper)
             const Rule& rule = ruleForOutput(input);
             if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter);
         }
@@ -272,7 +272,7 @@ Dict Process::evaluateArguments(const string& target, const Dict& scopeArguments
     for(auto arg: rule.argumentExps) if(arg.value.type==Rule::Expression::Value) parameters += arg.value;
 
     for(auto arg: scopeArguments) if(parameters.contains(arg.key)) {
-        if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value);
+        if(args.contains(arg.key)) args.remove(arg.key); // Removes inherited sweep //assert_(args.at(arg.key)==arg.value, scope+"/"_+target, arg.key, args.at(arg.key), arg.value);
         else args.insert(copy(arg.key), copy(arg.value)); // Filters relevant scope arguments
     }
     for(auto arg: rule.sweeps) { // Explicits sweep as arguments (for cache validation)
@@ -356,7 +356,7 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
             }
         }
     } else { // Actually generates targets when sweeps have been explicited
-        log(">>", target, evaluateArguments(target, arguments));
+        log(">>", target, evaluateArguments(target, arguments, false, false));
         Time time;
         results << getResult(target, arguments);
         if((uint64)time > 100) log("<<", target, time);
@@ -506,11 +506,11 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                args.remove(parameter);
                args.insert(String(parameter), value);
                shared<Result> result = getResult(rule.inputs.first(), args);
-               if(result->metadata=="scalar"_) {
+               if(result->metadata=="scalar"_ || result->metadata=="argument"_) {
                    if(!metadata) metadata = String("sweep.tsv"_);
                    assert(metadata == "sweep.tsv"_);
-                   data << result->relevantArguments.at(parameter) << "\t"_ << result->data;
-               } else error("Non-concatenable sweep result type for"_, rule, rule.sweeps);
+                   data << value << "\t"_ << result->data << (endsWith(result->data,"\n"_)?""_:"\n"_);
+               } else error("Non-concatenable sweep result type for"_, rule, rule.sweeps, result->metadata);
                if(TextData(result->data).decimal() == 0) break;
            }
            outputs[0]->metadata = move(metadata);

@@ -9,12 +9,12 @@ if resolution == 'auto': resolution = PhysicalResolution # Parses resolution fro
 resolutions = resolution path # Parses all resolutions (using sweep generator)
 
 # Use largest possible box fitting all inputs (box=auto)
-if !box: box = Round input-box # Rounds input-box to nearest integer for Source
+if box == 'auto': integer-box = Round input-box # Rounds input-box to nearest integer for Source
  input-box = Div common-box resolution # Converts physical common box to pixels (using current input resolution)
  common-box = CommonSampleSize resolutions # Returns largest possible box fitting all inputs
 
 # Imports volume data from image slices
-if box == 'auto': source = Source box
+if box == 'auto': source = Source integer-box
 if box != 'auto': source = Source
 
 # Denoises

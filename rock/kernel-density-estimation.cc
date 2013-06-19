@@ -25,7 +25,7 @@ UniformSample<double> kernelDensityEstimation(const UniformHistogram& histogram,
 UniformSample<double> kernelDensityEstimation(const NonUniformHistogram& histogram, double h=nan, bool normalize=false) {
     const double N = histogram.sampleCount();
     if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
-    double max = ::max(histogram.keys);
+    double max = ::max(histogram.keys) + 4*h;
     double delta=__FLT_MAX__;
     for(uint i: range(histogram.keys.size-1)) {
         double diff = histogram.keys[i+1]-histogram.keys[i];

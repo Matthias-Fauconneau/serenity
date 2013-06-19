@@ -6,7 +6,7 @@
 #include "math.h"
 
 // Scalar
-inline String toASCII(double scalar) { return ftoa(scalar, 6)+"\n"_; }
+inline String toASCII(double scalar) { return ftoa(scalar, 5)+"\n"_; }
 
 // Vector
 generic struct Vector : buffer<T> {
