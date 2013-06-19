@@ -42,7 +42,7 @@ class(Otsu, Operation) {
         outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = toASCII(densityThreshold);
         output(outputs, 1, "map"_, [&]{
-            return "threshold "_+toASCII(densityThreshold)+"\n"_
+            return "threshold "_+toASCII(densityThreshold)+
                     "threshold16 "_+dec(threshold)+"\n"_
                     "maximum "_+dec(density.size-1)+"\n"_
                     "backgroundCount "_+dec(parameters[0])+"\n"_

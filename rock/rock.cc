@@ -131,7 +131,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 if(target->metadata=="scalar"_) log(target->name, "=", target->data);
                 else if(endsWith(target->metadata,"map"_)) { if(count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data));  } // Map of scalars
                 else if(endsWith(target->metadata,".tsv"_)) { if(count(target->data,'\n')<64) log_(str(target->name, ":\n"_+target->data)); } // Distribution
-                else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(current) current = share(target); } // Displays first displayable volume
+                else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(!current) current = share(target); } // Displays first displayable volume
                 else error(target->name, target->relevantArguments, target->metadata);
             }
         }
@@ -196,7 +196,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) { remove(Folder(argument,cwd)); targetPaths << argument; } // Removes any empty target folder
             else if(!isDefined("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
-                for(const string& file: Folder(argument,cwd).list(Files|Folders)) {
+                if(existsFolder(argument,cwd)) for(const string& file: Folder(argument,cwd).list(Files|Folders)) {
                     assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments, targetsSweeps);
                     assert_(imageFileFormat(Map(file,Folder(argument,cwd))), file, arguments, targetsSweeps);
                 }
