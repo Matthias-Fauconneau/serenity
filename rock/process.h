@@ -3,7 +3,7 @@
 #include "file.h"
 
 /// Defines arguments taking multiple values
-typedef map<string, array<Variant>> Sweeps;
+typedef map<String, array<Variant>> Sweeps;
 
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
 struct Rule {

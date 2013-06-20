@@ -43,14 +43,14 @@ generic struct array : buffer<T> {
     /// \name Append operators
     array& operator<<(T&& e) { uint s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
     array& operator<<(array<T>&& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (&at(s+i)) T(move(a[i])); return *this; }
-    array& operator<<(const T& v) { *this<< copy(v); return *this; }
-    array& operator<<(const ref<T>& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (&at(s+i)) T(copy(a[i])); return *this; }
+    array& operator<<(const T& v) { uint s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }
+    array& operator<<(const ref<T>& a) {uint s=size; reserve(size=s+a.size); for(uint i: range(a.size)) new (&at(s+i)) T(a[i]); return *this; }
     /// \}
 
     /// \name Appends once (if not already contained) operators
     array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
     array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
-    array& operator +=(const T& v) { if(!contains(v)) *this<<copy(v); return *this; }
+    array& operator +=(const T& v) { if(!contains(v)) *this<<v; return *this; }
     array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; }
     /// \}
 
@@ -63,11 +63,11 @@ generic struct array : buffer<T> {
         return at(index);
     }
     /// Inserts a value at \a index
-    T& insertAt(int index, const T& v) { return insertAt(index,copy(v)); }
+    T& insertAt(int index, const T& v) { return insertAt(index,v); }
     /// Inserts immediately before the first element greater than or equal to the argument
     int insertSorted(T&& e) { uint i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
     /// Inserts immediately before the first element greater than or equal to the argument
-    int insertSorted(const T& v) { return insertSorted(copy(v)); }
+    int insertSorted(const T& v) { return insertSorted(v); }
 
     /// Removes one element at \a index
     void removeAt(uint index) { at(index).~T(); for(uint i: range(index, size-1)) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); size--; }
@@ -118,7 +118,7 @@ generic inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r
 
 /// Replaces in \a array every occurence of \a before with \a after
 generic array<T> replace(array<T>&& a, const T& before, const T& after) {
-    for(T& e : a) if(e==before) e=copy(after); return move(a);
+    for(T& e : a) if(e==before) e=after; return move(a);
 }
 
 /// Returns an array of the application of a function to every elements of a reference

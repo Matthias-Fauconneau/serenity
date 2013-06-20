@@ -75,7 +75,7 @@ struct UniformHistogram : UniformSample<int64> {
     /// Returns the mean of the samples represented by the histogram
     double mean() const { return sum()/sampleCount(); }
     /// Returns the variance of the samples represented by the histogram
-    double variance() const { float sampleMean=mean(), ssd=0; for(uint i: range(size)) ssd += at(i)*sq(i-sampleMean); return ssd/sampleCount(); }
+    double variance() const { float sampleMean=mean(), ssd=0; for(uint i: range(size)) ssd += at(i)*sq(i-sampleMean); return ssd/(sampleCount()-1); }
 };
 
 // NonUniformSample

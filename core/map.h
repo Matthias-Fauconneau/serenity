@@ -32,9 +32,9 @@ template<Type K, Type V> struct map {
         return values[i];
     }
 
-    template<Type KK> V value(const KK& key, V&& value) const {
+    template<Type KK, Type VV> VV value(const KK& key, VV&& value) const {
         int i = keys.indexOf(key);
-        return i>=0 ? copy(values[i]) : move(value);
+        return i>=0 ? VV(values[i]) : move(value);
     }
     template<Type KK> const V& value(const KK& key, const V& value=V()) const {
         int i = keys.indexOf(key);
@@ -98,8 +98,8 @@ template<Type K, Type V> struct map {
         pair<K,V> operator* () const { return {*k,*v}; }
         const iterator& operator++ () { k++; v++; return *this; }
     };
-    iterator begin() { return iterator((K*)keys.begin(),(V*)values.begin()); }
-    iterator end() { return iterator((K*)keys.end(),(V*)values.end()); }
+    /*iterator begin() { return iterator((K*)keys.begin(),(V*)values.begin()); }
+    iterator end() { return iterator((K*)keys.end(),(V*)values.end()); }*/
 
     array<K> keys;
     array<V> values;
@@ -113,7 +113,7 @@ template<Type K, Type V> String str(const map<K,V>& m) {
     String s; s<<'{'; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<": "_<<str(m.values[i]); if(i<m.size()-1) s<<", "_; } s<<'}'; return s;
 }
 template<Type K, Type V> String toASCII(const map<K,V>& m) {
-    String s; for(uint i: range(m.size())) { s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
+    String s; for(uint i: range(m.size())) { assert_(m.keys[i]); s<<str(m.keys[i]); if(m.values[i]) s<<':'<<str(m.values[i]); if(i<m.size()-1) s<<'|'; } return replace(move(s),'/','\\');
 }
 
 template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {

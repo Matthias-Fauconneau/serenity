@@ -155,7 +155,7 @@ class(CommonSampleSize, Operation), virtual Pass {
         for(auto input: inputs) {
             Dict args = copy(arguments);
             if(args.contains("path"_)) args.remove("path"_); //Removes sweep argument
-            args.insert(String("path"_), input.key);
+            args.insert(String("path"_), copy(input.key));
             Source source; source.outputSize(args, {}, 0);
             physicalSampleSizes << float(input.value)*vec3(source.max);
         }

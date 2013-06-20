@@ -19,7 +19,10 @@ String Handle::name() const { if(fd==AT_FDCWD) return String("."_); String s(256
 const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
 const Folder& root() { static const Folder root("/"_,currentWorkingDirectory()); return root; }
 Folder::Folder(const string& folder, const Folder& at, bool create):Handle(0){
-    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
+    if(create && !existsFolder(folder,at)) {
+        assert_(isASCII(folder));
+        check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
+    }
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_);
 }
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
@@ -63,7 +66,7 @@ void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
-File::File(const string& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),at.name()+"/"_+path+"'"_, (int)flags)){}
+File::File(const string& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),at.name()+"/"_+path+"'"_, (int)flags)){ assert_(path.size<0x100); }
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 File::size() const { return stat().st_size; }
 int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }
@@ -87,13 +90,16 @@ void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 
 // File system
 void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
-    assert(existsFile(oldName,oldAt), oldName, newName);
-    assert(!existsFile(newName,newAt), oldName, newName);
+    assert_(oldName != newName);
+    assert_(existsFile(oldName,oldAt), oldName, newName);
+    assert_(!existsFile(newName,newAt), oldName, newName);
+    assert_(isUTF8(newName) && isASCII(newName), newName);
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)), oldName, newName);
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { rename(at, oldName, at, newName); }
 void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
-void remove(const Folder& folder) { check_( unlinkat(folder.fd,".",AT_REMOVEDIR), folder.name()); }
+void removeFolder(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
+void remove(const Folder& folder) { int fd=check(openat(folder.fd, strz("."_), O_WRONLY|O_DIRECTORY, 0), folder.name()); check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); close(fd); }
 void symlink(const string& from,const string& to, const Folder& at) {
     assert(from!=to);
     remove(from,at);

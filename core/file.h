@@ -155,6 +155,8 @@ void rename(const string& oldName, const string& newName, const Folder& at=root(
 void remove(const string& name, const Folder& at=root());
 /// Removes folder
 void remove(const Folder& folder);
+/// Removes folder
+void removeFolder(const string& name, const Folder& at=root());
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const string& target,const string& name, const Folder& at=root());
 /// Sets the last modified time for \a path to current time

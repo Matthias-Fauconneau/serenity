@@ -24,6 +24,10 @@ bool endsWith(const string& str, const string& sub);
 /// Returns true if \a str contains the \a substring
 bool find(const string& str, const string& substring);
 
+/// Returns true if a string is a displayable unextended ASCII string
+bool isASCII(const string& s);
+/// Returns true if a string is a valid UTF8 string
+bool isUTF8(const string& s);
 /// Returns true if s contains only [0-9]
 bool isInteger(const string& s);
 /// Parses an integer value

@@ -203,7 +203,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                     assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments, targetsSweeps);
                     assert_(imageFileFormat(Map(file,Folder(argument,cwd))), file, arguments, targetsSweeps);
                 }
-                arguments.insert(String("path"_),argument);
+                arguments.insert(String("path"_), String(argument));
             }
             else if(!argument.contains('=')) targetPaths << argument;
             else error("Invalid argument", argument);

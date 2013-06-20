@@ -115,7 +115,7 @@ histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connecte
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 volume-distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected bandwidth='0.5'
 volume-distribution-radius-connected = KernelDensityEstimation histogram-radius-connected bandwidth='0.5'
-# Normalize probability density on total volume
+# Normalize probability density on total volume (including background (i.e not the same as density normalization))
 distribution-radius-unconnected = Div volume-distribution-radius-unconnected volume-total
 distribution-radius-connected = Div volume-distribution-radius-connected volume-total
 
@@ -125,17 +125,24 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resampled-resolution
  porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resampled-resolution
 
-# Connected Porosity( cylinderRadius ) sweep (REV)
- porosity-connected-cylinderRadius = porosity-connected cylinder
- porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
+# Representative elementary volume estimation
+ # Sweeps cylinderRadius computing connected size distributions and porosity
+  distribution-radius-connected-cylinderRadius = distribution-radius-connected cylinder
+  porosity-connected-cylinderRadius = porosity-connected cylinder
+  porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
 
-# Automatic analysis
- # Computes sequence of relative deviation between neighbouring values (REV sequence should be log uniform for best results)
- porosity-deviation-cylinderRadius = RunningDeviation porosity-connected-cylinderRadius-scaled
- # Returns the minimum cylinderRadius with deviation < 5%
- minimum-cylinderRadius = Optimize porosity-deviation-cylinderRadius criteria='minimumArgument' constraint='<0.05'
+ # Pore size distribution error
+  # Computes relative errors (assuming last distribution is correct)
+  distribution-radius-connected-error = RelativeError distribution-radius-connected-cylinderRadius
 
-# Clip 
+ # Porosity error
+  # Computes relative errors (assuming last value is correct)
+  porosity-error = RelativeError porosity-connected-cylinderRadius-scaled
+  # Smoothes relative errors
+  porosity-error-smooth = RunningAverage porosity-error
+  # Returns the minimum cylinderRadius with error < 5%
+  minimum-cylinderRadius = Optimize porosity-error-smooth criteria='minimumArgument' constraint='<0.05'
+
 # Square roots squared distance
  sqrt-unconnected = SquareRoot pruned-unconnected
  sqrt-connected = SquareRoot pruned-connected

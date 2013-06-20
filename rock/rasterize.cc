@@ -86,7 +86,7 @@ void rasterize(Volume16& target, const Volume& source) {
     uint tileCount = X/tileSide*Y/tileSide*Z/tileSide;
 
     uint16* const targetData = target;
-    interleavedLookup(target);
+    assert_(target.tiled());
     const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
 
     Time time; Time report;
