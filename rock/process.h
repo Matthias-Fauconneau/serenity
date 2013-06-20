@@ -15,11 +15,11 @@ struct Rule {
     Sweeps sweeps; // Process-specified parameter sweeps
 };
 template<> inline String str(const Rule::Expression& e) { return str<Variant>(e); }
-template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs/*,rule.argumentExps?str(rule.argumentExps):""_,rule.sweeps?str(rule.sweeps):""_*/); }
+template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {
-    /// Returns all valid parameters
+    /// Returns all valid parameters (accepted by operations compiled in this binary, used in process definition or for derived class special behavior)
     array<string> parameters();
 
     /// Configures process using given arguments and definition (which can depends on the arguments)
@@ -62,7 +62,8 @@ struct Process {
     array<shared<Result>> results; // Generated intermediate (and target) data
     struct Evaluation {
         String target; Dict input; bool local, sweep; Dict output;
-        Evaluation(const string& target, Dict&& input, bool local, bool sweep, Dict&& output):target(String(target)),input(move(input)),local(local),sweep(sweep), output(move(output)){}
+        Evaluation(const string& target, Dict&& input, bool local, bool sweep, Dict&& output) :
+            target(String(target)),input(move(input)),local(local),sweep(sweep), output(move(output)){}
     };
     array<unique<Evaluation>> cache; // Caches argument evaluation
 };

@@ -4,7 +4,7 @@
 #include "math.h"
 
 array<string> Process::parameters() {
-    array<string> parameters = copy(specialParameters); // Valid parameters accepted by operations compiled in this binary, used in process definition or for derived class special behavior
+    array<string> parameters = copy(specialParameters);
     for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
     return parameters;
 }
@@ -59,7 +59,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
             assert_(outputs, s.until('\n'));
             s.skip();
-            if(outputs.size==1 /*&& parameters.contains(outputs[0]) process parameter might not be defined yet*/ && (s.peek()=='\'' || s.peek()=='{' || s.peek()=='$')) { // Default argument
+            if(outputs.size==1 && (s.peek()=='\'' || s.peek()=='{' || s.peek()=='$')) { // Default argument
                 string key = outputs[0];
                 parameters += key; // May not be defined yet
                 if(s.match('\'')) {
@@ -127,7 +127,6 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                             if(sweeps.contains(key)) { // User overrides local sweep
                                 assert_(sweeps.at(key));
                                 rule.sweeps.insert(String(key), copy(sweeps.at(key)));
-                                //for(uint i: range(targets.size)) if(results[i].contains(rule.inputs[0])) sweepOverrides[i] += key;
                             } else {
                                 if(::find(sweep,".."_)) {
                                     TextData s (sweep);
@@ -215,9 +214,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 bool relevant = false;
                 if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
                 if(relevant) targetSweeps.insert(copy(sweep.key), copy(sweep.value));
-                //else assert_(defaultSweeps.contains(sweep.key), "Irrelevant sweep parameter", sweep.key, "for", targets[i], str(sweep.value,','), sweeps, defaultSweeps);
             }
-            //for(string key: sweepOverrides[i]) targetSweeps.remove(key); // Removes sweep overrides from process sweeps (will be discarded as irrelevant (hopefully)
             targetsSweeps << move(targetSweeps);
         }
         this->parseSpecialArguments(specialArguments);
@@ -247,7 +244,6 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
     Dict scopeArgumentsAndSweeps = copy(scopeArguments);
     for(auto arg: rule.sweeps) {
         assert_(arg.value, arg.key);
-        //if(scopeArgumentsAndSweeps.contains(arg.key)) assert_(scopeArgumentsAndSweeps.at(arg.key)==str(arg.value,','), rule, arg.key, scopeArgumentsAndSweeps.at(arg.key), str(arg.value,','));
         if(scopeArgumentsAndSweeps.contains(arg.key)) {}
         else scopeArgumentsAndSweeps.insert(copy(arg.key), str(arg.value,',')); // Explicits sweep as arguments (for argument validation)
     }
@@ -255,9 +251,11 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
     // Recursively evaluate to invalid cache on argument changes
     for(const string& input: rule.inputs) {
         for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
-            if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target);
+            if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target+"/"_+input);
             else args.insert(copy(arg.key), copy(arg.value));
         }
+    }
+    for(const string& input: rule.inputs) {
         if(!sweep) { // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
             const Rule& rule = ruleForOutput(input);
             if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter);
@@ -274,7 +272,7 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
     for(auto arg: rule.argumentExps) if(arg.value.type==Rule::Expression::Value) parameters += arg.value;
 
     for(auto arg: scopeArgumentsAndSweeps) if(parameters.contains(arg.key)) {
-        if(args.contains(arg.key)) args.remove(arg.key); // Removes inherited sweep //assert_(args.at(arg.key)==arg.value, scope+"/"_+target, arg.key, args.at(arg.key), arg.value);
+        if(args.contains(arg.key)) args.remove(arg.key); // Removes inherited sweep
         args.insert(copy(arg.key), copy(arg.value)); // Filters relevant scope arguments
     }
     for(auto arg: rule.sweeps) { // Explicits sweep as arguments (for cache validation)
@@ -427,7 +425,8 @@ PersistentProcess::~PersistentProcess() {
 
 shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments, const string& scope) {
     const Rule& rule = ruleForOutput(target);
-    if(!&rule && arguments.contains(target)) return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_); // Conversion from argument to result
+    if(!&rule && arguments.contains(target)) // Conversion from argument to result
+        return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_);
     assert_(&rule, target);
 
     const shared<Result>& result = find(target, arguments);
