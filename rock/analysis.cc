@@ -7,13 +7,16 @@
 class(RelativeError, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_));
-        assert_(source.data, source.elements);
-        NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
-        buffer<double> relativeError ( sample.size() );
-        const auto& f = sample.values;
-        for(uint i: range(f.size)) relativeError[i] = abs((f[i]/f.last())-1);
+        if(source.data) { // Scalar
+            assert_(!source.elements);
+            NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
+            double correct = sample.values.last();
+            buffer<double> relativeError ( sample.size() );
+            for(uint i: range(sample.values.size)) relativeError[i] = abs((sample.values[i]/correct)-1);
+            target.metadata = copy(source.metadata);
+            target.data = toASCII( NonUniformSample<double,double>(sample.keys, relativeError) );
+        }
         target.metadata = copy(source.metadata);
-        target.data = toASCII( NonUniformSample<double,double>(sample.keys, relativeError) );
     }
 };
 

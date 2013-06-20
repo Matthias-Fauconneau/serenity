@@ -59,3 +59,14 @@ class(Maximum, Operation), virtual Pass {
         else error(source.metadata);
     }
 };
+
+/// Computes absolute difference
+class(AbsoluteDifference, Operation) {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        assert_(inputs[0]->metadata == inputs[1]->metadata);
+        outputs[0]->metadata = copy(inputs[0]->metadata);
+        auto A = parseMap(inputs[0]->data), B = parseMap(inputs[1]->data);
+        assert_(A.keys == B.keys);
+        outputs[0]->data = toASCII( ScalarMap(A.keys, abs( A.values - B.values ) ) );
+    }
+};

@@ -254,8 +254,8 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
 
     // Recursively evaluate to invalid cache on argument changes
     for(const string& input: rule.inputs) {
-        for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) { //FIXME: memoize
-            if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value);
+        for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
+            if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target);
             else args.insert(copy(arg.key), copy(arg.value));
         }
         if(!sweep) { // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
@@ -400,7 +400,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
         } else { // Folder
             Folder folder (path, storageFolder);
             shared<ResultFile> result(name, folder.modifiedTime(), move(arguments), String(metadata), String(), path, storageFolder);
-            for(const String& path: folder.list(Files)) {
+            for(const String& path: folder.list(Files|Sorted)) {
                 string key = section(path,'.',0,1), metadata=section(path,'.',1,-1);
                 assert_(metadata == result->metadata);
                 File file = File(path, folder, ReadWrite);
@@ -543,7 +543,6 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         if(result->elements) { // Copies each elements data from anonymous memory to files in a folder
             assert_(!result->maps && !result->data);
             assert_(result->elements.size() > 1);
-            log(result->fileName);
             Folder folder(result->fileName, result->folder, true);
             for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
             touchFile(result->fileName, result->folder, true);
@@ -576,3 +575,12 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     }
     return share(find(target, arguments));
 }
+
+/// Returns the last value of a result with multiple elements
+//TODO: builtin index operator
+class(Last, Operation) {
+    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+        outputs[0]->metadata = copy(inputs[0]->metadata);
+        outputs[0]->data = copy(inputs[0]->elements.values.last());
+    }
+};

@@ -9,13 +9,21 @@
 inline String toASCII(double scalar) { return ftoa(scalar, 5)+"\n"_; }
 
 // Vector
-generic struct Vector : buffer<T> {
+
+/*generic struct Vector : buffer<T> {
        using buffer<T>::buffer;
        Vector(buffer<T>&& A):buffer<T>(move(A)){}
-};
+};*/
+generic using Vector = buffer<T>;
 /// Multiplies vector by a scalar
 generic Vector<T> operator*(T scalar, const Vector<T>& A) { uint N=A.size; Vector<T> R(N); for(uint i: range(N)) R[i]=scalar*A[i]; return R; }
+/// Rounds to integer
 inline Vector<int> round(const Vector<double>& A) { uint N=A.size; Vector<int> R(N); for(uint i: range(N)) R[i]=round(A[i]); return R; }
+/// Computes absolute values
+generic Vector<T> abs(const Vector<T>& A) { uint N=A.size; Vector<T> R(N); for(uint i: range(N)) R[i]=abs(A[i]); return R; }
+/// Substracts two vectors
+generic Vector<T> operator-(const Vector<T>& A, const Vector<T>& B) { uint N=A.size; Vector<T> R(N); for(uint i: range(N)) R[i]=A[i]-B[i]; return R; }
+
 /// Parses a vector from comma-separated values
 generic Vector<T> parseVector(const string& file)  {
     TextData s (file);

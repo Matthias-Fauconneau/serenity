@@ -95,7 +95,7 @@ generic String str(const unique<T>& t) { return str(*t.pointer); }
 generic String str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
-String ftoa(double number, int precision=2, int pad=0, bool exponent=false, bool inf=true);
+String ftoa(double number, int precision=2, int pad=0, bool exponent=false, bool inf=false);
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 

@@ -132,8 +132,10 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
   porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
 
  # Pore size distribution error
-  # Computes relative errors (assuming last distribution is correct)
-  distribution-radius-connected-error = RelativeError distribution-radius-connected-cylinderRadius
+  # Assumes last distribution is correct
+  distribution-radius-connected-correct = Last distribution-radius-connected-cylinderRadius #[-1]
+  # Computes relative errors
+  distribution-radius-connected-error = AbsoluteDifference distribution-radius-connected distribution-radius-connected-correct
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)

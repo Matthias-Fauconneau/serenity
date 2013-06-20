@@ -128,12 +128,13 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         // Displays target results
         if(arguments.value("view"_,"0"_)!="0"_) {
             for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) {
-                assert(target->data.size);
-                if(target->metadata=="scalar"_) log_(str(target->name, "=", target->data));
-                else if(endsWith(target->metadata,"map"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data));  } // Map of scalars
-                else if(endsWith(target->metadata,".tsv"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data)); } // Distribution
-                else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(!current) current = share(target); } // Displays first displayable volume
-                else error(target->name, target->relevantArguments, target->metadata);
+                if(target->data) {
+                    if(target->metadata=="scalar"_) log_(str(target->name, "=", target->data));
+                    else if(endsWith(target->metadata,"map"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data));  } // Map of scalars
+                    else if(endsWith(target->metadata,".tsv"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data)); } // Distribution
+                    else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(!current) current = share(target); } // Displays first displayable volume
+                    else error(target->name, target->relevantArguments, target->metadata);
+                } else assert_(target->elements);
             }
         }
         if(current) {
