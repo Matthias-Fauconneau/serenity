@@ -28,7 +28,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             s.skip();
             if(s.match('#')) { s.until('\n'); continue; }
             if(s.match("if"_)) {
-                s.skip();
+                s.whileAny(" \t\r"_);
                 bool enable;
                 string op;
                 string right;
@@ -39,26 +39,26 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 if(sweeps.contains(parameter)) left = str(sweeps.at(parameter),',');
                 else if(arguments.contains(parameter)) left = copy(arguments.at(parameter));
                 if(!left) left=String("1"_);
-                s.skip();
+                s.whileAny(" \t\r"_);
                 if(!op) op = s.whileAny("!="_);
                 if(!op) op = "!="_, right = "0"_;
-                if(!right) { s.skip(); s.skip("'"_); right = s.until('\''); }
+                if(!right) { s.whileAny(" \t\r"_); s.skip("'"_); right = s.until('\''); }
                 assert_(left && right);
                 if(op=="=="_) enable = (left == right);
                 else if(op=="!="_) enable = (left != right);
                 else error("Unknown operator", op);
                 s.skip(":"_);
                 if(!enable) { s.until('\n'); continue; }
-                s.skip();
+                s.whileAny(" \t\r"_);
             }
             array<string> outputs;
-            for(;!s.match('='); s.skip()) {
+            for(;!s.match('='); s.whileAny(" \t\r"_)) {
                 string output = s.word("_-"_);
                 assert_(output, s.until('\n'));
                 outputs << output;
             }
             assert_(outputs, s.until('\n'));
-            s.skip();
+            s.whileAny(" \t\r"_);
             if(outputs.size==1 && (s.peek()=='\'' || s.peek()=='{' || s.peek()=='$')) { // Default argument
                 string key = outputs[0];
                 parameters += key; // May not be defined yet
@@ -118,7 +118,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 s.whileAny(" \t\r"_);
                 for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
                     if(s.match('#')) { s.whileNot('\n'); continue; }
-                    string key = s.word("_-"_);
+                    string key = s.word("_-"_); s.whileAny(" \t\r"_);
                     assert_(key, s.until('\n'), word);
                     if(s.match('=')) { // Explicit argument
                         if(s.match('{')) { // Sweep
@@ -142,14 +142,16 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                             if(s.match('\'')) rule.argumentExps.insert(String(key), Rule::Expression(String(s.until('\''))));
                             else {
                                 string word = s.word("-_"_);
-                                assert_(word, "Unquoted literal", s.whileNo(" \t\r\n"_));
+                                assert_(word, "Unquoted literal", "'"_+s.slice(0,s.index)+"'"_);
                                 parameters += word;
                                 rule.argumentExps.insert(String(key), Rule::Expression(String(word), Rule::Expression::Value));
                             }
                         }
                     }
-                    else if(resultNames.contains(key)) rule.inputs << key; // Result input
-                    else {
+                    else if(resultNames.contains(key)) {
+                        rule.inputs << key; // Result input
+                        if(s.match("[]"_)) { assert_(outputs.size==1); assert_(rule.inputs.size==1); assert_(!rule.arrayOperation); rule.arrayOperation = true; }
+                    } else {
                         if(rule.operation) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) rule.sweeps.insert(String(key), copy(sweeps.at(key))); // Sweep value
                         else if(arguments.contains(key)) rule.sweeps.insert(String(key), move(array<Variant>()<<copy(arguments.at(key)))); // Single sweep value
@@ -500,7 +502,20 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     if(operation) {
         relevantArguments = &evaluateArguments(target, arguments);
         //log(scope+"/"_+target);
-        operation->execute(evaluateArguments(target, arguments, true), cast<Result*>(outputs), cast<Result*>(inputs));
+        if(rule.arrayOperation) { // Operation with elements inputs are run on each element
+            assert_(inputs.size==1 && inputs[0]->elements && !inputs[0]->data && outputs.size==1 && !outputs[0]->data);
+            for(auto e: inputs[0]->elements) {
+                Result input(inputs[0]->name, inputs[0]->timestamp, copy(inputs[0]->relevantArguments), copy(inputs[0]->metadata), copy(e.value));
+                Result output(outputs[0]->name, 0, {}, {}, {});
+                operation->execute(evaluateArguments(target, arguments, true), {&output}, {&input});
+                if(!outputs[0]->metadata) outputs[0]->metadata = copy(output.metadata);
+                assert_(outputs[0]->metadata == output.metadata);
+                assert_(output.data, target, rule.operation);
+                outputs[0]->elements.insert(copy(e.key), move(output.data));
+            }
+        } else {
+            operation->execute(evaluateArguments(target, arguments, true), cast<Result*>(outputs), cast<Result*>(inputs));
+        }
     } else { // Sweep generator
            assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
            assert_(rule.inputs.size == 1 && outputs.size==1, "FIXME: Only single target sweeps can be generated");

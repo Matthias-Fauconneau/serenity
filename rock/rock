@@ -120,6 +120,8 @@ distribution-radius-unconnected = Div volume-distribution-radius-unconnected vol
 distribution-radius-connected = Div volume-distribution-radius-connected volume-total
 
 # Scales radius (e.g to original pixel or physical resolution)
+ histogram-radius-unconnected-scaled = ScaleVariable histogram-radius-unconnected resampled-resolution
+ histogram-radius-connected-scaled = ScaleVariable histogram-radius-connected resampled-resolution
  distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resampled-resolution
  distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resampled-resolution
  porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resampled-resolution
@@ -132,18 +134,18 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
   porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
 
  # Pore size distribution error
-  # Assumes last distribution is correct
-  distribution-radius-connected-correct = Last distribution-radius-connected-cylinderRadius #[-1]
-  # Computes relative errors
-  distribution-radius-connected-error = AbsoluteDifference distribution-radius-connected distribution-radius-connected-correct
+  distribution-radius-connected-error = Error distribution-radius-connected-cylinderRadius #TODO: slice and index operators -> abs(psd[0..-2] - psd[-1])
+  distribution-radius-connected-error-sum = Sum distribution-radius-connected-error[]
+  # Returns the minimum cylinderRadius with distribution error < 5%
+  minimum-cylinderRadius-distribution = Optimize distribution-radius-connected-error-sum criteria='minimumArgument' constraint='<0.05'
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)
   porosity-error = RelativeError porosity-connected-cylinderRadius-scaled
   # Smoothes relative errors
   porosity-error-smooth = RunningAverage porosity-error
-  # Returns the minimum cylinderRadius with error < 5%
-  minimum-cylinderRadius = Optimize porosity-error-smooth criteria='minimumArgument' constraint='<0.05'
+  # Returns the minimum cylinderRadius with porosity error < 5%
+  minimum-cylinderRadius-porosity = Optimize porosity-error-smooth criteria='minimumArgument' constraint='<0.05'
 
 # Square roots squared distance
  sqrt-unconnected = SquareRoot pruned-unconnected
@@ -154,12 +156,12 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  sqrt-connected-scaled = ScaleValues sqrt-connected resampled-resolution
 
 # Exports to CDL
- cdl-unconnected = ToCDL sqrt-unconnected
- cdl-connected = ToCDL sqrt-connected
+ cdl-unconnected = ToCDL sqrt-unconnected-scaled
+ cdl-connected = ToCDL sqrt-connected-scaled
 
 # Exports to ASCII
- ascii-unconnected = ToASCII sqrt-unconnected
- ascii-connected = ToASCII sqrt-connected
+ ascii-unconnected = ToASCII sqrt-unconnected-scaled
+ ascii-connected = ToASCII sqrt-connected-scaled
 
 # Exports to PNG
  png-source = ToPNG source

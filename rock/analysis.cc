@@ -20,6 +20,27 @@ class(RelativeError, Operation), virtual Pass {
     }
 };
 
+class(Error, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        assert_(endsWith(source.metadata,".tsv"_));
+        if(source.elements) { // Sample
+            assert_(!source.data && source.elements.size()>1);
+            string reference = source.elements.keys.last();
+            NonUniformSample<double,double> correct = parseNonUniformSample<double,double>(source.elements.values.last());
+            for(auto element: source.elements) {
+                if(element.key == reference) continue;
+                NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(element.value);
+                assert_(sample.size()<=correct.size(), sample.size(), correct.size(), source.elements.keys);
+                buffer<double> error ( correct.size() );
+                const auto& f = sample.values;
+                for(uint i: range(error.size)) error[i] = abs((i<f.size?f[i]:0)-correct.values[i]);
+                target.elements.insert(copy(element.key), toASCII( NonUniformSample<double,double>(correct.keys, error) ));
+            }
+        }
+        target.metadata = copy(source.metadata);
+    }
+};
+
 /// Computes running average (i.e convolution with a box kernel)
 class(RunningAverage, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {

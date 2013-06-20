@@ -5,7 +5,7 @@
 class(Sum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = String("scalar"_);
-        target.data = str(parseUniformSample<double>(source.data).sum())+"\n"_;
+        target.data = toASCII( parseNonUniformSample<double,double>(source.data).sum() );
     }
 };
 
@@ -60,7 +60,7 @@ class(Maximum, Operation), virtual Pass {
     }
 };
 
-/// Computes absolute difference
+/*/// Computes absolute difference
 class(AbsoluteDifference, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == inputs[1]->metadata);
@@ -69,4 +69,4 @@ class(AbsoluteDifference, Operation) {
         assert_(A.keys == B.keys);
         outputs[0]->data = toASCII( ScalarMap(A.keys, abs( A.values - B.values ) ) );
     }
-};
+};*/

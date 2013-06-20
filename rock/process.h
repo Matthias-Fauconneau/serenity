@@ -13,9 +13,10 @@ struct Rule {
     struct Expression : Variant { enum EType { Literal, Value } type=Value; Expression(Variant&& value=Variant(), EType type=Literal):Variant(move(value)),type(type){} };
     map<String, Expression> argumentExps;
     Sweeps sweeps; // Process-specified parameter sweeps
+    bool arrayOperation = false; // Run operation on each element of an input array
 };
 template<> inline String str(const Rule::Expression& e) { return str<Variant>(e); }
-template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs); }
+template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs)+(rule.arrayOperation?"[]"_:""_); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {

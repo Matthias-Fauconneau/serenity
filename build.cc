@@ -97,7 +97,7 @@ struct Build {
             if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
                 static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -march=native -o"_);
                 array<String> args;
-                args << object << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
+                args << copy(object) << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
                 if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DNO_INLINE"_) << String("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << String("-g"_) << String("-Ofast"_);
                 else if(::find(build,"release"_)) args <<  String("-Ofast"_);
@@ -136,9 +136,9 @@ struct Build {
             String name = target+"."_+build;
             String binary = tmp+build+"/"_+name;
             if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime() || fileChanged) {
-                array<String> args; args<<String("-o"_)<<binary;
+                array<String> args; args<<String("-o"_)<<copy(binary);
                 args << apply<String>(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
-                args << files;
+                args << copy(files);
                 args << String("-L/ptmp/lib"_) << apply<String>(libraries, [this](const String& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
                 if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) fail();
