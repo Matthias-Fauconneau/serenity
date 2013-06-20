@@ -67,7 +67,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
-        if(targetPaths.size>targets.size) error("Expected less names, skipped names"_, targetPaths.slice(targets.size),
+        if(targetPaths.size>targets.size) error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
                                                   "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
         if(targets.size>targetPaths.size && !arguments.contains("view"_)) error("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
 #ifndef BUILD

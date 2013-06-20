@@ -150,7 +150,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     }
                     else if(resultNames.contains(key)) {
                         rule.inputs << key; // Result input
-                        if(s.match("[]"_)) { assert_(outputs.size==1); assert_(rule.inputs.size==1); assert_(!rule.arrayOperation); rule.arrayOperation = true; }
+                        if(s.match("[]"_)) { error("Disabled"_); assert_(outputs.size==1); assert_(rule.inputs.size==1); assert_(!rule.arrayOperation); rule.arrayOperation = true; }
                     } else {
                         if(rule.operation) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) rule.sweeps.insert(String(key), copy(sweeps.at(key))); // Sweep value

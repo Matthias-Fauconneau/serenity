@@ -119,7 +119,7 @@ class(Source, Operation), virtual VolumeOperation {
                     const uint sliceStride = Y*2*X*2;
                     buffer<uint16> sliceBuffer(2*sliceStride);
                     for(uint i: range(2)) {
-                        Map file(slices[min.z+z*2+i],folder);
+                        Map file(slices[(min.z+z)*2+i],folder);
                         Tiff16 tiff(file); assert_(tiff);
                         tiff.read(sliceBuffer.begin()+i*sliceStride, min.x*2, min.y*2, size.x*2, size.y*2, X*2);
                     }

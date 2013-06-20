@@ -11,16 +11,32 @@ class(RelativeError, Operation), virtual Pass {
             assert_(!source.elements);
             NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
             double correct = sample.values.last();
-            buffer<double> relativeError ( sample.size() );
+            buffer<double> relativeError ( sample.size()-1 );
             for(uint i: range(sample.values.size)) relativeError[i] = abs((sample.values[i]/correct)-1);
             target.metadata = copy(source.metadata);
-            target.data = toASCII( NonUniformSample<double,double>(sample.keys, relativeError) );
+            target.data = toASCII( NonUniformSample<double,double>(sample.keys.slice(0, sample.size()-1), relativeError) );
+        }
+        if(source.elements) { // Sample
+            assert_(!source.data && source.elements.size()>1);
+            string reference = source.elements.keys.last();
+            NonUniformSample<double,double> correct = parseNonUniformSample<double,double>(source.elements.values.last());
+            NonUniformSample<double,double> errors;
+            for(auto element: source.elements) {
+                if(element.key == reference) continue;
+                NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(element.value);
+                assert_(sample.size()<=correct.size(), sample.size(), correct.size(), source.elements.keys);
+                UniformSample<double> error ( correct.size() );
+                const auto& f = sample.values;
+                for(uint i: range(error.size)) error[i] = abs((i<f.size?f[i]:0)-correct.values[i]);
+                errors.insert(toDecimal(element.key), error.sum() / correct.sum() );
+            }
+            target.data = toASCII( errors );
         }
         target.metadata = copy(source.metadata);
     }
 };
 
-class(Error, Operation), virtual Pass {
+/*class(Error, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_));
         if(source.elements) { // Sample
@@ -39,7 +55,7 @@ class(Error, Operation), virtual Pass {
         }
         target.metadata = copy(source.metadata);
     }
-};
+};*/
 
 /// Computes running average (i.e convolution with a box kernel)
 class(RunningAverage, Operation), virtual Pass {

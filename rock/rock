@@ -134,10 +134,10 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
   porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
 
  # Pore size distribution error
-  distribution-radius-connected-error = Error distribution-radius-connected-cylinderRadius #TODO: slice and index operators -> abs(psd[0..-2] - psd[-1])
-  distribution-radius-connected-error-sum = Sum distribution-radius-connected-error[]
+  distribution-radius-error = RelativeError distribution-radius-connected-cylinderRadius
+  distribution-radius-error-scaled = ScaleVariable distribution-radius-error resampled-resolution
   # Returns the minimum cylinderRadius with distribution error < 5%
-  minimum-cylinderRadius-distribution = Optimize distribution-radius-connected-error-sum criteria='minimumArgument' constraint='<0.05'
+  minimum-cylinderRadius-distribution = Optimize distribution-radius-error criteria='minimumArgument' constraint='<0.5'
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)

@@ -16,13 +16,16 @@ defineVolumePass(SquareRoot, float, squareRoot);
 
 /// Scales all values
 void scaleValues(VolumeFloat& target, const VolumeFloat& source, const float scale) {
-    assert_(source.squared && source.floatingPoint);
+    assert_(source.floatingPoint);
     target.maximum = ceil(scale*source.maximum), target.squared=false;
     const float* const sourceData = source; float* const targetData = target;
     for(uint index: range(source.size())) targetData[index] = scale*sourceData[index];
 }
-class(ScaleValues, Operation), virtual VolumePass<float> {
-    void execute(const Dict& args, VolumeT<float>& target, const Volume& source) override { scaleValues(target, source, args.at("scale"_)); }
+class(ScaleValues, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(float); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        scaleValues(outputs[0], inputs[0], TextData(otherInputs[0]->data).decimal());
+    }
 };
 
 /// Exports volume to normalized 8bit PNGs for visualization
