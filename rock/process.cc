@@ -442,9 +442,9 @@ PersistentProcess::~PersistentProcess() {
 
 shared<Result> PersistentProcess::getResult(const string& target, const Dict& scopeArguments, const string& scope) {
     const Rule& rule = ruleForOutput(target);
-    if(!&rule && arguments.contains(target)) // Conversion from argument to result
-        return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_);
-    assert_(&rule, target);
+    if(!&rule && scopeArguments.contains(target)) // Conversion from argument to result
+        return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(scopeArguments.at(target)), ""_, ""_);
+    assert_(&rule, "Unknown rule", target, "(or failed argument or sweep conversion");
 
     Dict arguments = copy(scopeArguments);
     for(auto arg: rule.argumentExps) if(arg.value.type == Rule::Expression::Literal) {
